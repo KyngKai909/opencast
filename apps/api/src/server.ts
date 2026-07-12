@@ -25,8 +25,9 @@ import type {
 } from "@openchannel/shared";
 import {
   API_PORT,
-  DELETE_LOCAL_AFTER_IPFS,
+  DELETE_LOCAL_AFTER_R2,
   HLS_ROOT,
+  IPFS_ARCHIVE_DEFAULT,
   KEEP_ORIGINAL_UPLOADS,
   LIVEPEER_DEFAULT_ENABLED,
   MAX_COMPRESSION_INPUT_BYTES,
@@ -37,6 +38,7 @@ import {
 } from "./config.js";
 import { getChannel, getChannelAssets, getOrCreatePlayoutState, readDb, transaction } from "./db.js";
 import { hasPinataJwt, uploadFileToIpfs } from "./ipfs.js";
+import { assetObjectKey, isR2Configured, uploadFileToR2 } from "./r2.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "./livepeer.js";
 import {
   compressForStreaming,
@@ -257,6 +259,127 @@ async function removeLocalFiles(paths: Array<string | undefined>): Promise<void>
   for (const filePath of unique) {
     await fs.unlink(filePath).catch(() => undefined);
   }
+}
+
+function parseBoolFlag(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") {
+    return true;
+  }
+  if (normalized === "false" || normalized === "0" || normalized === "no") {
+    return false;
+  }
+  return undefined;
+}
+
+type AssetStorageFields = Pick<
+  Asset,
+  "storageProvider" | "localPath" | "originalLocalPath" | "r2Key" | "r2Url" | "ipfsCid" | "ipfsUrl" | "archivedToIpfs"
+>;
+
+interface FinalizeStorageInput {
+  /** Storage scope used to namespace the R2 object key (channel id or library scope). */
+  scopeId: string;
+  assetId: string;
+  title: string;
+  /** Local, stream-ready file produced by compression (or the raw upload). */
+  streamReadyPath: string;
+  /** Raw upload file, if still on disk. */
+  uploadedPath?: string;
+  /** Original upload kept when KEEP_ORIGINAL_UPLOADS is on. */
+  originalLocalPath?: string;
+  /** Per-request opt-in to also pin a permanent archival copy to IPFS. */
+  archiveToIpfs?: boolean;
+}
+
+interface FinalizeStorageResult {
+  fields: AssetStorageFields;
+  warnings: string[];
+}
+
+/**
+ * Resolve where a freshly-processed asset lives.
+ *
+ * HOT PATH: Cloudflare R2 (zero egress) is the default playout source. When R2
+ * isn't configured — or has no stable public base — we gracefully fall back to
+ * local disk (dev convenience / hybrid fallback). IPFS is an OPTIONAL archival
+ * pin that never touches the live read path: it runs from the local file before
+ * any deletion and only sets ipfs* fields, never localPath/storageProvider.
+ */
+async function finalizeAssetStorage(input: FinalizeStorageInput): Promise<FinalizeStorageResult> {
+  const { scopeId, assetId, title, streamReadyPath, uploadedPath, originalLocalPath } = input;
+  const warnings: string[] = [];
+
+  const fields: AssetStorageFields = {
+    storageProvider: "local",
+    localPath: streamReadyPath,
+    originalLocalPath,
+    archivedToIpfs: false
+  };
+
+  // --- HOT PATH: R2 object storage -----------------------------------------
+  let servingFromR2 = false;
+  const wantsR2 = UPLOAD_STORAGE_MODE === "r2" || UPLOAD_STORAGE_MODE === "hybrid";
+  if (wantsR2 && isR2Configured()) {
+    try {
+      const key = assetObjectKey(scopeId, assetId, streamReadyPath);
+      const result = await uploadFileToR2(streamReadyPath, key);
+      fields.r2Key = result.key;
+      if (result.url) {
+        // Stable public URL → serve live playout from R2 (the intended hot path).
+        fields.storageProvider = "r2";
+        fields.localPath = result.url;
+        fields.r2Url = result.url;
+        servingFromR2 = true;
+      } else {
+        // Object is safely in R2 as a durable backup, but there is no stable URL
+        // to read it from, so playout keeps reading local disk.
+        warnings.push(
+          "R2_PUBLIC_BASE is not set: object stored in R2 as a backup, but live playout reads from local disk. Set R2_PUBLIC_BASE (custom domain or r2.dev) for the zero-egress hot path."
+        );
+      }
+    } catch (error) {
+      // Graceful fallback to local — never fail a creator upload on R2 hiccups.
+      warnings.push(
+        `R2 upload failed; serving from local disk instead. ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  // --- OPTIONAL: IPFS archival pin (off the live path) ---------------------
+  const wantsArchive = input.archiveToIpfs ?? IPFS_ARCHIVE_DEFAULT;
+  if (wantsArchive) {
+    if (hasPinataJwt()) {
+      try {
+        const pin = await uploadFileToIpfs(streamReadyPath, title);
+        fields.ipfsCid = pin.cid;
+        fields.ipfsUrl = pin.url;
+        fields.archivedToIpfs = true;
+      } catch (error) {
+        warnings.push(
+          `IPFS archival pin failed (asset still served from ${fields.storageProvider}). ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    } else {
+      warnings.push("IPFS archival requested but PINATA_JWT is not configured; archival skipped.");
+    }
+  }
+
+  // --- Cleanup: only after R2 + archival are done reading the local file ----
+  if (servingFromR2 && DELETE_LOCAL_AFTER_R2) {
+    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
+    fields.originalLocalPath = undefined;
+  }
+
+  return { fields, warnings };
 }
 
 function normalizeBackgroundUploadPath(value: unknown): string | undefined {
@@ -741,31 +864,27 @@ async function runExternalIngestJob(jobId: string): Promise<void> {
         });
 
         const [durationSec, mediaKind] = await Promise.all([probeDurationSec(localPath), probeMediaKind(localPath)]);
-        let ipfsCid: string | undefined;
-        let ipfsUrl: string | undefined;
-        let storageProvider: "local" | "ipfs" = "local";
-        let ipfsWarning: string | undefined;
+        const ingestTitle = nextItem.title?.trim() || `Imported ${assetId.slice(0, 8)}`;
 
-        if (hasPinataJwt()) {
-          await transaction((db) => {
-            const job = db.externalIngestJobs.find((entry) => entry.id === jobId);
-            if (!job) {
-              return;
-            }
-            updateExternalIngestItem(job, nextItem.id, "uploading_ipfs", 84);
-            updateExternalIngestProgress(job);
-            job.updatedAt = nowIso();
-          });
-
-          try {
-            const pin = await uploadFileToIpfs(localPath, nextItem.title ?? `Imported ${assetId.slice(0, 8)}`);
-            ipfsCid = pin.cid;
-            ipfsUrl = pin.url;
-            storageProvider = "ipfs";
-          } catch (error) {
-            ipfsWarning = error instanceof Error ? error.message : "IPFS upload failed.";
+        await transaction((db) => {
+          const job = db.externalIngestJobs.find((entry) => entry.id === jobId);
+          if (!job) {
+            return;
           }
-        }
+          // Route ingested media to the R2 hot path (never IPFS on the live path);
+          // IPFS pinning here is archival-only, controlled by IPFS_ARCHIVE_DEFAULT.
+          updateExternalIngestItem(job, nextItem.id, "processing", 84);
+          updateExternalIngestProgress(job);
+          job.updatedAt = nowIso();
+        });
+
+        const storage = await finalizeAssetStorage({
+          scopeId: toStorageScopeId(channelId),
+          assetId,
+          title: ingestTitle,
+          streamReadyPath: localPath
+        });
+        const ipfsWarning = storage.warnings.length ? storage.warnings.join(" ") : undefined;
 
         await transaction((db) => {
           const job = db.externalIngestJobs.find((entry) => entry.id === jobId);
@@ -773,18 +892,14 @@ async function runExternalIngestJob(jobId: string): Promise<void> {
             return;
           }
 
-          const title = nextItem.title?.trim() || `Imported ${assetId.slice(0, 8)}`;
           const insertionCategory = normalizeInsertionCategory(undefined, job.type);
           const asset: Asset = {
             id: assetId,
             channelId: job.channelId,
-            title,
+            title: ingestTitle,
             sourceType: "external",
             sourceUrl: nextItem.sourceUrl,
-            localPath,
-            storageProvider,
-            ipfsCid,
-            ipfsUrl,
+            ...storage.fields,
             durationSec,
             type: job.type,
             insertionCategory,
@@ -1533,39 +1648,15 @@ app.post("/api/library/assets/upload", upload.single("file"), async (req, res) =
   const type = normalizeAssetType(req.body?.type);
   const insertionCategory = normalizeInsertionCategory(req.body?.insertionCategory, type);
 
-  const pinataConfigured = hasPinataJwt();
-  if (UPLOAD_STORAGE_MODE === "ipfs" && !pinataConfigured) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    return sendError(res, 503, "IPFS-only storage mode requires PINATA_JWT to be configured.");
-  }
-
-  let ipfsCid: string | undefined;
-  let ipfsUrl: string | undefined;
-  let ipfsWarning: string | undefined;
-  if (pinataConfigured && UPLOAD_STORAGE_MODE !== "local") {
-    try {
-      const pin = await uploadFileToIpfs(streamReadyPath, title);
-      ipfsCid = pin.cid;
-      ipfsUrl = pin.url;
-    } catch (error) {
-      ipfsWarning = error instanceof Error ? error.message : "IPFS upload failed.";
-    }
-  } else if (UPLOAD_STORAGE_MODE !== "local" && !pinataConfigured) {
-    ipfsWarning = "PINATA_JWT is not configured; falling back to local storage.";
-  }
-
-  if (UPLOAD_STORAGE_MODE === "ipfs" && !ipfsUrl) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    return sendError(res, 502, `IPFS pinning failed in ipfs mode. ${ipfsWarning ?? "Unknown pinning error."}`);
-  }
-
-  if (ipfsUrl && DELETE_LOCAL_AFTER_IPFS) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    originalLocalPath = undefined;
-  }
-
-  const storageProvider: "local" | "ipfs" = ipfsUrl ? "ipfs" : "local";
-  const playbackSourcePath = ipfsUrl ?? streamReadyPath;
+  const storage = await finalizeAssetStorage({
+    scopeId: toStorageScopeId(libraryScopeId),
+    assetId,
+    title,
+    streamReadyPath,
+    uploadedPath,
+    originalLocalPath,
+    archiveToIpfs: parseBoolFlag(req.body?.archiveToIpfs)
+  });
 
   const payload = await transaction((editable) => {
     const asset: Asset = {
@@ -1573,11 +1664,7 @@ app.post("/api/library/assets/upload", upload.single("file"), async (req, res) =
       channelId: libraryScopeId,
       title,
       sourceType: "upload",
-      localPath: playbackSourcePath,
-      originalLocalPath,
-      storageProvider,
-      ipfsCid,
-      ipfsUrl,
+      ...storage.fields,
       compression,
       durationSec,
       type,
@@ -1586,7 +1673,7 @@ app.post("/api/library/assets/upload", upload.single("file"), async (req, res) =
       createdAt: nowIso()
     };
     editable.assets.push(asset);
-    return { asset, ipfsWarning, compressionWarning };
+    return { asset, storageWarnings: storage.warnings, compressionWarning };
   });
 
   res.status(201).json(payload);
@@ -1656,39 +1743,15 @@ app.post("/api/channels/:channelId/assets/upload", upload.single("file"), async 
   if (folderId && !db.assetFolders.some((folder) => folder.id === folderId && folder.channelId === channel.id)) {
     return sendError(res, 400, "folderId does not belong to this channel.");
   }
-  const pinataConfigured = hasPinataJwt();
-  if (UPLOAD_STORAGE_MODE === "ipfs" && !pinataConfigured) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    return sendError(res, 503, "IPFS-only storage mode requires PINATA_JWT to be configured.");
-  }
-
-  let ipfsCid: string | undefined;
-  let ipfsUrl: string | undefined;
-  let ipfsWarning: string | undefined;
-  if (pinataConfigured && UPLOAD_STORAGE_MODE !== "local") {
-    try {
-      const pin = await uploadFileToIpfs(streamReadyPath, title);
-      ipfsCid = pin.cid;
-      ipfsUrl = pin.url;
-    } catch (error) {
-      ipfsWarning = error instanceof Error ? error.message : "IPFS upload failed.";
-    }
-  } else if (UPLOAD_STORAGE_MODE !== "local" && !pinataConfigured) {
-    ipfsWarning = "PINATA_JWT is not configured; falling back to local storage.";
-  }
-
-  if (UPLOAD_STORAGE_MODE === "ipfs" && !ipfsUrl) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    return sendError(res, 502, `IPFS pinning failed in ipfs mode. ${ipfsWarning ?? "Unknown pinning error."}`);
-  }
-
-  if (ipfsUrl && DELETE_LOCAL_AFTER_IPFS) {
-    await removeLocalFiles([streamReadyPath, uploadedPath, originalLocalPath]);
-    originalLocalPath = undefined;
-  }
-
-  const storageProvider: "local" | "ipfs" = ipfsUrl ? "ipfs" : "local";
-  const playbackSourcePath = ipfsUrl ?? streamReadyPath;
+  const storage = await finalizeAssetStorage({
+    scopeId: toStorageScopeId(channel.id),
+    assetId,
+    title,
+    streamReadyPath,
+    uploadedPath,
+    originalLocalPath,
+    archiveToIpfs: parseBoolFlag(req.body?.archiveToIpfs)
+  });
 
   const payload = await transaction((editable) => {
     const asset: Asset = {
@@ -1696,12 +1759,8 @@ app.post("/api/channels/:channelId/assets/upload", upload.single("file"), async 
       channelId: channel.id,
       title,
       sourceType: "upload",
-      localPath: playbackSourcePath,
-      originalLocalPath,
       folderId,
-      storageProvider,
-      ipfsCid,
-      ipfsUrl,
+      ...storage.fields,
       compression,
       durationSec,
       type,
@@ -1711,7 +1770,7 @@ app.post("/api/channels/:channelId/assets/upload", upload.single("file"), async 
     };
 
     editable.assets.push(asset);
-    return { asset, ipfsWarning, compressionWarning };
+    return { asset, storageWarnings: storage.warnings, compressionWarning };
   });
 
   res.status(201).json(payload);
