@@ -32,9 +32,24 @@ export interface Asset {
   localPath: string;
   originalLocalPath?: string;
   folderId?: string;
-  storageProvider?: "local" | "ipfs";
+  /**
+   * Where the live playout read path resolves this asset from.
+   * - "r2": Cloudflare R2 object storage (default hot path, zero egress).
+   * - "local": local disk (dev-convenience fallback when no R2 creds).
+   * - "ipfs": legacy IPFS-primary assets (pre-R2). New uploads never serve
+   *   from IPFS; IPFS is archival-only. See {@link Asset.ipfsUrl}.
+   */
+  storageProvider?: "local" | "r2" | "ipfs";
+  /** Object key in the R2 bucket, when storageProvider === "r2". */
+  r2Key?: string;
+  /** Publicly resolvable playout URL for the R2 object (never an IPFS gateway). */
+  r2Url?: string;
+  /** IPFS CID of the optional, non-blocking archival pin (never the playout source). */
   ipfsCid?: string;
+  /** IPFS gateway URL of the archival copy. Archival only — never used for live playout. */
   ipfsUrl?: string;
+  /** True when a permanent archival copy has been pinned to IPFS alongside the hot copy. */
+  archivedToIpfs?: boolean;
   compression?: AssetCompression;
   durationSec?: number;
   type: AssetType;
