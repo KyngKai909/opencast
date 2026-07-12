@@ -1006,39 +1006,6 @@ export default function StationManagerPage() {
 
       <section className="railBlock">
         <div className="railBlock__head">
-          <h3>Sections</h3>
-          <p>Switch station workflows.</p>
-        </div>
-        <div className="railNav">
-          <button type="button" data-active={tab === "monitor"} onClick={() => setTab("monitor")}>
-            <span className="uiInline">
-              <AppIcon name="monitor" />
-              Monitor
-            </span>
-          </button>
-          <button type="button" data-active={tab === "playlist"} onClick={() => setTab("playlist")}>
-            <span className="uiInline">
-              <AppIcon name="list" />
-              Playlist
-            </span>
-          </button>
-          <button type="button" data-active={tab === "runtime"} onClick={() => setTab("runtime")}>
-            <span className="uiInline">
-              <AppIcon name="clock" />
-              Runtime
-            </span>
-          </button>
-          <button type="button" data-active={tab === "ads"} onClick={() => setTab("ads")}>
-            <span className="uiInline">
-              <AppIcon name="megaphone" />
-              Ads
-            </span>
-          </button>
-        </div>
-      </section>
-
-      <section className="railBlock">
-        <div className="railBlock__head">
           <h3>Output Endpoint</h3>
           <p className="wrapAnywhere">{streamUrl || "No stream URL yet"}</p>
         </div>
@@ -1115,6 +1082,33 @@ export default function StationManagerPage() {
             </button>
           </div>
           </header>
+
+          <nav className="managerTabs" aria-label="Station Workspace Tabs">
+            <button type="button" data-active={tab === "monitor"} onClick={() => setTab("monitor")}>
+              <span className="uiInline">
+                <AppIcon name="monitor" />
+                Monitor
+              </span>
+            </button>
+            <button type="button" data-active={tab === "playlist"} onClick={() => setTab("playlist")}>
+              <span className="uiInline">
+                <AppIcon name="list" />
+                Playlist
+              </span>
+            </button>
+            <button type="button" data-active={tab === "runtime"} onClick={() => setTab("runtime")}>
+              <span className="uiInline">
+                <AppIcon name="clock" />
+                Runtime
+              </span>
+            </button>
+            <button type="button" data-active={tab === "ads"} onClick={() => setTab("ads")}>
+              <span className="uiInline">
+                <AppIcon name="megaphone" />
+                Ads
+              </span>
+            </button>
+          </nav>
 
           <section className="workspaceContent managerConsoleContent">
             {loading || !detail ? (

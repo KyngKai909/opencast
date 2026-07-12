@@ -2222,7 +2222,7 @@ a.uiButton {
 }
 
 .managerConsoleContent {
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .managerRail {
