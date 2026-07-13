@@ -193,7 +193,7 @@ export async function uploadAsset(
     insertionCategory?: AssetInsertionCategory;
     onProgress?: (progress: UploadProgress) => void;
   }
-): Promise<{ asset: Asset; ipfsWarning?: string; compressionWarning?: string }> {
+): Promise<{ asset: Asset; storageWarnings?: string[]; compressionWarning?: string }> {
   const form = new FormData();
   form.set("file", input.file);
   if (input.title?.trim()) {
@@ -224,7 +224,7 @@ export async function uploadLibraryAsset(input: {
   type: AssetType;
   insertionCategory?: AssetInsertionCategory;
   onProgress?: (progress: UploadProgress) => void;
-}): Promise<{ asset: Asset; ipfsWarning?: string; compressionWarning?: string }> {
+}): Promise<{ asset: Asset; storageWarnings?: string[]; compressionWarning?: string }> {
   const form = new FormData();
   form.set("ownerWallet", input.ownerWallet);
   form.set("file", input.file);
@@ -245,6 +245,19 @@ export async function importLibraryAssetsToChannel(
 ): Promise<{ assets: Asset[] }> {
   return request(`/api/channels/${channelId}/library/import`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+}
+
+export async function patchAsset(
+  assetId: string,
+  input: { title?: string; insertionCategory?: AssetInsertionCategory; type?: AssetType }
+): Promise<{ asset: Asset }> {
+  return request(`/api/assets/${assetId}`, {
+    method: "PATCH",
     headers: {
       "Content-Type": "application/json"
     },

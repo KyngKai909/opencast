@@ -1,10 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-mode="night">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>OpenChannel MVP</title>
+    <title>OpenCast</title>
+    <script>
+      // Pre-paint daypart resolution (no FOUC). Reads the same cookie the
+      // ThemeProvider writes; "auto"/unset → daypart from the local hour.
+      (function () {
+        try {
+          var m = document.cookie.split("; ").reduce(function (a, c) {
+            var p = c.split("=");
+            return p[0] === "opencast_mode" ? decodeURIComponent(p[1]) : a;
+          }, "");
+          if (m !== "day" && m !== "dusk" && m !== "night") {
+            var h = new Date().getHours();
+            m = h >= 6 && h < 17 ? "day" : h >= 17 && h < 20 ? "dusk" : "night";
+          }
+          document.documentElement.setAttribute("data-mode", m);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,48 +1,25 @@
-import { useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import AppHeader from "./components/AppHeader";
-import CreatorDashboardPage from "./pages/CreatorDashboardPage";
-import LoginPage from "./pages/LoginPage";
-import StationManagerPage from "./pages/StationManagerPage";
-import StationPreviewPage from "./pages/StationPreviewPage";
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-const THEME_STORAGE_KEY = "opencast-core-theme";
+// Route-level code splitting: hls.js (only used on Watch) stays out of the
+// initial bundle, keeping first load light.
+const ExplorePage = lazy(() => import("./pages/ExplorePage"));
+const WatchPage = lazy(() => import("./pages/WatchPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 
-function readInitialTheme(): "light" | "dark" {
-  if (typeof window === "undefined") {
-    return "dark";
-  }
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return stored === "light" ? "light" : "dark";
+function RouteFallback() {
+  return <div className="min-h-screen bg-bg" aria-busy="true" />;
 }
 
 export default function App() {
-  const location = useLocation();
-  const [theme, setTheme] = useState<"light" | "dark">(() => readInitialTheme());
-  const isAuthRoute = location.pathname === "/";
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  }, [theme]);
-
   return (
-    <div className="appRoot">
-      {!isAuthRoute ? (
-        <AppHeader
-          theme={theme}
-          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-        />
-      ) : null}
+    <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route path="/dashboard" element={<CreatorDashboardPage />} />
-        <Route path="/studio" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/stations/:channelId" element={<StationManagerPage />} />
-        <Route path="/stations/:channelId/preview" element={<StationPreviewPage />} />
-        <Route path="/station/:channelId" element={<StationPreviewPage />} />
+        <Route path="/" element={<ExplorePage />} />
+        <Route path="/watch/:channelRef" element={<WatchPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </div>
+    </Suspense>
   );
 }

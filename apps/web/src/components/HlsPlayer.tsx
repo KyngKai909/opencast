@@ -5,9 +5,10 @@ interface HlsPlayerProps {
   src: string;
   autoPlay?: boolean;
   muted?: boolean;
+  className?: string;
 }
 
-export default function HlsPlayer({ src, autoPlay = true, muted = true }: HlsPlayerProps) {
+export default function HlsPlayer({ src, autoPlay = true, muted = true, className }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,11 +81,11 @@ export default function HlsPlayer({ src, autoPlay = true, muted = true }: HlsPla
   }, [autoPlay, muted, src]);
 
   return (
-    <div className="fieldGrid">
-      <div className="mediaShell">
-        <video ref={videoRef} playsInline controls />
-      </div>
-      {error ? <div className="inlineAlert inlineAlert--error">{error}</div> : null}
+    <div className={className}>
+      <video ref={videoRef} playsInline controls className="h-full w-full bg-black object-contain" />
+      {error ? (
+        <div className="absolute inset-x-0 bottom-0 bg-black/70 p-2 text-center text-xs text-onair">{error}</div>
+      ) : null}
     </div>
   );
 }

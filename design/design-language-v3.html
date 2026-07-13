@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en" data-mode="night">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenCast — Design Language v3</title>
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=general-sans@400,500,600,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ======================================================================
+         OpenCast Design Language v3 — the authority for the React build.
+         Three daypart modes. Signal-green identity persists; the world recolors.
+         Every color/radius/space/motion value is a token.
+         ==================================================================== */
+
+      /* ---- Mode-agnostic tokens ---- */
+      :root {
+        --font-display: "Clash Display", "General Sans", sans-serif;
+        --font-ui: "General Sans", system-ui, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+        --r-xs: 6px;
+        --r-sm: 10px;
+        --r-md: 14px;
+        --r-lg: 20px;
+        --r-pill: 999px;
+
+        --sp-1: 4px;
+        --sp-2: 8px;
+        --sp-3: 12px;
+        --sp-4: 16px;
+        --sp-5: 24px;
+        --sp-6: 32px;
+        --sp-8: 48px;
+
+        --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        --ease-broadcast: cubic-bezier(0.5, 0, 0.1, 1);
+        --dur-fast: 130ms;
+        --dur: 240ms;
+        --dur-slow: 560ms;
+        /* Daypart drift: themed properties cross-fade over this. */
+        --dur-drift: 900ms;
+      }
+
+      /* ================= NIGHT — deep cinematic (default / hero) ============ */
+      :root[data-mode="night"] {
+        color-scheme: dark;
+        --bg: #07090c;
+        --bg-grad: radial-gradient(120% 90% at 50% -10%, #0d1622 0%, #07090c 55%);
+        --surface: #0e1218;
+        --surface-2: #151b23;
+        --surface-3: #1d2530;
+        --line: #232c38;
+        --line-strong: #35404f;
+
+        --ink: #eef2f6;
+        --ink-muted: #8b97a6;
+        --ink-faint: #5a6675;
+
+        --signal: #24e58a;         /* live / accent */
+        --signal-bright: #57f6a8;
+        --signal-ink: #04140c;     /* text on a signal fill */
+        --signal-soft: rgba(36, 229, 138, 0.14);
+        --signal-line: rgba(36, 229, 138, 0.42);
+
+        --next: #4f9bff;           /* up-next */
+        --sponsor: #f4c250;        /* sponsor gold */
+        --onair: #ff4655;          /* record red */
+
+        --shadow: 0 20px 60px -24px rgba(0, 0, 0, 0.8);
+        --glow: 0 0 0 1px var(--signal-line), 0 0 34px -6px rgba(36, 229, 138, 0.55);
+        --scanline: rgba(255, 255, 255, 0.035);
+      }
+
+      /* ================= DUSK — warm golden-hour primetime ================= */
+      :root[data-mode="dusk"] {
+        color-scheme: dark;
+        --bg: #17100d;
+        --bg-grad: radial-gradient(120% 90% at 50% -10%, #3a1f16 0%, #17100d 58%);
+        --surface: #1f1611;
+        --surface-2: #2a1d16;
+        --surface-3: #37271d;
+        --line: #3d2b20;
+        --line-strong: #55392a;
+
+        --ink: #fceee4;
+        --ink-muted: #caa38c;
+        --ink-faint: #927059;
+
+        --signal: #2fe39a;
+        --signal-bright: #5cf2b2;
+        --signal-ink: #04140c;
+        --signal-soft: rgba(47, 227, 154, 0.15);
+        --signal-line: rgba(47, 227, 154, 0.4);
+
+        --next: #ff9a4d;           /* sunset — next reads warm at primetime */
+        --sponsor: #ffc234;
+        --onair: #ff5a48;
+
+        --shadow: 0 20px 60px -24px rgba(20, 6, 0, 0.75);
+        --glow: 0 0 0 1px var(--signal-line), 0 0 34px -6px rgba(47, 227, 154, 0.5);
+        --scanline: rgba(255, 210, 170, 0.05);
+      }
+
+      /* ================= DAY — airy / bright, still signal-identified ====== */
+      :root[data-mode="day"] {
+        color-scheme: light;
+        --bg: #eef2f0;
+        --bg-grad: radial-gradient(120% 90% at 50% -10%, #ffffff 0%, #e7ece9 60%);
+        --surface: #ffffff;
+        --surface-2: #f1f5f2;
+        --surface-3: #e6ece8;
+        --line: #d6ded9;
+        --line-strong: #bcc6c0;
+
+        --ink: #0d1512;
+        --ink-muted: #4f5d56;
+        --ink-faint: #7c8a82;
+
+        /* On light, the accent must stay legible: deep green for text/edges,
+           bright green only as a fill behind dark ink. */
+        --signal: #068a52;
+        --signal-bright: #00a862;
+        --signal-ink: #04140c;
+        --signal-soft: rgba(6, 138, 82, 0.12);
+        --signal-line: rgba(6, 138, 82, 0.45);
+
+        --next: #1f6fe0;
+        --sponsor: #a9791a;
+        --onair: #d92d3a;
+
+        --shadow: 0 18px 44px -22px rgba(20, 40, 30, 0.28);
+        --glow: 0 0 0 1px var(--signal-line), 0 0 26px -8px rgba(6, 138, 82, 0.4);
+        --scanline: rgba(0, 40, 25, 0.03);
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: var(--font-ui);
+        background: var(--bg);
+        background-image: var(--bg-grad);
+        background-attachment: fixed;
+        color: var(--ink);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        /* Smooth daypart drift — no hard cut when the mode changes. */
+        transition: background-color var(--dur-drift) var(--ease-out),
+          color var(--dur-drift) var(--ease-out);
+      }
+      /* Drift every themed surface too */
+      .card, .pill, .btn, .rail, .slot, .lower-third, .swatch, .tally,
+      .specimen, header, .mode-btn {
+        transition: background-color var(--dur-drift) var(--ease-out),
+          border-color var(--dur-drift) var(--ease-out),
+          color var(--dur-drift) var(--ease-out),
+          box-shadow var(--dur-drift) var(--ease-out);
+      }
+
+      a { color: inherit; }
+      h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; margin: 0; }
+      .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+      :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: var(--r-xs); }
+
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 0 var(--sp-4) var(--sp-8); }
+
+      /* ---- Header + mode switch ---- */
+      header {
+        position: sticky; top: 0; z-index: 20;
+        display: flex; align-items: center; gap: var(--sp-4);
+        padding: var(--sp-3) var(--sp-4);
+        background: color-mix(in oklab, var(--bg) 80%, transparent);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: var(--sp-2); font-family: var(--font-display); font-weight: 600; font-size: 20px; }
+      .brand b { color: var(--signal); }
+      .switch { margin-left: auto; display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill); }
+      .mode-btn { border: 0; background: transparent; color: var(--ink-muted); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: var(--r-pill); cursor: pointer; }
+      .mode-btn[aria-pressed="true"] { background: var(--signal); color: var(--signal-ink); }
+
+      section { padding-top: var(--sp-8); }
+      .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--signal); margin-bottom: var(--sp-2); }
+      .section-title { font-size: 26px; font-weight: 600; margin-bottom: var(--sp-4); }
+      .lede { color: var(--ink-muted); max-width: 60ch; margin: 0 0 var(--sp-5); }
+
+      .grid { display: grid; gap: var(--sp-3); }
+      .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--sp-5); }
+
+      /* ---- Swatches ---- */
+      .swatches { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+      .swatch { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+      .swatch .chip { height: 60px; }
+      .swatch .meta { padding: 8px 10px; font-size: 11px; }
+      .swatch .name { font-weight: 600; }
+      .swatch .val { font-family: var(--font-mono); color: var(--ink-muted); }
+
+      /* ---- Typography specimen ---- */
+      .specimen { border-left: 2px solid var(--signal-line); padding-left: var(--sp-4); margin-bottom: var(--sp-4); }
+      .specimen .role { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
+      .t-display { font-family: var(--font-display); font-size: clamp(30px, 6vw, 52px); font-weight: 600; line-height: 1.02; }
+      .t-ui { font-family: var(--font-ui); font-size: 18px; }
+      .t-mono { font-family: var(--font-mono); font-size: 18px; }
+
+      /* ---- Pills ---- */
+      .row { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; }
+      .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: var(--r-pill); font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--line-strong); color: var(--ink-muted); background: var(--surface-2); }
+      .pill.live { color: var(--signal); border-color: var(--signal-line); background: var(--signal-soft); }
+      .pill.next { color: var(--next); border-color: color-mix(in oklab, var(--next) 45%, transparent); background: color-mix(in oklab, var(--next) 12%, transparent); }
+      .pill.sponsor { color: var(--sponsor); border-color: color-mix(in oklab, var(--sponsor) 45%, transparent); background: color-mix(in oklab, var(--sponsor) 12%, transparent); }
+      .dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; position: relative; }
+      .pill.live .dot::after { content: ""; position: absolute; inset: -4px; border-radius: 999px; background: var(--signal); opacity: 0.5; animation: ping 1.8s var(--ease-out) infinite; }
+      @keyframes ping { 0% { transform: scale(0.6); opacity: 0.55; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+
+      /* ---- Buttons ---- */
+      .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--r-pill); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast); }
+      .btn:active { transform: translateY(1px); }
+      .btn.signal { background: var(--signal); color: var(--signal-ink); box-shadow: 0 8px 22px -8px var(--signal-line); }
+      .btn.signal:hover { background: var(--signal-bright); }
+      .btn.outline { background: transparent; border-color: var(--line-strong); color: var(--ink); }
+      .btn.outline:hover { border-color: var(--signal); color: var(--signal); }
+      .btn.ghost { background: transparent; color: var(--ink-muted); }
+
+      /* ---- Channel identity / lower-third ---- */
+      .stage { position: relative; aspect-ratio: 16/9; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); background: linear-gradient(135deg, #123 0%, #061019 100%); }
+      .stage .scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--scanline) 2px 3px); }
+      .lower-third { position: absolute; left: var(--sp-4); bottom: var(--sp-4); right: var(--sp-4); display: flex; align-items: center; gap: var(--sp-3); }
+      .ch-badge { display: grid; place-items: center; width: 54px; height: 54px; border-radius: var(--r-md); background: var(--signal); color: var(--signal-ink); font-family: var(--font-display); font-weight: 700; font-size: 20px; box-shadow: var(--glow); }
+      .lt-meta { background: color-mix(in oklab, #000 55%, transparent); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--r-md); padding: 8px 14px; color: #fff; }
+      .lt-meta .ch-num { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--signal-bright); }
+      .lt-meta .ch-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+      .lt-meta .ch-now { font-size: 12px; opacity: 0.8; }
+
+      /* ---- Tally + live presence ---- */
+      .tally { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--line); }
+      .tally .rec { width: 9px; height: 9px; border-radius: 999px; background: var(--onair); box-shadow: 0 0 10px var(--onair); }
+      .tally .count { font-family: var(--font-mono); font-weight: 600; }
+      .avatars { display: flex; }
+      .avatars span { width: 22px; height: 22px; border-radius: 999px; border: 2px solid var(--surface-2); margin-left: -7px; background: var(--surface-3); display: grid; place-items: center; font-size: 10px; font-family: var(--font-mono); }
+
+      /* ============ NowNextRail — the signature component ================= */
+      .rail { display: flex; gap: 8px; overflow-x: auto; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); scrollbar-width: thin; }
+      .slot { position: relative; flex: 0 0 auto; min-width: 150px; padding: 12px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); }
+      .slot .time { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
+      .slot .prog { font-weight: 600; margin-top: 4px; font-size: 14px; }
+      .slot .tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; margin-top: 8px; color: var(--ink-faint); }
+      /* NOW — glowing live edge */
+      .slot.now { border-color: var(--signal-line); background: color-mix(in oklab, var(--signal) 10%, var(--surface-2)); box-shadow: var(--glow); }
+      .slot.now::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--signal); box-shadow: 0 0 12px var(--signal); }
+      .slot.now .tag { color: var(--signal); }
+      .slot.next { border-color: color-mix(in oklab, var(--next) 40%, var(--line)); }
+      .slot.next .tag { color: var(--next); }
+      .slot.sponsor { border-color: color-mix(in oklab, var(--sponsor) 40%, var(--line)); background: color-mix(in oklab, var(--sponsor) 8%, var(--surface-2)); }
+      .slot.sponsor .tag { color: var(--sponsor); }
+
+      /* ================= BroadcastFX (reduced-motion gated) =============== */
+      .fx-target { position: relative; overflow: hidden; }
+      .fx-channel-switch { animation: channelSwitch 520ms var(--ease-broadcast); }
+      @keyframes channelSwitch {
+        0% { transform: translateY(-8px) skewX(6deg); filter: contrast(1.6) brightness(1.4); }
+        18% { transform: translateY(6px) skewX(-4deg); filter: hue-rotate(20deg) saturate(1.4); }
+        40% { transform: translateY(-2px) skewX(1deg); text-shadow: 2px 0 var(--onair), -2px 0 var(--next); }
+        100% { transform: none; filter: none; text-shadow: none; }
+      }
+      .fx-tune-in { animation: tuneIn 900ms var(--ease-out); }
+      @keyframes tuneIn {
+        0% { opacity: 0; filter: brightness(3) blur(6px); transform: scale(1.04); }
+        30% { opacity: 0.6; filter: brightness(1.6) blur(1px); }
+        60% { opacity: 0.9; filter: brightness(0.9); }
+        100% { opacity: 1; filter: none; transform: none; }
+      }
+      .fx-go-live { animation: goLive 620ms steps(2, end) 1; }
+      @keyframes goLive {
+        0%, 100% { filter: none; }
+        20% { filter: invert(1) hue-rotate(90deg); }
+        40% { filter: none; }
+        60% { filter: invert(1) saturate(2); transform: translateX(-2px); }
+        80% { filter: none; transform: translateX(2px); }
+      }
+      .sweep::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%); transform: translateX(-120%); }
+      .sweep.run::after { animation: sweep 520ms var(--ease-out); }
+      @keyframes sweep { to { transform: translateX(120%); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+        .fx-channel-switch, .fx-tune-in, .fx-go-live, .sweep.run::after { animation: none !important; }
+        .pill.live .dot::after { display: none; }
+      }
+
+      .cols-2 { grid-template-columns: 1fr; }
+      @media (min-width: 720px) { .cols-2 { grid-template-columns: 1fr 1fr; } }
+
+      footer { color: var(--ink-faint); font-size: 12px; padding: var(--sp-8) 0; text-align: center; }
+      .note { font-size: 12px; color: var(--ink-faint); font-family: var(--font-mono); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="brand">Open<b>Cast</b> <span class="note" style="margin-left:8px">design v3</span></span>
+      <div class="switch" role="group" aria-label="Theme mode">
+        <button class="mode-btn" data-set="day">Day</button>
+        <button class="mode-btn" data-set="dusk">Dusk</button>
+        <button class="mode-btn" data-set="night">Night</button>
+        <button class="mode-btn" data-set="auto">Auto</button>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <section>
+        <div class="eyebrow">Daypart system</div>
+        <h1 class="section-title" style="font-size:clamp(30px,6vw,46px)">A network that changes with the hour.</h1>
+        <p class="lede">
+          OpenCast wears three moods. <b>Night</b> is the cinematic default. <b>Dusk</b> warms into
+          golden-hour primetime. <b>Day</b> goes airy and bright. The signal-green identity holds
+          across all three. <b>Auto</b> follows local time and drifts between them live — no reload,
+          no hard cut. Current: <span class="mono" id="mode-label">night</span>.
+        </p>
+        <div class="row"><span class="note" id="auto-note"></span></div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Palette</div>
+        <h2 class="section-title">Tokens for the current mode</h2>
+        <div class="grid swatches" id="swatches"></div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Typography</div>
+        <h2 class="section-title">Three voices</h2>
+        <div class="card">
+          <div class="specimen"><div class="role">Clash Display — emotional / titles / channel names</div><div class="t-display">Late Night Loops</div></div>
+          <div class="specimen"><div class="role">General Sans — interface</div><div class="t-ui">Tuned in, with others, to something happening now.</div></div>
+          <div class="specimen"><div class="role">IBM Plex Mono — live-data layer</div><div class="t-mono">CH 07 · 22:41:08 · 1,204 watching</div></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Signals</div>
+        <h2 class="section-title">State pills &amp; buttons</h2>
+        <div class="card grid" style="gap:var(--sp-5)">
+          <div class="row">
+            <span class="pill live"><span class="dot"></span> Live</span>
+            <span class="pill"><span class="dot"></span> Now</span>
+            <span class="pill next"><span class="dot"></span> Next</span>
+            <span class="pill sponsor"><span class="dot"></span> Sponsor</span>
+            <span class="pill">Offline</span>
+          </div>
+          <div class="row">
+            <button class="btn signal">Go live</button>
+            <button class="btn outline">Tune in</button>
+            <button class="btn ghost">Details</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Broadcast identity</div>
+        <h2 class="section-title">Lower-third, tally &amp; presence</h2>
+        <div class="grid cols-2">
+          <div class="stage fx-target" id="stage">
+            <div class="scan"></div>
+            <div class="lower-third">
+              <div class="ch-badge">07</div>
+              <div class="lt-meta">
+                <div class="ch-num">CH 07 · LNL</div>
+                <div class="ch-name">Late Night Loops</div>
+                <div class="ch-now">On now · Kappa Mikey — S1E9</div>
+              </div>
+            </div>
+          </div>
+          <div class="card grid" style="gap:var(--sp-4); align-content:start">
+            <div class="row">
+              <span class="tally"><span class="rec"></span> <span class="count">1,204</span> watching</span>
+            </div>
+            <div class="row">
+              <div class="avatars"><span>KM</span><span>JD</span><span>AR</span><span>+</span></div>
+              <span class="note">18 friends in the Circle</span>
+            </div>
+            <p class="note">Tally + live presence make a channel feel inhabited, not archived.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Signature component</div>
+        <h2 class="section-title">NowNextRail</h2>
+        <p class="lede">The time-based spine of Watch and Explore. Program slots on a track — a
+          glowing live edge for <b>now</b>, then <b>next</b>, with <b>sponsor</b> breaks inline.</p>
+        <div class="rail" id="rail">
+          <div class="slot"><div class="time">22:04</div><div class="prog">Kappa Mikey — S1E8</div><div class="tag">Aired</div></div>
+          <div class="slot now"><div class="time">22:41 → now</div><div class="prog">Kappa Mikey — S1E9</div><div class="tag">On air</div></div>
+          <div class="slot sponsor"><div class="time">23:04</div><div class="prog">Nova Energy</div><div class="tag">Sponsor</div></div>
+          <div class="slot next"><div class="time">23:05</div><div class="prog">Kappa Mikey — S1E10</div><div class="tag">Up next</div></div>
+          <div class="slot"><div class="time">23:28</div><div class="prog">Bumper — LNL</div><div class="tag">Bumper</div></div>
+          <div class="slot"><div class="time">23:29</div><div class="prog">Kappa Mikey — S1E11</div><div class="tag">Scheduled</div></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="eyebrow">Interaction layer</div>
+        <h2 class="section-title">BroadcastFX</h2>
+        <p class="lede">Punchy retro character on viewer surfaces — fired on real events, never looped,
+          and fully disabled under <span class="mono">prefers-reduced-motion</span>.</p>
+        <div class="card row" style="gap:var(--sp-3)">
+          <button class="btn outline" data-fx="channel-switch">channel-switch</button>
+          <button class="btn outline" data-fx="tune-in">tune-in</button>
+          <button class="btn outline" data-fx="go-live">go-live</button>
+          <span class="note">→ plays on the stage above</span>
+        </div>
+      </section>
+
+      <footer>OpenCast — Design Language v3 · daypart-aware, signal-identified · verified at 390px</footer>
+    </div>
+
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var COOKIE = "opencast_mode";
+        var VALID = ["day", "dusk", "night"];
+
+        function readCookie(name) {
+          return document.cookie.split("; ").reduce(function (acc, c) {
+            var p = c.split("=");
+            return p[0] === name ? decodeURIComponent(p[1]) : acc;
+          }, "");
+        }
+        function writeCookie(name, val) {
+          document.cookie = name + "=" + encodeURIComponent(val) + "; path=/; max-age=" + 60 * 60 * 24 * 365 + "; SameSite=Lax";
+        }
+        // Daypart from local hour: day 6–16, dusk 17–19, night 20–5.
+        function daypart(d) {
+          var h = (d || new Date()).getHours();
+          if (h >= 6 && h < 17) return "day";
+          if (h >= 17 && h < 20) return "dusk";
+          return "night";
+        }
+
+        var pref = readCookie(COOKIE) || "auto"; // default Auto → Night fallback
+        var autoTimer = null;
+
+        function applyMode(mode) {
+          root.setAttribute("data-mode", VALID.indexOf(mode) >= 0 ? mode : "night");
+          document.getElementById("mode-label").textContent = mode;
+        }
+        function refreshAuto() {
+          if (pref === "auto") applyMode(daypart());
+        }
+        function setPref(next) {
+          pref = next;
+          writeCookie(COOKIE, next);
+          if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+          if (next === "auto") {
+            applyMode(daypart());
+            autoTimer = setInterval(refreshAuto, 60 * 1000); // re-evaluate live, no reload
+            document.getElementById("auto-note").textContent = "Auto is on — following local time (" + daypart() + ").";
+          } else {
+            applyMode(next);
+            document.getElementById("auto-note").textContent = "";
+          }
+          document.querySelectorAll(".mode-btn").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.dataset.set === next));
+          });
+        }
+
+        document.querySelectorAll(".mode-btn").forEach(function (b) {
+          b.addEventListener("click", function () { setPref(b.dataset.set); });
+        });
+
+        // BroadcastFX demo
+        var stage = document.getElementById("stage");
+        var reduce = matchMedia("(prefers-reduced-motion: reduce)");
+        var FX = { "channel-switch": "fx-channel-switch", "tune-in": "fx-tune-in", "go-live": "fx-go-live" };
+        document.querySelectorAll("[data-fx]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (reduce.matches) return; // gated
+            var cls = FX[b.dataset.fx];
+            stage.classList.remove.apply(stage.classList, Object.values(FX));
+            void stage.offsetWidth; // reflow to restart
+            stage.classList.add(cls);
+            if (b.dataset.fx === "channel-switch") {
+              stage.classList.add("sweep", "run");
+              setTimeout(function () { stage.classList.remove("run"); }, 560);
+            }
+          });
+        });
+
+        // Swatch board — reads the live computed value of each token per mode.
+        var SWATCHES = [
+          ["--bg", "bg"], ["--surface", "surface"], ["--surface-2", "surface-2"],
+          ["--surface-3", "surface-3"], ["--line", "line"], ["--line-strong", "line-strong"],
+          ["--ink", "ink"], ["--ink-muted", "ink-muted"], ["--ink-faint", "ink-faint"],
+          ["--signal", "signal"], ["--signal-bright", "signal-bright"], ["--next", "next"],
+          ["--sponsor", "sponsor"], ["--onair", "on-air"]
+        ];
+        function paintSwatches() {
+          var cs = getComputedStyle(root);
+          document.getElementById("swatches").innerHTML = SWATCHES.map(function (s) {
+            var val = cs.getPropertyValue(s[0]).trim();
+            return '<div class="swatch"><div class="chip" style="background:' + val + '"></div>' +
+              '<div class="meta"><div class="name">' + s[1] + '</div><div class="val">' + val + '</div></div></div>';
+          }).join("");
+        }
+        // Repaint after each mode change (drift-friendly: paint on the frame the mode flips).
+        var _apply = applyMode;
+        applyMode = function (m) { _apply(m); requestAnimationFrame(paintSwatches); };
+
+        setPref(pref);
+        paintSwatches();
+      })();
+    </script>
+  </body>
+</html>

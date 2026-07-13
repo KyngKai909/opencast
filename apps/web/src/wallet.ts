@@ -1,4 +1,6 @@
-const WALLET_STORAGE_KEY = "openchannel.creator.wallet.v1";
+// Identity is persisted in a COOKIE (not localStorage) per the environment
+// storage rule — mirrors how the theme preference is stored.
+const WALLET_COOKIE = "opencast_wallet";
 
 function normalizeWalletAddress(value: string | undefined | null): string | null {
   if (!value) {
@@ -12,23 +14,25 @@ function normalizeWalletAddress(value: string | undefined | null): string | null
 }
 
 function readStoredWallet(): string | null {
-  if (typeof window === "undefined") {
+  if (typeof document === "undefined") {
     return null;
   }
-  return normalizeWalletAddress(window.localStorage.getItem(WALLET_STORAGE_KEY));
+  const raw = document.cookie.split("; ").reduce((acc, c) => {
+    const [k, v] = c.split("=");
+    return k === WALLET_COOKIE ? decodeURIComponent(v ?? "") : acc;
+  }, "");
+  return normalizeWalletAddress(raw);
 }
 
 function writeStoredWallet(address: string | null): void {
-  if (typeof window === "undefined") {
+  if (typeof document === "undefined") {
     return;
   }
-
   if (!address) {
-    window.localStorage.removeItem(WALLET_STORAGE_KEY);
+    document.cookie = `${WALLET_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
     return;
   }
-
-  window.localStorage.setItem(WALLET_STORAGE_KEY, address);
+  document.cookie = `${WALLET_COOKIE}=${encodeURIComponent(address)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
 interface EthereumProvider {

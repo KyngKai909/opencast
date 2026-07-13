@@ -11,6 +11,8 @@
     "env:check:railway": "node scripts/env-check.mjs --railway",
     "predev": "npm run build -w @openchannel/shared",
     "dev": "concurrently -n API,WORKER,WEB -c blue,magenta,green \"npm run dev -w @openchannel/api\" \"npm run dev -w @openchannel/worker\" \"npm run dev -w @openchannel/web\"",
+    "predev:review": "npm run build -w @openchannel/shared",
+    "dev:review": "concurrently -k -n API,WEB -c blue,green \"PORT=8787 API_PORT=8787 npm run dev -w @openchannel/api\" \"npm run dev -w @openchannel/web\"",
     "predev:runtime": "npm run build -w @openchannel/shared",
     "dev:runtime": "concurrently -n API,WORKER,WEB -c blue,magenta,green \"npx tsx apps/api/src/server.ts\" \"npx tsx apps/worker/src/worker.ts\" \"npm run dev -w @openchannel/web\"",
     "build": "npm run build -w @openchannel/shared && npm run build -w @openchannel/api && npm run build -w @openchannel/worker && npm run build -w @openchannel/web",

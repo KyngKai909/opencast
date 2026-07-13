@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "opencast",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:review"],
+      "port": 5173
+    }
+  ]
+}

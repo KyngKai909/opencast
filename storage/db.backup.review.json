@@ -1,0 +1,183 @@
+{
+  "channels": [
+    {
+      "id": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "name": "Test Station",
+      "slug": "test-station",
+      "description": "Just a test",
+      "adInterval": 2,
+      "createdAt": "2026-02-19T08:46:26.383Z",
+      "updatedAt": "2026-02-20T03:16:18.004Z",
+      "brandColor": "#ff5f3a",
+      "playerLabel": "Test Brand",
+      "streamMode": "video",
+      "adTriggerMode": "disabled",
+      "adTimeIntervalSec": 600
+    },
+    {
+      "id": "bb3704c5-4884-4488-bcf7-cd7ad6865c23",
+      "ownerWallet": "0x1111111111111111111111111111111111111111",
+      "name": "Smoke Station",
+      "slug": "smoke-station",
+      "description": "core flow smoke",
+      "adInterval": 2,
+      "adTriggerMode": "every_n_programs",
+      "adTimeIntervalSec": 600,
+      "brandColor": "#00a96b",
+      "playerLabel": "Smoke Station",
+      "streamMode": "video",
+      "createdAt": "2026-04-15T19:19:27.856Z",
+      "updatedAt": "2026-04-15T19:19:27.856Z"
+    },
+    {
+      "id": "39b636b1-3123-443c-b498-66152e8486bb",
+      "ownerWallet": "0x895d44d10d1b7b4f5f38e2ae2322539cf93f7aaa",
+      "name": "Test",
+      "slug": "test",
+      "description": "Test",
+      "adInterval": 2,
+      "adTriggerMode": "every_n_programs",
+      "adTimeIntervalSec": 600,
+      "brandColor": "#0ea5e9",
+      "playerLabel": "Test",
+      "streamMode": "video",
+      "createdAt": "2026-04-15T19:32:11.796Z",
+      "updatedAt": "2026-04-15T19:32:11.796Z"
+    }
+  ],
+  "assets": [
+    {
+      "id": "7d441f24-5b4d-4d33-b0d8-42a127d88671",
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "title": "Kappa Mikey S1E8",
+      "sourceType": "upload",
+      "localPath": "/Users/kyngkai909/Documents/GitHub/untitled-project/storage/uploads/3de09b66-fda7-4ec7-9de7-065f98ff19af/7d441f24-5b4d-4d33-b0d8-42a127d88671.mp4",
+      "storageProvider": "local",
+      "durationSec": 1416,
+      "type": "program",
+      "createdAt": "2026-02-19T17:48:09.955Z",
+      "mediaKind": "video",
+      "insertionCategory": "program"
+    },
+    {
+      "id": "8772663b-9974-45a5-b9ed-2405adb018d7",
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "title": "Kappa Mikey S1E3",
+      "sourceType": "upload",
+      "localPath": "/Users/kyngkai909/Documents/GitHub/untitled-project/storage/uploads/3de09b66-fda7-4ec7-9de7-065f98ff19af/8772663b-9974-45a5-b9ed-2405adb018d7.mp4",
+      "storageProvider": "local",
+      "durationSec": 1419,
+      "type": "program",
+      "createdAt": "2026-02-19T17:48:32.412Z",
+      "mediaKind": "video",
+      "insertionCategory": "program"
+    },
+    {
+      "id": "1d1a9b64-b063-4f8f-bde4-f98cf7c86f0f",
+      "channelId": "library:0x895d44d10d1b7b4f5f38e2ae2322539cf93f7aaa",
+      "title": "DBZA Full Series",
+      "sourceType": "upload",
+      "localPath": "/Users/kyngkai909/Documents/GitHub/untitled-project/storage/uploads/library_0x895d44d10d1b7b4f5f38e2ae2322539cf93f7aaa/1d1a9b64-b063-4f8f-bde4-f98cf7c86f0f.mp4",
+      "storageProvider": "local",
+      "durationSec": 41431,
+      "type": "program",
+      "insertionCategory": "program",
+      "mediaKind": "video",
+      "createdAt": "2026-04-15T20:42:46.883Z"
+    }
+  ],
+  "assetFolders": [],
+  "playlistItems": [
+    {
+      "id": "c7262ad7-5e2c-4e73-b037-11bb3e7fec3d",
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "assetId": "7d441f24-5b4d-4d33-b0d8-42a127d88671",
+      "position": 1,
+      "createdAt": "2026-02-19T17:48:53.516Z"
+    },
+    {
+      "id": "c76cec2c-d118-4034-b3be-a511138ee42c",
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "assetId": "8772663b-9974-45a5-b9ed-2405adb018d7",
+      "position": 2,
+      "createdAt": "2026-02-19T17:48:53.516Z"
+    }
+  ],
+  "playoutStates": [
+    {
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "isRunning": false,
+      "queueIndex": 16,
+      "programCountSinceAd": 16,
+      "updatedAt": "2026-02-20T06:50:16.260Z",
+      "lastAdAt": "2026-02-20T06:46:58.064Z",
+      "currentProgramOffsetSec": 0
+    },
+    {
+      "channelId": "bb3704c5-4884-4488-bcf7-cd7ad6865c23",
+      "isRunning": false,
+      "queueIndex": 0,
+      "programCountSinceAd": 0,
+      "updatedAt": "2026-04-15T19:28:54.380Z",
+      "lastAdAt": "2026-04-15T19:19:30.046Z",
+      "lastError": "No program assets in playlist.",
+      "currentProgramOffsetSec": 0
+    },
+    {
+      "channelId": "39b636b1-3123-443c-b498-66152e8486bb",
+      "isRunning": false,
+      "queueIndex": 0,
+      "programCountSinceAd": 0,
+      "updatedAt": "2026-04-15T21:06:16.453Z",
+      "lastAdAt": "2026-04-15T20:33:30.826Z",
+      "lastError": "No program assets in playlist.",
+      "currentProgramOffsetSec": 0
+    }
+  ],
+  "commands": [],
+  "streamSchedules": [
+    {
+      "id": "28fab6c4-1c03-4a86-8f65-f4c9eaf4af32",
+      "channelId": "39b636b1-3123-443c-b498-66152e8486bb",
+      "startAt": "2026-04-15T20:33:30.492Z",
+      "enabled": true,
+      "createdAt": "2026-04-15T20:33:30.537Z",
+      "updatedAt": "2026-04-15T20:33:30.822Z",
+      "startedAt": "2026-04-15T20:33:30.822Z"
+    }
+  ],
+  "destinations": [],
+  "livepeerConfigs": [
+    {
+      "channelId": "3de09b66-fda7-4ec7-9de7-065f98ff19af",
+      "enabled": true,
+      "updatedAt": "2026-02-20T06:37:08.352Z",
+      "streamId": "3ac14354-63f9-4dc9-b45b-a383612c37ee",
+      "streamKey": "3ac1-70jm-hmu8-08wh",
+      "playbackId": "3ac1kqldysll0mqc",
+      "playbackUrl": "https://livepeercdn.studio/hls/3ac1kqldysll0mqc/index.m3u8",
+      "ingestUrl": "rtmp://rtmp.livepeer.com/live/3ac1-70jm-hmu8-08wh"
+    },
+    {
+      "channelId": "bb3704c5-4884-4488-bcf7-cd7ad6865c23",
+      "enabled": true,
+      "updatedAt": "2026-04-15T19:19:29.521Z",
+      "streamId": "b1938524-1498-4512-9eaa-c2ffb1e6b626",
+      "streamKey": "b193-90qx-3w9a-5e78",
+      "playbackId": "b193513suaoslxp3",
+      "playbackUrl": "https://livepeercdn.studio/hls/b193513suaoslxp3/index.m3u8",
+      "ingestUrl": "rtmp://rtmp.livepeer.com/live/b193-90qx-3w9a-5e78"
+    },
+    {
+      "channelId": "39b636b1-3123-443c-b498-66152e8486bb",
+      "enabled": true,
+      "updatedAt": "2026-04-15T19:32:27.412Z",
+      "streamId": "08467718-0a43-48ae-8fb5-5a0ce03a9d63",
+      "streamKey": "0846-e3xt-omaa-uvc5",
+      "playbackId": "0846hqhhr64py28v",
+      "playbackUrl": "https://livepeercdn.studio/hls/0846hqhhr64py28v/index.m3u8",
+      "ingestUrl": "rtmp://rtmp.livepeer.com/live/0846-e3xt-omaa-uvc5"
+    }
+  ],
+  "externalIngestJobs": []
+}

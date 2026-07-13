@@ -36,9 +36,12 @@ export interface Asset {
   localPath: string;
   originalLocalPath?: string;
   folderId?: string;
-  storageProvider?: "local" | "ipfs";
+  storageProvider?: "local" | "r2" | "ipfs";
+  r2Key?: string;
+  r2Url?: string;
   ipfsCid?: string;
   ipfsUrl?: string;
+  archivedToIpfs?: boolean;
   compression?: AssetCompression;
   durationSec?: number;
   type: AssetType;
