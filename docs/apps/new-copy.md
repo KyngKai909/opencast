@@ -241,3 +241,57 @@ Sign-in reuses the reference's sign-in words; "Master control is where stations 
 | Switcher | "Off air", "Owner. Studio" |
 | Rights | "No claims about anything BEAT has aired.", the "offers paused" standing, the operator note, the answered and closed timeline lines, the remove confirmation, "Choose a file", the phone's "finish on a computer" line, the send blockers, the toasts. Every claim word is in `components/station/claimWords.ts` |
 | Claiming a station | the verifying, waiting, completed and stop states; the wrong-account line; the stop dialog |
+
+### apps/spots (Phase 5)
+
+Sign-in reuses the reference's words; its foot line "Local spots on local stations, paid for only when they air." is new. Mock-only panels (the station's answers, spending a budget) and mock error messages aren't listed. Screens no frame draws are written in full in their files: Close account (`components/settings/CloseSection.tsx`), the web Add money modal (`components/money/AddMoney.tsx`), the order states after a quote (`pages/deals/Order.tsx`), the redeem states other than "good" (`components/results/CheckResult.tsx`).
+
+**Getting started and money**
+
+| Where | Words |
+|---|---|
+| Step 1 | "Choose one"; preview "Your business", "Category and town"; service area "Town", "mi", "Used to target by distance. Stations see the town you work from."; online "Stations see "Online". Your spots can air across the markets you choose."; errors "Say what the business is called.", "Choose a category.", "That doesn't look like a web address.", "Give the address customers come to.", "Give the town you work from.", "Between 1 and 200 miles.", "Choose at least one market."; reach "{6} of {8} stations can carry {alcohol}", "…PREP and HALL don't carry it.", "No station in the {Inland Empire} carries {x} yet"; "Connected" |
+| Step 2 | "Instant, from 0x1234…abcd", "Shared read-only: money is added inside Clear", "Not available here yet"; "Add $250 by card", "Add $250 from your Clear account", "Connect Clear", "Confirm in Clear", "Continue"; "Add at least $1.00."; "Auto top-up didn't turn on. You can turn it on from the balance."; "Go to the balance"; "At $4.00 an airing, $250 is roughly 62 airings." / "$250 is roughly 62 airings." |
+| Balance | "Today", "less than a day", "No airings yet this month, so there's no pace to go by."; "Nothing held for scheduled airings", "{Name}. No spots listed yet."; "Nothing yet. Money you add, and every airing, shows here.", "Nothing of that kind yet.", "Show earlier"; "Nothing linked yet"; "By card", "From your Clear business account", "Arrives tomorrow / today / {October 5}"; "At about $9.20 a day, what's available lasts until {Monday evening}, before this arrives. Your spots pause then, and resume when it does." |
+| Add money | "Add a way to pay first, in Settings.", "The owner hasn't added a way to pay yet."; "$7.55 fee, Stripe's at cost"; "From Clear", "Not connected yet", "Shared read-only", "Clear shares your account read-only, so money is added inside Clear. Send USDC to your balance at this address, and it's available once it arrives."; "$250 is in your balance", "Undone. The $250 won't be added." |
+| Take money out | "Type an amount, like $300.00.", "That's more than is available.", "{$0.00}, nothing scheduled", "What's left is under a day of airings, so your spots pause and stations are told. They resume when you add money.", "$300.00 is on its way to {source}" |
+| Movements | "Added by card", "Card fee" / "Stripe's fee, at cost", "Added from Clear" / "From 0x…", "Taken out" / "To {source}" |
+
+**Results and redeeming**
+
+| Where | Words |
+|---|---|
+| Periods and empties | "All spots, August 1 to September 26.", "All spots, September 20 to 26."; "Nothing has aired this month. Spots air once stations put them in their breaks.", "Nothing has aired yet.", "This spot hasn't aired yet."; "In a break" |
+| Proof | "…, :12 of :30"; "175 × $8.00 ÷ 1,000, for :12 of :30 = $0.56"; "$4.00 an airing = $4.00"; "No frame was captured for this airing. The log entry below is the record." |
+| Codes | "Codes used at checkout online. Counted automatically"; "Connect Clear Pay to count codes used at the counter by themselves"; "{CODE} isn't one of your codes."; "Codes and customers aren't available yet."; "Change the offer", "{CODE}. Customers see it when they save the offer.", "Offer changed for {CODE}." |
+| Statement | "Ended the month"; "{Business}. August 1 to 31."; "None this month"; "Card fees, Stripe's at cost"; "Taken out", "Made for you", "Refunds"; "That statement wasn't found."; "Your first statement starts with the first money you add." |
+| Redeem | "{CODE} isn't one of your codes. Check it with the customer."; "This customer used {CODE} on {Saturday, September 26}. It's once per customer."; "This saved offer ran out on …"; "It won't count as a customer: no airing in the last 7 days."; "Type another code", "Type a code instead"; "Hold the customer's screen up to the camera."; "Redeem is off for this business. Turn it on in Settings to mark codes used at the counter."; "Redeemed ORANGE10, 10% off."; "Online uses are counted by themselves." |
+
+**Sponsorships and Made for you**
+
+| Where | Words |
+|---|---|
+| Toasts | "Sent to BEAT.", "Sent to BEAT for a quote.", "$140.00 held for Holiday gift cards.", "{title} is in your Spots now.", "Sent to Opencast for review.", "BEAT said no: We're full.", "Cancelled. $X is back.", "It ends with its paid month, {date}.", "Ended." |
+| Empties | "No sponsorships yet.", "No orders yet. A station or Opencast's studio can make your first spot.", "Nothing near you takes sponsors yet." |
+| New sponsorship | "Write your credit to send.", "Choose what to sponsor.", "Checking your credit.", "Enter the amount a month.", "BEAT's minimum is $75.", "Your balance can't cover the first month. Add money to send.", "Fix the flagged phrase to send."; the price flag ""10% off" is a price or an offer" / "Credits don't carry prices or offers. That belongs in a spot"; "…, full"; "BEAT's reason: We're full." |
+| A sponsorship | "Held next", "Ends", "Reason", "Withdraw it before BEAT answers.", "Ending stops the renewal. It ends with its paid month." |
+| Orders | "Not quoted", "Cancel the order", "Accept BEAT's quote", "Ask another maker", "Set a rate and budget", "Cancel and get $X back"; "Asked {date}. BEAT quotes here before anything is paid.", "BEAT passed on this one…", "BEAT is making it…", "With Opencast for review…", "Held from your balance"; "Your available balance is $X. Add money to accept."; "Give it a name.", "Say what it's about.", "Pick a date.", "Pick a date after today." |
+| Review | "Pause where something's wrong and pin a note to that moment.", "A note at :06", "Pin it", "BEAT marked it their mistake. It doesn't use a round.", "Ask for the fixes", "Ask for changes, using your last round" / "1 of your N rounds", "Ask Opencast to review it" |
+
+**Settings and the switcher**
+
+| Where | Words |
+|---|---|
+| Team | "Only the owner changes the team."; "Invited today", "Invite expired", "Viewer. Invited Friday"; "Make them a manager", "Make them a viewer", "Remove from {business}", "Resend the invite"; "{name} is now a manager" / "…a viewer", "{name} no longer has access to {business}", "Invite sent to {email}", "Invite sent again to {email}"; "{email} is already on the team.", "{email} already has an invite waiting. Resend it from the list.", "Enter an email address." |
+| Profile | "Only the owner and managers change the profile."; the service-area and online where-lines; "Add a second location. Spots can target either or both", "Another location?", "Spots can target any of your locations"; the category re-check notice; the logo, address and location errors; the location dialog ("Add a location" / "Add a service area", "Name it", "Optional", "Address", "Private. Stations see the city", "Miles around it") |
+| Money and receipts | "Nothing connected yet", "Add money from the Balance page to connect a bank or card"; "On. Adds $200.00 from Chase ending 8810 when about 3 days of airings are left"; "Make default", "Not set"; "That's your default. Make another one the default first."; "An EIN is nine digits, like 12-3456789."; "No receipts yet. Adding money, orders and each month's statement are listed here."; "Add as a source" |
+| Connections | "Only the owner connects or disconnects these.", "Not connected", "Connect Clear isn't set up here yet.", "Connect Clear", "Waiting for Clear", "Disconnect", "{0x1234…abcd}. Linked Sept 26", "Payouts and withdrawals can go here. Money is added inside Clear." / "You can also add money from Clear. You confirm each transfer in Clear."; "{Square} is connected. Codes used online are counted too", "Connecting isn't available here yet." |
+| Close account | all of it (see the file) |
+| Switcher and invites | "Your businesses", "Add a business"; "That invite didn't work." |
+
+**Connect Clear in master control (Settings, Station account)**
+
+| Where | Words |
+|---|---|
+| Your Clear wallet | "Your Clear wallet"; "Connect Clear isn't set up here."; "Link your Clear wallet to pay {BEAT} out to it. You approve it on Clear's page, and Clear decides what it shares."; "Clear wallet, 0x1234…abcd"; "Full access: payouts can go here, and you confirm any transfer in Clear" / "Read only: payouts can go here. Money moves inside Clear"; "{BEAT} is paid out to this wallet" / "{BEAT} is paid into its Clear account"; "Pay {BEAT} out here", "Pay into {BEAT}'s Clear account instead", "Disconnect"; toasts "Clear is connected.", "Clear is disconnected.", "{BEAT} is paid out to your Clear wallet." |
+| Earnings, ads from partners on | "{$12.50} to come. Paid when partners pay, 30 to 90 days after airing" |

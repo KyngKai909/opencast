@@ -132,6 +132,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | P23 | **Market spot preview URL** for stations | master-control C.2 | Yes | 4 |
 | P24 | **Maker "Tell me when it's listed"** on the station side | orders 06.2 | Drop the button | 4 |
 | P25 | **A business's short name** (`business.shortName`: "Orange Street", "Inland Tire"), used in thumbnails, break summaries and notices | master-control C.3; biz-spots 05.1 | Yes | 4 |
+| P26 | **Edit a location in place** (`PATCH /businesses/:id/locations/:locationId`): only add and remove exist, and adding puts it last, so editing the first address would reorder them | biz-settings 01.1 | Yes | 5 |
 
 ## ledger
 
@@ -143,6 +144,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | E4 | **Receipts for a business**: prepayment, expense or statement, with a PDF each | biz-settings 03.1 | Yes | 5 |
 | E5 | **Funding sources**: remove, make default | biz-settings 03.1; biz-funding 03.1 | UI only | 5 |
 | E6 | (minor) **Deposit quote basis** (rate, reference station); **withdrawal arrival**; the usual top-up amount | biz-funding 02.1, 04.1, 06.1 | Copy or derived | 5 |
+| E7 | **The business's deposit address** (`Balance.depositAddress`): with Clear shared read-only, `quoteClearTransfer` answers 409, so nothing says where to send USDC from inside Clear | biz-funding 02.1, 06.1 | Yes | 5 |
 
 ## audience
 
@@ -223,3 +225,7 @@ As in the viewer: every proposed field is an optional extension of a contract sc
 - **P6** `pause` and `back` on a market spot. **P17** the members' credit. **P22** sponsor profile. **P23** spot preview (url, still). **P24** `POST /orders/:id/tell-me-when-listed`, `makerToldWhenListed`, `listedRate`.
 - **E2** sponsors listed on earnings, `held.tonightBreaks`, `nextPayout.amountMicros`. **E3** per line `group`, `airings`, `rate`, `averageTunedIn`; `paidOn` and `destination` on statements. **U1** `byProgram[]` on the audience.
 - **T1** `takedowns[].airings[]`, `term`, `carrierNotice`. **B6** `POST /claims/:id/attachments`. **N10** `GET /claim/:token` with the handover's status. **O1** the `signed_on_off` notification key.
+
+## How the business app carries them (Phase 5)
+
+As in the other apps: optional extensions in `apps/spots/src/api/ext/<area>.ts` (money, spots, results, deals, settings), named by request id, returned by the mocks. New here: E7 and P26. Used most: E6 (the basis for "roughly N airings"), P9 (category reach), P10 (address lookup), P12 and B5 (the Redeem tool: today's count, and checking a code without counting it), P13 and P14 (codes and periods in results), P16 (what a business can sponsor: blocks the new-sponsorship page against the real API), P17 to P19 (credit preview, makers, deliveries), P20 (Clear Pay and an online checkout), P21 (close a business), E3 to E5 (statement lines, receipts, funding sources), P11 (the logo, with the logo mark shown until one is uploaded).
