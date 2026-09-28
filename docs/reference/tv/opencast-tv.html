@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TV mode · Opencast reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+
+/* ===== TV: always the dark ground ===== */
+.tv { --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69; --standby:#F0B43C; --standby-fill:#F0B43C; --on-standby:#0F1830;
+  --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830; --screen:#0A1124;
+  width:1920px; height:1080px; position:relative; overflow:hidden; background:#000; color:var(--ink); font:28px/1.4 var(--font-text); border-radius:6px; box-shadow:0 0 0 1px var(--line); }
+.tv .pic.full { position:absolute; inset:0; aspect-ratio:auto; border-radius:0; }
+.tv .pic .bug { right:5%; bottom:6%; }
+.tv .pic .bug .cs { font-size:40px; } .tv .pic .bug .ch { font-size:22px; }
+.tv .pic.reel .card b { font-size:150px; } .tv .pic.reel .card span { font-size:34px; }
+.tv .pic .l3 .nm { font-size:44px; } .tv .pic .l3 .tt { font-size:28px; }
+.dim::after { content:""; position:absolute; inset:0; background:rgb(5 9 20 / .55); }
+.tv-panel { position:absolute; background:rgb(12 20 42 / .94); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line); }
+.tv .tally { height:44px; padding:0 16px; font-size:18px; border-width:2px; }
+.tv .tag { height:36px; padding:0 14px; font-size:22px; border-width:1.5px; }
+.tv .tag .d { width:10px; height:10px; }
+.kbd { display:inline-grid; place-items:center; min-width:44px; height:40px; padding:0 10px; border:2px solid var(--line); border-radius:8px; font:600 20px var(--font-text); color:var(--ink); margin-right:10px; }
+.f { box-shadow:0 0 0 5px var(--signal) !important; background:var(--raised) !important; }
+
+/* banner */
+.banner { left:96px; right:96px; bottom:54px; padding:34px 40px 26px; display:grid; grid-template-columns:380px minmax(0,1fr) 260px; gap:44px; }
+.banner .id { display:grid; grid-template-columns:auto 1fr; gap:4px 22px; align-content:center; }
+.banner .id .ch { grid-row:span 2; font:500 76px/1 var(--font-mono); letter-spacing:-.05em; padding-right:22px; border-right:2px solid var(--line); }
+.banner .id .cs { font-size:56px; line-height:1; } .banner .id small { font-size:24px; color:var(--ink-70); }
+.banner .now .src { font-size:24px; color:var(--ink-70); }
+.banner .now h3 { margin:2px 0 10px; font:800 58px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.prog { display:flex; align-items:center; gap:18px; font-size:24px; color:var(--ink-70); }
+.prog .mono { color:var(--ink); }
+.prog .bar { flex:1; height:8px; background:var(--hair); border-radius:4px; overflow:hidden; } .prog .bar i { display:block; height:100%; background:var(--ink); }
+.banner .nx { margin-top:14px; font-size:26px; color:var(--ink-70); display:flex; gap:14px; align-items:center; }
+.banner .nx b { color:var(--ink); font-weight:600; }
+.banner .side { display:flex; flex-direction:column; align-items:flex-end; justify-content:space-between; gap:16px; }
+.banner .clock { font:500 44px var(--font-mono); letter-spacing:-.03em; }
+.hints { grid-column:1 / -1; display:flex; gap:40px; padding-top:20px; border-top:1px solid var(--hair); font-size:22px; color:var(--ink-70); align-items:center; }
+.hints .end { margin-left:auto; }
+
+/* number entry */
+.numpad { top:54px; right:96px; padding:26px 36px; text-align:right; }
+.numpad .num { font:500 150px/1 var(--font-mono); letter-spacing:-.06em; }
+.numpad .num em { font-style:normal; color:var(--ink-50); }
+.numpad .num .caret { display:inline-block; width:10px; height:120px; background:var(--signal); vertical-align:-12px; margin-left:6px; }
+.numpad .who { font-size:28px; color:var(--ink-70); margin-top:10px; }
+.numpad .who b { color:var(--ink); }
+
+/* guide overlay */
+.gov { position:absolute; inset:0; background:rgb(8 14 32 / .96); padding:54px 96px; display:flex; flex-direction:column; }
+.gov-top { display:grid; grid-template-columns:minmax(0,1fr) 640px; gap:56px; height:390px; }
+.gov-top .info .when { font:500 26px var(--font-mono); color:var(--ink-70); }
+.gov-top .info h3 { margin:6px 0 12px; font:800 64px/1 var(--font-display); font-stretch:112%; letter-spacing:-.035em; }
+.gov-top .info p { font-size:28px; color:var(--ink-70); margin:0 0 18px; max-width:40ch; }
+.gov-top .info .hint { font-size:22px; color:var(--ink-50); }
+.gov-top .live { position:relative; }
+.gov-top .live .pic { border-radius:var(--r-screen); }
+.gov-top .live .cap2 { display:flex; justify-content:space-between; font-size:22px; color:var(--ink-70); margin-top:10px; }
+.gg { margin-top:34px; position:relative; flex:1; }
+.gg-h, .gg-r { display:grid; grid-template-columns:260px repeat(12,1fr); }
+.gg-h { font:500 24px var(--font-mono); color:var(--ink-50); border-bottom:2px solid var(--line); }
+.gg-h div { padding:0 0 10px 14px; }
+.gg-r { height:92px; border-bottom:1px solid var(--hair); }
+.gg-st { display:flex; align-items:center; gap:18px; padding-right:14px; }
+.gg-st .ch { font:500 28px var(--font-mono); color:var(--ink-70); width:70px; } .gg-st .cs { font-size:30px; }
+.gg-p { margin:6px 4px; padding:10px 16px; border-radius:var(--r-control); background:rgb(255 255 255 / .04); display:flex; flex-direction:column; justify-content:center; min-width:0; }
+.gg-p b { font-weight:600; font-size:26px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gg-p small { font-size:21px; color:var(--ink-50); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gg-p.on { background:var(--raised); }
+.gg-p .lv { color:var(--live); font-weight:600; }
+.gg-now { position:absolute; top:0; bottom:0; width:3px; background:var(--ink); left:calc(260px + (100% - 260px) * .2); }
+.gg-now span { position:absolute; top:-2px; left:50%; transform:translate(-50%,-100%); font:500 20px var(--font-mono); background:var(--ink); color:var(--ground); padding:2px 8px; border-radius:3px; }
+
+/* dialogs and rails */
+.dlg { left:50%; top:50%; transform:translate(-50%,-50%); width:760px; padding:40px 44px; }
+.dlg .when { font:500 24px var(--font-mono); color:var(--ink-70); }
+.dlg h3 { margin:6px 0 26px; font:800 52px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.tv-btn { display:flex; align-items:center; gap:16px; height:78px; padding:0 28px; border-radius:var(--r-control); border:2px solid var(--line); font:600 30px var(--font-text); margin-top:14px; background:transparent; color:var(--ink); }
+.tv-btn small { margin-left:auto; font-size:22px; font-weight:500; color:var(--ink-50); }
+.tv-btn.primary { background:var(--signal-fill); color:var(--on-signal); border-color:var(--signal-fill); }
+.tv-btn.primary.f { background:var(--signal-fill) !important; box-shadow:0 0 0 5px var(--ground), 0 0 0 10px var(--signal) !important; }
+.mrail { position:absolute; left:0; top:0; bottom:0; width:640px; background:rgb(10 17 36 / .97); padding:54px 48px 54px 96px; display:flex; flex-direction:column; box-shadow:1px 0 0 var(--line); }
+.mrail .logo { display:flex; align-items:center; gap:14px; font:800 40px var(--font-display); font-stretch:125%; letter-spacing:-.02em; margin-bottom:40px; }
+.mrail .logo svg { width:52px; height:42px; }
+.mi { display:flex; align-items:center; gap:18px; height:76px; padding:0 22px; border-radius:var(--r-control); font:600 32px var(--font-text); color:var(--ink-70); margin-bottom:6px; }
+.mi small { margin-left:auto; font-size:24px; font-weight:500; color:var(--ink-50); }
+.mi.f { color:var(--ink); }
+.mrail .foot { margin-top:auto; font-size:22px; color:var(--ink-50); }
+.pstrip { left:96px; right:96px; bottom:54px; padding:30px 34px; }
+.pstrip h4 { margin:0 0 18px; font:700 30px var(--font-display); display:flex; justify-content:space-between; }
+.pstrip h4 span { font:500 22px var(--font-text); color:var(--ink-50); }
+.pgrid { display:grid; grid-template-columns:repeat(6,1fr); gap:18px; }
+.pt { border-radius:var(--r-control); border:2px solid var(--line); padding:18px 20px; }
+.pt .k { font:500 22px var(--font-mono); color:var(--ink-50); }
+.pt .ch { display:block; font:500 44px/1.1 var(--font-mono); letter-spacing:-.04em; }
+.pt .cs { font-size:28px; display:block; } .pt small { display:block; font-size:21px; color:var(--ink-70); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pt.empty { border-style:dashed; color:var(--ink-50); }
+
+/* full screen states */
+.radio-full { position:absolute; inset:0; padding:54px 96px; display:flex; flex-direction:column; color:#fff; }
+.radio-full .drift { position:absolute; left:220px; top:170px; }
+.radio-full .f1 { font:500 330px/1 var(--font-mono); letter-spacing:-.07em; }
+.radio-full .cs { font-size:96px; line-height:1; margin-top:10px; }
+.radio-full .sub { font-size:34px; opacity:.88; margin-top:10px; }
+.radio-full .meter { display:flex; gap:8px; align-items:flex-end; height:80px; margin-top:44px; }
+.radio-full .meter i { width:12px; background:rgb(255 255 255 / .7); border-radius:2px; }
+.state-full { position:absolute; inset:0; background:var(--screen); padding:0 180px; display:flex; flex-direction:column; justify-content:center; }
+.state-full .big { font:800 150px/1 var(--font-display); font-stretch:125%; letter-spacing:-.045em; }
+.state-full p { font-size:36px; color:var(--ink-70); max-width:30ch; margin:26px 0 40px; }
+.state-full p .mono { color:var(--ink); }
+.state-full .row { display:flex; gap:20px; } .state-full .row .tv-btn { margin:0; }
+.setup { position:absolute; inset:0; background:var(--ground); padding:96px 180px; display:grid; grid-template-columns:1fr 1fr; gap:120px; align-items:center; }
+.setup .logo { display:flex; align-items:center; gap:16px; font:800 44px var(--font-display); font-stretch:125%; letter-spacing:-.02em; margin-bottom:60px; }
+.setup .logo svg { width:58px; height:47px; }
+.setup h2 { margin:0 0 20px; font:800 84px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; }
+.setup p { font-size:30px; color:var(--ink-70); margin:0 0 30px; max-width:30ch; }
+.code { font:500 72px var(--font-mono); letter-spacing:.06em; }
+.qrbox { width:300px; height:300px; background:#fff; border-radius:12px; padding:22px; }
+.qrbox svg { width:100%; height:100%; }
+.pledge-panel { top:54px; right:96px; bottom:54px; width:620px; padding:44px; display:flex; flex-direction:column; }
+.pledge-panel h3 { margin:0 0 14px; font:800 50px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.pledge-panel p { font-size:27px; color:var(--ink-70); margin:0 0 30px; }
+.pledge-panel .url { font:500 26px var(--font-mono); margin-top:24px; }
+.castchip { display:inline-flex; align-items:center; gap:12px; font-size:22px; color:var(--ink-70); }
+.castchip svg { width:30px; height:24px; }
+
+/* remote map */
+.remote-wrap { display:grid; grid-template-columns:260px minmax(0,1fr); gap:var(--s5); align-items:start; }
+.remote-wrap > * { min-width:0; }
+.scroll-x { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.map { min-width:640px; }
+@media (max-width:760px) { .remote-wrap { grid-template-columns:1fr; } .remote { margin:0 auto; } }
+.remote { width:220px; padding:28px 22px 34px; border-radius:60px; background:var(--raised); box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; align-items:center; gap:16px; }
+.remote .r3 { display:grid; grid-template-columns:repeat(3,48px); gap:10px; }
+.remote .b { height:36px; border-radius:18px; border:1px solid var(--line); display:grid; place-items:center; font:600 11px var(--font-text); color:var(--ink-70); }
+.remote .n { width:48px; height:36px; border-radius:18px; border:1px solid var(--line); display:grid; place-items:center; font:500 15px var(--font-mono); }
+.remote .dpad { width:150px; height:150px; border-radius:50%; border:1px solid var(--line); position:relative; }
+.remote .dpad .ok { position:absolute; inset:45px; border-radius:50%; background:var(--ground); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.remote .dpad span { position:absolute; font-size:12px; color:var(--ink-50); }
+.remote .rock { display:flex; gap:22px; }
+.remote .rock div { width:48px; height:92px; border-radius:24px; border:1px solid var(--line); display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:8px 0; font:600 11px var(--font-text); color:var(--ink-70); }
+.map { width:100%; border-collapse:collapse; }
+.map th { text-align:left; font:600 13px var(--font-text); color:var(--ink-50); padding:0 14px 8px 0; border-bottom:1px solid var(--line); }
+.map td { padding:11px 14px 11px 0; border-bottom:1px solid var(--hair); font-size:15px; vertical-align:top; }
+.map td:first-child { font-weight:600; white-space:nowrap; }
+.map td.basic { color:var(--ink-70); }
+
+/* phone remote */
+.pr-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 12px; border-bottom:1px solid var(--hair); }
+.pr-top .dev { display:flex; align-items:center; gap:8px; font-weight:600; }
+.pr-top .dev svg { width:22px; height:18px; color:var(--signal); }
+.pr-now { display:grid; grid-template-columns:1fr auto; gap:10px; padding:16px 18px; border-bottom:1px solid var(--hair); }
+.pr-now .id { display:flex; gap:10px; align-items:baseline; } .pr-now .id .ch { font-size:18px; } .pr-now .id .cs { font-size:18px; }
+.pr-now b { display:block; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; margin:4px 0 8px; }
+.pr-now .prog { font-size:12.5px; gap:10px; } .pr-now .prog .bar { height:4px; }
+.rocker { display:flex; justify-content:center; align-items:center; gap:22px; padding:22px 0 10px; }
+.rocker .rk { width:92px; height:188px; border-radius:var(--r-screen); border:1px solid var(--line); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:14px 0; }
+.rocker .rk button { width:64px; height:64px; border-radius:var(--r-control); border:0; background:var(--raised); color:var(--ink); display:grid; place-items:center; cursor:pointer; }
+.rocker .rk button svg { width:26px; height:26px; }
+.rocker .rk span { font:600 11px var(--font-text); color:var(--ink-50); }
+.rocker .mid { text-align:center; }
+.rocker .mid .ch { font:500 44px/1 var(--font-mono); letter-spacing:-.05em; display:block; }
+.rocker .mid .cs { font-size:18px; }
+.pr-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:12px 18px; }
+.pr-row .btn { height:52px; flex-direction:column; gap:2px; font-size:12px; padding:0; }
+.pr-row .btn svg { width:18px; height:18px; }
+.pr-pres { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; padding:4px 18px 14px; }
+.pr-pres button { height:56px; border:1px solid var(--line); border-radius:var(--r-control); background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; }
+.pr-pres button .k { font:500 10px var(--font-mono); color:var(--ink-50); } .pr-pres button .ch { font:500 14px var(--font-mono); }
+.pr-pres button.on { background:var(--ink); color:var(--ground); border-color:var(--ink); } .pr-pres button.on .k { color:var(--ground); opacity:.7; }
+.keypad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:10px 28px 16px; }
+.keypad button { height:62px; border-radius:var(--r-control); border:1px solid var(--line); background:none; font:500 26px var(--font-mono); cursor:pointer; }
+.keypad button.go { background:var(--signal-fill); color:var(--on-signal); border-color:var(--signal-fill); font:600 16px var(--font-text); }
+.kp-disp { text-align:center; padding:18px 0 6px; }
+.kp-disp .d { font:500 64px/1 var(--font-mono); letter-spacing:-.05em; } .kp-disp .d em { font-style:normal; color:var(--ink-50); }
+.kp-disp small { display:block; font-size:14px; color:var(--ink-70); margin-top:6px; }
+.dev-list .opt .ic { width:36px; height:36px; border-radius:var(--r-control); background:var(--raised); display:grid; place-items:center; flex:none; }
+.dev-list .opt .ic svg { width:20px; height:16px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-cast" viewBox="0 0 24 20"><path d="M2 14.5a4 4 0 0 1 4 4M2 10.5a8 8 0 0 1 8 8M2 6.5a12 12 0 0 1 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6 2.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 20"><rect x="2" y="2" width="20" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 18.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 20"><rect x="7" y="1" width="10" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-back" viewBox="0 0 20 20"><path d="M8 5L3 10l5 5M3 10h9a5 5 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M10 9v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.3" r="1.1" fill="currentColor"/></symbol>
+  <symbol id="i-keys" viewBox="0 0 20 20"><g fill="currentColor"><circle cx="5" cy="5" r="1.6"/><circle cx="10" cy="5" r="1.6"/><circle cx="15" cy="5" r="1.6"/><circle cx="5" cy="10" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15" cy="10" r="1.6"/><circle cx="5" cy="15" r="1.6"/><circle cx="10" cy="15" r="1.6"/><circle cx="15" cy="15" r="1.6"/></g></symbol>
+  <symbol id="qr" viewBox="0 0 29 29"><path fill="#0F1830" d="M0 0h7v7H0zM1 1v5h5V1zM2 2h3v3H2zM22 0h7v7h-7zM23 1v5h5V1zM24 2h3v3h-3zM0 22h7v7H0zM1 23v5h5v-5zM2 24h3v3H2zM9 0h2v2H9zM12 1h3v1h-3zM16 0h2v3h-2zM9 3h1v3H9zM11 4h2v2h-2zM14 3h1v4h-1zM17 4h3v2h-3zM9 8h3v1H9zM13 8h1v2h-1zM15 8h3v1h-3zM19 8h2v3h-2zM0 9h2v1H0zM3 9h4v1H3zM22 9h3v1h-3zM26 9h3v2h-3zM1 11h3v2H1zM5 11h2v1H5zM8 10h1v4H8zM10 11h2v2h-2zM14 11h3v1h-3zM18 12h1v3h-1zM21 12h2v1h-2zM24 11h1v3h-1zM27 12h2v1h-2zM0 14h2v2H0zM4 14h3v1H4zM10 14h2v3h-2zM13 13h2v2h-2zM16 14h1v1h-1zM20 14h3v2h-3zM25 15h4v1h-4zM3 16h2v2H3zM6 17h3v1H6zM12 17h4v1h-4zM17 16h2v2h-2zM22 17h2v2h-2zM26 17h1v3h-1zM0 19h2v2H0zM4 19h1v2H4zM8 19h3v1H8zM13 19h1v3h-1zM15 20h3v1h-3zM19 19h2v2h-2zM23 20h2v1h-2zM28 19h1v4h-1zM9 21h2v3H9zM12 23h3v1h-3zM16 22h2v2h-2zM20 22h4v1h-4zM25 22h2v2h-2zM9 25h1v4H9zM11 26h3v1h-3zM15 25h2v3h-2zM18 26h2v1h-2zM21 24h2v3h-2zM24 25h1v2h-1zM26 26h3v1h-3zM11 28h3v1h-3zM18 28h4v1h-4zM25 28h2v1h-2z"/></symbol>
+</defs></svg>
+
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: TV mode</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Ref. 03</span><span>Opencast on the television</span></div>
+  <h1>Turn it on and it's on.</h1>
+  <p>Opencast running on the TV itself, working like a cable box. It reaches the TV two ways, and both use these screens. As a TV app (web code on Android TV, Google TV, Fire TV and TV browsers), it's driven by the TV's remote. When casting (Chromecast or AirPlay from the phone), the TV shows the picture and the banner, and the phone becomes the remote.</p>
+  <p>Frames are 1920 by 1080 with the broadcast safe area from the style guide. The TV is always on the dark ground, whatever the switch at the top says. It's 8:42 pm and BEAT 12.1 is on.</p>
+  <ul class="toc">
+    <li><a href="#remote"><span class="mono">01</span>The remote</a></li>
+    <li><a href="#watching"><span class="mono">02</span>Watching and changing channel</a></li>
+    <li><a href="#guide"><span class="mono">03</span>The guide</a></li>
+    <li><a href="#menus"><span class="mono">04</span>Menu and presets</a></li>
+    <li><a href="#states"><span class="mono">05</span>Radio, off air, first launch, pledge</a></li>
+    <li><a href="#cast"><span class="mono">06</span>Casting and the phone remote</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>It opens tuned in</h3><p class="muted">The last channel, full screen, within a second or two. No home screen, no profile picker.</p></div>
+    <div><h3>Up and down is channels</h3><p class="muted">On the picture, the arrows change channel even on remotes without CH buttons. Everything else is one press away.</p></div>
+    <div><h3>Nothing to type</h3><p class="muted">Signing in and pledging hand off to the phone with a code or a QR. The TV never shows a keyboard.</p></div>
+    <div><h3>Ten feet away</h3><p class="muted">Nothing under 21px at 1080p, one focus ring in signal cyan, and everything inside the 90% title-safe area.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= REMOTE ================= -->
+<section class="ref" id="remote"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>The remote</span></div>
+  <h2>Every button, and what a basic remote does instead.</h2>
+  <p class="lede">A full cable-style remote has CH, Guide, Info, Last and number keys. Most streaming remotes only have arrows, OK, Back, Home and Play, so every action also has a path from those.</p>
+  <div class="remote-wrap">
+    <div class="remote" aria-hidden="true">
+      <div class="r3"><span class="b">MENU</span><span class="b">GUIDE</span><span class="b">INFO</span></div>
+      <div class="dpad"><span style="top:12px;left:50%;transform:translateX(-50%)">▲</span><span style="bottom:12px;left:50%;transform:translateX(-50%)">▼</span><span style="left:14px;top:50%;transform:translateY(-50%)">◀</span><span style="right:14px;top:50%;transform:translateY(-50%)">▶</span><div class="ok">OK</div></div>
+      <div class="r3"><span class="b">BACK</span><span class="b">LAST</span><span class="b">▶ II</span></div>
+      <div class="rock"><div><span>VOL</span><span>+</span><span>−</span></div><div><span>CH</span><span>▲</span><span>▼</span></div></div>
+      <div class="r3"><span class="n">1</span><span class="n">2</span><span class="n">3</span><span class="n">4</span><span class="n">5</span><span class="n">6</span><span class="n">7</span><span class="n">8</span><span class="n">9</span><span class="n">.</span><span class="n">0</span><span class="n">↵</span></div>
+    </div>
+    <div class="scroll-x">
+      <table class="map">
+        <thead><tr><th>Button</th><th>While watching</th><th>In the guide and menus</th><th>On a basic remote</th></tr></thead>
+        <tbody>
+          <tr><td>CH ▲ ▼</td><td>Next or previous channel, in dial order, with the banner</td><td>Page up and down</td><td class="basic">Arrow ▲ ▼ on the picture</td></tr>
+          <tr><td>Arrows ▲ ▼</td><td>Change channel</td><td>Move focus</td><td class="basic">Same</td></tr>
+          <tr><td>Arrow ◀</td><td>Open presets</td><td>Move focus</td><td class="basic">Same</td></tr>
+          <tr><td>Arrow ▶</td><td>Open the guide</td><td>Move focus</td><td class="basic">Same</td></tr>
+          <tr><td>OK</td><td>Show the banner; OK again opens the guide</td><td>Choose</td><td class="basic">Same</td></tr>
+          <tr><td>Guide</td><td>Open the guide</td><td>Close the guide</td><td class="basic">Arrow ▶, or OK twice</td></tr>
+          <tr><td>Info</td><td>Show the banner</td><td>Details of the focused program</td><td class="basic">OK</td></tr>
+          <tr><td>Last</td><td>Back to the channel you were just on</td><td></td><td class="basic">Back, on the picture</td></tr>
+          <tr><td>Back</td><td>Last channel</td><td>Close the overlay</td><td class="basic">Same</td></tr>
+          <tr><td>0 to 9, dot</td><td>Tune by number: 1, 2 tunes 12.1</td><td>Jump to that channel in the guide</td><td class="basic">Not available; use the guide or presets</td></tr>
+          <tr><td>Menu</td><td>Open the menu rail</td><td>Close it</td><td class="basic">Home, or long-press Back</td></tr>
+          <tr><td>Play / Pause</td><td>Pause, held for up to 30 minutes, then back to live</td><td></td><td class="basic">Same</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= WATCHING ================= -->
+<section class="ref" id="watching"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Watching and changing channel</span></div>
+  <h2>A picture, and a banner when you need it.</h2>
+  <p class="lede">Most of the time the screen is only the station's picture and its bug. Changing channel or pressing OK brings up the banner for five seconds: who you're watching, what's on, how far in, and what's next.</p>
+  <div class="stage">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic reel cq full"><div class="scene"></div><div class="card"><div><b>Saturday Reel</b><span>Cartoons, 1928 to 1934</span></div></div><div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div></div>
+        <div class="tv-panel banner">
+          <div class="id"><span class="ch">12.1</span><span class="cs">BEAT</span><small>Inland Beat</small></div>
+          <div class="now">
+            <span class="src">Carried from REEL 24.1</span>
+            <h3>Saturday Reel</h3>
+            <div class="prog"><span class="mono">8:30</span><span class="bar"><i style="width:40%"></i></span><span class="mono">9:00</span><span>18 min left</span></div>
+            <div class="nx">Next at <span class="mono">9:00</span><b>Beat Tape Live</b><span class="tag tag-live"><span class="d"></span>Live</span></div>
+          </div>
+          <div class="side"><span class="clock">8:42 pm</span><span class="tally lit">ON AIR</span></div>
+          <div class="hints"><span><span class="kbd">▲▼</span>Channels</span><span><span class="kbd">OK</span>Guide</span><span><span class="kbd">◀</span>Presets</span><span class="end"><span class="kbd">Back</span>Last channel, CIVC 7.1</span></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The banner is the whole interface</h3><p>Ident, what's on with how far in, what's next, the clock and the tally. It hides after five seconds. It covers the station's bug while it's up, since it carries the same ident.</p></div>
+      <div class="note"><h3>A progress bar, not a scrub bar</h3><p>It shows where the program is, not something you can move. The start and end times sit at each end.</p></div>
+      <div class="note"><h3>Hints teach the remote</h3><p>The bottom row names the three most useful keys and where Back will take you. After a week of use, the row hides itself.</p></div>
+      <div class="note"><h3>Channel changes are instant</h3><p>The next and previous stations are warmed up in the background, so ▲ ▼ switches picture in well under a second, like cable did.</p></div>
+    </div>
+  </div>
+
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic cq full"><div class="scene"></div><div class="podium"></div><div class="figure"></div><div class="l3"><span class="nm">Dana Whitfield</span><br><span class="tt">Chair, Planning Commission</span></div><div class="bug"><span class="cs">CIVC</span><span class="ch">7.1</span></div></div>
+        <div class="tv-panel numpad">
+          <div class="num">12<em>.1</em><span class="caret"></span></div>
+          <div class="who"><b>BEAT</b>, Inland Beat</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Tune by number</h3><p>Typing 1 then 2 shows 12 with the .1 filled in and the station it will tune to. It tunes after a second and a half, or at once on OK.</p></div>
+      <div class="note"><h3>Wrong numbers</h3><p>A channel with no station shows "No station on 13" and the nearest two, then stays on the current channel.</p></div>
+      <div class="note"><h3>The old picture stays</h3><p>CIVC keeps playing until BEAT is ready, so typing never produces a black screen.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= GUIDE ================= -->
+<section class="ref" id="guide"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>The guide</span></div>
+  <h2>The cable guide, with the channel still playing.</h2>
+  <p class="lede">The guide covers the screen but keeps the current channel playing in a window, the way cable guides did. The focused program's details sit at the top left. Arrows move through the grid; OK on a program that's on now tunes to it, and OK on a later one opens its options.</p>
+  <div class="stage">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="gov">
+          <div class="gov-top">
+            <div class="info">
+              <div class="when">9:00 – 10:00 pm, BEAT 12.1</div>
+              <h3>Beat Tape Live</h3>
+              <p><span style="color:var(--live);font-weight:600">Live</span> from the Redlands studio. Producers play unreleased tapes and talk through how they were made.</p>
+              <div class="hint"><span class="kbd">OK</span>Options <span class="kbd" style="margin-left:24px">Back</span>Close guide</div>
+            </div>
+            <div class="live">
+              <div class="pic reel cq"><div class="scene"></div><div class="card"><div><b style="font-size:64px">Saturday Reel</b></div></div><div class="bug"><span class="cs" style="font-size:22px">BEAT</span><span class="ch" style="font-size:13px">12.1</span></div></div>
+              <div class="cap2"><span>Now on BEAT 12.1</span><span class="mono">8:42 pm</span></div>
+            </div>
+          </div>
+          <div class="gg" id="tvGuide"></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Six rows, two hours</h3><p>At ten feet, six stations and two hours is as much as reads. CH ▲ ▼ pages through the dial six stations at a time.</p></div>
+      <div class="note"><h3>Focus follows time</h3><p>Moving up and down keeps you at the same time of night, so scanning "what's on at 9" is only ▲ ▼.</p></div>
+      <div class="note"><h3>The picture keeps going</h3><p>Opening the guide never stops what you're watching. Closing it returns you exactly where you were.</p></div>
+    </div>
+  </div>
+
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="gov" style="filter:brightness(.45)"><div class="gov-top"><div class="info"><div class="when">9:00 – 10:00 pm, BEAT 12.1</div><h3>Beat Tape Live</h3></div><div class="live"><div class="pic reel cq"><div class="scene"></div></div></div></div><div class="gg" id="tvGuide2"></div></div>
+        <div class="tv-panel dlg">
+          <div class="when">Tonight, 9:00 pm, BEAT 12.1</div>
+          <h3>Beat Tape Live</h3>
+          <div class="tv-btn primary f">Remind me<small style="color:var(--on-signal);opacity:.75">On this TV and your phone</small></div>
+          <div class="tv-btn">Switch me over at 9:00</div>
+          <div class="tv-btn">Tune to BEAT now<small>Saturday Reel is on</small></div>
+          <div class="tv-btn">About Inland Beat</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Options for later programs</h3><p>The same choices as the web listing, stacked as big buttons with the primary focused. Back closes it and returns to the same cell.</p></div>
+      <div class="note"><h3>No record button</h3><p>Opencast is a broadcast, so there's nothing to record. If on-demand is ever added, it appears here, not as a DVR.</p></div>
+      <div class="note"><h3>Reminders reach the TV</h3><p>At 8:59 a small card slides in over whatever's on: "Beat Tape Live is starting on BEAT 12.1. OK to switch."</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= MENUS ================= -->
+<section class="ref" id="menus"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Menu and presets</span></div>
+  <h2>A rail for everything else, a strip for favourites.</h2>
+  <p class="lede">The menu slides in from the left over a dimmed picture and holds everything that isn't watching. Presets come up from the bottom with ◀ and tune with OK or with the number keys 1 to 6.</p>
+  <div class="stage">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic reel cq full dim"><div class="scene"></div><div class="card"><div><b>Saturday Reel</b></div></div></div>
+        <div class="mrail">
+          <div class="logo"><svg><use href="#mk"/></svg>opencast</div>
+          <div class="mi">Guide</div>
+          <div class="mi">Presets<small>5 saved</small></div>
+          <div class="mi f">Radio band<small>4 stations</small></div>
+          <div class="mi">Your market<small>Inland Empire</small></div>
+          <div class="mi">Captions<small>Off</small></div>
+          <div class="mi">Settings</div>
+          <div class="mi">Signed in as Kai M.</div>
+          <div class="foot">Menu or Back to close</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Seven items</h3><p>Guide, presets, radio, market, captions, settings and the account. Search isn't here: with a remote, the dial and the guide are faster than typing.</p></div>
+      <div class="note"><h3>The picture keeps playing</h3><p>Dimmed behind the rail, with its sound on. The menu is a pause in attention, not in the broadcast.</p></div>
+    </div>
+  </div>
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic reel cq full"><div class="scene"></div><div class="card"><div><b>Saturday Reel</b><span>Cartoons, 1928 to 1934</span></div></div><div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div></div>
+        <div class="tv-panel pstrip">
+          <h4>Presets <span>OK to tune, or press 1 to 6</span></h4>
+          <div class="pgrid">
+            <div class="pt"><span class="k">1</span><span class="ch">12.1</span><span class="cs">BEAT</span><small>Saturday Reel</small></div>
+            <div class="pt f"><span class="k">2</span><span class="ch">7.1</span><span class="cs">CIVC</span><small><span style="color:var(--live);font-weight:600">Live</span> Town Hall</small></div>
+            <div class="pt"><span class="k">3</span><span class="ch">88.3</span><span class="cs">NITE</span><small>Radio dramas</small></div>
+            <div class="pt"><span class="k">4</span><span class="ch">24.1</span><span class="cs">REEL</span><small>Cartoons, 1928 to 1934</small></div>
+            <div class="pt"><span class="k">5</span><span class="ch">101.9</span><span class="cs">CRAT</span><small><span style="color:var(--live);font-weight:600">Live</span> Producers' Hour</small></div>
+            <div class="pt empty"><span class="k">6</span><span class="ch">+</span><span class="cs" style="font-family:var(--font-text);font-weight:600;font-size:24px">Save this channel</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>What's on, on each</h3><p>Every preset shows what it's airing now, so the strip is a small guide of the stations you care about.</p></div>
+      <div class="note"><h3>Saving from the TV</h3><p>An empty slot offers to save the channel you're watching. Holding OK on a full slot replaces it.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= STATES ================= -->
+<section class="ref" id="states"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>Radio, off air, first launch, pledge</span></div>
+  <h2>The full-screen moments.</h2>
+  <p class="lede">A radio station on a TV, a station that's signed off, the first time the app opens, and the one action that needs money.</p>
+  <div class="stage">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="radio-full" style="background:#33507A">
+          <div class="drift">
+            <div class="f1">88.3</div>
+            <div class="cs">NITE</div>
+            <div class="sub">Night Desk, radio dramas from the 1940s. Now: The Hollow Door, part 2</div>
+            <div class="meter" aria-hidden="true"><i style="height:40%"></i><i style="height:72%"></i><i style="height:55%"></i><i style="height:92%"></i><i style="height:60%"></i><i style="height:34%"></i><i style="height:76%"></i><i style="height:48%"></i><i style="height:84%"></i><i style="height:38%"></i><i style="height:66%"></i><i style="height:52%"></i><i style="height:70%"></i><i style="height:44%"></i></div>
+          </div>
+          <span class="tally lit" style="position:absolute;top:54px;right:96px">ON AIR</span>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The frequency is the picture</h3><p>Station colour fills the screen, the frequency is set huge, and the level meter moves with the sound.</p></div>
+      <div class="note"><h3>It drifts</h3><p>The whole block moves slowly around the screen, a few pixels a minute, so an all-night radio station doesn't burn into an OLED.</p></div>
+    </div>
+  </div>
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="state-full">
+          <div class="big">Off air</div>
+          <p>CIVC 7.1 signs on again at <span class="mono">6:00 am</span>. REEL 24.1 is on now.</p>
+          <div class="row"><div class="tv-btn primary f">Tune to REEL 24.1</div><div class="tv-btn">Open the guide</div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Always a way out</h3><p>Off air says when the station is back and focuses a button to something that's on. Stand by uses the same layout with the colour bars.</p></div>
+      <div class="note"><h3>Channels keep working</h3><p>▲ ▼ still flips the dial from here; an off-air station is a place on the dial, not a dead end.</p></div>
+    </div>
+  </div>
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="setup">
+          <div>
+            <div class="logo"><svg><use href="#mk"/></svg>opencast</div>
+            <h2>Sign in on your phone.</h2>
+            <p>Scan the code, or go to <span class="mono" style="color:var(--ink)">useopencast.org/tv</span> and enter:</p>
+            <div class="code">K7Q 4MP</div>
+            <div class="tv-btn primary f" style="margin-top:44px;width:640px">Watch without signing in</div>
+            <p style="font-size:24px;margin-top:18px">Your market: Inland Empire, from this TV's connection. Change it any time in the menu.</p>
+          </div>
+          <div style="justify-self:center"><div class="qrbox" style="width:420px;height:420px"><svg><use href="#qr"/></svg></div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Signing in is optional</h3><p>The focused button is "Watch without signing in". An account only adds presets, reminders and pledges, and those carry over from the phone once signed in.</p></div>
+      <div class="note"><h3>Code or QR</h3><p>Both finish on the phone, where a wallet or email sign-in already works. The TV updates the moment it's done.</p></div>
+      <div class="note"><h3>The market is guessed</h3><p>From the TV's connection, and said out loud with where to change it. The next thing on screen is the first station's picture.</p></div>
+    </div>
+  </div>
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic reel cq full"><div class="scene"></div><div class="card" style="right:620px"><div><b style="font-size:110px">Saturday Reel</b></div></div><div class="bug" style="right:720px"><span class="cs">BEAT</span><span class="ch">12.1</span></div></div>
+        <div class="tv-panel pledge-panel">
+          <h3>Pledge to Inland Beat</h3>
+          <p>Scan with your phone. It opens BEAT's pledge with $10.00 a month selected, and you finish there.</p>
+          <div class="qrbox"><svg><use href="#qr"/></svg></div>
+          <div class="url">useopencast.org/beat/pledge</div>
+          <div class="tv-btn" style="margin-top:auto">Close</div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Money happens on the phone</h3><p>The TV never takes payment details. Pledge, from the menu or a station's info, becomes a QR that opens the same pledge sheet as the phone app.</p></div>
+      <div class="note"><h3>The picture shifts, it doesn't stop</h3><p>The panel takes the right side and the program keeps playing to its left.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= CAST ================= -->
+<section class="ref" id="cast"><div class="wrap">
+  <div class="ch-label"><span class="n">06</span><span>Casting and the phone remote</span></div>
+  <h2>The TV shows it. The phone runs it.</h2>
+  <p class="lede">When the phone app casts to a Chromecast or AirPlay TV, the TV plays the station full screen and shows the same banner on every change. The phone turns into a remote: channel rocker, number keys, presets, guide and info.</p>
+  <div class="stage">
+    <div class="fit" data-w="1920" data-h="1080"><div class="scaler">
+      <div class="tv">
+        <div class="pic cq full"><div class="scene"></div><div class="podium"></div><div class="figure"></div><div class="l3"><span class="nm">Dana Whitfield</span><br><span class="tt">Chair, Planning Commission</span></div><div class="bug"><span class="cs">CIVC</span><span class="ch">7.1</span></div></div>
+        <div class="tv-panel banner">
+          <div class="id"><span class="ch">7.1</span><span class="cs">CIVC</span><small>Inland Civic</small></div>
+          <div class="now">
+            <span class="src"><span style="color:var(--live);font-weight:600">Live</span> from Redlands City Hall</span>
+            <h3>Town Hall: backyard homes and ADUs</h3>
+            <div class="prog"><span class="mono">8:00</span><span class="bar"><i style="width:47%"></i></span><span class="mono">9:30</span><span>48 min left</span></div>
+            <div class="nx">Next at <span class="mono">9:30</span><b>Planning Commission, Sept 24</b></div>
+          </div>
+          <div class="side"><span class="clock">8:42 pm</span><span class="tally lit">ON AIR</span></div>
+          <div class="hints"><span class="castchip"><svg><use href="#i-cast"/></svg>Playing from Kai's phone</span><span class="end">Change channel on your phone</span></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The same banner</h3><p>The TV side of casting is the watching screen from section 02. Only the hint row changes, to say where the controls are.</p></div>
+      <div class="note"><h3>Guide on the phone</h3><p>While casting, Guide opens the phone's guide, where choosing a program tunes the TV. The TV guide overlay is for the TV app, where the remote drives it.</p></div>
+      <div class="note"><h3>Others can join</h3><p>Anyone on the same network with the app can pick up the remote, so the whole room can change channel. The chip names whoever changed it last.</p></div>
+    </div>
+  </div>
+
+  <div class="stage phones" style="margin-top:var(--s6)">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><button class="icon-btn bare" aria-label="Minimise player"><svg class="i"><use href="#i-down"/></svg></button><span class="quiet" style="font-size:13px;margin:0 auto">CIVC 7.1</span><button class="icon-btn bare" aria-label="Cast"><svg class="i" style="width:22px;height:18px"><use href="#i-cast"/></svg></button></div>
+            <div class="p-main">
+              <div class="pic cq" style="border-radius:0"><div class="scene"></div><div class="podium"></div><div class="figure"></div><div class="bug"><span class="cs">CIVC</span><span class="ch">7.1</span></div></div>
+            </div>
+            <div class="backdrop">
+              <div class="sheet">
+                <div class="grab"><i></i></div>
+                <div class="m-head" style="padding-top:6px"><div><h3>Watch on</h3><p>TVs on this Wi-Fi</p></div></div>
+                <div class="m-main dev-list">
+                  <div class="opts" style="border-top:0">
+                    <div class="opt sel"><span class="ic"><svg><use href="#i-tv"/></svg></span><div><b>Living room TV</b><small>Chromecast</small></div><span class="rad" style="margin-left:auto"></span></div>
+                    <div class="opt"><span class="ic"><svg><use href="#i-tv"/></svg></span><div><b>Bedroom TV</b><small>AirPlay</small></div><span class="rad" style="margin-left:auto"></span></div>
+                    <div class="opt"><span class="ic"><svg><use href="#i-phone"/></svg></span><div><b>This phone</b><small>Stop casting</small></div><span class="rad" style="margin-left:auto"></span></div>
+                  </div>
+                  <p class="m-note">Got Opencast installed on the TV? It's faster than casting and has its own remote controls.</p>
+                </div>
+                <div class="m-foot"><button class="btn btn-primary">Play on Living room TV</button></div>
+              </div>
+            </div>
+            <div class="hind" style="position:relative;z-index:11"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Choosing a TV.</b></p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="pr-top"><span class="dev"><svg><use href="#i-cast"/></svg>Living room TV</span><button class="btn btn-ghost btn-sm" style="margin-left:auto">Stop</button></div>
+            <div class="p-main">
+              <div class="pr-now">
+                <div><div class="id"><span class="ch">7.1</span><span class="cs">CIVC</span><span class="tag tag-live"><span class="d"></span>Live</span></div><b>Town Hall: backyard homes and ADUs</b>
+                  <div class="prog"><span class="mono">8:00</span><span class="bar"><i style="width:47%"></i></span><span class="mono">9:30</span></div></div>
+                <span class="tally lit">ON AIR</span>
+              </div>
+              <div class="rocker">
+                <div class="rk"><button aria-label="Channel up"><svg><use href="#i-up"/></svg></button><span>CH</span><button aria-label="Channel down"><svg><use href="#i-down"/></svg></button></div>
+                <div class="mid"><span class="ch">7.1</span><span class="cs">CIVC</span><div class="quiet" style="font-size:12px;margin-top:6px">Up: 9.1 RDLS<br>Down: 31.1 PREP</div></div>
+                <div class="rk"><button aria-label="Pause"><svg><use href="#i-pause"/></svg></button><span>PLAY</span><button aria-label="Last channel"><svg><use href="#i-back"/></svg></button></div>
+              </div>
+              <div class="pr-row">
+                <button class="btn btn-ghost"><svg><use href="#i-guide"/></svg>Guide</button>
+                <button class="btn btn-ghost"><svg><use href="#i-info"/></svg>Info</button>
+                <button class="btn btn-ghost"><svg><use href="#i-keys"/></svg>Keypad</button>
+                <button class="btn btn-ghost"><svg><use href="#i-back"/></svg>Last</button>
+              </div>
+              <div style="padding:6px 18px 6px;font-size:13px;font-weight:600;color:var(--ink-50)">Presets</div>
+              <div class="pr-pres">
+                <button><span class="k">1</span><span class="ch">12.1</span></button>
+                <button class="on"><span class="k">2</span><span class="ch">7.1</span></button>
+                <button><span class="k">3</span><span class="ch">88.3</span></button>
+                <button><span class="k">4</span><span class="ch">24.1</span></button>
+                <button><span class="k">5</span><span class="ch">101.9</span></button>
+                <button style="border-style:dashed"><span class="k">6</span><span class="ch" style="color:var(--ink-50)">+</span></button>
+              </div>
+              <p class="quiet" style="font-size:12.5px;text-align:center;margin:4px 18px 16px">Volume buttons on the phone control the TV.</p>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>The phone remote.</b></p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="pr-top"><span class="dev"><svg><use href="#i-cast"/></svg>Living room TV</span><button class="btn btn-ghost btn-sm" style="margin-left:auto">Done</button></div>
+            <div class="p-main">
+              <div class="kp-disp"><div class="d">24<em>.1</em></div><small><b style="color:var(--ink)">REEL</b>, Saturday Reel. Tuning in 1 second</small></div>
+              <div class="keypad">
+                <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>6</button><button>7</button><button>8</button><button>9</button><button>.</button><button>0</button><button class="go">Tune</button>
+              </div>
+              <p class="quiet" style="font-size:12.5px;text-align:center;margin:0 28px">Radio frequencies work too: 8, 8, 3 tunes 88.3.</p>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Keypad.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>The cast button</h3><p>It sits in the player's top bar and opens a short list of TVs on the Wi-Fi. It also points out that the installed TV app is better than casting where it's available.</p></div>
+      <div class="note"><h3>A rocker, like a remote</h3><p>Two rockers: channel on the left, play and last on the right, with the current channel between them and its neighbours named underneath.</p></div>
+      <div class="note"><h3>Everything a remote has</h3><p>Guide, Info, a keypad and Last, plus the six presets, so a phone does everything the cable-style remote in section 01 does.</p></div>
+      <div class="note"><h3>On the lock screen</h3><p>While casting, the lock screen shows channel up, channel down and pause, so changing channel doesn't need the app open.</p></div>
+      <div class="note open"><h3>Casting to Roku and Apple TV</h3><p>AirPlay reaches Apple TV. Roku has no casting target for web apps; Roku viewers are reached through FAST packaging of stations instead.</p></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, TV mode. Stations, programs and people are illustrations. Opencast is a working name.</p></div></footer>
+
+<script>
+(function(){
+  /* TV guide: 8:30 to 10:30 pm in 10-minute units (12) */
+  var G = [
+    ['7.1','CIVC',[[0,6,'Town Hall: backyard homes','Live, until 9:30',1,0],[6,12,'Planning Commission','9:30 – 11:00',0,0]]],
+    ['9.1','RDLS',[[0,4.5,'City Council, Sept 16','Listed, until 9:15',1,0],[4.5,7.5,'Community calendar','9:15',0,0],[7.5,12,'Council Watch','From CIVC',0,0]]],
+    ['12.1','BEAT',[[0,3,'Saturday Reel','From REEL',1,0],[3,9,'Beat Tape Live','Live, 9:00 – 10:00',0,1],[9,12,'Late Crate, ep. 15','10:00',0,0]]],
+    ['18.1','SAZN',[[0,3,'Tamales for forty','Until 9:00',1,0],[3,9,'Orange Street after hours','9:00',0,0],[9,12,'Saz\u00f3n archive','10:00',0,0]]],
+    ['24.1','REEL',[[0,3,'Cartoons, 1928 to 1934','Until 9:00',1,0],[3,9,'Newsreel hour','9:00',0,0],[9,12,'Cartoons from 1935','10:00',0,0]]],
+    ['31.1','PREP',[[0,9,'Football: Redlands East Valley at Citrus Valley','Until 10:00',1,0],[9,12,'Friday scoreboard','10:00',0,0]]]
+  ];
+  function guide(id){
+    var el=document.getElementById(id); if(!el) return;
+    var h='<div class="gg-h"><div></div><div style="grid-column:span 3">8:30 pm</div><div style="grid-column:span 3">9:00</div><div style="grid-column:span 3">9:30</div><div style="grid-column:span 3">10:00</div></div>';
+    h+=G.map(function(r){ return '<div class="gg-r"><div class="gg-st"><span class="ch">'+r[0]+'</span><span class="cs">'+r[1]+'</span></div>'+r[2].map(function(p){ var a=Math.round(p[0])+2, b=Math.round(p[1])+2; return '<div class="gg-p'+(p[4]?' on':'')+(p[5]?' f':'')+'" style="grid-column:'+a+' / '+b+'"><b>'+p[2]+'</b><small>'+(p[3].indexOf('Live')===0?'<span class="lv">Live</span>'+p[3].slice(4):p[3])+'</small></div>'; }).join('')+'</div>'; }).join('');
+    h+='<div class="gg-now" style="left:calc(260px + (100% - 260px) * '+(12/120)+')"><span>8:42</span></div>';
+    el.innerHTML=h;
+  }
+  guide('tvGuide'); guide('tvGuide2');
+  /* 4.5 and 7.5 units: use 5-minute grid for RDLS */
+  var st=document.createElement('style'); st.textContent='.gg-h,.gg-r{grid-template-columns:260px repeat(24,1fr)}'; document.head.appendChild(st);
+  document.querySelectorAll('.gg-h div[style*="span 3"]').forEach(function(d){ d.style.gridColumn='span 6'; });
+  document.querySelectorAll('.gg-p').forEach(function(c){ var m=c.getAttribute('style').match(/grid-column:(\d+) \/ (\d+)/); });
+  /* re-render with 5-minute units */
+  function guide5(id){
+    var el=document.getElementById(id); if(!el) return;
+    var h='<div class="gg-h"><div></div><div style="grid-column:span 6">8:30 pm</div><div style="grid-column:span 6">9:00</div><div style="grid-column:span 6">9:30</div><div style="grid-column:span 6">10:00</div></div>';
+    h+=G.map(function(r){ return '<div class="gg-r"><div class="gg-st"><span class="ch">'+r[0]+'</span><span class="cs">'+r[1]+'</span></div>'+r[2].map(function(p){ var a=Math.round(p[0]*2)+2, b=Math.round(p[1]*2)+2; return '<div class="gg-p'+(p[4]?' on':'')+(p[5]?' f':'')+'" style="grid-column:'+a+' / '+b+'"><b>'+p[2]+'</b><small>'+(p[3].indexOf('Live')===0?'<span class="lv">Live</span>'+p[3].slice(4):p[3])+'</small></div>'; }).join('')+'</div>'; }).join('');
+    h+='<div class="gg-now" style="left:calc(260px + (100% - 260px) * '+(12/120)+')"><span>8:42</span></div>';
+    el.innerHTML=h;
+  }
+  guide5('tvGuide'); guide5('tvGuide2');
+
+  function fitAll(){ document.querySelectorAll('.fit').forEach(function(f){ var w=+f.dataset.w, h=+f.dataset.h, s=Math.min(1, f.clientWidth/w); var sc=f.querySelector('.scaler'); sc.style.transform='scale('+s+')'; sc.style.width=w+'px'; f.style.height=(h*s)+'px'; }); }
+  fitAll(); window.addEventListener('resize', fitAll);
+  if (window.ResizeObserver){ var ro=new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
+  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  function cur(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
+  function lab(){ btn.textContent = cur()==='dark'?'Light ground':'Dark ground'; }
+  try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+</script>
+</body>
+</html>

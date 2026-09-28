@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Station, program, search and radio · Opencast reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+
+.sec-top { display:flex; align-items:baseline; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-top:26px; }
+.sec-top:first-child { margin-top:0; }
+.sec-top h3 { margin:0; font:700 18px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-top .sub { font-size:13px; color:var(--ink-50); }
+.sec-top .end { margin-left:auto; }
+
+/* station page */
+.st-band { color:#fff; padding:26px 28px 22px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:4px 22px; align-items:end; }
+.st-band .ch { font:500 64px/1 var(--font-mono); letter-spacing:-.05em; grid-row:span 2; padding-right:22px; border-right:1px solid rgb(255 255 255 / .45); }
+.st-band .cs { font:800 52px/1 var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.st-band .nm { font-size:15px; opacity:.9; }
+.st-band .acts { grid-row:span 2; display:flex; gap:10px; align-self:center; }
+.st-band .btn-on { background:#fff; color:#0F1830; }
+.st-band .btn-line { color:#fff; border-color:rgb(255 255 255 / .6); }
+.st-body { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:32px; padding:22px 28px 30px; }
+.now-card { display:grid; grid-template-columns:300px minmax(0,1fr); gap:18px; padding:14px 0; border-bottom:1px solid var(--hair); }
+.now-card b { display:block; font:800 24px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.025em; margin:6px 0 4px; }
+.now-card p { margin:0 0 10px; font-size:14px; color:var(--ink-70); }
+.days2 { display:flex; gap:4px; margin:12px 0 4px; }
+.days2 button { height:30px; padding:0 11px; border:1px solid var(--hair); border-radius:var(--r-control); background:none; font:600 12.5px var(--font-text); color:var(--ink-70); }
+.days2 button.on { border-color:var(--ink); color:var(--ink); }
+.sch2 { display:grid; grid-template-columns:70px minmax(0,1fr) auto; gap:12px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; align-items:center; }
+.sch2 .mono { font-size:13px; color:var(--ink-50); }
+.sch2 b { font-weight:600; display:block; } .sch2 small { font-size:12.5px; color:var(--ink-50); }
+.sch2.now { background:var(--raised); box-shadow:inset 3px 0 0 var(--tally); padding-left:10px; margin-left:-10px; }
+.sch2.past { opacity:.55; }
+.side p { font-size:14px; color:var(--ink-70); margin:10px 0 0; }
+.kv2 div { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.kv2 div span:first-child { color:var(--ink-70); } .kv2 div span:last-child { font-weight:600; text-align:right; }
+.lk { display:grid; grid-template-columns:44px minmax(0,1fr); gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.lk .ch { font:500 13px var(--font-mono); color:var(--ink-50); }
+.lk b { font-weight:600; display:block; } .lk small { font-size:12.5px; color:var(--ink-70); }
+.und { font-size:13.5px; color:var(--ink-70); padding:8px 0; border-bottom:1px solid var(--hair); }
+
+/* program page */
+.pr-head { display:grid; grid-template-columns:420px minmax(0,1fr); gap:28px; padding:24px 28px 20px; border-bottom:1px solid var(--hair); }
+.pr-head .tc.lg { aspect-ratio:16/9; }
+.pr-head .tc.lg .t { font-size:34px; }
+.pr-head h2 { margin:6px 0 8px; font:800 40px/1 var(--font-display); font-stretch:112%; letter-spacing:-.035em; }
+.pr-head p { font-size:15px; color:var(--ink-70); margin:0 0 14px; max-width:56ch; }
+.pr-head .meta { display:flex; gap:12px; flex-wrap:wrap; font-size:13.5px; color:var(--ink-70); margin-bottom:16px; }
+.pr-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:36px; padding:18px 28px 30px; }
+.wt { display:grid; grid-template-columns:52px 64px minmax(0,1fr) auto; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.wt .ch { font:500 15px var(--font-mono); } .wt .cs { font-size:14px; }
+.wt b { font-weight:600; display:block; } .wt small { font-size:12.5px; color:var(--ink-70); }
+.ep { display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.ep .n { font:500 13px var(--font-mono); color:var(--ink-50); }
+.ep b { font-weight:600; display:block; } .ep small { font-size:12.5px; color:var(--ink-70); }
+.ep.aired { color:var(--ink-50); } .ep.aired b { color:var(--ink-70); }
+
+/* search */
+.srch { padding:22px 28px; }
+.srch .bigfield { display:flex; align-items:center; gap:12px; height:56px; padding:0 18px; border:2px solid var(--ink); border-radius:var(--r-control); font-size:20px; background:var(--raised); }
+.srch .bigfield .q { color:var(--ink); } .srch .bigfield .caret { width:2px; height:24px; background:var(--signal); margin-left:-8px; }
+.srch .bigfield .hint { margin-left:auto; font-size:13px; color:var(--ink-50); }
+.tune-row { display:flex; align-items:center; gap:16px; padding:14px 16px; margin-top:14px; border:1px solid var(--signal); border-radius:var(--r-control); background:var(--raised); }
+.tune-row .ch { font:500 34px/1 var(--font-mono); letter-spacing:-.04em; }
+.tune-row b { display:block; font-weight:600; } .tune-row small { font-size:13px; color:var(--ink-70); }
+.tune-row .end { margin-left:auto; display:flex; gap:10px; align-items:center; font-size:13px; color:var(--ink-50); }
+.res-h { display:flex; align-items:baseline; gap:10px; margin:22px 0 0; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.res-h h4 { margin:0; font:700 16px var(--font-display); }
+.res-h span { font-size:13px; color:var(--ink-50); }
+.res { display:grid; grid-template-columns:112px minmax(0,1fr) 240px auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.res .tc { padding:5px 7px; } .res .tc .t { font-size:10.5px; }
+.res b { display:block; font:700 15px/1.25 var(--font-display); } .res small { font-size:12.5px; color:var(--ink-70); }
+.res .when { font-size:13px; color:var(--ink-70); } .res .when .mono { color:var(--ink); }
+.res.st { grid-template-columns:56px 80px minmax(0,1fr) auto; }
+.res.st .ch { font:500 17px var(--font-mono); } .res.st .cs { font-size:15px; }
+mark { background:none; color:inherit; box-shadow:inset 0 -2px 0 var(--signal); }
+.recent { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.recent span { height:30px; padding:0 12px; border:1px solid var(--hair); border-radius:var(--r-control); font-size:13px; color:var(--ink-70); display:inline-flex; align-items:center; }
+
+/* radio band */
+.rb-scale { position:relative; height:120px; margin:6px 0 18px; border-bottom:2px solid var(--ink); }
+.rb-scale .tick { position:absolute; bottom:0; width:1px; background:var(--line); }
+.rb-scale .tick.maj { background:var(--ink); }
+.rb-scale .lbl { position:absolute; bottom:-24px; transform:translateX(-50%); font:500 12px var(--font-mono); color:var(--ink-50); }
+.rb-scale .stn { position:absolute; bottom:0; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:4px; }
+.rb-scale .stn .cs { font-size:12.5px; }
+.rb-scale .stn .f { font:500 12px var(--font-mono); color:var(--ink-70); }
+.rb-scale .stn .bar { width:6px; height:38px; border-radius:2px; }
+.rb-scale .needle { position:absolute; bottom:-6px; top:0; width:2px; background:var(--tally); box-shadow:0 0 8px var(--tally-glow); }
+.rb-scale .needle::after { content:""; position:absolute; top:-2px; left:-4px; width:10px; height:10px; border-radius:50%; background:var(--tally); }
+.rb-list { margin-top:36px; border-top:1px solid var(--line); }
+.rbr { display:grid; grid-template-columns:110px 70px minmax(0,1fr) 200px auto; gap:14px; align-items:center; padding:12px 0; border-bottom:1px solid var(--hair); }
+.rbr .f { font:500 30px/1 var(--font-mono); letter-spacing:-.04em; }
+.rbr .cs { font-size:15px; }
+.rbr b { display:block; font:700 16px/1.25 var(--font-display); } .rbr small { font-size:13px; color:var(--ink-70); }
+.rbr .nx { font-size:13px; color:var(--ink-50); } .rbr .nx .mono { color:var(--ink-70); }
+.rbr.on { background:var(--raised); box-shadow:inset 3px 0 0 var(--tally); }
+.rbr.on .f { padding-left:10px; }
+
+/* phone */
+.p-back { flex:none; display:flex; align-items:center; gap:6px; padding:4px 12px 10px; border-bottom:1px solid var(--hair); }
+.p-back b { font:800 19px var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.ph-band { color:#fff; padding:18px 18px 16px; }
+.ph-band .ch { font:500 40px/1 var(--font-mono); letter-spacing:-.05em; }
+.ph-band .cs { font:800 34px/1 var(--font-display); font-stretch:125%; margin-left:10px; }
+.ph-band .nm { font-size:13.5px; opacity:.9; margin-top:8px; }
+.ph-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:12px 16px; border-bottom:1px solid var(--hair); }
+.ph-acts .btn { padding:0 6px; font-size:13.5px; height:40px; }
+.ph-sec { padding:12px 16px 4px; }
+.ph-sec .sch2 { grid-template-columns:52px minmax(0,1fr); }
+.ph-srch { padding:10px 14px; border-bottom:1px solid var(--hair); }
+.ph-srch .bigfield { height:48px; font-size:17px; border-width:2px; }
+.ph-res { padding:0 16px; }
+.ph-res .res.st { grid-template-columns:48px 60px minmax(0,1fr); }
+.ph-res .res { grid-template-columns:72px minmax(0,1fr); }
+.rb-mini { display:flex; gap:0; overflow:hidden; padding:14px 16px 8px; }
+.rb-mini .sc { position:relative; height:70px; flex:1; border-bottom:2px solid var(--ink); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-chev" viewBox="0 0 20 20"><path d="M8 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol></defs></svg>
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: station, program, search and radio</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Ref. 05</span><span>Viewer app, web and phone</span></div>
+  <h1>Where the dial's links go.</h1>
+  <p>Four pages the home file already points at: a station's own page, a program's page, search, and the radio band. Each answers one question: who is this station, where can I watch this, how do I find something, and what's on the radio.</p>
+  <p>Same tokens and components as the home file. It's 8:42 pm on Saturday in the Inland Empire.</p>
+  <ul class="toc">
+    <li><a href="#station"><span class="mono">01</span>Station page</a></li>
+    <li><a href="#program"><span class="mono">02</span>Program page</a></li>
+    <li><a href="#search"><span class="mono">03</span>Search</a></li>
+    <li><a href="#radio"><span class="mono">04</span>Radio band</a></li>
+    <li><a href="#phone"><span class="mono">05</span>On the phone</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>A schedule, not a library</h3><p class="muted">Station and program pages show when things air. Nothing plays on demand; everything leads to tuning in or a reminder.</p></div>
+    <div><h3>Carriage is visible</h3><p class="muted">Every page names who made a program and who airs it, so the network between stations is something viewers can follow.</p></div>
+    <div><h3>Numbers tune</h3><p class="muted">Typing a channel or frequency in search tunes to it, the way a keypad did.</p></div>
+    <div><h3>Still no scores</h3><p class="muted">Member counts and carriage counts are the only numbers. No views, no ratings, no rankings.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= STATION ================= -->
+<section class="ref" id="station"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Station page</span></div>
+  <h2>Who the station is, and its whole week.</h2>
+  <p class="lede">The station preview sheet opens into this. The station's colour carries the header, like its own ID card. Below are what's on now, the week's schedule, and a side column saying who runs it, what it carries, what it makes for others, and who supports it.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="900"><div class="scaler">
+      <div class="app" style="height:900px">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a class="on" href="#station">Dial</a><a href="#station">Guide</a><a href="#radio">Radio</a><a href="#station">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main">
+          <div class="st-band" style="background:#8C3B7A">
+            <span class="ch">12.1</span><span class="cs">BEAT</span>
+            <div class="acts"><a class="btn btn-on" href="#station">Tune in</a><button class="btn btn-ghost btn-line"><svg class="i"><use href="#i-check"/></svg>Preset 1</button><button class="btn btn-ghost btn-line">Pledge</button><button class="btn btn-ghost btn-line"><svg class="i"><use href="#i-share"/></svg>Share</button></div>
+            <span class="nm">Inland Beat. Music from producers around the Inland Empire, on air around the clock.</span>
+          </div>
+          <div class="st-body">
+            <div>
+              <div class="sec-top"><h3>On now</h3></div>
+              <div class="now-card">
+                <div class="pic reel cq" style="border-radius:var(--r-screen)"><div class="scene"></div><div class="card"><div><b style="font-size:34px">Saturday Reel</b></div></div><div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div></div>
+                <div><span class="quiet" style="font-size:13px"><span class="mono">8:30 – 9:00 pm</span>, 18 min left</span><b>Saturday Reel</b><p>Cartoons from 1928 to 1934. Carried from <a href="#program" style="color:var(--signal);font-weight:600;text-decoration:none">REEL 24.1</a>.</p><p style="margin:0">Next at <span class="mono">9:00</span>: <b style="display:inline;font:600 14px var(--font-text)">Beat Tape Live</b> <span style="color:var(--live);font-weight:600;font-size:13px">Live</span></p></div>
+              </div>
+              <div class="sec-top"><h3>This week</h3><span class="end"><a class="btn-text btn" style="font-size:13.5px" href="#station">Full guide</a></span></div>
+              <div class="days2"><button>Sun</button><button>Mon</button><button>Tue</button><button>Wed</button><button>Thu</button><button>Fri</button><button class="on">Sat</button></div>
+              <div id="stSched"></div>
+            </div>
+            <aside class="side">
+              <div class="sec-top"><h3>About</h3></div>
+              <p>Run by a producer collective in Redlands. Beat showcases on weeknights, live sets on Saturdays, and carried programs overnight.</p>
+              <div class="kv2" style="margin-top:10px">
+                <div><span>Market</span><span>Inland Empire</span></div>
+                <div><span>On the dial since</span><span>September 2026</span></div>
+                <div><span>Members</span><span>214</span></div>
+              </div>
+              <div class="sec-top"><h3>Carries</h3><span class="sub">From other stations</span></div>
+              <div class="lk"><span class="ch">24.1</span><div><b>Saturday Reel</b><small>From REEL, Saturdays 8:30 pm</small></div></div>
+              <div class="lk"><span class="ch">90.7</span><div><b>Slow Hours</b><small>From HALL, nightly 11:00 pm</small></div></div>
+              <div class="sec-top"><h3>Made here, carried elsewhere</h3></div>
+              <div class="lk"><span class="ch">12.1</span><div><b>Late Crate</b><small>Carried by 2 stations</small></div></div>
+              <div class="sec-top"><h3>Made possible by</h3></div>
+              <div class="und">Members of Inland Beat</div>
+              <div class="und">Redlands Hardware</div>
+              <div class="und">Orange Street Coffee</div>
+            </aside>
+          </div>
+        </div>
+        <div class="a-player">
+          <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+          <div><div class="ti">Saturday Reel</div><div class="st">BEAT 12.1, carried from REEL</div></div>
+          <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn" aria-label="Channel down"><svg class="i"><use href="#i-down"/></svg></button><button class="icon-btn" aria-label="Channel up"><svg class="i"><use href="#i-up"/></svg></button><button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The header is the station's</h3><p>Its colour, its channel and call sign in white, and its own one-line description. Buttons on the colour use white and outline so they pass contrast on any station colour.</p></div>
+      <div class="note"><h3>The week, not an archive</h3><p>Day tabs over the station's listings. Past programs today are faded, the one on air has the tally edge, and each future program opens its listing with Remind me.</p></div>
+      <div class="note"><h3>Its place in the network</h3><p>What it carries from other stations, and what it makes that others carry. The carriage count is the only measure of a station anywhere a viewer looks.</p></div>
+      <div class="note"><h3>Made possible by</h3><p>Underwriters and members, exactly as they're read on air. Businesses running spots aren't listed; underwriting is a public credit, spots aren't.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= PROGRAM ================= -->
+<section class="ref" id="program"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Program page</span></div>
+  <h2>A program, and everywhere it airs.</h2>
+  <p class="lede">"Carried from REEL 24.1" and program titles in the guide open this. It says who makes the program, every station in your market that airs it and when, and its episodes with the next airing of each.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="900"><div class="scaler">
+      <div class="app" style="height:900px">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a class="on" href="#program">Dial</a><a href="#program">Guide</a><a href="#radio">Radio</a><a href="#program">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main">
+          <div class="pr-head">
+            <div class="tc lg" style="background:#9A5412"><span class="t">Saturday Reel</span><span class="b">REEL 24.1</span></div>
+            <div>
+              <span class="quiet" style="font-size:13.5px">A series from <b style="color:var(--ink)">REEL 24.1</b></span>
+              <h2>Saturday Reel</h2>
+              <div class="meta"><span>40 episodes of 30 minutes</span><span>Public domain, restored</span><span>Carried by 12 stations</span></div>
+              <p>Animated shorts from the late silent and early sound era, cleaned up frame by frame. Each episode is three or four shorts around a theme.</p>
+              <div style="display:flex;gap:10px"><a class="btn btn-primary" href="#program">Tune in to BEAT 12.1, on now</a><button class="btn btn-ghost">About REEL</button></div>
+            </div>
+          </div>
+          <div class="pr-body">
+            <div>
+              <div class="sec-top"><h3>Where to watch</h3><span class="sub">In the Inland Empire</span></div>
+              <div class="wt"><span class="ch">12.1</span><span class="cs">BEAT</span><div><b>Now, until 9:00 pm</b><small>Saturdays at 8:30 pm</small></div><span class="tag tag-live" style="border-color:var(--ink);color:var(--ink)">On now</span></div>
+              <div class="wt"><span class="ch">24.1</span><span class="cs">REEL</span><div><b>Saturdays, all day</b><small>Its own station</small></div><button class="btn btn-ghost btn-sm">Tune in</button></div>
+              <div class="wt"><span class="ch">18.1</span><span class="cs">SAZN</span><div><b>Sunday at 9:00 am</b><small>Weekly</small></div><button class="btn btn-ghost btn-sm"><svg class="i"><use href="#i-bell"/></svg>Remind me</button></div>
+              <p class="quiet" style="font-size:13px;margin:10px 0 0">Also on 9 stations outside your market. <a href="#program" style="color:var(--signal);font-weight:600;text-decoration:none">See where</a></p>
+            </div>
+            <div>
+              <div class="sec-top"><h3>Episodes</h3><span class="sub">14 of 40 aired so far</span></div>
+              <div class="ep aired"><span class="n">13</span><div><b>Barnyard frolics</b><small>Last aired tonight on REEL, 8:00 pm</small></div><span></span></div>
+              <div class="ep"><span class="n">14</span><div><b>River boats and paddle wheels</b><small>On BEAT now</small></div><span class="tag tag-live" style="border-color:var(--ink);color:var(--ink)">On now</span></div>
+              <div class="ep"><span class="n">15</span><div><b>Skeletons at midnight</b><small>Next: SAZN, Sunday 9:00 am</small></div><button class="icon-btn bare" aria-label="Remind me"><svg class="i"><use href="#i-bell"/></svg></button></div>
+              <div class="ep"><span class="n">16</span><div><b>The jazz shorts</b><small>Next: REEL, October 3, 8:00 pm</small></div><button class="icon-btn bare" aria-label="Remind me"><svg class="i"><use href="#i-bell"/></svg></button></div>
+              <div class="ep"><span class="n">17</span><div><b>Down on the farm</b><small>Not scheduled yet</small></div><span></span></div>
+            </div>
+          </div>
+        </div>
+        <div class="a-player">
+          <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+          <div><div class="ti">Saturday Reel</div><div class="st">BEAT 12.1, carried from REEL</div></div>
+          <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn" aria-label="Channel down"><svg class="i"><use href="#i-down"/></svg></button><button class="icon-btn" aria-label="Channel up"><svg class="i"><use href="#i-up"/></svg></button><button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The maker first</h3><p>The page leads with REEL, the station that made it, even when you arrived from BEAT. Carrying a program never hides its source.</p></div>
+      <div class="note"><h3>The primary action is what's on</h3><p>If it's airing anywhere in your market right now, the button tunes there. If not, it becomes Remind me for the next airing.</p></div>
+      <div class="note"><h3>Episodes lead to airings</h3><p>Each episode shows its next airing and a reminder. There's no play button: an episode is watched when a station airs it.</p></div>
+      <div class="note open"><h3>On demand</h3><p>This is the page on-demand viewing would attach to, if it's ever added. The earlier question about watching from the start lives here too.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= SEARCH ================= -->
+<section class="ref" id="search"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>Search</span></div>
+  <h2>Type a name, a program or a channel.</h2>
+  <p class="lede">Search takes three kinds of query. A channel or frequency tunes straight away. A call sign or station name finds the station. Anything else finds programs, ordered by when they air next, so what's on now comes first.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a href="#search">Dial</a><a href="#search">Guide</a><a href="#radio">Radio</a><a href="#search">Presets</a></nav>
+          <div class="a-search" style="visibility:hidden"></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main"><div class="srch">
+          <div class="bigfield"><svg class="i" style="width:22px;height:22px;color:var(--ink-50)"><use href="#i-search"/></svg><span class="q">town hall</span><span class="caret"></span><span class="hint">Esc to close</span></div>
+          <div class="res-h"><h4>Programs</h4><span>Airing next first</span></div>
+          <div class="res"><div class="tc" style="background:#2E6B5A"><span class="t">Town Hall</span></div><div><b><mark>Town Hall</mark>: backyard homes and ADUs</b><small>CIVC 7.1, Inland Civic</small></div><span class="when"><span style="color:var(--live);font-weight:600">Live now</span>, until <span class="mono">9:30 pm</span></span><a class="btn btn-primary btn-sm" href="#search">Tune in</a></div>
+          <div class="res"><div class="tc" style="background:#2E6B5A"><span class="t">Co-op town hall</span></div><div><b>Co-op <mark>town hall</mark>: members' questions</b><small>CIVC 7.1</small></div><span class="when">Tuesday, <span class="mono">7:00 pm</span></span><button class="btn btn-ghost btn-sm"><svg class="i"><use href="#i-bell"/></svg>Remind me</button></div>
+          <div class="res"><div class="tc" style="background:#4F5B2A"><span class="t">Colton town hall</span></div><div><b>Colton <mark>town hall</mark>, district 3</b><small>RDLS 9.1, listed from the city's stream</small></div><span class="when">October 8, <span class="mono">6:30 pm</span></span><button class="btn btn-ghost btn-sm"><svg class="i"><use href="#i-bell"/></svg>Remind me</button></div>
+          <div class="res-h"><h4>Stations</h4></div>
+          <div class="res st"><span class="ch">7.1</span><span class="cs">CIVC</span><div><b>Inland Civic</b><small>Public affairs. Town halls and council meetings</small></div><button class="btn btn-ghost btn-sm">Station</button></div>
+          <div class="res-h"><h4>Recent searches</h4></div>
+          <div class="recent"><span>12.1</span><span>cartoons</span><span>council</span><span>88.3</span></div>
+        </div></div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Ordered by time, not relevance</h3><p>A program on now beats one next month. Within the same time, programs in your market come before carried copies elsewhere.</p></div>
+      <div class="note"><h3>Search opens over everything</h3><p>The slash key or the search bar opens a full-width field. Esc returns to exactly where you were, and the player keeps going.</p></div>
+      <div class="note"><h3>Listed programs appear too</h3><p>City streams Opencast lists but doesn't restream are searchable, marked "listed from the city's stream".</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= RADIO ================= -->
+<section class="ref" id="radio"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Radio band</span></div>
+  <h2>A tuner, then the stations on it.</h2>
+  <p class="lede">The Radio nav opens the radio band as a dial: a scale from 88 to 108 with each station marked at its frequency, and a needle where you're tuned. Below it, the same stations as rows with what's on now and next.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a href="#radio">Dial</a><a href="#radio">Guide</a><a class="on" href="#radio">Radio</a><a href="#radio">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main"><div class="a-pad">
+          <div class="sec-h"><h3>Radio band</h3><span class="sub">Inland Empire, 4 stations</span><div class="end"><span class="quiet" style="font-size:13px">Arrow keys move along the band</span></div></div>
+          <div class="rb-scale" id="rbScale"></div>
+          <div class="rb-list" id="rbList"></div>
+        </div></div>
+        <div class="a-player">
+          <div class="tc" style="background:#33507A"><span class="t">88.3</span></div>
+          <div><div class="ti">Radio dramas from the 1940s</div><div class="st">NITE 88.3, The Hollow Door, part 2</div></div>
+          <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn" aria-label="Down the band"><svg class="i"><use href="#i-down"/></svg></button><button class="icon-btn" aria-label="Up the band"><svg class="i"><use href="#i-up"/></svg></button><button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The scale is the navigation</h3><p>Clicking a station on the scale tunes it; the needle slides there. Gaps on the scale show open frequencies, which is also how a would-be station sees there's room.</p></div>
+      <div class="note"><h3>The tally follows you</h3><p>The station you're tuned to gets the tally edge in the list and the needle on the scale, and the player bar shows its frequency.</p></div>
+      <div class="note"><h3>Keeps going in the background</h3><p>Radio is built to be heard with the tab hidden or the phone locked, with channel up and down on the lock screen.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= PHONE ================= -->
+<section class="ref" id="phone"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>On the phone</span></div>
+  <h2>The same four pages, one column.</h2>
+  <p class="lede">Nothing is removed. The station page's side column moves under the schedule, search puts the channel shortcut at the top, and the radio band's scale scrolls sideways.</p>
+  <div class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-back"><button class="icon-btn bare" aria-label="Back"><svg class="i"><use href="#i-down"/></svg></button><b>Station</b></div>
+            <div class="p-main">
+              <div class="ph-band" style="background:#8C3B7A"><div><span class="ch">12.1</span><span class="cs">BEAT</span></div><div class="nm">Inland Beat. Music from producers around the Inland Empire.</div></div>
+              <div class="ph-acts"><a class="btn btn-primary" href="#phone">Tune in</a><button class="btn btn-ghost">Preset 1</button><button class="btn btn-ghost">Pledge</button></div>
+              <div class="ph-sec">
+                <div class="sec-top" style="margin-top:0"><h3>Tonight</h3></div>
+                <div id="phSched"></div>
+                <div class="sec-top"><h3>Carries</h3></div>
+                <div class="lk"><span class="ch">24.1</span><div><b>Saturday Reel</b><small>From REEL</small></div></div>
+                <div class="lk"><span class="ch">90.7</span><div><b>Slow Hours</b><small>From HALL</small></div></div>
+              </div>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Station page.</b></p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="ph-srch srch" style="padding:10px 14px"><div class="bigfield"><svg class="i" style="color:var(--ink-50)"><use href="#i-search"/></svg><span class="q">24</span><span class="caret"></span></div></div>
+            <div class="p-main">
+              <div style="padding:0 14px">
+                <div class="tune-row"><span class="ch">24.1</span><div><b>Tune to REEL</b><small>Cartoons from 1928 to 1934</small></div><div class="end"><svg class="i" style="color:var(--signal)"><use href="#i-chev"/></svg></div></div>
+              </div>
+              <div class="ph-res">
+                <div class="res-h"><h4>Stations</h4></div>
+                <div class="res st"><span class="ch">24.1</span><span class="cs">REEL</span><div><b>Saturday Reel</b><small>Classic, public domain</small></div></div>
+                <div class="res-h"><h4>Programs</h4></div>
+                <div class="res"><div class="tc" style="background:#A3402A"><span class="t">24 Hours</span></div><div><b><mark>24</mark> hours at the fair</b><small>SAZN 18.1, Sunday 2:00 pm</small></div></div>
+              </div>
+            </div>
+            <nav class="p-tabs"><a href="#phone"><svg><use href="#i-dial"/></svg>Dial</a><a href="#phone"><svg><use href="#i-guide"/></svg>Guide</a><a class="on" href="#phone"><svg><use href="#i-search"/></svg>Search</a><a href="#phone"><svg><use href="#i-user"/></svg>You</a></nav>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Search, typing a channel.</b></p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-back"><b style="margin-left:6px">Radio band</b><span class="quiet" style="font-size:13px;margin-left:auto;margin-right:6px">4 stations</span></div>
+            <div class="p-main">
+              <div style="padding:14px 16px 30px;overflow-x:auto"><div class="rb-scale" id="rbScalePh" style="width:640px;height:96px"></div></div>
+              <div id="rbListPh" style="padding:0 16px;border-top:1px solid var(--line)"></div>
+            </div>
+            <div class="p-mini"><div class="tc" style="background:#33507A"><span class="t">88.3</span></div><div style="min-width:0"><div class="ti clamp1">Radio dramas</div><div class="st clamp1">NITE 88.3</div></div><div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn bare" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div></div>
+            <nav class="p-tabs"><a class="on" href="#phone"><svg><use href="#i-dial"/></svg>Dial</a><a href="#phone"><svg><use href="#i-guide"/></svg>Guide</a><a href="#phone"><svg><use href="#i-search"/></svg>Search</a><a href="#phone"><svg><use href="#i-user"/></svg>You</a></nav>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Radio band.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Channel shortcut first</h3><p>Typing digits puts a "Tune to" row above the results. One tap tunes; it's the phone version of the TV keypad.</p></div>
+      <div class="note"><h3>Radio stays on the Dial tab</h3><p>The radio band opens from the TV and Radio switch on the dial, so it keeps the Dial tab selected. There's no fifth tab.</p></div>
+      <div class="note"><h3>A swipeable scale</h3><p>The band scale scrolls sideways with the needle kept in view, and tapping a station mark tunes it.</p></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, station, program, search and radio. Stations, programs and people are illustrations. Opencast is a working name.</p></div></footer>
+
+<script>
+(function(){
+  function fill(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
+  var SCH = [
+    ['6:00 pm','Crate Session 02','From the library','past'],
+    ['8:00','Late Crate, ep. 14','Beat showcase','past'],
+    ['8:30','Saturday Reel','Carried from REEL 24.1','now'],
+    ['9:00','Beat Tape Live','<span style="color:var(--live);font-weight:600">Live</span> from the Redlands studio',''],
+    ['10:00','Late Crate, ep. 15','Beat showcase',''],
+    ['11:00','Slow Hours','Carried from HALL 90.7',''],
+    ['12:00 am','Late Crate, eps. 12 to 15','Overnight repeat','']
+  ];
+  fill('stSched', SCH.map(function(r){ return '<div class="sch2 '+r[3]+'"><span class="mono">'+r[0]+'</span><div><b>'+r[1]+'</b><small>'+r[2]+'</small></div>'+(r[3]===''?'<button class="icon-btn bare" aria-label="Remind me"><svg class="i"><use href="#i-bell"/></svg></button>':'<span></span>')+'</div>'; }).join(''));
+  fill('phSched', SCH.slice(2).map(function(r){ return '<div class="sch2 '+r[3]+'"><span class="mono">'+r[0]+'</span><div><b>'+r[1]+'</b><small>'+r[2]+'</small></div></div>'; }).join(''));
+
+  var R = [['88.3','NITE','#33507A','Radio dramas from the 1940s','Now: The Hollow Door, part 2','6:00 am','Morning desk',1],['90.7','HALL','#56508A','Slow beats for late work','All night','2:00 am','Quiet hours'],['101.9','CRAT','#7E2F35','The Producers\u2019 Hour','<span style="color:var(--live);font-weight:600">Live</span> from Riverside','9:00','Sample Sunday'],['104.3','VOZE','#1D6A70','Noche de oldies','Oldies en espa\u00f1ol','12:00 am','Madrugada']];
+  function scale(id){
+    var el=document.getElementById(id); if(!el) return; var h='';
+    for (var f=88; f<=108; f+=0.5){ var x=(f-88)/20*100; var maj=(f%2===0); h+='<span class="tick'+(maj?' maj':'')+'" style="left:'+x+'%;height:'+(maj?16:8)+'px"></span>'; if(maj) h+='<span class="lbl" style="left:'+x+'%">'+f+'</span>'; }
+    R.forEach(function(r){ var x=(parseFloat(r[0])-88)/20*100; h+='<span class="stn" style="left:'+x+'%;bottom:18px"><span class="cs">'+r[1]+'</span><span class="f">'+r[0]+'</span><span class="bar" style="background:'+r[2]+'"></span></span>'; });
+    h+='<span class="needle" style="left:'+((88.3-88)/20*100)+'%"></span>';
+    el.innerHTML=h;
+  }
+  scale('rbScale'); scale('rbScalePh');
+  fill('rbList', R.map(function(r){ return '<div class="rbr'+(r[7]?' on':'')+'"><span class="f">'+r[0]+'</span><span class="cs">'+r[1]+'</span><div><b>'+r[3]+'</b><small>'+r[4]+'</small></div><span class="nx">Next at <span class="mono">'+r[5]+'</span> '+r[6]+'</span>'+(r[7]?'<span class="tally lit">ON AIR</span>':'<button class="btn btn-ghost btn-sm">Tune in</button>')+'</div>'; }).join(''));
+  fill('rbListPh', R.map(function(r){ return '<div class="rbr'+(r[7]?' on':'')+'" style="grid-template-columns:80px minmax(0,1fr)"><span class="f" style="font-size:24px">'+r[0]+'</span><div><span class="cs" style="font-size:13px">'+r[1]+'</span><b style="font-size:14.5px">'+r[3]+'</b></div></div>'; }).join(''));
+
+  function fitAll(){ document.querySelectorAll('.fit').forEach(function(f){ var w=+f.dataset.w, h=+f.dataset.h, s=Math.min(1, f.clientWidth/w); var sc=f.querySelector('.scaler'); sc.style.transform='scale('+s+')'; sc.style.width=w+'px'; f.style.height=(h*s)+'px'; }); }
+  fitAll(); window.addEventListener('resize', fitAll);
+  if (window.ResizeObserver){ var ro=new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
+  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  function cur(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
+  function lab(){ btn.textContent = cur()==='dark'?'Light ground':'Dark ground'; }
+  try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+</script>
+</body>
+</html>

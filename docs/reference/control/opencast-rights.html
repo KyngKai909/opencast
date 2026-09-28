@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rights, takedowns and claimable stations · Opencast reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+
+
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+
+/* ===== Master control ===== */
+.step-h { display:flex; align-items:baseline; gap:12px; margin:var(--s6) 0 var(--s3); }
+.step-h:first-of-type { margin-top:0; }
+.step-h .mono { font-size:13px; color:var(--ink-50); }
+.step-h h3 { margin:0; font:700 22px/1.2 var(--font-display); letter-spacing:-.015em; }
+.flow-map { display:flex; flex-wrap:wrap; gap:6px 0; margin:0 0 var(--s5); padding:0; list-style:none; font-size:14px; }
+.flow-map li { display:flex; align-items:center; color:var(--ink-70); }
+.flow-map li + li::before { content:""; width:22px; height:1px; background:var(--line); margin:0 10px; }
+.flow-map .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+
+.mc-head { height:56px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1px solid var(--hair); }
+.mc-lock { display:inline-flex; align-items:center; gap:12px; }
+.mc-lock .a-logo { font-size:18px; } .mc-lock .a-logo svg { width:24px; height:19px; }
+.mc-lock .div { width:1px; height:20px; background:var(--line); }
+.mc-lock b { font-weight:600; font-size:15px; }
+.stn-switch { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:var(--r-control); background:none; cursor:pointer; }
+.stn-switch .sw { width:14px; height:14px; border-radius:3px; }
+.stn-switch .ch { font-size:14px; } .stn-switch .cs { font-size:14px; }
+.mc-clock { margin-left:auto; font:500 15px var(--font-mono); font-variant-numeric:tabular-nums; }
+.mc-end { display:flex; align-items:center; gap:10px; }
+.mc-body { flex:1; display:grid; grid-template-columns:200px minmax(0,1fr); min-height:0; }
+.mc-rail { border-right:1px solid var(--hair); padding:14px 10px; overflow:auto; }
+.mc-rail .g { font-size:12px; font-weight:600; color:var(--ink-50); padding:12px 10px 4px; }
+.mc-rail .g:first-child { padding-top:0; }
+.mc-rail a { display:flex; align-items:center; gap:8px; height:34px; padding:0 10px; border-radius:var(--r-control); text-decoration:none; color:var(--ink-70); font-size:14.5px; font-weight:500; }
+.mc-rail a.on { background:var(--raised); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair); }
+.mc-rail a .ct { margin-left:auto; font:500 12px var(--font-mono); color:var(--ink-50); }
+.mc-rail a .ct.warn { color:var(--standby); }
+.mc-steps { padding:18px 14px; }
+.mc-steps .st { display:flex; align-items:center; gap:10px; padding:9px 4px; font-size:14.5px; color:var(--ink-50); font-weight:500; }
+.mc-steps .st .n { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font:500 12px var(--font-mono); flex:none; }
+.mc-steps .st.done { color:var(--ink-70); } .mc-steps .st.done .n { background:var(--ink); border-color:var(--ink); color:var(--ground); }
+.mc-steps .st.cur { color:var(--ink); } .mc-steps .st.cur .n { border-color:var(--signal); color:var(--signal); box-shadow:0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent); }
+.mc-steps .hint { margin-top:18px; padding-top:14px; border-top:1px solid var(--hair); font-size:13px; color:var(--ink-70); line-height:1.45; }
+.mc-main { overflow:auto; padding:22px 28px 28px; position:relative; }
+.mc-title { display:flex; align-items:flex-end; gap:14px; margin-bottom:18px; }
+.mc-title h2 { margin:0; font:800 28px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.mc-title p { margin:4px 0 0; font-size:14.5px; color:var(--ink-70); max-width:62ch; }
+.mc-title .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.mc-foot { display:flex; align-items:center; gap:12px; padding-top:16px; margin-top:18px; border-top:1px solid var(--hair); }
+.mc-foot .end { margin-left:auto; display:flex; gap:10px; }
+.split { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:28px; }
+.pane { border-left:1px solid var(--hair); padding-left:28px; }
+.pane h4 { margin:0 0 10px; font:700 15px var(--font-display); }
+.fld { margin-bottom:16px; }
+.fld > label, .fld > .lb { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.fld .field { color:var(--ink); }
+.fld .ok { font-size:13px; color:var(--signal); margin-top:6px; display:flex; gap:6px; align-items:center; }
+.fld .help { font-size:13px; color:var(--ink-50); margin-top:6px; }
+.fld-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.chgrid { display:grid; grid-template-columns:repeat(10,1fr); gap:5px; }
+.cn { height:32px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:500 13px var(--font-mono); color:var(--ink); cursor:pointer; }
+.cn.taken { border-style:dashed; border-color:var(--hair); color:var(--ink-50); text-decoration:line-through; cursor:not-allowed; }
+.cn.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.swatches { display:flex; gap:8px; align-items:center; }
+.swatches i { width:30px; height:30px; border-radius:var(--r-control); display:block; cursor:pointer; }
+.swatches i.sel { box-shadow:0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.swatches .field { height:34px; width:120px; font:500 13px var(--font-mono); }
+.vis { display:flex; flex-direction:column; gap:14px; }
+.vis .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; }
+.mini-listing { display:grid; grid-template-columns:40px 1fr 72px; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+.mini-listing .ch { font-size:15px; font-weight:500; } .mini-listing .cs { font-size:13px; } .mini-listing b { display:block; font:700 14px/1.2 var(--font-display); } .mini-listing small { font-size:12px; color:var(--ink-50); }
+.mini-listing .tc { padding:4px 6px; } .mini-listing .tc .t { font-size:9px; }
+
+/* library */
+.drop { border:1.5px dashed var(--line); border-radius:var(--r-screen); padding:18px; display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+.drop .ic { width:44px; height:44px; border-radius:var(--r-control); background:var(--raised); display:grid; place-items:center; flex:none; }
+.drop b { display:block; font-weight:600; } .drop small { color:var(--ink-70); font-size:13px; }
+.drop .end { margin-left:auto; display:flex; gap:8px; }
+.lib-h, .lib-row { display:grid; grid-template-columns:88px minmax(0,1fr) 128px 64px 190px 36px; gap:14px; align-items:center; }
+.lib-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding:0 0 6px; border-bottom:1px solid var(--line); }
+.lib-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.lib-row .tc { padding:4px 6px; } .lib-row .tc .t { font-size:9.5px; }
+.lib-row b { display:block; font-weight:600; font-size:14.5px; } .lib-row small { font-size:12.5px; color:var(--ink-50); }
+.lib-row .d { font:500 13px var(--font-mono); }
+.typesel { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 8px; border:1px solid var(--line); border-radius:var(--r-control); font:500 12px var(--font-mono); background:none; }
+.typesel.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.typesel.spt { color:var(--standby); border-color:var(--standby); }
+.typesel.und { border-style:dashed; }
+.status { font-size:13px; display:flex; flex-direction:column; gap:4px; }
+.status.ready { color:var(--ink-70); } .status.ready::before { content:"Ready for air"; color:var(--ink); font-weight:600; }
+.status .bar { height:4px; background:var(--hair); border-radius:2px; overflow:hidden; } .status .bar i { display:block; height:100%; background:var(--signal); }
+.status.need { color:var(--standby); font-weight:600; }
+.dots3 { width:30px; height:30px; border-radius:var(--r-control); border:0; background:none; color:var(--ink-50); font-size:18px; line-height:1; cursor:pointer; }
+.lib-sum { display:flex; gap:18px; font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.lib-sum b { color:var(--ink); font-weight:600; }
+
+/* program log timeline */
+.days { display:flex; gap:4px; margin-bottom:14px; }
+.days button { height:32px; padding:0 12px; border:1px solid var(--hair); border-radius:var(--r-control); background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.days button.on { border-color:var(--ink); color:var(--ink); }
+.tl { position:relative; display:grid; grid-template-columns:56px 1fr; }
+.tl .hrs { position:relative; }
+.tl .hrs span { position:absolute; left:0; font:500 12px var(--font-mono); color:var(--ink-50); transform:translateY(-50%); }
+.tl .col { position:relative; border-left:1px solid var(--line); }
+.tl .col .hl { position:absolute; left:0; right:0; height:1px; background:var(--hair); }
+.blk { position:absolute; left:8px; right:0; border-radius:var(--r-control); padding:5px 10px; font-size:13px; overflow:hidden; display:flex; gap:10px; align-items:flex-start; }
+.blk b { font-weight:600; font-size:13.5px; }
+.blk small { color:var(--ink-70); font-size:12px; }
+.blk .code { flex:none; margin-top:1px; }
+.blk.pgm { background:var(--raised); box-shadow:inset 0 0 0 1px var(--hair); }
+.blk.car { background:var(--raised); box-shadow:inset 0 0 0 1px var(--line); border:1px dashed var(--line); }
+.blk.brk { background:color-mix(in srgb, var(--standby-fill) 22%, var(--ground)); box-shadow:inset 3px 0 0 var(--standby); padding:0 10px; align-items:center; font-size:11.5px; color:var(--ink-70); }
+.blk.dead { background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby-fill) 18%, transparent) 0 8px, transparent 8px 16px); border:1.5px dashed var(--standby); color:var(--standby); align-items:center; justify-content:center; font-weight:600; }
+.blk.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.code { display:inline-block; min-width:36px; text-align:center; font:500 11px var(--font-mono); padding:1px 5px; border-radius:var(--r-sign); border:1px solid var(--line); }
+.code.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.code.spt { border-color:var(--standby); color:var(--standby); }
+.code.und { border-style:dashed; }
+.warnbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--standby); border-radius:var(--r-control); color:var(--ink); font-size:14px; margin-bottom:14px; }
+.warnbar .ic { color:var(--standby); }
+.warnbar b { font-weight:600; }
+.warnbar .end { margin-left:auto; }
+.okbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:var(--r-control); font-size:14px; margin-bottom:14px; }
+
+/* translators */
+.tr-row { display:grid; grid-template-columns:44px minmax(0,1fr) 250px 90px; gap:14px; align-items:center; padding:14px 0; border-bottom:1px solid var(--hair); }
+.tr-row:first-of-type { border-top:1px solid var(--line); }
+.tr-row .lg { width:44px; height:44px; border-radius:var(--r-control); display:grid; place-items:center; font:800 13px var(--font-display); color:#fff; }
+.tr-row b { display:block; font-weight:600; } .tr-row small { font-size:13px; color:var(--ink-70); display:block; }
+.tr-row .lb { font-size:12px; color:var(--ink-50); font-weight:600; margin-bottom:4px; }
+.tr-row .seg button { font-size:12px; padding:0 10px; }
+
+/* preflight + monitor */
+.check-list { border-top:1px solid var(--line); }
+.ck { display:grid; grid-template-columns:28px 1fr auto; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--hair); }
+.ck .m { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; }
+.ck.ok .m { background:var(--ink); color:var(--ground); } .ck.ok .m svg { width:14px; height:14px; }
+.ck.warn .m { border:1.5px solid var(--standby); color:var(--standby); font:700 13px var(--font-text); }
+.ck b { font-weight:600; display:block; font-size:14.5px; } .ck small { font-size:13px; color:var(--ink-70); }
+.signon { display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px; border:1px solid var(--hair); border-radius:var(--r-screen); text-align:center; }
+.signon .btn { height:56px; padding:0 40px; font-size:17px; }
+.signon small { font-size:13px; color:var(--ink-70); max-width:32ch; }
+.mon { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; }
+.mon .lbl { font-size:12.5px; font-weight:600; color:var(--ink-50); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.mon .pv { opacity:.85; }
+.rundown { margin-top:16px; border-top:1px solid var(--line); }
+.rd { display:grid; grid-template-columns:78px 50px minmax(0,1fr) 64px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rd .t { font:500 13px var(--font-mono); color:var(--ink-70); }
+.rd .d { font:500 13px var(--font-mono); text-align:right; }
+.rd.now { background:var(--raised); box-shadow:inset 3px 0 0 var(--tally); }
+.rd.now .t { padding-left:10px; }
+.rd small { display:block; font-size:12px; color:var(--ink-50); }
+.cd { font:500 28px var(--font-mono); letter-spacing:-.03em; }
+.health { border-top:1px solid var(--line); }
+.hl-row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.hl-row span:last-child { color:var(--ink-70); font-family:var(--font-mono); font-size:13px; }
+.hl-row .good::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ink-70); margin-right:6px; }
+
+/* syndication + spots */
+.filters { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.syn-h, .syn-row { display:grid; grid-template-columns:112px minmax(0,1fr) 230px 92px 150px; gap:14px; align-items:center; }
+.syn-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.syn-row { padding:10px 0; border-bottom:1px solid var(--hair); }
+.syn-row .tc { padding:6px 8px; } .syn-row .tc .t { font-size:11px; }
+.syn-row b { display:block; font:700 15px/1.2 var(--font-display); } .syn-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.syn-row .terms { font-size:13px; line-height:1.35; } .syn-row .terms em { font-style:normal; font-weight:600; display:block; }
+.syn-row .by { font-size:13px; color:var(--ink-70); }
+.syn-row .acts { display:flex; gap:6px; justify-content:flex-end; }
+.syn-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.syn-row.sel > :first-child { margin-left:10px; }
+.termopt { display:grid; grid-template-columns:22px 1fr auto; gap:12px; padding:13px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.termopt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; margin-top:2px; }
+.termopt.sel .rad { border-color:var(--signal); } .termopt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.termopt b { font-weight:600; display:block; font-size:15px; } .termopt small { font-size:13px; color:var(--ink-70); display:block; margin-top:2px; }
+.termopt .p { font:500 14px var(--font-mono); text-align:right; }
+.brkbar { display:flex; height:18px; border-radius:3px; overflow:hidden; border:1px solid var(--line); }
+.brkbar i { display:block; height:100%; }
+.brkbar .f { background:var(--ink); } .brkbar .th { background:repeating-linear-gradient(135deg, var(--line) 0 4px, transparent 4px 8px); } .brkbar .o { background:transparent; }
+.brkbar .n { background:var(--standby-fill); }
+.bk-h, .bk-row { display:grid; grid-template-columns:78px minmax(0,1fr) 220px 110px 120px; gap:14px; align-items:center; }
+.bk-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.bk-row { padding:12px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.bk-row .t { font:500 13px var(--font-mono); }
+.bk-row b { display:block; font-weight:600; } .bk-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.bk-row .open { font-size:13px; } .bk-row .open .mono { font-weight:500; }
+.legend { display:flex; gap:16px; font-size:12.5px; color:var(--ink-70); margin-top:10px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.legend i { width:14px; height:10px; border-radius:2px; border:1px solid var(--line); display:inline-block; }
+.sp-h, .sp-row { display:grid; grid-template-columns:100px minmax(0,1fr) 54px 150px; gap:12px; align-items:center; }
+.sp-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.sp-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; cursor:pointer; }
+.sp-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.sp-row.sel > :first-child { margin-left:10px; }
+.sp-row .tc { padding:5px 7px; } .sp-row .tc .t { font-size:10px; }
+.sp-row b { display:block; font-weight:600; } .sp-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.sp-row .d { font:500 13px var(--font-mono); }
+.sp-row .rate { font-size:13px; } .sp-row .rate .mono { font-weight:500; }
+.spot-detail .pic { margin-bottom:12px; }
+.adpic { background:#5a3a22 !important; }
+.adpic .card { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:8%; color:#fff; }
+.adpic .card b { font:800 clamp(14px,7cqw,34px)/1 var(--font-display); font-stretch:112%; }
+.adpic .card span { font-size:clamp(9px,3cqw,14px); opacity:.9; margin-top:4px; }
+.adpic .qr { position:absolute; right:6%; top:10%; width:18%; aspect-ratio:1; background:#fff; border-radius:4px; padding:4%; }
+.adpic .qr i { display:block; width:100%; height:100%; background:
+  linear-gradient(90deg,#111 0 30%,transparent 30% 40%,#111 40% 50%,transparent 50% 70%,#111 70%) 0 0/100% 20%,
+  linear-gradient(90deg,transparent 0 20%,#111 20% 45%,transparent 45% 60%,#111 60% 80%,transparent 80%) 0 50%/100% 20%,
+  linear-gradient(90deg,#111 0 35%,transparent 35% 55%,#111 55%) 0 100%/100% 20%; background-repeat:no-repeat; }
+.kv { border-top:1px solid var(--line); margin:10px 0; }
+.kv div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.kv div span:first-child { color:var(--ink-70); } .kv div span:last-child { font-weight:600; text-align:right; }
+.week { display:grid; grid-template-columns:56px repeat(7,1fr); border-top:1px solid var(--line); }
+.week .wh { font-size:12.5px; font-weight:600; color:var(--ink-50); padding:6px 8px; border-bottom:1px solid var(--line); }
+.week .wh.on { color:var(--ink); }
+.week .tm { font:500 12px var(--font-mono); color:var(--ink-50); padding:8px 0; border-bottom:1px solid var(--hair); }
+.week .cl { border-left:1px solid var(--hair); border-bottom:1px solid var(--hair); padding:4px; font-size:12px; min-height:48px; }
+.week .cl .it { border-radius:4px; padding:4px 6px; background:var(--raised); height:100%; line-height:1.25; }
+.week .cl .it.new { background:transparent; border:2px solid var(--signal); }
+.week .cl .it.rep { text-decoration:line-through; color:var(--ink-50); }
+.week .cl .it.live { box-shadow:inset 2px 0 0 var(--live); }
+
+/* phone master control */
+.pm-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 16px 10px; border-bottom:1px solid var(--hair); }
+.pm-top .cs { font-size:16px; } .pm-top .ch { font-size:14px; color:var(--ink-50); }
+.pm-sec { padding:14px 16px; border-bottom:1px solid var(--hair); }
+.pm-sec h4 { margin:0 0 8px; font:700 15px var(--font-display); }
+.pm-next { display:flex; align-items:center; gap:12px; }
+.pm-next small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pm-acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:14px 16px; }
+.notif { margin:14px 12px 0; padding:12px 14px; border-radius:16px; background:var(--raised); box-shadow:0 0 0 1px var(--hair), 0 8px 24px rgb(0 0 0 / .25); font-size:13.5px; }
+.notif .top { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--ink-50); margin-bottom:4px; }
+.notif .top svg { width:16px; height:13px; }
+.notif b { display:block; font-weight:600; font-size:14.5px; }
+
+.sec-top { display:flex; align-items:baseline; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-top:22px; }
+.sec-top:first-child { margin-top:0; }
+.sec-top h3 { margin:0; font:700 17px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-top .sub { font-size:13px; color:var(--ink-50); }
+.sec-top .end { margin-left:auto; display:flex; gap:8px; }
+.row2 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.row2 b { display:block; font-weight:600; font-size:14.5px; } .row2 small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:1px; }
+.row2 .end { display:flex; gap:8px; align-items:center; }
+.row2 .m { font:500 14px var(--font-mono); text-align:right; }
+.state { display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:var(--r-sign); font:600 12.5px var(--font-text); border:1px solid var(--line); white-space:nowrap; }
+.state.hold { color:var(--standby); border-color:var(--standby); }
+.state.done { color:var(--ink-70); }
+.state.up { color:var(--live); border-color:var(--live); }
+.cl-h, .cl { display:grid; grid-template-columns:100px minmax(0,1fr) 180px 200px 90px; gap:14px; align-items:center; }
+.cl-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.cl { padding:12px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.cl .t { font:500 13px/1.35 var(--font-mono); color:var(--ink-70); }
+.cl b { display:block; font-weight:600; } .cl small { display:block; font-size:12.5px; color:var(--ink-70); }
+.cl.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--standby); }
+.cl.sel .t { padding-left:10px; }
+.standing { display:grid; grid-template-columns:repeat(3,1fr); border-top:2px solid var(--ink); margin-bottom:20px; }
+.standing > div { padding:14px 18px 0 0; }
+.standing > div + div { padding-left:18px; border-left:1px solid var(--hair); }
+.standing .v { font:500 28px var(--font-mono); letter-spacing:-.03em; }
+.standing small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:2px; }
+.claim-card { border:1.5px solid var(--standby); border-radius:var(--r-screen); padding:16px 18px; }
+.claim-card h4 { margin:0 0 4px; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.claim-card .quote { margin:12px 0; padding:10px 14px; border-left:3px solid var(--line); font-size:14px; color:var(--ink-70); background:var(--raised); }
+.timeline { border-top:1px solid var(--line); }
+.tl-r { display:grid; grid-template-columns:22px 130px minmax(0,1fr); gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); font-size:13.5px; align-items:start; }
+.tl-r .dot { width:12px; height:12px; border-radius:50%; border:2px solid var(--line); margin-top:4px; }
+.tl-r.done .dot { background:var(--ink); border-color:var(--ink); }
+.tl-r.cur .dot { border-color:var(--standby); background:var(--standby-fill); }
+.tl-r .when { font:500 12.5px var(--font-mono); color:var(--ink-70); }
+.tl-r b { font-weight:600; display:block; } .tl-r small { font-size:12.5px; color:var(--ink-70); }
+.tl-r.future { color:var(--ink-50); }
+/* claim landing */
+.claim-page { max-width:760px; margin:0 auto; padding:36px 28px; }
+.claim-page .kick { font-size:14px; color:var(--ink-70); }
+.claim-page h2 { margin:8px 0 12px; font:800 44px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; }
+.claim-page > p { font-size:16px; color:var(--ink-70); margin:0 0 20px; }
+.claim-stats { display:grid; grid-template-columns:repeat(3,1fr); border-top:2px solid var(--ink); margin:18px 0; }
+.claim-stats > div { padding:14px 16px 0 0; }
+.claim-stats > div + div { padding-left:16px; border-left:1px solid var(--hair); }
+.claim-stats .v { font:500 26px var(--font-mono); letter-spacing:-.03em; }
+.claim-stats small { display:block; font-size:12.5px; color:var(--ink-70); }
+.steps3 { list-style:none; padding:0; margin:0; border-top:1px solid var(--line); }
+.steps3 li { display:grid; grid-template-columns:36px minmax(0,1fr) auto; gap:12px; padding:14px 0; border-bottom:1px solid var(--hair); align-items:center; }
+.steps3 .n { width:28px; height:28px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font:500 13px var(--font-mono); }
+.steps3 li.done .n { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.steps3 li.cur .n { border-color:var(--signal); color:var(--signal); }
+.steps3 b { display:block; font-weight:600; } .steps3 small { font-size:13px; color:var(--ink-70); }
+.run-by { display:inline-flex; align-items:center; gap:8px; height:28px; padding:0 10px; border-radius:var(--r-sign); border:1px dashed var(--line); font-size:12.5px; font-weight:600; color:var(--ink-70); }
+.p-back { flex:none; display:flex; align-items:center; gap:6px; padding:4px 12px 10px; border-bottom:1px solid var(--hair); }
+.p-back b { font:800 19px var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M4 13v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 3l8 14H2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: rights, takedowns and claimable stations</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Ref. 10</span><span>Master control, web and phone</span></div>
+  <h1>When someone says "that's mine."</h1>
+  <p>Two things that protect creators. Rights claims: someone says a station aired their work without permission, the item comes off air everywhere it airs, and the station either removes it or answers the claim. Claimable stations: Opencast runs a station of a creator's work with their permission, and hands it over when they're ready.</p>
+  <p>Same master control shell and tokens. BEAT 12.1 has one open claim, on an item imported from a link.</p>
+  <ul class="toc">
+    <li><a href="#rights"><span class="mono">01</span>Rights page</a></li>
+    <li><a href="#claim"><span class="mono">02</span>A claim</a></li>
+    <li><a href="#counter"><span class="mono">03</span>Answering a claim</a></li>
+    <li><a href="#carried"><span class="mono">04</span>A claim on a carried program</a></li>
+    <li><a href="#handover"><span class="mono">05</span>Claiming a station</a></li>
+    <li><a href="#phone"><span class="mono">06</span>On the phone</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>Off air first, questions after</h3><p class="muted">A claim takes the item off air straight away, on every station airing it. The log fills the gap, so nobody hears silence.</p></div>
+    <div><h3>Two honest ways out</h3><p class="muted">Remove it, or answer the claim with the same three reasons the station gave when it uploaded. No other paths, no arguing in messages.</p></div>
+    <div><h3>A record that counts</h3><p class="muted">Upheld claims stay on a station's record for a year, and repeated ones have consequences. The station always sees its own standing.</p></div>
+    <div><h3>Permission before a station</h3><p class="muted">Opencast only runs a station of someone's work after they've said yes or their licence allows it, and hands it over with everything it earned, held in escrow until then.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= RIGHTS PAGE ================= -->
+<section class="ref" id="rights"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Rights page</span></div>
+  <h2>Open claims, past claims, and where the station stands.</h2>
+  <p class="lede">A new "Rights" page under Station. At the top, the station's standing this year. Below, every claim with its item, who made it, its state and what happens next.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app mc" data-nav="rights" data-air="on">
+        <div class="mc-title"><div><h2>Rights</h2><p>Claims about what BEAT has aired, and BEAT's record.</p></div></div>
+        <div class="standing">
+          <div><span class="v">1</span><small>Open claim</small></div>
+          <div><span class="v">0</span><small>Upheld in the last 12 months</small></div>
+          <div><span class="v">Good</span><small>Standing. 3 upheld claims in a year pause carriage offers</small></div>
+        </div>
+        <div class="cl-h"><span>Received</span><span>Item</span><span>From</span><span>State</span><span></span></div>
+        <div class="cl sel"><span class="t">Today<br>3:12 pm</span><div><b>Crate Session 03</b><small>Imported from a link. Claim: the recording is theirs</small></div><div><b style="font-weight:500">Westside Tapes LLC</b><small>Says they own the master recording</small></div><span class="state hold">Off air, 9 days to answer</span><a class="btn btn-ghost btn-sm" href="#claim">Open</a></div>
+        <div class="cl"><span class="t">August 19</span><div><b>Late Crate, ep. 12</b><small>A sample in the second segment</small></div><div><b style="font-weight:500">R. Delgado</b><small>Composer</small></div><span class="state done">Answered, back on air</span><a class="btn btn-ghost btn-sm" href="#carried">View</a></div>
+        <div class="cl"><span class="t">July 2</span><div><b>BEAT station ID, v1</b><small>Background track</small></div><div><b style="font-weight:500">Loopdeck</b><small>Sample library</small></div><span class="state done">Removed by BEAT</span><a class="btn btn-ghost btn-sm" href="#rights">View</a></div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Standing in plain numbers</h3><p>Open claims, upheld claims this year, and what the threshold is. A station should never be surprised by a consequence.</p></div>
+      <div class="note"><h3>Removing isn't "upheld"</h3><p>A station that removes an item when asked isn't marked against. Only claims that go against a station after it answered count toward the record.</p></div>
+      <div class="note open"><h3>The repeat policy</h3><p>A platform needs a policy for repeat infringers to keep its legal protection. "3 upheld in a year pauses carriage offers" is a placeholder; the real thresholds and what follows need a lawyer.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= CLAIM ================= -->
+<section class="ref" id="claim"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>A claim</span></div>
+  <h2>What they say, what happened, what's next.</h2>
+  <p class="lede">The claim in the claimant's words, the item and every place it was scheduled, a timeline of what's happened and what happens next, and the station's two choices.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="840"><div class="scaler">
+      <div class="app mc" data-nav="rights" data-air="on" style="height:840px">
+        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Rights / Crate Session 03</span><h2>A rights claim on Crate Session 03</h2></div></div>
+        <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
+          <div>
+            <div class="claim-card">
+              <span class="state hold">Off air since 3:12 pm</span>
+              <h4 style="margin-top:10px">Westside Tapes LLC says they own this recording.</h4>
+              <div class="quote">"Crate Session 03 contains our 1994 master recording of 'Night Shift Sessions' in full between 12:40 and 31:05. It was not licensed to Inland Beat."</div>
+              <div class="kv" style="margin:0">
+                <div><span>What's claimed</span><span>12:40 to 31:05, a master recording</span></div>
+                <div><span>Their contact</span><span>Through Opencast</span></div>
+                <div><span>Sworn statement</span><span>Included, as the law requires</span></div>
+              </div>
+            </div>
+            <div class="sec-top"><h3>Where it was scheduled</h3><span class="sub">All removed, gaps filled</span></div>
+            <div class="row2"><div><b>Monday, 8:00 pm on BEAT</b><small>Replaced with Late Crate, ep. 13</small></div><span class="state done">Pulled</span></div>
+            <div class="row2"><div><b>Carriage</b><small>None. Imported items can't be offered to other stations</small></div><span></span></div>
+          </div>
+          <div>
+            <div class="sec-top" style="margin-top:0"><h3>What happens</h3></div>
+            <div class="timeline">
+              <div class="tl-r done"><span class="dot"></span><span class="when">Today, 3:12 pm</span><div><b>Claim received, item off air</b><small>Everywhere it was scheduled</small></div></div>
+              <div class="tl-r cur"><span class="dot"></span><span class="when">By October 5</span><div><b>BEAT removes it or answers</b><small>9 days left</small></div></div>
+              <div class="tl-r future"><span class="dot"></span><span class="when">If answered</span><div><b>Westside Tapes has 10 business days to take it further</b><small>If they don't, it can air again</small></div></div>
+              <div class="tl-r future"><span class="dot"></span><span class="when">If no answer</span><div><b>Removed from the library on October 5</b><small>Counts as removed, not upheld</small></div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:18px">
+              <button class="btn btn-ghost">Remove it from BEAT</button>
+              <a class="btn btn-ghost" href="#counter">Answer the claim</a>
+            </div>
+            <p class="m-note">Cutting out the claimed part is a third option: replace the file with an edit that leaves out 12:40 to 31:05, and it's treated as a new item.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Their words, unedited</h3><p>The claim is shown as they wrote it, with the claimed time range, so the station can check the exact minutes.</p></div>
+      <div class="note"><h3>The timeline is the explanation</h3><p>What already happened, what's due and by when, and what each path leads to. No legal page to read.</p></div>
+      <div class="note"><h3>Neither button is primary</h3><p>Both are ghost buttons. Removing and answering are equally legitimate, and the interface shouldn't lean either way.</p></div>
+      <div class="note"><h3>Editing it out</h3><p>A station can replace the file with a cut version. It becomes a new item, so its rights are confirmed fresh.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= COUNTER ================= -->
+<section class="ref" id="counter"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>Answering a claim</span></div>
+  <h2>The same three reasons as at upload.</h2>
+  <p class="lede">Answering asks which of the three rights statements is true, the same ones the station chose when it uploaded, plus what backs it up. The answer goes to the claimant, and the station's identity goes with it.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app mc" data-nav="rights" data-air="on">
+        <div class="mc-title"><div><h2>A rights claim on Crate Session 03</h2></div></div>
+        <div class="overlay backdrop">
+          <div class="modal" style="width:560px">
+            <div class="m-head"><div><span class="quiet" style="font-size:13px">To Westside Tapes LLC</span><h3 style="margin-top:4px">Answer the claim</h3></div><button class="icon-btn bare x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="m-main">
+              <div class="opts" style="border-top:0">
+                <div class="opt"><span class="rad"></span><div><b>We made it</b><small>BEAT owns the recording outright</small></div></div>
+                <div class="opt sel"><span class="rad"></span><div><b>The owner gave permission</b><small>Attach the permission or licence</small></div></div>
+                <div class="opt"><span class="rad"></span><div><b>It's in the public domain</b><small>Say where it came from</small></div></div>
+              </div>
+              <div class="fld" style="margin-top:14px"><label>Attach the permission</label><div class="field" style="color:var(--ink)"><svg class="i"><use href="#i-link"/></svg>westside-licence-2023.pdf</div></div>
+              <div class="fld"><label>Anything to add</label><div class="field" style="height:70px;align-items:flex-start;padding-top:10px;color:var(--ink)">Licensed from Westside Tapes in March 2023 for broadcast on community stations.</div></div>
+              <div class="check" style="border-top:1px solid var(--hair)"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b>I understand this answer goes to Westside Tapes with BEAT's legal name and contact,</b> and that a false answer has legal consequences.</div></div>
+            </div>
+            <div class="m-foot"><button class="btn btn-primary">Send answer</button></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Same words as upload</h3><p>The three statements match the library's rights question, so a station is asked to stand by what it already said.</p></div>
+      <div class="note"><h3>Identity travels with it</h3><p>A counter-notice has to identify the person answering. The checkbox says so in one sentence before anything is sent.</p></div>
+      <div class="note open"><h3>Legal wording</h3><p>The timeline and this form follow the shape of a US copyright takedown and counter-notice. The exact wording and deadlines need a lawyer before launch; I'm not one.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= CARRIED ================= -->
+<section class="ref" id="carried"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>A claim on a carried program</span></div>
+  <h2>Pulled from the maker and every carrier at once.</h2>
+  <p class="lede">When a claim hits a program other stations carry, it comes off air on all of them. The maker sees each carrier and what replaced the episode; carriers get a notice naming the episode and the gap that was filled, without the claimant's details.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app mc" data-nav="rights" data-air="on">
+        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Rights / Late Crate, ep. 12</span><h2>A claim on Late Crate, ep. 12</h2><p>Received August 19 from R. Delgado. Answered August 20. Back on air August 30.</p></div></div>
+        <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
+          <div>
+            <div class="sec-top" style="margin-top:0"><h3>Where it was pulled</h3><span class="sub">August 19, 11:02 am</span></div>
+            <div class="row2"><div><b>BEAT 12.1</b><small>2 airings, replaced with ep. 13</small></div><span class="state done">Back on air</span></div>
+            <div class="row2"><div><b>HALL 90.7</b><small>Carries on barter. 3 airings replaced with the next episode</small></div><span class="state done">Back on air</span></div>
+            <div class="row2"><div><b>SAZN 18.1</b><small>Carries on barter. 1 airing replaced with ep. 11</small></div><span class="state done">Back on air</span></div>
+            <div class="sec-top"><h3>What carriers were told</h3></div>
+            <div class="claim-card" style="border-color:var(--line)">
+              <p style="margin:0;font-size:14px">"Late Crate, ep. 12 from BEAT is off air while a rights claim is resolved. We replaced your 3:00 am airing with ep. 13. You don't need to do anything."</p>
+            </div>
+          </div>
+          <div>
+            <div class="sec-top" style="margin-top:0"><h3>Timeline</h3></div>
+            <div class="timeline">
+              <div class="tl-r done"><span class="dot"></span><span class="when">Aug 19</span><div><b>Claim, pulled from 3 stations</b></div></div>
+              <div class="tl-r done"><span class="dot"></span><span class="when">Aug 20</span><div><b>BEAT answered</b><small>We made it</small></div></div>
+              <div class="tl-r done"><span class="dot"></span><span class="when">Aug 30</span><div><b>No further action from the claimant</b><small>Back on air on all 3 stations</small></div></div>
+            </div>
+            <p class="m-note">Carriers were told again when it returned. Their logs picked it up from the next scheduled airing.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Pull everywhere, fill everywhere</h3><p>One claim reaches every station airing the item, and each station's log fills the gap with the next episode or its usual fill, so carriers never go silent over someone else's claim.</p></div>
+      <div class="note"><h3>Carriers don't need to act</h3><p>The notice says what was replaced and that nothing is required. The dispute stays between the maker and the claimant.</p></div>
+      <div class="note"><h3>It comes back the same way</h3><p>When a claim resolves in the maker's favour, the episode returns to every carrier's schedule from its next airing, and they're told.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= HANDOVER ================= -->
+<section class="ref" id="handover"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>Claiming a station</span></div>
+  <h2>"We've been running your station. It's yours when you want it."</h2>
+  <p class="lede">A claimable station is one Opencast's team runs from a creator's work, after the creator agreed or because their work is already published under a licence that allows it. When the creator is ready, this page hands it over: what it has aired, its audience, the money held for them in escrow, and three steps to take ownership.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="880"><div class="scaler">
+      <div class="app" style="height:880px">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <span class="quiet" style="font-size:14px">Claim your station</span>
+          <span class="avatar" style="margin-left:auto">MR</span>
+        </div>
+        <div class="a-main">
+          <div class="claim-page">
+            <span class="kick">For Marcus Reyes</span>
+            <h2>CRAT 101.9 is ready for you.</h2>
+            <p>You said yes on August 12. Since then, Opencast's team has run a radio station of your mixes and producer interviews on the Inland Empire dial. Everything below becomes yours when you claim it.</p>
+            <div class="stn-band" style="background:#7E2F35;border-radius:var(--r-control)"><span class="ch">101.9</span><span class="cs">CRAT</span><span class="nm">Crate<br>Radio band, Inland Empire</span></div>
+            <div class="claim-stats">
+              <div><span class="v">45</span><small>Days on air</small></div>
+              <div><span class="v">88</span><small>Listeners with CRAT as a preset</small></div>
+              <div><span class="v">$214.60</span><small>Earned, held in escrow for you</small></div>
+            </div>
+            <ol class="steps3">
+              <li class="done"><span class="n"><svg style="width:13px;height:13px"><use href="#i-check"/></svg></span><div><b>Sign in</b><small>As Marcus Reyes</small></div><span></span></li>
+              <li class="cur"><span class="n">2</span><div><b>Show it's you</b><small>Connect the SoundCloud account your mixes come from</small></div><button class="btn btn-primary btn-sm">Connect SoundCloud</button></li>
+              <li><span class="n">3</span><div><b>Take it over</b><small>You become CRAT's owner. The $214.60 is paid from escrow to your wallet 72 hours after you're verified</small></div><span></span></li>
+            </ol>
+            <div class="row2" style="margin-top:14px;border-top:1px solid var(--line)"><div><b>Check it yourself</b><small>Held for station #101 in a public escrow contract, 0x5ee2&hellip;a41d. It can only pay you</small></div><span class="mono" style="font-size:13px">$214.60</span></div>
+            <p class="quiet" style="font-size:13.5px;margin-top:16px">Not what you want? <a href="#handover" style="color:var(--signal);font-weight:600;text-decoration:none">Ask us to sign it off</a>. We'll take it off the dial within a day and pay out what it earned.</p>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>It starts from the yes</h3><p>The page opens with the date the creator agreed. A station of someone's work never exists before that.</p></div>
+      <div class="note"><h3>Proof, not paperwork</h3><p>Identity is shown by connecting the account the work was published from, not by uploading documents.</p></div>
+      <div class="note"><h3>Everything comes with it</h3><p>Call sign, channel, presets, carriage, and everything it earned, paid out of escrow to the wallet made when they sign in. The team stays on as operators until the new owner removes them.</p></div>
+      <div class="note"><h3>A balance anyone can check</h3><p>The escrow contract and the station's ID are on the claim page and the station page, so a creator can check what's held, and that the contract can only pay them, before trusting the claim.</p></div>
+      <div class="note"><h3>Why 72 hours</h3><p>An approved claim waits three days in public before paying out, so if someone other than the creator got verified, it can be stopped.</p></div>
+      <div class="note"><h3>Saying no is one link</h3><p>If the creator doesn't want it, it's signed off within a day and paid out. No questions, no retention flow.</p></div>
+    </div>
+  </div>
+
+  <div class="stage" style="margin-top:var(--s5)">
+    <div class="fit" data-w="1280" data-h="560"><div class="scaler">
+      <div class="app mc" data-nav="monitor" data-air="on" style="height:560px">
+        <div class="mc-title"><div><h2>Monitor</h2><p>On air since August 12.</p></div><div class="end"><span class="run-by">Run by Opencast for Marcus Reyes, not yet claimed. Earnings held in escrow</span></div></div>
+        <div class="pic cq" style="border-radius:var(--r-screen);max-width:520px;background:#7E2F35"><div class="card" style="position:absolute;inset:0;display:grid;place-items:center;color:#fff"><div style="font:500 72px var(--font-mono);letter-spacing:-.05em">101.9</div></div></div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Always labelled</h3><p>While Opencast runs a station, master control says so at the top, and the station's public page says "Run by Opencast for Marcus Reyes". Viewers are never misled about who's behind it.</p></div>
+      <div class="note"><h3>Held earnings</h3><p>Everything a claimable station earns, after the same fees and pool share as any station, is paid into an escrow contract under its station ID. It can go to the creator when they claim or ask to stop, or after 3 years unclaimed to the creator fund. The contract can't pay Opencast.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= PHONE ================= -->
+<section class="ref" id="phone"><div class="wrap">
+  <div class="ch-label"><span class="n">06</span><span>On the phone</span></div>
+  <h2>A claim arrives, and what it already did.</h2>
+  <p class="lede">A rights claim is always a notification, even in quiet hours, because something has already been pulled. It opens to the claim with the deadline and both choices.</p>
+  <div class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>3:12</span><span class="dots"><i></i><b></b></span></div>
+            <div class="notif"><div class="top"><svg><use href="#mk"/></svg>Opencast master control, now</div><b>A rights claim on Crate Session 03</b><span class="muted">It's off air on BEAT and Monday's airing was replaced. 9 days to answer.</span></div>
+            <div style="flex:1"></div>
+            <div class="sheet" style="position:relative">
+              <div class="grab"><i></i></div>
+              <div class="m-head" style="padding-top:6px"><div><span class="state hold">Off air, 9 days to answer</span><h3 style="margin-top:8px">Westside Tapes says they own this recording</h3><p>12:40 to 31:05 of Crate Session 03.</p></div></div>
+              <div class="m-main">
+                <div class="row2" style="padding-top:0"><div><b>Monday, 8:00 pm</b><small>Replaced with Late Crate, ep. 13</small></div></div>
+              </div>
+              <div class="m-foot"><button class="btn btn-ghost">Remove it</button><button class="btn btn-ghost">Answer</button></div>
+            </div>
+            <div class="hind" style="position:relative;z-index:1;background:var(--ground)"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>A claim arrives.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>It says what already happened</h3><p>"It's off air and Monday was replaced" comes before any request, so the operator's first question, is anything silent, is answered first.</p></div>
+      <div class="note"><h3>Answering is desk work</h3><p>Attaching a licence is easier at a computer, so Answer on the phone opens the form with a prompt to finish on master control if a file is needed.</p></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, rights, takedowns and claimable stations. Claims, people, companies and amounts are illustrations. Nothing here is legal advice. Opencast is a working name.</p></div></footer>
+
+<script>
+(function(){
+/* ----- shell builder for master control frames ----- */
+  var NAV = [
+    ['On air', [['monitor','Monitor'],['audience','Audience'],['log','Program log'],['live','Live sources'],['breaks','Breaks','OPEN']]],
+    ['Market', [['synd','Syndication market']]],
+    ['Programming', [['library','Library','31'],['listings','Listings','2']]],
+    ['Money', [['spots','Spot market'],['sponsors','Sponsors'],['earnings','Earnings']]],
+    ['Station', [['trans','Translators','1'],['rights','Rights','1'],['settings','Settings']]]
+  ];
+  var STEPS = ['Your station','Library','Program log','Translators','Sign on'];
+  document.querySelectorAll('.app.mc').forEach(function(app){
+    var setup = +app.dataset.setup || 0, air = app.dataset.air, nav = app.dataset.nav;
+    var overlays = [].slice.call(app.querySelectorAll(':scope > .overlay, :scope > .toast'));
+    overlays.forEach(function(o){ o.remove(); });
+    var content = app.innerHTML;
+    var head = '<div class="mc-head"><span class="mc-lock"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><span class="div"></span><b>Master control</b></span>';
+    if (setup) {
+      head += '<span class="quiet" style="font-size:14px">New station, step '+setup+' of 5</span><div class="mc-end" style="margin-left:auto"><button class="btn btn-ghost btn-sm">Save and finish later</button></div></div>';
+    } else {
+      head += '<button class="stn-switch"><span class="sw" style="background:#8C3B7A"></span><span class="ch">12.1</span><span class="cs">BEAT</span><svg class="i" style="width:15px;height:15px"><use href="#i-down"/></svg></button>'+
+        '<span class="mc-clock">'+(app.dataset.clock||'8:42:12 pm')+'</span><div class="mc-end">'+(air==='on'?'<span class="tally lit">ON AIR</span><button class="btn btn-ghost btn-sm">Sign off</button>':'<span class="tally">ON AIR</span>')+'</div></div>';
+    }
+    var rail;
+    if (setup) {
+      rail = '<div class="mc-rail mc-steps">'+STEPS.map(function(s,i){ var n=i+1, cls = n<setup?'done':(n===setup?'cur':''); return '<div class="st '+cls+'"><span class="n">'+(n<setup?'<svg style="width:13px;height:13px"><use href="#i-check"/></svg>':n)+'</span>'+s+'</div>'; }).join('')+
+        '<div class="hint">Each step saves as you go. Nothing is public until you sign on.</div></div>';
+    } else {
+      rail = '<nav class="mc-rail">'+NAV.map(function(g){ return '<div class="g">'+g[0]+'</div>'+g[1].map(function(it){ return '<a href="#top" class="'+(it[0]===nav?'on':'')+'">'+it[1]+(it[2]?'<span class="ct'+((it[0]==='breaks'||it[0]==='listings'||it[0]==='rights')?' warn':'')+'">'+(it[2]==='OPEN'?(app.dataset.open||'3:30'):it[2])+'</span>':'')+'</a>'; }).join(''); }).join('')+'</nav>';
+    }
+    app.innerHTML = head + '<div class="mc-body">'+rail+'<div class="mc-main">'+content+'</div></div>';
+    overlays.forEach(function(o){ app.appendChild(o); });
+  });
+
+
+  function fitAll(){ document.querySelectorAll('.fit').forEach(function(f){ var w=+f.dataset.w, h=+f.dataset.h, s=Math.min(1, f.clientWidth/w); var sc=f.querySelector('.scaler'); sc.style.transform='scale('+s+')'; sc.style.width=w+'px'; f.style.height=(h*s)+'px'; }); }
+  fitAll(); window.addEventListener('resize', fitAll);
+  if (window.ResizeObserver){ var ro=new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
+  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  function cur(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
+  function lab(){ btn.textContent = cur()==='dark'?'Light ground':'Dark ground'; }
+  try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+</script>
+</body>
+</html>

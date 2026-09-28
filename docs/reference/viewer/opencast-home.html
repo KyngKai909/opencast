@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home and the dial · Opencast reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: home and the dial</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Ref. 01</span><span>Viewer app, web and phone</span></div>
+  <h1>Home is a dial, not a feed.</h1>
+  <p>This is the reference for the viewer side of Opencast: home, tuning in, the guide and every modal that opens from them, on the web and in the phone app. Built on the style guide's tokens and components. It's 8:42 pm on a Saturday in the Inland Empire, and every station, program and business is an illustration.</p>
+  <p>The screens are live. Scroll inside them, and switch the ground at the top to see both themes.</p>
+  <ul class="toc">
+    <li><a href="#home-desk"><span class="mono">01</span>Home, web</a></li>
+    <li><a href="#home-phone"><span class="mono">02</span>Home, phone</a></li>
+    <li><a href="#watch-desk"><span class="mono">03</span>Tuned in, web</a></li>
+    <li><a href="#watch-phone"><span class="mono">04</span>Tuned in, phone and radio</a></li>
+    <li><a href="#guide"><span class="mono">05</span>The guide</a></li>
+    <li><a href="#m-station"><span class="mono">06</span>Station preview</a></li>
+    <li><a href="#m-more"><span class="mono">07</span>Carried from, pledge, share, remind</a></li>
+    <li><a href="#first"><span class="mono">08</span>First visit and thin markets</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>Ordered by the dial</h3><p class="muted">Your market's stations are listed by channel number, the same every time. Nothing is ranked by an algorithm, so people learn where things are.</p></div>
+    <div><h3>Live and local first</h3><p class="muted">The top slot goes to something live in your market. Carried and national programming comes after it.</p></div>
+    <div><h3>You join where it is</h3><p class="muted">Tuning in lands mid-program, like a real station. There's no scrub bar and no restart.</p></div>
+    <div><h3>No scores</h3><p class="muted">No view counts, star ratings or trending lists anywhere a viewer sees. A station is judged by its schedule.</p></div>
+  </div>
+</div></section>
+
+<!-- ================= 01 HOME DESKTOP ================= -->
+<section class="ref" id="home-desk"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Home, web</span></div>
+  <h2>A screen, the presets beside it, then the dial.</h2>
+  <p class="lede">The top of home is laid out like a console: the picture on the left and six preset buttons beside it. Below is your market, station by station in channel order, then programs carried widely, what's coming up live, and the radio band.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a class="on" href="#home-desk">Dial</a><a href="#guide">Guide</a><a href="#home-desk">Radio</a><a href="#home-desk">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main"><div class="a-pad">
+          <div class="hero">
+            <div class="pic cq"><div class="scene"></div><div class="podium"></div><div class="figure"></div>
+              <div class="corner"><span class="tag tag-live"><span class="d"></span>Live</span><span class="tag">Preview, muted</span></div>
+              <div class="l3"><span class="nm">Dana Whitfield</span><br><span class="tt">Chair, Planning Commission</span></div>
+              <div class="bug"><span class="cs">CIVC</span><span class="ch">7.1</span></div>
+            </div>
+            <div class="feat-info">
+              <div class="kick"><span class="tag tag-live"><span class="d"></span>Live</span><span class="quiet" style="font-size:13px">Your market</span></div>
+              <h2>Town Hall: backyard homes and ADUs</h2>
+              <p class="by"><b>CIVC 7.1</b>, Inland Civic. Live from Redlands City Hall until <span class="mono">9:30 pm</span></p>
+              <p>Residents question the Planning Commission on the new accessory dwelling rules. Questions from the room and from viewers.</p>
+              <div class="acts"><a class="btn btn-primary" href="#watch-desk">Tune in</a><a class="btn btn-ghost" href="#m-station">Station</a></div>
+            </div>
+            <div class="presets">
+              <h4>Presets <span>Keys 1 to 6</span></h4>
+              <div id="deskPresets"></div>
+            </div>
+          </div>
+
+          <div class="mrow">
+            <div class="sec-h"><h3>Inland Empire</h3><span class="sub">Your market, 6 stations on the TV band</span>
+              <div class="end"><div class="seg"><button aria-pressed="true">TV band</button><button aria-pressed="false">Radio band</button></div><a class="btn btn-ghost btn-sm" href="#guide">Full guide</a></div>
+            </div>
+            <div class="chips" style="margin-bottom:14px"><button class="chip on">All</button><button class="chip">Live now</button><button class="chip">Public affairs</button><button class="chip">Music</button><button class="chip">Classic</button><button class="chip">Food</button><button class="chip">Sports</button></div>
+            <div class="dial-h"><span></span><span>Ch.</span><span>Station</span><span>On now</span><span>Next</span></div>
+            <div class="dial" id="deskDial"></div>
+          </div>
+
+          <div class="mrow">
+            <div class="sec-h"><h3>Carried widely</h3><span class="sub">Programs other stations choose to air</span></div>
+            <div class="cards4" id="deskCarried"></div>
+          </div>
+
+          <div class="two-col">
+            <div>
+              <div class="sec-h"><h3>Coming up live</h3></div>
+              <div id="deskUp"></div>
+            </div>
+            <div>
+              <div class="sec-h"><h3>Radio band</h3><span class="sub">4 stations</span></div>
+              <div class="radio4" id="deskRadio"></div>
+            </div>
+          </div>
+        </div></div>
+        <div class="a-player">
+          <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+          <div><div class="ti">Saturday Reel</div><div class="st">BEAT 12.1, carried from REEL</div></div>
+          <div class="ctl">
+            <span class="tally lit">ON AIR</span>
+            <button class="icon-btn" aria-label="Channel down"><svg class="i"><use href="#i-down"/></svg></button>
+            <button class="icon-btn" aria-label="Channel up"><svg class="i"><use href="#i-up"/></svg></button>
+            <button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button>
+            <button class="icon-btn bare" aria-label="Volume"><svg class="i"><use href="#i-vol"/></svg></button>
+            <button class="icon-btn bare" aria-label="Open player"><svg class="i"><use href="#i-expand"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The hero is a muted preview</h3><p>It's labelled "Preview, muted" and has no tally, because it isn't on your screen until you tune in. The one lit tally on home is in the player bar, which is.</p></div>
+      <div class="note"><h3>What gets the hero</h3><p>Live programming in your market first, then a live program carried into your market, then whatever your first preset is airing. Never a pick by popularity.</p></div>
+      <div class="note"><h3>Presets are keys 1 to 6</h3><p>Like a car radio. On the web, pressing a number tunes that preset from anywhere in the app. More than six are kept in Presets, without keys.</p></div>
+      <div class="note"><h3>The dial is a list, not cards</h3><p>One row per station in channel order: what's on, when it ends and what's next. A click tunes in. The ident opens the station preview.</p></div>
+      <div class="note"><h3>Listed, not carried</h3><p>RDLS 9.1 is a city's own public-access stream. Opencast lists it and plays the city's player, but doesn't restream it. The dashed "Listed" tag says so.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 02 HOME PHONE ================= -->
+<section class="ref" id="home-phone"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Home, phone</span></div>
+  <h2>The same order, one column.</h2>
+  <p class="lede">The phone keeps the web's order: the live hero, a strip of preset buttons, your market, carried programs and the radio band. The player sits above the tabs, where a thumb reaches it.</p>
+  <div class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire</button><button class="icon-btn bare" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button></div>
+            <div class="p-main"><div class="p-pad">
+              <div class="p-feat">
+                <div class="pic cq"><div class="scene"></div><div class="podium"></div><div class="figure"></div>
+                  <div class="corner"><span class="tag tag-live"><span class="d"></span>Live</span></div>
+                  <div class="bug"><span class="cs">CIVC</span><span class="ch">7.1</span></div>
+                </div>
+                <span class="quiet" style="font-size:13px">CIVC 7.1, until <span class="mono">9:30 pm</span></span>
+                <h2>Town Hall: backyard homes and ADUs</h2>
+                <p class="by">Live from Redlands City Hall, with questions from viewers.</p>
+                <div class="acts"><a class="btn btn-primary" href="#watch-phone">Tune in</a><a class="btn btn-ghost" href="#m-station">Station</a></div>
+              </div>
+              <div class="p-sec"><div class="sec-h"><h3>Presets</h3></div><div class="p-pres" id="phPresets"></div></div>
+              <div class="p-sec">
+                <div class="sec-h"><h3>Inland Empire</h3><div class="end"><div class="seg"><button aria-pressed="true">TV</button><button aria-pressed="false">Radio</button></div></div></div>
+                <div id="phDial" style="border-top:1px solid var(--line)"></div>
+              </div>
+              <div class="p-sec"><div class="sec-h"><h3>Carried widely</h3></div><div class="p-carried" id="phCarried"></div></div>
+              <div class="p-sec"><div class="sec-h"><h3>Coming up live</h3></div><div id="phUp"></div></div>
+            </div></div>
+            <div class="p-mini">
+              <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+              <div style="min-width:0"><div class="ti clamp1">Saturday Reel</div><div class="st clamp1">BEAT 12.1</div></div>
+              <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn bare" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+            </div>
+            <nav class="p-tabs"><a class="on" href="#home-phone"><svg><use href="#i-dial"/></svg>Dial</a><a href="#guide"><svg><use href="#i-guide"/></svg>Guide</a><a href="#home-phone"><svg><use href="#i-search"/></svg>Search</a><a href="#home-phone"><svg><use href="#i-user"/></svg>You</a></nav>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Home.</b> Scroll inside the phone.</p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Four tabs</h3><p>Dial, Guide, Search, You. Radio isn't a tab; it's a band on the dial, switched with the TV and Radio control, because it's the same kind of thing on a different number.</p></div>
+      <div class="note"><h3>Presets become a strip</h3><p>Six buttons in a horizontal row, numbered, with the one playing filled in ink. Tap to tune, press and hold to reassign.</p></div>
+      <div class="note"><h3>The mini player keeps the tally</h3><p>It stays lit while something plays, including with the screen locked. Swiping the mini player up opens the full player.</p></div>
+      <div class="note"><h3>Rows drop the next program</h3><p>At phone width a row is channel, call sign, what's on and until when. Next moves into the station preview.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 03 WATCH DESKTOP ================= -->
+<section class="ref" id="watch-desk"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>Tuned in, web</span></div>
+  <h2>The picture, the dial controls, and the station's night.</h2>
+  <p class="lede">Tuning in to BEAT 12.1 while it airs a program it carries. The player has no scrub bar. Beside it is the station's schedule for tonight, with the program on air marked by the tally edge, and the three things a viewer can do for a station: save it, pledge, share.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a class="on" href="#home-desk">Dial</a><a href="#guide">Guide</a><a href="#home-desk">Radio</a><a href="#home-desk">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main" style="overflow:hidden">
+          <div class="w-grid">
+            <div class="w-left">
+              <div class="pic reel cq"><div class="scene"></div>
+                <div class="card"><div><b>Saturday Reel</b><span>Cartoons, 1928 to 1934</span></div></div>
+                <div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div>
+              </div>
+              <div class="w-bar">
+                <span class="tally lit">ON AIR</span>
+                <button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button>
+                <div class="ch-tune">
+                  <button class="icon-btn" aria-label="Channel down to 9.1"><svg class="i"><use href="#i-down"/></svg></button>
+                  <span class="ch">12.1</span>
+                  <button class="icon-btn" aria-label="Channel up to 18.1"><svg class="i"><use href="#i-up"/></svg></button>
+                </div>
+                <span class="quiet" style="font-size:13px">Arrow keys change channel</span>
+                <div class="right">
+                  <button class="icon-btn bare" aria-label="Volume"><svg class="i"><use href="#i-vol"/></svg></button>
+                  <button class="icon-btn bare" aria-label="Full screen"><svg class="i"><use href="#i-expand"/></svg></button>
+                </div>
+              </div>
+              <h2 class="w-title">Saturday Reel</h2>
+              <div class="w-meta"><span class="mono">8:30 – 9:00 pm</span><a href="#m-more">Carried from REEL 24.1</a></div>
+              <p class="w-desc">Animated shorts from the late silent and early sound era, restored and in the public domain. Tonight: a steamboat, a haunted barn and a long-lost jazz short.</p>
+            </div>
+            <aside class="w-rail">
+              <div class="stn-block"><span class="ch">12.1</span><span class="cs">BEAT</span><small>Inland Beat, Redlands</small></div>
+              <div class="rail-acts">
+                <button class="btn btn-ghost btn-sm is-set"><svg class="i"><use href="#i-check"/></svg>Preset 1</button>
+                <a class="btn btn-ghost btn-sm" href="#m-more">Pledge</a>
+                <a class="btn btn-ghost btn-sm" href="#m-more"><svg class="i"><use href="#i-share"/></svg>Share</a>
+              </div>
+              <div class="sched">
+                <h4>On BEAT tonight</h4>
+                <div class="sch past"><span class="mono">8:00</span><div><b>Late Crate, ep. 14</b><small>Beat showcase</small></div></div>
+                <div class="sch now"><span class="mono">8:30</span><div><b>Saturday Reel</b><small>Carried from REEL 24.1</small></div></div>
+                <div class="sch"><span class="mono">9:00</span><div><b>Beat Tape Live</b><small><span style="color:var(--live);font-weight:600">Live</span>, from the Redlands studio</small></div></div>
+                <div class="sch"><span class="mono">10:00</span><div><b>Late Crate, ep. 15</b><small>Beat showcase</small></div></div>
+                <div class="sch"><span class="mono">11:00</span><div><b>Slow Hours</b><small>Carried from HALL 90.7</small></div></div>
+              </div>
+              <p class="pledge-note">Inland Beat is supported by 214 members and by local underwriters. <a href="#m-more" style="color:var(--signal);font-weight:600;text-decoration:none">Pledge</a></p>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>No scrub bar</h3><p>A broadcast has no seeking. Pause holds your place for up to 30 minutes, then the player offers "Back to live" rather than piling up a delay.</p></div>
+      <div class="note"><h3>Changing channel</h3><p>Up and down move along the dial in channel order, 9.1 to 12.1 to 18.1, with arrow keys on the web. The number between the buttons is always the station you're on.</p></div>
+      <div class="note"><h3>Carriage is a link</h3><p>"Carried from REEL 24.1" opens the carried-from modal. The picture carries BEAT's bug, because BEAT is the station airing it.</p></div>
+      <div class="note"><h3>The member count is the exception</h3><p>It's a count of supporters, not viewers, and it only appears next to Pledge.</p></div>
+      <div class="note open"><h3>Watch from the start</h3><p>Whether a program that's already started can be watched from the beginning on demand. Leaving it out keeps the broadcast feel; adding it helps late joiners of long council meetings.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 04 WATCH PHONE ================= -->
+<section class="ref" id="watch-phone"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Tuned in, phone and radio</span></div>
+  <h2>Swipe to change channel. On radio, the number is the picture.</h2>
+  <p class="lede">On the phone, the full player fills the screen and a vertical swipe on the picture flips the dial. A radio-band station has no picture, so its frequency and colour take the space.</p>
+  <div class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><button class="icon-btn bare" aria-label="Minimise player"><svg class="i"><use href="#i-down"/></svg></button><span class="quiet" style="font-size:13px;margin:0 auto">Swipe the picture to change channel</span><button class="icon-btn bare" aria-label="Share"><svg class="i"><use href="#i-share"/></svg></button></div>
+            <div class="p-main">
+              <div class="pic reel cq" style="border-radius:0"><div class="scene"></div>
+                <div class="card"><div><b>Saturday Reel</b><span>Cartoons, 1928 to 1934</span></div></div>
+                <div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div>
+              </div>
+              <div class="p-pad" style="padding-top:14px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div class="stn-block" style="gap:2px 10px"><span class="ch" style="font-size:20px;padding-right:10px">12.1</span><span class="cs" style="font-size:16px">BEAT</span><small>Inland Beat</small></div>
+                  <span class="tally lit" style="margin-left:auto">ON AIR</span>
+                </div>
+                <h2 class="w-title" style="font-size:24px;margin-top:14px">Saturday Reel</h2>
+                <div class="w-meta" style="font-size:13px"><span class="mono">8:30 – 9:00 pm</span><a href="#m-more">Carried from REEL 24.1</a></div>
+                <div class="rail-acts" style="margin-top:14px">
+                  <button class="btn btn-ghost btn-sm is-set"><svg class="i"><use href="#i-check"/></svg>Preset 1</button>
+                  <a class="btn btn-ghost btn-sm" href="#m-more">Pledge</a>
+                  <a class="btn btn-ghost btn-sm" href="#m-more">Share</a>
+                </div>
+                <div class="sched" style="margin-top:20px">
+                  <h4>On BEAT tonight</h4>
+                  <div class="sch now"><span class="mono">8:30</span><div><b>Saturday Reel</b><small>Carried from REEL 24.1</small></div></div>
+                  <div class="sch"><span class="mono">9:00</span><div><b>Beat Tape Live</b><small><span style="color:var(--live);font-weight:600">Live</span>, from the Redlands studio</small></div></div>
+                  <div class="sch"><span class="mono">10:00</span><div><b>Late Crate, ep. 15</b><small>Beat showcase</small></div></div>
+                  <div class="sch"><span class="mono">11:00</span><div><b>Slow Hours</b><small>Carried from HALL 90.7</small></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Full player, TV band.</b></p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><button class="icon-btn bare" aria-label="Minimise player"><svg class="i"><use href="#i-down"/></svg></button><span class="quiet" style="font-size:13px;margin:0 auto">Radio band</span><button class="icon-btn bare" aria-label="Share"><svg class="i"><use href="#i-share"/></svg></button></div>
+            <div class="p-main">
+              <div class="radio-panel" style="background:#33507A">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start"><span class="f">88.3</span><span class="tally lit">ON AIR</span></div>
+                <span class="cs">NITE</span><span class="nm">Night Desk, Riverside</span>
+                <div class="meter" aria-hidden="true"><i style="height:40%"></i><i style="height:70%"></i><i style="height:55%"></i><i style="height:92%"></i><i style="height:62%"></i><i style="height:34%"></i><i style="height:74%"></i><i style="height:48%"></i><i style="height:80%"></i><i style="height:38%"></i><i style="height:66%"></i><i style="height:52%"></i></div>
+              </div>
+              <div class="p-pad" style="padding-top:16px">
+                <h2 class="w-title" style="font-size:24px;margin-top:0">Radio dramas from the 1940s</h2>
+                <div class="w-meta" style="font-size:13px"><span>Now: The Hollow Door, part 2</span><span class="mono">until 6:00 am</span></div>
+                <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin:22px 0 6px">
+                  <button class="icon-btn" style="width:52px;height:52px" aria-label="Down to 104.3"><svg class="i"><use href="#i-down"/></svg></button>
+                  <button class="icon-btn" style="width:68px;height:68px;border-radius:50%;background:var(--ink);color:var(--ground);border-color:var(--ink)" aria-label="Pause"><svg class="i" style="width:26px;height:26px"><use href="#i-pause"/></svg></button>
+                  <button class="icon-btn" style="width:52px;height:52px" aria-label="Up to 90.7"><svg class="i"><use href="#i-up"/></svg></button>
+                </div>
+                <p class="quiet" style="text-align:center;font-size:12.5px;margin:0 0 16px">Down wraps to <span class="mono">104.3</span>, up is <span class="mono">90.7</span></p>
+                <div class="rail-acts"><button class="btn btn-ghost btn-sm is-set"><svg class="i"><use href="#i-check"/></svg>Preset 3</button><a class="btn btn-ghost btn-sm" href="#m-more">Pledge</a><a class="btn btn-ghost btn-sm" href="#m-more">Share</a></div>
+              </div>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Full player, radio band.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Swipe, with a number</h3><p>Swiping up or down on the picture changes channel. During the swipe the next station's channel number and call sign show over the picture, so it reads as tuning, not scrolling.</p></div>
+      <div class="note"><h3>Radio uses the station's colour</h3><p>The panel is the station's colour, which is the one place its colour fills a large area, since there's no picture to protect.</p></div>
+      <div class="note"><h3>The band decides the neighbours</h3><p>Radio up and down move through the radio band only. You never flip from 88.3 into a TV station.</p></div>
+      <div class="note"><h3>Locked screen</h3><p>Both bands keep playing with the phone locked. The lock-screen controls are pause and channel up and down, with the call sign and program as the title.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 05 GUIDE ================= -->
+<section class="ref" id="guide"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>The guide</span></div>
+  <h2>Every station, three hours at a time.</h2>
+  <p class="lede">The guide is a page, not a modal. Stations run down the side in channel order and half hours across the top, with a line for the current time. Selecting a program opens its listing, where you can tune in or set a reminder.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a href="#home-desk">Dial</a><a class="on" href="#guide">Guide</a><a href="#home-desk">Radio</a><a href="#home-desk">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main"><div class="a-pad">
+          <div class="gd-tools">
+            <h2>Tonight</h2><span class="quiet">Saturday, September 26</span>
+            <div class="end">
+              <div class="seg"><button aria-pressed="true">All stations</button><button aria-pressed="false">Presets</button></div>
+              <div class="seg"><button aria-pressed="true">TV band</button><button aria-pressed="false">Radio band</button></div>
+              <button class="btn btn-ghost btn-sm">Earlier</button><button class="btn btn-ghost btn-sm">Later</button>
+            </div>
+          </div>
+          <div class="gd-wrap"><div class="gd" id="deskGuide"></div></div>
+        </div></div>
+        <div class="a-player">
+          <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+          <div><div class="ti">Saturday Reel</div><div class="st">BEAT 12.1, carried from REEL</div></div>
+          <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn" aria-label="Channel down"><svg class="i"><use href="#i-down"/></svg></button><button class="icon-btn" aria-label="Channel up"><svg class="i"><use href="#i-up"/></svg></button><button class="icon-btn" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+        </div>
+        <div class="backdrop" style="background:transparent;place-items:start end;padding:210px 70px 0 0;pointer-events:none">
+          <div class="modal" style="width:360px;pointer-events:auto">
+            <div class="m-head"><div><span class="quiet" style="font-size:13px"><span class="mono">9:00 – 10:00 pm</span>, BEAT 12.1</span><h3 style="margin-top:4px">Beat Tape Live</h3><p><span style="color:var(--live);font-weight:600">Live</span> from the Redlands studio. Producers play unreleased tapes and talk through how they were made.</p></div><button class="icon-btn bare x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="m-main" style="padding-top:12px;padding-bottom:12px">
+              <div class="opt" style="border:0;padding:4px 0"><div style="flex:1"><b>Switch me over at 9:00</b><small>If I'm watching something else on Opencast</small></div><span class="toggle"></span></div>
+            </div>
+            <div class="m-foot"><button class="btn btn-primary"><svg class="i"><use href="#i-bell"/></svg>Remind me</button><a class="btn btn-ghost" href="#watch-desk">Tune in to BEAT</a></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The now line</h3><p>A single ink line with the time, moving as the evening does. Programs on air sit on the raised colour. Live programs carry the word Live, in red text, never the tally.</p></div>
+      <div class="note"><h3>Programs that started earlier</h3><p>A program that began before the window shows a leading marker and its real start time, so "City Council" reads as already under way.</p></div>
+      <div class="note"><h3>The listing pops over the grid</h3><p>Selecting a cell outlines it and opens its listing beside it, not a centred modal, so you keep your place in the grid. Reminder is the primary action for anything not yet on.</p></div>
+      <div class="note"><h3>Switch me over</h3><p>A broadcast-only idea: at the start time, the player changes channel for you if you're already watching. Off by default.</p></div>
+    </div>
+  </div>
+
+  <div style="margin-top:var(--s6)" class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><h3 style="margin:0;font:800 24px var(--font-display);font-stretch:112%;letter-spacing:-.03em">Tonight</h3><div class="seg" style="margin-left:auto"><button aria-pressed="true">TV</button><button aria-pressed="false">Radio</button></div></div>
+            <div class="p-main" style="overflow:auto"><div id="phGuide"></div></div>
+            <div class="p-mini">
+              <div class="tc" style="background:#8C3B7A"><span class="t">Saturday Reel</span></div>
+              <div style="min-width:0"><div class="ti clamp1">Saturday Reel</div><div class="st clamp1">BEAT 12.1</div></div>
+              <div class="ctl"><span class="tally lit">ON AIR</span><button class="icon-btn bare" aria-label="Pause"><svg class="i"><use href="#i-pause"/></svg></button></div>
+            </div>
+            <nav class="p-tabs"><a href="#home-phone"><svg><use href="#i-dial"/></svg>Dial</a><a class="on" href="#guide"><svg><use href="#i-guide"/></svg>Guide</a><a href="#home-phone"><svg><use href="#i-search"/></svg>Search</a><a href="#home-phone"><svg><use href="#i-user"/></svg>You</a></nav>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Guide, phone.</b> The grid scrolls both ways; stations stay pinned.</p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>Same grid, narrower</h3><p>The station column shrinks to call sign and channel and stays pinned while the times scroll sideways. The page opens scrolled to now.</p></div>
+      <div class="note"><h3>A listing is a sheet</h3><p>Tapping a program opens the same listing as a bottom sheet, with the same two buttons.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 06 STATION PREVIEW ================= -->
+<section class="ref" id="m-station"><div class="wrap">
+  <div class="ch-label"><span class="n">06</span><span>Station preview</span></div>
+  <h2>Who the station is, before you tune in.</h2>
+  <p class="lede">Opens from any station ident: on the dial, in the guide or on a carried program. It says what's on now and later tonight, which programs the station carries, and lets you tune in or save it. On the web it's a modal; on the phone, a sheet.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
+      <div class="app">
+        <div class="a-head">
+          <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+          <nav class="a-nav"><a class="on" href="#home-desk">Dial</a><a href="#guide">Guide</a><a href="#home-desk">Radio</a><a href="#home-desk">Presets</a></nav>
+          <div class="a-search"><svg class="i"><use href="#i-search"/></svg>Search stations and programs<kbd>/</kbd></div>
+          <button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire<svg class="i"><use href="#i-down"/></svg></button>
+          <span class="avatar">KM</span>
+        </div>
+        <div class="a-main"><div class="a-pad"><div class="dial" id="deskDial2"></div></div></div>
+        <div class="backdrop">
+          <div class="modal">
+            <div class="stn-band" style="background:#2E6B5A"><span class="ch">7.1</span><span class="cs">CIVC</span><span class="nm">Inland Civic<br>Redlands, Inland Empire</span><button class="icon-btn x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="m-main">
+              <div class="lst"><span class="lbl">On now</span><div><b>Town Hall: backyard homes and ADUs</b><small><span style="color:var(--live);font-weight:600">Live</span>, until <span class="mono">9:30 pm</span></small></div></div>
+              <div class="lst"><span class="lbl">Next<span class="mono">9:30</span></span><div><b>Planning Commission, Sept 24 meeting</b><small>Full meeting, unedited</small></div></div>
+              <div class="lst"><span class="lbl">Later<span class="mono">11:30</span></span><div><b>Council Watch</b><small>This week's council meetings across the Inland Empire, in an hour</small></div></div>
+              <p class="m-note">Public affairs. On air 6:00 am to 1:00 am. Council Watch is carried by 6 stations.</p>
+            </div>
+            <div class="m-foot"><a class="btn btn-primary" href="#watch-desk">Tune in</a><button class="btn btn-ghost">Add to presets</button></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The band is the station's colour</h3><p>With channel and call sign in white, the way a station's own ID card would look. The body goes back to Opencast's colours.</p></div>
+      <div class="note"><h3>Three listings, no more</h3><p>Now, next and one later. The full schedule is the station page, reached from the call sign; the preview only answers "is it worth tuning to?"</p></div>
+      <div class="note"><h3>Carriage says who else airs it</h3><p>The note names programs the station makes that others carry, which is the quiet signal of a good station.</p></div>
+    </div>
+  </div>
+  <div class="stage phones" style="margin-top:var(--s6)">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>Inland Empire</button></div>
+            <div class="p-main"><div class="p-pad"><div id="phDial2"></div></div></div>
+            <div class="backdrop">
+              <div class="sheet">
+                <div class="grab"><i></i></div>
+                <div class="stn-band" style="background:#2E6B5A;margin:0 12px;border-radius:12px"><span class="ch">7.1</span><span class="cs">CIVC</span><span class="nm">Inland Civic<br>Redlands</span></div>
+                <div class="m-main">
+                  <div class="lst"><span class="lbl">On now</span><div><b>Town Hall: backyard homes and ADUs</b><small><span style="color:var(--live);font-weight:600">Live</span>, until <span class="mono">9:30 pm</span></small></div></div>
+                  <div class="lst"><span class="lbl">Next<span class="mono">9:30</span></span><div><b>Planning Commission, Sept 24</b><small>Full meeting, unedited</small></div></div>
+                  <div class="lst"><span class="lbl">Later<span class="mono">11:30</span></span><div><b>Council Watch</b><small>Carried by 6 stations</small></div></div>
+                </div>
+                <div class="m-foot"><a class="btn btn-primary" href="#watch-phone">Tune in</a><button class="btn btn-ghost">Add to presets</button></div>
+              </div>
+            </div>
+            <div class="hind" style="position:relative;z-index:11"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>Station preview, phone.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>A sheet, not a page</h3><p>Dragging it up opens the full station page; dragging it down closes it. The dial stays visible behind it so it feels like a pause, not a navigation.</p></div>
+      <div class="note"><h3>Add to presets gives a number</h3><p>If a key from 1 to 6 is free, the station takes the lowest one and the button turns into "Preset 4". If all six are taken, it asks which to replace.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 07 MORE MODALS ================= -->
+<section class="ref" id="m-more"><div class="wrap">
+  <div class="ch-label"><span class="n">07</span><span>Carried from, pledge, share, remind</span></div>
+  <h2>The modals that open from the player.</h2>
+  <p class="lede">Each is shown on the web at its real size over the player. On the phone they open as sheets at full width with the same content and buttons.</p>
+
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1120"><div class="scaler">
+      <div class="app" style="height:1120px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:0">
+        <div style="position:relative;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair)">
+          <div class="backdrop">
+            <div class="modal" style="width:440px">
+              <div class="m-head"><div><span class="quiet" style="font-size:13px">You're watching it on BEAT 12.1</span><h3 style="margin-top:4px">Saturday Reel is made by REEL 24.1</h3></div><button class="icon-btn bare x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+              <div class="m-main carriers">
+                <p style="margin:0 0 10px;font-size:14px" class="muted">12 stations carry it. In your market:</p>
+                <div class="opts">
+                  <div class="opt"><span class="ch" style="width:40px">12.1</span><div><span class="cs">BEAT</span><small style="display:block">You're here</small></div><span class="end">8:30 pm</span></div>
+                  <div class="opt"><span class="ch" style="width:40px">18.1</span><div><span class="cs">SAZN</span><small style="display:block">Sunday morning</small></div><span class="end">Sun 9:00 am</span></div>
+                  <div class="opt"><span class="ch" style="width:40px">24.1</span><div><span class="cs">REEL</span><small style="display:block">Its own station, all day Saturday</small></div><span class="end">8:00 pm</span></div>
+                </div>
+              </div>
+              <div class="m-foot"><button class="btn btn-primary">Tune in to REEL</button><button class="btn btn-ghost">Add REEL to presets</button></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;border-bottom:1px solid var(--hair)">
+          <div class="backdrop">
+            <div class="modal" style="width:440px">
+              <div class="m-head"><div><h3>Pledge to Inland Beat</h3><p>BEAT 12.1 is run by listeners and local underwriters.</p></div><button class="icon-btn bare x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+              <div class="m-main" style="padding-top:12px">
+                <div class="seg" style="width:100%"><button aria-pressed="true" style="flex:1">Monthly</button><button aria-pressed="false" style="flex:1">Once</button></div>
+                <div class="amts"><button class="amt">$5</button><button class="amt sel">$10</button><button class="amt">$20</button><button class="amt">Other</button></div>
+                <div class="check"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b>Credit me on air</b> as "Kai M." in BEAT's monthly thank-you to members</div></div>
+                <p class="m-note" style="margin-top:0">$10.00 a month goes to Inland Beat. Cancel any time from You.</p>
+              </div>
+              <div class="m-foot"><button class="btn btn-primary">Continue to payment</button></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;border-right:1px solid var(--hair)">
+          <div class="backdrop">
+            <div class="modal" style="width:440px">
+              <div class="m-head"><div><h3>Share</h3></div><button class="icon-btn bare x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+              <div class="m-main" style="padding-top:8px">
+                <div class="opts" style="border-top:0">
+                  <div class="opt"><span class="rad"></span><div><b>The station</b><small>Opens BEAT 12.1, whatever is on</small></div></div>
+                  <div class="opt sel"><span class="rad"></span><div><b>Beat Tape Live, tonight at 9:00 pm</b><small>Shown in their own time zone</small></div></div>
+                </div>
+                <div class="preview-card"><div class="tc" style="background:#8C3B7A"><span class="t">Beat Tape Live</span><span class="b">BEAT 12.1</span></div><div><b>Beat Tape Live</b><small>Tonight at 9:00 pm on BEAT 12.1</small><small>Live on Opencast</small></div></div>
+                <div class="linkbox"><svg class="i"><use href="#i-link"/></svg>useopencast.org/beat/tonight-9pm</div>
+              </div>
+              <div class="m-foot"><button class="btn btn-primary">Copy link</button><button class="btn btn-ghost">More options</button></div>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative">
+          <div class="pic reel cq" style="position:absolute;inset:24px;aspect-ratio:auto"><div class="scene"></div>
+            <div class="card"><div><b>Saturday Reel</b><span>Cartoons, 1928 to 1934</span></div></div>
+            <div class="bug"><span class="cs">BEAT</span><span class="ch">12.1</span></div>
+          </div>
+          <div class="toast" style="bottom:48px"><span>Reminder set for Beat Tape Live, 9:00 pm</span><a href="#m-more">Undo</a></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Carried from</h3><p>Answers "why is this here?" and lists where else in your market it airs, with times. The primary action is tuning to the station that makes it.</p></div>
+      <div class="note"><h3>Pledge</h3><p>Monthly is the default, like a member station. The on-air credit is opt-in and uses the name you choose, and stations read it in their underwriting breaks.</p></div>
+      <div class="note open"><h3>Opencast's share of pledges</h3><p>The copy assumes pledges go to the station less card fees, with nothing to Opencast. Confirm before this is written anywhere public.</p></div>
+      <div class="note"><h3>Share a time, not a video</h3><p>Sharing a program shares when it airs. The link tunes in if it's on, and offers a reminder if it isn't yet.</p></div>
+      <div class="note"><h3>Remind me</h3><p>Setting a reminder confirms with a toast and an Undo, not a modal. At the start time it's a notification: "Beat Tape Live is on BEAT 12.1 now."</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 08 FIRST VISIT ================= -->
+<section class="ref" id="first"><div class="wrap">
+  <div class="ch-label"><span class="n">08</span><span>First visit and thin markets</span></div>
+  <h2>Pick a market once. Say plainly when it's small.</h2>
+  <p class="lede">The first visit asks one question, where you're tuning in from, because the market decides the order of the dial. And while Opencast is young, some markets will have two stations. The dial says so and fills the rest honestly.</p>
+  <div class="stage phones">
+    <div class="phone-row">
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="fv">
+              <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
+              <h2>Where are you tuning in from?</h2>
+              <p>Your market decides which stations come first on your dial. You can still tune in to any station, anywhere.</p>
+              <button class="btn btn-primary btn-block"><svg class="i"><use href="#i-pin"/></svg>Use my location</button>
+              <div class="or">Or enter a ZIP code</div>
+              <div class="field">92373</div>
+              <div class="or">Or pick one</div>
+              <div class="opts mk-list">
+                <div class="opt sel"><span class="rad"></span><div><b>Inland Empire</b></div><span class="end">9 stations</span></div>
+                <div class="opt"><span class="rad"></span><div><b>Los Angeles</b></div><span class="end">14 stations</span></div>
+                <div class="opt"><span class="rad"></span><div><b>High Desert</b></div><span class="end">2 stations</span></div>
+              </div>
+              <p class="skip">Your location is only used to pick a market and isn't stored.</p>
+            </div>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>First visit.</b> On the web, the same content in a modal over the dial.</p>
+      </div>
+      <div>
+        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
+          <div class="phone">
+            <div class="sbar"><span>8:42</span><span class="dots"><i></i><b></b></span></div>
+            <div class="p-top"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><button class="market" type="button"><svg class="i"><use href="#i-pin"/></svg>High Desert</button></div>
+            <div class="p-main"><div class="p-pad">
+              <div class="sec-h" style="margin-top:6px"><h3>High Desert</h3><span class="sub">2 stations so far</span></div>
+              <div style="border-top:1px solid var(--line)">
+                <div class="prow"><span class="ch">5.1</span><div class="w"><div class="top"><span class="cs">MOJV</span><span class="tag tag-live"><span class="d"></span>Live</span></div><b class="clamp1">Victorville council, special session</b><small>Until 10:00 pm</small></div><div class="tc" style="background:#4F5B2A"><span class="t">MOJV</span></div></div>
+                <div class="prow"><span class="ch">96.1</span><div class="w"><div class="top"><span class="cs">DUST</span></div><b class="clamp1">Desert country, all night</b><small>Radio band</small></div><div class="tc" style="background:#7E2F35"><span class="t">DUST</span></div></div>
+              </div>
+              <div class="p-sec"><div class="sec-h"><h3>Nearby: Inland Empire</h3><span class="sub">40 miles</span></div>
+                <div id="phDialNear" style="border-top:1px solid var(--line)"></div>
+              </div>
+              <div class="p-sec" style="border-top:2px solid var(--ink);padding-top:14px">
+                <h3 style="margin:0 0 6px;font:700 18px var(--font-display)">Start a station here</h3>
+                <p class="muted" style="font-size:14px;margin:0 0 12px">The High Desert has room on the dial. Any channel from 2 to 69 is open except 5.</p>
+                <button class="btn btn-ghost btn-block">Open master control</button>
+              </div>
+            </div></div>
+            <nav class="p-tabs"><a class="on" href="#home-phone"><svg><use href="#i-dial"/></svg>Dial</a><a href="#guide"><svg><use href="#i-guide"/></svg>Guide</a><a href="#home-phone"><svg><use href="#i-search"/></svg>Search</a><a href="#home-phone"><svg><use href="#i-user"/></svg>You</a></nav>
+            <div class="hind"><i></i></div>
+          </div>
+        </div></div>
+        <p class="cap"><b>A thin market.</b></p>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note"><h3>One question</h3><p>No account, no genre quiz. Location is used once to pick a market, and the market is all that's stored. Everything else waits until someone wants a preset or a reminder.</p></div>
+      <div class="note"><h3>Counts are station counts</h3><p>The market picker shows how many stations each market has. That's the only count the viewer app shows about anything.</p></div>
+      <div class="note"><h3>Never pad a thin dial</h3><p>Two stations are shown as two stations, then the nearest market under its own heading and distance. Nothing from elsewhere is passed off as local.</p></div>
+      <div class="note"><h3>An empty dial recruits</h3><p>In a thin market the last block invites viewers to start a station, naming the open channels. That's how a market fills.</p></div>
+      <div class="note"><h3>No presets yet</h3><p>For a new viewer, the six preset keys show as dashed and empty, with "Tune in to a station and press Add to presets." The layout doesn't change when they fill.</p></div>
+    </div>
+  </div>
+</div></section>
+</main>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, home and the dial. Stations, programs, people and businesses are illustrations. Opencast is a working name. Built on the Opencast brand and style guide.</p></div></footer>
+
+<script>
+(function () {
+  /* ----- data: Inland Empire, Saturday 8:42 pm ----- */
+  var TV = [
+    { ch:'7.1', cs:'CIVC', nm:'Inland Civic', col:'#2E6B5A', now:'Town Hall: backyard homes and ADUs', live:true, until:'9:30 pm', nextT:'9:30', next:'Planning Commission, Sept 24' },
+    { ch:'9.1', cs:'RDLS', nm:'Redlands Public Access', col:'#4F5B2A', now:'City Council, Sept 16 meeting', listed:true, until:'9:15 pm', nextT:'9:15', next:'Community calendar' },
+    { ch:'12.1', cs:'BEAT', nm:'Inland Beat', col:'#8C3B7A', now:'Saturday Reel', from:'REEL', until:'9:00 pm', nextT:'9:00', next:'Beat Tape Live', nextLive:true, playing:true },
+    { ch:'18.1', cs:'SAZN', nm:'Sazón', col:'#A3402A', now:'Tamales for forty', until:'9:00 pm', nextT:'9:00', next:'Orange Street after hours' },
+    { ch:'24.1', cs:'REEL', nm:'Saturday Reel', col:'#9A5412', now:'Cartoons from 1928 to 1934', until:'9:00 pm', nextT:'9:00', next:'Newsreel hour' },
+    { ch:'31.1', cs:'PREP', nm:'Inland Preps', col:'#1F5E8C', now:'Football: Redlands East Valley at Citrus Valley', until:'10:00 pm', nextT:'10:00', next:'Friday scoreboard' }
+  ];
+  var RADIO = [
+    { ch:'88.3', cs:'NITE', nm:'Night Desk', col:'#33507A', now:'Radio dramas from the 1940s', until:'6:00 am' },
+    { ch:'90.7', cs:'HALL', nm:'Study Hall', col:'#56508A', now:'Slow beats for late work', until:'2:00 am' },
+    { ch:'101.9', cs:'CRAT', nm:'Crate', col:'#7E2F35', now:'The Producers\u2019 Hour', live:true, until:'9:00 pm' },
+    { ch:'104.3', cs:'VOZE', nm:'La Voz', col:'#1D6A70', now:'Noche de oldies', until:'12:00 am' }
+  ];
+  var PRESETS = [
+    { k:1, ch:'12.1', cs:'BEAT', now:'Saturday Reel', on:true },
+    { k:2, ch:'7.1', cs:'CIVC', now:'Town Hall', live:true },
+    { k:3, ch:'88.3', cs:'NITE', now:'Radio dramas' },
+    { k:4, ch:'24.1', cs:'REEL', now:'Cartoons, 1928 to 1934' },
+    { k:5, ch:'101.9', cs:'CRAT', now:'The Producers\u2019 Hour', live:true },
+    { k:6, empty:true }
+  ];
+  var CARRIED = [
+    { t:'Saturday Reel', col:'#9A5412', from:'REEL 24.1', by:12, where:'On BEAT 12.1 now' },
+    { t:'Council Watch', col:'#2E6B5A', from:'CIVC 7.1', by:6, where:'Next on CIVC at 11:30 pm' },
+    { t:'The Producers\u2019 Hour', col:'#7E2F35', from:'CRAT 101.9', by:9, where:'Live on CRAT now', live:true },
+    { t:'Night Desk', col:'#33507A', from:'NITE 88.3', by:4, where:'On NITE until 6:00 am' }
+  ];
+  var UP = [
+    { d:'9:00 pm', w:'Tonight', t:'Beat Tape Live', s:'BEAT 12.1' },
+    { d:'6:00 pm', w:'Monday', t:'City Council, regular meeting', s:'RDLS 9.1, listed from the city\u2019s stream' },
+    { d:'7:00 pm', w:'Tuesday', t:'Co-op town hall: members\u2019 questions', s:'CIVC 7.1' }
+  ];
+  function esc(s){ return String(s); }
+  function liveTag(){ return '<span class="tag tag-live"><span class="d"></span>Live</span>'; }
+
+  function deskPresets(el){
+    el.innerHTML = PRESETS.map(function(p){
+      if (p.empty) return '<div class="pre empty"><span class="k">'+p.k+'</span><span></span><span class="w">Empty</span></div>';
+      return '<div class="pre'+(p.on?' on':'')+'"><span class="k">'+p.k+'</span><span class="ch">'+p.ch+'</span><span class="w"><span class="cs">'+p.cs+'</span><small class="clamp1">'+(p.live?'<span style="color:var(--live);font-weight:600">Live</span> ':'')+esc(p.now)+'</small></span></div>';
+    }).join('');
+  }
+  function phPresets(el){
+    el.innerHTML = PRESETS.map(function(p){
+      if (p.empty) return '<button class="pbtn empty"><span class="k">'+p.k+'</span><span class="ch">+</span><span class="cs" style="font-family:var(--font-text);font-weight:600">Add</span></button>';
+      return '<button class="pbtn'+(p.on?' on':'')+'"><span class="k">'+p.k+'</span><span class="ch">'+p.ch+'</span><span class="cs">'+p.cs+'</span></button>';
+    }).join('');
+  }
+  function nowLine(s){
+    var bits = [];
+    if (s.live) bits.push(liveTag());
+    if (s.listed) bits.push('<span class="tag tag-listed">Listed</span>');
+    if (s.from) bits.push('<span>Carried from '+s.from+'</span>');
+    bits.push('<span>Until <span class="mono">'+s.until+'</span></span>');
+    return bits.join('');
+  }
+  function deskDial(el){
+    el.innerHTML = TV.map(function(s){
+      return '<div class="drow"><div class="tc" style="background:'+s.col+'"><span class="t" style="font-size:11.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(s.now)+'</span></div>'+
+        '<span class="ch">'+s.ch+'</span><span class="stn"><span class="cs">'+s.cs+'</span><small>'+s.nm+'</small></span>'+
+        '<span class="now"><b class="clamp1">'+esc(s.now)+'</b><small>'+nowLine(s)+'</small></span>'+
+        '<span class="nx"><span class="mono">'+s.nextT+'</span>'+esc(s.next)+(s.nextLive?' <span style="color:var(--live);font-weight:600">Live</span>':'')+'</span></div>';
+    }).join('');
+  }
+  function phRow(s){
+    return '<div class="prow"><span class="ch">'+s.ch+'</span><div class="w"><div class="top"><span class="cs">'+s.cs+'</span>'+(s.live?liveTag():'')+(s.listed?'<span class="tag tag-listed">Listed</span>':'')+'</div><b class="clamp1">'+esc(s.now)+'</b><small>'+(s.from?'From '+s.from+', until ':'Until ')+s.until+'</small></div><div class="tc" style="background:'+s.col+'"><span class="t">'+s.cs+'</span></div></div>';
+  }
+  function carried(c){
+    return '<div class="carried"><div class="tc lg" style="background:'+c.col+'"><span class="t">'+esc(c.t)+'</span><span class="b">From '+c.from+'</span></div><b>'+esc(c.t)+'</b><div class="from">From '+c.from+', carried by '+c.by+' stations</div><div class="where">'+(c.live?'<span style="color:var(--live);font-weight:600">Live</span> ':'')+esc(c.where)+'</div></div>';
+  }
+  function up(u){
+    return '<div class="up"><span class="when">'+u.w+'<br>'+u.d+'</span><div><b>'+esc(u.t)+'</b><small>'+esc(u.s)+'</small></div><button class="btn btn-ghost btn-sm"><svg class="i"><use href="#i-bell"/></svg>Remind me</button></div>';
+  }
+  function radio(r){
+    return '<div class="rt"><span class="f">'+r.ch+'</span><div><span class="cs">'+r.cs+'</span><small class="clamp1">'+(r.live?'<span style="color:var(--live);font-weight:600">Live</span> ':'')+esc(r.now)+'</small></div></div>';
+  }
+  function fill(id, html){ var el=document.getElementById(id); if (el) el.innerHTML = html; }
+
+  deskPresets(document.getElementById('deskPresets'));
+  phPresets(document.getElementById('phPresets'));
+  deskDial(document.getElementById('deskDial'));
+  deskDial(document.getElementById('deskDial2'));
+  fill('phDial', TV.map(phRow).join(''));
+  fill('phDial2', TV.map(phRow).join(''));
+  fill('phDialNear', TV.slice(0,3).map(phRow).join(''));
+  fill('deskCarried', CARRIED.map(carried).join(''));
+  fill('phCarried', CARRIED.map(carried).join(''));
+  fill('deskUp', UP.map(up).join(''));
+  fill('phUp', UP.map(function(u){ return up(u).replace('<svg class="i"><use href="#i-bell"/></svg>Remind me','Remind'); }).join(''));
+  fill('deskRadio', RADIO.map(radio).join(''));
+
+  /* ----- guide: 8:00 to 11:00 pm in 10-minute units (18) ----- */
+  var G = [
+    { cs:'CIVC', ch:'7.1', p:[[0,9,'Town Hall: backyard homes and ADUs','8:00 – 9:30',{live:1,on:1}],[9,18,'Planning Commission, Sept 24','9:30 – 11:00']] },
+    { cs:'RDLS', ch:'9.1', p:[[0,7.5,'City Council, Sept 16','Began 7:00, listed',{on:1,cont:1}],[7.5,10.5,'Community calendar','9:15'],[10.5,16.5,'Council Watch','From CIVC'],[16.5,18,'Slide loop','']] },
+    { cs:'BEAT', ch:'12.1', p:[[0,3,'Late Crate, ep. 14','8:00'],[3,6,'Saturday Reel','From REEL',{on:1}],[6,12,'Beat Tape Live','9:00 – 10:00',{live:1,sel:1}],[12,18,'Late Crate, ep. 15','10:00']] },
+    { cs:'SAZN', ch:'18.1', p:[[0,6,'Tamales for forty','8:00 – 9:00',{on:1}],[6,12,'Orange Street after hours','9:00'],[12,18,'Sazón archive','10:00']] },
+    { cs:'REEL', ch:'24.1', p:[[0,6,'Cartoons from 1928 to 1934','8:00 – 9:00',{on:1}],[6,12,'Newsreel hour','9:00'],[12,18,'Cartoons from 1935','10:00']] },
+    { cs:'PREP', ch:'31.1', p:[[0,12,'Football: Redlands East Valley at Citrus Valley','Began 7:30',{on:1,cont:1}],[12,15,'Friday scoreboard','10:00'],[15,18,'Highlights','10:30']] }
+  ];
+  function guide(el, compact){
+    var times = ['8:00 pm','8:30','9:00','9:30','10:00','10:30'];
+    var head = '<div class="gd-head"><div></div>'+times.map(function(t){ return '<div style="grid-column:span 3">'+t+'</div>'; }).join('')+'</div>';
+    var rows = G.map(function(r){
+      var cells = r.p.map(function(p){
+        var o = p[4]||{}, a = p[0], b = p[1];
+        var span = 'grid-column:'+(Math.round(a*2)+2)+' / '+(Math.round(b*2)+2);
+        var cls = 'gd-p'+(o.on?' on':'')+(o.sel?' sel':'')+(o.cont?' cont':'');
+        return '<div class="'+cls+'" style="'+span+'"><b>'+esc(p[2])+'</b><small>'+(o.live?'<span class="lv">Live</span> ':'')+esc(p[3])+'</small></div>';
+      }).join('');
+      return '<div class="gd-row"><div class="gd-st"><span class="cs">'+r.cs+'</span><span class="ch">'+r.ch+'</span></div>'+cells+'</div>';
+    }).join('');
+    el.innerHTML = head + rows + '<div class="gd-now" style="left:calc(var(--stc) + (100% - var(--stc)) * '+(42/180)+')"><span>8:42</span></div>';
+  }
+  /* guide grid uses 36 half-units: redefine columns */
+  var gstyle = document.createElement('style');
+  gstyle.textContent = '.gd{--stc:150px}.gd-head,.gd-row{grid-template-columns:var(--stc) repeat(36,1fr)}.gd-head div:first-child{grid-column:1}'+
+    '#phGuide .gd{--stc:74px;min-width:760px}#phGuide .gd-st .cs{font-size:12.5px}#phGuide .gd-head div{padding:6px 6px}#phGuide .gd-p{padding:6px 8px}';
+  document.head.appendChild(gstyle);
+  var dg = document.getElementById('deskGuide'); guide(dg);
+  var pg = document.getElementById('phGuide'); var inner = document.createElement('div'); inner.className='gd'; pg.appendChild(inner); guide(inner, true);
+  /* head cells must span 6 half-units each (30 minutes) */
+  document.querySelectorAll('.gd-head div[style*="span 3"]').forEach(function(d){ d.style.gridColumn = 'span 6'; });
+  /* open phone guide scrolled near now */
+  
+
+  /* ----- scale frames to fit ----- */
+  function fitAll(){
+    document.querySelectorAll('.fit').forEach(function(f){
+      var w = +f.dataset.w, h = +f.dataset.h, s = Math.min(1, f.clientWidth / w);
+      var sc = f.querySelector('.scaler'); sc.style.transform = 'scale('+s+')'; sc.style.width = w+'px';
+      f.style.height = (h*s)+'px';
+    });
+  }
+  fitAll(); window.addEventListener('resize', fitAll);
+  if (window.ResizeObserver) { var ro = new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
+
+  /* ----- ground toggle ----- */
+  var root = document.documentElement, btn = document.getElementById('groundToggle');
+  function cur(){ var t = root.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  function lab(){ btn.textContent = cur()==='dark' ? 'Light ground' : 'Dark ground'; }
+  try { var sv = localStorage.getItem('oc-ground'); if (sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n = cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Opencast · Television, run by your neighbors</title>
+<meta name="description" content="Opencast is a dial of 24/7 local stations run by people and groups where you live. Tune in, cast it to the TV and flip channels with your phone. Or start a station of your own.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73; --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830; --screen:#0A1124;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830; --screen:#0A1124;
+}
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:calc(env(safe-area-inset-top,0px) + 72px); scroll-behavior:smooth; }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; } button, input, select { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; border-radius:2px; }
+p { margin:0 0 var(--s3); max-width:62ch; }
+h1,h2,h3,h4 { margin:0; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1200px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+
+/* header */
+.site-head { position:sticky; top:0; z-index:20; background:var(--ground); border-bottom:1px solid var(--hair); padding-top:env(safe-area-inset-top,0px); }
+.site-head .wrap { display:flex; align-items:center; gap:var(--s4); min-height:64px; }
+.brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; }
+.brand svg { width:30px; height:25px; color:var(--ink); }
+.brand span { font:800 21px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.nav { display:flex; gap:var(--s4); margin-left:var(--s3); }
+.nav a { text-decoration:none; color:var(--ink-70); font-size:15px; }
+.nav a:hover { color:var(--ink); }
+.head-end { margin-left:auto; display:flex; align-items:center; gap:12px; }
+.ground-toggle { font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+@media (max-width:900px) { .nav { display:none; } .ground-toggle { display:none; } }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:48px; padding:0 22px; border-radius:var(--r-control); font:600 16px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-primary:hover { filter:brightness(1.08); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-ghost:hover { background:var(--raised); }
+.btn-sm { height:38px; padding:0 14px; font-size:14px; }
+.tag { display:inline-flex; align-items:center; gap:7px; height:26px; padding:0 10px; border-radius:var(--r-sign); font:600 13px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tally { display:inline-flex; align-items:center; height:26px; padding:0 10px; border-radius:var(--r-sign); font:800 12px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--on-screen-70); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 14px 2px var(--tally-glow); }
+
+/* hero */
+.hero { padding:var(--s6) 0 var(--s7); }
+.hero .wrap { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); gap:var(--s6); align-items:center; }
+.hero h1 { font:800 clamp(48px,7.4vw,112px)/.92 var(--font-display); font-stretch:125%; letter-spacing:-.045em; margin:0 0 var(--s4); }
+.hero .lede { font-size:clamp(18px,1.8vw,22px); line-height:1.5; color:var(--ink-70); max-width:40ch; margin-bottom:var(--s5); }
+.hero .acts { display:flex; gap:12px; flex-wrap:wrap; }
+.hero .where { margin-top:var(--s4); font-size:14px; color:var(--ink-50); }
+@media (max-width:900px) { .hero .wrap { grid-template-columns:1fr; gap:var(--s5); } .hero { padding-bottom:var(--s6); } }
+
+/* the tuner */
+.tuner { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:14px; align-items:stretch; }
+.set { position:relative; aspect-ratio:4/3; border-radius:var(--r-screen); background:var(--screen); color:var(--on-screen); overflow:hidden; }
+.set .pic { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:7% 7% 8%; transition:opacity .14s ease; }
+.set .pic.flip { opacity:0; }
+.set .pic .ttl { font:800 clamp(26px,3.6vw,46px)/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; color:#fff; max-width:14ch; }
+.set .pic .sub { font-size:clamp(13px,1.2vw,16px); color:rgb(255 255 255 / .85); margin-top:8px; }
+.set .bug { position:absolute; right:6%; bottom:7%; text-align:right; line-height:1; color:#fff; opacity:.8; }
+.set .bug .cs { display:block; font-size:clamp(14px,1.6vw,20px); } .set .bug .ch { font:500 clamp(10px,1vw,12px) var(--font-mono); }
+.set .tally { position:absolute; top:5%; right:5%; }
+.set .band { position:absolute; left:6%; top:6%; display:flex; gap:8px; align-items:center; }
+.set .band .tag { background:rgb(10 17 36 / .6); border-color:rgb(236 233 225 / .45); color:#ECE9E1; }
+.set .band .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.set .radio { font:500 clamp(64px,10vw,130px)/1 var(--font-mono); letter-spacing:-.06em; color:#fff; margin-bottom:10px; }
+.rock { display:flex; flex-direction:column; justify-content:space-between; align-items:center; border:1px solid var(--line); border-radius:var(--r-screen); padding:10px 0; }
+.rock button { width:52px; height:52px; border-radius:var(--r-control); border:1px solid var(--line); background:var(--raised); color:var(--ink); display:grid; place-items:center; cursor:pointer; }
+.rock button svg { width:22px; height:22px; }
+.rock .lbl { font:600 11px var(--font-text); color:var(--ink-50); letter-spacing:.06em; }
+.readout { grid-column:1 / -1; display:grid; grid-template-columns:auto 1fr auto; gap:0 16px; align-items:center; padding:12px 2px 0; border-top:1px solid var(--hair); }
+.readout .ch { font:500 34px/1 var(--font-mono); letter-spacing:-.04em; padding-right:16px; border-right:1px solid var(--line); }
+.readout .who .cs { font-size:18px; display:block; line-height:1.15; }
+.readout .who small { font-size:14px; color:var(--ink-70); }
+.readout .hint { font-size:13px; color:var(--ink-50); text-align:right; }
+@media (hover:none) { .readout .hint .keys { display:none; } }
+@media (max-width:520px) { .tuner { grid-template-columns:1fr; } .rock { flex-direction:row; padding:0 10px; height:64px; } .rock .lbl { order:0; } }
+
+/* sections */
+section.s { padding:var(--s7) 0; border-top:1px solid var(--hair); }
+.s-h { font:800 clamp(36px,5.2vw,72px)/1 var(--font-display); font-stretch:112%; letter-spacing:-.04em; max-width:16ch; margin-bottom:var(--s4); }
+.s-lede { font-size:clamp(18px,1.6vw,21px); line-height:1.5; color:var(--ink-70); max-width:58ch; margin-bottom:var(--s6); }
+.cols3 { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s5); }
+.cols4 { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); }
+.pt { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.pt h3 { font:700 22px/1.2 var(--font-display); letter-spacing:-.015em; margin-bottom:8px; }
+.pt p { font-size:16px; color:var(--ink-70); margin:0; }
+@media (max-width:900px) { .cols3, .cols4 { grid-template-columns:1fr 1fr; } }
+@media (max-width:600px) { .cols3, .cols4 { grid-template-columns:1fr; } }
+
+/* dial vs feed */
+.versus { display:grid; grid-template-columns:1fr 1fr; gap:var(--s5); margin-bottom:var(--s6); }
+.versus > div { border-top:1px solid var(--line); }
+.versus h4 { font:600 14px var(--font-text); color:var(--ink-50); padding:12px 0; }
+.vrow { display:flex; gap:14px; align-items:baseline; padding:12px 0; border-top:1px solid var(--hair); font-size:17px; }
+.vrow .mono { font-size:15px; color:var(--ink-70); width:52px; flex:none; }
+.versus .feed .vrow { color:var(--ink-50); }
+@media (max-width:760px) { .versus { grid-template-columns:1fr; } }
+
+/* remote */
+.remote-row { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:var(--s6); align-items:start; }
+.big-quote { font:800 clamp(28px,3.4vw,44px)/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; max-width:20ch; margin:0 0 var(--s4); }
+.devices { border-top:1px solid var(--line); }
+.dv { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); font-size:16px; }
+.dv span:last-child { color:var(--ink-70); text-align:right; }
+@media (max-width:900px) { .remote-row { grid-template-columns:1fr; } }
+
+/* broadcasters */
+.steps { list-style:none; padding:0; margin:0 0 var(--s6); counter-reset:st; border-top:1px solid var(--line); }
+.steps li { display:grid; grid-template-columns:64px 220px 1fr; gap:var(--s4); padding:18px 0; border-bottom:1px solid var(--hair); align-items:baseline; }
+.steps li .n { font:500 15px var(--font-mono); color:var(--ink-50); }
+.steps li b { font:700 20px var(--font-display); letter-spacing:-.01em; }
+.steps li span { color:var(--ink-70); font-size:16px; }
+@media (max-width:760px) { .steps li { grid-template-columns:40px 1fr; } .steps li span { grid-column:2; } }
+.terms { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s4); }
+.terms > div { border-top:1px solid var(--line); padding-top:var(--s3); }
+.terms h4 { font:700 20px var(--font-display); margin-bottom:6px; }
+.terms p { font-size:16px; color:var(--ink-70); margin:0; }
+.sub-h { font:700 26px/1.2 var(--font-display); letter-spacing:-.02em; margin:0 0 var(--s3); }
+@media (max-width:760px) { .terms { grid-template-columns:1fr; } }
+
+/* log strip */
+.logstrip { border-top:1px solid var(--line); margin-bottom:var(--s5); }
+.lg { display:grid; grid-template-columns:90px 60px 1fr auto; gap:14px; padding:11px 0; border-bottom:1px solid var(--hair); align-items:center; font-size:16px; }
+.lg .t { font:500 14px var(--font-mono); color:var(--ink-70); }
+.lg .d { font:500 14px var(--font-mono); }
+.code { display:inline-block; min-width:44px; text-align:center; font:500 12px var(--font-mono); padding:2px 6px; border-radius:var(--r-sign); border:1px solid var(--line); }
+.code.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.code.spt { border-color:var(--standby); color:var(--standby); }
+.code.und { border-style:dashed; }
+.lg small { display:block; font-size:13px; color:var(--ink-50); }
+
+/* money */
+.split3 { display:grid; grid-template-columns:repeat(3,1fr); border-top:2px solid var(--ink); }
+.split3 > div { padding:var(--s4) var(--s4) 0 0; }
+.split3 > div + div { padding-left:var(--s4); border-left:1px solid var(--hair); }
+.split3 h3 { font:700 22px var(--font-display); margin-bottom:8px; }
+.split3 p { font-size:16px; color:var(--ink-70); margin:0; }
+@media (max-width:760px) { .split3 { grid-template-columns:1fr; } .split3 > div + div { padding-left:0; border-left:0; border-top:1px solid var(--hair); margin-top:var(--s4); } }
+.note-line { margin-top:var(--s5); font-size:15px; color:var(--ink-50); max-width:70ch; }
+
+/* local */
+.lineup { border-top:1px solid var(--line); }
+.lu { display:grid; grid-template-columns:70px 90px minmax(0,1fr) auto; gap:16px; padding:14px 0; border-bottom:1px solid var(--hair); align-items:center; }
+.lu .ch { font:500 22px var(--font-mono); letter-spacing:-.03em; }
+.lu .cs { font-size:17px; }
+.lu b { font:700 18px/1.25 var(--font-display); display:block; }
+.lu small { font-size:14px; color:var(--ink-70); }
+.lu .sw { width:52px; height:30px; border-radius:6px; }
+@media (max-width:600px) { .lu { grid-template-columns:52px minmax(0,1fr) 40px; } .lu .cs { display:none; } .lu .sw { width:40px; } }
+
+/* open */
+.open-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--s6); align-items:start; }
+pre.cli { margin:0; background:var(--screen); color:var(--on-screen); border-radius:var(--r-control); padding:var(--s4); font:14px/1.7 var(--font-mono); overflow-x:auto; }
+pre.cli .c { color:var(--on-screen-70); }
+@media (max-width:900px) { .open-row { grid-template-columns:1fr; } }
+
+/* waitlist */
+.join { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,460px); gap:var(--s6); align-items:start; }
+.form { border-top:2px solid var(--ink); padding-top:var(--s4); }
+.fl { margin-bottom:var(--s3); }
+.fl > label, .fl > .lb { display:block; font-size:14px; font-weight:600; margin-bottom:6px; }
+.inp { width:100%; height:48px; padding:0 14px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:16px; }
+.inp::placeholder { color:var(--ink-50); }
+.roles { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.roles label { position:relative; display:flex; align-items:center; justify-content:center; text-align:center; height:48px; border:1px solid var(--line); border-radius:var(--r-control); font-size:14px; font-weight:600; cursor:pointer; padding:0 8px; line-height:1.2; }
+.roles input { position:absolute; opacity:0; pointer-events:none; }
+.roles input:checked + span { color:var(--ground); }
+.roles label:has(input:checked) { background:var(--ink); border-color:var(--ink); color:var(--ground); }
+.roles label:has(input:focus-visible) { outline:2px solid var(--signal); outline-offset:3px; }
+.cs-inp { font-family:var(--font-display); font-stretch:125%; font-weight:800; text-transform:uppercase; letter-spacing:.02em; }
+.form .fine { font-size:13px; color:var(--ink-50); margin-top:12px; }
+.done { display:none; border-top:2px solid var(--ink); padding-top:var(--s4); }
+.done.on { display:block; }
+.done h3 { font:800 34px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:14px 0 10px; }
+@media (max-width:900px) { .join { grid-template-columns:1fr; } }
+
+/* faq */
+.faq { border-top:1px solid var(--line); max-width:860px; }
+.faq details { border-bottom:1px solid var(--hair); }
+.faq summary { list-style:none; cursor:pointer; padding:18px 40px 18px 0; position:relative; font:700 19px/1.3 var(--font-display); letter-spacing:-.01em; }
+.faq summary::-webkit-details-marker { display:none; }
+.faq summary::after { content:"+"; position:absolute; right:4px; top:14px; font:400 26px var(--font-text); color:var(--ink-50); }
+.faq details[open] summary::after { content:"\2212"; }
+.faq details p { color:var(--ink-70); font-size:16px; padding-bottom:10px; }
+
+/* footer */
+footer { border-top:1px solid var(--hair); padding:var(--s6) 0 var(--s5); }
+.foot { display:grid; grid-template-columns:1.4fr repeat(3,1fr); gap:var(--s4); }
+.foot h4 { font:600 14px var(--font-text); color:var(--ink-50); margin-bottom:10px; }
+.foot ul { list-style:none; padding:0; margin:0; }
+.foot li { margin-bottom:6px; font-size:15px; }
+.foot a { text-decoration:none; color:var(--ink-70); } .foot a:hover { color:var(--ink); }
+.fine-print { margin-top:var(--s5); font-size:13px; color:var(--ink-50); max-width:80ch; }
+@media (max-width:760px) { .foot { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</defs></svg>
+
+<header class="site-head"><div class="wrap">
+  <a class="brand" href="#top" aria-label="Opencast, top of page"><svg><use href="#mk"/></svg><span>opencast</span></a>
+  <nav class="nav" aria-label="Sections">
+    <a href="#dial">The dial</a><a href="#remote">On your TV</a><a href="#stations">Run a station</a><a href="#producers">For producers</a><a href="#businesses">For businesses</a><a href="#open">Open source</a>
+  </nav>
+  <div class="head-end">
+    <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+    <a class="btn btn-primary btn-sm" href="#join">Join the waitlist</a>
+  </div>
+</div></header>
+
+<main id="top">
+<section class="hero"><div class="wrap">
+  <div>
+    <h1>Television, run by your neighbors.</h1>
+    <p class="lede">Opencast is a dial of 24/7 stations run by people and groups where you live. Tune in, cast it to the TV and flip channels with your phone. Or start a station of your own.</p>
+    <div class="acts"><a class="btn btn-primary" href="#join">Join the waitlist</a><a class="btn btn-ghost" href="#stations">Reserve a channel</a></div>
+    <p class="where">Starting in the Inland Empire, California.</p>
+  </div>
+  <div class="tuner" aria-label="A sample of the Opencast dial">
+    <div class="set">
+      <div class="pic" id="tPic"></div>
+      <div class="band" id="tBand"></div>
+      <span class="tally lit" role="img" aria-label="On air">ON AIR</span>
+      <div class="bug" id="tBug"></div>
+    </div>
+    <div class="rock">
+      <button type="button" id="chUp" aria-label="Channel up"><svg><use href="#i-up"/></svg></button>
+      <span class="lbl">CH</span>
+      <button type="button" id="chDown" aria-label="Channel down"><svg><use href="#i-down"/></svg></button>
+    </div>
+    <div class="readout" aria-live="polite">
+      <span class="ch" id="tCh">7.1</span>
+      <span class="who"><span class="cs" id="tCs">CIVC</span><small id="tNow"></small></span>
+      <span class="hint">Try it<span class="keys">, or use<br>the arrow keys</span></span>
+    </div>
+  </div>
+</div></section>
+
+<section class="s" id="dial"><div class="wrap">
+  <h2 class="s-h">A dial, not a feed.</h2>
+  <p class="s-lede">Streaming apps hand you an endless grid and ask you to choose. Opencast works the way TV did: something is always on, the stations are always in the same place, and you change channel until something catches you.</p>
+  <div class="versus">
+    <div><h4>Opencast</h4>
+      <div class="vrow"><span class="mono">7.1</span>Your town hall, live</div>
+      <div class="vrow"><span class="mono">12.1</span>A local beat show, then cartoons from 1928</div>
+      <div class="vrow"><span class="mono">88.3</span>Radio dramas until 6:00 am</div>
+    </div>
+    <div class="feed"><h4>A feed</h4>
+      <div class="vrow"><span class="mono">1</span>Recommended for you</div>
+      <div class="vrow"><span class="mono">2</span>Because you watched something once</div>
+      <div class="vrow"><span class="mono">3</span>Trending, somewhere</div>
+    </div>
+  </div>
+  <div class="cols4">
+    <div class="pt"><h3>Ordered by channel</h3><p>Your market's stations sit in channel order, the same every time, so you learn where things are.</p></div>
+    <div class="pt"><h3>Live and local first</h3><p>Something happening near you right now always comes before anything else.</p></div>
+    <div class="pt"><h3>You join where it is</h3><p>Tuning in lands mid-program, like a real station. No scrubbing, no restarting.</p></div>
+    <div class="pt"><h3>No scores</h3><p>No view counts, star ratings or trending lists. A station is judged by its schedule.</p></div>
+  </div>
+</div></section>
+
+<section class="s" id="remote"><div class="wrap">
+  <h2 class="s-h">Your phone is the remote.</h2>
+  <div class="remote-row">
+    <div>
+      <p class="s-lede" style="margin-bottom:var(--s3)">Cast it to the TV, then flip channels with your thumb. Choosing is tiring. Changing channel isn't.</p>
+      <p class="muted" style="font-size:18px"> Put Opencast on the TV and your phone turns into a remote: channel up and down, a keypad for 12.1, a guide and six presets. On a TV with the Opencast app, the TV's own remote does the same.</p>
+      <p class="muted" style="font-size:18px">It opens on the last channel you watched. There's no home screen to get past.</p>
+    </div>
+    <div class="devices">
+      <div class="dv"><span>Chromecast and Google TV</span><span>Cast from your phone</span></div>
+      <div class="dv"><span>Android TV, Fire TV</span><span>Opencast app, with the TV remote</span></div>
+      <div class="dv"><span>Apple TV and AirPlay TVs</span><span>Mirror from the iPhone app</span></div>
+      <div class="dv"><span>Phone, tablet, computer</span><span>Watch anywhere</span></div>
+      <div class="dv"><span>Roku</span><span class="quiet">Later</span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="s" id="stations"><div class="wrap">
+  <h2 class="s-h">Run a station, not a channel.</h2>
+  <p class="s-lede">YouTube made everyone a creator. Opencast makes everyone a station. You program a schedule, air your own shows and other stations' programs, choose the commercials in your breaks, and keep relaying to YouTube and Twitch if you like.</p>
+  <ol class="steps">
+    <li><span class="n">01</span><b>Claim a channel</b><span>Pick a call sign and a number on your market's dial. Numbers are limited per market, like the real thing.</span></li>
+    <li><span class="n">02</span><b>Fill your library</b><span>Upload shows, spots, bumpers and a station ID. They're prepared for air automatically.</span></li>
+    <li><span class="n">03</span><b>Build the log</b><span>Lay out the day to the second. Breaks are placed for you, and gaps are flagged before they reach air.</span></li>
+    <li><span class="n">04</span><b>Sign on</b><span>Your station goes on the dial and stays on around the clock, with live shows switched in when they start.</span></li>
+  </ol>
+  <h3 class="sub-h">Carry each other's programs</h3>
+  <p class="muted" style="max-width:62ch;margin-bottom:var(--s4)">Any program can be offered to other stations, the way PBS stations share programming. A small station can fill 24 hours; a good program can travel. The station that makes it sets the terms (<a href="#producers" style="color:var(--signal);font-weight:600;text-decoration:none">more for producers</a>):</p>
+  <div class="terms">
+    <div><h4>Barter</h4><p>No fee. Break time inside the program is shared between the station airing it and the one that made it.</p></div>
+    <div><h4>Cash</h4><p>The airing station pays a set rate per airing and keeps all the break time.</p></div>
+    <div><h4>Cash plus barter</h4><p>A lower rate, plus a share of the break time.</p></div>
+  </div>
+</div></section>
+
+<section class="s" id="producers"><div class="wrap">
+  <h2 class="s-h">Make it once. Air it everywhere.</h2>
+  <p class="s-lede">The syndication market is where programs find stations. List a show with your terms, and stations across every market can pick it up to fill their nights. You don't need a station of your own to use it: studios and solo producers list programs the same way.</p>
+  <div class="logstrip" aria-label="One program airing on three stations">
+    <div class="lg" style="grid-template-columns:120px 90px 1fr auto"><span class="t">Sat 8:00 pm</span><span class="mono" style="font-size:14px">12.1</span><div>Late Crate, on BEAT<small>Made here</small></div><span class="d">Maker</span></div>
+    <div class="lg" style="grid-template-columns:120px 90px 1fr auto"><span class="t">Nightly 3:00 am</span><span class="mono" style="font-size:14px">90.7</span><div>Late Crate, on HALL<small>Carried on barter terms</small></div><span class="d">Carrier</span></div>
+    <div class="lg" style="grid-template-columns:120px 90px 1fr auto"><span class="t">Sun 11:00 pm</span><span class="mono" style="font-size:14px">18.1</span><div>Late Crate, on SAZN<small>Carried on barter terms</small></div><span class="d">Carrier</span></div>
+  </div>
+  <div class="cols4">
+    <div class="pt"><h3>You set the terms</h3><p>Barter, cash per airing, or both. How many airings, live or later, and whether you approve each station.</p></div>
+    <div class="pt"><h3>Paid by the airing</h3><p>Every airing on another station is recorded to the second, and your share settles from it.</p></div>
+    <div class="pt"><h3>Your name stays on it</h3><p>Every station airing your program credits you, and viewers can follow it back to you.</p></div>
+    <div class="pt"><h3>Rights kept clean</h3><p>What you list has its rights confirmed once, so every station carrying it stands on the same record.</p></div>
+  </div>
+  <div class="acts" style="margin-top:var(--s5);display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn-primary" href="#join" data-role="producer">List your programs</a><a class="btn btn-ghost" href="#stations">Or run a station</a></div>
+</div></section>
+
+<section class="s" id="businesses"><div class="wrap">
+  <h2 class="s-h">Commercials, made here.</h2>
+  <p class="s-lede">Local businesses list their spots with a rate. Stations choose which ones air in their breaks, so a coffee shop reaches the people who live near it, on a station those people chose. Opencast's own studio can make the spot for you.</p>
+  <div class="logstrip" aria-label="A sample break on BEAT 12.1">
+    <div class="lg"><span class="t">8:28:30</span><span><span class="code spt">SPT</span></span><div>Orange Street Coffee<small>Spot, a code on screen for 10% off</small></div><span class="d">:30</span></div>
+    <div class="lg"><span class="t">8:29:00</span><span><span class="code spt">SPT</span></span><div>Inland Tire and Wheel<small>Spot</small></div><span class="d">:30</span></div>
+    <div class="lg"><span class="t">8:29:30</span><span><span class="code und">UND</span></span><div>Made possible by members of Inland Beat<small>Underwriting</small></div><span class="d">:15</span></div>
+    <div class="lg"><span class="t">8:29:55</span><span><span class="code">SID</span></span><div>BEAT 12.1, Redlands<small>Station ID</small></div><span class="d">:05</span></div>
+  </div>
+  <div class="cols3">
+    <div class="pt"><h3>Stations choose</h3><p>Nothing airs on a station that the station didn't pick. Creators decide what their audience sees.</p></div>
+    <div class="pt"><h3>Pay how you like</h3><p>A rate per thousand people tuned in, or a flat rate per airing. Conversions come from a code or QR on screen.</p></div>
+    <div class="pt"><h3>Local first</h3><p>Filter by distance, so a spot runs where its customers are.</p></div>
+  </div>
+</div></section>
+
+<section class="s" id="money"><div class="wrap">
+  <h2 class="s-h">Shared, not skimmed.</h2>
+  <p class="s-lede">The software is free and open. Opencast pays for itself with a share of spot revenue, and that share is split with the stations that make the platform worth watching.</p>
+  <div class="split3">
+    <div><h3>An equal base</h3><p>Every active station gets the same base share, whatever its size.</p></div>
+    <div><h3>A share by watch time</h3><p>More goes to stations people actually spend time with, so better programming earns more.</p></div>
+    <div><h3>A fund for new work</h3><p>A portion goes to a fund for new stations and new programs.</p></div>
+  </div>
+  <p class="note-line">Pledges from viewers go to the station. The exact split, and what makes a station active, will be published before launch. Nothing here is a promise of earnings.</p>
+</div></section>
+
+<section class="s" id="local"><div class="wrap">
+  <h2 class="s-h">Starting in the Inland Empire.</h2>
+  <p class="s-lede">The first dial is local on purpose: town halls and council meetings, the people making music and food here, and a lineup of classic public-domain programming to fill the nights. Here's the kind of lineup we're building toward.</p>
+  <div class="lineup">
+    <div class="lu"><span class="ch">7.1</span><span class="cs">CIVC</span><div><b>Public affairs</b><small>Town halls, council meetings and questions from viewers</small></div><span class="sw" style="background:#2E6B5A"></span></div>
+    <div class="lu"><span class="ch">12.1</span><span class="cs">BEAT</span><div><b>Music</b><small>Local producers, live sets and beat showcases</small></div><span class="sw" style="background:#8C3B7A"></span></div>
+    <div class="lu"><span class="ch">18.1</span><span class="cs">SAZN</span><div><b>Food</b><small>Kitchens and cooks from around the region</small></div><span class="sw" style="background:#A3402A"></span></div>
+    <div class="lu"><span class="ch">24.1</span><span class="cs">REEL</span><div><b>Classic</b><small>Cartoons, newsreels and films from the public domain</small></div><span class="sw" style="background:#9A5412"></span></div>
+    <div class="lu"><span class="ch">88.3</span><span class="cs">NITE</span><div><b>Radio band</b><small>Old-time radio dramas, all night</small></div><span class="sw" style="background:#33507A"></span></div>
+  </div>
+  <p class="note-line">Stations shown are examples of what the dial could hold, not current stations.</p>
+</div></section>
+
+<section class="s" id="open"><div class="wrap">
+  <div class="open-row">
+    <div>
+      <h2 class="s-h">Open source, all of it.</h2>
+      <p class="s-lede" style="margin-bottom:var(--s4)">The playout engine and master control are free to read, run and change today, and the viewer apps will be too. A station can run its own copy; the shared dial is what joins them up.</p>
+      <a class="btn btn-ghost" href="https://github.com/KyngKai909/untitled-project">Read the code</a>
+    </div>
+    <pre class="cli"><span class="c"># run a station locally</span>
+git clone https://github.com/KyngKai909/untitled-project
+npm install
+npm run dev
+
+<span class="c"># master control at localhost:5173</span>
+<span class="c"># the playout worker loops your log to HLS,</span>
+<span class="c"># and relays to Livepeer when you sign on</span></pre>
+  </div>
+</div></section>
+
+<section class="s" id="join"><div class="wrap">
+  <div class="join">
+    <div>
+      <h2 class="s-h">Get on the dial.</h2>
+      <p class="s-lede">Join the waitlist as a viewer, reserve a call sign for your station, list your programs for the syndication market, or list your business for the first spot market. We'll write when your market opens, and not before.</p>
+    </div>
+    <div>
+      <form class="form" id="waitForm" novalidate>
+        <div class="fl"><span class="lb" id="roleLbl">I'm joining as</span>
+          <div class="roles" role="radiogroup" aria-labelledby="roleLbl">
+            <label><input type="radio" name="role" value="viewer" checked><span>A viewer</span></label>
+            <label><input type="radio" name="role" value="station"><span>A station</span></label>
+            <label><input type="radio" name="role" value="producer"><span>A producer</span></label>
+            <label><input type="radio" name="role" value="business"><span>A business</span></label>
+          </div>
+        </div>
+        <div class="fl"><label for="em">Email</label><input class="inp" id="em" type="email" placeholder="you@example.com" autocomplete="email" required></div>
+        <div class="fl"><label for="zip">ZIP code</label><input class="inp" id="zip" inputmode="numeric" placeholder="92373" autocomplete="postal-code"></div>
+        <div class="fl" id="csField" hidden><label for="cs">Call sign you'd like</label><input class="inp cs-inp" id="cs" maxlength="5" placeholder="BEAT"><div class="quiet" style="font-size:13px;margin-top:6px">Three to five letters. We'll hold it until your market opens.</div></div>
+        <button class="btn btn-primary" style="width:100%" type="submit">Join the waitlist</button>
+        <p class="fine">Your ZIP decides your market. We don't share your email.</p>
+      </form>
+      <div class="done" id="done" role="status">
+        <span class="tally lit" style="color:#fff">ON AIR</span>
+        <h3 id="doneH">You're on the list.</h3>
+        <p class="muted" id="doneP">We'll write when the Inland Empire dial opens.</p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="s" id="faq"><div class="wrap">
+  <h2 class="s-h">Questions.</h2>
+  <div class="faq">
+    <details><summary>Is it free to watch?</summary><p>Yes. Stations are supported by local spots, underwriting and pledges from viewers who want to support them.</p></details>
+    <details><summary>Does it cost anything to run a station?</summary><p>No. The software is free and open source. Stations can earn from spots in their breaks and from pledges.</p></details>
+    <details><summary>Can I keep streaming to YouTube and Twitch?</summary><p>Yes. Master control relays your station to other services, and you choose whether each one airs your spots or a station ID slate in the breaks.</p></details>
+    <details><summary>What can I put on air?</summary><p>Anything you made, anything you have the owner's permission to air, and anything in the public domain. Every item's rights are confirmed before it airs.</p></details>
+    <details><summary>Why channel numbers?</summary><p>Because a dial you can learn is easier than a feed you have to search. Each market has a limited set of numbers, and stations keep theirs.</p></details>
+    <details><summary>Is Opencast the final name?</summary><p>Not yet. It's the working name while we build.</p></details>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div class="foot">
+    <div><a class="brand" href="#top"><svg><use href="#mk"/></svg><span>opencast</span></a><p class="muted" style="font-size:15px;margin-top:12px">Television, run by your neighbors. Starting in the Inland Empire, California.</p></div>
+    <div><h4>Watch</h4><ul><li><a href="#dial">The dial</a></li><li><a href="#remote">On your TV</a></li><li><a href="#join">Waitlist</a></li></ul></div>
+    <div><h4>Broadcast</h4><ul><li><a href="#stations">Run a station</a></li><li><a href="#producers">For producers</a></li><li><a href="#businesses">For businesses</a></li><li><a href="#money">How the money works</a></li></ul></div>
+    <div><h4>Opencast</h4><ul><li><a href="https://github.com/KyngKai909/untitled-project">Source code</a></li><li><a href="https://claude.ai/artifact/NMRzW6vzYFf5onCSpBNA6g">Brand and style guide</a></li><li><a href="#faq">Questions</a></li></ul></div>
+  </div>
+  <p class="fine-print">Stations and programs shown are illustrations. Opencast is a working name. Revenue sharing is described to show how the model is intended to work and is not an offer or a promise of earnings.</p>
+</div></footer>
+
+<script>
+(function(){
+  var ST = [
+    { ch:'7.1', cs:'CIVC', nm:'Inland Civic', col:'#2E6B5A', t:'Town Hall: backyard homes and ADUs', s:'Live from Redlands City Hall, until 9:30 pm', live:true },
+    { ch:'9.1', cs:'RDLS', nm:'Redlands Public Access', col:'#4F5B2A', t:'City Council, regular meeting', s:'From the city\u2019s own stream' },
+    { ch:'12.1', cs:'BEAT', nm:'Inland Beat', col:'#8C3B7A', t:'Saturday Reel', s:'Carried from REEL 24.1, until 9:00 pm' },
+    { ch:'18.1', cs:'SAZN', nm:'Saz\u00f3n', col:'#A3402A', t:'Tamales for forty', s:'A family kitchen in Fontana, until 9:00 pm' },
+    { ch:'24.1', cs:'REEL', nm:'Saturday Reel', col:'#9A5412', t:'Cartoons from 1928 to 1934', s:'Public domain, restored, until 9:00 pm' },
+    { ch:'31.1', cs:'PREP', nm:'Inland Preps', col:'#1F5E8C', t:'Football: Redlands East Valley at Citrus Valley', s:'Last night\u2019s game, until 10:00 pm' },
+    { ch:'88.3', cs:'NITE', nm:'Night Desk', col:'#33507A', t:'Radio dramas from the 1940s', s:'Radio band, until 6:00 am', radio:true },
+    { ch:'101.9', cs:'CRAT', nm:'Crate', col:'#7E2F35', t:'The Producers\u2019 Hour', s:'Radio band, live', live:true, radio:true }
+  ];
+  var i = 0, pic = document.getElementById('tPic'), band = document.getElementById('tBand'), bug = document.getElementById('tBug');
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function render(){
+    var s = ST[i];
+    pic.style.background = s.col;
+    pic.innerHTML = (s.radio ? '<div class="radio">'+s.ch+'</div>' : '') + '<div class="ttl">'+s.t+'</div><div class="sub">'+s.s+'</div>';
+    band.innerHTML = (s.live ? '<span class="tag tag-live"><span class="d"></span>Live</span>' : '') + (s.radio ? '<span class="tag">Radio band</span>' : '');
+    bug.innerHTML = s.radio ? '' : '<span class="cs">'+s.cs+'</span><span class="ch">'+s.ch+'</span>';
+    document.getElementById('tCh').textContent = s.ch;
+    document.getElementById('tCs').textContent = s.cs;
+    document.getElementById('tNow').textContent = s.nm;
+  }
+  function tune(d){
+    i = (i + d + ST.length) % ST.length;
+    if (reduce) { render(); return; }
+    pic.classList.add('flip');
+    setTimeout(function(){ render(); pic.classList.remove('flip'); }, 140);
+  }
+  render();
+  document.getElementById('chUp').addEventListener('click', function(){ tune(1); });
+  document.getElementById('chDown').addEventListener('click', function(){ tune(-1); });
+  var tuner = document.querySelector('.tuner');
+  document.addEventListener('keydown', function(e){
+    if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    var r = tuner.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); tune(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); tune(-1); }
+  });
+
+  document.querySelectorAll('[data-role]').forEach(function(a){ a.addEventListener('click', function(){ var i=document.querySelector('input[name=role][value='+a.dataset.role+']'); if(i){ i.checked=true; i.dispatchEvent(new Event('change',{bubbles:true})); } }); });
+  /* waitlist: shows its confirmation; not connected to a list yet */
+  var form = document.getElementById('waitForm'), csField = document.getElementById('csField');
+  form.addEventListener('change', function(){ var r = form.querySelector('input[name=role]:checked').value; csField.hidden = r !== 'station'; });
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var em = document.getElementById('em');
+    if (!em.value || em.value.indexOf('@') < 1) { em.focus(); em.setCustomValidity('Enter an email address'); em.reportValidity(); em.setCustomValidity(''); return; }
+    var r = form.querySelector('input[name=role]:checked').value, cs = document.getElementById('cs').value.trim().toUpperCase();
+    document.getElementById('doneH').textContent = r === 'station' && cs ? cs + ' is on hold for you.' : r === 'business' ? 'Your business is on the list.' : r === 'producer' ? 'Your programs are on the list.' : 'You\u2019re on the list.';
+    document.getElementById('doneP').textContent = r === 'station' ? 'We\u2019ll write when your market opens, and your call sign is held until then.' : r === 'producer' ? 'We\u2019ll write when the syndication market opens to makers.' : r === 'business' ? 'We\u2019ll write when the first spot market opens near you.' : 'We\u2019ll write when your market\u2019s dial opens.';
+    form.style.display = 'none'; document.getElementById('done').classList.add('on');
+  });
+
+  var root = document.documentElement, btn = document.getElementById('groundToggle');
+  function cur(){ var t = root.getAttribute('data-theme'); if (t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  function lab(){ btn.textContent = cur() === 'dark' ? 'Light ground' : 'Dark ground'; }
+  try { var sv = localStorage.getItem('oc-ground'); if (sv === 'dark' || sv === 'light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n = cur() === 'dark' ? 'light' : 'dark'; root.setAttribute('data-theme', n); try { localStorage.setItem('oc-ground', n); } catch(e){} lab(); });
+})();
+</script>
+</body>
+</html>

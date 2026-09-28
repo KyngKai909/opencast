@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brand and style guide · Opencast</title>
+<meta name="description" content="The Opencast mark, colour, type, space, components, words and voice. The reference for the app, a station's on-screen graphics, print and social.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root {
+  color-scheme: light;
+  --ground: #E3E6EC;
+  --raised: #F3F5F8;
+  --ink: #0F1830;
+  --ink-70: #3F4960;
+  --ink-50: #525C73;
+  --line: #737D92;
+  --hair: #C6CCD7;
+  --tally: #C42A1C;
+  --on-tally: #FFFFFF;
+  --tally-glow: rgb(196 42 28 / .35);
+  --live: #B02518;
+  --standby: #8A5A00;
+  --standby-fill: #E9A93A;
+  --on-standby: #0F1830;
+  --signal: #0A6883;
+  --signal-fill: #0A6883;
+  --on-signal: #FFFFFF;
+  --screen: #0F1830;
+  --on-screen: #ECE9E1;
+  --on-screen-70: #B1B8C9;
+
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-text: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --s1: 4px; --s2: 8px; --s3: 16px; --s4: 24px; --s5: 40px; --s6: 64px; --s7: 104px;
+  --r-sign: 3px; --r-control: 6px; --r-screen: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0F1830; --raised: #18244A; --ink: #ECE9E1; --ink-70: #B1B8C9; --ink-50: #8F98AE;
+    --line: #67759A; --hair: #26345A;
+    --tally: #D9301F; --on-tally: #FFFFFF; --tally-glow: rgb(217 48 31 / .55); --live: #FF7A69;
+    --standby: #F0B43C; --standby-fill: #F0B43C; --on-standby: #0F1830;
+    --signal: #6CCFEA; --signal-fill: #6CCFEA; --on-signal: #0F1830;
+    --screen: #0A1124; --on-screen: #ECE9E1; --on-screen-70: #B1B8C9;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0F1830; --raised: #18244A; --ink: #ECE9E1; --ink-70: #B1B8C9; --ink-50: #8F98AE;
+  --line: #67759A; --hair: #26345A;
+  --tally: #D9301F; --on-tally: #FFFFFF; --tally-glow: rgb(217 48 31 / .55); --live: #FF7A69;
+  --standby: #F0B43C; --standby-fill: #F0B43C; --on-standby: #0F1830;
+  --signal: #6CCFEA; --signal-fill: #6CCFEA; --on-signal: #0F1830;
+  --screen: #0A1124; --on-screen: #ECE9E1; --on-screen-70: #B1B8C9;
+}
+
+/* ---------- Base ---------- */
+:root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); scroll-behavior: smooth; }
+*, *::before, *::after { box-sizing: inherit; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-text); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+img, svg { max-width: 100%; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 2px; }
+p { margin: 0 0 var(--s3); max-width: 62ch; }
+h1, h2, h3, h4 { margin: 0; font-weight: 800; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(var(--s4), env(safe-area-inset-left, 0px)); padding-right: max(var(--s4), env(safe-area-inset-right, 0px)); }
+.muted { color: var(--ink-70); }
+.quiet { color: var(--ink-50); }
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- Header ---------- */
+.site-head { border-bottom: 1px solid var(--hair); }
+.site-head .wrap { display: flex; align-items: center; gap: var(--s4); min-height: 64px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand svg { width: 30px; height: 25px; color: var(--ink); }
+.brand span { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 21px; letter-spacing: -.02em; }
+.site-nav { display: flex; gap: var(--s4); margin-left: var(--s3); }
+.site-nav a { text-decoration: none; color: var(--ink-70); font-size: 15px; }
+.site-nav a:hover { color: var(--ink); }
+.head-end { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
+.ground-toggle { font: 500 14px var(--font-text); color: var(--ink-70); background: none; border: 1px solid var(--line); border-radius: var(--r-control); height: 36px; padding: 0 12px; cursor: pointer; }
+.ground-toggle:hover { color: var(--ink); }
+@media (max-width: 860px) { .site-nav { display: none; } }
+
+/* ---------- Buttons ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: var(--r-control); font: 600 15px var(--font-text); text-decoration: none; cursor: pointer; border: 1px solid transparent; white-space: nowrap; }
+.btn-primary { background: var(--signal-fill); color: var(--on-signal); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { background: var(--raised); }
+.btn-sign-on { background: var(--ink); color: var(--ground); }
+.btn-sm { height: 36px; padding: 0 14px; font-size: 14px; }
+
+/* ---------- Section scaffolding ---------- */
+section.ch { padding: var(--s6) 0; border-top: 1px solid var(--hair); }
+.ch-label { display: flex; align-items: baseline; gap: 12px; font-size: 15px; color: var(--ink-70); margin-bottom: var(--s4); }
+.ch-label .n { font-family: var(--font-mono); font-size: 13px; color: var(--ink-50); }
+.ch-title { font-family: var(--font-display); font-stretch: 112%; font-size: clamp(34px, 5.2vw, 68px); line-height: 1; letter-spacing: -.035em; max-width: 18ch; margin-bottom: var(--s4); }
+.ch-lede { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.5; color: var(--ink-70); max-width: 60ch; margin-bottom: var(--s5); }
+.sub { font-family: var(--font-display); font-stretch: 100%; font-weight: 700; font-size: 20px; letter-spacing: -.015em; margin: var(--s5) 0 var(--s3); }
+.sub:first-child { margin-top: 0; }
+
+/* rule grids: specs laid out between hairlines, never in boxes */
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 var(--s4); border-top: 1px solid var(--hair); }
+.spec { padding: var(--s3) 0 var(--s4); border-bottom: 1px solid var(--hair); }
+.spec h4 { font-family: var(--font-text); font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.spec .val { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; margin-bottom: 6px; }
+.spec p { font-size: 15px; line-height: 1.5; color: var(--ink-70); margin: 0; }
+
+.dont { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0 var(--s4); }
+.dont li { padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 15px; color: var(--ink-70); }
+.dont li::before { content: "No. "; font-weight: 600; color: var(--live); }
+
+/* ---------- Hero ---------- */
+.hero { padding: var(--s6) 0 var(--s6); }
+.hero .wrap { display: grid; grid-template-columns: 1.15fr 1fr; gap: var(--s5); align-items: center; }
+.hero h1 { font-family: var(--font-display); font-stretch: 125%; font-size: clamp(44px, 6.4vw, 96px); line-height: .94; letter-spacing: -.04em; margin: 0 0 var(--s4); }
+.hero .lede { font-size: clamp(17px, 1.7vw, 21px); line-height: 1.5; color: var(--ink-70); max-width: 44ch; }
+.hero-toc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: var(--s4); padding: 0; list-style: none; font-size: 15px; }
+.hero-toc a { color: var(--ink-70); text-decoration: none; }
+.hero-toc a:hover { color: var(--ink); text-decoration: underline; }
+.hero-toc .mono { font-size: 12px; color: var(--ink-50); margin-right: 6px; }
+@media (max-width: 860px) { .hero .wrap { grid-template-columns: 1fr; } }
+
+/* A screen: the only thing that gets a frame */
+.screen { position: relative; aspect-ratio: 16 / 9; background: var(--screen); color: var(--on-screen); border-radius: var(--r-screen); overflow: hidden; }
+.screen.four-three { aspect-ratio: 4 / 3; }
+.hero-screen { display: grid; place-items: center; }
+.hero-screen .lockup { color: var(--on-screen); }
+.hero-screen .tally { position: absolute; top: 18px; right: 18px; }
+.hero-screen .ident { position: absolute; left: 20px; bottom: 16px; font-family: var(--font-mono); font-size: 13px; color: var(--on-screen-70); }
+.hero-screen .clock { position: absolute; right: 20px; bottom: 16px; font-family: var(--font-mono); font-size: 13px; color: var(--on-screen-70); }
+
+/* ---------- The mark ---------- */
+.lockup { display: inline-flex; align-items: center; gap: .42em; font-size: 44px; }
+.lockup svg { width: 1.24em; height: 1em; flex: none; }
+.lockup span { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+.mark-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); margin-bottom: var(--s4); }
+.mark-tile { display: flex; flex-direction: column; gap: 10px; }
+.mark-tile .plate { aspect-ratio: 1; border-radius: var(--r-screen); display: grid; place-items: center; box-shadow: 0 0 0 1px var(--hair); }
+.plate.on-ground { background: var(--raised); color: var(--ink); }
+.plate.light { background: #E3E6EC; color: #0F1830; --tally: #C42A1C; }
+.plate.dark { background: #0F1830; color: #ECE9E1; --tally: #D9301F; }
+.plate.on-screen { background: var(--screen); color: var(--on-screen); }
+.plate svg.mk { width: 44%; }
+.plate .sizes { display: flex; align-items: flex-end; gap: 18px; }
+.mark-tile figcaption { font-size: 14px; color: var(--ink-70); font-style: italic; }
+.mark-tile.wide { grid-column: span 2; }
+.mark-tile.wide .plate { aspect-ratio: auto; height: 100%; min-height: 180px; }
+@media (max-width: 760px) { .mark-grid { grid-template-columns: 1fr 1fr; } .mark-tile.wide { grid-column: span 2; } }
+.provisional { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--standby); margin-bottom: var(--s4); }
+.provisional::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--standby); }
+
+/* ---------- Colour ---------- */
+.swatches { border-top: 1px solid var(--hair); }
+.sw { display: grid; grid-template-columns: 132px 1.3fr 1fr 1fr 1fr; gap: var(--s3); align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.sw .chip { display: grid; grid-template-columns: 1fr 1fr; height: 56px; border-radius: var(--r-control); overflow: hidden; border: 1px solid var(--hair); }
+.sw .chip i { display: block; }
+.sw h4 { font-family: var(--font-text); font-size: 16px; font-weight: 600; }
+.sw .role { font-size: 14px; color: var(--ink-70); line-height: 1.4; }
+.sw .kv { font-size: 13px; line-height: 1.45; }
+.sw .kv b { display: block; font-weight: 600; font-size: 12px; color: var(--ink-50); font-family: var(--font-text); }
+.sw .kv .mono { font-size: 13px; }
+.sw-head { display: grid; grid-template-columns: 132px 1.3fr 1fr 1fr 1fr; gap: var(--s3); font-size: 13px; color: var(--ink-50); padding: 0 0 8px; }
+.pass { color: var(--ink-70); }
+.deco { color: var(--ink-50); }
+@media (max-width: 860px) {
+  .sw, .sw-head { grid-template-columns: 96px 1fr 1fr; }
+  .sw .kv.token, .sw-head .token { display: none; }
+  .sw .kv.dark-v, .sw-head .dark-v { grid-column: 2; }
+  .sw .kv.light-v, .sw-head .light-v { grid-column: 3; }
+  .sw h4 + .role { display: none; }
+}
+.stations-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); }
+.station-card { display: flex; flex-direction: column; gap: 8px; }
+.station-card .tc { aspect-ratio: 16/9; border-radius: var(--r-screen); color: #fff; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; }
+.station-card .tc .cs { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 22px; letter-spacing: -.01em; }
+.station-card .tc .ch { font-family: var(--font-mono); font-size: 13px; opacity: .92; }
+.station-card p { font-size: 14px; color: var(--ink-70); margin: 0; }
+@media (max-width: 760px) { .stations-row { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- Type ---------- */
+.faces { border-top: 1px solid var(--hair); }
+.face { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--s5); padding: var(--s5) 0; border-bottom: 1px solid var(--hair); align-items: start; }
+.face .sample-display { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(34px, 4.6vw, 62px); line-height: .98; letter-spacing: -.035em; }
+.face .sample-text { font-size: clamp(19px, 2vw, 24px); line-height: 1.45; max-width: 34ch; }
+.face .sample-mono { font-family: var(--font-mono); font-size: clamp(24px, 3vw, 36px); font-weight: 500; letter-spacing: -.01em; }
+.face h3 { font-family: var(--font-text); font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.face p { font-size: 15px; color: var(--ink-70); margin-bottom: 8px; }
+.face .tok { font-family: var(--font-mono); font-size: 13px; color: var(--ink-50); }
+@media (max-width: 760px) { .face { grid-template-columns: 1fr; gap: var(--s3); } }
+.scale { border-top: 1px solid var(--hair); margin-top: var(--s5); }
+.scale-row { display: grid; grid-template-columns: 170px 1fr; gap: var(--s3); align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.scale-row .nm { font-size: 14px; color: var(--ink-70); }
+.scale-row .nm small { display: block; font-family: var(--font-mono); font-size: 12px; color: var(--ink-50); }
+.t-ident { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(40px, 5vw, 72px); line-height: .94; letter-spacing: -.04em; }
+.t-heading { font-family: var(--font-display); font-stretch: 112%; font-weight: 800; font-size: clamp(30px, 3.6vw, 48px); line-height: 1; letter-spacing: -.035em; }
+.t-title { font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: -.015em; }
+.t-lede { font-size: 20px; line-height: 1.5; }
+.t-body { font-size: 17px; line-height: 1.6; }
+.t-small { font-size: 14px; line-height: 1.45; font-weight: 500; }
+.t-clock { font-family: var(--font-mono); font-weight: 500; font-size: 15px; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) { .scale-row { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ---------- Space & shape ---------- */
+.space-list { border-top: 1px solid var(--hair); }
+.space-row { display: grid; grid-template-columns: 110px 70px 1fr; gap: var(--s3); align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.space-row .bar { height: 12px; background: var(--ink); border-radius: 1px; }
+.space-row .use { color: var(--ink-70); }
+@media (max-width: 600px) { .space-row { grid-template-columns: 90px 1fr; } .space-row .use { grid-column: 1 / -1; } }
+.shapes { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); margin-top: var(--s5); }
+.shape { display: flex; flex-direction: column; gap: 10px; }
+.shape .demo { height: 120px; display: grid; place-items: center; }
+.shape h4 { font-family: var(--font-text); font-size: 16px; font-weight: 600; }
+.shape p { font-size: 15px; color: var(--ink-70); margin: 0; }
+.shape .tok { font-family: var(--font-mono); font-size: 12px; color: var(--ink-50); }
+@media (max-width: 760px) { .shapes { grid-template-columns: 1fr; } }
+.rule-callout { margin-top: var(--s5); padding-top: var(--s4); border-top: 2px solid var(--ink); display: grid; grid-template-columns: 1fr 2fr; gap: var(--s4); }
+.rule-callout h3 { font-family: var(--font-display); font-stretch: 112%; font-size: 30px; letter-spacing: -.03em; line-height: 1.05; }
+@media (max-width: 760px) { .rule-callout { grid-template-columns: 1fr; } }
+
+/* ---------- Components ---------- */
+.comp { display: grid; grid-template-columns: 260px 1fr; gap: var(--s5); padding: var(--s5) 0; border-top: 1px solid var(--hair); }
+.comp:first-of-type { border-top: 0; padding-top: 0; }
+.comp-notes h3 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -.015em; margin-bottom: 8px; }
+.comp-notes p { font-size: 15px; color: var(--ink-70); line-height: 1.5; }
+.comp-demo { min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+@media (max-width: 860px) { .comp { grid-template-columns: 1fr; gap: var(--s3); } }
+
+/* tags */
+.tag { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: var(--r-sign); font: 600 13px var(--font-text); border: 1px solid var(--line); color: var(--ink-70); }
+.tag .d { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.tag-live { color: var(--live); border-color: var(--live); }
+.tag-next { background: var(--standby-fill); color: var(--on-standby); border-color: var(--standby-fill); }
+.tag-off { color: var(--ink-50); border-style: dashed; }
+.tag-carried { color: var(--ink-70); }
+
+/* tally sign */
+.tally { display: inline-flex; align-items: center; justify-content: center; height: 26px; padding: 0 10px; border-radius: var(--r-sign); font-family: var(--font-display); font-stretch: 112%; font-weight: 800; font-size: 12px; letter-spacing: .09em; border: 1.5px solid currentColor; color: var(--on-screen-70); background: transparent; }
+.tally.on-ground { color: var(--ink-50); }
+.tally.lit { background: var(--tally); border-color: var(--tally); color: var(--on-tally); box-shadow: 0 0 14px 2px var(--tally-glow); }
+.tally.lg { height: 44px; padding: 0 18px; font-size: 18px; }
+@keyframes tally-on {
+  0%, 55% { background: transparent; border-color: currentColor; color: var(--on-screen-70); box-shadow: none; }
+  62% { background: var(--tally); border-color: var(--tally); color: var(--on-tally); box-shadow: 0 0 14px 2px var(--tally-glow); }
+  66% { background: transparent; border-color: currentColor; color: var(--on-screen-70); box-shadow: none; }
+  72%, 100% { background: var(--tally); border-color: var(--tally); color: var(--on-tally); box-shadow: 0 0 14px 2px var(--tally-glow); }
+}
+.hero-screen .tally.lit { animation: tally-on 1.6s ease-out 1 both; }
+@media (prefers-reduced-motion: reduce) { .hero-screen .tally.lit { animation: none; } html { scroll-behavior: auto; } }
+
+/* station ident */
+.ident { display: inline-grid; grid-template-columns: auto auto; column-gap: 12px; align-items: center; }
+.ident .chn { grid-row: span 2; font-family: var(--font-mono); font-weight: 500; font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; padding-right: 12px; border-right: 1px solid var(--line); line-height: 1.1; }
+.ident .cs { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 18px; letter-spacing: -.005em; line-height: 1.1; }
+.ident .nm { font-size: 14px; color: var(--ink-70); line-height: 1.3; }
+
+/* listing */
+.listing { display: grid; grid-template-columns: 96px 1fr; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--hair); }
+.listing:first-child { border-top: 1px solid var(--hair); }
+.listing .thumb { aspect-ratio: 16/9; border-radius: 8px; color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 15px; }
+.listing .top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 2px; }
+.listing .top .cs { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 15px; }
+.listing .top .chn { font-family: var(--font-mono); font-size: 13px; color: var(--ink-50); }
+.listing .now { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -.01em; line-height: 1.25; }
+.listing .meta { font-size: 14px; color: var(--ink-70); margin: 2px 0 0; }
+.listing .next { font-size: 14px; color: var(--ink-50); margin: 4px 0 0; }
+.listing .next .mono { font-size: 13px; }
+
+/* guide */
+.guide { min-width: 680px; }
+.g-head, .g-row { display: grid; grid-template-columns: 150px repeat(4, 1fr); }
+.g-head { font-family: var(--font-mono); font-size: 13px; color: var(--ink-50); border-bottom: 1px solid var(--line); }
+.g-head div { padding: 6px 10px; }
+.g-row { border-bottom: 1px solid var(--hair); min-height: 64px; }
+.g-st { padding: 10px 10px 10px 0; display: flex; flex-direction: column; justify-content: center; }
+.g-st .cs { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 15px; line-height: 1.2; }
+.g-st .chn { font-family: var(--font-mono); font-size: 12px; color: var(--ink-50); }
+.g-p { padding: 10px; border-left: 1px solid var(--hair); display: flex; flex-direction: column; justify-content: center; font-size: 14px; line-height: 1.3; }
+.g-p b { font-weight: 600; font-size: 15px; }
+.g-p small { color: var(--ink-50); font-size: 13px; }
+.g-p.on { background: var(--raised); }
+.g-p.live b::after { content: " Live"; color: var(--live); font-weight: 600; font-size: 13px; }
+.g-body { position: relative; }
+.g-now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); left: calc(150px + (100% - 150px) * 0.35); }
+.g-now span { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 12px; background: var(--ink); color: var(--ground); padding: 1px 6px; border-radius: 2px; white-space: nowrap; }
+.g-wrap { padding-top: 26px; }
+
+/* program log */
+.log { width: 100%; border-collapse: collapse; min-width: 560px; }
+.log th { text-align: left; font: 600 13px var(--font-text); color: var(--ink-50); padding: 0 10px 8px 0; border-bottom: 1px solid var(--line); }
+.log td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--hair); font-size: 15px; vertical-align: top; }
+.log td.t { font-family: var(--font-mono); font-size: 14px; white-space: nowrap; color: var(--ink-70); }
+.log td.d { font-family: var(--font-mono); font-size: 14px; text-align: right; white-space: nowrap; }
+.code { display: inline-block; min-width: 42px; text-align: center; font-family: var(--font-mono); font-size: 12px; font-weight: 500; padding: 2px 6px; border-radius: var(--r-sign); border: 1px solid var(--line); }
+.code.pgm { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.code.spt { border-color: var(--standby); color: var(--standby); }
+.code.und { border-style: dashed; }
+.log .src { display: block; font-size: 13px; color: var(--ink-50); }
+.log tr.airing td { background: var(--raised); }
+.log tr.airing td:first-child { box-shadow: inset 3px 0 0 var(--tally); padding-left: 10px; }
+
+/* lower third, player */
+.frame { position: relative; aspect-ratio: 16/9; border-radius: var(--r-screen); overflow: hidden; background: #2A3A40; }
+.frame .pic { position: absolute; inset: 0; background:
+  linear-gradient(180deg, rgb(0 0 0 / 0) 55%, rgb(0 0 0 / .35) 100%),
+  repeating-linear-gradient(90deg, #33474d 0 18%, #2c3e44 18% 19%); }
+.frame .podium { position: absolute; left: 38%; bottom: 0; width: 24%; height: 42%; background: #4A3A2C; border-radius: 4px 4px 0 0; }
+.frame .figure { position: absolute; left: 44%; bottom: 38%; width: 12%; aspect-ratio: 1 / 1.1; background: #1d2a30; border-radius: 45% 45% 10% 10%; }
+.l3 { position: absolute; left: 5%; bottom: 8%; max-width: 62%; }
+.l3 .nm { background: #ECE9E1; color: #0F1830; font-family: var(--font-display); font-stretch: 112%; font-weight: 800; font-size: clamp(14px, 2.4vw, 24px); letter-spacing: -.015em; padding: .25em .55em; display: inline-block; }
+.l3 .ttl { background: #0F1830; color: #ECE9E1; font-size: clamp(11px, 1.5vw, 15px); padding: .3em .75em; display: inline-block; }
+.bug { position: absolute; right: 3.5%; bottom: 7%; color: #fff; opacity: .78; text-align: right; line-height: 1; }
+.bug .cs { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(12px, 2vw, 20px); display: block; }
+.bug .chn { font-family: var(--font-mono); font-size: clamp(9px, 1.2vw, 12px); }
+.frame .live-corner { position: absolute; left: 5%; top: 7%; }
+
+.player { display: grid; grid-template-columns: 112px 1fr auto; gap: var(--s3); align-items: center; padding: 12px; background: var(--raised); border-radius: var(--r-screen); max-width: 620px; }
+.player .thumb { aspect-ratio: 16/9; border-radius: 8px; background: #8C3B7A; color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: 14px; }
+.player .t { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -.01em; line-height: 1.2; }
+.player .s { font-size: 13px; color: var(--ink-70); }
+.player .ctl { display: flex; align-items: center; gap: 10px; }
+.icon-btn { width: 40px; height: 40px; border-radius: var(--r-control); border: 1px solid var(--line); background: transparent; color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.icon-btn svg { width: 18px; height: 18px; }
+@media (max-width: 560px) { .player { grid-template-columns: 80px 1fr; } .player .ctl { grid-column: 1 / -1; justify-content: space-between; } }
+
+/* ---------- Tally section ---------- */
+.tally-stage { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s3); }
+.tally-stage .screen { display: grid; place-items: center; aspect-ratio: 4/3; }
+.tally-stage figcaption { font-size: 14px; color: var(--ink-70); margin-top: 10px; }
+.tally-stage figcaption b { color: var(--ink); font-weight: 600; display: block; }
+@media (max-width: 760px) { .tally-stage { grid-template-columns: 1fr; } }
+.rules-list { list-style: none; padding: 0; margin: var(--s4) 0 0; border-top: 1px solid var(--hair); max-width: 760px; }
+.rules-list li { padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 16px; }
+pre.code-block { background: var(--screen); color: var(--on-screen); border-radius: var(--r-control); padding: var(--s3) var(--s4); overflow-x: auto; font: 13px/1.6 var(--font-mono); margin: 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5); margin-top: var(--s5); }
+.two > div { min-width: 0; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+
+/* ---------- Words ---------- */
+.lex { width: 100%; border-collapse: collapse; min-width: 620px; }
+.lex th { text-align: left; font: 600 13px var(--font-text); color: var(--ink-50); padding: 0 16px 8px 0; border-bottom: 1px solid var(--line); }
+.lex td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--hair); font-size: 15px; vertical-align: top; }
+.lex td:first-child { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.lex td:nth-child(2) { color: var(--ink-50); }
+.lex td:nth-child(3) { color: var(--ink-70); }
+.lex tr.grp td { font: 600 13px var(--font-text); color: var(--ink-50); text-decoration: none; padding-top: 24px; border-bottom: 1px solid var(--line); white-space: normal; }
+.dial-rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); margin-top: var(--s5); }
+.dial-rules .big { font-family: var(--font-mono); font-weight: 500; font-size: 34px; letter-spacing: -.03em; line-height: 1.1; margin-bottom: 6px; }
+.dial-rules h4 { font-family: var(--font-text); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.dial-rules p { font-size: 15px; color: var(--ink-70); margin: 0; }
+.dial-rules > div { border-top: 2px solid var(--ink); padding-top: var(--s3); }
+@media (max-width: 760px) { .dial-rules { grid-template-columns: 1fr; } }
+.terms { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); margin-top: var(--s4); }
+.terms > div { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.terms h4 { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -.01em; margin-bottom: 4px; }
+.terms p { font-size: 15px; color: var(--ink-70); margin: 0; }
+@media (max-width: 760px) { .terms { grid-template-columns: 1fr; } }
+
+/* ---------- Voice ---------- */
+.voice { border-top: 1px solid var(--hair); }
+.v-row { display: grid; grid-template-columns: 200px 1fr 1fr; gap: var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--hair); }
+.v-row h4 { font-family: var(--font-text); font-size: 15px; font-weight: 600; }
+.v-row .say, .v-row .not { font-size: 16px; line-height: 1.45; }
+.v-row .say::before, .v-row .not::before { display: block; font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.v-row .say::before { content: "Say"; color: var(--signal); }
+.v-row .not::before { content: "Not"; color: var(--live); }
+.v-row .not { color: var(--ink-70); }
+.v-row.plain { grid-template-columns: 200px 2fr; }
+.v-row.plain p { font-size: 16px; margin: 0; color: var(--ink-70); }
+@media (max-width: 760px) { .v-row, .v-row.plain { grid-template-columns: 1fr; gap: 6px; } }
+
+/* ---------- No-picture states ---------- */
+.states { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s4); }
+.state figcaption { margin-top: 10px; font-size: 14px; color: var(--ink-70); }
+.state figcaption b { display: block; color: var(--ink); font-weight: 600; font-size: 15px; }
+.state .screen { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 8%; }
+.state .big { font-family: var(--font-display); font-stretch: 125%; font-weight: 800; font-size: clamp(22px, 3.2vw, 38px); letter-spacing: -.03em; line-height: 1; margin-bottom: 10px; }
+.state .small { font-size: clamp(12px, 1.3vw, 15px); color: var(--on-screen-70); max-width: 36ch; line-height: 1.45; }
+.state .small .mono { color: var(--on-screen); }
+.state .bars { position: absolute; left: 0; right: 0; top: 0; height: 12%; display: grid; grid-template-columns: repeat(6, 1fr); }
+.state .bars i:nth-child(1) { background: #ECE9E1; } .state .bars i:nth-child(2) { background: #F0B43C; }
+.state .bars i:nth-child(3) { background: #6CCFEA; } .state .bars i:nth-child(4) { background: #D9301F; }
+.state .bars i:nth-child(5) { background: #26345A; } .state .bars i:nth-child(6) { background: #0A1124; }
+.state .radio-ident { font-family: var(--font-mono); font-weight: 500; font-size: clamp(34px, 6vw, 64px); letter-spacing: -.04em; line-height: 1; margin-bottom: 8px; }
+.state .dead { position: absolute; top: 7%; right: 5%; }
+.meter { display: flex; gap: 3px; align-items: flex-end; height: 22px; margin-top: 14px; }
+.meter i { width: 4px; background: var(--on-screen-70); border-radius: 1px; }
+@media (max-width: 760px) { .states { grid-template-columns: 1fr; } }
+
+/* ---------- On screen / off ---------- */
+.safe-demo { position: relative; aspect-ratio: 16/9; border-radius: var(--r-screen); background: var(--screen); overflow: hidden; }
+.safe-demo .zone { position: absolute; border: 1px dashed; }
+.safe-demo .action { inset: 3.5%; border-color: #F0B43C; }
+.safe-demo .title { inset: 5%; border-color: #6CCFEA; }
+.safe-demo .lbl { position: absolute; font-family: var(--font-mono); font-size: 11px; padding: 2px 5px; }
+.safe-demo .lbl.a { right: 3.5%; top: 3.5%; color: #F0B43C; }
+.safe-demo .lbl.t { left: 5%; top: 5%; color: #6CCFEA; }
+.safe-demo .l3zone { position: absolute; left: 5%; right: 5%; bottom: 5%; height: 26%; background: rgb(236 233 225 / .08); border-top: 1px solid rgb(236 233 225 / .25); }
+.safe-demo .l3zone span, .safe-demo .bugzone span { position: absolute; left: 8px; top: 6px; font-size: 12px; color: #B1B8C9; }
+.safe-demo .bugzone { position: absolute; right: 5%; bottom: 5%; width: 14%; height: 14%; border: 1px solid rgb(236 233 225 / .35); }
+.safe-demo .bugzone span { left: auto; right: 6px; }
+.sizes-list { border-top: 1px solid var(--hair); }
+.sizes-list div { display: flex; justify-content: space-between; gap: var(--s3); padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 15px; }
+.sizes-list div span:last-child { font-family: var(--font-mono); font-size: 14px; color: var(--ink-70); white-space: nowrap; }
+.bullets { padding-left: 1.1em; margin: var(--s3) 0 0; color: var(--ink-70); font-size: 15px; }
+.bullets li { margin-bottom: 6px; }
+
+/* ---------- Footer ---------- */
+footer.site-foot { border-top: 1px solid var(--hair); padding: var(--s6) 0 var(--s5); }
+.foot-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: var(--s4); }
+.foot-grid h4 { font-family: var(--font-text); font-size: 14px; font-weight: 600; color: var(--ink-50); margin-bottom: 10px; }
+.foot-grid ul { list-style: none; padding: 0; margin: 0; }
+.foot-grid li { margin-bottom: 6px; font-size: 15px; }
+.foot-grid a { text-decoration: none; color: var(--ink-70); }
+.foot-grid a:hover { color: var(--ink); }
+.foot-note { margin-top: var(--s5); font-size: 13px; color: var(--ink-50); max-width: 80ch; }
+@media (max-width: 760px) { .foot-grid { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- Symbol: the mark, used everywhere below -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mk-outline" viewBox="0 0 62 50">
+      <rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/>
+      <circle cx="43" cy="18" r="5.5" fill="var(--tally)"/>
+    </symbol>
+    <symbol id="mk-outline-mono" viewBox="0 0 62 50">
+      <rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/>
+      <circle cx="43" cy="18" r="5.5" fill="currentColor"/>
+    </symbol>
+    <symbol id="mk-solid" viewBox="0 0 62 50">
+      <path fill="currentColor" fill-rule="evenodd" d="M11 0h40a11 11 0 0 1 11 11v28a11 11 0 0 1-11 11H11A11 11 0 0 1 0 39V11A11 11 0 0 1 11 0Zm32 11.5a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Opencast home">
+      <svg><use href="#mk-outline"/></svg><span>opencast</span>
+    </a>
+    <nav class="site-nav" aria-label="Main">
+      <a href="#">Watch</a><a href="#">Listen</a><a href="#">Guide</a><a href="#">Stations</a><a href="#">For broadcasters</a>
+    </nav>
+    <div class="head-end">
+      <button class="ground-toggle" id="groundToggle" type="button" aria-label="Switch between dark and light ground">Light ground</button>
+      <a class="btn btn-primary btn-sm" href="#">Tune in</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <div class="ch-label"><span class="n">Ch. 01</span><span>Brand and style guide</span></div>
+      <h1>How Opencast looks, sounds and signs on.</h1>
+      <p class="lede">The reference for anything carrying the Opencast name: the app, a station's on-screen graphics, a flyer or a post. Every value here is the value the app is built from.</p>
+      <ul class="hero-toc">
+        <li><a href="#mark"><span class="mono">02</span>Mark</a></li>
+        <li><a href="#colour"><span class="mono">03</span>Colour</a></li>
+        <li><a href="#type"><span class="mono">04</span>Type</a></li>
+        <li><a href="#space"><span class="mono">05</span>Space and shape</a></li>
+        <li><a href="#components"><span class="mono">06</span>Components</a></li>
+        <li><a href="#tally"><span class="mono">07</span>The tally light</a></li>
+        <li><a href="#words"><span class="mono">08</span>Words on the dial</a></li>
+        <li><a href="#voice"><span class="mono">09</span>Voice</a></li>
+        <li><a href="#states"><span class="mono">10</span>When there's no picture</a></li>
+        <li><a href="#broadcast"><span class="mono">11</span>On screen and off</a></li>
+      </ul>
+    </div>
+    <div class="screen hero-screen" aria-label="The Opencast lockup on a screen, with the tally light on">
+      <span class="tally lit" role="img" aria-label="On air">ON AIR</span>
+      <div class="lockup" style="font-size:clamp(30px,4.4vw,54px)"><svg><use href="#mk-outline"/></svg><span>opencast</span></div>
+      <span class="ident">OPEN 1.1</span>
+      <span class="clock" id="heroClock">8:42 pm</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MARK ================= -->
+<section class="ch" id="mark">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 02</span><span>Mark</span></div>
+    <h2 class="ch-title">A screen, and the light that says it's on.</h2>
+    <p class="ch-lede">The mark is a picture tube with its tally lit. The wordmark is Archivo at its widest, set in lowercase, with no separately drawn lettering.</p>
+    <div class="provisional">Provisional. Opencast is a working name, so the mark is drawn to survive a rename.</div>
+
+    <div class="mark-grid">
+      <figure class="mark-tile" style="margin:0">
+        <div class="plate light"><svg class="mk" viewBox="0 0 62 50"><use href="#mk-outline"/></svg></div>
+        <figcaption>Outline, ink on the light ground</figcaption>
+      </figure>
+      <figure class="mark-tile" style="margin:0">
+        <div class="plate dark"><svg class="mk" viewBox="0 0 62 50"><use href="#mk-outline"/></svg></div>
+        <figcaption>Outline, on the dark ground</figcaption>
+      </figure>
+      <figure class="mark-tile" style="margin:0">
+        <div class="plate on-ground"><div class="sizes">
+          <svg width="48" height="39" viewBox="0 0 62 50"><use href="#mk-solid"/></svg>
+          <svg width="32" height="26" viewBox="0 0 62 50"><use href="#mk-solid"/></svg>
+          <svg width="16" height="13" viewBox="0 0 62 50"><use href="#mk-solid"/></svg>
+        </div></div>
+        <figcaption>Solid, at 48, 32 and 16px</figcaption>
+      </figure>
+      <figure class="mark-tile" style="margin:0">
+        <div class="plate on-screen"><svg class="mk" viewBox="0 0 62 50"><use href="#mk-outline-mono"/></svg></div>
+        <figcaption>One colour, for print and embroidery</figcaption>
+      </figure>
+      <figure class="mark-tile wide" style="margin:0">
+        <div class="plate light"><div class="lockup"><svg><use href="#mk-outline"/></svg><span>opencast</span></div></div>
+        <figcaption>Lockup, on the light ground</figcaption>
+      </figure>
+      <figure class="mark-tile wide" style="margin:0">
+        <div class="plate dark"><div class="lockup"><svg><use href="#mk-outline"/></svg><span>opencast</span></div></div>
+        <figcaption>Lockup, on the dark ground</figcaption>
+      </figure>
+    </div>
+
+    <div class="specs">
+      <div class="spec"><h4>Outline or solid by size</h4><div class="val">96px / 15mm</div><p>Outline from 96px on screen or 15mm in print. Below that the stroke closes up, so use the solid mark, which has the same silhouette with the light cut out.</p></div>
+      <div class="spec"><h4>The light</h4><div class="val">Tally red</div><p>In colour, the dot is the only red in the mark. In one colour, it takes the ink. It never pulses or blinks.</p></div>
+      <div class="spec"><h4>Clear space</h4><div class="val">¼ of the mark's height</div><p>Keep that margin on every side. On a station's picture, the Opencast mark never appears. The station's own bug does.</p></div>
+      <div class="spec"><h4>Wordmark</h4><div class="val">Archivo 800, width 125</div><p>Lowercase, tracking −3.5%, set at the mark's full height. The gap between them is 0.42 of the type size.</p></div>
+    </div>
+    <h3 class="sub">Don't</h3>
+    <ul class="dont">
+      <li>Recolour the screen, or put the red anywhere but the light</li>
+      <li>Add waves, antennas or signal arcs</li>
+      <li>Animate the light to blink or pulse</li>
+      <li>Set the wordmark in capitals or retype it</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= COLOUR ================= -->
+<section class="ch" id="colour">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 03</span><span>Colour</span></div>
+    <h2 class="ch-title">A studio after dark, and one light that means on air.</h2>
+    <p class="ch-lede">The app's default ground is a deep studio blue, because most of what happens on Opencast is watching a picture. A light ground exists for reading, print and anyone who prefers it. Every colour has a value on each ground.</p>
+
+    <h3 class="sub">Ground and ink</h3>
+    <div class="scroll-x"><div style="min-width:0">
+    <div class="sw-head"><span></span><span>Name and role</span><span class="dark-v">Dark ground</span><span class="light-v">Light ground</span><span class="token">Token</span></div>
+    <div class="swatches">
+      <div class="sw"><div class="chip"><i style="background:#0F1830"></i><i style="background:#E3E6EC"></i></div><div><h4>Ground</h4><div class="role">The page. Most of every view.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#0F1830</span></div><div class="kv light-v"><b>Light</b><span class="mono">#E3E6EC</span></div><div class="kv token"><span class="mono">--ground</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#18244A"></i><i style="background:#F3F5F8"></i></div><div><h4>Raised</h4><div class="role">Fields, the player bar, the row that's playing.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#18244A</span></div><div class="kv light-v"><b>Light</b><span class="mono">#F3F5F8</span></div><div class="kv token"><span class="mono">--raised</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#0A1124"></i><i style="background:#0F1830"></i></div><div><h4>Screen</h4><div class="role">Behind any picture. Dark on both grounds.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#0A1124</span></div><div class="kv light-v"><b>Light</b><span class="mono">#0F1830</span></div><div class="kv token"><span class="mono">--screen</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#ECE9E1"></i><i style="background:#0F1830"></i></div><div><h4>Ink</h4><div class="role">Text and drawn lines.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#ECE9E1</span> <span class="pass">14.5:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#0F1830</span> <span class="pass">14.1:1</span></div><div class="kv token"><span class="mono">--ink</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#B1B8C9"></i><i style="background:#3F4960"></i></div><div><h4>Ink 70</h4><div class="role">Secondary text and descriptions.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#B1B8C9</span> <span class="pass">8.9:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#3F4960</span> <span class="pass">7.2:1</span></div><div class="kv token"><span class="mono">--ink-70</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#8F98AE"></i><i style="background:#525C73"></i></div><div><h4>Ink 50</h4><div class="role">The lightest text allowed. Times, channel numbers.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#8F98AE</span> <span class="pass">6.1:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#525C73</span> <span class="pass">5.4:1</span></div><div class="kv token"><span class="mono">--ink-50</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#67759A"></i><i style="background:#737D92"></i></div><div><h4>Line</h4><div class="role">Borders of controls. Never text.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#67759A</span> <span class="deco">3.3:1 on raised</span></div><div class="kv light-v"><b>Light</b><span class="mono">#737D92</span> <span class="deco">3.3:1</span></div><div class="kv token"><span class="mono">--line</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#26345A"></i><i style="background:#C6CCD7"></i></div><div><h4>Hairline</h4><div class="role">Rules between rows. Decorative only.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#26345A</span></div><div class="kv light-v"><b>Light</b><span class="mono">#C6CCD7</span></div><div class="kv token"><span class="mono">--hair</span></div></div>
+    </div>
+    </div></div>
+
+    <h3 class="sub">Signals</h3>
+    <p class="muted" style="font-size:15px">Four colours carry meaning. Each always sits beside a word that says the same thing, so no one has to tell red from amber to use the app.</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip"><i style="background:#D9301F"></i><i style="background:#C42A1C"></i></div><div><h4>Tally</h4><div class="role">On air, on your screen. Once per view.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#D9301F</span> <span class="pass">white 4.8:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#C42A1C</span> <span class="pass">white 5.7:1</span></div><div class="kv token"><span class="mono">--tally</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#FF7A69"></i><i style="background:#B02518"></i></div><div><h4>Live</h4><div class="role">Happening now, not recorded. As text.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#FF7A69</span> <span class="pass">6.9:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#B02518</span> <span class="pass">5.4:1</span></div><div class="kv token"><span class="mono">--live</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#F0B43C"></i><i style="background:#8A5A00"></i></div><div><h4>Standby</h4><div class="role">Up next, and spots in the log.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#F0B43C</span> <span class="pass">9.5:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#8A5A00</span> <span class="pass">4.7:1</span></div><div class="kv token"><span class="mono">--standby</span></div></div>
+      <div class="sw"><div class="chip"><i style="background:#6CCFEA"></i><i style="background:#0A6883"></i></div><div><h4>Signal</h4><div class="role">What you can press: the primary button, links, focus.</div></div><div class="kv dark-v"><b>Dark</b><span class="mono">#6CCFEA</span> <span class="pass">9.8:1</span></div><div class="kv light-v"><b>Light</b><span class="mono">#0A6883</span> <span class="pass">5.1:1</span></div><div class="kv token"><span class="mono">--signal</span></div></div>
+    </div>
+    <p class="quiet" style="font-size:14px;margin-top:var(--s3)">Contrast is measured against each ground. Text needs 4.5:1; controls, icons and focus rings need 3:1. On a standby or signal fill, text is the dark ink on the dark ground and white on the light one.</p>
+
+    <h3 class="sub">Station colours</h3>
+    <p class="muted" style="font-size:15px">Every station picks its own colour, and it's used for that station's title cards, bug and page header. Opencast's own colours never sit on a station's picture. A station colour must hold 4.5:1 against white, because station text on it is always white.</p>
+    <div class="stations-row">
+      <div class="station-card"><div class="tc" style="background:#2E6B5A"><span class="cs">CIVC</span><span class="ch">7.1</span></div><p>Inland Civic, public affairs. 6.2:1</p></div>
+      <div class="station-card"><div class="tc" style="background:#8C3B7A"><span class="cs">BEAT</span><span class="ch">12.1</span></div><p>Inland Beat, music. 6.9:1</p></div>
+      <div class="station-card"><div class="tc" style="background:#9A5412"><span class="cs">REEL</span><span class="ch">24.1</span></div><p>Saturday Reel, classic cartoons. 5.8:1</p></div>
+      <div class="station-card"><div class="tc" style="background:#33507A"><span class="cs">NITE</span><span class="ch">88.3</span></div><p>Night Desk, radio band. 8.2:1</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TYPE ================= -->
+<section class="ch" id="type">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 04</span><span>Type</span></div>
+    <h2 class="ch-title">Wide for the ident, plain for the rest.</h2>
+    <p class="ch-lede">Three faces, each with one job. A wide grotesque for names and headlines, the way station idents were set. A public-service sans for everything people read. A mono only for what a clock or a dial produces. All three are free and open-licensed.</p>
+
+    <div class="faces">
+      <div class="face">
+        <div class="sample-display">Tonight on 7.1: the town hall.</div>
+        <div><h3>Archivo</h3><p>Idents, headlines, station names and program titles. ExtraBold 800 at width 125 for idents; Bold 700 at normal width for titles.</p><p>Tracking −3.5% to −4% on headlines. Line height 0.92–1.05.</p><div class="tok">--font-display</div></div>
+      </div>
+      <div class="face">
+        <div class="sample-text">A 24/7 station you run like a real one: your own programs, carried shows, local spots and a schedule people can set their evening by.</div>
+        <div><h3>Public Sans</h3><p>Body, descriptions, buttons and forms. Drawn for public-service interfaces, which suits a platform built on public broadcasting.</p><p>Regular 400 for body at 17px on 1.6. SemiBold 600 for buttons and labels.</p><div class="tok">--font-text</div></div>
+      </div>
+      <div class="face">
+        <div class="sample-mono">8:42 pm&nbsp;&nbsp;12.1&nbsp;&nbsp;00:28:30</div>
+        <div><h3>IBM Plex Mono</h3><p>Times, channel and frequency numbers, durations, timecode and log codes. Never for labels or headings.</p><p>Medium 500, tabular figures, so times line up down a guide.</p><div class="tok">--font-mono</div></div>
+      </div>
+    </div>
+
+    <div class="scale">
+      <div class="scale-row"><div class="nm">Ident<small>Archivo 800 · w125 · 40–128px</small></div><div class="t-ident">BEAT 12.1</div></div>
+      <div class="scale-row"><div class="nm">Heading<small>Archivo 800 · w112 · 30–68px</small></div><div class="t-heading">What's on near you</div></div>
+      <div class="scale-row"><div class="nm">Program title<small>Archivo 700 · 19–24px</small></div><div class="t-title">Town Hall: backyard homes and ADUs</div></div>
+      <div class="scale-row"><div class="nm">Lede<small>Public Sans 400 · 19–22px</small></div><div class="t-lede">Live from the council chamber, with questions from the room.</div></div>
+      <div class="scale-row"><div class="nm">Body<small>Public Sans 400 · 17px / 1.6</small></div><div class="t-body">Carried from Inland Civic on barter terms. The station keeps the local breaks.</div></div>
+      <div class="scale-row"><div class="nm">Small<small>Public Sans 500 · 14px</small></div><div class="t-small">Carried by 12 stations</div></div>
+      <div class="scale-row"><div class="nm">Clock<small>Plex Mono 500 · 13–15px</small></div><div class="t-clock">8:00 pm – 9:30 pm</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SPACE & SHAPE ================= -->
+<section class="ch" id="space">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 05</span><span>Space and shape</span></div>
+    <h2 class="ch-title">Seven steps of space, three corners.</h2>
+    <p class="ch-lede">Every gap comes from one scale. Every corner comes from what the thing is: a sign, a control or a screen.</p>
+    <div class="space-list">
+      <div class="space-row"><span class="mono">--s1</span><span class="mono">4px</span><div><div class="bar" style="width:4px"></div></div></div>
+      <div class="space-row"><span class="mono">--s2</span><span class="mono">8px</span><div><div class="bar" style="width:8px"></div></div></div>
+      <div class="space-row"><span class="mono">--s3</span><span class="mono">16px</span><div><div class="bar" style="width:16px"></div></div></div>
+      <div class="space-row"><span class="mono">--s4</span><span class="mono">24px</span><div><div class="bar" style="width:24px"></div></div></div>
+      <div class="space-row"><span class="mono">--s5</span><span class="mono">40px</span><div><div class="bar" style="width:40px"></div></div></div>
+      <div class="space-row"><span class="mono">--s6</span><span class="mono">64px</span><div><div class="bar" style="width:64px"></div></div></div>
+      <div class="space-row"><span class="mono">--s7</span><span class="mono">104px</span><div><div class="bar" style="width:104px"></div></div></div>
+    </div>
+
+    <div class="shapes">
+      <div class="shape">
+        <div class="demo"><span class="tally on-ground">OFF AIR</span></div>
+        <h4>Sign</h4><p>Tally lights, tags and log codes. Almost square, like a lit sign on a studio wall.</p><span class="tok">--r-sign 3px</span>
+      </div>
+      <div class="shape">
+        <div class="demo"><span class="btn btn-ghost">Add to presets</span></div>
+        <h4>Control</h4><p>Buttons, fields and toggles. A slight corner, like a console key.</p><span class="tok">--r-control 6px</span>
+      </div>
+      <div class="shape">
+        <div class="demo"><div class="screen" style="width:160px;box-shadow:0 0 0 1px var(--line)"></div></div>
+        <h4>Screen</h4><p>Anything that shows a picture: the player, thumbnails, title cards. Rounded like a picture tube.</p><span class="tok">--r-screen 14px</span>
+      </div>
+    </div>
+
+    <div class="rule-callout">
+      <h3>The picture is the only box.</h3>
+      <p class="muted" style="margin:0">Guides, listings and logs are separated by rules and space, never by cards. A frame means a picture is inside it. If a layout seems to need an extra step of space or a fourth corner, the layout is wrong.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPONENTS ================= -->
+<section class="ch" id="components">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 06</span><span>Components</span></div>
+    <h2 class="ch-title">The pieces every screen is built from.</h2>
+    <p class="ch-lede">These are working components, shown out of context. Stations, programs and businesses in the examples are illustrations.</p>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Buttons</h3><p>One primary per view, in signal. Verb first, sentence case, and the same verb through a flow: a "Sign on" button produces a station that is "Signed on".</p></div>
+      <div class="comp-demo"><div class="row">
+        <a class="btn btn-primary" href="#components">Tune in</a>
+        <a class="btn btn-ghost" href="#components">Add to presets</a>
+        <a class="btn btn-sign-on" href="#components">Sign on</a>
+        <a class="btn btn-ghost btn-sm" href="#components">Full guide</a>
+      </div><p class="quiet" style="font-size:14px;margin-top:12px">"Sign on" is master control's main button and uses ink, not signal, because it changes what goes out to viewers.</p></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Tags</h3><p>A word in a sign. Live means happening in real time. Next is what comes on after this. Off air is a station that has signed off. Nothing but live is red.</p></div>
+      <div class="comp-demo"><div class="row">
+        <span class="tag tag-live"><span class="d"></span>Live</span>
+        <span class="tag tag-next">Next at 9:30</span>
+        <span class="tag tag-off">Off air</span>
+        <span class="tag tag-carried">Carried</span>
+        <span class="tag">Radio band</span>
+      </div></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Station ident</h3><p>Channel number, call sign and name, always in that order. The number is where it sits on the dial; the call sign is who it is.</p></div>
+      <div class="comp-demo"><div class="row" style="gap:var(--s5)">
+        <div class="ident"><span class="chn">7.1</span><span class="cs">CIVC</span><span class="nm">Inland Civic</span></div>
+        <div class="ident"><span class="chn">12.1</span><span class="cs">BEAT</span><span class="nm">Inland Beat</span></div>
+        <div class="ident"><span class="chn">88.3</span><span class="cs">NITE</span><span class="nm">Night Desk</span></div>
+      </div></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Listing</h3><p>One station on the dial: what's on now, how long it runs, and what's next. Carried programs name their source. There is no star rating or view count here.</p></div>
+      <div class="comp-demo">
+        <div class="listing">
+          <div class="thumb" style="background:#2E6B5A">CIVC</div>
+          <div>
+            <div class="top"><span class="chn">7.1</span><span class="cs">CIVC</span><span class="tag tag-live"><span class="d"></span>Live</span></div>
+            <div class="now">Town Hall: backyard homes and ADUs</div>
+            <p class="meta">Until 9:30 pm, with questions from the room</p>
+            <p class="next">Next <span class="mono">9:30</span> Planning Commission, regular meeting</p>
+          </div>
+        </div>
+        <div class="listing">
+          <div class="thumb" style="background:#9A5412">REEL</div>
+          <div>
+            <div class="top"><span class="chn">24.1</span><span class="cs">REEL</span></div>
+            <div class="now">Saturday Reel: cartoons from 1928 to 1934</div>
+            <p class="meta">Carried from REEL by 12 stations</p>
+            <p class="next">Next <span class="mono">9:00</span> Newsreel hour</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Guide</h3><p>Stations down the side, half hours across the top, one line for the current time. The program on air sits on the raised colour. The tally never appears in the guide, because nothing in it is on your screen yet.</p></div>
+      <div class="comp-demo"><div class="scroll-x"><div class="g-wrap"><div class="guide">
+        <div class="g-head"><div></div><div>8:00 pm</div><div>8:30</div><div>9:00</div><div>9:30</div></div>
+        <div class="g-body">
+          <div class="g-now"><span>8:42</span></div>
+          <div class="g-row"><div class="g-st"><span class="cs">CIVC</span><span class="chn">7.1</span></div><div class="g-p on live" style="grid-column:span 3"><b>Town Hall: backyard homes</b><small>8:00 – 9:30</small></div><div class="g-p"><b>Planning Commission</b><small>9:30</small></div></div>
+          <div class="g-row"><div class="g-st"><span class="cs">BEAT</span><span class="chn">12.1</span></div><div class="g-p"><b>Late Crate, ep. 14</b><small>8:00</small></div><div class="g-p on"><b>Saturday Reel</b><small>Carried from REEL</small></div><div class="g-p" style="grid-column:span 2"><b>Beat Tape Live</b><small>9:00 – 10:00</small></div></div>
+          <div class="g-row"><div class="g-st"><span class="cs">REEL</span><span class="chn">24.1</span></div><div class="g-p on" style="grid-column:span 2"><b>Saturday Reel</b><small>8:00 – 9:00</small></div><div class="g-p" style="grid-column:span 2"><b>Newsreel hour</b><small>9:00 – 10:00</small></div></div>
+          <div class="g-row"><div class="g-st"><span class="cs">NITE</span><span class="chn">88.3</span></div><div class="g-p on" style="grid-column:span 4"><b>Night Desk: radio dramas from the 1940s</b><small>Radio band, until 6:00 am</small></div></div>
+        </div>
+      </div></div></div></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Program log</h3><p>Master control's running order, to the second. Each line carries a log code, the way traffic logs always have: PGM program, SPT spot, UND underwriting, BMP bumper, SID station ID. The code is the signal; colour only backs it up.</p></div>
+      <div class="comp-demo"><div class="scroll-x">
+        <table class="log">
+          <thead><tr><th>Airs</th><th>Code</th><th>Item</th><th style="text-align:right">Runs</th></tr></thead>
+          <tbody>
+            <tr><td class="t">8:00:00</td><td><span class="code pgm">PGM</span></td><td>Late Crate, ep. 14<span class="src">From your library</span></td><td class="d">28:30</td></tr>
+            <tr class="airing"><td class="t">8:28:30</td><td><span class="code spt">SPT</span></td><td>Orange Street Coffee<span class="src">Spot market, per view</span></td><td class="d">:30</td></tr>
+            <tr><td class="t">8:29:00</td><td><span class="code spt">SPT</span></td><td>Inland Tire and Wheel<span class="src">Spot market, flat rate</span></td><td class="d">:30</td></tr>
+            <tr><td class="t">8:29:30</td><td><span class="code und">UND</span></td><td>Made possible by members of Inland Beat<span class="src">Underwriting</span></td><td class="d">:15</td></tr>
+            <tr><td class="t">8:29:45</td><td><span class="code">BMP</span></td><td>Back to the reel<span class="src">Bumper</span></td><td class="d">:10</td></tr>
+            <tr><td class="t">8:29:55</td><td><span class="code">SID</span></td><td>BEAT 12.1, Redlands<span class="src">Station ID</span></td><td class="d">:05</td></tr>
+            <tr><td class="t">8:30:00</td><td><span class="code pgm">PGM</span></td><td>Saturday Reel<span class="src">Carried from REEL 24.1, barter terms</span></td><td class="d">30:00</td></tr>
+          </tbody>
+        </table>
+      </div><p class="quiet" style="font-size:14px;margin-top:12px">The line on air carries a tally edge. It's the only red in master control apart from the sign itself.</p></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Lower third and bug</h3><p>The two graphics a station puts on its own picture. The lower third names who is speaking. The bug, bottom right, says which station you're watching. Both use the station's graphics, never Opencast's.</p></div>
+      <div class="comp-demo"><div class="frame" style="max-width:640px">
+        <div class="pic"></div><div class="podium"></div><div class="figure"></div>
+        <span class="tag tag-live live-corner" style="background:rgb(15 24 48 / .72);border-color:#FF7A69;color:#FF7A69"><span class="d"></span>Live</span>
+        <div class="l3"><span class="nm">Dana Whitfield</span><br><span class="ttl">Chair, Planning Commission</span></div>
+        <div class="bug"><span class="cs">CIVC</span><span class="chn">7.1</span></div>
+      </div></div>
+    </div>
+
+    <div class="comp">
+      <div class="comp-notes"><h3>Player bar</h3><p>Stays with you across the app, and keeps playing with the screen off. This is your screen, so the tally lights here. Channel up and down flip the dial the way a remote did.</p></div>
+      <div class="comp-demo">
+        <div class="player">
+          <div class="thumb">BEAT</div>
+          <div><div class="t">Saturday Reel</div><div class="s">BEAT 12.1, carried from REEL</div></div>
+          <div class="ctl">
+            <span class="tally lit">ON AIR</span>
+            <button class="icon-btn" type="button" aria-label="Channel down"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l5 5 5-5"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Channel up"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5-5 5 5"/></svg></button>
+            <button class="icon-btn" type="button" aria-label="Pause"><svg viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="4" width="3.5" height="12" rx="1"/><rect x="11.5" y="4" width="3.5" height="12" rx="1"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TALLY ================= -->
+<section class="ch" id="tally">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 07</span><span>The tally light</span></div>
+    <h2 class="ch-title">A tally doesn't blink. It's on or it's off.</h2>
+    <p class="ch-lede">In a studio, the red light on top of a camera means that camera is the one going out. Opencast uses it the same way: it lights for the one picture that is actually on your screen, and for a broadcaster's station while it's signed on.</p>
+
+    <div class="tally-stage">
+      <figure style="margin:0"><div class="screen"><span class="tally lit lg">ON AIR</span></div><figcaption><b>Lit</b>Your screen is showing this station, or your station is signed on.</figcaption></figure>
+      <figure style="margin:0"><div class="screen"><span class="tally lg">ON AIR</span></div><figcaption><b>Dark</b>Signed off, or the player is paused. The sign stays, unlit, so the layout doesn't jump.</figcaption></figure>
+      <figure style="margin:0"><div class="screen"><span class="tally lg" style="color:#F0B43C">STAND BY</span></div><figcaption><b>Standby</b>Master control only, in the seconds before sign-on and while reconnecting.</figcaption></figure>
+    </div>
+
+    <ul class="rules-list">
+      <li>Light it only when something is really going out, or really on your screen.</li>
+      <li>One per view. Many stations are on air at once; only one is on yours.</li>
+      <li>It is always the words "On air". The colour is never the only signal.</li>
+      <li>It never pulses. It switches on once, with a single flicker, and holds. With reduced motion, it simply appears lit.</li>
+    </ul>
+
+    <div class="two">
+      <div>
+        <h3 class="sub" style="margin-top:0">Anatomy</h3>
+        <div class="specs">
+          <div class="spec"><h4>Sign</h4><div class="val">26px tall, 3px corners</div><p>44px tall in master control. Padding of 10px, or 18px at the large size.</p></div>
+          <div class="spec"><h4>Word</h4><div class="val">Archivo 800, 12px</div><p>Width 112, capitals, +9% tracking. Capitals are kept for the sign, call signs and log codes.</p></div>
+          <div class="spec"><h4>Glow</h4><div class="val">14px, 55%</div><p>A 2px spread of the tally colour, 35% on the light ground. No glow when unlit.</p></div>
+          <div class="spec"><h4>Switch-on</h4><div class="val">1.6s, once</div><p>Unlit, a brief light, a flicker off, then lit and held. It never repeats.</p></div>
+        </div>
+      </div>
+      <div>
+        <h3 class="sub" style="margin-top:0">For developers</h3>
+<pre class="code-block">.tally {
+  height: 26px; padding: 0 10px;
+  border-radius: 3px;
+  border: 1.5px solid currentColor;
+  font: 800 12px/1 "Archivo", sans-serif;
+  font-stretch: 112%;
+  letter-spacing: .09em;
+}
+.tally.lit {
+  background: #D9301F;  /* #C42A1C on light */
+  border-color: #D9301F;
+  color: #fff;
+  box-shadow: 0 0 14px 2px rgb(217 48 31 / .55);
+  animation: tally-on 1.6s ease-out 1 both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tally.lit { animation: none; }
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= WORDS ================= -->
+<section class="ch" id="words">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 08</span><span>Words on the dial</span></div>
+    <h2 class="ch-title">Say it the way a station would.</h2>
+    <p class="ch-lede">Opencast uses the words broadcasting already had. They're more exact than streaming's words, and they tell people this is a station they tune to, not a feed they scroll.</p>
+
+    <div class="scroll-x">
+      <table class="lex">
+        <thead><tr><th>Say</th><th>Instead of</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="3">On the dial</td></tr>
+          <tr><td>Station</td><td>Channel, creator</td><td>Who is broadcasting. A person, a group or a business.</td></tr>
+          <tr><td>Channel</td><td>Slot, position</td><td>Where a station sits on the dial, like 12.1.</td></tr>
+          <tr><td>Call sign</td><td>Handle, username</td><td>A station's short name, like BEAT. Three to five letters, unique.</td></tr>
+          <tr><td>Network</td><td>Publisher</td><td>A station whose programs other stations carry.</td></tr>
+          <tr><td>Your market</td><td>Near you, local feed</td><td>The stations in your area, first on the dial.</td></tr>
+          <tr><td>Tune in</td><td>Watch now, play</td><td>Open a station. You join it wherever it is in the schedule.</td></tr>
+          <tr><td>Presets</td><td>Following, subscriptions</td><td>The stations saved to your dial.</td></tr>
+          <tr><td>Guide, listings</td><td>Schedule, feed</td><td>What's on, and when, across stations.</td></tr>
+          <tr class="grp"><td colspan="3">In master control</td></tr>
+          <tr><td>Master control</td><td>Dashboard, creator studio</td><td>Where a station is run.</td></tr>
+          <tr><td>Library</td><td>Uploads, content</td><td>Everything a station can put on air.</td></tr>
+          <tr><td>Program log</td><td>Playlist, queue</td><td>What airs, in order, to the second.</td></tr>
+          <tr><td>Sign on, sign off</td><td>Go live, end stream</td><td>Start and stop broadcasting.</td></tr>
+          <tr><td>Translators</td><td>Multistream destinations</td><td>Other services a station relays to, like YouTube.</td></tr>
+          <tr><td>Dead air</td><td>Empty queue</td><td>Nothing in the log. Master control warns before it happens.</td></tr>
+          <tr class="grp"><td colspan="3">Breaks and money</td></tr>
+          <tr><td>Spot</td><td>Ad</td><td>A commercial. Runs :15, :30 or :60.</td></tr>
+          <tr><td>Underwriting</td><td>Sponsorship</td><td>A credit that names a supporter, without a sales pitch.</td></tr>
+          <tr><td>Bumper, station ID</td><td>Intro, outro</td><td>Short pieces that lead in and out of breaks, and say who you're watching.</td></tr>
+          <tr><td>Avails</td><td>Ad slots</td><td>Open time in a station's breaks.</td></tr>
+          <tr><td>Rate card</td><td>Pricing</td><td>What a station or advertiser charges.</td></tr>
+          <tr><td>Syndication, carry</td><td>Share, repost</td><td>Airing another station's program under agreed terms.</td></tr>
+          <tr><td>Spot market</td><td>Ad store</td><td>Where businesses list spots and stations choose them.</td></tr>
+          <tr><td>Pledge</td><td>Donate, tip</td><td>Direct support from viewers to a station.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="dial-rules">
+      <div><div class="big">2.1 – 69.9</div><h4>The TV band</h4><p>Video stations take a channel from 2 to 69. A station that carries another around the clock puts it on a subchannel: 12.2, 12.3.</p></div>
+      <div><div class="big">88.1 – 107.9</div><h4>The radio band</h4><p>Audio stations take a frequency, in odd tenths, like FM. You can tell the band from the number alone.</p></div>
+      <div><div class="big">BEAT</div><h4>Call signs</h4><p>Three to five capital letters, unique across Opencast. No K or W prefix, so no one mistakes one for a licensed station.</p></div>
+    </div>
+
+    <h3 class="sub">Carriage terms</h3>
+    <div class="terms">
+      <div><h4>Barter</h4><p>The default. No fee. Ad time inside the program is split between the station airing it and the station that made it.</p></div>
+      <div><h4>Cash</h4><p>The airing station pays the producer's syndication rate and keeps all the ad time.</p></div>
+      <div><h4>Cash plus barter</h4><p>A lower rate, plus a share of the ad time.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VOICE ================= -->
+<section class="ch" id="voice">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 09</span><span>Voice</span></div>
+    <h2 class="ch-title">Talk like the booth, not the lobby.</h2>
+    <p class="ch-lede">Calm, exact and a little dry, like an announcer between programs. Plain words, short sentences, the time always given.</p>
+
+    <div class="voice">
+      <div class="v-row"><h4>Use the station's words</h4><div class="say">Sign on at 6:00 am. Your log runs until 11:40 pm.</div><div class="not">Go live now! Your queue has 17h of content.</div></div>
+      <div class="v-row"><h4>Give the time</h4><div class="say">Next on 7.1 at 9:30: Planning Commission.</div><div class="not">Coming up soon on this channel.</div></div>
+      <div class="v-row"><h4>Errors say what happened</h4><div class="say">Stand by. The signal from BEAT dropped. Reconnecting.</div><div class="not">Oops! Something went wrong.</div></div>
+      <div class="v-row"><h4>Credit the source</h4><div class="say">Carried from REEL 24.1.</div><div class="not">Shared by REEL.</div></div>
+      <div class="v-row"><h4>No promises about money</h4><div class="say">Your share of spot revenue this month.</div><div class="not">Earn more than on YouTube.</div></div>
+      <div class="v-row"><h4>Explain a term once</h4><div class="say">Barter terms: no fee, and the ad time is split.</div><div class="not">Carry on barter.</div></div>
+      <div class="v-row plain"><h4>Times</h4><p>12-hour clock with a lowercase am or pm on its first use in a row: 8:00 pm, 8:30, 9:00. Durations as :30, 28:30, 1:02:15.</p></div>
+      <div class="v-row plain"><h4>Names</h4><p>Opencast is the platform. A station is never "an Opencast". Stations are named by call sign, then channel: BEAT 12.1.</p></div>
+      <div class="v-row plain"><h4>Paragraphs</h4><p>Three or four lines on a phone. No exclamation marks and no emoji in the interface.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= STATES ================= -->
+<section class="ch" id="states">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 10</span><span>When there's no picture</span></div>
+    <h2 class="ch-title">Stand by is a message, not an apology.</h2>
+    <p class="ch-lede">Television already solved empty screens: say what's happening and when it will change. Every state without a picture follows that.</p>
+
+    <div class="states">
+      <figure class="state" style="margin:0"><div class="screen">
+        <div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="big">Please stand by</div>
+        <div class="small">The signal from BEAT 12.1 dropped. Reconnecting, and we'll pick up where the program is now.</div>
+      </div><figcaption><b>Stand by</b>A lost signal. The colour bars are the only decoration any state gets.</figcaption></figure>
+
+      <figure class="state" style="margin:0"><div class="screen">
+        <div class="big">Off air</div>
+        <div class="small">CIVC 7.1 signs on again at <span class="mono">6:00 am</span>. In the meantime, REEL 24.1 is on.</div>
+      </div><figcaption><b>Off air</b>A station that has signed off. Always says when it's back, and offers another station.</figcaption></figure>
+
+      <figure class="state" style="margin:0"><div class="screen">
+        <span class="tally lit dead">ON AIR</span>
+        <div class="big" style="color:#F0B43C">Dead air in 12 min</div>
+        <div class="small">Your log runs out at <span class="mono">11:40 pm</span>. Add programs or carry something from the syndication market.</div>
+      </div><figcaption><b>Dead air warning</b>Master control only. The station is still on air, so the tally stays lit.</figcaption></figure>
+
+      <figure class="state" style="margin:0"><div class="screen">
+        <div class="radio-ident">88.3</div>
+        <div class="big" style="font-size:clamp(18px,2.2vw,26px)">NITE, Night Desk</div>
+        <div class="small">Radio dramas from the 1940s, until <span class="mono">6:00 am</span></div>
+        <div class="meter" aria-hidden="true"><i style="height:40%"></i><i style="height:75%"></i><i style="height:55%"></i><i style="height:95%"></i><i style="height:60%"></i><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i></div>
+      </div><figcaption><b>Radio band</b>No picture by design. The frequency is the picture.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ================= BROADCAST GRAPHICS ================= -->
+<section class="ch" id="broadcast">
+  <div class="wrap">
+    <div class="ch-label"><span class="n">Ch. 11</span><span>On screen and off</span></div>
+    <h2 class="ch-title">Keep it inside the safe area.</h2>
+    <p class="ch-lede">A station's picture can end up on a phone, a laptop or a television through a translator. Graphics stay inside the broadcast safe areas so nothing is cropped anywhere.</p>
+
+    <div class="two" style="margin-top:0">
+      <div>
+        <div class="safe-demo">
+          <div class="zone action"></div><div class="zone title"></div>
+          <span class="lbl a">Action safe 93%</span><span class="lbl t">Title safe 90%</span>
+          <div class="l3zone"><span>Lower third</span></div>
+          <div class="bugzone"><span>Bug</span></div>
+        </div>
+        <ul class="bullets">
+          <li>Text stays inside title safe, the middle 90% of the frame.</li>
+          <li>Anything that moves stays inside action safe, the middle 93%.</li>
+          <li>The bug sits bottom right, at 78% opacity, and never covers a lower third.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="sub" style="margin-top:0">Program and break lengths</h3>
+        <div class="sizes-list">
+          <div><span>Program output</span><span>1920 × 1080, 1280 × 720</span></div>
+          <div><span>Spots</span><span>:15 · :30 · :60</span></div>
+          <div><span>Underwriting credit</span><span>:10 – :15</span></div>
+          <div><span>Bumper</span><span>:05 – :10</span></div>
+          <div><span>Station ID</span><span>:05</span></div>
+        </div>
+        <h3 class="sub">Social sizes</h3>
+        <div class="sizes-list">
+          <div><span>Feed, square</span><span>1080 × 1080</span></div>
+          <div><span>Feed, portrait</span><span>1080 × 1350</span></div>
+          <div><span>Story, reel, short</span><span>1080 × 1920</span></div>
+          <div><span>Link preview</span><span>1200 × 630</span></div>
+        </div>
+        <ul class="bullets">
+          <li>Lead with the ident: call sign, channel and the time.</li>
+          <li>One program per graphic. "Tonight at 8 on 7.1" beats a list.</li>
+          <li>On stories, keep text out of the top and bottom 14%.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div><a class="brand" href="#top"><svg><use href="#mk-outline"/></svg><span>opencast</span></a><p class="muted" style="font-size:15px;margin-top:12px">Open-source 24/7 broadcasting. Every station runs like a real one. Starting in the Inland Empire, California.</p></div>
+      <div><h4>Viewers</h4><ul><li><a href="#">Watch</a></li><li><a href="#">Listen</a></li><li><a href="#">Guide</a></li><li><a href="#">Stations</a></li></ul></div>
+      <div><h4>Broadcasters</h4><ul><li><a href="#">Master control</a></li><li><a href="#">Syndication market</a></li><li><a href="#">Spot market</a></li><li><a href="https://github.com/KyngKai909/untitled-project">Source</a></li></ul></div>
+      <div><h4>Opencast</h4><ul><li><a href="#">About</a></li><li><a href="#">For advertisers</a></li><li><a href="#top">Brand and style guide</a></li></ul></div>
+    </div>
+    <p class="foot-note">Stations, programs, people and businesses shown on this page are illustrations. Opencast is a working name. Carriage and revenue terms are described to show how the model works and are not offers.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById('groundToggle');
+  function current() {
+    var t = root.getAttribute('data-theme');
+    if (t) return t;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function label() { btn.textContent = current() === 'dark' ? 'Light ground' : 'Dark ground'; }
+  try { var saved = localStorage.getItem('oc-ground'); if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved); } catch (e) {}
+  label();
+  btn.addEventListener('click', function () {
+    var next = current() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('oc-ground', next); } catch (e) {}
+    label();
+  });
+  if (window.matchMedia) { var mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', label); }
+
+  var clock = document.getElementById('heroClock');
+  function tick() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes(), ap = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12; clock.textContent = h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+  }
+  tick(); setInterval(tick, 20000);
+})();
+</script>
+</body>
+</html>
