@@ -65,6 +65,7 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     fillOrder: ["SPT", "UND", "BMP", "SID"],
     openTimeTo: "spot_market",
     blockedCategories: [],
+    adsFromPartners: false,
     ...o
   };
 }

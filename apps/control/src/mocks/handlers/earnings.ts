@@ -9,9 +9,10 @@ import { http } from "msw";
 import { audienceApi, ledgerApi, networkApi } from "@opencast/contracts";
 import { money } from "@opencast/ui";
 import { AudienceReportX, StationEarningsX, StatementsX } from "../../api/ext/earnings";
-import { dbStation, membership } from "../db";
-import { audienceReport, hasAudience, heldEarnings, moveToBank, payoutAccount, stationEarnings, stationStatements, statementCsv, statementOwner } from "../fixtures/earnings";
+import { dbStation, getDb, membership } from "../db";
+import { audienceReport, hasAudience, heldEarnings, moveToBank, payoutAccount, setPayoutTo, stationEarnings, stationStatements, statementCsv, statementOwner } from "../fixtures/earnings";
 import type { MockPerson } from "../fixtures/people";
+import { stationState } from "../fixtures/station";
 import { fail, needsUser, path, reply } from "../respond";
 
 type Need = "see" | "own";
@@ -37,7 +38,9 @@ export const earningsHandlers = [
     const period = q === "week" || q === "year" ? q : "month";
     const e = stationEarnings(id, period);
     if (!e) return fail(404, "not_found", "There are no earnings for this station yet.");
-    return reply(StationEarningsX, e);
+    // Ads from partners: the switch in Breaks settings; nothing earned until the backfill exists.
+    const on = !!stationState().breakRules[id]?.adsFromPartners;
+    return reply(StationEarningsX, { ...e, lines: { ...e.lines, partnerAds: { on, micros: 0, pendingMicros: 0 } } });
   }),
 
   http.get(path(ledgerApi.listStationStatements), ({ request, params }) => {
@@ -67,9 +70,25 @@ export const earningsHandlers = [
     const id = String(params.stationId);
     const no = guard(p, id, "own");
     if (no) return no;
-    const a = payoutAccount(id);
+    const a = payoutAccount(id, dbStation(id)?.ident.callSign ?? "The station");
     if (!a) return fail(404, "not_found", "There's no payout account for this station yet.");
     return reply(ledgerApi.getPayoutAccount.response, a);
+  }),
+
+  // Paying out to the owner's linked Clear wallet (read-only access is enough), or back.
+  http.put(path(ledgerApi.setPayoutDestination), async ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const id = String(params.stationId);
+    const no = guard(p, id, "own");
+    if (no) return no;
+    const body = ledgerApi.setPayoutDestination.body.safeParse(await request.json().catch(() => null));
+    if (!body.success) return fail(400, "invalid", "Choose where the station is paid.");
+    const link = getDb().clearLinks?.[p.id];
+    if (body.data.kind === "clear_wallet" && !link) return fail(409, "clear_not_linked", "Connect Clear first.");
+    setPayoutTo(id, body.data.kind, body.data.kind === "clear_wallet" ? link!.address : null);
+    const a = payoutAccount(id)!;
+    return reply(ledgerApi.setPayoutDestination.response, { status: a.status, url: a.url });
   }),
 
   http.post(path(ledgerApi.moveToBank), async ({ request, params }) => {

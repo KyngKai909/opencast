@@ -69,6 +69,29 @@ export function ladder(rule: Pick<BreakRule, "lengthMs" | "fillOrder">) {
   }));
 }
 
+/**
+ * The ladder with "Ads from partners" (station-settings 02.1): a backfill for time still open,
+ * placed after the rotation, backups and thank-you credit and before the bumpers and station ID
+ * (the platform prompt fixes its place, so it can't be dragged). Up to half the break.
+ */
+export type LadderRow = ReturnType<typeof ladder>[number] & { partner?: boolean; fillIndex: number | null };
+
+export function ladderWithPartners(rule: Pick<BreakRule, "lengthMs" | "fillOrder" | "adsFromPartners">): LadderRow[] {
+  const rows: LadderRow[] = ladder(rule).map((r, i) => ({ ...r, fillIndex: i }));
+  const at = rows.findIndex((r) => r.code === "BMP" || r.code === "SID");
+  const partner: LadderRow = {
+    n: 0,
+    code: "SPT",
+    title: "Ads from partners",
+    detail: `${rule.adsFromPartners ? "On" : "Off"}. Only time still open`,
+    time: `0:00 – ${duration(Math.round(rule.lengthMs / 2 / 1000) * 1000)}`,
+    partner: true,
+    fillIndex: null
+  };
+  rows.splice(at < 0 ? rows.length : at, 0, partner);
+  return rows.map((r, i) => ({ ...r, n: i + 1 }));
+}
+
 /** The cap meter: one cell a minute up to broadcast TV's 16; the station's minutes filled. */
 export function capCells(spotMsPerHour: number): boolean[] {
   const filled = Math.round(spotMsPerHour / 60_000);

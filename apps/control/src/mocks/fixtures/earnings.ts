@@ -484,9 +484,19 @@ export function stationEarnings(stationId: string, period: Period): StationEarni
   };
 }
 
-export function payoutAccount(stationId: string) {
+/** Where payouts go: the station's Clear account unless the owner chose their linked Clear wallet. */
+const payoutTo: Record<string, { kind: "clear_account" | "clear_wallet"; address: string | null }> = {};
+
+export function payoutAccount(stationId: string, name = "The station") {
   const l = ledgerOf(stationId);
-  return l ? { status: l.payout.status, url: l.payout.url } : null;
+  if (!l) return null;
+  const to = payoutTo[stationId];
+  const destination = to?.kind === "clear_wallet" && to.address ? { kind: "clear_wallet" as const, label: `Clear wallet, ${to.address.slice(0, 6)}…${to.address.slice(-4)}`, address: to.address } : { kind: "clear_account" as const, label: `${name}'s Clear account`, address: null };
+  return { status: l.payout.status, url: l.payout.url, destination };
+}
+
+export function setPayoutTo(stationId: string, kind: "clear_account" | "clear_wallet", address: string | null) {
+  payoutTo[stationId] = { kind, address };
 }
 
 export type MoveResult = { ok: true; payoutId: string; scheduledFor: string } | { ok: false; status: number; code: string; message: string };

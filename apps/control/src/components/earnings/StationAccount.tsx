@@ -3,7 +3,8 @@
 // it; it's built from the contract (getPayoutAccount, moveToBank, and the account lines of
 // getStationEarnings). Owners act; operators see (station-settings 03.1: "Earnings, payouts and
 // the station account: Owner, Operator see only"). The payout schedule and bank can't be changed
-// here: the contract has no endpoint for it.
+// here: the contract has no endpoint for it. The owner's linked Clear wallet can take the payouts
+// (Connect Clear, components/clear/ClearWallet.tsx).
 
 import { useState } from "react";
 import { ledgerApi } from "@opencast/contracts";
@@ -11,6 +12,7 @@ import { Button, KeyValueList, Notice, type KeyValueRow } from "@opencast/ui";
 import { StationEarningsX } from "../../api/ext/earnings";
 import { useApi } from "../../api/hooks";
 import { useStation } from "../../station/StationContext";
+import { ClearWallet } from "../clear/ClearWallet";
 import { payoutDetail } from "./lines";
 import { MoveToBank } from "./MoveToBank";
 import { weekdayOf } from "./periods";
@@ -86,6 +88,7 @@ export default function StationAccount() {
       ) : (
         <p className="cc-acct__note">Only owners move money or change where {name} is paid.</p>
       )}
+      <ClearWallet />
       {owner && !setUp && (
         <MoveToBank open={moving} onClose={() => setMoving(false)} stationId={s.id} name={name} availableMicros={e.account.availableMicros} destination={e.nextPayout?.destination ?? null} />
       )}

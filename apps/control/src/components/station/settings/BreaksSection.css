@@ -29,3 +29,7 @@
 @media (max-width: 767px) {
   .cc-breaks { padding: 16px 16px 24px; }
 }
+
+/* Ads from partners while it's off: the row reads quieter (its words say "Off"). */
+.cc-lad--off { color: var(--ink-50); }
+.cc-lad__code--off { border-style: dashed; }

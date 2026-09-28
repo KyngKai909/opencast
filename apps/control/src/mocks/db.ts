@@ -6,7 +6,7 @@
 // in the log and on the monitor). An area's own data (market offers, spots, sponsorships,
 // earnings, claims…) lives in its own mocks/fixtures/<area>.ts, and may keep its own saved state.
 
-import type { Folder, LibraryItem, LiveSource, Program, StationIdent, StationSetup } from "@opencast/contracts";
+import type { ClearLink, Folder, LibraryItem, LiveSource, Program, StationIdent, StationSetup } from "@opencast/contracts";
 import { seedEvening, seedLiveSources, type DbBreak, type DbLogEntry } from "./fixtures/evening";
 import { seedLibrary } from "./fixtures/library";
 import { JEN, KAI, MARCUS, SAM } from "./fixtures/people";
@@ -41,9 +41,11 @@ export interface Db {
   breaks: DbBreak[];
   library: { items: LibraryItem[]; folders: Folder[]; programs: Program[] };
   liveSources: LiveSource[];
+  /** Linked Clear accounts, by person id (Connect Clear). */
+  clearLinks: Record<string, ClearLink>;
 }
 
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 const KEY = "oc-mock-control-db";
 
 function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStation["setup"] {
@@ -95,7 +97,8 @@ export function seed(): Db {
     log,
     breaks,
     library,
-    liveSources: seedLiveSources()
+    liveSources: seedLiveSources(),
+    clearLinks: {}
   };
 }
 

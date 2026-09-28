@@ -53,6 +53,15 @@ export function pledgesDetail(l: StationEarningsX["lines"]["pledges"], period: E
   return `${plural(l.members, "member")}, ${l.newMembers.toLocaleString("en-US")} new ${PERIOD_WORD[period]}. After card fees`;
 }
 
+/**
+ * Ads from partners (earnings 02.1): paid when partners pay, never held. Off, it says where to turn
+ * it on; on, what's still to come.
+ */
+export function partnerAdsDetail(p: NonNullable<StationEarningsX["lines"]["partnerAds"]>): string {
+  if (!p.on) return "Off. Turn it on in Breaks settings. Paid when partners pay, 30 to 90 days after airing";
+  return p.pendingMicros > 0 ? `${money(p.pendingMicros)} to come. Paid when partners pay, 30 to 90 days after airing` : "Paid when partners pay, 30 to 90 days after airing";
+}
+
 /** The earnings page's groups. A studio has no breaks or members of its own, and carries nothing. */
 export function earningsSections(e: StationEarningsX, period: EarningsPeriod, studio: boolean): MoneySection[] {
   const l = e.lines;
@@ -63,7 +72,8 @@ export function earningsSections(e: StationEarningsX, period: EarningsPeriod, st
       title: "From your breaks",
       rows: [
         { key: "spots", title: "Spots", detail: spotsDetail(l.spots), amount: l.spots.micros },
-        { key: "sponsors", title: "Sponsors", detail: sponsorsDetail(l.sponsors), amount: l.sponsors.micros }
+        { key: "sponsors", title: "Sponsors", detail: sponsorsDetail(l.sponsors), amount: l.sponsors.micros },
+        ...(l.partnerAds ? [{ key: "partnerAds", title: "Ads from partners", detail: partnerAdsDetail(l.partnerAds), amount: l.partnerAds.micros }] : [])
       ]
     });
     sections.push({ key: "viewers", title: "From viewers", rows: [{ key: "pledges", title: "Pledges", detail: pledgesDetail(l.pledges, period), amount: l.pledges.micros }] });
