@@ -197,7 +197,8 @@ export function s3ObjectStore(config: S3Config): ObjectStore {
     async put(key, file, { contentType, storageClass, sha256 }) {
       await ensureBucket();
       const { size } = await fs.stat(file);
-      // The store recomputes the checksum and refuses the write if the bytes differ.
+      // R2 recomputes the checksum and refuses the write if the bytes differ. (Railway buckets
+      // accept it unchecked; downloads re-hash either way.)
       await client.send(new PutObjectCommand({ Bucket, Key: key, Body: createReadStream(file), ContentLength: size, ContentType: contentType, ...(config.storageClasses === false ? {} : { StorageClass: cls(storageClass) }), ChecksumSHA256: sha256.toString("base64") }));
     },
     async has(key) {

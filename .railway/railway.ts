@@ -44,7 +44,8 @@ export default defineRailway((ctx) => {
         R2_ACCESS_KEY_ID: ref(media, "ACCESS_KEY_ID"),
         R2_SECRET_ACCESS_KEY: ref(media, "SECRET_ACCESS_KEY"),
         R2_BUCKET: ref(media, "BUCKET"),
-        S3_FORCE_PATH_STYLE: "true",
+        // Railway buckets use virtual-host URLs, and have no storage classes.
+        S3_FORCE_PATH_STYLE: "false",
         S3_STORAGE_CLASSES: "false"
       };
   const origin = (name: string) => `https://\${{${name}.RAILWAY_PUBLIC_DOMAIN}}`;
