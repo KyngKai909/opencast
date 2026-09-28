@@ -176,7 +176,7 @@ export const player = specimens([
       "Live: three mock stations served as live HLS (npm run mock:streams -w @opencast/player), 250 ms a request. Tuning joins live, mid-program; the old picture stays until the new one has a frame; the neighbours are warm. Click the picture, then use the arrow keys, 1 to 6, or the buttons. Tune times are measured from the command to the new picture on screen.",
     grounds: ["dark"],
     stacked: true,
-    states: [{ label: "Three stations, web", render: () => <PlayerDemo size="web" dial={TV_DIAL} /> }]
+    states: [{ label: "Three stations, web", render: () => <PlayerDemo size="web" dial={ALL_DIAL} /> }]
   },
   {
     id: "player-tv",

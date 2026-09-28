@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Tally, cx } from "@opencast/ui";
 import type { Channel } from "../types";
 
@@ -6,7 +7,38 @@ import type { Channel } from "../types";
  * frequency is set huge, with a level meter that moves with the sound (tv 05.1). The whole block
  * drifts a few pixels a minute so an all-night station doesn't burn into an OLED.
  */
-export function RadioScreen({ channel: c, playing, onAirHere, tally = true }: { channel: Channel; playing: boolean; onAirHere: boolean; /** Hidden while the banner (which carries the tally) is up: one tally per view. */ tally?: boolean }) {
+export function RadioScreen({
+  channel: c,
+  playing,
+  onAirHere,
+  tally = true,
+  levels
+}: {
+  channel: Channel;
+  playing: boolean;
+  onAirHere: boolean;
+  /** Hidden while the banner (which carries the tally) is up: one tally per view. */
+  tally?: boolean;
+  /** Real sound levels (the engine's audioLevels); null where they can't be measured. */
+  levels?: (bars: number) => number[] | null;
+}) {
+  const meter = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!levels || !playing) return;
+    let raf = 0;
+    const tick = () => {
+      const el = meter.current;
+      const v = levels(14);
+      if (el) {
+        // Measured: set each bar from the sound. Not measurable here: the bars keep their rhythm.
+        el.classList.toggle("oc-radio__meter--measured", v !== null);
+        if (v) el.querySelectorAll("i").forEach((bar, i) => ((bar as HTMLElement).style.height = `${Math.round(8 + v[i] * 92)}%`));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [levels, playing]);
   const now = c.now?.title;
   const sub = [c.station.name, now].filter(Boolean).join(", ");
   return (
@@ -15,7 +47,7 @@ export function RadioScreen({ channel: c, playing, onAirHere, tally = true }: { 
         <div className="oc-radio__f oc-mono">{c.station.channel}</div>
         <div className="oc-radio__cs oc-cs">{c.station.callSign}</div>
         {sub && <div className="oc-radio__sub">{sub}</div>}
-        <div className="oc-radio__meter" aria-hidden="true">
+        <div ref={meter} className="oc-radio__meter" aria-hidden="true">
           {Array.from({ length: 14 }, (_, i) => (
             <i key={i} style={{ ["--i" as string]: i }} />
           ))}

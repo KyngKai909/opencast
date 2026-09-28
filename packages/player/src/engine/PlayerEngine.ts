@@ -15,6 +15,7 @@ import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, type WarmMode } from "./Deck";
 import { defaultDriver, type MediaDriver } from "./driver";
+import { AudioLevels } from "./meter";
 
 export type CaptionMode = "off" | "on" | "muted_only";
 export type CaptionSize = "small" | "medium" | "large";
@@ -86,6 +87,7 @@ export class PlayerEngine {
   /** A tune asked for before the surface attached: it runs on attach. */
   private queuedTune: { stationId: string; source?: CommandSource } | null = null;
   private volume = 1;
+  private audio = new AudioLevels();
 
   constructor(options: EngineOptions = {}) {
     this.driver = options.driver ?? defaultDriver();
@@ -233,6 +235,7 @@ export class PlayerEngine {
     if (seq !== this.tuneSeq) return; // A newer tune took over.
     for (const d of this.decks.values()) if (d !== deck && d.role === "active") d.warm(this.o.warm === "play" ? "play" : "buffer");
     deck.show(this.state.muted || this.state.mutedByBrowser);
+    this.audio.measure(deck.video);
     this.applyCaptions(deck);
     this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
     this.settle(stationId, previous, "playing");
@@ -347,7 +350,14 @@ export class PlayerEngine {
     if (!d) return;
     if (this.state.paused?.expired) return this.backToLive();
     this.clearPause();
-    void d.video.play().catch(() => {});
+    // If the paused moment has scrolled out of what the stream still keeps, move forward to the
+    // oldest moment it has: as close to where you paused as the stream allows.
+    const v = d.video;
+    if (v.seekable.length) {
+      const oldest = v.seekable.start(0);
+      if (v.currentTime < oldest + 1) v.currentTime = oldest + 2;
+    }
+    void v.play().catch(() => {});
     this.patch({ status: "playing" });
     this.mediaSession();
   }
@@ -375,6 +385,7 @@ export class PlayerEngine {
   // ---------- Sound and captions ----------
 
   setMuted(muted: boolean) {
+    if (!muted) this.audio.unlock();
     const d = this.active();
     if (d) d.video.muted = muted;
     this.patch({ muted, mutedByBrowser: false });
@@ -434,6 +445,8 @@ export class PlayerEngine {
 
   /** Acts on a command from any input. Commands the player doesn't own go to onCommand. */
   handle(command: Command, source?: CommandSource): void {
+    // A command means someone's there: let sound run through the level meter.
+    this.audio.unlock();
     // Any press during the sleep fade cancels the timer.
     if (this.state.sleep?.fading && command.type !== "sleep") this.sleep(null);
     switch (command.type) {
@@ -493,6 +506,11 @@ export class PlayerEngine {
     } catch {
       // Some browsers have mediaSession without MediaMetadata.
     }
+  }
+
+  /** Real sound levels for the meter (0 to 1 each), or null where they can't be measured. */
+  audioLevels(bars: number): number[] | null {
+    return this.state.status === "playing" ? this.audio.levels(bars) : null;
   }
 
   /** The <video> on screen, for the heartbeat's media time. */

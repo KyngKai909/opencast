@@ -124,9 +124,11 @@
 .oc-radio__meter { display: flex; gap: calc(8 * var(--u)); align-items: flex-end; height: calc(80 * var(--u)); margin-top: calc(44 * var(--u)); }
 .oc-radio__meter i { width: max(calc(12 * var(--u)), 3px); height: 8%; background: rgb(255 255 255 / .7); border-radius: 2px; }
 /* No audio analysis yet: while playing, the bars move on their own rhythms. */
-.oc-radio--playing .oc-radio__meter i { animation: oc-level calc(.55s + var(--i) * 37ms) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -91ms); }
+.oc-radio__meter--measured i { animation: none !important; transition: height 60ms linear; }
+.oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: oc-level calc(.55s + var(--i) * 37ms) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -91ms); }
 @keyframes oc-level { from { height: 30%; } to { height: 92%; } }
 @media (prefers-reduced-motion: reduce) {
-  .oc-radio--playing .oc-radio__meter i { animation: none; height: 60%; }
+  .oc-radio__meter--measured i { animation: none !important; transition: height 60ms linear; }
+.oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
 }
 .oc-radio__tally { position: absolute; top: calc(54 * var(--u)); right: calc(96 * var(--u)); }

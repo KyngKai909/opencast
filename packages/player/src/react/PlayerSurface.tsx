@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Slate, Tag, cx } from "@opencast/ui";
 import type { Hint } from "../input/types";
 import { usePlayer } from "./context";
@@ -45,6 +45,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, className }: Play
   const last = s.channels.find((c) => c.station.id === s.lastId);
   const isRadio = current?.station.band === "radio";
   const onAirHere = s.status === "playing" && !!current?.onAir && s.pendingId === null;
+  const levelsFor = useCallback((bars: number) => engine.audioLevels(bars), [engine]);
   const captionSize = { small: 0.034, medium: 0.042, large: 0.054 }[s.captionSize];
 
   return (
@@ -57,7 +58,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, className }: Play
     >
       <div ref={stage} className="oc-player__stage" />
 
-      {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} />}
+      {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} levels={levelsFor} />}
 
       {current && s.status === "off_air" && (
         <div className="oc-player__cover">

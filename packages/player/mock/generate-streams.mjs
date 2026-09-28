@@ -68,7 +68,8 @@ for (const s of MOCK_STATIONS) {
   const dir = path.join(OUT, s.slug);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(path.join(dir, "frames"), { recursive: true });
-  const tone = ["-f", "lavfi", "-t", String(LOOP), "-i", `sine=frequency=${s.tone}:sample_rate=48000,volume=0.08`];
+  // A tone with quiet pink noise and a slow swell: enough spread across the bands for a level meter.
+  const tone = ["-f", "lavfi", "-t", String(LOOP), "-i", `sine=frequency=${s.tone}:sample_rate=48000,volume=0.06[t];anoisesrc=color=pink:amplitude=0.05:sample_rate=48000,lowpass=f=6000[n];[t][n]amix=inputs=2:normalize=0,tremolo=f=0.6:d=0.7`];
   const hls = ["-f", "hls", "-hls_time", String(SEGMENT), "-hls_list_size", "0", "-hls_segment_filename", "seg_%03d.ts", "vod.m3u8"];
 
   if (s.band === "radio") {
