@@ -18,7 +18,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { at, createdAt, id, micros, millis } from "./columns.js";
 import { spots } from "./namespaces.js";
-import { breaks, programs, stations } from "./broadcast.js";
+import { breaks, contents, programs, stations } from "./broadcast.js";
 import { agreements } from "./catalog.js";
 import { markets } from "./network.js";
 import { users } from "./accounts.js";
@@ -129,7 +129,10 @@ export const spotFiles = spots.table("spot_files", {
     .references(() => spotsTable.id),
   version: integer("version").notNull(),
   originalFilename: text("original_filename"),
-  location: text("location").notNull(),
+  /** The prepared spot, by content ID. */
+  contentId: text("content_id").references(() => contents.cid),
+  /** Before content IDs: a disk path or URL. */
+  location: text("location"),
   durationMs: millis("duration_ms").notNull(),
   widthPx: integer("width_px"),
   heightPx: integer("height_px"),
@@ -138,7 +141,7 @@ export const spotFiles = spots.table("spot_files", {
   scaledToFit: boolean("scaled_to_fit").notNull().default(false),
   current: boolean("current").notNull().default(true),
   createdAt: createdAt()
-});
+}, (t) => [check("spot_file_has_content", sql`${t.contentId} is not null or ${t.location} is not null`)]);
 
 export const uploadChecks = spots.table("upload_checks", {
   id: id(),
@@ -369,10 +372,12 @@ export const orderFiles = spots.table("order_files", {
     .references(() => productionOrders.id),
   role: text("role", { enum: ["brief", "delivery"] }).notNull(),
   version: integer("version"),
-  location: text("location").notNull(),
+  contentId: text("content_id").references(() => contents.cid),
+  /** Before content IDs: a disk path or URL. */
+  location: text("location"),
   filename: text("filename"),
   createdAt: createdAt()
-});
+}, (t) => [check("order_file_has_content", sql`${t.contentId} is not null or ${t.location} is not null`)]);
 
 /** Notes pinned to timecodes. The maker's own mistakes don't use up a round. */
 export const orderNotes = spots.table("order_notes", {

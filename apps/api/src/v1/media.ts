@@ -5,7 +5,6 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { compressForStreaming, expandExternalUrls, ingestFromExternalUrl, probeDurationSec, probeMediaKind } from "../media.js";
-import { assetObjectKey, isR2Configured, uploadFileToR2 } from "../r2.js";
 
 export interface Probe {
   durationMs: number | null;
@@ -15,10 +14,8 @@ export interface Probe {
 }
 
 export interface Prepared {
-  storage: "local" | "r2";
-  /** What the worker reads: a disk path or a URL. */
-  location: string;
-  r2Key: string | null;
+  /** The stream-ready file on local disk, to be stored by its content ID. */
+  file: string;
   compression: { tool: "ffmpeg"; profile: string; compressedAt: string };
 }
 
@@ -26,7 +23,7 @@ export interface MediaPipeline {
   probe(file: string): Promise<Probe>;
   /** Integrated loudness in LUFS (EBU R128). */
   loudness(file: string): Promise<number | null>;
-  /** Compress to the stream-ready profile and put it where playout reads from. */
+  /** Compress to the stream-ready profile. The caller stores the result by content ID. */
   prepare(file: string, input: { scope: string; itemId: string; mediaKind: "video" | "audio" }): Promise<Prepared>;
   importLink(url: string, outDir: string, baseName: string, signal?: AbortSignal): Promise<string>;
   expandLinks(url: string): Promise<string[]>;
@@ -73,21 +70,7 @@ export function ffmpegPipeline(storageRoot: string): MediaPipeline {
     async prepare(file, { scope, itemId, mediaKind }) {
       const outDir = path.join(storageRoot, "uploads", scope, "ready");
       const compressed = await compressForStreaming(file, outDir, itemId, mediaKind);
-      const compression = { tool: "ffmpeg" as const, profile: compressed.profile, compressedAt: new Date().toISOString() };
-      if (isR2Configured()) {
-        try {
-          const key = assetObjectKey(scope, itemId, compressed.outputPath);
-          const stored = await uploadFileToR2(compressed.outputPath, key);
-          if (stored.url) {
-            await fs.unlink(compressed.outputPath).catch(() => undefined);
-            return { storage: "r2", location: stored.url, r2Key: stored.key, compression };
-          }
-          return { storage: "local", location: compressed.outputPath, r2Key: stored.key, compression };
-        } catch (error) {
-          console.warn(`[media] R2 upload failed; keeping ${itemId} on local disk`, error);
-        }
-      }
-      return { storage: "local", location: compressed.outputPath, r2Key: null, compression };
+      return { file: compressed.outputPath, compression: { tool: "ffmpeg", profile: compressed.profile, compressedAt: new Date().toISOString() } };
     },
 
     importLink: (url, outDir, baseName, signal) => ingestFromExternalUrl(url, outDir, baseName, { signal }),

@@ -186,8 +186,12 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
           answerDueAt
         })
         .returning();
-      // Off air at once: every future airing, on the maker and every carrier.
+      // The file is locked: kept, so it can come back, but never aired or exported.
+      await services.library.content.lock(await services.library.contentOfItems([item.id]), claim.id);
+      // Off air at once: every future airing, on the maker and every carrier, and any
+      // other station's item made from the same file.
       const pulled = await services.log.pullItem(item.id);
+      for (const other of await services.library.itemsSharingContent([item.id])) pulled.push(...(await services.log.pullItem(other)));
       const stations = new Set([item.stationId, ...pulled.map((p) => p.stationId)]);
       for (const stationId of stations) {
         await db.insert(T).values({
@@ -240,6 +244,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
         // Back on air: the station can put it on the log again.
         await tx.update(T).set({ restoredAt: now }).where(eq(T.claimId, claimId));
       });
+      await services.library.content.unlock(await services.library.contentOfItems([claim.assetId]), claimId);
       return (await views([await one(claimId)]))[0];
     },
 
@@ -256,7 +261,10 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
       const now = deps.clock.now();
       if (outcome === "upheld") await services.library.archiveForClaim(claim.assetId);
       await db.update(C).set({ status: outcome, closedAt: now }).where(eq(C.id, claimId));
-      if (outcome !== "upheld") await db.update(T).set({ restoredAt: now }).where(and(eq(T.claimId, claimId), sql`${T.restoredAt} is null`));
+      if (outcome !== "upheld") {
+        await db.update(T).set({ restoredAt: now }).where(and(eq(T.claimId, claimId), sql`${T.restoredAt} is null`));
+        await services.library.content.unlock(await services.library.contentOfItems([claim.assetId]), claimId);
+      }
       return (await views([await one(claimId)]))[0];
     },
 

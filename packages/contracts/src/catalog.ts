@@ -108,7 +108,16 @@ export const catalogApi = {
     summary: "An offer, with its episodes, break marks and who carries it",
     params: z.object({ offerId: Id }),
     response: Offer.extend({
-      episodes: z.array(z.object({ id: Id, title: z.string(), durationMs: Millis.nullable(), breakPointsMs: z.array(Millis) })),
+      episodes: z.array(
+        z.object({
+          id: Id,
+          title: z.string(),
+          durationMs: Millis.nullable(),
+          breakPointsMs: z.array(Millis),
+          /** A low-bitrate HLS preview, once rendered (added in 2026-09). */
+          previewUrl: z.string().nullable().optional()
+        })
+      ),
       carriedBy: z.array(z.object({ station: StationIdent, since: Timestamp }))
     })
   }),

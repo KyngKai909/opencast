@@ -219,6 +219,79 @@ export const assets = broadcast.table(
   ]
 );
 
+/**
+ * A stored file, keyed by its content ID (CIDv1, raw, sha-256). Stored once however
+ * many assets, spots or orders point at it. Deleted from storage only when nothing
+ * references it and no claim has it locked.
+ */
+export const contents = broadcast.table(
+  "contents",
+  {
+    cid: text("cid").primaryKey(),
+    bytes: bigint("bytes", { mode: "number" }).notNull(),
+    contentType: text("content_type").notNull(),
+    /** Standard: the prepared file playout airs. Infrequent: originals. */
+    storageClass: text("storage_class", { enum: ["standard", "infrequent"] }).notNull(),
+    store: text("store", { enum: ["local", "r2"] }).notNull(),
+    /** A rights claim is open against it: kept (so it can come back), never deleted, never aired. */
+    lockedAt: at("locked_at"),
+    lockReason: text("lock_reason"),
+    /** Gone from storage: nothing referenced it, or a claim was resolved against it. */
+    deletedAt: at("deleted_at"),
+    deletedReason: text("deleted_reason", { enum: ["unreferenced", "takedown"] }),
+    /** Published to IPFS on purpose: the Opencast catalog, or a station's Export to IPFS. */
+    ipfsCid: text("ipfs_cid"),
+    ipfsPinId: text("ipfs_pin_id"),
+    ipfsReason: text("ipfs_reason", { enum: ["catalog", "export"] }),
+    ipfsPublishedAt: at("ipfs_published_at"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    check("cid_format", sql`${t.cid} ~ '^b[a-z2-7]{58}$'`),
+    check("deleted_has_reason", sql`(${t.deletedAt} is null) = (${t.deletedReason} is null)`),
+    check("ipfs_has_reason", sql`(${t.ipfsCid} is null) = (${t.ipfsReason} is null)`)
+  ]
+);
+
+/** What points at a content ID. The last reference going is what lets the object go. */
+export const contentRefs = broadcast.table(
+  "content_refs",
+  {
+    cid: text("cid")
+      .notNull()
+      .references(() => contents.cid),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file"] }).notNull(),
+    ownerId: uuid("owner_id").notNull(),
+    createdAt: createdAt()
+  },
+  (t) => [primaryKey({ columns: [t.cid, t.owner, t.ownerId] }), index("content_refs_owner").on(t.owner, t.ownerId)]
+);
+
+/**
+ * Low-bitrate HLS previews, kept only while something needs one: an item offered in
+ * the syndication market, a spot in review, a production order's delivery.
+ */
+export const contentPreviews = broadcast.table("content_previews", {
+  cid: text("cid")
+    .primaryKey()
+    .references(() => contents.cid),
+  status: text("status", { enum: ["rendering", "ready", "failed"] }).notNull(),
+  createdAt: createdAt()
+});
+
+export const contentPreviewNeeds = broadcast.table(
+  "content_preview_needs",
+  {
+    cid: text("cid")
+      .notNull()
+      .references(() => contents.cid),
+    reason: text("reason", { enum: ["offer", "review", "order"] }).notNull(),
+    subjectId: uuid("subject_id").notNull(),
+    createdAt: createdAt()
+  },
+  (t) => [primaryKey({ columns: [t.cid, t.reason, t.subjectId] })]
+);
+
 /** Stored copies of an asset. Replacing the file adds a version and keeps its history and schedule. */
 export const assetFiles = broadcast.table(
   "asset_files",
@@ -228,15 +301,19 @@ export const assetFiles = broadcast.table(
       .notNull()
       .references(() => assets.id),
     version: integer("version").notNull(),
-    storage: text("storage", { enum: ["local", "r2", "ipfs"] }).notNull(),
-    /** A disk path (local) or URL (R2, IPFS gateway): what the worker reads. */
-    location: text("location").notNull(),
+    /** The prepared file playout airs. */
+    contentId: text("content_id").references(() => contents.cid),
+    /** The original upload, kept in Infrequent Access. */
+    originalContentId: text("original_content_id").references(() => contents.cid),
+    /** Before content IDs: a disk path or URL. Rows made since point at content IDs instead. */
+    storage: text("storage", { enum: ["local", "r2", "ipfs"] }),
+    location: text("location"),
     r2Key: text("r2_key"),
     ipfsCid: text("ipfs_cid"),
     compression: jsonb("compression"),
     createdAt: createdAt()
   },
-  (t) => [uniqueIndex("asset_files_version").on(t.assetId, t.version)]
+  (t) => [uniqueIndex("asset_files_version").on(t.assetId, t.version), check("asset_file_has_content", sql`${t.contentId} is not null or ${t.location} is not null`)]
 );
 
 /** Where a maker allows breaks inside an episode ("Break points 4, every 30 minutes"). */

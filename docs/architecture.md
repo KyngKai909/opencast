@@ -66,11 +66,40 @@ runner.ts           per station: one long-running muxer (MPEG-TS in, `-c copy` o
                     last :10), timestamps carried on, so outputs never reconnect between items. Spots,
                     credits, bumpers and IDs air in full; programs are joined late instead. When a segment
                     ends: an as-run row with its real times, a proof frame for spots, and settlement.
+cache.ts            the worker's file cache on its volume: hourly, the next 48 hours of every station's log
+                    (plus station IDs, bumpers, rotations and dead-air repeats), earliest airtime first,
+                    evicting what airs furthest away; a file due within the hour and not cached tells the
+                    station and Network desk and is fetched at once. Playout reads only from here: a miss
+                    airs the usual fill and is reported. Hit rate, bytes and misses on the worker's /health
+live.ts             a live source read ahead of its block (encoders can connect early or reconnect)
 slates.ts           station ID, credit, off-air, stand-by, bug, code + QR: SVG rendered with sharp
 scte35.ts           splice_insert cues; the API adds EXT-X-DATERANGE (SCTE35-OUT/IN) to live playlists
 ```
 
-Live blocks read the encoder from Livepeer's playback when the source was made with a Livepeer key, or from a local RTMP listener (`LIVE_LISTEN_PORT`) otherwise; no signal airs the stand-by slate and tells the station.
+Live blocks read the encoder from Livepeer's playback when the source was made with a Livepeer key, or from a local RTMP listener (`LIVE_LISTEN_PORT`) otherwise. The feed opens a minute before the block; with no signal the stand-by slate airs and the station is told, and it switches to the feed as soon as one arrives (and back, if it drops). The local listener serves one live block at a time, since there's one port; production reads through Livepeer.
+
+Held airings that never aired (a file missing from the cache, a station signed off) give their hold back an hour after their slot (`spots.releaseUnaired`, in the jobs tick).
+
+## Storage
+
+Files are stored by **content ID**: a CID (v1, raw codec, sha-256) of the bytes. The same file uploaded by twelve stations is stored once.
+
+```
+storage.ts          the storage interface: an object store (R2 or any S3-compatible store; local disk in
+                    development) and an IPFS publisher (Pinata), keyed by content ID
+library/content.ts  contents (one row per file), content_refs (who points at it), previews and their needs
+```
+
+| What | Where | Class |
+|---|---|---|
+| The prepared file playout airs (items, spots, deliveries) | `<cid>` | Standard |
+| Original uploads, order briefs | `<cid>` | Infrequent Access |
+| Previews: low-bitrate HLS for the market, spot review and order review | `previews/<cid>/` | Standard, only while an offer, a review or an open order needs it |
+
+- **References.** Asset files (prepared and original), spot files and order files each hold a reference. Deleting an item drops its references; the object goes when the last one does. A database trigger refuses to mark content deleted while anything references it or a claim holds it.
+- **Takedowns.** A claim locks the file (kept, never aired, never exported) and pulls every station's item made from it off the log. Answered or withdrawn: unlocked. Resolved against it (removed, upheld, expired): deleted from storage, from previews and from the worker cache, and it can never be stored again.
+- **IPFS** is publishing, not storage: the catalog station's items are pinned when prepared, and an owner can "Export to IPFS" their own upload after accepting that it's public and permanent. The IPFS CID is recorded beside the content ID.
+- **Moving off Pinata**: `npm run storage:move-off-pinata -w @opencast/api` reports; `--copy` copies each pin into storage and verifies it by hash; `--unpin --yes-unpin` then unpins every verified, non-catalog copy.
 
 ## Money
 

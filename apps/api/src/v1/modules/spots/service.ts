@@ -56,6 +56,10 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
   setRotation(stationId: string, kind: "main" | "backup", spotIds: string[]): Promise<RotationView>;
   /** The spots a station's rotation (then backup) offers for a break, in order. For playout. */
   rotationFor(stationId: string, kind: "main" | "backup"): Promise<Array<{ spotId: string; lengthSec: number; category: string; dayparts: string[] }>>;
+  /** Held airings more than an hour past their slot that never aired: their holds go back. */
+  releaseUnaired(): Promise<number>;
+  /** The files of every spot a station could air soon: placed airings, and its rotations. */
+  upcomingSpotContent(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; spotId: string; contentId: string; airsAt: Date | null }>>;
   /** What's placed in each break, in order, with what playout needs to air it. */
   breakAirings(breakIds: string[]): Promise<Map<string, BreakAiring[]>>;
   /** Spots placed on a station in a window (for the hourly cap and same-spot limit). */
@@ -123,6 +127,8 @@ export interface BreakAiring {
   airingId: string;
   spotId: string;
   lengthSec: number;
+  /** The spot's file by content ID (the worker cache has it), or a legacy path. */
+  contentId: string | null;
   location: string | null;
   code: { code: string; offer: string } | null;
   carriageAgreementId: string | null;
@@ -243,6 +249,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     ]);
     const checks = files.length ? await db.select().from(schema.uploadChecks).where(inArray(schema.uploadChecks.spotFileId, files.map((f) => f.id))) : [];
     const spend = await services.ledger.spotSpend(ids, await dayStartFor(rows[0].advertiserId));
+    const content = services.library.content;
+    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: await content.previewUrl(f.contentId) }] as const)));
     return rows.map((r) => {
       const file = files.find((f) => f.spotId === r.id);
       const code = codes.find((c) => c.spotId === r.id);
@@ -270,7 +278,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         code: code ? { code: code.code, offer: code.offer, windowDays: code.windowDays } : null,
         file: file
           ? {
-              url: file.location,
+              url: urls.get(file.id)?.url ?? "",
+              previewUrl: urls.get(file.id)?.previewUrl ?? null,
               durationMs: file.durationMs,
               originalFilename: file.originalFilename,
               checks: checks
@@ -417,7 +426,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           })
           .returning();
         if (input.file) {
-          await db.insert(schema.spotFiles).values({ spotId: row.id, version: 1, location: input.file.location, durationMs: input.file.durationMs, originalFilename: input.file.filename, current: true });
+          const [saved] = await db.insert(schema.spotFiles).values({ spotId: row.id, version: 1, contentId: input.file.contentId, durationMs: input.file.durationMs, originalFilename: input.file.filename, current: true }).returning();
+          await services.library.content.addRef(db, input.file.contentId, "spot_file", saved.id);
         }
         return row.id;
       }
@@ -651,6 +661,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const copy = path.join(kept, `${spotId}-${Date.now()}${path.extname(file.originalName)}`);
       await fs.copyFile(file.path, copy);
       const prepared = await deps.media.prepare(copy, { scope: `business-${row.advertiserId}`, itemId: `${spotId}-${Date.now()}`, mediaKind: probe.mediaKind });
+      // Stored by content ID: the same spot uploaded twice is stored once.
+      const stored = await services.library.content.store(prepared.file, { storageClass: "standard" });
+      await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(copy, { force: true })]);
       const code = (await db.select().from(schema.codes).where(eq(schema.codes.spotId, spotId)))[0];
 
       // The checks on arrival.
@@ -673,8 +686,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         await tx.update(schema.spotFiles).set({ current: false }).where(eq(schema.spotFiles.spotId, spotId));
         const [saved] = await tx
           .insert(schema.spotFiles)
-          .values({ spotId, version: version + 1, originalFilename: file.originalName, location: prepared.location, durationMs, widthPx: probe.width, heightPx: probe.height, loudnessLufs: loudness, scaledToFit: scaleToFit, current: true })
+          .values({ spotId, version: version + 1, originalFilename: file.originalName, contentId: stored.cid, durationMs, widthPx: probe.width, heightPx: probe.height, loudnessLufs: loudness, scaledToFit: scaleToFit, current: true })
           .returning();
+        await services.library.content.addRef(tx, stored.cid, "spot_file", saved.id);
         await tx.insert(schema.uploadChecks).values(checks.map((c) => ({ spotFileId: saved.id, check: c.check, result: c.result === "pending" ? "for_you" : c.result, detail: { ...c.detail, pending: c.result === "pending" } })));
       });
       return service.spot(spotId);
@@ -698,6 +712,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         .where(and(eq(schema.uploadChecks.spotFileId, file.id), eq(schema.uploadChecks.check, "length")));
       if (lengthCheck[0]?.result === "for_you") throw refused("wrong_length", `It has to be exactly :${row.lengthSec}.`);
       await setStatus(spotId, { status: "in_review" });
+      // The review screen plays a preview, kept only while it's in review.
+      if (file.contentId) await services.library.content.needPreview([file.contentId], "review", spotId);
       return service.spot(spotId);
     },
 
@@ -745,6 +761,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         await setStatus(spotId, { status: "listed", listedAt: deps.clock.now() });
         await services.spots.notifyMakerListed(spotId);
       }
+      await services.library.content.dropPreview("review", spotId);
       return service.spot(spotId);
     },
 
@@ -841,6 +858,45 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       }));
     },
 
+    async releaseUnaired() {
+      const cutoff = new Date(deps.clock.now().getTime() - 3_600_000);
+      // A week back is plenty: the job runs every minute.
+      const since = new Date(cutoff.getTime() - 7 * 86_400_000);
+      const past = await db.select({ id: AI.id, holdId: AI.holdId }).from(AI).where(and(gte(AI.scheduledAt, since), lt(AI.scheduledAt, cutoff)));
+      const open = await services.ledger.openHolds(past.map((a) => a.holdId));
+      let released = 0;
+      for (const airing of past) {
+        if (!(open.get(airing.holdId) ?? 0)) continue;
+        await db.transaction((tx) => services.ledger.release(tx, airing.holdId, undefined, { sourceType: "airing", sourceId: airing.id, memo: "Returned: didn't air" }));
+        released++;
+      }
+      return released;
+    },
+
+    async upcomingSpotContent(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const SF = schema.spotFiles;
+      const [placed, rotated] = await Promise.all([
+        db
+          .select({ stationId: AI.stationId, spotId: AI.spotId, contentId: SF.contentId, airsAt: AI.scheduledAt })
+          .from(AI)
+          .innerJoin(SF, and(eq(SF.spotId, AI.spotId), eq(SF.current, true)))
+          .where(and(inArray(AI.stationId, stationIds), gte(AI.scheduledAt, from), lt(AI.scheduledAt, to))),
+        db
+          .select({ stationId: schema.rotations.stationId, spotId: schema.rotationSpots.spotId, contentId: SF.contentId })
+          .from(schema.rotationSpots)
+          .innerJoin(schema.rotations, eq(schema.rotations.id, schema.rotationSpots.rotationId))
+          .innerJoin(SP, eq(SP.id, schema.rotationSpots.spotId))
+          .innerJoin(SF, and(eq(SF.spotId, schema.rotationSpots.spotId), eq(SF.current, true)))
+          .where(and(inArray(schema.rotations.stationId, stationIds), isNull(schema.rotationSpots.removedAt), eq(SP.status, "listed")))
+      ]);
+      return [
+        ...placed.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: r.airsAt }] : [])),
+        // In rotation: could be placed in any break from now on.
+        ...rotated.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: null }] : []))
+      ];
+    },
+
     async breakAirings(breakIds) {
       const result = new Map<string, BreakAiring[]>();
       if (!breakIds.length) return result;
@@ -858,6 +914,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           airingId: r.airing.id,
           spotId: r.spot.id,
           lengthSec: r.spot.lengthSec,
+          contentId: r.file?.contentId ?? null,
           location: r.file?.location ?? null,
           code: r.code ? { code: r.code.code, offer: r.code.offer } : null,
           carriageAgreementId: r.airing.carriageAgreementId,

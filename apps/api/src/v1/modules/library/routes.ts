@@ -38,6 +38,11 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await library.archiveItem(params.itemId);
     return { ok: true as const };
   });
+  r.handle(api.exportToIpfs, async ({ user, params }) => {
+    // The owner's call alone: it can't be taken back.
+    await accounts.requireStation(user, await library.stationOfItem(params.itemId), ["owner"]);
+    return library.exportToIpfs(params.itemId);
+  });
   r.handle(api.confirmRights, async ({ user, params, body }) => {
     await canEditStation(user, await library.stationOfItem(params.itemId));
     return library.confirmRights(user, params.itemId, body);

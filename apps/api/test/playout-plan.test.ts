@@ -180,3 +180,17 @@ describe("live, off air and dead air", () => {
     expect((await owner.get("/v1/me/notices").expect(200)).body[0]).toMatchObject({ kind: "dead_air_filled" });
   });
 });
+
+describe("airings that never aired", () => {
+  it("give their holds back an hour after their slot; aired ones aren't touched", async () => {
+    h.clock.set("2026-10-02T09:00:00.000Z");
+    const before = await jess.get(`/v1/businesses/${businessId}/balance`).expect(200);
+    expect(before.body.heldAirings).toBeGreaterThan(0);
+    const released = await h.services.spots.releaseUnaired();
+    expect(released).toBe(before.body.heldAirings);
+    const after = await jess.get(`/v1/businesses/${businessId}/balance`).expect(200);
+    expect(after.body).toMatchObject({ heldAirings: 0, heldMicros: $(25) });
+    // Only once.
+    expect(await h.services.spots.releaseUnaired()).toBe(0);
+  });
+});

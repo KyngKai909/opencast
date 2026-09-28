@@ -20,7 +20,11 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.asset_folders",
     "broadcast.asset_break_points",
     "broadcast.rights_confirmations",
-    "broadcast.import_jobs"
+    "broadcast.import_jobs",
+    "broadcast.contents",
+    "broadcast.content_refs",
+    "broadcast.content_previews",
+    "broadcast.content_preview_needs"
   ],
   log: ["broadcast.log_entries", "broadcast.repeat_groups", "broadcast.breaks", "broadcast.dead_air_events"],
   playout: ["broadcast.playout_state", "broadcast.commands", "broadcast.livepeer_config", "broadcast.schedules", "broadcast.as_run"],

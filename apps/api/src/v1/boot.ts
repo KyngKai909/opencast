@@ -7,6 +7,7 @@ import { createV1 } from "./index.js";
 import { createJobs } from "./jobs.js";
 import { ffmpegPipeline } from "./media.js";
 import { fakePayments } from "./payments.js";
+import { storageFromEnv } from "./storage.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -25,6 +26,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     bus: new EventBus(),
     clock,
     media: ffmpegPipeline(storageRoot),
+    storage: storageFromEnv(env, storageRoot),
     notifier: {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
       email: async (to, n) => console.log(`[notify] email to ${to}: ${n.title}`)

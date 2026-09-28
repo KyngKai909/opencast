@@ -6,6 +6,7 @@ import type { LibraryItem } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
+import { createContent, type Content } from "./content.js";
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
 
@@ -22,8 +23,12 @@ export interface ItemRef {
   rightsConfirmed: boolean;
   source: "upload" | "link" | "creator_work" | "library";
   mediaKind: "video" | "audio";
-  /** Where playout reads it: the current file's location. */
+  /** The current file's content ID: what playout airs, from the worker's cache. */
+  contentId: string | null;
+  /** Before content IDs: a disk path or URL playout reads directly. */
   location: string | null;
+  /** Its file is locked by a rights claim, or gone: it can't air. */
+  contentUnavailable: boolean;
   archived: boolean;
   /** Where the maker allows breaks inside it. */
   breakPointsMs: number[];
@@ -42,6 +47,16 @@ export interface ProgramRef {
 }
 
 export interface LibraryService {
+  /** Files by content ID: storing, references, locks, previews, IPFS. */
+  content: Content;
+  /** Every content ID an item's files point at (all versions, originals too). */
+  contentOfItems(itemIds: string[]): Promise<string[]>;
+  /** Other stations' items made from the same files (a takedown pulls them too). */
+  itemsSharingContent(itemIds: string[]): Promise<string[]>;
+  /** Every item's current content ID, for the worker cache. */
+  currentContent(itemIds: string[]): Promise<Map<string, string>>;
+  /** Publishes the station's own original to IPFS. Public, and it can't be taken back. */
+  exportToIpfs(itemId: string): Promise<{ contentId: string; ipfsCid: string; url: string }>;
   titles(input: { itemIds: string[]; programIds: string[] }): Promise<{ items: Map<string, string>; programs: Map<string, string> }>;
   itemsByIds(ids: string[]): Promise<Map<string, ItemRef>>;
   programsByIds(ids: string[]): Promise<Map<string, ProgramRef>>;
@@ -132,8 +147,10 @@ const P = schema.programs;
 /** Anything under a minute is guessed as a bumper; the station can change it. */
 const guessCode = (durationMs: number | null): LogCode => (durationMs !== null && durationMs < 60_000 ? "BMP" : "PGM");
 
-export function createLibraryService({ deps, services }: ModuleContext): LibraryService {
+export function createLibraryService(ctx: ModuleContext): LibraryService {
+  const { deps, services } = ctx;
   const { db } = deps;
+  const content = createContent(ctx);
   const jobs = new Set<Promise<unknown>>();
   const background = (work: Promise<unknown>) => {
     const tracked = work.catch((error) => console.error("[library] background job failed", error)).finally(() => jobs.delete(tracked));
@@ -161,6 +178,7 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
     const confirmed = new Set(rights.map((r) => r.id));
     const pointsBy = new Map<string, number[]>();
     for (const p of points) pointsBy.set(p.assetId, [...(pointsBy.get(p.assetId) ?? []), p.offsetMs].sort((a, b) => a - b));
+    const info = await content.info([...files.values()].map((f) => f.contentId).filter((v): v is string => Boolean(v)));
     return rows.map((r) => ({
       id: r.id,
       stationId: r.stationId,
@@ -173,7 +191,13 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
       rightsConfirmed: confirmed.has(r.id),
       source: r.source,
       mediaKind: r.mediaKind,
+      contentId: files.get(r.id)?.contentId ?? null,
       location: files.get(r.id)?.location ?? null,
+      contentUnavailable: (() => {
+        const cid = files.get(r.id)?.contentId;
+        const i = cid ? info.get(cid) : undefined;
+        return Boolean(cid && (!i || i.locked || i.deleted));
+      })(),
       archived: r.archivedAt !== null,
       breakPointsMs: pointsBy.get(r.id) ?? []
     }));
@@ -182,10 +206,12 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
   async function toItems(rows: Array<typeof A.$inferSelect>): Promise<LibraryItem[]> {
     const ids = rows.map((r) => r.id);
     if (!ids.length) return [];
-    const [rights, breakPoints] = await Promise.all([
+    const [rights, breakPoints, files] = await Promise.all([
       db.select().from(R).where(inArray(R.assetId, ids)),
-      db.select().from(schema.assetBreakPoints).where(inArray(schema.assetBreakPoints.assetId, ids))
+      db.select().from(schema.assetBreakPoints).where(inArray(schema.assetBreakPoints.assetId, ids)),
+      currentFiles(ids)
     ]);
+    const info = await content.info([...files.values()].flatMap((f) => [f.contentId, f.originalContentId]).filter((v): v is string => Boolean(v)));
     const names = await services.accounts.displayNames(rights.map((r) => r.confirmedBy).filter((v): v is string => Boolean(v)));
     const rightsBy = new Map(rights.map((r) => [r.assetId, r]));
     const pointsBy = new Map<string, number[]>();
@@ -221,6 +247,20 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
           : null,
         offerable: r.source !== "link",
         breakPointsMs: pointsBy.get(r.id) ?? [],
+        storage: (() => {
+          const file = files.get(r.id);
+          const prepared = file?.contentId ? info.get(file.contentId) : undefined;
+          if (!file?.contentId || !prepared) return null;
+          const original = file.originalContentId ? info.get(file.originalContentId) : undefined;
+          return {
+            contentId: prepared.cid,
+            bytes: prepared.bytes,
+            // Stations whose items point at the same file (it's stored once).
+            sharedWith: Math.max(0, prepared.references - 1),
+            locked: prepared.locked,
+            ipfs: original?.ipfs ?? prepared.ipfs ?? null
+          };
+        })(),
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -292,27 +332,37 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
   async function prepareInBackground(itemId: string, stationId: string, file: string, mediaKind: "video" | "audio") {
     try {
       await db.update(A).set({ prepProgress: 10 }).where(eq(A.id, itemId));
-      const [prepared, loudness] = await Promise.all([
-        deps.media.prepare(file, { scope: stationId, itemId, mediaKind }),
-        deps.media.loudness(file).catch(() => null)
-      ]);
+      const [prepared, loudness] = await Promise.all([deps.media.prepare(file, { scope: stationId, itemId, mediaKind }), deps.media.loudness(file).catch(() => null)]);
+      // Stored by content ID: the file playout airs in Standard, the original in Infrequent Access.
+      const [ready, original] = await Promise.all([content.store(prepared.file, { storageClass: "standard" }), content.store(file, { storageClass: "infrequent" })]);
       await db.transaction(async (tx) => {
         const [{ version }] = await tx.select({ version: max(F.version) }).from(F).where(eq(F.assetId, itemId));
-        await tx.insert(F).values({
-          assetId: itemId,
-          version: (version ?? 0) + 1,
-          storage: prepared.storage,
-          location: prepared.location,
-          r2Key: prepared.r2Key,
-          compression: prepared.compression
-        });
+        const [row] = await tx
+          .insert(F)
+          .values({ assetId: itemId, version: (version ?? 0) + 1, contentId: ready.cid, originalContentId: original.cid, compression: prepared.compression })
+          .returning();
+        await content.addRef(tx, ready.cid, "asset_file", row.id);
+        await content.addRef(tx, original.cid, "asset_original", row.id);
         // Prepared for air: levelled to broadcast loudness by the compression profile.
         await tx.update(A).set({ status: "ready", prepProgress: 100, loudnessLufs: loudness }).where(eq(A.id, itemId));
       });
+      // The local copies were only for the work; the store has them now.
+      await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(file, { force: true })]);
+      await afterReady(itemId, stationId, ready.cid);
     } catch (error) {
       await db.update(A).set({ status: "failed", prepProgress: null }).where(eq(A.id, itemId));
       throw error;
     }
+  }
+
+  /** The Opencast catalog is published to IPFS on purpose; items in an open offer get a preview. */
+  async function afterReady(itemId: string, stationId: string, cid: string) {
+    const [row] = await db.select({ title: A.title, programId: A.programId }).from(A).where(eq(A.id, itemId));
+    if ((await services.stations.kindOf(stationId)) === "catalog" && deps.storage.ipfs.configured) {
+      await content.publishToIpfs(cid, "catalog", row?.title ?? itemId).catch((error) => console.error("[library] catalog publish failed", error));
+    }
+    const offerId = row?.programId ? await services.catalog.openOfferFor(row.programId) : null;
+    if (offerId) await content.needPreview([cid], "offer", offerId);
   }
 
   async function jobView(row: typeof schema.importJobs.$inferSelect): Promise<ImportJobView> {
@@ -373,7 +423,42 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
     await setItems(items, failed === 0 ? "completed" : failed === items.length ? "failed" : "partial");
   }
 
+  async function cidsOf(itemIds: string[]) {
+    if (!itemIds.length) return [];
+    const rows = await db.select({ a: F.contentId, b: F.originalContentId }).from(F).where(inArray(F.assetId, itemIds));
+    return [...new Set(rows.flatMap((r) => [r.a, r.b]).filter((v): v is string => Boolean(v)))];
+  }
+
   const service: LibraryService = {
+    content,
+
+    contentOfItems: cidsOf,
+
+    async itemsSharingContent(itemIds) {
+      const cids = await cidsOf(itemIds);
+      if (!cids.length) return [];
+      const rows = await db
+        .selectDistinct({ id: F.assetId })
+        .from(F)
+        .where(sql`(${inArray(F.contentId, cids)} or ${inArray(F.originalContentId, cids)})`);
+      return rows.map((r) => r.id).filter((id) => !itemIds.includes(id));
+    },
+
+    async currentContent(itemIds) {
+      const files = await currentFiles(itemIds);
+      return new Map([...files].flatMap(([id, f]) => (f.contentId ? [[id, f.contentId] as [string, string]] : [])));
+    },
+
+    async exportToIpfs(itemId) {
+      const row = await itemRow(itemId);
+      if (row.source !== "upload") throw refused("not_yours", "Only a station's own uploads can be exported to IPFS.");
+      const file = (await currentFiles([itemId])).get(itemId);
+      const cid = file?.originalContentId ?? file?.contentId;
+      if (!cid) throw refused("not_ready", "It's still being prepared.");
+      const published = await content.publishToIpfs(cid, "export", row.originalFilename ?? row.title);
+      return { contentId: cid, ...published };
+    },
+
     async titles({ itemIds, programIds }) {
       const [items, programs] = await Promise.all([
         itemIds.length ? db.select({ id: A.id, title: A.title }).from(A).where(inArray(A.id, itemIds)) : [],
@@ -444,7 +529,7 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
         .from(A)
         .where(and(eq(A.stationId, stationId), inArray(A.code, ["SID", "BMP"]), eq(A.status, "ready"), isNull(A.archivedAt)))
         .orderBy(asc(A.createdAt));
-      const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.location && r.durationMs);
+      const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs);
       return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
     },
 
@@ -456,7 +541,7 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
         .orderBy(sql`${A.createdAt} desc`)
         .limit(limit * 3);
       const offAir = await services.trust.offAirItems(rows.map((r) => r.id));
-      return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !offAir.has(r.id)).slice(0, limit);
+      return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).slice(0, limit);
     },
 
     async addCreatorWork(tx, input) {
@@ -605,10 +690,16 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
         throw refused("in_use", `Can't be deleted yet: ${parts.join(" and ")}.`);
       }
       await db.update(A).set({ archivedAt: deps.clock.now() }).where(eq(A.id, itemId));
+      // Its files go too, unless another item, spot or order points at them, or a claim holds them.
+      const fileIds = (await db.select({ id: F.id }).from(F).where(eq(F.assetId, itemId))).map((f) => f.id);
+      await content.release("asset_file", fileIds);
+      await content.release("asset_original", fileIds);
     },
 
     async archiveForClaim(itemId) {
       await db.update(A).set({ archivedAt: deps.clock.now() }).where(eq(A.id, itemId));
+      // Resolved against it: the files leave storage, wherever else they're used.
+      await content.takeDown(await cidsOf([itemId]));
     },
 
     async confirmRights(user, itemId, input) {
@@ -703,6 +794,7 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
     },
 
     async settle() {
+      await content.settle();
       while (jobs.size) await Promise.all([...jobs]);
     }
   };

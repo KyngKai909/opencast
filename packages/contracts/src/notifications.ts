@@ -8,6 +8,8 @@ export const NoticeKind = z.enum([
   "dead_air_warning",
   "dead_air_filled",
   "signal_lost",
+  /** Added 2026-09: a file in the next hour isn't on the playout server yet; or one was missing at air. */
+  "file_not_ready",
   "spot_paused",
   "spot_back",
   "low_balance",

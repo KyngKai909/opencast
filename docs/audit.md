@@ -246,3 +246,12 @@ Three commits from 2026-07-12 that lived only in the old iCloud checkout; pushed
 - Committed the handoff (`docs/reference/`, `docs/prompts/`, `docs/handoff.md`) to `main` (`1d16570`), as the handoff asks.
 - Pushed the local-only `feat/opencast-phase-a` so it isn't lost.
 - Created `monorepo` from `main`.
+
+## Addendum (2026-09-28): how files were stored
+
+Added when the platform prompt gained the storage section.
+
+- **Pinned to IPFS through Pinata.** Uploads and link imports were compressed, then pinned when `UPLOAD_STORAGE_MODE` was `ipfs` or `hybrid` (production ran `ipfs`, with `DELETE_LOCAL_AFTER_IPFS=true`, so the gateway URL became the only copy). The unmerged R2 commit (`0864f8a`) made R2 the default and IPFS an archive, but never reached production.
+- **On local disk.** `storage/uploads/<channel>/…` on the API's Railway volume: originals, and prepared files when pinning was off. HLS under `storage/hls`.
+- **At air time** the worker read `asset.localPath` as-is: a disk path, or the IPFS gateway URL, fetched by ffmpeg over HTTP while airing. Every airing of a pinned file was a gateway read.
+- **How much is pinned.** Counted with the old project's key (read only): **1 file, 0.1 GB** in Pinata's v3 Files API (public and private). The key can't read the legacy pin list (403), so anything pinned through the older API isn't in that count. The report is `npm run storage:move-off-pinata -w @opencast/api`.

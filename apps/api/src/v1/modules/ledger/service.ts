@@ -60,6 +60,8 @@ export interface LedgerService {
   openAmount(holdIds: string[]): Promise<Map<string, number>>;
   /** Returns what's left of a hold (or part of it) to available. */
   release(db: Executor, holdId: string, micros?: number, source?: Source): Promise<number>;
+  /** What's still held on each hold (0 once settled or released). */
+  openHolds(holdIds: string[]): Promise<Map<string, number>>;
   /**
    * Pays a station for something that aired or was delivered: the real cost from the hold
    * (topped up from available, then absorbed by Opencast), less Opencast's share and the
@@ -308,6 +310,16 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       if (!holdIds.length) return new Map();
       const rows = await db
         .select({ holdId: P.holdId, open: sql<string>`sum(${P.amountMicros})` })
+        .from(P)
+        .where(inArray(P.holdId, holdIds))
+        .groupBy(P.holdId);
+      return new Map(rows.map((r) => [r.holdId!, Number(r.open)]));
+    },
+
+    async openHolds(holdIds) {
+      if (!holdIds.length) return new Map();
+      const rows = await db
+        .select({ holdId: P.holdId, open: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
         .from(P)
         .where(inArray(P.holdId, holdIds))
         .groupBy(P.holdId);

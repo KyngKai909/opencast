@@ -143,6 +143,8 @@ app.use(
   })
 );
 app.use("/uploads", express.static(UPLOAD_ROOT));
+// Objects by content ID when storage is local disk (development); R2 serves its own in production.
+app.use("/objects", express.static(path.join(STORAGE_ROOT, "objects"), { immutable: true, maxAge: "365d" }));
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, timestamp: nowIso() });
 });

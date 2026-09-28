@@ -4,6 +4,7 @@
 // Past the rounds included, either side can ask Opencast to review; a disputed
 // order stays held until then.
 
+import os from "node:os";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
@@ -39,7 +40,7 @@ export interface OrdersPart {
 
 export function createOrders(
   { deps, services }: ModuleContext,
-  hooks: { createSpotFromOrder(input: { businessId: string; orderId: string; title: string; lengthSec: number; category: string; file: { location: string; durationMs: number; filename: string | null } | null }): Promise<string> }
+  hooks: { createSpotFromOrder(input: { businessId: string; orderId: string; title: string; lengthSec: number; category: string; file: { contentId: string; durationMs: number; filename: string | null } | null }): Promise<string> }
 ): OrdersPart {
   const { db } = deps;
   const O = schema.productionOrders;
@@ -69,6 +70,8 @@ export function createOrders(
       db.select().from(N).where(inArray(N.orderId, ids)).orderBy(asc(N.createdAt))
     ]);
     const authors = await services.accounts.displayNames(notes.map((n) => n.authorId));
+    const content = services.library.content;
+    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: f.role === "delivery" ? await content.previewUrl(f.contentId) : null }] as const)));
     return rows.flatMap((r) => {
       const maker = idents.get(r.makerStationId);
       if (!maker) return [];
@@ -86,8 +89,8 @@ export function createOrders(
           state: r.status,
           quote: r.quoteMicros !== null && r.deliverBy ? { priceMicros: r.quoteMicros, deliverBy: r.deliverBy, roundsIncluded: r.roundsIncluded ?? 0, voicedBy: r.voicedBy } : null,
           roundsUsed: new Set(mine.filter((n) => !n.makersMistake).map((n) => n.round)).size,
-          briefFiles: files.filter((f) => f.orderId === r.id && f.role === "brief").map((f) => ({ id: f.id, url: f.location, filename: f.filename })),
-          deliveries: files.filter((f) => f.orderId === r.id && f.role === "delivery").map((f) => ({ id: f.id, version: f.version ?? 1, url: f.location, createdAt: f.createdAt.toISOString() })),
+          briefFiles: files.filter((f) => f.orderId === r.id && f.role === "brief").map((f) => ({ id: f.id, url: urls.get(f.id)?.url ?? "", filename: f.filename })),
+          deliveries: files.filter((f) => f.orderId === r.id && f.role === "delivery").map((f) => ({ id: f.id, version: f.version ?? 1, url: urls.get(f.id)?.url ?? "", previewUrl: urls.get(f.id)?.previewUrl ?? null, createdAt: f.createdAt.toISOString() })),
           notes: mine.map((n) => ({ id: n.id, timecodeMs: n.timecodeMs, author: authors.get(n.authorId) ?? null, body: n.body, makersMistake: n.makersMistake, round: n.round, createdAt: n.createdAt.toISOString() })),
           deliveredAt: r.deliveredAt?.toISOString() ?? null,
           autoApproveAt: r.autoApproveAt?.toISOString() ?? null,
@@ -101,17 +104,33 @@ export function createOrders(
 
   const emit = (r: typeof O.$inferSelect) => deps.bus.emit("order.updated", { orderId: r.id, businessId: r.advertiserId, makerStationId: r.makerStationId, state: r.status });
 
-  async function keep(orderId: string, file: UploadedFile, role: "brief" | "delivery") {
-    const dir = path.join(deps.config.storageRoot, "uploads", `orders-${orderId}`);
-    await fs.mkdir(dir, { recursive: true });
-    const target = path.join(dir, `${role}-${Date.now()}${path.extname(file.originalName)}`);
-    await fs.copyFile(file.path, target);
-    return target;
+  /** Stores an order's file by content ID and records it on the order. */
+  async function keep(orderId: string, file: UploadedFile, role: "brief" | "delivery", version: number | null) {
+    const content = services.library.content;
+    // Briefs are read once or twice: Infrequent Access. A delivery may become the spot that airs.
+    const stored = await content.store(file.path, { storageClass: role === "brief" ? "infrequent" : "standard", contentType: file.mimeType || undefined });
+    return db.transaction(async (tx) => {
+      const [saved] = await tx.insert(F).values({ orderId, role, version, contentId: stored.cid, filename: file.originalName }).returning();
+      await content.addRef(tx, stored.cid, "order_file", saved.id);
+      return saved;
+    });
+  }
+
+  /** Reads a stored file's length from a local copy. */
+  async function probeContent(cid: string) {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencast-order-"));
+    try {
+      const file = path.join(dir, "delivery");
+      await services.library.content.fetch(cid, file);
+      return await deps.media.probe(file);
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   }
 
   async function approve(order: typeof O.$inferSelect) {
     const [delivery] = await db.select().from(F).where(and(eq(F.orderId, order.id), eq(F.role, "delivery"))).orderBy(desc(F.createdAt)).limit(1);
-    const probe = delivery ? await deps.media.probe(delivery.location).catch(() => null) : null;
+    const probe = delivery?.contentId ? await probeContent(delivery.contentId).catch(() => null) : delivery?.location ? await deps.media.probe(delivery.location).catch(() => null) : null;
     await db.transaction(async (tx) => {
       if (order.holdId) {
         await services.ledger.settle(tx, {
@@ -131,8 +150,9 @@ export function createOrders(
       title: order.title,
       lengthSec: order.lengthSec,
       category: business?.category ?? "Services",
-      file: delivery && probe?.durationMs ? { location: delivery.location, durationMs: probe.durationMs, filename: delivery.filename } : null
+      file: delivery?.contentId && probe?.durationMs ? { contentId: delivery.contentId, durationMs: probe.durationMs, filename: delivery.filename } : null
     });
+    await services.library.content.dropPreview("order", order.id);
     const [updated] = await db.update(O).set({ status: "approved", approvedAt: deps.clock.now(), spotId }).where(eq(O.id, order.id)).returning();
     emit(updated);
   }
@@ -183,7 +203,7 @@ export function createOrders(
       if (!file) throw badRequest("Choose a file.", { file: "Required" });
       const found = await row(orderId);
       if (!["asked", "quoted"].includes(found.status)) throw refused("brief_closed", "The brief can't change once the quote is accepted.");
-      await db.insert(F).values({ orderId, role: "brief", location: await keep(orderId, file, "brief"), filename: file.originalName });
+      await keep(orderId, file, "brief", null);
       return part.order(orderId);
     },
 
@@ -228,7 +248,8 @@ export function createOrders(
       if (!["accepted", "changes_requested"].includes(found.status)) throw refused("not_in_the_making", "That order isn't waiting for a delivery.");
       const versions = await db.select().from(F).where(and(eq(F.orderId, orderId), eq(F.role, "delivery")));
       const now = deps.clock.now();
-      await db.insert(F).values({ orderId, role: "delivery", version: versions.length + 1, location: await keep(orderId, file, "delivery"), filename: file.originalName });
+      const saved = await keep(orderId, file, "delivery", versions.length + 1);
+      await services.library.content.needPreview([saved.contentId!], "order", orderId);
       const [updated] = await db
         .update(O)
         .set({ status: "delivered", deliveredAt: now, autoApproveAt: new Date(now.getTime() + AUTO_APPROVE_DAYS * DAY) })
@@ -279,6 +300,7 @@ export function createOrders(
       const found = await row(orderId);
       if (["asked", "quoted"].includes(found.status)) {
         const [u] = await db.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId)).returning();
+        await services.library.content.dropPreview("order", orderId);
         emit(u);
         return (await views([u]))[0];
       }
@@ -289,6 +311,7 @@ export function createOrders(
           if (found.holdId) await services.ledger.release(tx, found.holdId, undefined, { sourceType: "production_order", sourceId: orderId, memo: "Returned: order cancelled" });
           await tx.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId));
         });
+        await services.library.content.dropPreview("order", orderId);
         const updated = await row(orderId);
         emit(updated);
         return (await views([updated]))[0];

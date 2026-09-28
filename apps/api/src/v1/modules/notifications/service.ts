@@ -12,6 +12,7 @@ type Kind =
   | "dead_air_warning"
   | "dead_air_filled"
   | "signal_lost"
+  | "file_not_ready"
   | "spot_paused"
   | "spot_back"
   | "low_balance"
@@ -59,6 +60,7 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
   station: {
     dead_air_warning: { push: true, email: true },
     signal_lost: { push: true, email: false },
+    file_not_ready: { push: true, email: false },
     spot_paused: { push: true, email: false },
     carriage_request: { push: true, email: true },
     carried_program_changed: { push: true, email: false },
@@ -225,6 +227,23 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       link: `/stations/${e.stationId}/live`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: `signal:${e.stationId}:${deps.clock.now().toISOString().slice(0, 16)}`
+    });
+  });
+
+  // Files the playout server doesn't have: the station and Network desk both hear.
+  deps.bus.on("station.file_not_ready", async (e) => {
+    const tz = await services.stations.timezoneOf(e.stationId);
+    const when = clockTime(new Date(e.airsAt), tz);
+    const recipients = [...new Set([...(await stationTeam(e.stationId)), ...(await services.accounts.adminIds())])];
+    await service.notify(recipients, {
+      kind: "file_not_ready",
+      title: e.missedAtAir ? `${e.title} didn't air` : `${e.title} isn't ready for ${when}`,
+      body: e.missedAtAir
+        ? `Its file wasn't on the playout server at ${when}, so station ID and bumpers aired in its place.`
+        : `Its file isn't on the playout server yet. It's being copied; if it doesn't arrive, station ID and bumpers air in its place.`,
+      link: `/stations/${e.stationId}/log`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: `file:${e.missedAtAir ? "missed" : "late"}:${e.stationId}:${e.itemId}:${e.airsAt}`
     });
   });
 

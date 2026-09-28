@@ -2,6 +2,7 @@ import type { Db } from "@opencast/db";
 import type { EventBus } from "./events.js";
 import type { TokenVerifier } from "./auth.js";
 import type { MediaPipeline } from "./media.js";
+import type { Storage } from "./storage.js";
 import type { Payments } from "./payments.js";
 import type { AccountsService } from "./modules/accounts/service.js";
 import type { StationsService } from "./modules/stations/service.js";
@@ -37,6 +38,8 @@ export interface Deps {
   clock: Clock;
   auth: TokenVerifier;
   media: MediaPipeline;
+  /** Object storage by content ID (R2, or local disk in development), and IPFS for publishing. */
+  storage: Storage;
   notifier: Notifier;
   payments: Payments;
   config: {

@@ -53,6 +53,17 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Carried episodes' slot length | Rounded up to the next half hour, which leaves the barter break | The maker's own slot length, if the designs want one |
 | Stations that take production orders | `takesOrders` on the station (studios always do) | Confirm with the design |
 
+## Storage
+
+| Question | Now | Proposal |
+|---|---|---|
+| Content IDs "in the IPFS CID format ... so any file can move to IPFS later without renaming" | Every object is keyed by a CIDv1 (raw codec, sha-256) of the whole file. That's a valid CID and dedupes exactly, but IPFS itself stores files over ~1 MB as chunked UnixFS, so pinning a video gives it a *different* CID (`bafybei…`) | Keep the raw CID as our key (it names the bytes; nothing renames). On publish, record the IPFS CID beside it (`contents.ipfs_cid`), as built. Say so in the Export to IPFS copy: "published as bafybei…" |
+| Which Pinata pins are catalog items | None yet: the catalog station has published nothing, and the migration keeps any `--keep <cid>` or `ipfs_reason = catalog` | Mark catalog pins before running `--unpin` |
+| Pins made through Pinata's legacy API | The old project's key is scoped to the v3 Files API; the legacy pin list answers 403, so only v3 files were counted (1 file, 0.1 GB) | Check the Pinata dashboard's total, or use an admin key, before unpinning |
+| R2 bucket | Not created: no R2 keys in the new setup yet, so development stores on local disk | Create `opencast-media` in Phase 7, with a custom domain for previews; set keys on api and worker only |
+| Proof frames and previews on R2's lifecycle rules | Previews are deleted by the API when their need ends | Also a bucket lifecycle rule on `previews/` (30 days) as a backstop |
+| Worker cache size | 100 GB volume, 90% used | Size from real libraries: 48 hours of 24/7 carriage at 2.5 Mbps is ~54 GB per station before deduplication |
+
 ## Playout, to settle in deploy (Phase 7)
 
 | Question | Now | Proposal |

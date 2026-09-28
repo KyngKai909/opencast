@@ -13,9 +13,27 @@ import { EventBus } from "../src/v1/events.js";
 import { createV1 } from "../src/v1/index.js";
 import { ffmpegPipeline } from "../src/v1/media.js";
 import { fakePayments } from "../src/v1/payments.js";
+import { localObjectStore, type IpfsPublisher } from "../src/v1/storage.js";
 import type { Deps, Services } from "../src/v1/context.js";
 
 export const APP_ID = "test-app";
+
+/** IPFS that records what was pinned instead of publishing it. */
+export function fakeIpfs(): IpfsPublisher & { pins: Map<string, string> } {
+  const pins = new Map<string, string>();
+  return {
+    configured: true,
+    pins,
+    async pin(file, name) {
+      const id = `pin-${pins.size + 1}`;
+      pins.set(id, name);
+      return { ipfsCid: `bafybeifake${pins.size}`, pinId: id, url: `https://gateway.test/ipfs/bafybeifake${pins.size}` };
+    },
+    async unpin(pinId) {
+      pins.delete(pinId);
+    }
+  };
+}
 
 export interface Harness {
   app: express.Express;
@@ -79,6 +97,7 @@ export async function createHarness(options: { realTime?: boolean } = {}): Promi
   const deps: Deps = {
     db: database.db,
     media: ffmpegPipeline(storageRoot),
+    storage: { objects: localObjectStore(path.join(storageRoot, "objects")), ipfs: fakeIpfs() },
     payments: fakePayments(clock),
     notifier: {
       push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
@@ -234,6 +253,13 @@ export async function itemFixture(
   if (fields.rights !== false) {
     await h.db.insert(schema.rightsConfirmations).values({ assetId: item.id, basis: "made_it" });
   }
-  await h.db.insert(schema.assetFiles).values({ assetId: item.id, version: 1, storage: "local", location: fields.location ?? `/fixtures/${item.id}.mp4` });
+  if (fields.location) {
+    // A real file: stored by its content ID, as an upload would be.
+    const { cid } = await h.services.library.content.store(fields.location, { storageClass: "standard" });
+    const [file] = await h.db.insert(schema.assetFiles).values({ assetId: item.id, version: 1, contentId: cid }).returning();
+    await h.services.library.content.addRef(h.db, cid, "asset_file", file.id);
+  } else {
+    await h.db.insert(schema.assetFiles).values({ assetId: item.id, version: 1, storage: "local", location: `/fixtures/${item.id}.mp4` });
+  }
   return item;
 }

@@ -19,3 +19,4 @@ storage/proof/
 storage/slates/
 storage/cache/
 storage/objects/
+storage/pinata-move-*.json

@@ -12,7 +12,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | Path | Package | What it is | Owner |
 |---|---|---|---|
 | `apps/api` | `@opencast/api` | Express API: stations, library, uploads, playout control | platform |
-| `apps/worker` | `@opencast/worker` | Playout worker: HLS output and Livepeer push | platform |
+| `apps/worker` | `@opencast/worker` | Playout: airs every station from its log, from its file cache; HLS and Livepeer out | platform |
 | `apps/control` | `@opencast/control` | Master control (the old `apps/web`, unchanged) | apps |
 | `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone (empty) | apps |
 | `apps/tv` | `@opencast/tv` | TV mode and the Cast receiver (empty) | apps |
@@ -81,6 +81,12 @@ cd apps/worker && npx tsx scripts/demo-evening.ts
 ```
 
 It prints the station, when it starts, and an RTMP URL to push an encoder to for the live block. Afterwards, `npx tsx scripts/as-run.ts <stationId>` prints what aired.
+
+The worker airs files from its cache (`storage/cache` locally, a volume on Railway), which it fills ahead of time from object storage. `curl localhost:8788/health` shows the cache's hit rate, bytes and misses.
+
+## Storage
+
+Files are stored once, by content ID, in object storage: R2 when its keys are set, `storage/objects` otherwise (served at `/objects` in development). IPFS is only for the Opencast catalog and a station's own "Export to IPFS". See [docs/architecture.md](docs/architecture.md#storage).
 
 ## Environment
 

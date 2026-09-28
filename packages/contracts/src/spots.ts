@@ -92,6 +92,8 @@ export const Spot = z.object({
   file: z
     .object({
       url: z.string(),
+      /** A low-bitrate HLS preview while the spot is in review (added in 2026-09). */
+      previewUrl: z.string().nullable().optional(),
       durationMs: Millis,
       originalFilename: z.string().nullable(),
       checks: z.array(UploadCheck)
@@ -211,7 +213,16 @@ export const ProductionOrder = z.object({
     .nullable(),
   roundsUsed: z.number().int(),
   briefFiles: z.array(z.object({ id: Id, url: z.string(), filename: z.string().nullable() })),
-  deliveries: z.array(z.object({ id: Id, version: z.number().int(), url: z.string(), createdAt: Timestamp })),
+  deliveries: z.array(
+    z.object({
+      id: Id,
+      version: z.number().int(),
+      url: z.string(),
+      /** A low-bitrate HLS preview while the order is open (added in 2026-09). */
+      previewUrl: z.string().nullable().optional(),
+      createdAt: Timestamp
+    })
+  ),
   notes: z.array(OrderNote),
   deliveredAt: Timestamp.nullable(),
   autoApproveAt: Timestamp.nullable(),

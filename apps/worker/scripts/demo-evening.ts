@@ -58,7 +58,10 @@ async function station(callSign: string, name: string, colour: string, tenths: n
 }
 async function item(stationId: string, title: string, code: "PGM" | "BMP" | "SID", file: string, seconds: number, programId?: string) {
   const [a] = await db.insert(schema.assets).values({ stationId, programId: programId ?? null, title, code, source: "upload", mediaKind: "video", durationMs: seconds * 1000, status: "ready" }).returning();
-  await db.insert(schema.assetFiles).values({ assetId: a.id, version: 1, storage: "local", location: file });
+  // Stored by content ID; the worker copies it into its cache before air.
+  const { cid } = await services.library.content.store(file, { storageClass: "standard" });
+  const [f] = await db.insert(schema.assetFiles).values({ assetId: a.id, version: 1, contentId: cid }).returning();
+  await services.library.content.addRef(db, cid, "asset_file", f.id);
   await db.insert(schema.rightsConfirmations).values({ assetId: a.id, basis: "made_it" });
   return a;
 }
@@ -95,7 +98,9 @@ async function spot(title: string, file: string, stationId: string, code?: strin
     .insert(schema.spotsTable)
     .values({ advertiserId: business.id, title, lengthSec: 15, category: "Food", status: "listed", rateKind: "per_airing", rateMicros: 4_000_000, totalBudgetMicros: 40_000_000, dailyCapMicros: 12_000_000 })
     .returning();
-  await db.insert(schema.spotFiles).values({ spotId: s.id, version: 1, location: file, durationMs: 15_000 });
+  const { cid } = await services.library.content.store(file, { storageClass: "standard" });
+  const [f] = await db.insert(schema.spotFiles).values({ spotId: s.id, version: 1, contentId: cid, durationMs: 15_000 }).returning();
+  await services.library.content.addRef(db, cid, "spot_file", f.id);
   if (code) await db.insert(schema.codes).values({ spotId: s.id, code, offer: "10% off" });
   const [rotation] = await db.insert(schema.rotations).values({ stationId, kind: "main" }).returning();
   await db.insert(schema.rotationSpots).values({ rotationId: rotation.id, spotId: s.id, position: 0 });

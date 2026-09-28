@@ -46,6 +46,8 @@ export interface AccountsService {
   addStationMember(db: Executor, stationId: string, userId: string, role: StationRole): Promise<void>;
   addBusinessMember(db: Executor, businessId: string, userId: string, role: BusinessRole): Promise<void>;
   stationMemberIds(stationId: string, roles?: StationRole[]): Promise<string[]>;
+  /** Opencast admins (Network desk). */
+  adminIds(): Promise<string[]>;
   businessMemberIds(businessId: string, roles?: BusinessRole[]): Promise<string[]>;
 
   team(scope: TeamScope): Promise<TeamView>;
@@ -510,6 +512,11 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         target: [schema.advertiserMemberships.advertiserId, schema.advertiserMemberships.userId],
         set: { role }
       });
+    },
+
+    async adminIds() {
+      const rows = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.isAdmin, true));
+      return rows.map((r) => r.id);
     },
 
     async stationMemberIds(stationId, roles) {

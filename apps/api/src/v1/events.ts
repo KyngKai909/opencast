@@ -8,6 +8,8 @@ export interface Events {
   "station.dead_air_filled": { stationId: string; gapStartsAt: string; gapEndsAt: string };
   "station.signed_on": { stationId: string; first: boolean };
   "station.signal_lost": { stationId: string; liveSourceId: string | null };
+  /** A file due within the hour isn't in the worker cache (or wasn't, at air). */
+  "station.file_not_ready": { stationId: string; itemId: string; title: string; airsAt: string; missedAtAir: boolean };
   "station.signed_off": { stationId: string; permanently: boolean };
   "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance"; stationIds: string[] };
   "spot.resumed": { spotId: string; businessId: string; stationIds: string[] };

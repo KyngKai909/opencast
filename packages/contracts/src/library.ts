@@ -42,6 +42,23 @@ export const LibraryItem = z.object({
   /** Link imports stay local and can never be offered for carriage. */
   offerable: z.boolean(),
   breakPointsMs: z.array(Millis),
+  /**
+   * How it's stored (added in 2026-09): by content ID, once however many stations air it.
+   * Null while it's being prepared, and for items made before content IDs.
+   */
+  storage: z
+    .object({
+      contentId: z.string(),
+      bytes: z.number().int(),
+      /** Other items (any station) pointing at the same file. */
+      sharedWith: z.number().int(),
+      /** A rights claim is open against the file. */
+      locked: z.boolean(),
+      /** Published to IPFS: the catalog, or the station's own Export to IPFS. */
+      ipfs: z.object({ cid: z.string(), reason: z.enum(["catalog", "export"]), url: z.string() }).nullable()
+    })
+    .nullable()
+    .optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -157,6 +174,15 @@ export const libraryApi = {
     summary: "Delete an item. Refused while it's in the log or carried by other stations.",
     params: ItemParams,
     response: Ok
+  }),
+  exportToIpfs: endpoint({
+    method: "POST",
+    path: "/library/:itemId/export-ipfs",
+    auth: "user",
+    summary: "Export the station's own original to IPFS (owner only). IPFS files are public and can't be taken back.",
+    params: ItemParams,
+    body: z.object({ understandPublicAndPermanent: z.literal(true) }),
+    response: z.object({ contentId: z.string(), ipfsCid: z.string(), url: z.string() })
   }),
   confirmRights: endpoint({
     method: "POST",

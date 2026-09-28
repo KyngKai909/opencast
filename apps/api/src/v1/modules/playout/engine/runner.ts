@@ -13,6 +13,7 @@ import type { ModuleContext } from "../../../context.js";
 import type { Segment } from "./plan.js";
 import type { Slates, StationLook } from "./slates.js";
 import { LiveFeed, type LiveInput } from "./live.js";
+import type { ContentCache } from "./cache.js";
 import { schema } from "@opencast/db";
 import { eq } from "drizzle-orm";
 
@@ -33,6 +34,9 @@ export interface RunnerOptions {
   liveInput(liveSourceId: string): Promise<LiveInput | null>;
   appOrigin: string;
   onSignalLost?(): void;
+  /** Files come from here at air time; a miss airs the usual fill and is reported. */
+  cache?: ContentCache;
+  onFileMissing?(missing: { itemId: string; title: string; airsAt: Date }): void;
   log?(line: string): void;
 }
 
@@ -303,6 +307,15 @@ export class StationRunner {
       });
   }
 
+  private reported = new Set<string>();
+  private reportMissing(missing: { itemId: string; title: string; airsAt: Date }) {
+    const key = `${missing.itemId}:${missing.airsAt.getTime()}`;
+    if (this.reported.has(key)) return;
+    this.reported.add(key);
+    this.log(`${missing.title}: its file isn't in the cache; the usual fill airs instead`);
+    this.options.onFileMissing?.(missing);
+  }
+
   /** Opens the live feeds of blocks starting within the pre-roll; closes those whose blocks are over. */
   private async syncFeeds() {
     const now = this.ctx.deps.clock.now().getTime();
@@ -362,6 +375,25 @@ export class StationRunner {
         // Skipped: the rest of its time on the station ID slate.
         seg = { ...seg, code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await this.options.slates.stationId(this.options.look) }, airingId: undefined, code10: undefined };
         reason = "station_id_fill";
+      }
+      const cache = this.options.cache;
+      if (seg.missing) {
+        // Planned without its file. If the file has arrived since, plan again and air it.
+        if (cache?.has(seg.missing.contentId)) {
+          this.aired.delete(seg.key);
+          this.replan();
+          await this.segmentAt(this.ctx.deps.clock.now());
+          continue;
+        }
+        cache?.take(seg.missing.contentId);
+        this.reportMissing(seg.missing);
+      } else if (seg.source.kind === "file" && seg.source.contentId && cache) {
+        // At air: from the cache, or (evicted since it was planned) the station ID slate.
+        if (!cache.take(seg.source.contentId)) {
+          if (seg.itemId) this.reportMissing({ itemId: seg.itemId, title: seg.label, airsAt: seg.startsAt });
+          seg = { ...seg, code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await this.options.slates.stationId(this.options.look) }, airingId: undefined, code10: undefined };
+          reason = "station_id_fill";
+        }
       }
       const liveSourceId = seg.source.kind === "live" ? seg.source.liveSourceId : undefined;
       if (liveSourceId && !this.feeds.has(liveSourceId)) await this.syncFeeds();

@@ -10,12 +10,13 @@ import type { BreakSlotView } from "../../log/service.js";
 import { clockTime } from "../../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
 import { Slates, type StationLook } from "./slates.js";
+import type { ContentCache } from "./cache.js";
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
 export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
 
 export type SegmentSource =
-  | { kind: "file"; location: string; seekMs: number; mediaKind: "video" | "audio" }
+  | { kind: "file"; location: string; seekMs: number; mediaKind: "video" | "audio"; contentId?: string }
   | { kind: "image"; path: string }
   | { kind: "live"; liveSourceId: string };
 
@@ -37,13 +38,22 @@ export interface Segment {
   liveSourceId?: string;
   /** A spot's code and QR, drawn for its last :10. */
   code10?: { code: string; offer: string };
+  /** Fill airing in place of something whose file wasn't in the cache. */
+  missing?: { itemId: string; title: string; contentId: string; airsAt: Date };
 }
 
 import { DEAD_AIR_NOTE } from "../../log/service.js";
 const BUMPER_MIN_MS = 1_000;
 
-export function createPlanner({ deps, services }: ModuleContext) {
+export function createPlanner({ deps, services }: ModuleContext, options: { cache?: ContentCache } = {}) {
   const slates = new Slates(path.join(deps.config.storageRoot, "slates"));
+  const cache = options.cache;
+
+  /** Where playout reads a file: from the worker cache by content ID, or a legacy path. Never a download. */
+  function fileAt(ref: { contentId: string | null; location: string | null }): string | null {
+    if (ref.contentId) return cache?.has(ref.contentId) ? cache.pathOf(ref.contentId) : null;
+    return ref.location;
+  }
 
   async function look(stationId: string): Promise<StationLook & { bug: { mode: string; opacity: number } }> {
     const l = await services.stations.look(stationId);
@@ -72,7 +82,7 @@ export function createPlanner({ deps, services }: ModuleContext) {
       // A bumper is never cut short; what's left holds on the station ID slate.
       if (bumper.durationMs! > left) break;
       const len = bumper.durationMs!;
-      out.push({ key: `${context.key}:bmp:${n}`, startsAt: new Date(cursor), endsAt: new Date(cursor + len), code: "BMP", label: bumper.title, source: { kind: "file", location: bumper.location!, seekMs: 0, mediaKind: bumper.mediaKind }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId, itemId: bumper.id });
+      out.push({ key: `${context.key}:bmp:${n}`, startsAt: new Date(cursor), endsAt: new Date(cursor + len), code: "BMP", label: bumper.title, source: { kind: "file", location: fileAt(bumper)!, seekMs: 0, mediaKind: bumper.mediaKind, contentId: bumper.contentId ?? undefined }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId, itemId: bumper.id });
       cursor += len;
       left -= len;
       n++;
@@ -89,7 +99,7 @@ export function createPlanner({ deps, services }: ModuleContext) {
       endsAt: new Date(cursor + sidMs),
       code: "SID",
       label: sid?.title ?? `${station.callSign ?? station.name} ${station.channel ?? ""}`.trim(),
-      source: sid ? { kind: "file", location: sid.location!, seekMs: 0, mediaKind: sid.mediaKind } : { kind: "image", path: await slates.stationId(station) },
+      source: sid ? { kind: "file", location: fileAt(sid)!, seekMs: 0, mediaKind: sid.mediaKind, contentId: sid.contentId ?? undefined } : { kind: "image", path: await slates.stationId(station) },
       reason: context.reason,
       inBreak: context.inBreak,
       breakId: context.breakId,
@@ -104,7 +114,7 @@ export function createPlanner({ deps, services }: ModuleContext) {
     /** Everything that airs on a station between `from` and `to`, in order, with no gaps. */
     async plan(stationId: string, from: Date, to: Date): Promise<Segment[]> {
       const lookback = new Date(from.getTime() - 6 * 3_600_000);
-      const [entries, breaks, fillers, station, credits, members] = await Promise.all([
+      const [entries, breaks, allFillers, station, credits, members] = await Promise.all([
         services.log.entries(stationId, lookback, to),
         services.log.breaks(stationId, lookback, to),
         services.library.fillers(stationId),
@@ -112,6 +122,8 @@ export function createPlanner({ deps, services }: ModuleContext) {
         services.spots.creditsFor(stationId),
         services.ledger.memberCredits(stationId)
       ]);
+      // Only station IDs and bumpers the cache has.
+      const fillers = { stationIds: allFillers.stationIds.filter((f) => fileAt(f)), bumpers: allFillers.bumpers.filter((f) => fileAt(f)) };
       const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
       const [items, airings, programs, offAir] = await Promise.all([
         services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v))),
@@ -131,14 +143,16 @@ export function createPlanner({ deps, services }: ModuleContext) {
         // Spots, producer's share first; already held, so they air even if paused since.
         for (const airing of slot.id ? (airings.get(slot.id) ?? []) : []) {
           const len = airing.lengthSec * 1000;
-          if (!airing.location || cursor + len > end) continue;
+          const at = fileAt(airing);
+          // Not in the cache: it doesn't air (its hold goes back), and the break fills as usual.
+          if (!at || cursor + len > end) continue;
           out.push({
             key: `${key}:spt:${airing.airingId}`,
             startsAt: new Date(cursor),
             endsAt: new Date(cursor + len),
             code: "SPT",
             label: "Spot",
-            source: { kind: "file", location: airing.location, seekMs: 0, mediaKind: "video" },
+            source: { kind: "file", location: at, seekMs: 0, mediaKind: "video", contentId: airing.contentId ?? undefined },
             reason: "rotation",
             inBreak: true,
             breakId: slot.id ?? undefined,
@@ -201,10 +215,15 @@ export function createPlanner({ deps, services }: ModuleContext) {
           if (t < e) segments.push({ key: `entry:${entry.id}:${t}`, startsAt: new Date(t), endsAt: new Date(e), code: "PGM", label: "Live", source: { kind: "live", liveSourceId: entry.liveSourceId! }, reason: "live", inBreak: false, logEntryId: entry.id, programId: entry.programId ?? undefined, liveSourceId: entry.liveSourceId ?? undefined });
         } else {
           const item = entry.assetId ? items.get(entry.assetId) : undefined;
-          const playable = item && item.location && item.durationMs && !offAir.has(item.id) && !item.archived;
+          const at = item ? fileAt(item) : null;
+          const playable = item && at && item.durationMs && !item.contentUnavailable && !offAir.has(item.id) && !item.archived;
           if (!playable) {
-            // Pulled by a claim, or not ready: station ID and bumpers, never nothing.
+            // Pulled by a claim, not ready, or not in the cache: station ID and bumpers, never nothing.
+            const before = segments.length;
             await openTime(s, e);
+            if (item?.contentId && !item.contentUnavailable && !at && segments[before]) {
+              segments[before] = { ...segments[before], missing: { itemId: item.id, title: item.title, contentId: item.contentId, airsAt: entry.startsAt } };
+            }
           } else {
             let t = s;
             let pos = 0;
@@ -215,7 +234,7 @@ export function createPlanner({ deps, services }: ModuleContext) {
               endsAt: new Date(to),
               code: entry.code,
               label: title,
-              source: { kind: "file", location: item.location!, seekMs: seek, mediaKind: item.mediaKind },
+              source: { kind: "file", location: at!, seekMs: seek, mediaKind: item.mediaKind, contentId: item.contentId ?? undefined },
               reason,
               inBreak: false,
               logEntryId: entry.id,

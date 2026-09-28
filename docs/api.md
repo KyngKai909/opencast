@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-183 endpoints in 13 modules.
+184 endpoints in 13 modules.
 
 ## accounts (24)
 
@@ -62,7 +62,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getSpeakers` | GET | `/programs/:programId/speakers` | signed in | The lower-thirds speaker list for a live program |
 | `setSpeakers` | PUT | `/programs/:programId/speakers` | signed in | Replace the speaker list |
 
-## library (14)
+## library (15)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -73,6 +73,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getItem` | GET | `/library/:itemId` | signed in | One item |
 | `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points |
 | `deleteItem` | DELETE | `/library/:itemId` | signed in | Delete an item. Refused while it's in the log or carried by other stations. |
+| `exportToIpfs` | POST | `/library/:itemId/export-ipfs` | signed in | Export the station's own original to IPFS (owner only). IPFS files are public and can't be taken back. |
 | `confirmRights` | POST | `/library/:itemId/rights` | signed in | Confirm the rights to air it. Needed before it can go on the log. |
 | `createFolder` | POST | `/stations/:stationId/library/folders` | signed in | Make a folder |
 | `updateFolder` | PATCH | `/library/folders/:folderId` | signed in | Rename or move a folder |

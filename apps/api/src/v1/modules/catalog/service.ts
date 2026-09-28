@@ -41,11 +41,13 @@ export interface CatalogService {
   /** Throws unless this airing is allowed under the agreement (dates, per-episode limit, window, live only). */
   checkAiring(input: { agreementId: string; carrierStationId: string; itemId: string; startsAt: Date; excludeEntryId?: string }): Promise<void>;
   carrierCount(programId: string): Promise<number>;
+  /** The program's open offer, if it has one. */
+  openOfferFor(programId: string): Promise<string | null>;
   /** Active agreements a station is party to, for earnings and playout. */
   activeAgreements(stationId: string): Promise<AgreementRef[]>;
 
   browse(filter: { forStation?: string; category?: string; band?: "tv" | "radio"; term?: Term; fitsSchedule?: boolean; q?: string }): Promise<Offer[]>;
-  offer(offerId: string): Promise<Offer & { episodes: Array<{ id: string; title: string; durationMs: number | null; breakPointsMs: number[] }>; carriedBy: Array<{ station: StationIdent; since: string }> }>;
+  offer(offerId: string): Promise<Offer & { episodes: Array<{ id: string; title: string; durationMs: number | null; breakPointsMs: number[]; previewUrl: string | null }>; carriedBy: Array<{ station: StationIdent; since: string }> }>;
   countPreview(offerId: string): Promise<number>;
   makerOfOffer(offerId: string): Promise<string>;
   offerProgram(programId: string, terms: TermsInput): Promise<Offer>;
@@ -262,6 +264,11 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
     });
   }
 
+  async function previewEpisodes(offerId: string, programId: string) {
+    const episodes = await services.library.episodes(programId);
+    await services.library.content.needPreview(episodes.map((e) => e.contentId).filter((v): v is string => Boolean(v)), "offer", offerId);
+  }
+
   const service: CatalogService = {
     async agreementsByIds(ids) {
       if (!ids.length) return new Map();
@@ -289,6 +296,11 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       if (agreement.liveOnly && !(await services.log.airsAt(agreement.makerStationId, itemId, startsAt))) {
         throw refused("live_only", "This program is carried live only, at the same time as the maker airs it.");
       }
+    },
+
+    async openOfferFor(programId) {
+      const [row] = await db.select({ id: O.id }).from(O).where(and(eq(O.programId, programId), eq(O.status, "offered")));
+      return row?.id ?? null;
     },
 
     async carrierCount(programId) {
@@ -327,7 +339,7 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       const idents = await services.stations.idents((carriers.get(view.program.id) ?? []).map((a) => a.carrierStationId));
       return {
         ...view,
-        episodes: episodes.map((e) => ({ id: e.id, title: e.title, durationMs: e.durationMs, breakPointsMs: e.breakPointsMs })),
+        episodes: await Promise.all(episodes.map(async (e) => ({ id: e.id, title: e.title, durationMs: e.durationMs, breakPointsMs: e.breakPointsMs, previewUrl: await services.library.content.previewUrl(e.contentId) }))),
         carriedBy: (carriers.get(view.program.id) ?? []).flatMap((a) => {
           const station = idents.get(a.carrierStationId);
           return station ? [{ station, since: a.startedAt.toISOString() }] : [];
@@ -367,6 +379,7 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         .insert(O)
         .values({ programId, makerStationId, ...terms })
         .returning();
+      await previewEpisodes(row.id, programId);
       return (await offerViews([row]))[0];
     },
 
@@ -381,6 +394,9 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         .set({ ...patch, updatedAt: deps.clock.now() })
         .where(eq(O.id, offerId))
         .returning();
+      // Previews exist only while it's offered in the market.
+      if (patch.status === "withdrawn") await services.library.content.dropPreview("offer", offerId);
+      if (patch.status === "offered" && current.status !== "offered") await previewEpisodes(offerId, current.programId);
       return (await offerViews([row]))[0];
     },
 

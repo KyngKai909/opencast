@@ -49,6 +49,7 @@ Write `docs/audit.md` covering:
 - how the three Railway services are configured today
 - dead code, duplicated logic and anything that would break during a move
 - the `yt-dlp` import path and what rights checks exist (the reference design keeps link imports but makes them station-local and never offered for carriage)
+- how files are stored today: what's pinned to IPFS through Pinata, what's on local disk, how the worker reads files at air time, and how many gigabytes are pinned
 
 **STOP.** Summarise the audit and list anything that surprised you.
 
@@ -113,7 +114,16 @@ Constraints that matter:
 
 Write a one-time migration script that reads the existing `opencast_state` blob and the JSON files and writes them into the new tables. Keep the old table untouched as a backup. Local development uses Docker Compose Postgres instead of the JSON fallback; remove the JSON fallback once the migration is verified.
 
-**STOP.** Show the schema, the migration result against a copy of production data, and any rows that didn't map cleanly.
+**Storage.** IPFS through Pinata stops being the working store. It costs more per gigabyte than object storage, it charges for reads the worker makes every day, its files are public by default, and a takedown can't guarantee removal. Replace it with this:
+- **Object storage** on Cloudflare R2 (S3-compatible, no charge for reads), behind a `storage` interface so another S3-compatible provider can be swapped in. Every object is keyed by its content ID, computed in the IPFS CID format (CIDv1, raw, sha-256), so identical files are stored once however many stations air them, and any file can move to IPFS later without renaming.
+- **Classes:** the prepared file the worker airs in Standard; the original upload in Infrequent Access; preview renditions (low-bitrate HLS for the syndication market preview, the business review screen and the spot review queue) only for items offered in the market, in review, or in a production order. Delete preview renditions when they're no longer needed.
+- **Assets** point at content IDs, never at files. Deleting an asset removes the object only when no other asset, carriage agreement or claim still references that content ID.
+- **Takedowns** remove the content ID from every station's log, from the worker cache, and from storage once the claim resolves against it; until then the object is locked, not deleted, so it can come back.
+- **IPFS stays for two things only:** the Opencast catalog (public domain, published and pinned on purpose), and "Export to IPFS", a per-item action a station owner takes on its own original, with a warning that IPFS files are public and can't be taken back. Keep Pinata for those, behind the same `storage` interface.
+- **Migration:** copy everything currently pinned into R2 under its content ID, verify each copy by hash, and unpin everything except catalog items. Report the gigabytes moved and the monthly cost before and after at the STOP.
+
+
+**STOP.** Show the schema, the migration result against a copy of production data, any rows that didn't map cleanly, and the storage migration: gigabytes moved to R2, what stayed on IPFS, and the monthly storage cost before and after.
 
 ## Phase 4: API modules and contracts
 
@@ -162,6 +172,8 @@ Change the worker from a queue loop to a timeline:
 Tuned-in counting: viewers' players send a heartbeat every 30 seconds with station and session. Store per-station per-minute concurrency in `audience`. Drop sessions that behave like bots (no media progress, impossible rates) before they count. Billing per thousand tuned in reads these numbers.
 
 Keep the Redis leader lock for worker replicas.
+
+**Worker cache.** The worker keeps a local cache on a Railway volume. Every hour it reads the next 48 hours of every station's log and fetches any content ID it doesn't already have, earliest airtime first, evicting what airs furthest in the future (or never) when space runs short. An item that isn't cached by an hour before it airs raises a warning to the station and Network desk. Nothing at air time ever waits on a download; if a file is somehow missing, the log's usual fill airs instead and the gap is reported. Expose cache hit rate, bytes cached and misses in the health endpoint.
 
 **STOP.** Show a station's evening running end to end locally: programs, a carried program with a barter break, a live block, a dead-air auto-fill, and the as-run log it produced.
 
@@ -231,6 +243,7 @@ Services, each its own Railway service:
 - `api`, `worker`
 - `control` (master control), `viewer` (web app), `spots` (advertiser app), `desk` (Network desk, behind admin sign-in), `site` (marketing), `tv` (TV mode web build and the Chromecast receiver, static)
 - Postgres and Redis as Railway plugins
+- a Railway volume for the worker's cache, sized from the audit (start at 100 GB), and R2 credentials as variables on `api` and `worker` only
 
 For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: `api.`, `control.`, `app.`, `spots.`, `www.` and `tv.` on whatever domain is chosen.
 

@@ -9,6 +9,7 @@ export interface JobResults {
   deadAirChecked: number;
   claimsExpired: number;
   ordersApproved: number;
+  unairedReleased: number;
   dailyCapsResumed: number;
   sponsorships: { held: number; paid: number; lapsed: number } | null;
 }
@@ -34,6 +35,8 @@ export function createJobs(deps: Deps, services: Services) {
     await services.log.checkDeadAir(onAir);
     const claimsExpired = await services.trust.expireOverdue();
     const ordersApproved = await services.spots.autoApproveOrders();
+    // Held airings that never aired (a missing file, a station signed off): the money goes back.
+    const unairedReleased = await services.spots.releaseUnaired();
 
     // Midnight: daily caps come back by themselves (Los Angeles time for now; per market later).
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
@@ -47,7 +50,7 @@ export function createJobs(deps: Deps, services: Services) {
       sponsorships = await services.spots.rollSponsorships();
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, dailyCapsResumed, sponsorships };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, dailyCapsResumed, sponsorships };
   }
 
   let timer: NodeJS.Timeout | undefined;

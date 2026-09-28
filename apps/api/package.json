@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "lint": "echo \"No lint configured for api\"",
     "test": "vitest run --exclude 'test/playout-{run,live}.test.ts' && npm run test:realtime",
+    "storage:move-off-pinata": "tsx scripts/move-off-pinata.ts",
     "test:realtime": "vitest run test/playout-run.test.ts test/playout-live.test.ts --no-file-parallelism"
   },
   "dependencies": {
