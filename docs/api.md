@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-184 endpoints in 13 modules.
+185 endpoints in 13 modules.
 
 ## accounts (24)
 
@@ -173,7 +173,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
 
-## ledger (14)
+## ledger (15)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -187,6 +187,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listStatements` | GET | `/businesses/:businessId/statements` | signed in | Monthly statements with every airing |
 | `getStationEarnings` | GET | `/stations/:stationId/earnings` | signed in | Earnings lines, held money, the account and next payout (owner; operators see only) |
 | `listStationStatements` | GET | `/stations/:stationId/statements` | signed in | Weekly statements; the CSV has the ledger entries behind each line |
+| `getPayoutAccount` | GET | `/stations/:stationId/payout-account` | signed in | Where the station is paid (its Clear account, or Stripe Connect), and a link if it has to finish setting it up (owner only) |
 | `moveToBank` | POST | `/stations/:stationId/payouts` | signed in | Move earnings to the bank now (owner only) |
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |
 | `listMyPledges` | GET | `/me/pledges` | signed in | My pledges |

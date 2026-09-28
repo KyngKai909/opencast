@@ -12,7 +12,7 @@ import { privyVerifier, type LinkedAccount } from "../src/v1/auth.js";
 import { EventBus } from "../src/v1/events.js";
 import { createV1 } from "../src/v1/index.js";
 import { ffmpegPipeline } from "../src/v1/media.js";
-import { fakePayments } from "../src/v1/payments.js";
+import { fakePayments } from "../src/v1/payments/index.js";
 import { localObjectStore, type IpfsPublisher } from "../src/v1/storage.js";
 import type { Deps, Services } from "../src/v1/context.js";
 
@@ -62,7 +62,7 @@ export interface User {
   delete(url: string): request.Test;
 }
 
-export async function createHarness(options: { realTime?: boolean } = {}): Promise<Harness> {
+export async function createHarness(options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"] } = {}): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
@@ -98,7 +98,7 @@ export async function createHarness(options: { realTime?: boolean } = {}): Promi
     db: database.db,
     media: ffmpegPipeline(storageRoot),
     storage: { objects: localObjectStore(path.join(storageRoot, "objects")), ipfs: fakeIpfs() },
-    payments: fakePayments(clock),
+    payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
       push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
       email: async (to, n) => void sent.push({ channel: "email", to, title: n.title })
@@ -160,6 +160,8 @@ export async function createHarness(options: { realTime?: boolean } = {}): Promi
       };
     },
     async close() {
+      // Background work (preparing uploads, rendering previews) finishes before the database goes.
+      await services.library.settle();
       await deps.bus.settle();
       await database.drop();
     }

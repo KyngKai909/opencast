@@ -51,6 +51,7 @@ import {
 } from "./media.js";
 import { nowIso, slugify } from "./utils.js";
 import { bootV1 } from "./v1/boot.js";
+import { webhookHandler } from "./v1/webhooks.js";
 
 const app = express();
 // The new API, on the new schema (mounted at /v1 below).
@@ -116,6 +117,9 @@ app.use(
     }
   })
 );
+// Provider webhooks (Stripe, Clear) need the raw body to check the signature, so they come first.
+app.post("/v1/webhooks/:provider", ...webhookHandler(v1.deps, v1.services));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 

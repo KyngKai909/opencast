@@ -266,3 +266,60 @@ export const revenueConfig = ledger.table("revenue_config", {
   offerWindowDays: smallint("offer_window_days").notNull().default(7),
   createdAt: createdAt()
 });
+
+/**
+ * Accounts at a payments provider: an advertiser's or station's Clear business account, a
+ * Stripe customer, a station's Stripe Connect Express account, Opencast's own.
+ */
+export const providerAccounts = ledger.table(
+  "provider_accounts",
+  {
+    id: id(),
+    ownerType: text("owner_type", { enum: ["advertiser", "station", "opencast"] }).notNull(),
+    /** The advertiser or station; null for Opencast's own accounts. */
+    ownerId: uuid("owner_id"),
+    /** "settlement" or "treasury" for Opencast's own; null otherwise. */
+    ownerLabel: text("owner_label"),
+    provider: text("provider", { enum: ["clear", "stripe_customer", "stripe_connect", "fake"] }).notNull(),
+    ref: text("ref").notNull(),
+    status: text("status", { enum: ["active", "needs_onboarding", "closed"] }).notNull().default("active"),
+    onboardingUrl: text("onboarding_url"),
+    createdAt: createdAt()
+  },
+  (t) => [unique("provider_accounts_owner").on(t.ownerType, t.ownerId, t.ownerLabel, t.provider).nullsNotDistinct()]
+);
+
+/**
+ * What the providers have to do for each ledger entry, written in the same transaction as the
+ * entry and sent afterwards by a job (the outbox): so no provider call ever happens inside a
+ * database transaction, a failed call is retried, and nothing moves twice (each move has its own
+ * idempotency key). A wallet is where money physically sits: "advertiser:<id>", "station:<id>",
+ * "opencast:settlement", "opencast:treasury".
+ */
+export const providerMoves = ledger.table(
+  "provider_moves",
+  {
+    id: id(),
+    entryId: uuid("entry_id")
+      .notNull()
+      .references(() => entries.id),
+    seq: smallint("seq").notNull(),
+    kind: text("kind", { enum: ["encumber", "release", "transfer"] }).notNull(),
+    fromWallet: text("from_wallet").notNull(),
+    toWallet: text("to_wallet"),
+    holdId: uuid("hold_id").references(() => holds.id),
+    amountMicros: micros("amount_micros").notNull(),
+    status: text("status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+    attempts: smallint("attempts").notNull().default(0),
+    providerRef: text("provider_ref"),
+    lastError: text("last_error"),
+    sentAt: at("sent_at"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    uniqueIndex("provider_moves_entry_seq").on(t.entryId, t.seq),
+    index("provider_moves_pending").on(t.status, t.createdAt),
+    check("move_amount_positive", sql`${t.amountMicros} > 0`),
+    check("transfer_has_destination", sql`(${t.kind} = 'transfer') = (${t.toWallet} is not null)`)
+  ]
+);

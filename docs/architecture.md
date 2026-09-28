@@ -119,7 +119,9 @@ withdrawal     available → external
 payout         station earnings → external
 ```
 
-Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments.ts`.
+Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments/` (adapters: `clear`, `stripe_only`, `fake`, chosen by `PAYMENTS_PROVIDER`).
+
+**The outbox.** A provider is never called inside a database transaction. Each entry writes, in its own transaction, what the provider has to do (`ledger.provider_moves`): an entry's postings map to wallets (the adapter's `custody`), encumbrances change for holds, and wallets that lost money pay wallets that gained it (`moves.ts`). The jobs tick sends them in order with an idempotency key each, retrying failures; a wallet with a failed move waits so nothing overtakes it. Money leaving (withdrawals, payouts) is taken out of the ledger first and reversed if the provider refuses. Deposits, pledges and payout results arrive by webhook (`POST /v1/webhooks/stripe|clear`). See `docs/clear-integration.md`.
 
 **Escrow and the creator fund.** A claimable station's settled earnings are `escrow_owed` (a liability to the station) until the weekly batch into `CreatorEscrow` (`contracts/`) confirms, then `escrow`. The contract pays only an approved creator wallet (a threshold of verifier keys, then 72 hours in public) or, after the unclaimed period, `CreatorFund`, which pays only grants its stewards approve (again a threshold and 72 hours), never to Opencast. Both are upgradeable only through a 7-day timelock any key holder can cancel. See `contracts/README.md`.
 

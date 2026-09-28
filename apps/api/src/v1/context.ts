@@ -3,7 +3,7 @@ import type { EventBus } from "./events.js";
 import type { TokenVerifier } from "./auth.js";
 import type { MediaPipeline } from "./media.js";
 import type { Storage } from "./storage.js";
-import type { Payments } from "./payments.js";
+import type { Payments } from "./payments/index.js";
 import type { AccountsService } from "./modules/accounts/service.js";
 import type { StationsService } from "./modules/stations/service.js";
 import type { LibraryService } from "./modules/library/service.js";

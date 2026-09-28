@@ -6,7 +6,7 @@ import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
 import { createJobs } from "./jobs.js";
 import { ffmpegPipeline } from "./media.js";
-import { fakePayments } from "./payments.js";
+import { paymentsFromEnv } from "./payments/index.js";
 import { storageFromEnv } from "./storage.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
@@ -19,8 +19,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   }
   const { db } = createDb(databaseUrl);
   const clock = { now: () => new Date() };
-  // Clear and Stripe adapters arrive in platform Phase 6.
-  console.warn("[v1] payments: using the local fake. No real money moves.");
+  const appOrigin = env.APP_ORIGIN ?? "http://localhost:5174";
   return {
     db,
     bus: new EventBus(),
@@ -31,7 +30,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
       email: async (to, n) => console.log(`[notify] email to ${to}: ${n.title}`)
     },
-    payments: fakePayments(clock),
+    payments: paymentsFromEnv(env, clock, appOrigin),
     auth: privyVerifier({
       privyAppId: env.PRIVY_APP_ID ?? "unset",
       verificationKey: env.PRIVY_VERIFICATION_KEY || undefined,
@@ -39,7 +38,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     }),
     config: {
       storageRoot,
-      appOrigin: env.APP_ORIGIN ?? "http://localhost:5174",
+      appOrigin,
       escrowContractAddress: env.ESCROW_CONTRACT_ADDRESS || null,
       production: env.NODE_ENV === "production"
     }

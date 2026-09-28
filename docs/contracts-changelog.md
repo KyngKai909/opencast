@@ -2,6 +2,11 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-28: the station's payout account
+
+- `GET /v1/stations/:stationId/payout-account` (owner only): `{ status: "active" | "needs_onboarding", url }`. Where the station is paid (its Clear account, or Stripe Connect Express in the Stripe-only setup). When `needs_onboarding`, send the owner to `url` to finish it.
+- Adding money by card may now answer `status: "pending"` while Stripe confirms; the balance updates when it arrives. Pledges return a Stripe Checkout `checkoutUrl` when real payments are on.
+
 ## 2026-09-28: storage by content ID (new fields and one endpoint)
 
 - `LibraryItem.storage` (optional, nullable): `{ contentId, bytes, sharedWith, locked, ipfs }`. `sharedWith` counts other items pointing at the same file; `locked` means a rights claim is open against it; `ipfs` is set once it's been published (catalog or Export to IPFS).

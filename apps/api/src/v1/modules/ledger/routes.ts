@@ -48,6 +48,10 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await accounts.requireStation(user, params.stationId, ["owner", "operator"]);
     return ledger.statements({ stationId: params.stationId });
   });
+  r.handle(api.getPayoutAccount, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, ["owner"]);
+    return ledger.payoutAccount(params.stationId);
+  });
   r.handle(api.moveToBank, async ({ user, params, body }) => {
     await accounts.requireStation(user, params.stationId, ["owner"]);
     return ledger.moveToBank(params.stationId, body.amountMicros);

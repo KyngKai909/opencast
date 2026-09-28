@@ -172,6 +172,14 @@ export const ledgerApi = {
     params: StationParams,
     response: z.array(Statement)
   }),
+  getPayoutAccount: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/payout-account",
+    auth: "user",
+    summary: "Where the station is paid (its Clear account, or Stripe Connect), and a link if it has to finish setting it up (owner only)",
+    params: StationParams,
+    response: z.object({ status: z.enum(["active", "needs_onboarding"]), url: z.string().nullable() })
+  }),
   moveToBank: endpoint({
     method: "POST",
     path: "/stations/:stationId/payouts",

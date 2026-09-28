@@ -10,6 +10,8 @@ export interface JobResults {
   claimsExpired: number;
   ordersApproved: number;
   unairedReleased: number;
+  /** Provider moves sent (and failed, to retry) from the outbox. */
+  moves: { sent: number; failed: number };
   dailyCapsResumed: number;
   sponsorships: { held: number; paid: number; lapsed: number } | null;
 }
@@ -37,6 +39,8 @@ export function createJobs(deps: Deps, services: Services) {
     const ordersApproved = await services.spots.autoApproveOrders();
     // Held airings that never aired (a missing file, a station signed off): the money goes back.
     const unairedReleased = await services.spots.releaseUnaired();
+    // Last: whatever the ledger wrote this minute goes to the provider.
+    const moves = await services.ledger.sendMoves();
 
     // Midnight: daily caps come back by themselves (Los Angeles time for now; per market later).
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
@@ -50,7 +54,7 @@ export function createJobs(deps: Deps, services: Services) {
       sponsorships = await services.spots.rollSponsorships();
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, dailyCapsResumed, sponsorships };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, dailyCapsResumed, sponsorships };
   }
 
   let timer: NodeJS.Timeout | undefined;

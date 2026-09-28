@@ -11,7 +11,8 @@ import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
-import type { FundingKind } from "../../payments.js";
+import type { FundingKind, Owner, PaymentEvent } from "../../payments/index.js";
+import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
 
 type AccountKind = (typeof schema.accountKind.enumValues)[number];
 type EntryKind = (typeof schema.entryKind.enumValues)[number];
@@ -99,6 +100,14 @@ export interface LedgerService {
   spotSpend(spotIds: string[], dayStart: Date): Promise<Map<string, { used: number; usedToday: number }>>;
   /** Warns a business at 3 days and 1 day of spend left, and pauses spots it can't cover. */
   checkRunway(businessId: string): Promise<void>;
+  /** Something a provider reported (a deposit arrived, a pledge was paid, a payout failed). */
+  handlePaymentEvent(event: PaymentEvent): Promise<void>;
+  /** Where a station is paid: its Clear account (or Stripe Connect), with a link if it must finish setting it up. */
+  payoutAccount(stationId: string): Promise<{ status: "active" | "needs_onboarding"; url: string | null }>;
+  /** Sends the outbox's pending moves to the provider. */
+  sendMoves(): Promise<{ sent: number; failed: number }>;
+  /** What the ledger says each provider wallet holds (the provider's balances should match). */
+  custodyBalances(): Promise<Map<string, number>>;
 }
 
 export interface MovementView {
@@ -220,6 +229,54 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     await services.spots.reviewBalance(businessId);
   }
 
+  /** Asks the provider to send a payout already taken out of the ledger; puts it back if refused. */
+  async function sendPayout(payoutId: string, entryId: string, from: Owner, destinationRef: string | null, micros: number) {
+    try {
+      const started = await deps.payments.startPayout({ payoutId, from, destinationRef, amountMicros: micros }, accountDirectory(db));
+      await db.update(schema.payouts).set({ status: "sent", providerRef: started.providerRef }).where(eq(schema.payouts.id, payoutId));
+    } catch (error) {
+      await db.transaction(async (tx) => {
+        await reverse(tx, entryId, `Payout didn't go through: ${(error as Error).message}`.slice(0, 200));
+        await tx.update(schema.payouts).set({ status: "failed" }).where(eq(schema.payouts.id, payoutId));
+      });
+      throw refused("payout_failed", `That payout didn't go through: ${(error as Error).message}`);
+    }
+  }
+
+  /** A reversal: a new entry with every posting of the original, the other way round. */
+  async function reverse(tx: Executor, entryId: string, memo: string) {
+    const postings = await tx.select().from(P).where(eq(P.entryId, entryId));
+    const [entry] = await tx
+      .insert(E)
+      .values({ kind: "reversal", occurredAt: deps.clock.now(), reversesEntryId: entryId, sourceType: "reversal", sourceId: entryId, memo })
+      .returning({ id: E.id });
+    const lines = postings.map((p) => ({ account: p.accountId, micros: -p.amountMicros, holdId: p.holdId ?? undefined }));
+    await tx.insert(P).values(lines.map((l) => ({ entryId: entry.id, accountId: l.account, amountMicros: l.micros, holdId: l.holdId ?? null })));
+    await recordMoves(tx, deps.payments, entry.id, lines);
+    return entry.id;
+  }
+
+  /** A pledge payment arrived: the station gets it less Stripe's fee and Opencast's share (0 until decided). */
+  async function pledgeReceived(pledgeId: string, amountMicros: number, feeMicros: number, providerRef: string) {
+    const [pledge] = await db.select().from(schema.pledges).where(eq(schema.pledges.id, pledgeId));
+    if (!pledge) return;
+    const config = await service.config();
+    const share = Math.floor((amountMicros * config.opencastPledgeShareBps) / BPS);
+    await db.transaction(async (tx) => {
+      await service.post(
+        tx,
+        "pledge",
+        [
+          { account: await service.account(tx, "external", { label: "stripe" }), micros: -amountMicros },
+          { account: await service.account(tx, "card_fees"), micros: feeMicros },
+          { account: await service.account(tx, "opencast_share"), micros: share },
+          { account: await service.account(tx, await stationAccountKind(pledge.stationId), { stationId: pledge.stationId }), micros: amountMicros - feeMicros - share }
+        ],
+        { sourceType: "pledge", sourceId: pledgeId, memo: `Pledge, ${dollars(amountMicros)}`, idempotencyKey: `pledge:${providerRef}` }
+      );
+    });
+  }
+
   const service: LedgerService = {
     async account(tx, kind, owner = {}) {
       const values = { kind, advertiserId: owner.advertiserId ?? null, stationId: owner.stationId ?? null, userId: owner.userId ?? null, label: owner.label ?? null };
@@ -249,6 +306,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .values({ kind, occurredAt: deps.clock.now(), sourceType: source.sourceType ?? null, sourceId: source.sourceId ?? null, memo: source.memo ?? null, idempotencyKey: source.idempotencyKey ?? null })
         .returning({ id: E.id });
       await tx.insert(P).values(real.map((l) => ({ entryId: entry.id, accountId: l.account, amountMicros: l.micros, holdId: l.holdId ?? null })));
+      // What the provider has to do, written with the entry and sent after it commits.
+      await recordMoves(tx, deps.payments, entry.id, real);
       return entry.id;
     },
 
@@ -550,7 +609,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async addFundingSource(businessId, input) {
-      const linked = await deps.payments.linkFundingSource({ businessId, kind: input.kind, token: input.token });
+      const businessName = (await services.spots.businessNames([businessId])).get(businessId) ?? "Business";
+      const linked = await deps.payments.linkFundingSource({ businessId, businessName, kind: input.kind, token: input.token }, accountDirectory(db));
       await db.transaction(async (tx) => {
         const existing = await tx.select({ id: schema.fundingSources.id }).from(schema.fundingSources).where(eq(schema.fundingSources.advertiserId, businessId));
         const makeDefault = input.makeDefault || existing.length === 0;
@@ -578,19 +638,22 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.fundingSources.id, input.fundingSourceId), eq(schema.fundingSources.advertiserId, businessId)));
       if (!source || source.removedAt) throw notFound("That funding source");
       const feeMicros = deps.payments.depositFeeMicros(source.kind, input.amountMicros);
-      const started = await deps.payments.startDeposit({ businessId, kind: source.kind, sourceRef: source.providerRef, amountMicros: input.amountMicros, feeMicros });
+      // The deposit exists first, so the provider can report back against it.
       const [deposit] = await db
         .insert(schema.deposits)
-        .values({
-          advertiserId: businessId,
-          fundingSourceId: source.id,
-          amountMicros: input.amountMicros,
-          feeMicros,
-          providerRef: started.providerRef,
-          expectedAt: started.expectedAt,
-          status: "pending"
-        })
+        .values({ advertiserId: businessId, fundingSourceId: source.id, amountMicros: input.amountMicros, feeMicros, status: "pending" })
         .returning();
+      let started;
+      try {
+        started = await deps.payments.startDeposit(
+          { depositId: deposit.id, businessId, kind: source.kind, sourceRef: source.providerRef, amountMicros: input.amountMicros, feeMicros },
+          accountDirectory(db)
+        );
+      } catch (error) {
+        await db.update(schema.deposits).set({ status: "failed" }).where(eq(schema.deposits.id, deposit.id));
+        throw refused("deposit_failed", `That didn't go through: ${(error as Error).message}`);
+      }
+      await db.update(schema.deposits).set({ providerRef: started.providerRef, expectedAt: started.expectedAt }).where(eq(schema.deposits.id, deposit.id));
       if (started.status === "arrived") await service.completeDeposit(deposit.id);
       return { depositId: deposit.id, status: started.status, balance: await service.balance(businessId) };
     },
@@ -652,8 +715,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       if (source.kind === "card") throw refused("not_to_a_card", "Money goes back to a bank or Clear account, not a card.");
       const available = await service.account(db, "advertiser_available", { advertiserId: businessId });
       if ((await balanceOf([available])) < input.amountMicros) throw refused("insufficient_balance", "That's more than you have available. Held money stays held.");
-      const started = await deps.payments.startPayout({ destinationRef: source.providerRef, amountMicros: input.amountMicros });
-      const payoutId = await db.transaction(async (tx) => {
+      // Out of the balance first; if the provider refuses, a reversal puts it back.
+      const { payoutId, entryId } = await db.transaction(async (tx) => {
         const entryId = await service.post(
           tx,
           "withdrawal",
@@ -665,10 +728,11 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         );
         const [payout] = await tx
           .insert(schema.payouts)
-          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "sent", providerRef: started.providerRef, entryId })
+          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "scheduled", entryId })
           .returning();
-        return payout.id;
+        return { payoutId: payout.id, entryId: entryId! };
       });
+      await sendPayout(payoutId, entryId, { type: "advertiser", id: businessId }, source.providerRef, input.amountMicros);
       await checkRunway(businessId);
       return { payoutId, balance: await service.balance(businessId) };
     },
@@ -765,9 +829,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
       const account = await service.account(db, "station_earnings", { stationId });
       if ((await balanceOf([account])) < micros) throw refused("insufficient_balance", "That's more than the station has.");
-      const started = await deps.payments.startPayout({ destinationRef: null, amountMicros: micros });
       const scheduledFor = deps.clock.now().toISOString().slice(0, 10);
-      const payoutId = await db.transaction(async (tx) => {
+      const { payoutId, entryId } = await db.transaction(async (tx) => {
         const entryId = await service.post(
           tx,
           "payout",
@@ -777,12 +840,10 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           ],
           { sourceType: "payout", memo: "Moved to bank" }
         );
-        const [payout] = await tx
-          .insert(schema.payouts)
-          .values({ accountId: account, amountMicros: micros, destination: "bank", scheduledFor, status: "sent", providerRef: started.providerRef, entryId })
-          .returning();
-        return payout.id;
+        const [payout] = await tx.insert(schema.payouts).values({ accountId: account, amountMicros: micros, destination: "bank", scheduledFor, status: "scheduled", entryId }).returning();
+        return { payoutId: payout.id, entryId: entryId! };
       });
+      await sendPayout(payoutId, entryId, { type: "station", id: stationId }, null, micros);
       return { payoutId, scheduledFor };
     },
 
@@ -793,26 +854,17 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .insert(schema.pledges)
         .values({ userId, stationId, cadence: input.cadence, amountMicros: input.amountMicros, creditOnAir: input.creditOnAir, startedAt: deps.clock.now() })
         .returning();
-      const started = await deps.payments.startPledge({ pledgeId: row.id, amountMicros: input.amountMicros, cadence: input.cadence });
+      const started = await deps.payments.startPledge({
+        pledgeId: row.id,
+        stationId,
+        stationName: profile.ident.name,
+        amountMicros: input.amountMicros,
+        cadence: input.cadence,
+        returnUrl: `${deps.config.appOrigin}/stations/${stationId}`
+      });
       await db.update(schema.pledges).set({ stripeRef: started.providerRef }).where(eq(schema.pledges.id, row.id));
-      if (started.paidNow) {
-        const config = await service.config();
-        const share = Math.floor((input.amountMicros * config.opencastPledgeShareBps) / BPS);
-        const fee = started.feeMicros;
-        await db.transaction(async (tx) => {
-          await service.post(
-            tx,
-            "pledge",
-            [
-              { account: await service.account(tx, "external", { label: "stripe" }), micros: -input.amountMicros },
-              { account: await service.account(tx, "card_fees"), micros: fee },
-              { account: await service.account(tx, "opencast_share"), micros: share },
-              { account: await service.account(tx, await stationAccountKind(stationId), { stationId }), micros: input.amountMicros - fee - share }
-            ],
-            { sourceType: "pledge", sourceId: row.id, memo: `Pledge, ${dollars(input.amountMicros)}` }
-          );
-        });
-      }
+      // Paid now (the fake), or when Stripe says so (the webhook).
+      if (started.paidNow) await pledgeReceived(row.id, input.amountMicros, started.feeMicros, started.providerRef);
       return { pledge: (await service.pledges(userId)).find((p) => p.id === row.id)!, checkoutUrl: started.checkoutUrl };
     },
 
@@ -863,10 +915,79 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           ...(input.stop ? { endsAfter: monthEnd } : {})
         })
         .where(eq(schema.pledges.id, pledgeId));
+      if (input.stop && row.cadence === "monthly" && row.stripeRef) await deps.payments.endPledge(row.stripeRef);
       return (await service.pledges(userId)).find((p) => p.id === pledgeId)!;
     },
 
     checkRunway: (businessId) => checkRunway(businessId),
+
+    async handlePaymentEvent(event) {
+      switch (event.kind) {
+        case "deposit_arrived":
+          return service.completeDeposit(event.depositId);
+        case "deposit_failed": {
+          await db
+            .update(schema.deposits)
+            .set({ status: "failed" })
+            .where(and(eq(schema.deposits.id, event.depositId), eq(schema.deposits.status, "pending")));
+          return;
+        }
+        case "pledge_paid":
+          return pledgeReceived(event.pledgeId, event.amountMicros, event.feeMicros, event.providerRef);
+        case "pledge_ended": {
+          const today = deps.clock.now().toISOString().slice(0, 10);
+          await db.update(schema.pledges).set({ endsAfter: today }).where(and(eq(schema.pledges.id, event.pledgeId), sql`${schema.pledges.endsAfter} is null`));
+          return;
+        }
+        case "payout_confirmed":
+        case "payout_failed": {
+          const [payout] = await db.select().from(schema.payouts).where(eq(schema.payouts.providerRef, event.payoutRef));
+          if (!payout || payout.status === "confirmed" || payout.status === "failed") return;
+          if (event.kind === "payout_confirmed") {
+            await db.update(schema.payouts).set({ status: "confirmed" }).where(eq(schema.payouts.id, payout.id));
+            return;
+          }
+          // The bank sent it back: the money is ours again.
+          await db.transaction(async (tx) => {
+            if (payout.entryId) await reverse(tx, payout.entryId, "Payout returned by the bank");
+            await tx.update(schema.payouts).set({ status: "failed" }).where(eq(schema.payouts.id, payout.id));
+          });
+          return;
+        }
+        case "account_ready": {
+          if (event.owner.type === "opencast") return;
+          await db
+            .update(schema.providerAccounts)
+            .set({ status: "active", onboardingUrl: null })
+            .where(and(eq(schema.providerAccounts.ownerType, event.owner.type), eq(schema.providerAccounts.ownerId, event.owner.id)));
+          return;
+        }
+      }
+    },
+
+    async payoutAccount(stationId) {
+      const ident = (await services.stations.idents([stationId])).get(stationId);
+      return deps.payments.payoutAccount({ type: "station", id: stationId, name: ident?.name ?? "Station" }, accountDirectory(db));
+    },
+
+    sendMoves: () => sendMoves(deps),
+
+    async custodyBalances() {
+      const rows = await db
+        .select({ account: L, holdAdvertiserId: H.advertiserId, micros: P.amountMicros })
+        .from(P)
+        .innerJoin(L, eq(L.id, P.accountId))
+        .leftJoin(H, eq(H.id, P.holdId));
+      const result = new Map<string, number>();
+      for (const r of rows) {
+        const wallet = deps.payments.custody(
+          { kind: r.account.kind, advertiserId: r.account.advertiserId, stationId: r.account.stationId, userId: r.account.userId, label: r.account.label },
+          r.holdAdvertiserId
+        );
+        if (wallet) result.set(wallet, (result.get(wallet) ?? 0) + r.micros);
+      }
+      return result;
+    },
 
     async escrowBalances(stationIds) {
       const result = new Map<string, { owed: number; held: number }>(stationIds.map((id) => [id, { owed: 0, held: 0 }]));
