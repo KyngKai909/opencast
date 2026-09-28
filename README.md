@@ -17,7 +17,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA | apps |
 | `apps/tv` | `@opencast/tv` | TV mode and the Cast receiver (empty) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
-| `apps/spots` | `@opencast/spots` | Opencast for business (empty) | apps |
+| `apps/spots` | `@opencast/spots` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
 | `apps/desk` | `@opencast/desk` | Network desk, internal (empty) | apps |
 | `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
