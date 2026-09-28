@@ -306,3 +306,12 @@ export const accountsApi = {
     response: Me
   })
 };
+
+export type Identity = z.infer<typeof Identity>;
+export type Membership = z.infer<typeof Membership>;
+export type ViewerSettings = z.infer<typeof ViewerSettings>;
+export type Preset = z.infer<typeof Preset>;
+export type Reminder = z.infer<typeof Reminder>;
+export type TeamMember = z.infer<typeof TeamMember>;
+export type Invite = z.infer<typeof Invite>;
+export type Team = z.infer<typeof Team>;

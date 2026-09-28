@@ -201,3 +201,9 @@ export const catalogApi = {
     response: z.object({ placed: z.number().int(), replaced: z.number().int(), blockedByLimit: z.number().int() })
   })
 };
+
+export type CarriageTerm = z.infer<typeof CarriageTerm>;
+export type Terms = z.infer<typeof Terms>;
+export type Slot = z.infer<typeof Slot>;
+export type CarriageRequest = z.infer<typeof CarriageRequest>;
+export type Agreement = z.infer<typeof Agreement>;

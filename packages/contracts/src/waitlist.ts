@@ -71,3 +71,5 @@ export const waitlistApi = {
     response: z.array(z.object({ id: Id, role: WaitlistRole, email: z.string(), zip: z.string(), market: Market.nullable(), callSign: z.string().nullable(), createdAt: Timestamp }))
   })
 };
+
+export type WaitlistRole = z.infer<typeof WaitlistRole>;

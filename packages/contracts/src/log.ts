@@ -227,3 +227,11 @@ export const playoutApi = {
     response: z.array(AsRunRow)
   })
 };
+
+export type BreakSlot = z.infer<typeof BreakSlot>;
+export type Gap = z.infer<typeof Gap>;
+export type ProgramLog = z.infer<typeof ProgramLog>;
+export type DeadAirStatus = z.infer<typeof DeadAirStatus>;
+export type SignOnCheck = z.infer<typeof SignOnCheck>;
+export type PlayoutStatus = z.infer<typeof PlayoutStatus>;
+export type AsRunRow = z.infer<typeof AsRunRow>;

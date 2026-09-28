@@ -72,3 +72,18 @@ export const Market = z.object({
   open: z.boolean()
 });
 export type Market = z.infer<typeof Market>;
+
+export type Id = z.infer<typeof Id>;
+export type Timestamp = z.infer<typeof Timestamp>;
+export type DateOnly = z.infer<typeof DateOnly>;
+export type Micros = z.infer<typeof Micros>;
+export type Millis = z.infer<typeof Millis>;
+export type ChannelNumber = z.infer<typeof ChannelNumber>;
+export type CallSign = z.infer<typeof CallSign>;
+export type Colour = z.infer<typeof Colour>;
+export type StationKind = z.infer<typeof StationKind>;
+export type StationRole = z.infer<typeof StationRole>;
+export type BusinessRole = z.infer<typeof BusinessRole>;
+export type Platform = z.infer<typeof Platform>;
+export type PageQuery = z.infer<typeof PageQuery>;
+export type Ok = z.infer<typeof Ok>;

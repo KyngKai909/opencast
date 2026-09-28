@@ -126,3 +126,8 @@ export const CREATOR_STAGE_LABELS: Record<CreatorStage, { desk: string; creator:
 
 /** Values that aren't decided read like this in every app, at $0.00. */
 export const NOT_SET_YET = "Not set yet";
+
+export type SponsorshipDeclineReason = z.infer<typeof SponsorshipDeclineReason>;
+export type CarriageRequestState = z.infer<typeof CarriageRequestState>;
+export type CarriageDeclineReason = z.infer<typeof CarriageDeclineReason>;
+export type ClaimState = z.infer<typeof ClaimState>;

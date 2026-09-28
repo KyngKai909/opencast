@@ -29,6 +29,13 @@
       "when": 1790565414083,
       "tag": "0003_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790565878679,
+      "tag": "0004_asset_archive",
+      "breakpoints": true
     }
   ]
 }

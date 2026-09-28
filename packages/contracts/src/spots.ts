@@ -697,3 +697,18 @@ export const spotsApi = {
   })
 };
 
+export type CustomersWhere = z.infer<typeof CustomersWhere>;
+export type BusinessLocation = z.infer<typeof BusinessLocation>;
+export type UploadCheck = z.infer<typeof UploadCheck>;
+export type Targeting = z.infer<typeof Targeting>;
+export type TargetMatch = z.infer<typeof TargetMatch>;
+export type MarketSpot = z.infer<typeof MarketSpot>;
+export type Rotation = z.infer<typeof Rotation>;
+export type Avail = z.infer<typeof Avail>;
+export type CreditCheck = z.infer<typeof CreditCheck>;
+export type Sponsorship = z.infer<typeof Sponsorship>;
+export type SponsorshipSetting = z.infer<typeof SponsorshipSetting>;
+export type OrderNote = z.infer<typeof OrderNote>;
+export type ProductionOrder = z.infer<typeof ProductionOrder>;
+export type ResultsAiring = z.infer<typeof ResultsAiring>;
+export type Results = z.infer<typeof Results>;

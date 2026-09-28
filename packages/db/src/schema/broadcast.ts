@@ -201,6 +201,8 @@ export const assets = broadcast.table(
     originalFilename: text("original_filename"),
     /** The old model's id, for the migration report. */
     legacyId: text("legacy_id").unique(),
+    /** Deleted from the library. Kept, because the as-run log and claims still point at it. */
+    archivedAt: at("archived_at"),
     createdAt: createdAt()
   },
   (t) => [

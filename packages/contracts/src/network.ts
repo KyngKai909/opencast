@@ -318,3 +318,12 @@ export const networkApi = {
     response: ListedSource
   })
 };
+
+export type SlotState = z.infer<typeof SlotState>;
+export type MarketBoard = z.infer<typeof MarketBoard>;
+export type Creator = z.infer<typeof Creator>;
+export type CreatorWork = z.infer<typeof CreatorWork>;
+export type PermissionPage = z.infer<typeof PermissionPage>;
+export type Recipe = z.infer<typeof Recipe>;
+export type HeldEarnings = z.infer<typeof HeldEarnings>;
+export type ListedSource = z.infer<typeof ListedSource>;

@@ -44,3 +44,6 @@ export const audienceApi = {
     response: AudienceReport
   })
 };
+
+export type Heartbeat = z.infer<typeof Heartbeat>;
+export type AudienceReport = z.infer<typeof AudienceReport>;

@@ -241,3 +241,10 @@ export const libraryApi = {
     })
   })
 };
+
+export type RightsBasis = z.infer<typeof RightsBasis>;
+export type Rights = z.infer<typeof Rights>;
+export type Folder = z.infer<typeof Folder>;
+export type Program = z.infer<typeof Program>;
+export type Library = z.infer<typeof Library>;
+export type ImportJob = z.infer<typeof ImportJob>;

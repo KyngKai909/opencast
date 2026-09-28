@@ -72,3 +72,7 @@ export const notificationsApi = {
     response: z.object({ prefs: NotificationPrefs, alwaysOn: z.array(NoticeKind) })
   })
 };
+
+export type NoticeKind = z.infer<typeof NoticeKind>;
+export type Notice = z.infer<typeof Notice>;
+export type NotificationPrefs = z.infer<typeof NotificationPrefs>;

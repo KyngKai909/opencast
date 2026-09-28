@@ -11,6 +11,7 @@ import { freshDatabase } from "@opencast/db/testing";
 import { privyVerifier, type LinkedAccount } from "../src/v1/auth.js";
 import { EventBus } from "../src/v1/events.js";
 import { createV1 } from "../src/v1/index.js";
+import { ffmpegPipeline } from "../src/v1/media.js";
 import type { Deps, Services } from "../src/v1/context.js";
 
 export const APP_ID = "test-app";
@@ -58,13 +59,15 @@ export async function createHarness(): Promise<Harness> {
     }
   };
 
+  const storageRoot = path.join(os.tmpdir(), `opencast-test-${randomUUID()}`);
   const deps: Deps = {
     db: database.db,
+    media: ffmpegPipeline(storageRoot),
     bus: new EventBus(),
     clock,
     auth: verifier,
     config: {
-      storageRoot: path.join(os.tmpdir(), `opencast-test-${randomUUID()}`),
+      storageRoot,
       appOrigin: "https://app.opencast.test",
       escrowContractAddress: null,
       production: false
@@ -109,9 +112,9 @@ export async function createHarness(): Promise<Harness> {
         did,
         token: jwt,
         get: (url) => auth(request(app).get(url)),
-        post: (url, body) => auth(request(app).post(url)).send(body ?? {}),
-        put: (url, body) => auth(request(app).put(url)).send(body ?? {}),
-        patch: (url, body) => auth(request(app).patch(url)).send(body ?? {}),
+        post: (url, body) => (body ? auth(request(app).post(url)).send(body) : auth(request(app).post(url))),
+        put: (url, body) => (body ? auth(request(app).put(url)).send(body) : auth(request(app).put(url))),
+        patch: (url, body) => (body ? auth(request(app).patch(url)).send(body) : auth(request(app).patch(url))),
         delete: (url) => auth(request(app).delete(url))
       };
     },
@@ -155,4 +158,59 @@ export async function stationFixture(
     await h.db.insert(schema.stationMemberships).values({ stationId: station.id, userId: fields.ownerId, role: "owner" });
   }
   return station;
+}
+
+/** A short test clip made with ffmpeg (a test pattern and a tone), cached per run. */
+const clips = new Map<string, Promise<string>>();
+export function testClip(seconds: number, kind: "video" | "audio" = "video"): Promise<string> {
+  const key = `${seconds}-${kind}`;
+  if (!clips.has(key)) {
+    clips.set(
+      key,
+      (async () => {
+        const { spawn } = await import("node:child_process");
+        const { promises: fs } = await import("node:fs");
+        const dir = path.join(os.tmpdir(), "opencast-test-clips");
+        await fs.mkdir(dir, { recursive: true });
+        const file = path.join(dir, `clip-${key}.${kind === "video" ? "mp4" : "m4a"}`);
+        const args =
+          kind === "video"
+            ? ["-y", "-f", "lavfi", "-i", `testsrc=duration=${seconds}:size=640x360:rate=24`, "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", file]
+            : ["-y", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:a", "aac", file];
+        await new Promise<void>((resolve, reject) => {
+          const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", ...args]);
+          child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}`))));
+        });
+        return file;
+      })()
+    );
+  }
+  return clips.get(key)!;
+}
+
+/** A library item written straight to the database (no file), with rights confirmed. */
+export async function itemFixture(
+  h: Harness,
+  stationId: string,
+  fields: { title?: string; durationMs?: number; code?: "PGM" | "SPT" | "UND" | "BMP" | "SID"; programId?: string; source?: "upload" | "link"; rights?: boolean; episodeNumber?: number } = {}
+) {
+  const [item] = await h.db
+    .insert(schema.assets)
+    .values({
+      stationId,
+      programId: fields.programId ?? null,
+      title: fields.title ?? "Episode",
+      episodeNumber: fields.episodeNumber ?? null,
+      code: fields.code ?? "PGM",
+      source: fields.source ?? "upload",
+      sourceUrl: fields.source === "link" ? "https://example.com/v" : null,
+      mediaKind: "video",
+      durationMs: fields.durationMs ?? 28.5 * 60_000,
+      status: "ready"
+    })
+    .returning();
+  if (fields.rights !== false) {
+    await h.db.insert(schema.rightsConfirmations).values({ assetId: item.id, basis: "made_it" });
+  }
+  return item;
 }

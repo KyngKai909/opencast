@@ -401,3 +401,13 @@ export const stationsApi = {
   })
 };
 
+export type DialRow = z.infer<typeof DialRow>;
+export type Dial = z.infer<typeof Dial>;
+export type GuideRow = z.infer<typeof GuideRow>;
+export type StationPage = z.infer<typeof StationPage>;
+export type SearchResult = z.infer<typeof SearchResult>;
+export type StationSetup = z.infer<typeof StationSetup>;
+export type BreakRule = z.infer<typeof BreakRule>;
+export type Translator = z.infer<typeof Translator>;
+export type LiveSource = z.infer<typeof LiveSource>;
+export type AvailableChannels = z.infer<typeof AvailableChannels>;

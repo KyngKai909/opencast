@@ -3,6 +3,7 @@ import { createDb } from "@opencast/db";
 import { privyVerifier } from "./auth.js";
 import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
+import { ffmpegPipeline } from "./media.js";
 
 export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -17,6 +18,7 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
     db,
     bus: new EventBus(),
     clock: { now: () => new Date() },
+    media: ffmpegPipeline(storageRoot),
     auth: privyVerifier({
       privyAppId: env.PRIVY_APP_ID ?? "unset",
       verificationKey: env.PRIVY_VERIFICATION_KEY || undefined,

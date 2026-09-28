@@ -194,3 +194,11 @@ export const ledgerApi = {
     response: Pledge
   })
 };
+
+export type Undecided = z.infer<typeof Undecided>;
+export type FundingSource = z.infer<typeof FundingSource>;
+export type Balance = z.infer<typeof Balance>;
+export type Movement = z.infer<typeof Movement>;
+export type Statement = z.infer<typeof Statement>;
+export type StationEarnings = z.infer<typeof StationEarnings>;
+export type Pledge = z.infer<typeof Pledge>;

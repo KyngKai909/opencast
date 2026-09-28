@@ -19,6 +19,8 @@ export interface AccountsService {
   me(userId: string): Promise<Me>;
   updateMe(userId: string, input: { displayName?: string | null; marketId?: string | null; settings?: Record<string, unknown> }): Promise<Me>;
   displayNames(userIds: string[]): Promise<Map<string, string | null>>;
+  /** Every email the user has, lower-cased (their account email and linked ones). */
+  emailsOf(userId: string): Promise<string[]>;
 
   presets(userId: string): Promise<Array<{ station: StationIdent; key: number | null; position: number }>>;
   savePreset(userId: string, input: PresetInput): Promise<void>;
@@ -289,6 +291,15 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       if (!userIds.length) return new Map();
       const rows = await db.select({ id: u.id, displayName: u.displayName }).from(u).where(inArray(u.id, userIds));
       return new Map(rows.map((r) => [r.id, r.displayName]));
+    },
+
+    async emailsOf(userId) {
+      const [user] = await db.select({ email: u.email }).from(u).where(eq(u.id, userId));
+      const linked = await db
+        .select({ value: schema.identities.value })
+        .from(schema.identities)
+        .where(and(eq(schema.identities.userId, userId), inArray(schema.identities.kind, ["email", "google", "apple"])));
+      return [...new Set([user?.email, ...linked.map((l) => l.value)].filter((v): v is string => Boolean(v)).map((v) => v.toLowerCase()))];
     },
 
     async presets(userId) {

@@ -101,3 +101,6 @@ export const trustApi = {
     response: Claim
   })
 };
+
+export type Claim = z.infer<typeof Claim>;
+export type Standing = z.infer<typeof Standing>;

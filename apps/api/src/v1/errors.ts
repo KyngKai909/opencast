@@ -22,7 +22,9 @@ export const refused = (code: string, message: string) => new HttpError(422, cod
 
 /** Postgres errors from the schema's guards become 409/422 with the guard's own words. */
 export function fromDatabaseError(error: unknown): HttpError | undefined {
-  const pgError = error as { code?: string; message?: string; constraint?: string };
+  // Drizzle wraps the driver's error; the Postgres details are on its cause.
+  const cause = (error as { cause?: unknown })?.cause;
+  const pgError = (cause && typeof (cause as { code?: unknown }).code === "string" ? cause : error) as { code?: string; message?: string; constraint?: string };
   if (!pgError || typeof pgError.code !== "string") {
     return undefined;
   }

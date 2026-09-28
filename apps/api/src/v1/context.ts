@@ -1,6 +1,7 @@
 import type { Db } from "@opencast/db";
 import type { EventBus } from "./events.js";
 import type { TokenVerifier } from "./auth.js";
+import type { MediaPipeline } from "./media.js";
 import type { AccountsService } from "./modules/accounts/service.js";
 import type { StationsService } from "./modules/stations/service.js";
 import type { LibraryService } from "./modules/library/service.js";
@@ -28,6 +29,7 @@ export interface Deps {
   bus: EventBus;
   clock: Clock;
   auth: TokenVerifier;
+  media: MediaPipeline;
   config: {
     /** Where uploads and working files go. */
     storageRoot: string;
