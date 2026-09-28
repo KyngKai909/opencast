@@ -1,0 +1,10 @@
+/* The market button (core .market; phone: .p-top .market). */
+.oc-market-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  font-weight: 600; font-size: 14px; color: var(--ink);
+  background: none; cursor: pointer; white-space: nowrap;
+}
+.oc-market-btn:hover { background: var(--raised); }
+.oc-market-btn--phone { height: 34px; padding: 0 10px; font-size: 13px; }

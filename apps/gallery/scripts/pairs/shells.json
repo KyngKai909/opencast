@@ -1,0 +1,1496 @@
+[
+  {
+    "id": "viewer-shell",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .app"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web"
+    },
+    "ignore": [
+      "border-top-left-radius",
+      "border-top-right-radius",
+      "border-bottom-left-radius",
+      "box-shadow"
+    ]
+  },
+  {
+    "id": "viewer-head",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-head"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head"
+    }
+  },
+  {
+    "id": "viewer-logo",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-head .a-logo"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head .oc-lockup"
+    },
+    "ignore": [
+      "line-height"
+    ]
+  },
+  {
+    "id": "viewer-nav",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-nav"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__nav"
+    }
+  },
+  {
+    "id": "viewer-nav-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-nav a.on"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__nav-item--on"
+    }
+  },
+  {
+    "id": "viewer-nav-off",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-nav a:not(.on)"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__nav-item:not(.oc-viewer-web__nav-item--on)"
+    }
+  },
+  {
+    "id": "viewer-search",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-search"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__search"
+    }
+  },
+  {
+    "id": "viewer-kbd",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-search kbd"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__kbd"
+    }
+  },
+  {
+    "id": "viewer-market",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-head .market"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head .oc-market-btn"
+    }
+  },
+  {
+    "id": "viewer-avatar",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-head .avatar"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head .oc-shell-avatar"
+    }
+  },
+  {
+    "id": "viewer-avatar-you",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#you .a-head .avatar"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='You: avatar ringed, no nav item'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head .oc-shell-avatar"
+    }
+  },
+  {
+    "id": "viewer-signin",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#signin .a-head .btn"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Signed out: Sign in'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__head .oc-btn"
+    }
+  },
+  {
+    "id": "viewer-main",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-main"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__main"
+    }
+  },
+  {
+    "id": "viewer-pad",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-pad"
+    },
+    "gallery": {
+      "path": "/viewer-web-shell",
+      "selector": ".gal-state[data-state='Dial, signed in, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-web__pad"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "player-bar",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar"
+    },
+    "ignore": [
+      "min-height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "player-card",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .tc"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar__card"
+    }
+  },
+  {
+    "id": "player-card-text",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .tc .t"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar__card .oc-shell-card__t"
+    }
+  },
+  {
+    "id": "player-title",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .ti"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar__title"
+    },
+    "ignore": [
+      "white-space"
+    ]
+  },
+  {
+    "id": "player-station",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .st"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar__station"
+    },
+    "ignore": [
+      "white-space"
+    ]
+  },
+  {
+    "id": "player-controls",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .ctl"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing, with volume and open player'] .gal-panel[data-theme='{ground}'] .oc-player-bar__ctl"
+    }
+  },
+  {
+    "id": "player-tally",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .tally"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar .oc-tally"
+    },
+    "ignore": [
+      "justify-content"
+    ]
+  },
+  {
+    "id": "player-channel-btn",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-player .icon-btn:not(.bare)"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-player-bar .oc-icon-btn"
+    }
+  },
+  {
+    "id": "player-radio",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#radio .a-player"
+    },
+    "gallery": {
+      "path": "/player-bar",
+      "selector": ".gal-state[data-state='Radio'] .gal-panel[data-theme='{ground}'] .oc-player-bar"
+    },
+    "ignore": [
+      "min-height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "phone-shell",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .phone"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone"
+    },
+    "ignore": [
+      "border-top-left-radius",
+      "border-top-right-radius",
+      "border-bottom-left-radius",
+      "box-shadow",
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "phone-top",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-top"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__top"
+    }
+  },
+  {
+    "id": "phone-logo",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-top .a-logo"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__top .oc-lockup"
+    },
+    "ignore": [
+      "line-height",
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "phone-market",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-top .market"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__top .oc-market-btn"
+    }
+  },
+  {
+    "id": "phone-main",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-main"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__main"
+    }
+  },
+  {
+    "id": "phone-tabs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-tabs"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__tabs"
+    }
+  },
+  {
+    "id": "phone-tab-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-tabs a.on"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__tab--on"
+    }
+  },
+  {
+    "id": "phone-tab-off",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-tabs a:not(.on)"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Dial tab, playing'] .gal-panel[data-theme='{ground}'] .oc-viewer-phone__tab:not(.oc-viewer-phone__tab--on)"
+    }
+  },
+  {
+    "id": "phone-back",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#phone .p-back"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Back bar: a settings section'] .gal-panel[data-theme='{ground}'] .oc-phone-back"
+    }
+  },
+  {
+    "id": "phone-back-title",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#phone .p-back b"
+    },
+    "gallery": {
+      "path": "/viewer-phone-shell",
+      "selector": ".gal-state[data-state='Back bar: a settings section'] .gal-panel[data-theme='{ground}'] .oc-phone-back__title"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "mini-player",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "mini-card",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini .tc"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player__card"
+    }
+  },
+  {
+    "id": "mini-card-text",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini .tc .t"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player__card .oc-shell-card__t"
+    }
+  },
+  {
+    "id": "mini-title",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini .ti"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player__title"
+    }
+  },
+  {
+    "id": "mini-station",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini .st"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player__station"
+    }
+  },
+  {
+    "id": "mini-controls",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-phone .p-mini .ctl"
+    },
+    "gallery": {
+      "path": "/mini-player",
+      "selector": ".gal-state[data-state='Playing'] .gal-panel[data-theme='{ground}'] .oc-mini-player__ctl"
+    }
+  },
+  {
+    "id": "control-shell",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup])"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell"
+    },
+    "ignore": [
+      "border-top-left-radius",
+      "border-top-right-radius",
+      "border-bottom-left-radius",
+      "box-shadow"
+    ]
+  },
+  {
+    "id": "control-head",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-head"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-head"
+    }
+  },
+  {
+    "id": "control-lock",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-lock"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-head__lock"
+    }
+  },
+  {
+    "id": "control-logo",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-lock .a-logo"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-head__lock .oc-lockup"
+    },
+    "ignore": [
+      "line-height",
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "control-divider",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-lock .div"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-head__div"
+    }
+  },
+  {
+    "id": "control-app-name",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-lock b"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-head__app"
+    }
+  },
+  {
+    "id": "station-switch",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .stn-switch"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-stn-switch"
+    }
+  },
+  {
+    "id": "station-switch-swatch",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .stn-switch .sw"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-stn-switch__sw"
+    }
+  },
+  {
+    "id": "station-switch-channel",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .stn-switch .ch"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-stn-switch__ch"
+    }
+  },
+  {
+    "id": "station-switch-call-sign",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .stn-switch .cs"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-stn-switch__cs"
+    }
+  },
+  {
+    "id": "control-clock",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-clock"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-shell__clock"
+    }
+  },
+  {
+    "id": "control-end",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-end"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-shell__end"
+    }
+  },
+  {
+    "id": "control-tally",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-end .tally"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-shell__end .oc-tally"
+    },
+    "ignore": [
+      "justify-content"
+    ]
+  },
+  {
+    "id": "control-sign-off",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-end .btn"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-shell__end .oc-btn"
+    }
+  },
+  {
+    "id": "control-body",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-body"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell__body"
+    }
+  },
+  {
+    "id": "control-rail",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail"
+    }
+  },
+  {
+    "id": "rail-group-first",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail .g:first-child"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__group:first-child .oc-shell-rail__label"
+    }
+  },
+  {
+    "id": "rail-group",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail .g:nth-of-type(2)"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__group:nth-child(2) .oc-shell-rail__label"
+    }
+  },
+  {
+    "id": "rail-item-on",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail a.on"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item--on"
+    }
+  },
+  {
+    "id": "rail-item",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail a:not(.on)"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item:not(.oc-shell-rail__item--on)"
+    }
+  },
+  {
+    "id": "rail-count",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail .ct:not(.warn)"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__count:not(.oc-shell-rail__count--warn)"
+    }
+  },
+  {
+    "id": "rail-count-warn",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-rail .ct.warn"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__count--warn"
+    }
+  },
+  {
+    "id": "control-main",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-main"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-shell__main"
+    }
+  },
+  {
+    "id": "control-title",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-title"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-title"
+    }
+  },
+  {
+    "id": "control-title-h",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-title h2"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-title__h"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "control-title-p",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-title p"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-title__p"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "control-title-end",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc:not([data-setup]) .mc-title .end"
+    },
+    "gallery": {
+      "path": "/control-shell",
+      "selector": ".gal-state[data-state='Monitor, on air'] .gal-panel[data-theme='{ground}'] .oc-control-title__end"
+    }
+  },
+  {
+    "id": "control-foot",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .mc-foot"
+    },
+    "gallery": {
+      "path": "/control-foot",
+      "selector": ".gal-state[data-state='Note and one button'] .gal-panel[data-theme='{ground}'] .oc-control-foot"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "control-foot-end",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .mc-foot .end"
+    },
+    "gallery": {
+      "path": "/control-foot",
+      "selector": ".gal-state[data-state='Note and one button'] .gal-panel[data-theme='{ground}'] .oc-control-foot__end"
+    }
+  },
+  {
+    "id": "setup-head",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-head"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-head"
+    }
+  },
+  {
+    "id": "setup-note",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-head > .quiet"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-head > .oc-shell-head__note"
+    }
+  },
+  {
+    "id": "setup-finish-later",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-head .btn"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-head__end .oc-btn"
+    }
+  },
+  {
+    "id": "setup-steps",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps"
+    }
+  },
+  {
+    "id": "step-current",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps .st.cur"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--current"
+    }
+  },
+  {
+    "id": "step-current-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps .st.cur .n"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--current .oc-shell-steps__n"
+    }
+  },
+  {
+    "id": "step-next",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps .st:not(.cur):not(.done)"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--next"
+    }
+  },
+  {
+    "id": "step-next-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps .st:not(.cur):not(.done) .n"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--next .oc-shell-steps__n"
+    }
+  },
+  {
+    "id": "step-done",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .mc-steps .st.done"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 2 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--done"
+    }
+  },
+  {
+    "id": "step-done-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .mc-steps .st.done .n"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 2 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__step--done .oc-shell-steps__n"
+    }
+  },
+  {
+    "id": "step-hint",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .app.mc[data-setup] .mc-steps .hint"
+    },
+    "gallery": {
+      "path": "/control-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 5'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__hint"
+    }
+  },
+  {
+    "id": "studio-switch",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#studio .stn-switch"
+    },
+    "gallery": {
+      "path": "/studio-shell",
+      "selector": ".gal-state[data-state='Your programs'] .gal-panel[data-theme='{ground}'] .oc-stn-switch"
+    }
+  },
+  {
+    "id": "studio-switch-kind",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#studio .stn-switch .quiet"
+    },
+    "gallery": {
+      "path": "/studio-shell",
+      "selector": ".gal-state[data-state='Your programs'] .gal-panel[data-theme='{ground}'] .oc-stn-switch__kind"
+    }
+  },
+  {
+    "id": "studio-note",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#studio .mc-end .quiet"
+    },
+    "gallery": {
+      "path": "/studio-shell",
+      "selector": ".gal-state[data-state='Your programs'] .gal-panel[data-theme='{ground}'] .oc-shell-head__end .oc-shell-head__note"
+    }
+  },
+  {
+    "id": "studio-rail-item-on",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#studio .mc-rail a.on"
+    },
+    "gallery": {
+      "path": "/studio-shell",
+      "selector": ".gal-state[data-state='Your programs'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item--on"
+    }
+  },
+  {
+    "id": "control-phone-top",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .pm-top"
+    },
+    "gallery": {
+      "path": "/control-phone-shell",
+      "selector": ".gal-state[data-state='On air'] .gal-panel[data-theme='{ground}'] .oc-control-phone__top"
+    }
+  },
+  {
+    "id": "control-phone-channel",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .pm-top .ch"
+    },
+    "gallery": {
+      "path": "/control-phone-shell",
+      "selector": ".gal-state[data-state='On air'] .gal-panel[data-theme='{ground}'] .oc-control-phone__ch"
+    }
+  },
+  {
+    "id": "control-phone-call-sign",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .pm-top .cs"
+    },
+    "gallery": {
+      "path": "/control-phone-shell",
+      "selector": ".gal-state[data-state='On air'] .gal-panel[data-theme='{ground}'] .oc-control-phone__cs"
+    }
+  },
+  {
+    "id": "control-phone-actions",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .pm-acts"
+    },
+    "gallery": {
+      "path": "/control-phone-shell",
+      "selector": ".gal-state[data-state='On air'] .gal-panel[data-theme='{ground}'] .oc-control-phone__actions"
+    }
+  },
+  {
+    "id": "control-phone-main",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .p-main"
+    },
+    "gallery": {
+      "path": "/control-phone-shell",
+      "selector": ".gal-state[data-state='On air'] .gal-panel[data-theme='{ground}'] .oc-control-phone__main"
+    }
+  },
+  {
+    "id": "business-head",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-head"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-head"
+    }
+  },
+  {
+    "id": "business-app-name",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-head .mc-lock b"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-head__app"
+    }
+  },
+  {
+    "id": "business-switch",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-sw"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-business-shell__switch"
+    }
+  },
+  {
+    "id": "business-logo",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-sw .lg"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-business-shell__logo"
+    }
+  },
+  {
+    "id": "business-end",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-head .end"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-head__end"
+    }
+  },
+  {
+    "id": "balance-chip",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .bal-chip"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-business-shell__balance"
+    }
+  },
+  {
+    "id": "balance-amount",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .bal-chip b"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-business-shell__amount"
+    }
+  },
+  {
+    "id": "business-avatar",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .biz-head .avatar"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-avatar"
+    }
+  },
+  {
+    "id": "business-rail-on",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .mc-rail a.on"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item--on"
+    }
+  },
+  {
+    "id": "business-rail-count",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#list .mc-rail a.on .ct"
+    },
+    "gallery": {
+      "path": "/business-shell",
+      "selector": ".gal-state[data-state='Spots'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item--on .oc-shell-rail__count"
+    }
+  },
+  {
+    "id": "business-setup-note",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#business .biz-head > .quiet"
+    },
+    "gallery": {
+      "path": "/business-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 3'] .gal-panel[data-theme='{ground}'] .oc-shell-head > .oc-shell-head__note"
+    }
+  },
+  {
+    "id": "business-setup-steps",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#business .mc-steps"
+    },
+    "gallery": {
+      "path": "/business-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 3'] .gal-panel[data-theme='{ground}'] .oc-shell-steps"
+    }
+  },
+  {
+    "id": "business-setup-hint",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#business .mc-steps .hint"
+    },
+    "gallery": {
+      "path": "/business-setup-shell",
+      "selector": ".gal-state[data-state='Step 1 of 3'] .gal-panel[data-theme='{ground}'] .oc-shell-steps__hint"
+    }
+  },
+  {
+    "id": "desk-head",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-head"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-shell-head"
+    }
+  },
+  {
+    "id": "desk-internal",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-head .internal"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-desk-shell__internal"
+    }
+  },
+  {
+    "id": "desk-end",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-head .end"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-shell-head__end"
+    }
+  },
+  {
+    "id": "desk-team",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-head .end .quiet"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-shell-head__end .oc-shell-head__note"
+    }
+  },
+  {
+    "id": "desk-rail-on",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-rail a.on"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__item--on"
+    }
+  },
+  {
+    "id": "desk-rail-count",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "#board .nd-rail .ct"
+    },
+    "gallery": {
+      "path": "/desk-shell",
+      "selector": ".gal-state[data-state='Market board'] .gal-panel[data-theme='{ground}'] .oc-shell-rail__count"
+    }
+  },
+  {
+    "id": "settings-wrap",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .swrap"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "settings-rail",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .snav"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__rail"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "settings-title",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .snav h2"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__title"
+    }
+  },
+  {
+    "id": "settings-link-on",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .snav a.on"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__link--on"
+    }
+  },
+  {
+    "id": "settings-link",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .snav a:not(.on):not(.danger)"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__link:not(.oc-settings__link--on):not(.oc-settings__link--danger)"
+    }
+  },
+  {
+    "id": "settings-link-danger",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .snav a.danger"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__link--danger"
+    }
+  },
+  {
+    "id": "settings-pane",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .spane"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__pane"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "settings-heading",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .spane > h3"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__heading"
+    }
+  },
+  {
+    "id": "settings-lede",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#identity .spane > p"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Station settings'] .gal-panel[data-theme='{ground}'] .oc-settings__lede"
+    }
+  },
+  {
+    "id": "business-settings-rail",
+    "reference": {
+      "file": "business/opencast-biz-settings.html",
+      "selector": "#profile .snav"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Business settings'] .gal-panel[data-theme='{ground}'] .oc-settings__rail"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "viewer-settings",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings"
+    }
+  },
+  {
+    "id": "viewer-settings-rail",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-rail"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__rail"
+    }
+  },
+  {
+    "id": "viewer-settings-title",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-rail h2"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__title"
+    }
+  },
+  {
+    "id": "viewer-settings-link-on",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-rail a.on"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__link--on"
+    }
+  },
+  {
+    "id": "viewer-settings-link",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-rail a:not(.on)"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__link:not(.oc-settings__link--on)"
+    }
+  },
+  {
+    "id": "viewer-settings-pane",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-pane"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__pane"
+    }
+  },
+  {
+    "id": "viewer-settings-heading",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-pane h3"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__heading"
+    }
+  },
+  {
+    "id": "viewer-settings-lede",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .set-pane > p"
+    },
+    "gallery": {
+      "path": "/settings-layout",
+      "selector": ".gal-state[data-state='Viewer settings'] .gal-panel[data-theme='{ground}'] .oc-settings__lede"
+    }
+  },
+  {
+    "id": "settings-phone-back",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#phone .p-back"
+    },
+    "gallery": {
+      "path": "/settings-layout-phone",
+      "selector": ".gal-state[data-state='A section'] .gal-panel[data-theme='{ground}'] .oc-phone-back"
+    }
+  },
+  {
+    "id": "tv-canvas",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": "#watching .tv"
+    },
+    "gallery": {
+      "path": "/tv-shell",
+      "selector": ".gal-state[data-state='Picture and hint row'] .gal-panel[data-ground='tv'] .oc-tv-shell__canvas"
+    },
+    "ignore": [
+      "border-top-left-radius",
+      "border-top-right-radius",
+      "border-bottom-left-radius",
+      "box-shadow"
+    ],
+    "grounds": [
+      "dark"
+    ]
+  }
+]

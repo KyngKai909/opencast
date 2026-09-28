@@ -1,0 +1,20 @@
+/* The business header's parts (shared-mid .biz-sw, .bal-chip). */
+.oc-business-shell__switch {
+  display: inline-flex; align-items: center; gap: 10px;
+  height: 38px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  background: none; cursor: pointer;
+}
+.oc-business-shell__switch:hover { background: var(--ground); }
+.oc-business-shell__logo {
+  /* New token: the logo square's 4px corner, hard-coded in the reference. */
+  --oc-logo-radius: 4px;
+  width: 22px; height: 22px; flex: none;
+  border-radius: var(--oc-logo-radius);
+  background: var(--oc-business); color: var(--on-station);
+  font: 800 10px var(--font-display);
+  display: grid; place-items: center;
+}
+.oc-business-shell__balance { display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-70); }
+.oc-business-shell__amount { font: 500 16px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); }

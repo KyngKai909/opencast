@@ -1,0 +1,25 @@
+/* TV mode's canvas (by-opencast-tv .tv): 1920×1080, always dark, the 90% title-safe area inside it. */
+.oc-tv-shell {
+  /* New token: the black around and under the picture. The reference hard-codes #000. */
+  --oc-tv-black: #000;
+  position: relative; overflow: hidden;
+  background: var(--oc-tv-black); color: var(--ink);
+}
+/* Fills its container; in one with no height of its own, it's 16:9 by its width. */
+.oc-tv-shell--fit { width: 100%; height: 100%; aspect-ratio: 16 / 9; }
+.oc-tv-shell__canvas {
+  width: 1920px; height: 1080px; position: relative; overflow: hidden;
+  background: var(--oc-tv-black); color: var(--ink);
+  font: 28px/1.4 var(--font-text);
+}
+.oc-tv-shell--fit .oc-tv-shell__canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.oc-tv-shell__picture { position: absolute; inset: 0; }
+/* Title safe: 5% in from each edge (96px and 54px at 1080p). */
+.oc-tv-shell__safe {
+  position: absolute; inset: var(--title-safe);
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 20px;
+  pointer-events: none;
+}
+.oc-tv-shell__safe > * { pointer-events: auto; }
+.oc-tv-shell__overlays { position: relative; flex: 1; min-height: 0; }
+.oc-tv-shell__hints { flex: none; display: flex; gap: 40px; align-items: center; font-size: 22px; color: var(--ink-70); }

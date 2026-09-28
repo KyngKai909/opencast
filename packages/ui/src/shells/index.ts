@@ -1,0 +1,20 @@
+// shells components (one export line per component)
+export { ShellRail, buildRail, type ShellRailProps, type ShellLink, type ShellNavItem, type ShellNavGroup, type ShellItems, type ShellRailSpec } from "./ShellRail";
+export { ShellSteps, type ShellStepsProps } from "./ShellSteps";
+export { PhoneBackBar, type PhoneBackBarProps } from "./PhoneBackBar";
+export { PlayerBar, type PlayerBarProps } from "./PlayerBar";
+export { MiniPlayer, type MiniPlayerProps } from "./MiniPlayer";
+export { ViewerWebShell, VIEWER_NAV, isSearchKey, type ViewerWebShellProps, type ViewerSection } from "./ViewerWebShell";
+export { ViewerPhoneShell, VIEWER_TABS, type ViewerPhoneShellProps, type ViewerTab } from "./ViewerPhoneShell";
+export { ControlShell, CONTROL_RAIL, type ControlShellProps, type ControlPage } from "./ControlShell";
+export { type ControlStation, type ControlStudio } from "./StationSwitch";
+export { ControlTitle, type ControlTitleProps } from "./ControlTitle";
+export { ControlFoot, type ControlFootProps } from "./ControlFoot";
+export { ControlSetupShell, CONTROL_SETUP_STEPS, type ControlSetupShellProps } from "./ControlSetupShell";
+export { StudioShell, STUDIO_RAIL, type StudioShellProps, type StudioPage } from "./StudioShell";
+export { ControlPhoneShell, type ControlPhoneShellProps } from "./ControlPhoneShell";
+export { BusinessShell, BUSINESS_RAIL, type BusinessShellProps, type BusinessPage, type ShellBusiness } from "./BusinessShell";
+export { BusinessSetupShell, BUSINESS_SETUP_STEPS, type BusinessSetupShellProps } from "./BusinessSetupShell";
+export { DeskShell, DESK_RAIL, type DeskShellProps, type DeskPage } from "./DeskShell";
+export { SettingsLayout, type SettingsLayoutProps, type SettingsSection } from "./SettingsLayout";
+export { TvShell, fitTv, TV_WIDTH, TV_HEIGHT, type TvShellProps } from "./TvShell";

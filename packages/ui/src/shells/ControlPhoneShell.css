@@ -1,0 +1,18 @@
+/* Master control on the phone (shared-mid .pm-top, .pm-acts; core .p-main). */
+.oc-control-phone {
+  display: flex; flex-direction: column; position: relative;
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--ground); color: var(--ink);
+  font-size: 15px; line-height: 1.45;
+  /* On a real phone: clear the status bar and the home indicator. */
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.oc-control-phone__top { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px 10px; border-bottom: 1px solid var(--hair); }
+.oc-control-phone__switch { display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.oc-control-phone__ch { font-size: 14px; color: var(--ink-50); }
+.oc-control-phone__cs { font-size: 16px; }
+.oc-control-phone__context { color: var(--ink-50); font-size: 13px; }
+.oc-control-phone__tally { margin-left: auto; }
+.oc-control-phone__main { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.oc-control-phone__main::-webkit-scrollbar { display: none; }
+.oc-control-phone__actions { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 16px; }

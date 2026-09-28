@@ -1,0 +1,21 @@
+/* The phone's mini player (core .p-mini). */
+.oc-mini-player {
+  /* New token: the mini player's 12px corner, hard-coded in the reference. */
+  --oc-mini-radius: 12px;
+  flex: none;
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+  margin: 0 10px 6px; padding: 8px;
+  border-radius: var(--oc-mini-radius);
+  background: var(--raised); box-shadow: 0 0 0 1px var(--hair);
+}
+/* With onOpen, the card and title are one button spanning the first two columns. */
+.oc-mini-player__open {
+  grid-column: 1 / 3; display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center;
+  padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.oc-mini-player__card { padding: 3px 5px; }
+.oc-mini-player__card .oc-shell-card__t { font-size: 8px; }
+.oc-mini-player__text { min-width: 0; }
+.oc-mini-player__title { font: 700 14px/1.2 var(--font-display); }
+.oc-mini-player__station { font-size: 12px; color: var(--ink-70); }
+.oc-mini-player__ctl { display: flex; gap: 6px; align-items: center; }

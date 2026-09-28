@@ -1,0 +1,40 @@
+/* Settings: sub-rail and pane (station and business settings .swrap, .snav, .spane; viewer you .set, .set-rail, .set-pane). */
+.oc-settings { display: grid; grid-template-columns: 200px minmax(0, 1fr); height: 100%; min-height: 0; }
+.oc-settings__rail { border-right: 1px solid var(--hair); padding: 20px 12px; overflow: auto; }
+/* The rail title and pane heading take two classes, so a host page's own h2 and h3 rules can't win over them. */
+.oc-settings .oc-settings__title { margin: 0 0 12px 8px; color: var(--ink); font: 800 24px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.oc-settings__link {
+  display: flex; align-items: center; width: 100%;
+  height: 34px; padding: 0 8px;
+  border: 0; border-radius: var(--r-control); background: none; cursor: pointer; text-align: start;
+  font-size: 14px; color: var(--ink-70); text-decoration: none; font-weight: 500;
+}
+.oc-settings__link:hover { color: var(--ink); }
+.oc-settings__link--on { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+.oc-settings__link--danger, .oc-settings__link--danger:hover { color: var(--live); }
+.oc-settings__pane { padding: 20px 30px 30px; overflow: auto; min-width: 0; }
+.oc-settings .oc-settings__heading { margin: 0 0 4px; color: var(--ink); font: 800 26px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.oc-settings__lede { margin: 0 0 18px; font-size: 14.5px; color: var(--ink-70); max-width: 64ch; }
+
+/* The viewer's settings page (you 05.1). */
+.oc-settings--viewer { grid-template-columns: 220px minmax(0, 1fr); }
+.oc-settings--viewer .oc-settings__rail { padding: 22px 14px; }
+.oc-settings--viewer.oc-settings .oc-settings__title { margin: 0 0 14px 10px; font-size: 26px; }
+.oc-settings--viewer .oc-settings__link { height: 36px; padding: 0 10px; font-size: 14.5px; }
+.oc-settings--viewer .oc-settings__pane { padding: 22px 32px; }
+.oc-settings--viewer.oc-settings .oc-settings__heading { font-size: 24px; letter-spacing: -.025em; }
+.oc-settings--viewer .oc-settings__lede { margin: 0 0 16px; max-width: none; }
+
+/* The phone: the list of sections, and each section a screen (you 06.3, station settings 05.1). */
+.oc-settings--phone { display: flex; flex-direction: column; }
+.oc-settings__list { list-style: none; margin: 0; padding: 0; }
+/* The list itself isn't drawn: its rows follow the settings rows (.p-list .row2), with a chevron. */
+.oc-settings__row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 16px; border: 0; border-bottom: 1px solid var(--hair); background: none; cursor: pointer; text-align: left;
+  font-size: 15px; font-weight: 600; color: var(--ink); text-decoration: none;
+}
+.oc-settings__row--danger { color: var(--live); }
+.oc-settings__chev { margin-left: auto; color: var(--ink-50); }
+.oc-settings__screen { flex: 1; overflow-y: auto; min-height: 0; }
+.oc-settings__phone-lede { margin: 0; padding: 14px 16px 0; font-size: 14.5px; color: var(--ink-70); }

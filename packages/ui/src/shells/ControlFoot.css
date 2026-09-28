@@ -1,0 +1,4 @@
+/* The page footer (shared-mid .mc-foot). */
+.oc-control-foot { display: flex; align-items: center; gap: 12px; padding-top: 16px; margin-top: 18px; border-top: 1px solid var(--hair); }
+.oc-control-foot__note { color: var(--ink-50); font-size: 13.5px; }
+.oc-control-foot__end { margin-left: auto; display: flex; gap: 10px; }

@@ -1,0 +1,21 @@
+/* The viewer app on the phone (core .phone, .p-top, .p-main, .p-pad, .p-tabs). */
+.oc-viewer-phone {
+  display: flex; flex-direction: column; position: relative;
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--ground); color: var(--ink);
+  font-size: 15px; line-height: 1.45;
+  /* On a real phone: clear the status bar and the home indicator. */
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.oc-viewer-phone__top { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 18px 10px; }
+.oc-viewer-phone__market { margin-left: auto; }
+.oc-viewer-phone__main { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.oc-viewer-phone__main::-webkit-scrollbar { display: none; }
+.oc-viewer-phone__pad { padding: 4px 18px 24px; }
+.oc-viewer-phone__tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--hair); padding-top: 6px; }
+.oc-viewer-phone__tab {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-size: 11px; font-weight: 600; color: var(--ink-50); text-decoration: none;
+}
+.oc-viewer-phone__tab--on { color: var(--ink); }

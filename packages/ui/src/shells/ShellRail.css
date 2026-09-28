@@ -1,0 +1,20 @@
+/* The rail (shared-mid .mc-rail: master control, business, desk). */
+.oc-shell-rail { border-right: 1px solid var(--hair); padding: 14px 10px; overflow: auto; }
+.oc-shell-rail__label { font-size: 12px; font-weight: 600; color: var(--ink-50); padding: 12px 10px 4px; }
+.oc-shell-rail__group:first-child .oc-shell-rail__label { padding-top: 0; }
+.oc-shell-rail__item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; height: 34px; padding: 0 10px;
+  border: 0; border-radius: var(--r-control); background: none;
+  text-decoration: none; text-align: start;
+  color: var(--ink-70); font-family: var(--font-text); font-size: 14.5px; font-weight: 500;
+  cursor: pointer;
+}
+.oc-shell-rail__item:hover { color: var(--ink); }
+.oc-shell-rail__item--on { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+.oc-shell-rail__count { margin-left: auto; font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-50); }
+.oc-shell-rail__count--warn { color: var(--standby); }
+/* Not drawn in the references (a host's rail is Open): the item fades to ink-50 and carries a lock, so it doesn't rely on colour. */
+.oc-shell-rail__item--disabled, .oc-shell-rail__item--disabled:hover { color: var(--ink-50); cursor: not-allowed; }
+.oc-shell-rail__lock { margin-left: auto; }
+.oc-shell-rail__count + .oc-shell-rail__lock { margin-left: 0; }
