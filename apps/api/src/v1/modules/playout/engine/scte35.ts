@@ -120,6 +120,18 @@ export function decodeSpliceInsert(bytes: Uint8Array): SpliceInsert & { crcOk: b
   return { eventId, outOfNetwork, durationMs, autoReturn, crcOk };
 }
 
+/**
+ * Every break gets a cue, stored or not: a stored break is cued by its ID; one generated from the
+ * break rule but not stored yet by an ID made from the station and its start, so the cue is the
+ * same on every playlist refresh. The event ID is the splice_event_id (32 bits).
+ */
+export function breakCue(stationId: string, brk: { id: string | null; startsAt: string; lengthMs: number }): { id: string; startsAt: Date; durationMs: number; eventId: number } {
+  const startsAt = new Date(brk.startsAt);
+  if (brk.id) return { id: brk.id, startsAt, durationMs: brk.lengthMs, eventId: parseInt(brk.id.slice(0, 8), 16) };
+  const id = `brk-${stationId}-${startsAt.getTime()}`;
+  return { id, startsAt, durationMs: brk.lengthMs, eventId: crc32Mpeg2(Buffer.from(id, "utf8")) };
+}
+
 /** The EXT-X-DATERANGE tag pair for one break. */
 export function breakDateRanges(input: { id: string; startsAt: Date; durationMs: number; eventId: number }): string[] {
   const out = toHex(encodeSpliceInsert({ eventId: input.eventId, outOfNetwork: true, durationMs: input.durationMs, autoReturn: true }));

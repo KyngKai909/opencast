@@ -7,6 +7,11 @@ export function accountsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
 
   r.handle(api.getMe, ({ user }) => accounts.me(user.id));
   r.handle(api.updateMe, ({ user, body }) => accounts.updateMe(user.id, body));
+  r.handle(api.linkClear, ({ user }) => accounts.linkClear(user));
+  r.handle(api.unlinkClear, async ({ user }) => {
+    await accounts.unlinkClear(user.id);
+    return { ok: true as const };
+  });
   r.handle(api.mergeDevice, async ({ user, body }) => {
     // The account's own presets win; the device's fill the rest.
     const existing = await accounts.presets(user.id);

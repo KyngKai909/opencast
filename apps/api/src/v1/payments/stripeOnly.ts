@@ -5,7 +5,7 @@
 // a refund of their most recent top-ups.
 
 import type { StripeCards } from "./stripe.js";
-import { chainCustody, stripeCardFeeMicros, type LedgerAccount, type Payments } from "./types.js";
+import { chainCustody, destinationWallet, stripeCardFeeMicros, type LedgerAccount, type Payments } from "./types.js";
 
 export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Payments {
   return {
@@ -30,6 +30,7 @@ export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Paym
     cancelDeposit: (ref) => stripe.cancel(ref),
 
     async startPayout(input, accounts) {
+      if (destinationWallet(input.destinationRef)) throw new Error("Clear wallets aren't available on this server.");
       if (input.from.type === "station") {
         const connect = await stripe.connectAccount({ type: "station", id: input.from.id }, accounts, `${appOrigin}/stations/${input.from.id}/earnings`);
         if (connect.status !== "active") throw new Error("The station hasn't finished setting up payouts with Stripe.");

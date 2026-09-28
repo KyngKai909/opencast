@@ -126,7 +126,7 @@ Before, every app's `build` script rebuilt `shared` first, and the root repeated
 
 `/v1` is the new API, built from `packages/contracts`: 183 endpoints in 13 modules, listed in `docs/api.md` (regenerate with `npm run docs:api`). How it's put together is in `docs/architecture.md`. The old `/api` routes stay for the old master control until the apps prompt replaces it.
 
-Sign-in is Privy: set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have it). Without it, signed-in endpoints answer 401; public ones (the dial, guide, station pages, heartbeats) still work. To make someone an Opencast admin: `update accounts.users set is_admin = true where email = '…'`.
+Sign-in is Privy, with Opencast's own Privy app (never Clear's): set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have it). Without it, signed-in endpoints answer 401; public ones (the dial, guide, station pages, heartbeats) still work. To make someone an Opencast admin: `update accounts.users set is_admin = true where email = '…'`.
 
 ## Playout
 

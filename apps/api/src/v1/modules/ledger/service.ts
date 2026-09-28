@@ -10,8 +10,8 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
-import { badRequest, notFound, refused } from "../../errors.js";
-import { stripeCardFeeMicros, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
+import { badRequest, conflict, notFound, refused } from "../../errors.js";
+import { stripeCardFeeMicros, walletDestination, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
 import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
 
 type AccountKind = (typeof schema.accountKind.enumValues)[number];
@@ -79,9 +79,16 @@ export interface LedgerService {
   balance(businessId: string): Promise<BalanceView>;
   runwayDays(businessIds: string[]): Promise<Map<string, number | null>>;
   movements(businessId: string, filter: { filter: "all" | "money" | "airings"; before?: string; limit: number }): Promise<MovementView[]>;
-  addFundingSource(businessId: string, input: { kind: FundingKind; token: string; makeDefault: boolean }): Promise<BalanceView["fundingSources"]>;
+  /** `clear_account` with token "linked" adds the caller's linked Clear wallet (withdrawals can go to it). */
+  addFundingSource(businessId: string, input: { kind: FundingKind; token: string; makeDefault: boolean }, byUserId?: string): Promise<BalanceView["fundingSources"]>;
   quoteDeposit(businessId: string, input: { amountMicros: number; method: FundingKind }): Promise<{ amountMicros: number; feeMicros: number; arrives: string; roughAirings: number | null }>;
   addMoney(businessId: string, input: { amountMicros: number; fundingSourceId: string }): Promise<{ depositId: string; status: "pending" | "arrived"; balance: BalanceView }>;
+  /** Funding from the caller's linked Clear wallet (full access): where to send it. 409 when the link is read-only or missing. */
+  quoteClearTransfer(businessId: string, userId: string, amountMicros: number): Promise<ClearTransferQuote>;
+  /** The transfer from Clear was sent: checked on chain, then credited like any deposit. Idempotent on the transaction. */
+  confirmClearTransfer(businessId: string, userId: string, input: { amountMicros: number; txHash: string }): Promise<{ depositId: string; status: "pending" | "arrived"; balance: BalanceView }>;
+  /** Checks pending transfers from Clear wallets again (the jobs tick). */
+  recheckClearTransfers(): Promise<{ arrived: number; failed: number }>;
   /** A pending deposit has arrived (the provider's webhook, or the fake). */
   completeDeposit(depositId: string): Promise<void>;
   cancelDeposit(businessId: string, depositId: string): Promise<BalanceView>;
@@ -106,8 +113,10 @@ export interface LedgerService {
   checkRunway(businessId: string): Promise<void>;
   /** Something a provider reported (a deposit arrived, a pledge was paid, a payout failed). */
   handlePaymentEvent(event: PaymentEvent): Promise<void>;
-  /** Where a station is paid: its Clear account (or Stripe Connect), with a link if it must finish setting it up. */
-  payoutAccount(stationId: string): Promise<{ status: "active" | "needs_onboarding"; url: string | null }>;
+  /** Where a station is paid: its Clear account (or Stripe Connect), or the owner's linked Clear wallet, with a link if it must finish setting it up. */
+  payoutAccount(stationId: string): Promise<PayoutAccountView>;
+  /** Pays the station to the owner's linked Clear wallet (read-only access is enough), or back to its own account. */
+  setPayoutDestination(stationId: string, userId: string, kind: "clear_account" | "clear_wallet"): Promise<PayoutAccountView>;
   /** Sends the outbox's pending moves to the provider. */
   sendMoves(): Promise<{ sent: number; failed: number }>;
   /**
@@ -129,6 +138,20 @@ export interface LedgerService {
   renewPledges(): Promise<number>;
   /** What the ledger says each provider wallet holds (the provider's balances should match). */
   custodyBalances(): Promise<Map<string, number>>;
+}
+
+export interface ClearTransferQuote {
+  to: string;
+  token: { address: string; symbol: "USDC"; decimals: 6 };
+  chainId: number;
+  amountUnits: string;
+  from: string;
+}
+
+export interface PayoutAccountView {
+  status: "active" | "needs_onboarding";
+  url: string | null;
+  destination: { kind: "clear_account" | "clear_wallet" | "stripe_connect"; label: string; address: string | null };
 }
 
 export interface MovementView {
@@ -164,6 +187,8 @@ export interface StationEarningsView {
     production: { micros: number; orders: number };
     opencastShare: { micros: number; notSetYet: boolean };
     pool: { micros: number; notSetYet: boolean };
+    /** "Ads from partners, paid when received": its own line, never held or escrowed. 0 until the backfill exists. */
+    partnerAds: { on: boolean; micros: number; pendingMicros: number };
   };
   totalMicros: number;
   held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number };
@@ -191,6 +216,7 @@ const DAY = 86_400_000;
 const BPS = 10_000;
 
 const dollars = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
+const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 /** How a ledger entry reads on a statement. */
 function statementLabel(kind: string, sourceType: string | null, amount: number, accountKind: string): string {
@@ -297,6 +323,12 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
     const account = await service.account(db, "station_earnings", { stationId });
     if ((await balanceOf([account])) < micros) throw refused("insufficient_balance", "That's more than the station has.");
+    // The owner's linked Clear wallet, if that's where the station is paid; else its own account.
+    const where = await service.payoutAccount(stationId);
+    const toWallet = where.destination.kind === "clear_wallet";
+    if (toWallet && (where.status !== "active" || !where.destination.address)) {
+      throw conflict("clear_unlinked", "Payouts go to a Clear wallet that's no longer linked to the station's owner. Connect Clear again, or pay out to the station's account.");
+    }
     const scheduledFor = deps.clock.now().toISOString().slice(0, 10);
     const { payoutId, entryId } = await db.transaction(async (tx) => {
       const entryId = await service.post(
@@ -308,11 +340,49 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         ],
         { sourceType: "payout", memo, idempotencyKey }
       );
-      const [payout] = await tx.insert(schema.payouts).values({ accountId: account, amountMicros: micros, destination: "bank", scheduledFor, status: "scheduled", entryId }).returning();
+      const [payout] = await tx
+        .insert(schema.payouts)
+        .values({ accountId: account, amountMicros: micros, destination: toWallet ? where.destination.label : "bank", scheduledFor, status: "scheduled", entryId })
+        .returning();
       return { payoutId: payout.id, entryId: entryId! };
     });
-    await sendPayout(payoutId, entryId, { type: "station", id: stationId }, null, micros);
+    await sendPayout(payoutId, entryId, { type: "station", id: stationId }, toWallet ? walletDestination(where.destination.address!) : null, micros);
     return { payoutId, scheduledFor };
+  }
+
+  /** Funding from and payouts to linked Clear wallets, when the provider has them. */
+  function clearRail() {
+    const rail = deps.payments.clearWallet;
+    if (!rail) throw conflict("clear_unavailable", "Clear isn't available on this server.");
+    return rail;
+  }
+
+  async function linkedClear(userId: string) {
+    const link = await services.accounts.clearLink(userId);
+    if (!link) throw conflict("clear_not_linked", "Clear isn't linked yet. Connect Clear first.");
+    return link;
+  }
+
+  async function businessOwner(businessId: string): Promise<Owner & { type: "advertiser" }> {
+    const name = (await services.spots.businessNames([businessId])).get(businessId) ?? "Business";
+    return { type: "advertiser", id: businessId, name };
+  }
+
+  /** Checks a transfer from a Clear wallet again, and credits it once it's confirmed. */
+  async function settleClearTransfer(deposit: typeof schema.deposits.$inferSelect) {
+    if (deposit.status !== "pending" || !deposit.txHash || !deposit.fromAddress) return deposit.status;
+    const rail = clearRail();
+    const to = await rail.depositAddress(await businessOwner(deposit.advertiserId), accountDirectory(db));
+    const check = await rail.verifyTransfer({ businessId: deposit.advertiserId, txHash: deposit.txHash, from: deposit.fromAddress, to, amountMicros: deposit.amountMicros });
+    if (check.status === "confirmed") {
+      await service.completeDeposit(deposit.id);
+      return "arrived" as const;
+    }
+    if (check.status === "failed") {
+      await db.update(schema.deposits).set({ status: "failed" }).where(and(eq(schema.deposits.id, deposit.id), eq(schema.deposits.status, "pending")));
+      return "failed" as const;
+    }
+    return "pending" as const;
   }
 
   /** A reversal: a new entry with every posting of the original, the other way round. */
@@ -600,6 +670,11 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           .orderBy(asc(schema.fundingSources.createdAt))
       ]);
       const kinds = new Map(sources.map((s) => [s.id, s.kind]));
+      // A linked Clear wallet stops working (and stops showing) once it's unlinked.
+      const unlinked = new Set<string>();
+      for (const source of sources) {
+        if (source.clearLinkId && !(await services.accounts.clearLinkById(source.clearLinkId))?.active) unlinked.add(source.id);
+      }
       return {
         availableMicros: available,
         heldMicros: held.reduce((sum, h) => sum + h.open, 0),
@@ -612,9 +687,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           id: d.id,
           amountMicros: d.amountMicros,
           expectedAt: d.expectedAt?.toISOString() ?? null,
-          method: (d.fundingSourceId && kinds.get(d.fundingSourceId)) || "clear_bank"
+          method: (d.fundingSourceId && kinds.get(d.fundingSourceId)) || (d.txHash ? "clear_account" : "clear_bank")
         })),
-        fundingSources: sources.map((s) => ({ id: s.id, kind: s.kind, label: s.label, isDefault: s.isDefault }))
+        fundingSources: sources.filter((s) => !unlinked.has(s.id)).map((s) => ({ id: s.id, kind: s.kind, label: s.label, isDefault: s.isDefault }))
       };
     },
 
@@ -688,7 +763,35 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       return views.slice(0, filter.limit);
     },
 
-    async addFundingSource(businessId, input) {
+    async addFundingSource(businessId, input, byUserId) {
+      if (input.kind === "clear_account" && input.token === "linked") {
+        // The owner's own Clear wallet, linked through Privy: withdrawals can go to it.
+        clearRail();
+        if (!byUserId) throw conflict("clear_not_linked", "Clear isn't linked yet. Connect Clear first.");
+        const link = await linkedClear(byUserId);
+        await db.transaction(async (tx) => {
+          const existing = await tx
+            .select()
+            .from(schema.fundingSources)
+            .where(and(eq(schema.fundingSources.advertiserId, businessId), sql`${schema.fundingSources.removedAt} is null`));
+          const makeDefault = input.makeDefault || existing.length === 0;
+          if (makeDefault) await tx.update(schema.fundingSources).set({ isDefault: false }).where(eq(schema.fundingSources.advertiserId, businessId));
+          const same = existing.find((f) => f.clearLinkId === link.id);
+          if (same) {
+            if (makeDefault) await tx.update(schema.fundingSources).set({ isDefault: true }).where(eq(schema.fundingSources.id, same.id));
+            return;
+          }
+          await tx.insert(schema.fundingSources).values({
+            advertiserId: businessId,
+            kind: "clear_account",
+            label: `Clear wallet ${shortAddress(link.address)}`,
+            providerRef: walletDestination(link.address),
+            clearLinkId: link.id,
+            isDefault: makeDefault
+          });
+        });
+        return (await service.balance(businessId)).fundingSources;
+      }
       const businessName = (await services.spots.businessNames([businessId])).get(businessId) ?? "Business";
       const linked = await deps.payments.linkFundingSource({ businessId, businessName, kind: input.kind, token: input.token }, accountDirectory(db));
       await db.transaction(async (tx) => {
@@ -717,6 +820,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .from(schema.fundingSources)
         .where(and(eq(schema.fundingSources.id, input.fundingSourceId), eq(schema.fundingSources.advertiserId, businessId)));
       if (!source || source.removedAt) throw notFound("That funding source");
+      if (source.clearLinkId) throw conflict("clear_transfer_needed", "Money from a Clear wallet comes in by a transfer you confirm in Clear.");
       const feeMicros = deps.payments.depositFeeMicros(source.kind, input.amountMicros);
       // The deposit exists first, so the provider can report back against it.
       const [deposit] = await db
@@ -738,6 +842,74 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       return { depositId: deposit.id, status: started.status, balance: await service.balance(businessId) };
     },
 
+    async quoteClearTransfer(businessId, userId, amountMicros) {
+      const rail = clearRail();
+      const usdc = deps.config.usdc;
+      if (!usdc) throw conflict("clear_unavailable", "Funding from Clear isn't set up on this server.");
+      const link = await linkedClear(userId);
+      if (link.access !== "full") throw conflict("clear_read_only", "Clear lets Opencast only read your Clear wallet, so add money from inside Clear.");
+      const to = await rail.depositAddress(await businessOwner(businessId), accountDirectory(db));
+      return { to, token: { address: usdc.address, symbol: "USDC", decimals: 6 }, chainId: usdc.chainId, amountUnits: String(amountMicros), from: link.address };
+    },
+
+    async confirmClearTransfer(businessId, userId, input) {
+      const txHash = input.txHash.toLowerCase();
+      const D = schema.deposits;
+      const reply = async (deposit: typeof D.$inferSelect) => {
+        if (deposit.advertiserId !== businessId) throw conflict("transfer_already_used", "That transfer was already used for another deposit.");
+        if (deposit.amountMicros !== input.amountMicros) throw conflict("transfer_already_used", "That transfer was already recorded for a different amount.");
+        if (deposit.status === "failed") throw refused("transfer_not_valid", "That transfer didn't check out, so it wasn't added.");
+        const status = deposit.status === "pending" ? await settleClearTransfer(deposit) : deposit.status;
+        return { depositId: deposit.id, status: status === "arrived" ? ("arrived" as const) : ("pending" as const), balance: await service.balance(businessId) };
+      };
+      // The same transaction again: the same answer (checked again if it was still pending).
+      const [seen] = await db.select().from(D).where(eq(D.txHash, txHash));
+      if (seen) return reply(seen);
+
+      const rail = clearRail();
+      const link = await linkedClear(userId);
+      const to = await rail.depositAddress(await businessOwner(businessId), accountDirectory(db));
+      const check = await rail.verifyTransfer({ businessId, txHash, from: link.address, to, amountMicros: input.amountMicros });
+      if (check.status === "failed") throw refused("transfer_not_valid", check.reason);
+      const [source] = await db
+        .select({ id: schema.fundingSources.id })
+        .from(schema.fundingSources)
+        .where(and(eq(schema.fundingSources.advertiserId, businessId), eq(schema.fundingSources.clearLinkId, link.id), sql`${schema.fundingSources.removedAt} is null`));
+      const [deposit] = await db
+        .insert(D)
+        .values({ advertiserId: businessId, fundingSourceId: source?.id ?? null, amountMicros: input.amountMicros, feeMicros: 0, status: "pending", txHash, fromAddress: link.address, providerRef: `tx:${txHash}` })
+        .onConflictDoNothing()
+        .returning();
+      if (!deposit) {
+        // Confirmed twice at once: the other request recorded it.
+        const [other] = await db.select().from(D).where(eq(D.txHash, txHash));
+        return reply(other);
+      }
+      if (check.status === "confirmed") await service.completeDeposit(deposit.id);
+      return { depositId: deposit.id, status: check.status === "confirmed" ? "arrived" : "pending", balance: await service.balance(businessId) };
+    },
+
+    async recheckClearTransfers() {
+      if (!deps.payments.clearWallet) return { arrived: 0, failed: 0 };
+      const pending = await db
+        .select()
+        .from(schema.deposits)
+        .where(and(eq(schema.deposits.status, "pending"), sql`${schema.deposits.txHash} is not null`))
+        .orderBy(asc(schema.deposits.createdAt))
+        .limit(100);
+      let arrived = 0;
+      let failed = 0;
+      for (const deposit of pending) {
+        const status = await settleClearTransfer(deposit).catch((error) => {
+          console.error(`[ledger] checking the Clear transfer for deposit ${deposit.id} failed`, error);
+          return "pending" as const;
+        });
+        if (status === "arrived") arrived++;
+        if (status === "failed") failed++;
+      }
+      return { arrived, failed };
+    },
+
     async completeDeposit(depositId) {
       const businessId = await db.transaction(async (tx) => {
         const [deposit] = await tx.select().from(schema.deposits).where(eq(schema.deposits.id, depositId)).for("update");
@@ -745,7 +917,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         const [source] = deposit.fundingSourceId
           ? await tx.select().from(schema.fundingSources).where(eq(schema.fundingSources.id, deposit.fundingSourceId))
           : [];
-        const kind = source?.kind ?? "clear_bank";
+        const kind = source?.kind ?? (deposit.txHash ? "clear_account" : "clear_bank");
         const external = await service.account(tx, "external", { label: kind === "card" ? "stripe" : "clear" });
         const entryId = await service.post(
           tx,
@@ -781,6 +953,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.deposits.id, depositId), eq(schema.deposits.advertiserId, businessId)));
       if (!deposit) throw notFound("That deposit");
       if (deposit.status !== "pending") throw refused("already_arrived", "That money has arrived. Take it out instead.");
+      // A transfer from a Clear wallet is already on chain: it arrives once it's checked.
+      if (deposit.txHash) throw refused("not_cancellable", "A transfer from Clear can't be undone here.");
       if (deposit.providerRef) await deps.payments.cancelDeposit(deposit.providerRef);
       await db.update(schema.deposits).set({ status: "cancelled" }).where(eq(schema.deposits.id, depositId));
       return service.balance(businessId);
@@ -793,6 +967,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.fundingSources.id, input.fundingSourceId), eq(schema.fundingSources.advertiserId, businessId)));
       if (!source) throw notFound("That funding source");
       if (source.kind === "card") throw refused("not_to_a_card", "Money goes back to a bank or Clear account, not a card.");
+      if (source.clearLinkId && !(await services.accounts.clearLinkById(source.clearLinkId))?.active) {
+        throw conflict("clear_unlinked", "That Clear wallet isn't linked anymore. Connect Clear again to use it.");
+      }
       const available = await service.account(db, "advertiser_available", { advertiserId: businessId });
       if ((await balanceOf([available])) < input.amountMicros) throw refused("insufficient_balance", "That's more than you have available. Held money stays held.");
       // Out of the balance first; if the provider refuses, a reversal puts it back.
@@ -897,6 +1074,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .from(schema.pledges)
         .where(and(eq(schema.pledges.stationId, stationId), gte(schema.pledges.startedAt, from)));
       const payoutAccount = kind === "escrow_owed" ? null : await service.payoutAccount(stationId).catch(() => null);
+      const rule = await services.stations.breakRule(stationId);
 
       return {
         period,
@@ -908,7 +1086,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           carriageOut: { micros: carriageOut, detail: "Programs you carry" },
           production: { micros: production, orders: rows.filter((r) => r.entry.sourceType === "production_order").length },
           opencastShare: { micros: -cut("opencast_share"), notSetYet: config.opencastSpotShareBps === 0 },
-          pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 }
+          pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 },
+          // Paid when the partner pays (30 to 90 days after airing), so nothing is ever held for it.
+          partnerAds: { on: rule.adsFromPartners, micros: 0, pendingMicros: 0 }
         },
         totalMicros: rows.reduce((s, r) => s + r.amount, 0),
         held: {
@@ -921,7 +1101,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         nextPayout:
           kind === "escrow_owed"
             ? null
-            : { on: nextPayoutOn.toISOString().slice(0, 10), schedule: config.payoutSchedule, destination: payoutAccount?.status === "active" ? "Your account" : null }
+            : { on: nextPayoutOn.toISOString().slice(0, 10), schedule: config.payoutSchedule, destination: payoutAccount?.status === "active" ? payoutAccount.destination.label : null }
       };
     },
 
@@ -1048,8 +1228,37 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async payoutAccount(stationId) {
+      const [chosen] = await db.select().from(schema.payoutDestinations).where(eq(schema.payoutDestinations.stationId, stationId));
+      if (chosen?.kind === "clear_wallet" && chosen.clearLinkId) {
+        // Only while it's still linked, and its person still owns the station.
+        const link = await services.accounts.clearLinkById(chosen.clearLinkId);
+        const owners = link ? await services.accounts.stationMemberIds(stationId, ["owner"]) : [];
+        const usable = Boolean(link?.active && owners.includes(link.userId));
+        const label = !link?.active ? "Clear wallet (not linked anymore)" : usable ? `Clear wallet ${shortAddress(link.address)}` : "Clear wallet (a former owner's)";
+        return { status: usable ? "active" : "needs_onboarding", url: null, destination: { kind: "clear_wallet", label, address: link?.address ?? null } };
+      }
       const ident = (await services.stations.idents([stationId])).get(stationId);
-      return deps.payments.payoutAccount({ type: "station", id: stationId, name: ident?.name ?? "Station" }, accountDirectory(db));
+      const account = await deps.payments.payoutAccount({ type: "station", id: stationId, name: ident?.name ?? "Station" }, accountDirectory(db));
+      const destination =
+        deps.payments.name === "stripe_only"
+          ? { kind: "stripe_connect" as const, label: "Stripe", address: null }
+          : { kind: "clear_account" as const, label: "The station's Clear account", address: null };
+      return { ...account, destination };
+    },
+
+    async setPayoutDestination(stationId, userId, kind) {
+      if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
+      let clearLinkId: string | null = null;
+      if (kind === "clear_wallet") {
+        clearRail();
+        clearLinkId = (await linkedClear(userId)).id;
+      }
+      const values = { stationId, kind, clearLinkId, setBy: userId, updatedAt: deps.clock.now() };
+      await db
+        .insert(schema.payoutDestinations)
+        .values(values)
+        .onConflictDoUpdate({ target: schema.payoutDestinations.stationId, set: { kind, clearLinkId, setBy: userId, updatedAt: values.updatedAt } });
+      return service.payoutAccount(stationId);
     },
 
     sendMoves: () => sendMoves(deps),

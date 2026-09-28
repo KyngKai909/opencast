@@ -43,7 +43,9 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 | `LEGACY_PLAYOUT` | | `off` | no station is on the old queue model |
 | `JOBS` | `off` | | the minute jobs run in the worker |
 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | ✓ | ✓ | staging: the Railway bucket `media` (virtual-host URLs; `S3_STORAGE_CLASSES=false`; it doesn't verify upload checksums, so only reads catch a bad copy). Production: Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_PUBLIC_BASE` too) |
-| `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET` | ✓ | ✓ | sign-in; without them signed-in endpoints answer 401 |
+| `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET` | ✓ | ✓ | sign-in, with Opencast's own Privy app (never Clear's: the API refuses to start with Clear's app ID); without them signed-in endpoints answer 401. The API also needs the secret to read a linked Clear wallet |
+| `CLEAR_PRIVY_PROVIDER_APP_ID` | ✓ | | Clear's Privy app ID, as the global-wallet provider (docs/clear-integration.md). Unset: "Connect Clear" answers 409 |
+| `CLEAR_WALLET_ACCESS` | ✓ | | `read_only` (default) or `full`: what Clear has granted Opencast in Clear's Privy dashboard. The API can't detect it |
 | `LIVEPEER_API_KEY` | ✓ | ✓ | live sources and the Livepeer output |
 | `PAYMENTS_PROVIDER` | ✓ | ✓ | `fake` on staging; `clear` or `stripe_only` in production (docs/clear-integration.md) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓ | ✓ | test keys on staging, live only in production. Webhook: `https://<api>/v1/webhooks/stripe` |
@@ -51,6 +53,7 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 | `SETTLEMENT_PRIVATE_KEY` | | ✓ | the wallet that sends the weekly escrow batch and the pool's fund share. Worker only |
 | `API_PROXY_BASE_URL` | | | control: `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8080` |
 | `VITE_API_BASE` | | | the web apps, at build: the API's public URL |
+| `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` | | | control and spots, at build: Clear's Privy app ID for "Connect Clear" (`linkCrossAppAccount`). The same value as the API's `CLEAR_PRIVY_PROVIDER_APP_ID` |
 
 Per-service examples: `apps/<service>/.env.example`.
 
@@ -77,7 +80,8 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 2. **Code.** Merge `monorepo` into `main` (a PR; never force-push `main`). Production builds `main`.
 3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs.
 4. **Keys.** Make fresh ones for production. Don't reuse the old project's Livepeer or Pinata keys, which are to be rotated:
-   - Privy: a production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed;
+   - Privy: Opencast's own production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed, and embedded wallets created only for people who sign in;
+   - Clear: its provider app ID (`CLEAR_PRIVY_PROVIDER_APP_ID` on api, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` on control and spots) and `CLEAR_WALLET_ACCESS`, once Clear has requested global-wallet provider access in its own Privy dashboard and allowed Opencast's app;
    - Livepeer: a new API key;
    - Stripe: live `STRIPE_SECRET_KEY`, plus a webhook to `https://<api>/v1/webhooks/stripe` for its `STRIPE_WEBHOOK_SECRET`;
    - `PAYMENTS_PROVIDER`: `stripe_only` until Clear has what docs/clear-integration.md lists, then `clear`.

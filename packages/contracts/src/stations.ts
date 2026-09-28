@@ -255,7 +255,9 @@ export const stationsApi = {
       legalContact: z.string().nullable().optional(),
       pledgesTaxDeductible: z.boolean().nullable().optional(),
       memberCreditStyle: z.enum(["voice", "text"]).optional(),
-      orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().max(80).nullable(), fromMicros: z.number().int().nonnegative().nullable() }).partial().optional()
+      orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().max(80).nullable(), fromMicros: z.number().int().nonnegative().nullable() }).partial().optional(),
+      /** IAB Content Taxonomy 3.0 ids to use instead of the ones derived from the category (added 2026-09-28); null goes back to derived. */
+      iabCategories: z.array(z.string().regex(/^[A-Za-z0-9]{1,8}$/)).min(1).max(10).nullable().optional()
     }),
     response: StationSetup
   }),

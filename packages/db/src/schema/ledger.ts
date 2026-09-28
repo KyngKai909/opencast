@@ -3,7 +3,7 @@ import { type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, 
 import { at, createdAt, id, micros } from "./columns.js";
 import { ledger } from "./namespaces.js";
 import { stations } from "./broadcast.js";
-import { users } from "./accounts.js";
+import { clearLinks, users } from "./accounts.js";
 import { advertisers, spotsTable, sponsorships, productionOrders } from "./spots.js";
 
 export const accountKind = ledger.enum("account_kind", [
@@ -165,25 +165,34 @@ export const fundingSources = ledger.table("funding_sources", {
   label: text("label").notNull(),
   providerRef: text("provider_ref"),
   isDefault: boolean("is_default").notNull().default(false),
+  /** A business owner's linked Clear wallet (Privy global wallet): withdrawals can go to it while it stays linked. */
+  clearLinkId: uuid("clear_link_id").references(() => clearLinks.id),
   removedAt: at("removed_at"),
   createdAt: createdAt()
 });
 
 /** A deposit on its way ("Arrives Tuesday", with Undo). Money lands through a `deposit` entry. */
-export const deposits = ledger.table("deposits", {
-  id: id(),
-  advertiserId: uuid("advertiser_id")
-    .notNull()
-    .references(() => advertisers.id),
-  fundingSourceId: uuid("funding_source_id").references(() => fundingSources.id),
-  amountMicros: micros("amount_micros").notNull(),
-  feeMicros: micros("fee_micros").notNull().default(0),
-  providerRef: text("provider_ref"),
-  expectedAt: at("expected_at"),
-  status: text("status", { enum: ["pending", "arrived", "cancelled", "failed"] }).notNull().default("pending"),
-  entryId: uuid("entry_id").references(() => entries.id),
-  createdAt: createdAt()
-});
+export const deposits = ledger.table(
+  "deposits",
+  {
+    id: id(),
+    advertiserId: uuid("advertiser_id")
+      .notNull()
+      .references(() => advertisers.id),
+    fundingSourceId: uuid("funding_source_id").references(() => fundingSources.id),
+    amountMicros: micros("amount_micros").notNull(),
+    feeMicros: micros("fee_micros").notNull().default(0),
+    providerRef: text("provider_ref"),
+    expectedAt: at("expected_at"),
+    status: text("status", { enum: ["pending", "arrived", "cancelled", "failed"] }).notNull().default("pending"),
+    /** A transfer from a linked Clear wallet: its transaction (lower-case), used once, and the wallet it came from. */
+    txHash: text("tx_hash"),
+    fromAddress: text("from_address"),
+    entryId: uuid("entry_id").references(() => entries.id),
+    createdAt: createdAt()
+  },
+  (t) => [uniqueIndex("deposits_tx_hash").on(t.txHash).where(sql`${t.txHash} is not null`)]
+);
 
 /** A payout to a station, producer or advertiser. Money leaves through a `payout` or `withdrawal` entry. */
 export const payouts = ledger.table("payouts", {
@@ -234,6 +243,26 @@ export const pledges = ledger.table("pledges", {
   startedAt: at("started_at").notNull().defaultNow(),
   endsAfter: date("ends_after")
 });
+
+/**
+ * Where a station is paid, when it isn't its own Clear account (or Stripe Connect): the owner's
+ * linked Clear wallet. Payouts wait if that wallet is unlinked or its owner no longer owns the station.
+ */
+export const payoutDestinations = ledger.table(
+  "payout_destinations",
+  {
+    stationId: uuid("station_id")
+      .primaryKey()
+      .references(() => stations.id),
+    kind: text("kind", { enum: ["clear_account", "clear_wallet"] }).notNull().default("clear_account"),
+    clearLinkId: uuid("clear_link_id").references(() => clearLinks.id),
+    setBy: uuid("set_by")
+      .notNull()
+      .references(() => users.id),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [check("clear_wallet_has_link", sql`${t.kind} <> 'clear_wallet' or ${t.clearLinkId} is not null`)]
+);
 
 /** A weekly deposit batch into the escrow contract. */
 export const escrowDeposits = ledger.table("escrow_deposits", {

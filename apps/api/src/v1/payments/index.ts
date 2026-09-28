@@ -7,6 +7,7 @@
 // Clear's API isn't wired yet (see docs/clear-integration.md), so "clear" runs against the
 // in-memory fake Clear and says so.
 
+import { usdcFromEnv } from "../chain/usdc.js";
 import { clearPayments, fakeClear } from "./clear.js";
 import { fakePayments } from "./fake.js";
 import { StripeCards } from "./stripe.js";
@@ -32,7 +33,8 @@ export function paymentsFromEnv(env: NodeJS.ProcessEnv, clock: { now(): Date }, 
   }
   if (provider === "clear") {
     console.warn(`[v1] payments: Clear (the in-memory fake Clear until its API is wired)${stripe ? ", Stripe for cards" : ", cards faked"}.`);
-    return clearPayments(fakeClear(), stripe, fakePayments(clock));
+    // Transfers from linked Clear wallets are checked on chain when CHAIN_RPC_URL, CHAIN_ID and USDC_ADDRESS are set.
+    return clearPayments(fakeClear(), stripe, fakePayments(clock), { usdc: usdcFromEnv(env) });
   }
   console.warn("[v1] payments: using the local fake. No real money moves.");
   return fakePayments(clock);

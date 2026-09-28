@@ -60,6 +60,9 @@ export default defineRailway((ctx) => {
     PRIVY_APP_ID: secret(),
     PRIVY_VERIFICATION_KEY: secret(),
     PRIVY_APP_SECRET: secret(),
+    // Clear as a Privy global wallet (docs/clear-integration.md): Clear's provider app, and what it shares.
+    CLEAR_PRIVY_PROVIDER_APP_ID: secret(),
+    CLEAR_WALLET_ACCESS: "read_only",
     LIVEPEER_API_KEY: secret(),
     // The escrow contract and creator fund (Base Sepolia on staging, Base in production); unset, claimable earnings stay owed.
     CHAIN_RPC_URL: secret(),
@@ -108,16 +111,17 @@ export default defineRailway((ctx) => {
     source,
     build: build("@opencast/control", ["apps/control/**"]),
     deploy: { startCommand: "npm run start -w @opencast/control", healthcheckPath: "/health", healthcheckTimeout: 300, ...restart },
-    env: { API_PROXY_BASE_URL: "http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8080" }
+    env: { API_PROXY_BASE_URL: "http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8080", VITE_PRIVY_APP_ID: secret(), VITE_CLEAR_PRIVY_PROVIDER_APP_ID: secret() }
   });
 
-  // The apps prompt's web apps (empty scaffolds until it builds them): static, served from dist.
+  // The apps prompt's web apps: static, served from dist.
   const web = (name: string) =>
     service(name, {
       source,
       build: build(`@opencast/${name}`, [`apps/${name}/**`, "scripts/serve-static.mjs"]),
       deploy: { startCommand: `node scripts/serve-static.mjs apps/${name}/dist`, healthcheckPath: "/health", healthcheckTimeout: 120, ...restart },
-      env: { VITE_API_BASE: origin("api") }
+      // Opencast's own Privy app (build time), and Clear's provider app for "Connect Clear".
+      env: { VITE_API_BASE: origin("api"), VITE_PRIVY_APP_ID: secret(), VITE_CLEAR_PRIVY_PROVIDER_APP_ID: secret() }
     });
 
   return project("opencast", {

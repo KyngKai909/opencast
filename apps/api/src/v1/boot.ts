@@ -1,6 +1,7 @@
 // Builds the v1 API from the environment: the API server and the worker both use this.
 import { createDb } from "@opencast/db";
 import { privyVerifier } from "./auth.js";
+import { clearLookupFromEnv } from "./clearLink.js";
 import type { Deps } from "./context.js";
 import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
@@ -17,6 +18,10 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   }
   if (!env.PRIVY_APP_ID) {
     console.warn("[v1] PRIVY_APP_ID isn't set: signed-in endpoints will answer 401 until it is.");
+  }
+  if (env.PRIVY_APP_ID && env.PRIVY_APP_ID === env.CLEAR_PRIVY_PROVIDER_APP_ID) {
+    // Opencast would accept tokens issued to Clear's app. It needs its own.
+    throw new Error("PRIVY_APP_ID is Clear's Privy app. Opencast needs its own Privy app (see docs/clear-integration.md).");
   }
   const { db } = createDb(databaseUrl);
   const clock = { now: () => new Date() };
@@ -39,10 +44,12 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       verificationKey: env.PRIVY_VERIFICATION_KEY || undefined,
       privyAppSecret: env.PRIVY_APP_SECRET || undefined
     }),
+    clear: clearLookupFromEnv(env),
     config: {
       storageRoot,
       appOrigin,
       escrowContractAddress: chain?.escrow ?? (env.ESCROW_CONTRACT_ADDRESS || null),
+      usdc: env.CHAIN_ID && env.USDC_ADDRESS ? { chainId: Number(env.CHAIN_ID), address: env.USDC_ADDRESS } : null,
       production: env.NODE_ENV === "production"
     }
   };

@@ -12,6 +12,15 @@ All additive; nothing existing changed shape.
 - `StationEarnings.lines.partnerAds` (optional): `{ on, micros, pendingMicros }`, "Ads from partners, paid when received".
 - `BreakRule.adsFromPartners` (optional boolean, off by default): the station's switch. Only a flag until partner ads are built.
 - `StationSetup.iabCategories` and `Program.iabCategories` (optional): IAB Content Taxonomy 3.0 ids. `Program.rating` (optional, `ContentRating`: TV-Y to TV-MA) and `Program.childDirected` (optional boolean), also accepted by `createProgram` and `updateProgram`.
+- `updateSetup` and `updateProgram` accept `iabCategories` (optional; 1 to 10 IAB ids, or null to go back to the ones derived from the category), so the overrides can be set. Derived: the program's category, else its station's, else Entertainment (`JLBCU7`); the mapping is `packages/domain/src/ads.ts`.
+- `createProgram` with a children's rating (TV-Y, TV-Y7) and no `childDirected` makes it child-directed; so does `updateProgram` setting one.
+
+How the backend answers (no shape changes):
+
+- `addFundingSource` with `{ kind: "clear_account", token: "linked" }` adds the caller's linked Clear wallet (owner only), labelled "Clear wallet 0x1234…abcd". Withdrawals can go to it; `addMoney` from it answers 409 `clear_transfer_needed` (money from a Clear wallet comes in by the transfer flow). It drops out of `fundingSources` once the wallet is unlinked.
+- Errors, all `{ error: { code, message } }`: 409 `clear_not_linked` ("Clear isn't linked yet." from `linkClear`; "Clear isn't linked yet. Connect Clear first." elsewhere), 409 `clear_not_configured` (the server has no Clear provider app ID or Privy secret), 502 `privy_unavailable`, 409 `clear_read_only` (quote with a read-only link), 409 `clear_unavailable` (no Clear on this server, or no USDC configured), 409 `transfer_already_used` (the transaction was recorded for another business or amount), 422 `transfer_not_valid` (it didn't send at least the amount from the linked wallet to the business's account), 409 `clear_unlinked` (a withdrawal or payout to a wallet that's no longer linked), 422 `not_cancellable` (cancelling a transfer from Clear).
+- `confirmClearTransfer` is idempotent on the transaction hash: the same hash again returns the same `depositId`. `status` is `pending` until the chain confirms it (the jobs tick checks again each minute).
+- `getPayoutAccount.destination`: `{ kind: "clear_account", label: "The station's Clear account" }`, `{ kind: "stripe_connect", label: "Stripe" }`, or `{ kind: "clear_wallet", label: "Clear wallet 0x1234…abcd", address }`. A Clear wallet that's unlinked, or whose person no longer owns the station, shows `status: "needs_onboarding"` and payouts wait. `StationEarnings.nextPayout.destination` uses the same label.
 
 ## 2026-09-28: claims on-chain
 

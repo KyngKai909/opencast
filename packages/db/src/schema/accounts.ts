@@ -192,3 +192,31 @@ export const devices = accounts.table("devices", {
   signedOutAt: at("signed_out_at"),
   createdAt: createdAt()
 });
+
+/**
+ * A person's Clear wallet, linked through Privy's cross-app linking: Clear's Privy app is the
+ * provider, Opencast's the requester. Nothing about a Clear account is known until the person
+ * links it. `access` is what Clear granted Opencast when it was linked (Clear's dashboard setting):
+ * read-only (verify the address, pay out to it) or full (also request transfers the person
+ * confirms). Unlinking keeps the row, so funding sources and payouts that used it can tell.
+ */
+export const clearLinks = accounts.table(
+  "clear_links",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    /** The Clear wallet's address (the cross-app account's embedded wallet), checksummed. */
+    address: text("address").notNull(),
+    /** The person's user ID in Clear's Privy app (the cross-app account's subject). */
+    subject: text("subject").notNull(),
+    /** Clear's provider app ID it was linked through. */
+    providerAppId: text("provider_app_id").notNull(),
+    access: text("access", { enum: ["read_only", "full"] }).notNull(),
+    linkedAt: at("linked_at").notNull(),
+    unlinkedAt: at("unlinked_at"),
+    createdAt: createdAt()
+  },
+  (t) => [uniqueIndex("clear_links_one_per_user").on(t.userId).where(sql`${t.unlinkedAt} is null`)]
+);

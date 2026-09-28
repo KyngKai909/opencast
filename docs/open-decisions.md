@@ -20,6 +20,7 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | When a spot pauses for balance: when available "runs out" (prompt) or "drops below a day of budget" (design) | spots, Phase 6 | the design's rule, below a day |
 | Sponsorships: held monthly and released at month end (prompt), or accrued weekly (the earnings design shows weekly lines)? | ledger, Phase 6 | the prompt's rule, monthly |
 | Code window: "used within 7 days" of an airing, but a saved offer shows "until" 14 days after saving | `spots.codes.window_days` | 7 |
+| Can Opencast open a Clear business account on someone's behalf during sign-up, or must they open it in Clear first? A Clear business account lives in Clear's own systems and Privy app; Opencast reaches it only through the linked global wallet and Clear's API | `ClearClient.openAccount` (docs/clear-integration.md) | they open it in Clear first |
 
 ## Money behaviour decided while building Phase 6 (say if any should change)
 
@@ -35,6 +36,15 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Statements | Weekly for stations (Mondays), monthly for businesses (the 1st); CSV at `GET /v1/statements/:id/csv` |
 | Cash carriage | Charged when the episode airs, once per log slot; per hour uses the slot's length |
 | Opencast's settlement wallet | The chain job signs with `SETTLEMENT_PRIVATE_KEY`; with Clear, the settlement Clear account must be that wallet (docs/clear-integration.md) |
+
+## Ads from partners (not built; docs/architecture.md says what's ready)
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| The provider: Google Ad Manager's Dynamic Ad Insertion, AWS Elemental MediaTailor, or another, behind the `adfill` interface | playout, when built | none: the switch (`BreakRule.adsFromPartners`) changes nothing yet |
+| Whether to start through a FAST aggregator's demand, if exchanges won't take Opencast directly at launch | when built | through an aggregator, if needed |
+| Opencast's share of ads from partners, and whether the pool applies | `revenue_config`, when built | 0 ("Not set yet"), as for spots |
+| Whether the IAB mappings for Opencast's categories (`packages/domain/src/ads.ts`) are right, and which categories to add | domain | Classic maps to Movies and Television; Public affairs to Politics and Civic affairs |
 
 ## The escrow contract and the creator fund
 

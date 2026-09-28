@@ -2,13 +2,15 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-187 endpoints in 13 modules.
+192 endpoints in 13 modules.
 
-## accounts (24)
+## accounts (26)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `getMe` | GET | `/me` | signed in | The signed-in person, their identities, stations and businesses |
+| `linkClear` | POST | `/me/clear` | signed in | After the app links Clear with Privy's cross-app linking, record it: the API reads the person's Clear cross-app account from Privy and stores its address and access. 409 if Privy has no Clear account linked. |
+| `unlinkClear` | DELETE | `/me/clear` | signed in | Forget the linked Clear account (the app also unlinks it in Privy). Funding sources and payout destinations that used it stop working. |
 | `updateMe` | PATCH | `/me` | signed in | Change display name, market or settings |
 | `mergeDevice` | POST | `/me/merge-device` | signed in | Keep presets and reminders saved on this device before signing in |
 | `listPresets` | GET | `/me/presets` | signed in | Presets in order |
@@ -174,7 +176,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
 
-## ledger (16)
+## ledger (19)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -183,6 +185,8 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `addFundingSource` | POST | `/businesses/:businessId/funding-sources` | signed in | Link a bank through Clear, a card through Stripe, or a Clear business account (owner only). The token comes from the provider's own widget. |
 | `quoteDeposit` | POST | `/businesses/:businessId/deposits/quote` | signed in | The fee in dollars before paying (card: Stripe's fee at cost; bank and Clear: none), and roughly how many airings |
 | `addMoney` | POST | `/businesses/:businessId/deposits` | signed in | Add money (owner, manager). Bank transfers arrive in 1 to 2 business days and can be undone until then. |
+| `quoteClearTransfer` | POST | `/businesses/:businessId/deposits/clear-transfer/quote` | signed in | Funding from a linked Clear wallet with full access (owner, manager): where to send it. The app asks Clear to send it (the person confirms on Clear's page), then confirms with the transaction hash. 409 when the person's Clear link is read-only or missing. |
+| `confirmClearTransfer` | POST | `/businesses/:businessId/deposits/clear-transfer` | signed in | The transfer from Clear was sent: the API checks it on chain (from the person's linked Clear wallet, to the business's account, at least the amount) and credits the balance once it confirms |
 | `cancelDeposit` | POST | `/businesses/:businessId/deposits/:depositId/cancel` | signed in | Undo a deposit that hasn't arrived |
 | `withdraw` | POST | `/businesses/:businessId/withdrawals` | signed in | Take out unheld money (owner only) |
 | `listStatements` | GET | `/businesses/:businessId/statements` | signed in | Monthly statements with every airing |
@@ -190,6 +194,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listStationStatements` | GET | `/stations/:stationId/statements` | signed in | Weekly statements; the CSV has the ledger entries behind each line |
 | `getStatementCsv` | GET | `/statements/:statementId/csv` | signed in | A statement's ledger entries as CSV (the business's team, or the station's owners) |
 | `getPayoutAccount` | GET | `/stations/:stationId/payout-account` | signed in | Where the station is paid (its Clear account, or Stripe Connect), and a link if it has to finish setting it up (owner only) |
+| `setPayoutDestination` | PUT | `/stations/:stationId/payout-account` | signed in | Pay the station out to the owner's linked Clear wallet (read-only access is enough), or back to its Clear account (owner only) |
 | `moveToBank` | POST | `/stations/:stationId/payouts` | signed in | Move earnings to the bank now (owner only) |
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |
 | `listMyPledges` | GET | `/me/pledges` | signed in | My pledges |
