@@ -535,7 +535,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             { account: stationAccount, micros: -producerPart },
             { account: await service.account(tx, await stationAccountKind(input.barter.producerStationId), { stationId: input.barter.producerStationId }), micros: producerPart }
           ],
-          { sourceType: "agreement", sourceId: input.barter.agreementId, memo: `Barter share of ${input.source.sourceId ?? "an airing"}` }
+          { sourceType: "agreement", sourceId: input.barter.agreementId, memo: `The producer's barter share (${(input.source.memo ?? "an airing").toLowerCase()})` }
         );
       }
 

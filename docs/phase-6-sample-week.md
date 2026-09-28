@@ -42,7 +42,7 @@ Each entry balances: money into an account is positive, out is negative.
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
-| 11:00 PM | barter_split | Barter share of 637d28a9-e91b-4f51-89b4-35dd30539e3b | BEAT: earnings −$4.00<br>REEL: earnings $4.00 |
+| 11:00 PM | barter_split | The producer's barter share (aired on beat 12.1) | BEAT: earnings −$4.00<br>REEL: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.65<br>Orange Street Coffee: available $0.65 |
@@ -107,8 +107,8 @@ Each entry balances: money into an account is positive, out is negative.
 | 11:00 PM | release |  | Held (all businesses) −$0.35<br>Orange Street Coffee: available $0.35 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
-| 11:00 PM | release |  | Held (all businesses) −$0.30<br>Orange Street Coffee: available $0.30 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
+| 11:00 PM | release |  | Held (all businesses) −$0.30<br>Orange Street Coffee: available $0.30 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
 
 ### Friday, October 9
