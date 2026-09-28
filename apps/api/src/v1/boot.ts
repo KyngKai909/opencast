@@ -18,6 +18,10 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   if (!env.PRIVY_APP_ID) {
     console.warn("[v1] PRIVY_APP_ID isn't set: signed-in endpoints will answer 401 until it is.");
   }
+  if (env.PRIVY_APP_ID && env.PRIVY_APP_ID === env.CLEAR_PRIVY_PROVIDER_APP_ID) {
+    // Opencast would accept tokens issued to Clear's app. It needs its own.
+    throw new Error("PRIVY_APP_ID is Clear's Privy app. Opencast needs its own Privy app (see docs/clear-integration.md).");
+  }
   const { db } = createDb(databaseUrl);
   const clock = { now: () => new Date() };
   const appOrigin = env.APP_ORIGIN ?? "http://localhost:5174";

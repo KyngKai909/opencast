@@ -1,6 +1,12 @@
 // Privy sign-in. The apps send Privy's access token (a JWT signed with the app's
 // ES256 key) as `Authorization: Bearer <token>` or the `privy-token` cookie.
 // We verify it against the app's verification key, or its JWKS when no key is set.
+//
+// Opencast has its own Privy app, separate from Clear's: its ID and secret come from
+// configuration (PRIVY_APP_ID, PRIVY_APP_SECRET), so anyone self-hosting uses their own. Only
+// tokens issued to that app verify (the audience is the app ID). Embedded wallets are created by
+// Privy only for people who sign in; the API never makes or shares one. Clear is reached as a
+// global wallet the person links (docs/clear-integration.md), never through Opencast's app.
 
 import { createRemoteJWKSet, importSPKI, jwtVerify, type JWTVerifyGetKey } from "jose";
 

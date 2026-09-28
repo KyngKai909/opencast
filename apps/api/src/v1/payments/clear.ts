@@ -1,7 +1,10 @@
 // The Clear adapter. Clear holds every advertiser's and station's money: each gets a Clear
-// business account (a Privy organization wallet holding USDC), with bank deposits and payouts
-// through Clear's own stack. A hold on an airing is an encumbrance on the advertiser's balance;
-// settlement moves USDC from the advertiser's account to the station's. Stripe is the card on-ramp.
+// business account holding USDC, with bank deposits and payouts through Clear's own stack. That
+// account lives in Clear's own systems and Clear's own Privy app, not Opencast's: Opencast reaches
+// it only through Clear's API (this client) and, for a person's own Clear wallet, the global
+// wallet they link through Privy's cross-app linking (docs/clear-integration.md). A hold on an
+// airing is an encumbrance on the advertiser's balance; settlement moves USDC from the
+// advertiser's account to the station's. Stripe is the card on-ramp.
 //
 // `ClearClient` is the shape Opencast needs from Clear, not Clear's API: what exists and what's
 // missing is listed in docs/clear-integration.md. Until a real client is written against Clear's
@@ -24,7 +27,11 @@ import {
 } from "./types.js";
 
 export interface ClearClient {
-  /** A Clear business account for an advertiser or station (or Opencast). `needs_verification` comes with Clear's hosted KYB link. */
+  /**
+   * A Clear business account for an advertiser or station (or Opencast). `needs_verification` comes
+   * with Clear's hosted KYB link. Whether Clear lets Opencast open one on someone's behalf is open
+   * (docs/open-decisions.md); under the safe default they open it in Clear first, and this finds it.
+   */
   openAccount(input: { owner: Owner; legalName: string; idempotencyKey: string }): Promise<{ accountId: string; status: "active" | "needs_verification"; verificationUrl: string | null }>;
   /** Links a bank from a Plaid Link public token. */
   linkBank(input: { accountId: string; plaidPublicToken: string }): Promise<{ bankRef: string; label: string }>;

@@ -20,6 +20,7 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | When a spot pauses for balance: when available "runs out" (prompt) or "drops below a day of budget" (design) | spots, Phase 6 | the design's rule, below a day |
 | Sponsorships: held monthly and released at month end (prompt), or accrued weekly (the earnings design shows weekly lines)? | ledger, Phase 6 | the prompt's rule, monthly |
 | Code window: "used within 7 days" of an airing, but a saved offer shows "until" 14 days after saving | `spots.codes.window_days` | 7 |
+| Can Opencast open a Clear business account on someone's behalf during sign-up, or must they open it in Clear first? A Clear business account lives in Clear's own systems and Privy app; Opencast reaches it only through the linked global wallet and Clear's API | `ClearClient.openAccount` (docs/clear-integration.md) | they open it in Clear first |
 
 ## Money behaviour decided while building Phase 6 (say if any should change)
 

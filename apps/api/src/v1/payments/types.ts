@@ -4,8 +4,9 @@
 //
 // Three adapters implement it:
 // - clear: Clear holds every station's and advertiser's money (a Clear business account each,
-//   USDC in a Privy organization wallet); a hold is an encumbrance on the advertiser's balance.
-//   Stripe is the card on-ramp (advertisers' card top-ups, viewers' pledges).
+//   holding USDC, in Clear's own systems and Privy app, reached through Clear's API); a hold is
+//   an encumbrance on the advertiser's balance. Stripe is the card on-ramp (advertisers' card
+//   top-ups, viewers' pledges).
 // - stripe_only: for anyone running Opencast without Clear. Advertisers' money sits in the
 //   platform's Stripe balance; stations are paid through Stripe Connect Express.
 // - fake: local development and tests. Moves nothing; keeps a mirror of every wallet.
