@@ -1,0 +1,12 @@
+/* Sign-in (viewer/you 01.1 .auth-opts, .or). */
+.cc-signin { min-height: 100vh; display: grid; place-items: center; padding: var(--s5) 16px; background: var(--ground); color: var(--ink); }
+.cc-signin__card { width: min(100%, 380px); display: flex; flex-direction: column; gap: 10px; }
+.cc-signin__kicker { margin: 0; font-size: 12.5px; color: var(--ink-50); }
+.cc-signin__h { margin: 0 0 8px; font: 800 24px/1.15 var(--font-display); font-stretch: 112%; letter-spacing: -.02em; }
+.cc-signin__p, .cc-signin__note { margin: 0; color: var(--ink-70); font-size: 14px; }
+.cc-signin__send { width: 100%; margin-top: 10px; }
+.cc-signin__or { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-50); margin: 8px 0; }
+.cc-signin__or::before, .cc-signin__or::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+.cc-signin__opts { display: flex; flex-direction: column; gap: 10px; }
+.cc-signin__row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-signin__foot { margin: 14px 0 0; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12.5px; color: var(--ink-50); line-height: 1.45; }

@@ -1,13 +1,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import "./styles.css";
+import "@opencast/ui/styles.css";
+import "@opencast/player/styles.css";
+import "./app.css";
+import { config } from "./config";
+import { App } from "./App";
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <BrowserRouter>
+async function boot() {
+  if (config.mock) {
+    const { startMocks } = await import("./mocks/browser");
+    await startMocks();
+  }
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
       <App />
-    </BrowserRouter>
-  </StrictMode>
-);
+    </StrictMode>
+  );
+}
+
+void boot();

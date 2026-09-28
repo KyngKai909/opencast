@@ -1,0 +1,24 @@
+// The Live and programming area's routes, under `/:callSign`.
+
+import { Route } from "react-router";
+import Library from "./Library";
+import LibraryItem from "./LibraryItem";
+import Listings from "./Listings";
+import LiveBlock from "./LiveBlock";
+import LiveSources from "./LiveSources";
+import Rehearse from "./Rehearse";
+
+export const liveStationRoutes = (
+  <>
+    <Route path="live-sources" element={<LiveSources />} />
+    <Route path="live-sources/:sourceId" element={<LiveSources />} />
+    <Route path="live-sources/:sourceId/rehearse" element={<Rehearse />} />
+    <Route path="live" element={<LiveBlock />} />
+    <Route path="live/:entryId" element={<LiveBlock />} />
+    <Route path="listings" element={<Listings />} />
+    <Route path="listings/:entryId" element={<Listings />} />
+    <Route path="library" element={<Library />} />
+    <Route path="library/items/:itemId" element={<LibraryItem />} />
+    <Route path="library/:folderId" element={<Library />} />
+  </>
+);

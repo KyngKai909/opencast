@@ -56,3 +56,5 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A24 | The phone guide has no Earlier and Later | home 05.2 | Six hours from the hour before now, scrolled sideways, at the drawn width per hour |
 | A25 | The station page's "This week" day tabs: the calendar week, or the next seven days | station-pages 01.1 | The next seven days (a schedule, not the calendar week) |
 | A26 | A monthly pledge switched to Once, and pausing a pledge | you 04.1; inventory worth raising 8 | Switching to Once ends it after this month. No pause control (none is drawn) |
+| A27 | A host's rail: disabled items, or a host-only rail | inventory worth raising 9; station-settings 03.1 | The fixed rail, every item but Live sources disabled with "Hosts see their own live blocks". Live sources opens the host's next live block; any other page sends them there |
+| A28 | "Breaks tonight" says "3:30 open across 4 breaks", but its rows add up to 4:15 (1:00, 1:30, 1:45) | master-control C.1 | The rows as drawn; the total and the rail's Breaks badge are computed from them (4:15) |

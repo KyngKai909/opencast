@@ -79,6 +79,7 @@ function isApiProxyPath(pathname) {
   return (
     pathname === "/api" ||
     pathname.startsWith("/api/") ||
+    pathname.startsWith("/v1/") ||
     pathname.startsWith("/hls/") ||
     pathname.startsWith("/uploads/")
   );
