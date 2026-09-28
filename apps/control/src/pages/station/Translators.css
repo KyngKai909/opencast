@@ -1,0 +1,7 @@
+/* Translators page (master-control A.5's rows, under the page title). */
+.cc-translators .oc-control-title__p { max-width: 540px; }
+.cc-translators__note { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--hair); font-size: 13.5px; color: var(--ink-70); }
+@media (max-width: 767px) {
+  .cc-translators .oc-control-title { padding: 16px 16px 0; }
+  .cc-translators__note { margin: 0; padding: 16px; border-top: 0; }
+}

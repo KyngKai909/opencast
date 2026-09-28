@@ -1,0 +1,28 @@
+/* What the settings sections share: section tops (.sec-top) and ruled rows (.row2). */
+.cc-sec-top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.cc-sec-top--gap { margin-top: 24px; }
+.cc-sec-top__h { margin: 0; font: 700 17px var(--font-display); letter-spacing: -.01em; }
+.cc-sec-top__sub { font-size: 13px; color: var(--ink-50); }
+.cc-sec-top__end { margin-left: auto; font-size: 13px; color: var(--ink-50); }
+
+
+.cc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-row b { display: block; font-weight: 600; font-size: 15px; }
+.cc-row small { display: block; font-size: 12.5px; color: var(--ink-70); line-height: 1.45; }
+.cc-row__val { font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); text-align: right; }
+
+/* A value picked from a short list, drawn as the value itself ("2:00", "2 an hour"). A real select. */
+.cc-valsel { position: relative; display: inline-flex; align-items: center; }
+.cc-valsel select {
+  appearance: none; -webkit-appearance: none;
+  border: 1px solid transparent; border-radius: var(--r-control); background: none;
+  font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink);
+  height: 30px; padding: 0 22px 0 8px; margin-right: -8px; text-align: right; cursor: pointer;
+}
+.cc-valsel select:hover:not(:disabled) { border-color: var(--hair); }
+.cc-valsel select:disabled { cursor: default; opacity: 1; padding-right: 8px; }
+.cc-valsel .oc-i { position: absolute; right: -4px; pointer-events: none; color: var(--ink-50); }
+.cc-valsel select:disabled + .oc-icon { display: none; }
+
+.cc-readonly { margin: 0 0 14px; font-size: 13.5px; color: var(--ink-70); }
+.cc-error { margin: 8px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }

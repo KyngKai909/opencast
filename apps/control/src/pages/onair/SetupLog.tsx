@@ -1,8 +1,18 @@
-// A.4 Program log with dead air and Fill, setup step 3 (the log page's component).
-// STUB from the foundation: the On air area builds it.
+// A.4 Program log with dead air and Fill, setup step 3: the station's log page in the setup shell.
 
-import { Stub } from "../common";
+import { useParams } from "react-router";
+import { stationsApi } from "@opencast/contracts";
+import { ControlTitle } from "@opencast/ui";
+import { useApi } from "../../api/hooks";
+import { LogPage } from "../../components/onair/LogPage";
+import { Quiet } from "../common";
 
 export default function SetupLog() {
-  return <Stub name="SetupLog" />;
+  const { stationId = "" } = useParams();
+  const setup = useApi(stationsApi.getSetup, { params: { stationId } });
+  if (setup.isLoading) return <Quiet />;
+  if (!setup.data) return <ControlTitle title="Program log" description={setup.error?.message} />;
+  const st = setup.data.station;
+  const base = st.callSign ? `/${st.callSign.toLowerCase()}` : null;
+  return <LogPage stationId={stationId} station={st} base={base} setup={{ back: `/setup/${stationId}/library`, next: `/setup/${stationId}/translators` }} />;
 }

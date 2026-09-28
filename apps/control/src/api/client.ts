@@ -43,8 +43,21 @@ export async function call<E extends EndpointDef, S extends z.ZodType = E["respo
     const token = await getToken();
     if (token) headers.authorization = `Bearer ${token}`;
   }
-  if (args.body !== undefined) headers["content-type"] = "application/json";
-  const res = await fetch(url, { method: endpoint.method, headers, body: args.body === undefined ? undefined : JSON.stringify(args.body) });
+  // Multipart endpoints (an upload): the body's fields plus `file`, as form data.
+  let body: BodyInit | undefined;
+  if (args.body instanceof FormData) body = args.body;
+  else if (endpoint.multipart && args.body && typeof args.body === "object") {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(args.body as Record<string, unknown>)) {
+      if (v === undefined || v === null) continue;
+      form.append(k, v instanceof Blob ? v : typeof v === "string" ? v : JSON.stringify(v));
+    }
+    body = form;
+  } else if (args.body !== undefined) {
+    headers["content-type"] = "application/json";
+    body = JSON.stringify(args.body);
+  }
+  const res = await fetch(url, { method: endpoint.method, headers, body });
   if (res.status === 204) return undefined as z.infer<S>;
   const json = await res.json().catch(() => null);
   if (!res.ok) {

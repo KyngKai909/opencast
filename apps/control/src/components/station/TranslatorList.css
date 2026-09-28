@@ -1,0 +1,25 @@
+/* Translators (master-control A.5: .tr-row, .lg). */
+.cc-tr { list-style: none; margin: 0; padding: 0; }
+.cc-tr--loading { min-height: 240px; }
+.cc-tr__row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 250px 90px; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.cc-tr__row:first-child { border-top: 1px solid var(--line); }
+.cc-tr__lg {
+  width: 44px; height: 44px; border-radius: var(--r-control); display: grid; place-items: center;
+  /* The service's own colour, carrying white letters like a station colour. */
+  background: var(--cc-tr-colour); color: var(--on-station);
+  font: 800 13px var(--font-display);
+}
+.cc-tr__what { min-width: 0; }
+.cc-tr__what b { display: block; font-weight: 600; }
+.cc-tr__what small { font-size: 13px; color: var(--ink-70); display: block; }
+.cc-tr__lb { font-size: 12px; color: var(--ink-50); font-weight: 600; margin-bottom: 4px; }
+.cc-tr__end { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.cc-tr__error { margin: 10px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.cc-connect .oc-field { margin-bottom: 16px; }
+
+@media (max-width: 900px) {
+  .cc-tr__row { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .cc-tr__breaks { grid-column: 2 / -1; grid-row: 2; }
+  .cc-tr__end { grid-column: 3; grid-row: 1; }
+}
+.cc-tr--phone .cc-tr__row { padding: 14px 16px; }

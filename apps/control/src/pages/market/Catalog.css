@@ -1,0 +1,28 @@
+/* Market 05.1 (control/opencast-market.css: .cat-band, .sortbar, .cat-grid, .cat-item) */
+.cc-mk-cat__band { background: var(--ink); color: var(--ground); border-radius: var(--r-screen); padding: 22px 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: end; margin-bottom: 18px; }
+.cc-mk-cat__h { margin: 0 0 6px; font: 800 32px/1 var(--font-display); font-stretch: var(--wide); letter-spacing: -.035em; color: var(--ground); }
+.cc-mk-cat__p { margin: 0; font-size: 14.5px; opacity: .85; max-width: 62ch; }
+.cc-mk-cat__by { font-size: 13px; opacity: .8; text-align: right; }
+.cc-mk-cat__by b { display: block; font-size: 15px; }
+.cc-mk-cat__bar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13.5px; color: var(--ink-70); }
+.cc-mk-cat__bar .oc-seg { margin-left: auto; }
+.cc-mk-cat__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.cc-mk-cat__link { color: inherit; text-decoration: none; display: block; }
+.cc-mk-cat__link:hover b { text-decoration: underline; }
+.cc-mk-cat__tc.oc-tc { margin-bottom: 8px; }
+.cc-mk-cat__tc .oc-tc__t { font-size: 19px; }
+.cc-mk-cat__item b { display: block; font: 700 16px/1.2 var(--font-display); }
+.cc-mk-cat__item small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 2px; }
+.cc-mk-cat__src { font-size: 12px; color: var(--ink-50); margin-top: 4px; }
+@media (max-width: 900px) {
+  .cc-mk-cat__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .cc-mk-cat__grid { grid-template-columns: minmax(0, 1fr); }
+  .cc-mk-cat__band { grid-template-columns: minmax(0, 1fr); }
+  .cc-mk-cat__by { text-align: left; }
+}
+@media (max-width: 767px) {
+  .cc-mk-cat { padding: 0 16px 24px; }
+  .cc-mk-cat__h { font-size: 26px; }
+}

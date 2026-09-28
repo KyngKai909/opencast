@@ -43,7 +43,7 @@ export interface Db {
   liveSources: LiveSource[];
 }
 
-export const DB_VERSION = 1;
+export const DB_VERSION = 3;
 const KEY = "oc-mock-control-db";
 
 function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStation["setup"] {
@@ -58,6 +58,9 @@ function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStat
     studioLocation: { latitude: 34.0556, longitude: -117.1825 },
     legalName: null,
     legalContact: null,
+    pledgesTaxDeductible: null,
+    memberCreditStyle: "voice",
+    orders: { takesOrders: false, turnaround: null, fromMicros: null },
     ...o,
     ...(ident.kind === "studio" ? { status: "on_air" as const, fixed: true } : {})
   } as DbStation["setup"];
@@ -70,7 +73,7 @@ export function seed(): Db {
   const stations: DbStation[] = STATIONS.filter((s) => ours.includes(s)).map((ident) => ({
     ident,
     setup: setup(ident, {
-      ...(ident === BEAT ? { description: "Music from producers around the Inland Empire, on air around the clock.", category: "Music", firstSignedOnAt: at("-14 18:00"), legalName: "Inland Beat Collective", legalContact: "kai@example.com" } : {}),
+      ...(ident === BEAT ? { description: "Music from producers around the Inland Empire, on air around the clock.", category: "Music", firstSignedOnAt: at("-14 18:00"), legalName: "Inland Beat Collective", legalContact: "kai@example.com", orders: { takesOrders: true, turnaround: "About a week", fromMicros: 100_000_000 } } : {}),
       ...(ident === HALL ? { description: "Slow beats for late work.", category: "Music" } : {}),
       // CRAT is run by Opencast until someone claims it (rights 05.1, 05.2).
       ...(ident === CRAT ? { description: "Producers and their tapes.", category: "Music" } : {}),

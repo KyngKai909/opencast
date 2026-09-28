@@ -1,0 +1,2 @@
+/* Live and programming pages: shared page glue. */
+.cc-live-msg { display: grid; gap: var(--s3); justify-items: start; }

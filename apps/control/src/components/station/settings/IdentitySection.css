@@ -1,0 +1,38 @@
+/* Settings, Identity (station-settings 01.1: .idgrid, .lockrow, .pane, .swatches). */
+.cc-identity { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 30px; }
+.cc-identity__note { margin: 0 0 12px; font-size: 13.5px; color: var(--ink-70); }
+.cc-identity__error { color: var(--standby); font-weight: 600; font-size: 14px; }
+.cc-identity__fields { margin-top: 16px; }
+.cc-identity__hint { margin: -6px 0 0; font-size: 13px; color: var(--ink-50); }
+
+.cc-lockrows { margin: 0; }
+.cc-lockrow { display: grid; grid-template-columns: 120px minmax(0, 1fr) 240px; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.cc-lockrow dt { font-size: 13px; color: var(--ink-70); }
+.cc-lockrow dd { margin: 0; }
+.cc-lockrow__v { font-weight: 600; }
+.cc-lockrow__v.oc-cs { font-size: 20px; }
+.cc-lockrow__v--ch { font: 500 20px var(--font-mono); font-variant-numeric: tabular-nums; }
+.cc-lockrow__why { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-50); }
+
+.cc-identity__bug { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-identity__bug b { display: block; font-weight: 600; font-size: 15px; }
+.cc-identity__bug small { display: block; font-size: 12.5px; color: var(--ink-70); }
+
+.cc-identity__preview { border-left: 1px solid var(--hair); padding-left: 24px; min-width: 0; }
+.cc-identity__ph { margin: 0 0 10px; font: 700 15px var(--font-display); padding-top: 6px; }
+.cc-identity__plabel { margin: 18px 0 6px; font-size: 13px; color: var(--ink-70); }
+.cc-identity__ph + .cc-identity__plabel { margin-top: 20px; }
+.cc-identity__move { margin-top: 20px; padding: 12px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--hair); }
+.cc-identity__move b { display: block; font-weight: 600; font-size: 14px; }
+.cc-identity__move small { display: block; font-size: 12.5px; color: var(--ink-70); line-height: 1.5; }
+
+@media (max-width: 1100px) {
+  .cc-identity { grid-template-columns: minmax(0, 1fr); }
+  .cc-identity__preview { border-left: 0; padding-left: 0; }
+}
+@media (max-width: 767px) {
+  .cc-identity { padding: 16px 16px 24px; }
+  .cc-lockrow { grid-template-columns: 110px minmax(0, 1fr); }
+  .cc-lockrow__why { grid-column: 2; }
+}
+.cc-identity__fields .oc-field { margin-bottom: 16px; }

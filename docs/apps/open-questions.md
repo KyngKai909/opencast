@@ -58,3 +58,22 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A26 | A monthly pledge switched to Once, and pausing a pledge | you 04.1; inventory worth raising 8 | Switching to Once ends it after this month. No pause control (none is drawn) |
 | A27 | A host's rail: disabled items, or a host-only rail | inventory worth raising 9; station-settings 03.1 | The fixed rail, every item but Live sources disabled with "Hosts see their own live blocks". Live sources opens the host's next live block; any other page sends them there |
 | A28 | "Breaks tonight" says "3:30 open across 4 breaks", but its rows add up to 4:15 (1:00, 1:30, 1:45) | master-control C.1 | The rows as drawn; the total and the rail's Breaks badge are computed from them (4:15) |
+| A29 | Cue a break when nothing live is on | master-control A.7; inventory worth raising 1 | Disabled outside live blocks, with the tooltip "For live programs" |
+| A30 | "Log runs until": the Monitor frame says "Sun 8:42 pm" on a night with dead air at 11:40 pm | master-control A.7, P.2 | Until the first gap (Sat 11:40 pm), in amber when a gap is coming |
+| A31 | Sign off: which button, and who | master-control header; station-settings 03.1 | Ink (it changes what goes out), owners only, after a confirmation. Signing on is owners' too |
+| A32 | An off-air log entry has no log code | log contract | Code OPEN |
+| A33 | The backup rotation fills leftover open time too, not only a paused spot's time | master-control C.3; biz-spots 05.1 | Yes, when the backup rotation has spots; otherwise the ID and bumpers |
+| A34 | How long "It's back" stays | biz-spots 05.1 | Until the station adds the spot back or takes the notice down; no expiry |
+| A35 | Who acts on money and carriage (contracts leave it open; inventory worth raising 9) | sponsorships, orders, offering, rights, earnings | Operators approve or decline sponsors, quote orders, carry, offer and decide requests, remove a claimed item. Owners also stop renewals, change minimums, answer claims, move money and download statements |
+| A36 | Sponsor money: a monthly charge on the earnings page, weekly accrual on statements | earnings 02.1, 03.1 | Monthly on earnings ($200), accrued weekly on statements ($46.15); the ledger's model needs a decision |
+| A37 | Audience for a week or a month has no chart drawn | earnings 01.1 | The numbers, programs and platforms without a chart |
+| A38 | Radio stations' audience words ("Watching on", "Casting to a TV") | earnings 01.1 | As drawn for TV; radio wording to decide |
+| A39 | BEAT's first sign-on is September 12 (Identity 01.1), but its earnings history starts August 31 with 214 members | station-settings 01.1; earnings | The Identity frame's date; the mock's history is illustration |
+| A40 | Listings schedule Crate Session 03 on Monday, but A.3 says an item with rights to confirm can't go on the log | live-listings 03.1; master-control A.3 | Kept as drawn; the sign-on checks flag it |
+| A41 | The browser source's line says "Owners and operators", but hosts go live from it too | live-listings 01.1; inventory worth raising 6 | Copy as drawn |
+| A42 | Lower thirds on an encoder's live block | live-listings 02.1; inventory worth raising 15 | Stored per block (S15); nothing composites them onto an encoder's picture yet |
+| A43 | When a listing needs a description | live-listings 03.1; inventory worth raising 8 | An episode without its own description needs one; a live program uses the series description |
+| A44 | "Fits your schedule" (until C1) | market 01.1, 06.1 | Fits when the episode is up to 30 minutes shorter than the gap or at most 2 over; "exact" within 2 minutes |
+| A45 | Undo on carrying, approving and sponsor decisions | market 06.1; offering 05.2; sponsorships 03.1 | A delayed send: it goes when the toast does. If the tab closes first, nothing is sent |
+| A46 | HALL in the switcher: "Operator. On air" with a tag (04.1) or "Operator. Dead air in 40 min" (05.2) | station-settings 04.1, 05.2 | Each as drawn |
+| A47 | Screens no frame draws: the maker's order after a quote, a studio's spot rotation and carriers, the statements list, Station account, Ownership, the Carried tab | master control | Built plain from the contracts, their copy in new-copy.md; they need designs |

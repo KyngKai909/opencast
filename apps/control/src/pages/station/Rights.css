@@ -1,0 +1,14 @@
+/* Rights page (rights 01.1: .standing, .cl-h, .cl, .cl.sel). */
+.cc-rights__standing { margin-bottom: 20px; }
+.cc-rights__when { display: block; line-height: 1.35; }
+.cc-rights__from { font-weight: 500; }
+.cc-rights__table .oc-table__row--attention .cc-rights__when { padding-left: 10px; }
+.cc-rights__state { width: 100%; }
+.cc-rights__empty { padding: 16px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-70); }
+.cc-rights__error { color: var(--standby); font-weight: 600; font-size: 14px; }
+
+/* The phone: rows to open, each with its state. */
+.cc-rights--phone { padding: 16px; }
+.cc-rights__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.cc-rights__row { display: grid; gap: 8px; justify-items: start; padding: 12px 0; border-bottom: 1px solid var(--hair); color: inherit; text-decoration: none; }
+.cc-rights__row--open { box-shadow: inset 3px 0 0 var(--standby); padding-left: 12px; background: var(--raised); }

@@ -3,7 +3,7 @@
 // Spots and IDs (4), Bumpers (2), and one recording not in a folder.
 
 import type { Folder, LibraryItem, Program } from "@opencast/contracts";
-import { BEAT, uid } from "./stations";
+import { BEAT, LAB, uid } from "./stations";
 import { MIN, SEC, at } from "./time";
 
 const ms = (m: number, s = 0) => m * MIN + s * SEC;
@@ -23,6 +23,10 @@ export const PROGRAM_IDS = {
   crateSession: uid(280002),
   crateTalk: uid(280003),
   beatTapeLive: uid(280004),
+  // The studio Inland Sound Lab's programs (market 04.1).
+  crateDiggers: uid(280301),
+  studioNotes: uid(280302),
+  loops: uid(280303),
   // Carried programs BEAT airs (their makers' programs).
   saturdayReel: uid(280101),
   slowHours: uid(280102)
@@ -100,8 +104,15 @@ const bumpers = [
 
 const loose = [item({ title: "Beat Tape Live, September 19", code: "PGM", programId: PROGRAM_IDS.beatTapeLive, durationMs: ms(57), createdAt: at("-7 22:00") })];
 
+// Inland Sound Lab's library: 18 items across its three programs (market 04.1: "Library 18").
+const lab = [
+  ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => item({ stationId: LAB.id, title: `Crate Diggers Radio Hour, ep. ${i}`, code: "PGM", programId: PROGRAM_IDS.crateDiggers, episodeNumber: i, durationMs: ms(58, 30), mediaKind: "audio", picture: null, breakPointsMs: [ms(29)], rights: { basis: "made_it", confirmedBy: "Sam T.", confirmedAt: at("-90 12:00"), note: null } })),
+  ...[1, 2, 3, 4, 5, 6].map((i) => item({ stationId: LAB.id, title: `Studio Notes, ep. ${i}`, code: "PGM", programId: PROGRAM_IDS.studioNotes, episodeNumber: i, durationMs: ms(28, 40), rights: { basis: "made_it", confirmedBy: "Sam T.", confirmedAt: at("-40 12:00"), note: null } })),
+  ...[1, 2, 3, 4].map((i) => item({ stationId: LAB.id, title: `Loops for Late Nights, ep. ${i}`, code: "PGM", programId: PROGRAM_IDS.loops, episodeNumber: i, durationMs: ms(59, 50), mediaKind: "audio", picture: null, rights: { basis: "made_it", confirmedBy: "Sam T.", confirmedAt: at("-75 12:00"), note: null } }))
+];
+
 export function seedLibrary(): { items: LibraryItem[]; folders: Folder[]; programs: Program[] } {
-  const items = [...lateCrate, ...crateSessions, ...crateTalk, ...spotsIds, ...bumpers, ...loose].map((i) => structuredClone(i));
+  const items = [...lateCrate, ...crateSessions, ...crateTalk, ...spotsIds, ...bumpers, ...loose, ...lab].map((i) => structuredClone(i));
   const count = (f: string) => items.filter((i) => i.folderId === f).length;
   const folders: Folder[] = [
     { id: FOLDERS.lateCrate, name: "Late Crate", parentFolderId: null, itemCount: count(FOLDERS.lateCrate) },
@@ -128,7 +139,10 @@ export function seedLibrary(): { items: LibraryItem[]; folders: Folder[]; progra
     program(PROGRAM_IDS.lateCrate, "Late Crate", { description: "One producer, one crate of records, one hour." }),
     program(PROGRAM_IDS.crateSession, "Crate Session", { description: "Sessions from the Inland Beat library." }),
     program(PROGRAM_IDS.crateTalk, "Crate Talk", { description: "Producers talk through a record, live.", live: true, listingStatus: "needs_description" }),
-    program(PROGRAM_IDS.beatTapeLive, "Beat Tape Live", { description: "Producers play unreleased tapes and talk through how they were made. Live from the Redlands studio.", live: true })
+    program(PROGRAM_IDS.beatTapeLive, "Beat Tape Live", { description: "Producers play unreleased tapes and talk through how they were made. Live from the Redlands studio.", live: true }),
+    program(PROGRAM_IDS.crateDiggers, "Crate Diggers Radio Hour", { station: LAB, description: "Producers dig through a crate of records, one hour at a time." }),
+    program(PROGRAM_IDS.studioNotes, "Studio Notes", { station: LAB, description: "Short visits to producers' home studios." }),
+    program(PROGRAM_IDS.loops, "Loops for Late Nights", { station: LAB, description: "Long, slow loops for the small hours." })
   ];
   return { items, folders, programs };
 }

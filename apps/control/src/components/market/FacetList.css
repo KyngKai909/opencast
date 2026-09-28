@@ -1,0 +1,11 @@
+/* .facets .g, .fc (control/opencast-market.css) */
+.cc-mk-facets__group { border: 0; margin: 0; padding: 0; min-width: 0; }
+.cc-mk-facets__group + .cc-mk-facets__group { margin-top: 14px; }
+.cc-mk-facets__g { padding: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); }
+.cc-mk-fc { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13.5px; color: var(--ink-70); cursor: pointer; position: relative; }
+.cc-mk-fc--on { color: var(--ink); }
+.cc-mk-fc__input { position: absolute; left: 0; width: 16px; height: 16px; margin: 0; opacity: 0; cursor: inherit; }
+.cc-mk-fc__bx { width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid var(--line); display: grid; place-items: center; flex: none; }
+.cc-mk-fc--on .cc-mk-fc__bx { background: var(--signal-fill); border-color: var(--signal-fill); color: var(--on-signal); }
+.cc-mk-fc__input:focus-visible + .cc-mk-fc__bx { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-mk-fc__ct { margin-left: auto; font: 500 11.5px var(--font-mono); color: var(--ink-50); }

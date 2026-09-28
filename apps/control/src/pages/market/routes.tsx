@@ -1,6 +1,7 @@
 // The Market area's routes, under `/:callSign` (a studio's `/:handle` too).
 
 import { Route } from "react-router";
+import Carried from "./Carried";
 import Carriers from "./Carriers";
 import Catalog from "./Catalog";
 import Market from "./Market";
@@ -15,6 +16,7 @@ export const marketStationRoutes = (
   <>
     <Route path="market" element={<Market />} />
     <Route path="market/catalog" element={<Catalog />} />
+    <Route path="market/carried" element={<Carried />} />
     <Route path="market/offers/:offerId" element={<Offer />} />
     <Route path="market/offers/:offerId/terms" element={<Offer />} />
     <Route path="market/offers/:offerId/preview/:episodeId" element={<Offer />} />

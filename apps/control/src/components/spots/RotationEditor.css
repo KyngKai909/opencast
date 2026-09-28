@@ -1,0 +1,14 @@
+/* The rotation tab: two ruled sections, headed as settings sections are (station-settings .sec-h). */
+.cc-rot { display: flex; flex-direction: column; gap: 28px; max-width: 980px; }
+.cc-rot__head { display: flex; align-items: baseline; gap: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 0; flex-wrap: wrap; }
+.cc-rot__head h2 { margin: 0; font: 700 17px var(--font-display); }
+.cc-rot__head p { margin: 0; font-size: 13px; color: var(--ink-70); }
+.cc-rot__sec .oc-table__head { display: none; }
+.cc-rot__rate .oc-lines__detail { font-size: 12.5px; }
+.cc-rot__act { display: inline-flex; align-items: center; gap: 2px; }
+.cc-rot__empty { margin: 0; padding: 14px 0; font-size: 14px; color: var(--ink-70); border-bottom: 1px solid var(--hair); }
+.cc-rot__foot { margin-top: 12px; }
+.cc-rot__add { display: flex; gap: 10px; align-items: flex-end; margin-top: 12px; max-width: 520px; }
+.cc-rot__add > :first-child { flex: 1; }
+.cc-rot__sec:focus { outline: none; }
+.cc-rot__sec:focus-visible { outline: 2px solid var(--signal); outline-offset: 4px; }

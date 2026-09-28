@@ -22,7 +22,7 @@ export const STATIONS: StationIdent[] = [
   ident(1019, "CRAT", "101.9", "Crate", "#7E2F35", "radio", "claimable"),
   ident(1043, "VOZE", "104.3", "La Voz", "#1D6A70", "radio", "station", "San Bernardino"),
   // A studio: a station with no channel (market 04.1).
-  { ...ident(5001, null, null, "Inland Sound Lab", "#1D6A70", null, "studio"), handle: "inland-sound-lab" }
+  { ...ident(5001, null, null, "Inland Sound Lab", "#7E2F35", null, "studio"), handle: "inland-sound-lab" }
 ];
 
 export function stationById(id: string): StationIdent | undefined {

@@ -1,0 +1,10 @@
+/* A weekly statement (earnings 03.1: .split 1fr 1fr, .sec-top, .row2). */
+.cc-stmt__split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.cc-stmt__error { margin: 0 0 16px; padding: 12px 0; color: var(--ink-70); border-top: 1px solid var(--line); }
+@media (max-width: 900px) {
+  .cc-stmt__split { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+}
+/* On the phone the page sets its own gutter: the phone shell's main has none. */
+@media (max-width: 767px) {
+  .cc-stmt { padding: 16px; }
+}

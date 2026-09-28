@@ -8,18 +8,21 @@ import Orders from "./Orders";
 import Sponsors from "./Sponsors";
 import SpotMarket from "./SpotMarket";
 import Statement from "./Statement";
+import Statements from "./Statements";
 import StudioSpotRotation from "./StudioSpotRotation";
 
 export const moneyStationRoutes = (
   <>
     <Route path="breaks" element={<Breaks />} />
     <Route path="spot-market" element={<SpotMarket />} />
+    <Route path="spot-market/rotation" element={<SpotMarket tab="rotation" />} />
     <Route path="spot-market/orders" element={<Orders />} />
     <Route path="spot-market/orders/:orderId" element={<Orders />} />
     <Route path="spot-market/:spotId" element={<SpotMarket />} />
     <Route path="sponsors" element={<Sponsors />} />
     <Route path="sponsors/:sponsorshipId" element={<Sponsors />} />
     <Route path="earnings" element={<Earnings />} />
+    <Route path="earnings/statements" element={<Statements />} />
     <Route path="earnings/statements/:statementId" element={<Statement />} />
     <Route path="audience" element={<Audience />} />
     {/* A studio's pages. */}

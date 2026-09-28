@@ -1,0 +1,14 @@
+/* Answering a claim (rights 03.1). */
+.cc-answer .oc-choices { margin-bottom: 16px; }
+.cc-answer .oc-field { margin-bottom: 16px; }
+.cc-answer__file { margin-bottom: 16px; }
+.cc-answer__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.cc-answer__pick {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: 44px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-control); background: var(--raised);
+  font: 400 15px var(--font-text); color: var(--ink); cursor: pointer; text-align: left;
+}
+.cc-answer__pick .oc-i { color: var(--ink-70); }
+.cc-answer__desk { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 16px; font-size: 13.5px; color: var(--ink-70); }
+.cc-answer__error { margin: 8px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.cc-answer .oc-choices { border-top: 0; }

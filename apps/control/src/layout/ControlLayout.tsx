@@ -3,8 +3,9 @@
 // under 768px, and the studio shell for a studio. Hosts see their own live blocks: every other
 // page sends them there, and the rail's other items are disabled with the reason.
 
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
-import { playoutApi } from "@opencast/contracts";
+import { libraryApi, playoutApi } from "@opencast/contracts";
 import { ControlPhoneShell, ControlShell, StudioShell, type ControlPage, type ShellItems, type StudioPage } from "@opencast/ui";
 import { useApi } from "../api/hooks";
 import StationSwitcher from "../components/overlays/StationSwitcher";
@@ -68,6 +69,18 @@ function segmentOf(pathname: string): string {
   return pathname.split("/").filter(Boolean)[1] ?? "";
 }
 
+/**
+ * The tally plays its one switch-on flicker only when it lights while you watch (a live block
+ * going from stand by to on air, a sign-on), not when a page opens on a station already on air.
+ */
+function useSwitchOn(state: "lit" | "standby" | "unlit" | null): boolean {
+  const seenDark = useRef(false);
+  useEffect(() => {
+    if (state !== null && state !== "lit") seenDark.current = true;
+  }, [state]);
+  return seenDark.current && state === "lit";
+}
+
 export function ControlLayout() {
   useInAppLinks();
   const { state, loading } = useResolvedStation();
@@ -90,7 +103,14 @@ function Frame() {
   const segment = segmentOf(loc.pathname);
   const status = useApi(playoutApi.getStatus, { params: { stationId: s.id } }, { enabled: !s.studio, refetchInterval: 15_000 });
   const badges = useRailBadges(s);
+  // A studio's rail counts its library (market 04.1: "Library 18").
+  const studioLibrary = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} }, { enabled: s.studio, retry: false });
   useNow(1000);
+  const onAir = !!status.data?.onAir;
+  // Null until the status is known, so a page opening on a station already on air doesn't flicker.
+  const known = opts.tally ?? (status.data ? (onAir ? "lit" : "unlit") : null);
+  const tally = known ?? "unlit";
+  const flicker = useSwitchOn(s.studio ? null : known);
 
   const openSwitcher = () => setParams((p) => (p.set("switch", "1"), p));
   const overlays = (
@@ -100,10 +120,19 @@ function Frame() {
     </>
   );
 
+  if (s.studio && phone) {
+    // No phone frame draws a studio: the phone shell with the studio's name, no tally (it doesn't broadcast).
+    return (
+      <ControlPhoneShell station={{ channel: "", callSign: s.station.name }} context={opts.context ?? "Studio"} tally="unlit" flicker={false} onSwitchStation={openSwitcher} actions={opts.actions}>
+        <Outlet />
+        {overlays}
+      </ControlPhoneShell>
+    );
+  }
   if (s.studio) {
     const active = (Object.keys(STUDIO_SEGMENT) as StudioPage[]).find((p) => STUDIO_SEGMENT[p] === segment) ?? "programs";
     return (
-      <StudioShell studio={{ name: s.station.name, colour: s.station.colour ?? "#1D6A70" }} onSwitchStation={openSwitcher} active={active} linkTo={(p) => `${s.base}/${STUDIO_SEGMENT[p]}`} flush={opts.flush}>
+      <StudioShell studio={{ name: s.station.name, colour: s.station.colour ?? "#7E2F35" }} onSwitchStation={openSwitcher} active={active} items={studioLibrary.data ? { library: { count: String(studioLibrary.data.items.length), countLabel: `${studioLibrary.data.items.length} items` } } : undefined} linkTo={(p) => `${s.base}/${STUDIO_SEGMENT[p]}`} flush={opts.flush}>
         <Outlet />
         {overlays}
       </StudioShell>
@@ -117,12 +146,11 @@ function Frame() {
     (Object.keys(PAGE_SEGMENT) as ControlPage[]).map((p) => [p, { ...badges[p], ...(s.can(PAGE_ABILITY[p]) ? {} : { disabled: HOST_REASON, count: undefined }) }])
   );
   if (s.role === "host") items["live-sources"] = { href: `${s.base}/live` };
-  const onAir = !!status.data?.onAir;
   const station = { channel: s.station.channel ?? "", callSign: s.station.callSign ?? s.station.name, colour: s.station.colour ?? "#8C3B7A" };
 
   if (phone) {
     return (
-      <ControlPhoneShell station={station} context={opts.context} tally={opts.tally ?? (onAir ? "lit" : "unlit")} flicker={false} onSwitchStation={openSwitcher} actions={opts.actions}>
+      <ControlPhoneShell station={station} context={opts.context} tally={tally} flicker={flicker} onSwitchStation={openSwitcher} actions={opts.actions}>
         <Outlet />
         {overlays}
       </ControlPhoneShell>
@@ -138,7 +166,7 @@ function Frame() {
       now={now()}
       timeZone={STATION_TZ}
       onAir={onAir}
-      flicker={false}
+      flicker={flicker}
       onSignOff={s.can("manage") ? () => navigate({ search: "?modal=sign-off" }) : undefined}
       flush={opts.flush}
     >

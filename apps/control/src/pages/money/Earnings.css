@@ -1,0 +1,13 @@
+/* Earnings (earnings 02.1: .split 1fr 360px; 04.2 on the phone: .p-back, .bal, .row2). */
+.cc-earn__split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; }
+.cc-earn__side > .cc-sec .cc-sec__top { margin-top: 22px; }
+.cc-earn__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.cc-earn__error { margin: 0; padding: 12px 0; color: var(--ink-70); border-top: 1px solid var(--line); }
+@media (max-width: 1080px) {
+  .cc-earn__split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.cc-earn-phone__head { display: flex; align-items: center; gap: 6px; padding: 10px 18px 10px; border-bottom: 1px solid var(--hair); }
+.cc-earn-phone__h { margin: 0; font: 800 19px var(--font-display); font-stretch: 112%; letter-spacing: -.02em; }
+.cc-earn-phone__period { margin-left: auto; font-size: 13px; color: var(--ink-50); }
+.cc-earn-phone__main { padding: 0 16px 16px; }

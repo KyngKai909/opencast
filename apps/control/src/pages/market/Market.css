@@ -1,0 +1,35 @@
+/* Market 01.1 Browse (control/opencast-market.css: .mk, .facets, .sortbar, .syn-row) and 06.1 on the phone. */
+.cc-mk__search { width: 280px; }
+.cc-mk__gap { margin-bottom: 14px; }
+.cc-mk__grid { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; }
+.cc-mk__list { min-width: 0; }
+.cc-mk__sortbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13.5px; color: var(--ink-70); }
+.cc-mk__sort { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+
+.cc-mk__table .oc-tc { padding: 6px 8px; }
+.cc-mk__table .oc-tc__t { font-size: 11px; }
+.cc-mk__prog b { display: flex; align-items: center; gap: 6px; font: 700 15px/1.2 var(--font-display); }
+.cc-mk__prog small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-mk__prog .cc-mk__fmt { color: var(--ink-70); }
+.cc-mk__prog .cc-mk-fit-tag { margin-top: 4px; }
+.cc-mk__yours.oc-tag { font-family: var(--font-text); }
+.cc-mk__terms { font-size: 13px; line-height: 1.35; }
+.cc-mk__terms em { font-style: normal; font-weight: 600; display: block; }
+.cc-mk__by { font-size: 13px; color: var(--ink-70); }
+
+/* The phone (06.1): rows of a 72px card, words, an action. */
+.cc-mk-phone { padding: 0 16px; }
+.cc-mk-phone__row { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-mk-phone__words b { display: block; font-weight: 600; font-size: 14.5px; }
+.cc-mk-phone__words small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.cc-mk-phone__foot { font-size: 12.5px; color: var(--ink-50); margin: 12px 0; }
+
+@media (max-width: 1023px) {
+  .cc-mk__grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .cc-mk { padding: 0 16px 24px; }
+  .cc-mk__table { --oc-table-cols: 72px minmax(0, 1fr) auto !important; }
+  .cc-mk__table .oc-table__head > :nth-child(3), .cc-mk__table .oc-table__head > :nth-child(4),
+  .cc-mk__table .oc-table__row > :nth-child(3), .cc-mk__table .oc-table__row > :nth-child(4) { display: none; }
+}

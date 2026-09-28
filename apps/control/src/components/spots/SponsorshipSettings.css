@@ -1,0 +1,20 @@
+/* sponsorships 04.1 (.minrow: minmax(0,1fr) 130px 110px; fields 34px, 14px mono). */
+.cc-sps { max-width: 1024px; }
+.cc-sps__head, .cc-sps__row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 110px; gap: 12px; align-items: center; }
+.cc-sps__head { font-size: 12.5px; color: var(--ink-50); font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.cc-sps__row { padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-sps__row .oc-lines__detail { font-size: 12.5px; }
+.cc-sps__row--toggle { grid-template-columns: minmax(0, 1fr) auto; }
+.cc-sps__field {
+  height: 34px; width: 100%; min-width: 0; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--raised); color: var(--ink); font: 500 14px var(--font-mono);
+}
+.cc-sps__field:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+.cc-sps__field:disabled { color: var(--ink-50); }
+.cc-sps__field[aria-invalid="true"] { border-color: var(--standby); }
+.cc-sps__theirs { grid-column: 2 / 4; font-size: 13px; color: var(--ink-50); }
+.cc-sps__note { margin: 12px 0 0; font-size: 13px; color: var(--ink-70); }
+.cc-sps__note--bad { color: var(--standby); }
+@media (max-width: 767px) {
+  .cc-sps__head, .cc-sps__row { grid-template-columns: minmax(0, 1fr) 104px 64px; }
+}

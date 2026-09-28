@@ -1,0 +1,31 @@
+/* 03.1 Listings (live-listings .ls-row, .editor, .chipset, .prevs, .mini-banner). */
+.cc-listings__need { color: var(--standby); font-weight: 700; }
+.cc-listings__empty { font-size: 14px; color: var(--ink-70); }
+.cc-listings__split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; column-gap: 28px; align-items: start; }
+.cc-listings__editor { border-left: 1px solid var(--hair); padding-left: 28px; display: grid; gap: 14px; }
+.cc-listings__editor .oc-field { margin: 0; }
+.cc-listings__desc .oc-field__box--area { min-height: 88px; }
+.cc-listings__count { font: 500 12px var(--font-mono); color: var(--ink-50); text-align: right; margin-top: 4px; }
+.cc-listings__error { margin: 0; font-size: 13px; color: var(--standby); }
+.cc-listings__label { font-size: 13px; font-weight: 600; margin-bottom: -6px; }
+.cc-listings__details .oc-kvrows__row { padding: 10px 0; }
+
+.cc-ls-rows .oc-table__cell b { display: block; font-weight: 600; }
+.cc-ls-rows .oc-table__cell small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-ls-row__t { font: 500 13px/1.35 var(--font-mono); color: var(--ink-70); }
+.cc-ls-row__st { font-size: 12.5px; }
+.cc-ls-row__st--need { color: var(--standby); font-weight: 600; }
+.cc-ls-row__chev { color: var(--ink-70); }
+
+.cc-prevs { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.cc-prevs__lbl { font-size: 12px; font-weight: 600; color: var(--ink-50); margin-bottom: 4px; }
+/* The TV banner, as it reads at ten feet: always the TV's dark screen. */
+.cc-mini-banner { background: var(--screen); color: var(--on-screen); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; }
+.cc-mini-banner__ch { grid-row: span 2; font: 500 22px var(--font-mono); padding-right: 12px; border-right: 1px solid var(--line); }
+.cc-mini-banner b { font: 800 15px var(--font-display); font-stretch: 112%; }
+.cc-mini-banner small { font-size: 11.5px; color: var(--on-screen-70); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .cc-listings__split { grid-template-columns: 1fr; row-gap: 28px; }
+  .cc-listings__editor { border-left: 0; padding-left: 0; border-top: 1px solid var(--hair); padding-top: 20px; }
+}

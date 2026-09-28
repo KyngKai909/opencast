@@ -1,0 +1,10 @@
+/* Settings, Station account: ruled rows (.row2), the owner's actions under them. */
+.cc-acct { max-width: 640px; }
+.cc-acct__notice { margin-bottom: 16px; }
+.cc-acct__rows { min-width: 0; }
+.cc-acct__acts { display: flex; gap: 8px; margin-top: 16px; }
+.cc-acct__note { margin: 12px 0 0; font-size: 13px; color: var(--ink-70); }
+/* On the phone the section is its own screen, with the phone gutter. */
+@media (max-width: 767px) {
+  .cc-acct { padding: 0 16px 24px; }
+}

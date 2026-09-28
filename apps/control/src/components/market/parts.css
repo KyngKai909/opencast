@@ -1,0 +1,23 @@
+/* The market's shared pieces (control/opencast-market.css, opencast-offering.css). */
+
+/* .sec-top */
+.cc-mk-sectop { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 22px; }
+.cc-mk-sectop--first { margin-top: 0; }
+.cc-mk-sectop__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.cc-mk-sectop__sub { font-size: 13px; color: var(--ink-50); }
+.cc-mk-sectop__end { margin-left: auto; display: flex; gap: 8px; }
+
+/* .from, .kind */
+.cc-mk-from { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cc-mk-from a { color: inherit; text-decoration: none; }
+.cc-mk-from a:hover { text-decoration: underline; }
+.cc-mk-from__sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.cc-mk-kind { display: inline-block; font: 600 11px var(--font-text); color: var(--ink-50); border: 1px solid var(--hair); border-radius: 3px; padding: 0 5px; }
+
+/* .fit-tag */
+.cc-mk-fit-tag.oc-tag { font-size: 11.5px; }
+
+/* .tabs in the market: 14px under (16px in the offering file). */
+.cc-mk-tabs { margin-bottom: 14px; }
+
+.cc-mk-quiet { margin: 16px 0; font-size: 14px; color: var(--ink-50); }

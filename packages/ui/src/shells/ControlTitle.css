@@ -3,4 +3,4 @@
 .oc-control-title__text { min-width: 0; }
 .oc-control-title__h { margin: 0; font: 800 28px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
 .oc-control-title__p { margin: 4px 0 0; font-size: 14.5px; color: var(--ink-70); max-width: 62ch; }
-.oc-control-title__end { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.oc-control-title__end { margin-left: auto; display: flex; gap: 10px; align-items: center; flex: none; }

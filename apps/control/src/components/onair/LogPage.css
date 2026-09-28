@@ -1,0 +1,36 @@
+/* The program log (master-control A.4: .days, .split, .pane, .warnbar, .tl). */
+.cc-log__days { margin-bottom: 14px; }
+.cc-log__split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; }
+.cc-log__split--week { grid-template-columns: minmax(0, 1fr); }
+.cc-log__main { min-width: 0; }
+.cc-log__main > .oc-notice { margin-bottom: 14px; }
+.cc-log__pane { border-left: 1px solid var(--hair); padding-left: 28px; }
+.cc-log__sec + .cc-log__sec { margin-top: 22px; }
+.cc-log__h { margin: 0 0 10px; font: 700 15px var(--font-display); }
+.cc-log__seg { margin-bottom: 10px; }
+.cc-log__go { margin-top: 12px; }
+.cc-log__err { margin: 8px 0 0; font-size: 13px; color: var(--standby); }
+.cc-log__quiet { margin: 0; font-size: 13.5px; color: var(--ink-50); }
+.cc-log__standby { color: var(--standby); }
+.cc-log--setup .oc-control-foot { margin-top: 18px; }
+
+/* The week: seven days side by side, the hours once at the left. */
+.cc-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.cc-week__h { margin: 0 0 4px; font: 600 13px var(--font-text); color: var(--ink-70); }
+.cc-week__day .oc-tl { grid-template-columns: 0 1fr; }
+.cc-week__day .oc-tl__hrs { visibility: hidden; }
+.cc-week__day:first-child .oc-tl { grid-template-columns: 44px 1fr; }
+.cc-week__day:first-child .oc-tl__hrs { visibility: visible; }
+
+@media (max-width: 1100px) {
+  .cc-log__split { grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; }
+  .cc-log__pane { padding-left: 20px; }
+}
+@media (max-width: 767px) {
+  .cc-log { padding: 14px 16px; }
+  .cc-log .oc-control-title { flex-wrap: wrap; }
+  .cc-log__days { overflow-x: auto; }
+  .cc-log__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-log__pane { border-left: 0; padding-left: 0; border-top: 1px solid var(--hair); padding-top: 18px; }
+  .cc-week { grid-template-columns: repeat(7, 120px); overflow-x: auto; }
+}

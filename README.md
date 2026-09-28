@@ -13,7 +13,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 |---|---|---|---|
 | `apps/api` | `@opencast/api` | Express API: stations, library, uploads, playout control | platform |
 | `apps/worker` | `@opencast/worker` | Playout: airs every station from its log, from its file cache; HLS and Livepeer out | platform |
-| `apps/control` | `@opencast/control` | Master control (the old `apps/web`, unchanged) | apps |
+| `apps/control` | `@opencast/control` | Master control: sign on, the Monitor, the log, live sources and going live, listings, the library, breaks, the spot market, sponsors, the syndication market, audience and earnings, rights, translators, settings; studios | apps |
 | `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA | apps |
 | `apps/tv` | `@opencast/tv` | TV mode and the Cast receiver (empty) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
@@ -97,6 +97,16 @@ npm run dev:mock -w @opencast/viewer
 Runs the viewer at http://localhost:5174 against mock data (Mock Service Worker), with the mock stations playing live and the clock held at Saturday 8:42 pm Pacific, as the reference frames are drawn. It signs in with any email and any six digits except 000000. The mock remembers what you change in `localStorage` (`oc-mock-db`); remove that key to start again. `npm run dev -w @opencast/viewer` runs it against the API instead: copy `apps/viewer/.env.example` to `.env.local` and set `VITE_API_BASE` and `VITE_PRIVY_APP_ID`.
 
 Every mock response is checked against the contract schemas, extended with the fields the viewer has asked for (`apps/viewer/src/api/ext*`, named by their ids in `docs/contract-requests.md`).
+
+### Master control
+
+```bash
+npm run dev:mock -w @opencast/control
+```
+
+Runs master control at http://localhost:5179 against mock data, with the clock held at Saturday 8:42:12 pm, as the reference frames are drawn (`?clock=<ISO time>` in the address starts it elsewhere, in mock mode only). Sign in with any six digits except 000000; the email picks who you are: `kai@example.com` owns BEAT 12.1 and operates HALL 90.7, `marcus@example.com` operates BEAT, `jen@example.com` hosts Beat Tape Live, `sam@example.com` runs the studio Inland Sound Lab, and any other address is someone new who can start a station. The mock remembers what you change in `localStorage` (keys starting `oc-mock-control-`); remove them to start again.
+
+`npm run dev -w @opencast/control` runs it on :5173 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`; see `apps/control/.env.example`). In production `server.mjs` serves the build and proxies `/v1` to the API.
 
 ### Why Turborepo
 

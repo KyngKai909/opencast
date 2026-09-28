@@ -1,0 +1,7 @@
+/* Offering 03.1 and 05.1 (control/opencast-offering.css: .m-main p, .kv, .m-note, the sheet's band) */
+.cc-mk-req__lede { margin: 0 0 10px; font-size: 15px; }
+.cc-mk-req__lede span { color: var(--ink-70); }
+.cc-mk-req__kv.oc-kv { margin: 0; }
+.cc-mk-req__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.cc-mk-req__fail { font-size: 13px; color: var(--standby); margin: 12px 0 0; }
+.cc-mk-req__band--phone { margin: 0 0 12px; }

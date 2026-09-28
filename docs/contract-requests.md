@@ -87,6 +87,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | G4 | **Fill a gap by carrying**: a `carry` option on `fillGap` for one night | master-control A.4, P.2; market 06.1 | No | 4 |
 | G5 | **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1; home 03.1 (tuned in: "Tonight: a steamboat, a haunted barn…", read from `Airing.episodeDescription`) | Yes | 4 |
 | G6 | **Test output before sign-on**: a playback URL for "Watch it" | master-control A.6 | Yes | 4 |
+| G7 | **Repeats readable**: `repeats[]` on `getLog` (what "Repeat this day" set up, until when), so the log can show and undo them | master-control A.4 | Yes | 4 |
 
 ## catalog
 
@@ -130,6 +131,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | P22 | **Sponsor profile** for the station: business category, city, distance, sponsors elsewhere; and members who asked to be named | sponsorships 03.1 | Yes | 4 |
 | P23 | **Market spot preview URL** for stations | master-control C.2 | Yes | 4 |
 | P24 | **Maker "Tell me when it's listed"** on the station side | orders 06.2 | Drop the button | 4 |
+| P25 | **A business's short name** (`business.shortName`: "Orange Street", "Inland Tire"), used in thumbnails, break summaries and notices | master-control C.3; biz-spots 05.1 | Yes | 4 |
 
 ## ledger
 
@@ -148,6 +150,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 |---|---|---|---|---|
 | U1 | **By program, per airing**: aired at, source, average, peak, stayed to the end, on now | earnings 01.1, 04.1 | Yes | 4 |
 | U2 | **Mirroring as a platform** (`Platform` has phone, cast, web, tv_app) | tv-update 01.1 | Send `phone` | 8 |
+| U3 | **Last week across the whole window** (`comparison[]`; `series[].lastWeek` stops at now) and the window's breaks (`breaks[]`) for the shaded bands | earnings 01.1 | Yes | 4 |
 
 ## trust
 
@@ -156,6 +159,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | T1 | **Takedown airing times** ("Monday, 8:00 pm on BEAT") and what carriers were told | rights 02.1, 04.1, 06.1 | Template | 4 |
 | T2 | **Replace a claimed item with a cut**, tied to the claim | rights 02.1 | Drop the footnote | 4 |
 | T3 | **Label fixes in `states.ts`**: "Removed" is shared by `removed` and `expired`, but an expired claim "counts as removed, not upheld" and the frame says "Removed by BEAT"; the frame says "Answered, back on air". The rights basis reads "We made it" in the claim and "I made it" in the library, and the note says they must match | rights 01.1, 03.1; master-control A.3 | n/a | 4 |
+| T4 | **What kind of work a claim is about** (`workNoun`: "recording", "film"), for "Claim: the recording is theirs" | rights 02.1, 04.1 | Yes | 4 |
 
 ## network
 
@@ -206,3 +210,16 @@ Every proposed field is an optional extension of a contract schema in `apps/view
 - **B2**: `listTvs`, `signOutTv`, `approveTvCode`; `Tv {kind, platform, signedIn, lastUsedAt, castingNow}`. Only the casting device really knows "Casting now".
 - **E1**: `card {label, expired}` on a pledge, `receipts.items`, `cadence` on `updatePledge` (switching a monthly pledge to once ends it after this month), and a card-session endpoint for Change.
 - **O1**: kinds `preset_live` and `station_news`. **O2 / A7**: quiet hours and email timing in `settings.notifications`.
+
+## How master control carries them (Phase 4)
+
+As in the viewer: every proposed field is an optional extension of a contract schema in `apps/control/src/api/ext/<area>.ts` (onair, live, market, spots, earnings, station), named by its request id, and the mocks return them. The new ones are G7, T4, P25 and U3 above. The shapes master control proposes for requests already listed:
+
+- **G1** break contents: `rows` (code, title, length, whose, note) on `getLog` breaks and `contents[]` on `Avail`. **G2** `onAirSince`, `next`, `output.bitrateKbps` on `PlayoutStatus`. **G3** end a live block early, and its state. **G5** listings per airing, and editing one. **G6** `watchUrl` on sign-on checks.
+- **A4** `GET /stations/:id/hosts`, and `programIds` on host invites. **A5** `GET /me/stations/status` (`stationId`, `onAir`, `deadAirAt`) for the switcher; it could live on `Me.memberships[]`.
+- **S14** `quality` and `previewUrl` on a live source. **S15** get and put the lower third per live block. **B3** `ingest` (WHIP) for browser sources: master control draws the whole studio on the local camera and sends nothing until it lands. **S16** Translator Connect is a key form until OAuth exists. **S17** a constant list of spot categories.
+- **L1** program format, card colour, advisory. **L5** an item's history (with `audioLayout`). **L6** replace an item's file. **L7** captions on a program.
+- **C1** fit slots on offers (`fit[]`, `?forStation`). **C2** `maker`, `makerKind`, `gap` on browse, and `offeredAt`. **C3** `breakMsPerHour`, `cashPlusBarter`, `barterFill`. **C4** `agreementId` and `repeatSlots` on requests. **C5** an episode's first airing and captions. **C6** slots on carriers and agreements, with `offerId`. **C7** carrier profile. **C8** `defaultTerm`. **C9** underwriter.
+- **P6** `pause` and `back` on a market spot. **P17** the members' credit. **P22** sponsor profile. **P23** spot preview (url, still). **P24** `POST /orders/:id/tell-me-when-listed`, `makerToldWhenListed`, `listedRate`.
+- **E2** sponsors listed on earnings, `held.tonightBreaks`, `nextPayout.amountMicros`. **E3** per line `group`, `airings`, `rate`, `averageTunedIn`; `paidOn` and `destination` on statements. **U1** `byProgram[]` on the audience.
+- **T1** `takedowns[].airings[]`, `term`, `carrierNotice`. **B6** `POST /claims/:id/attachments`. **N10** `GET /claim/:token` with the handover's status. **O1** the `signed_on_off` notification key.

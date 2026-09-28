@@ -1,0 +1,6 @@
+/* Settings in the control shell (station-settings .swrap: the sub-rail and pane fill the main). */
+.cc-settings { min-height: 100%; }
+.cc-settings__note { margin: 16px 0 0; font-size: 13.5px; color: var(--ink-70); }
+@media (max-width: 767px) {
+  .cc-settings__note { padding: 0 16px 24px; }
+}

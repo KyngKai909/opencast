@@ -157,3 +157,87 @@ Settings' undrawn panes (Account, Market, TVs and casting, Appearance, Privacy, 
 | Manage a pledge | "It won't be charged again after {month}."; "Add the name stations call you in Settings, Account, first"; "{card}, expired"; "Keep pledging"; "Ends", "After {month}. You won't be charged again."; "Hide"; "Your pledge to {station} is saved" |
 | Receipt | "on {date}", "Amount", "Once"; "{Station} says pledges to it are tax-deductible" / "aren't tax-deductible" / "hasn't said whether pledges to it are tax-deductible" |
 | Settings, signed out | "These apply on this device until you sign in.", "Saved on this device until you sign in."; "In this browser" (web Notifications); the note when the browser blocks notifications |
+
+### apps/control (Phase 4)
+
+Sign-in reuses the reference's sign-in words; "Master control is where stations run their dial. Watching never needs an account." is new. Mock-only error messages (in `src/mocks/`) aren't listed. Undrawn screens (A47) are written in full in their files: the maker's order states (`pages/money/Orders.tsx`), a studio's spot rotation and carriers, the statements list, Station account (`components/earnings/StationAccount.tsx`), Ownership (`components/station/settings/`), the Carried tab (`pages/market/Carried.tsx`).
+
+**Shell and start**
+
+| Where | Words |
+|---|---|
+| Not your station | "That station isn't one of yours.", "Choose one of your stations, or start another.", "Your stations" |
+| Not found | "There's nothing here.", "Back to master control" |
+| No station yet | "Start a station", "Pick a channel in your market, fill a log from your library and the market, and sign on. Each step saves as you go." |
+| A host's rail | "Hosts see their own live blocks" (A27) |
+
+**On air: setup, the log, the Monitor, sign off**
+
+| Where | Words |
+|---|---|
+| Station form | "White text on it reads at X:1. A station colour needs 4.5:1, so this one can't be saved."; "Write it as # and six characters, like #8C3B7A."; "Sound only."; "Open frequencies in the … Taken ones are struck through."; "X is taken"; "Three to five capital letters"; "Fixed since the first sign-on" |
+| Fill | "Nothing in your library can air yet"; "{A} and {B} both fit this slot" / "{A} fits this slot"; "See what fits this slot in the market"; phone "Late Crate 11 to 15, until 2:00 am", "From HALL 90.7, barter", "Back at 2:00 am"; "Dead air now"; "Fill the gap" |
+| Log toasts | "Filled … from your library.", "Off air from …", "Repeats every Saturday through …", "Repeats every day through …" |
+| Ready to sign on | "… need(s) fixing before you can sign on.", "All N are done.", "Starts with X, on until T"; fixes "Fill it", "Go to library", "Choose", "Write it"; "Test signal" |
+| Monitor | "{CALL} isn't on air yet. Finish setting it up, then sign on.", "Continue setting up", "Off air.", "Nothing is on the log from now.", "Nothing on the log", "Nothing in the market fits your open time right now.", "For live programs", "Break cued. Back to {title} after the break." |
+| Rundown and log rows | "Nothing scheduled", "Repeats from your library if no one fills it", "Off air", "Viewers see "Off air" and when you're back", "Next" |
+| Sign off | "Sign off {CALL}?", "{CALL} stops going out now. Viewers see "Off air" until you sign on again. The log stays as it is.", "Stay on air", "Sign off"; "{CALL} is off air", "There's nothing to sign off.", "Close", "Only an owner can sign off.", toast "{CALL} is off air." |
+
+**Live and programming**
+
+| Where | Words |
+|---|---|
+| Studio | "Stop sharing"; "{title} is going out until {time}." / "{title} ended at {time}. The log took over."; "On air: viewers see this picture."; camera: "Master control can't use the camera.", "There's no camera here.", "This browser can't use a camera.", "Allow the camera and microphone for this site in your browser, then try again.", "Connect one, or go live from another computer or a phone.", "Try again"; "Viewers see this until the connection comes back. Reconnecting." |
+| Encoder block | "Not connected yet", "Nothing is arriving from the encoder.", "Receiving, 1080p from Studio A", "{Title}, from {source}", "{Source}'s signal, with BEAT's graphics as viewers will see them." |
+| Live controls | "Break cued: 2:00 from the rotation, then back to you." / "From the rotation, then back to you"; "End {title} early?", "The log fills the rest of the block, until {time}. It never goes to dead air.", "Keep going"; "Battery at N%, about N min left at this rate."; "Show the lower third", "Hidden", "Add a speaker", "Ended" |
+| Live blocks | "No live blocks coming up", "When you're given a live block, it's here.", "Live blocks in the log are listed in Live sources.", "That live block isn't on the log.", "That block isn't one of yours." |
+| Rehearsal | "Rehearsal, from this browser", "A private rehearsal only you see, with BEAT's graphics as viewers would see them.", "Done" |
+| Live sources | "On air", "No source", "Remove this source", "{name} is removed.", "{name} has a new key. The old one stopped working.", "Server copied." / "Streaming key copied.", "Copy it now: this key is shown once."; Add a source "Encoder" / "Browser"; Hosts: "Hosts", "Hosts go live on their own blocks, change the lower third and cue a break. They see nothing else.", "No host yet", "Who hosts {program}?" |
+| Listings | "This week on BEAT. Every listing is complete.", "Local note", "From REEL. BEAT can add a local note.", "Nothing else airs today.", "Nothing is on the log this week." |
+| Library | "Couldn't prepare it for air. Replace the file."; the upload and import toasts; "Link"; "It hasn't aired yet.", "Nothing scheduled", "On IPFS", "Not offered", "Can't be offered for carriage", "Nothing uses it", "Removing it deletes the file from the library."; the Export to IPFS dialog; "Uploaded {date}" |
+
+**Market**
+
+| Where | Words |
+|---|---|
+| Browse | "Show all", "No programs match these filters.", "N programs" / "N one-offs"; phone "1 program fits…", "1 more needs…", "No programs in the market fit this gap." |
+| Toasts | "{Title} is in your log tonight at 11:40 pm"; "{Maker} has your request. {Title} goes in your log when they approve it."; "Crate Talk is offered. Stations can find it in the market."; "New terms saved. They apply to new carriers."; "…is no longer offered. Stations carrying it keep it until they end."; "Notice given. HALL carries Late Crate until October 5."; "Declined. NITE sees “Time slot”." / "…with no reason." |
+| Program page | "Choose terms", "Fits BEAT's schedule", "A weak slot, from your audience", "No longer offered to new carriers.", "{Maker} doesn't offer it to radio band stations."; preview "The preview is still being made.", "Generated" / "From the maker" |
+| Offer form | "{Title} terms", "Save terms", "Changes apply to new carriers. Stations carrying it keep their terms.", "Choose at least one deal.", "Up to 4:00, like 2:00.", "Set a price per airing, like $3.00." |
+| Requests and carriers | "Decline NITE's request? NITE sees the reason you choose, never a note.", "No reason", "Back", "Picture and sound"; "End carriage", "End carriage with HALL?", "Give notice", "Keep it", "ends October 5", "Offer it again" |
+| Place in the log | "Replaces: Nothing / One program", "2:00 of 4:00 an hour", "The second airing, within 30 days" |
+
+**Spots: breaks, the spot market, orders, sponsors**
+
+| Where | Words |
+|---|---|
+| Breaks | "No open time across N breaks."; "Nothing in it yet", "Both spots", "X and Y (backup)"; "Airing now", "Airing"; "The 8:44 pm break", "{context}. 2:00 long.", "Your rotation" / "Backup rotation", ", just added", "What fills this break shows once it's scheduled."; "No breaks tonight. Breaks come from your break rule in Settings." |
+| Breaks toasts and notices | "3 spots added. They start in the 8:44 pm break."; "{Business} added. It starts in the {time} break."; "They air when there's open time."; "{Spot} is back in your rotation."; "Your station ID and bumpers fill it."; "Its balance ran out." / "{short} added money." |
+| Spot market | "Never on BEAT: …. Change in Settings", "Nothing matches. Try a wider distance or another length.", "No businesses have listed spots near {CALL} yet."; "Budget", "No daily limit"; "Take out", "Add it back", "{short} paused it. Your backup rotation fills its time."; "The preview is still being prepared. The still is what viewers see first."; the rotation tab's lines ("Add a backup", "Add from the market", both empty states) |
+| Orders | "Not quoted", "your price"; "The spot", "Deliver", "Deliver a new version", "Notes", "Reply", "Add the note", "We'll tell you when it's listed."; toasts "Quote sent to …", "You passed. … is told, and offered the other makers.", "Delivered to …" |
+| Sponsors | "The business sees the reason:", "Keep it", "N more requests after this one."; "Starts Oct 1", "Doesn't renew", "Stop renewing", "It ends with its paid month", "No sponsors yet."; "Your credit, as it airs", "The credit, as it airs", "Full screen, :10 to :15, before the station ID."; toasts "{Business} approved.", "{Business} declined: {reason}." |
+| Sponsorship settings | "Saved.", "Only BEAT's owners change minimums." |
+
+**Earnings and audience**
+
+| Where | Words |
+|---|---|
+| Earnings | "No airings yet", "No sponsors yet", "{n} sponsors", "Production", "Spots you made", "{n} orders for businesses", "No airings held", "Available now.", "Available now. Payouts start once you finish setting up where you're paid.", "Finish setting up", "Stays in Clear until it's moved", "This week so far" / "2026 so far", "new this week" / "new this year" |
+| Move to bank | "Up to $X is available.", "Amount", "To", "Left available", "Arrives", "Held money isn't included. It becomes BEAT's when each airing runs.", "Move $X", "Enter an amount to move.", "Your bank", toast "$X is on its way to Chase ending 2231." |
+| Statements | "Every weekly payout, with the airings and lines behind it.", "Week", "Paid out", "No statements yet. The first comes the Monday after a week of earnings is paid out.", "That statement wasn't found.", "Total" |
+| Audience | "This week's peak, Saturday at 8:36 pm", "September's peak, September 19 at 9:40 pm", "Hours watched this week" / "in September", "Hours listened…", "Listeners with HALL as a preset", "Airings", "Live", "Nothing has aired yet tonight" / "this week" / "this month", "Last {weekday}"; phone "Peak this week" / "Peak this month N, {day} at {time}" |
+| Station account | "Available now. Earnings settle here after each airing", "Payouts", "Weekly, to Chase ending 2231. Next on Monday, September 28", "Not set up yet. Earnings stay in Clear until they're moved", "None scheduled. Earnings stay in Clear until they're moved", "Paid out this month", "Finish setting up where BEAT is paid", "Until then, BEAT's earnings stay in its Clear account.", "Only owners move money or change where BEAT is paid." |
+
+**Station: settings, translators, rights, claiming, the switcher**
+
+| Where | Words |
+|---|---|
+| Identity | the failing-colour and hex lines (as the station form), "Only the owner can change BEAT's identity.", "Set until the first sign-on, then fixed", the logo hint |
+| Breaks settings | "No backups yet", the arrow-key reorder hint |
+| Team | the invite errors, "Invited today", "Expires tomorrow" / "today" / "Expired", "Remove from BEAT", the team toasts |
+| Notifications | the web lede |
+| Ownership | all of it (A47) |
+| Translators | the Connect and Add forms, their errors and toasts, "relaying", "turned off" |
+| Switcher | "Off air", "Owner. Studio" |
+| Rights | "No claims about anything BEAT has aired.", the "offers paused" standing, the operator note, the answered and closed timeline lines, the remove confirmation, "Choose a file", the phone's "finish on a computer" line, the send blockers, the toasts. Every claim word is in `components/station/claimWords.ts` |
+| Claiming a station | the verifying, waiting, completed and stop states; the wrong-account line; the stop dialog |

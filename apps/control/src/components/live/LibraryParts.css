@@ -1,0 +1,37 @@
+/* The library's parts (master-control .drop, .lib-sum, .lib-row, .typesel; live-listings .folders). */
+.cc-folders { border-right: 1px solid var(--hair); padding: 18px 12px; }
+.cc-folders__g { font-size: 12px; font-weight: 600; color: var(--ink-50); padding: 0 8px 6px; }
+.cc-folders__g--gap { margin-top: 18px; }
+.cc-folders a { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--r-control); font-size: 14px; color: var(--ink-70); text-decoration: none; }
+.cc-folders a:hover { color: var(--ink); }
+.cc-folders a.cc-folders__on { background: var(--raised); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
+.cc-folders__ct { margin-left: auto; font: 500 12px var(--font-mono); color: var(--ink-50); }
+.cc-folders a.cc-folders__warn .cc-folders__ct { color: var(--standby); }
+
+.cc-drop { border: 1.5px dashed var(--line); border-radius: var(--r-screen); padding: 18px; display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.cc-drop--over { border-color: var(--signal); background: var(--raised); }
+.cc-drop__ic { width: 44px; height: 44px; border-radius: var(--r-control); background: var(--raised); display: grid; place-items: center; flex: none; }
+.cc-drop b { display: block; font-weight: 600; }
+.cc-drop small { color: var(--ink-70); font-size: 13px; }
+.cc-drop__end { margin-left: auto; display: flex; gap: 8px; flex: none; }
+
+.cc-lib-sum { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13.5px; color: var(--ink-70); margin: 0 0 12px; }
+.cc-lib-sum b { color: var(--ink); font-weight: 600; }
+.cc-lib-sum__warn { color: var(--standby); font-weight: 600; }
+.cc-lib-empty { font-size: 14px; color: var(--ink-70); }
+
+.cc-lib-rows .oc-table__cell small { display: block; font-size: 12.5px; color: var(--ink-50); }
+.cc-lib-row__title { display: block; font-weight: 600; font-size: 14.5px; color: var(--ink); text-decoration: none; }
+a.cc-lib-row__title:hover { text-decoration: underline; }
+.cc-lib-row__d { font: 500 13px var(--font-mono); }
+
+.cc-lib-status { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.cc-lib-status small { font-size: 12.5px; color: var(--ink-70) !important; }
+.cc-lib-status--warn { color: var(--standby); }
+.cc-lib-bar { display: block; height: 4px; border-radius: 2px; background: var(--hair); overflow: hidden; max-width: 190px; }
+.cc-lib-bar i { display: block; height: 100%; background: var(--signal); }
+.cc-lib-rights { padding: 0; border: 0; background: none; color: var(--standby); font: 600 13.5px var(--font-text); text-align: left; cursor: pointer; }
+.cc-lib-rights:hover { text-decoration: underline; }
+
+.cc-rights__note { font-size: 13px; color: var(--ink-70); margin: 14px 0 0; line-height: 1.5; }
+.cc-rights__error { font-size: 13px; color: var(--standby); margin: 10px 0 0; }

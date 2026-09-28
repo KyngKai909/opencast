@@ -1,0 +1,40 @@
+/* Settings, Team (station-settings 03.1: .tm-h, .tm, .role, .perm). */
+.cc-team { position: relative; }
+/* Level with the pane's heading, at its right (the frame's Invite someone). */
+.cc-team__invite { position: absolute; top: -51px; right: 0; }
+.cc-team__table .oc-table__head { font-size: 12.5px; }
+.cc-team__pending { font-weight: 500; color: var(--ink-70); }
+.cc-team__pending-av {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px dashed var(--line);
+  display: grid; place-items: center; font: 700 14px var(--font-text); color: var(--ink-50);
+}
+.cc-team__last { font-size: 12.5px; color: var(--ink-70); }
+.cc-team__roles { margin-top: 28px; }
+
+.cc-role {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.cc-role--fixed { border-style: dashed; color: var(--ink-70); }
+.cc-role--pick { padding: 0; position: relative; }
+.cc-role--pick select {
+  appearance: none; -webkit-appearance: none; height: 30px; border: 0; background: none; border-radius: var(--r-control);
+  padding: 0 30px 0 10px; font: 600 13px var(--font-text); color: var(--ink); cursor: pointer;
+}
+.cc-role--pick::after {
+  content: ""; position: absolute; right: 12px; top: 11px; width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); pointer-events: none;
+}
+.cc-role--pick option { color: var(--ink); background: var(--ground); }
+
+/* The phone: one row a person, the role and actions at the end. */
+.cc-team__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.cc-team__prow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-team__pwho { min-width: 0; display: grid; gap: 2px; }
+.cc-team__pend { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+@media (max-width: 767px) {
+  .cc-team { padding: 16px 16px 24px; }
+  .cc-team__invite { position: static; margin: 0 0 14px; }
+}

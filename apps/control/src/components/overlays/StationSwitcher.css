@@ -1,0 +1,31 @@
+/* The station switcher (station-settings 04.1 .menu-pop, .mp, .mp-sep, .mp-add; 05.2 on the phone). */
+.cc-switch--menu {
+  position: fixed; z-index: 20; width: 340px;
+  background: var(--ground); border-radius: var(--r-screen);
+  /* The menu's lift: black on either ground, as the frame draws it. */
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px rgb(0 0 0 / .35);
+  padding: 8px;
+}
+.cc-switch__row {
+  display: grid; grid-template-columns: 14px 48px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 10px; border-radius: var(--r-control); font-size: 14px; color: var(--ink); text-decoration: none;
+}
+.cc-switch__row:hover { background: var(--raised); }
+.cc-switch__row--on { background: var(--raised); }
+.cc-switch__row:focus-visible, .cc-switch__add:focus-visible { outline: 2px solid var(--signal); outline-offset: 0; }
+.cc-switch__sw { width: 14px; height: 14px; border-radius: 3px; background: var(--cc-sw); }
+.cc-switch__ch { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-70); }
+.cc-switch__who { min-width: 0; }
+.cc-switch__who b { display: block; font-weight: 600; }
+.cc-switch__who small { font-size: 12px; color: var(--ink-70); }
+.cc-switch__end { display: flex; align-items: center; gap: 8px; }
+.cc-switch__check { color: var(--signal); }
+.cc-switch__sep { height: 1px; background: var(--hair); margin: 6px 4px; }
+.cc-switch__add { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-control); font-size: 14px; font-weight: 600; color: var(--signal); text-decoration: none; }
+
+/* The phone: the sheet drops from the top bar (the note: "drops the switcher down from where it was tapped"). */
+.cc-switch-sheet.oc-backdrop--sheet { top: var(--cc-switch-top, 0); place-items: start stretch; }
+.cc-switch-sheet .oc-sheet { border-radius: 0 0 22px 22px; }
+.cc-switch-sheet .oc-modal__main { order: 1; padding: 16px 22px 8px; }
+.cc-switch-sheet .oc-sheet__grab { order: 2; }
+.cc-switch--sheet .cc-switch__row { padding: 12px 10px; }

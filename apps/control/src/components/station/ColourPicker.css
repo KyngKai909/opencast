@@ -1,0 +1,15 @@
+/* The station colour (station-settings 01.1 .swatches). */
+.cc-colour { border: 0; margin: 0 0 16px; padding: 0; min-width: 0; }
+.cc-colour__legend { padding: 0; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+.cc-colour__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cc-colour__swatches { display: flex; gap: 8px; }
+.cc-colour__sw { width: 30px; height: 30px; border-radius: var(--r-control); border: 0; padding: 0; cursor: pointer; }
+.cc-colour__sw--on { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.cc-colour__hex {
+  height: 34px; width: 120px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-control); background: var(--raised);
+  font: 500 13px var(--font-mono); color: var(--ink);
+}
+.cc-colour__hex[aria-invalid="true"] { border-color: var(--standby); }
+.cc-colour:disabled .cc-colour__sw { cursor: default; }
+.cc-colour:disabled .cc-colour__hex { color: var(--ink-70); }
