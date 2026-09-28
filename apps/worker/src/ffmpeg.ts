@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcess } from "node:child_process";
-import type { AssetMediaKind, StreamMode } from "@openchannel/shared";
+import type { AssetMediaKind, StreamMode } from "@opencast/domain";
 
 export interface FfmpegSessionResult {
   code: number;

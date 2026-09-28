@@ -9,6 +9,8 @@ storage/uploads/*
 !storage/uploads/.gitkeep
 storage/hls/*
 !storage/hls/.gitkeep
-storage/db.json
+storage/db*.json
 storage/db.lock
+apps/*/storage/
 *.log
+.turbo

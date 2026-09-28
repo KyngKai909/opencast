@@ -9,7 +9,7 @@ import type {
   MultistreamDestination,
   PlayoutCommand,
   PlayoutState
-} from "@openchannel/shared";
+} from "@opencast/domain";
 import { HLS_ROOT, LIVEPEER_DEFAULT_ENABLED, MEDIA_BASE_URL, POLL_INTERVAL_MS, UPLOAD_ROOT } from "./config.js";
 import { getChannel, getOrCreatePlayoutState, readDb, transaction } from "./db.js";
 import { resetChannelOutput, startHlsSegmenter, type FfmpegSession } from "./ffmpeg.js";
@@ -700,7 +700,7 @@ async function poll() {
   }
 }
 
-console.log(`[worker] OpenChannel playout worker started (poll interval ${POLL_INTERVAL_MS}ms)`);
+console.log(`[worker] Opencast playout worker started (poll interval ${POLL_INTERVAL_MS}ms)`);
 poll();
 const pollInterval = setInterval(poll, POLL_INTERVAL_MS);
 

@@ -22,7 +22,7 @@ import type {
   PlayoutCommand,
   StreamMode,
   StreamSchedule
-} from "@openchannel/shared";
+} from "@opencast/domain";
 import {
   API_PORT,
   DELETE_LOCAL_AFTER_R2,
@@ -1045,7 +1045,7 @@ async function recoverExternalIngestJobs() {
 }
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "openchannel-api", at: nowIso() });
+  res.json({ ok: true, service: "opencast-api", at: nowIso() });
 });
 
 app.get("/api/channels", async (req, res) => {
@@ -2783,7 +2783,7 @@ if (serveWebApp && fsSync.existsSync(webIndexPath)) {
 }
 
 app.listen(API_PORT, () => {
-  console.log(`OpenChannel API listening on port ${API_PORT}`);
+  console.log(`Opencast API listening on port ${API_PORT}`);
   console.log(`Serving HLS output from ${HLS_ROOT}`);
   if (serveWebApp) {
     console.log(`Serving web build from ${WEB_DIST_DIR}`);

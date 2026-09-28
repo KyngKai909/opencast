@@ -1,19 +1,19 @@
 {
-  "name": "@openchannel/api",
+  "name": "@opencast/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "if [ -n \"$RAILWAY_ENVIRONMENT\" ]; then node dist/server.js; else tsx watch src/server.ts; fi",
     "start": "node dist/server.js",
-    "build": "npm run build -w @openchannel/shared && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "echo \"No lint configured for api\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",
     "@aws-sdk/s3-request-presigner": "^3.1085.0",
-    "@openchannel/shared": "0.1.0",
+    "@opencast/domain": "0.1.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "multer": "^2.0.2",

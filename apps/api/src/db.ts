@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
-import type { Asset, Channel, DatabaseSchema, PlayoutState } from "@openchannel/shared";
+import type { Asset, Channel, DatabaseSchema, PlayoutState } from "@opencast/domain";
 import { DATABASE_URL, DB_LOCK_PATH, DB_PATH, HLS_ROOT, UPLOAD_ROOT } from "./config.js";
 
 const DEFAULT_DB: DatabaseSchema = {

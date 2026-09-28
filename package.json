@@ -1,5 +1,5 @@
 {
-  "name": "openchannel-mvp",
+  "name": "opencast",
   "private": true,
   "version": "0.1.0",
   "workspaces": [
@@ -9,28 +9,29 @@
   "scripts": {
     "env:check": "node scripts/env-check.mjs",
     "env:check:railway": "node scripts/env-check.mjs --railway",
-    "predev": "npm run build -w @openchannel/shared",
-    "dev": "concurrently -n API,WORKER,WEB -c blue,magenta,green \"npm run dev -w @openchannel/api\" \"npm run dev -w @openchannel/worker\" \"npm run dev -w @openchannel/web\"",
-    "predev:runtime": "npm run build -w @openchannel/shared",
-    "dev:runtime": "concurrently -n API,WORKER,WEB -c blue,magenta,green \"npx tsx apps/api/src/server.ts\" \"npx tsx apps/worker/src/worker.ts\" \"npm run dev -w @openchannel/web\"",
-    "build": "npm run build -w @openchannel/shared && npm run build -w @openchannel/api && npm run build -w @openchannel/worker && npm run build -w @openchannel/web",
-    "build:service:api": "npm run build -w @openchannel/shared && npm run build -w @openchannel/api",
-    "build:service:worker": "npm run build -w @openchannel/shared && npm run build -w @openchannel/worker",
-    "build:service:web": "npm run build -w @openchannel/web",
+    "predev": "turbo run build --filter=@opencast/domain --filter=@opencast/contracts",
+    "dev": "concurrently -n API,WORKER,CONTROL -c blue,magenta,green \"PORT=8787 API_PORT=8787 npm run dev -w @opencast/api\" \"npm run dev -w @opencast/worker\" \"npm run dev -w @opencast/control\"",
+    "predev:runtime": "turbo run build --filter=@opencast/domain --filter=@opencast/contracts",
+    "dev:runtime": "concurrently -n API,WORKER,CONTROL -c blue,magenta,green \"PORT=8787 API_PORT=8787 npx tsx apps/api/src/server.ts\" \"npx tsx apps/worker/src/worker.ts\" \"npm run dev -w @opencast/control\"",
+    "build": "turbo run build",
+    "build:service:api": "turbo run build --filter=@opencast/api...",
+    "build:service:worker": "turbo run build --filter=@opencast/worker...",
+    "build:service:control": "turbo run build --filter=@opencast/control...",
     "start": "npm run start:runtime",
     "start:api": "node apps/api/dist/server.js",
     "start:worker": "node apps/worker/dist/worker.js",
-    "start:web": "npm run start -w @openchannel/web",
-    "start:service:api": "npm run start -w @openchannel/api",
-    "start:service:worker": "npm run start -w @openchannel/worker",
-    "start:service:web": "npm run start -w @openchannel/web",
+    "start:service:api": "npm run start -w @opencast/api",
+    "start:service:worker": "npm run start -w @opencast/worker",
+    "start:service:control": "npm run start -w @opencast/control",
     "start:runtime": "node scripts/start-runtime.mjs",
     "start:railway": "npm run start:runtime",
-    "typecheck": "npm run typecheck --workspaces",
-    "lint": "npm run lint --workspaces"
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "typescript": "^5.9.2"
-  }
+    "typescript": "^5.9.2",
+    "turbo": "^2.11.5"
+  },
+  "packageManager": "npm@11.3.0"
 }
