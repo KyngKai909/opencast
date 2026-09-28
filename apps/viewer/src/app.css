@@ -1,0 +1,5 @@
+/* The viewer's own layout glue. Components and tokens come from @opencast/ui. */
+html, body, #root { height: 100%; }
+body { font-size: 15px; line-height: 1.45; overscroll-behavior-y: none; }
+#root { display: flex; flex-direction: column; }
+#root > * { flex: 1; min-height: 0; }

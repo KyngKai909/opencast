@@ -26,7 +26,12 @@ export const MOCK_STATIONS = [
   { slug: "civc", callSign: "CIVC", channel: "7.1", name: "Inland Civic", colour: "#2E6B5A", band: "tv", title: "Town Hall: backyard homes and ADUs", tone: 330, captions: ["Residents question the commission.", "The next speaker has two minutes.", "Backyard homes are allowed on most lots."] },
   { slug: "beat", callSign: "BEAT", channel: "12.1", name: "Inland Beat", colour: "#8C3B7A", band: "tv", title: "Saturday Reel", tone: 440, captions: ["Cartoons from 1928 to 1934.", "Carried from REEL 24.1.", "Beat Tape Live is next, at 9:00."] },
   { slug: "reel", callSign: "REEL", channel: "24.1", name: "Saturday Reel", colour: "#9A5412", band: "tv", title: "Cartoons from 1928 to 1934", tone: 523, captions: ["River boats and paddle wheels.", "Restored from the original prints.", "Newsreel hour is next, at 9:00."] },
-  { slug: "nite", callSign: "NITE", channel: "88.3", name: "Night Desk", colour: "#33507A", band: "radio", title: "Radio dramas from the 1940s", tone: 262, captions: ["The Hollow Door, part 2.", "A radio drama from 1946.", "Stay tuned for part 3."] }
+  { slug: "sazn", callSign: "SAZN", channel: "18.1", name: "Sazón", colour: "#A3402A", band: "tv", title: "Tamales for forty", tone: 587, captions: ["Masa, then the filling.", "Forty tamales before the party.", "Orange Street after hours is next."] },
+  { slug: "prep", callSign: "PREP", channel: "31.1", name: "Inland Preps", colour: "#1F5E8C", band: "tv", title: "Football: Redlands East Valley at Citrus Valley", tone: 392, captions: ["Third down on the forty.", "Citrus Valley leads by three.", "Friday scoreboard is next."] },
+  { slug: "nite", callSign: "NITE", channel: "88.3", name: "Night Desk", colour: "#33507A", band: "radio", title: "Radio dramas from the 1940s", tone: 262, captions: ["The Hollow Door, part 2.", "A radio drama from 1946.", "Stay tuned for part 3."] },
+  { slug: "hall", callSign: "HALL", channel: "90.7", name: "Study Hall", colour: "#56508A", band: "radio", title: "Slow beats for late work", tone: 294, captions: ["Slow beats for late work.", "Study Hall, 90.7.", "All night."] },
+  { slug: "crat", callSign: "CRAT", channel: "101.9", name: "Crate", colour: "#7E2F35", band: "radio", title: "The Producers’ Hour", tone: 349, captions: ["Live from the Crate studio.", "Producers play unreleased tapes.", "The Producers’ Hour."] },
+  { slug: "voze", callSign: "VOZE", channel: "104.3", name: "La Voz", colour: "#1D6A70", band: "radio", title: "Noche de oldies", tone: 311, captions: ["Noche de oldies.", "La Voz, 104.3.", "Hasta la medianoche."] }
 ];
 
 function frameSvg(s, second) {

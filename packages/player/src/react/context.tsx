@@ -3,6 +3,8 @@ import { PlayerEngine, type EngineOptions, type PlayerState } from "../engine/Pl
 import { startInputs, type InputAdapter } from "../input/types";
 
 const EngineContext = createContext<PlayerEngine | null>(null);
+/** Where the videos wait while no surface shows them, so sound carries on between pages. */
+const DockContext = createContext<HTMLElement | null>(null);
 
 export interface PlayerProviderProps {
   /** Pass an engine to share one (the Cast receiver makes its own); otherwise one is made from `options`. */
@@ -28,9 +30,25 @@ export function PlayerProvider({ engine, options, inputs = [], children }: Playe
     };
   }, [engine, options]);
   const e = engine ?? own;
+  const [dock, setDock] = useState<HTMLDivElement | null>(null);
   useEffect(() => (e ? startInputs(inputs, (command, source) => e.handle(command, source)) : undefined), [e, inputs]);
+  useEffect(() => {
+    // Until a surface mounts, the videos live in the dock (hidden, still playing).
+    if (e && dock && !e.isAttached()) e.attach(dock);
+  }, [e, dock]);
   if (!e) return null;
-  return <EngineContext.Provider value={e}>{children}</EngineContext.Provider>;
+  return (
+    <EngineContext.Provider value={e}>
+      <DockContext.Provider value={dock}>
+        {children}
+        <div ref={setDock} className="oc-player-dock" aria-hidden="true" />
+      </DockContext.Provider>
+    </EngineContext.Provider>
+  );
+}
+
+export function usePlayerDock(): HTMLElement | null {
+  return useContext(DockContext);
 }
 
 export function usePlayerEngine(): PlayerEngine {

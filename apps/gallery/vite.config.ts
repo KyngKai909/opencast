@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig, type Plugin } from "vite";
+import { defaultClientConditions, defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error: a plain .mjs module with no types
 import { mockLiveHls } from "@opencast/player/mock";
@@ -27,6 +27,7 @@ function referenceFiles(): Plugin {
 
 export default defineConfig({
   plugins: [react(), referenceFiles()],
-  resolve: { conditions: ["source"] },
+  // Workspace packages export their TypeScript under "source"; keep Vite's own conditions after it.
+  resolve: { conditions: ["source", ...defaultClientConditions] },
   server: { port: 5180, strictPort: true }
 });

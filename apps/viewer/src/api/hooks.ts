@@ -1,0 +1,30 @@
+import { useMutation, useQuery, useQueryClient, type UseQueryOptions } from "@tanstack/react-query";
+import type { EndpointDef } from "@opencast/contracts";
+import type { z } from "zod";
+import { call, type CallArgs } from "./client";
+
+/** A query key per endpoint and arguments: invalidate by path to refresh everything under it. */
+export function keyFor(endpoint: EndpointDef, args: CallArgs = {}) {
+  return [endpoint.method, endpoint.path, args.params ?? {}, args.query ?? {}] as const;
+}
+
+/** Reads an endpoint. Pass `schema` for an extended response (docs/contract-requests.md). */
+export function useApi<E extends EndpointDef, S extends z.ZodType = E["response"]>(
+  endpoint: E,
+  args: CallArgs = {},
+  opts: { schema?: S; enabled?: boolean } & Omit<UseQueryOptions<z.infer<S>>, "queryKey" | "queryFn"> = {}
+) {
+  const { schema, ...rest } = opts;
+  return useQuery<z.infer<S>>({ queryKey: keyFor(endpoint, args), queryFn: () => call(endpoint, args, schema), ...rest });
+}
+
+/** Changes something, then refreshes the queries under `invalidates` (endpoint paths). */
+export function useApiMutation<E extends EndpointDef>(endpoint: E, opts: { invalidates?: EndpointDef[] } = {}) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: CallArgs) => call(endpoint, args),
+    onSuccess: () => {
+      for (const e of opts.invalidates ?? []) void qc.invalidateQueries({ queryKey: [e.method, e.path] });
+    }
+  });
+}

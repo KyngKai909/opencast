@@ -143,7 +143,11 @@ export class PlayerEngine {
 
   // ---------- Setup ----------
 
-  /** Where the video elements live: the surface's picture box. */
+  isAttached(): boolean {
+    return this.host !== null;
+  }
+
+  /** Where the video elements live: the surface's picture box (or the provider's dock). */
   attach(host: HTMLElement) {
     this.host = host;
     for (const d of this.decks.values()) host.appendChild(d.video);

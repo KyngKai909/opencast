@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Slate, Tag, cx } from "@opencast/ui";
 import type { Hint } from "../input/types";
-import { usePlayer } from "./context";
+import { usePlayer, usePlayerDock } from "./context";
 import { Banner } from "./Banner";
 import { NumberPanel } from "./NumberPanel";
 import { RadioScreen } from "./RadioScreen";
@@ -30,9 +30,14 @@ export function PlayerSurface({ size = "web", timeZone, hints, className }: Play
   const stage = useRef<HTMLDivElement>(null);
   const now = useClock();
 
+  const dock = usePlayerDock();
   useEffect(() => {
     if (stage.current) engine.attach(stage.current);
-  }, [engine]);
+    // Leaving the page hands the videos back to the dock: the sound carries on.
+    return () => {
+      if (dock) engine.attach(dock);
+    };
+  }, [engine, dock]);
 
   useEffect(() => {
     // Fetch the banner's faces now, so the first channel change doesn't flash fallback digits.

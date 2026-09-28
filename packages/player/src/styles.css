@@ -132,3 +132,6 @@
 .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
 }
 .oc-radio__tally { position: absolute; top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
+
+/* The dock: videos wait here, playing, while no surface shows them. */
+.oc-player-dock { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; left: -10px; top: -10px; }
