@@ -2,11 +2,13 @@
 // every station on air from its program log from files in its cache, and the minute
 // tick (reminders, dead-air warnings, deadlines). Followers wait. The old queue loop
 // runs too while stations on the old model still need it (LEGACY_PLAYOUT=on).
-// GET /health reports leadership, stations on air and the cache.
+// GET /health reports leadership, stations on air and the cache; GET /hls/<station>/… serves its HLS.
 
+import fs from "node:fs";
 import http from "node:http";
+import path from "node:path";
 import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
-import { STORAGE_ROOT } from "./config.js";
+import { HLS_ROOT, STORAGE_ROOT } from "./config.js";
 import { startLegacyPlayout, workerInstanceId } from "./legacy.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
 
@@ -57,14 +59,37 @@ async function tick() {
 
 // Railway gives the worker a PORT; locally it's WORKER_HEALTH_PORT (the dev stack's PORT belongs to the web app).
 const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? (process.env.RAILWAY_ENVIRONMENT ? process.env.PORT : undefined) ?? 8788);
+const HLS_SEGMENT = /^\/hls\/([0-9a-f-]{36})\/(index\.m3u8|seg_\d+\.ts)$/;
 const health = http.createServer((req, res) => {
-  if (req.url !== "/health") {
-    res.writeHead(404).end();
+  const url = (req.url ?? "").split("?")[0];
+  if (url === "/health") {
+    const { stationsOnAir, cache } = engine.stats();
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, cache, at: new Date().toISOString() }));
     return;
   }
-  const { stationsOnAir, cache } = engine.stats();
-  res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, cache, at: new Date().toISOString() }));
+  // The stations' HLS, from this worker's disk (it's the one writing it): live playlists carry the break cues.
+  const hls = HLS_SEGMENT.exec(url);
+  if (hls && req.method === "GET") {
+    const [, stationId, file] = hls;
+    const headers = { "access-control-allow-origin": "*", "cache-control": file === "index.m3u8" ? "no-cache" : "public, max-age=60" };
+    if (file === "index.m3u8") {
+      services.playout
+        .playlistWithCues(stationId)
+        .then((playlist) => {
+          if (!playlist) return void res.writeHead(404, headers).end();
+          res.writeHead(200, { ...headers, "content-type": "application/vnd.apple.mpegurl" }).end(playlist);
+        })
+        .catch(() => res.writeHead(500, headers).end());
+      return;
+    }
+    const stream = fs.createReadStream(path.join(HLS_ROOT, stationId, file));
+    stream.on("open", () => res.writeHead(200, { ...headers, "content-type": "video/mp2t" }));
+    stream.on("error", () => res.writeHead(404, headers).end());
+    stream.pipe(res);
+    return;
+  }
+  res.writeHead(404).end();
 });
 health.on("error", (error) => console.error(`[worker] health endpoint couldn't start on ${healthPort}`, error.message));
 health.listen(healthPort, () => console.log(`[worker] health on :${healthPort}/health`));

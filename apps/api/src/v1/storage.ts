@@ -171,10 +171,12 @@ export interface S3Config {
   /** A public domain for the bucket, if it has one; otherwise URLs are presigned. */
   publicBase?: string;
   presignSeconds?: number;
+  /** Path-style URLs (bucket in the path): MinIO and other self-hosted S3 stores need it; R2 doesn't. */
+  forcePathStyle?: boolean;
 }
 
 export function s3ObjectStore(config: S3Config): ObjectStore {
-  const client = new S3Client({ region: "auto", endpoint: config.endpoint, credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey } });
+  const client = new S3Client({ region: "auto", endpoint: config.endpoint, forcePathStyle: config.forcePathStyle ?? false, credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey } });
   const Bucket = config.bucket;
   // R2 maps STANDARD_IA to Infrequent Access.
   const cls = (c: StorageClass) => (c === "infrequent" ? "STANDARD_IA" : "STANDARD");
@@ -272,7 +274,7 @@ export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string): Sto
   const endpoint = env.R2_ENDPOINT?.trim() || (env.R2_ACCOUNT_ID ? `https://${env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com` : "");
   const r2 = endpoint && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET;
   const objects = r2
-    ? s3ObjectStore({ endpoint, accessKeyId: env.R2_ACCESS_KEY_ID!.trim(), secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(), bucket: env.R2_BUCKET!.trim(), publicBase: env.R2_PUBLIC_BASE?.trim() || undefined, presignSeconds: Number(env.R2_PRESIGN_TTL_SEC) || undefined })
+    ? s3ObjectStore({ endpoint, accessKeyId: env.R2_ACCESS_KEY_ID!.trim(), secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(), bucket: env.R2_BUCKET!.trim(), publicBase: env.R2_PUBLIC_BASE?.trim() || undefined, presignSeconds: Number(env.R2_PRESIGN_TTL_SEC) || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === "true" })
     : localObjectStore(path.join(storageRoot, "objects"));
   const ipfs = env.PINATA_JWT ? pinataPublisher({ jwt: env.PINATA_JWT, uploadUrl: env.PINATA_UPLOAD_URL || undefined, gatewayBase: env.PINATA_GATEWAY_BASE || undefined }) : noIpfs;
   return { objects, ipfs };

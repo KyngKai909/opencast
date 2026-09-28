@@ -1,0 +1,25 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npx turbo run build --filter=@opencast/site...",
+    "watchPatterns": [
+      "apps/site/**",
+      "scripts/serve-static.mjs",
+      "packages/**",
+      "package.json",
+      "package-lock.json",
+      "turbo.json",
+      "tsconfig.base.json",
+      "nixpacks.toml",
+      "deploy/railway/site.json"
+    ]
+  },
+  "deploy": {
+    "startCommand": "node scripts/serve-static.mjs apps/site/dist",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}

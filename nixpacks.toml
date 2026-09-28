@@ -1,8 +1,10 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "ffmpeg"]
+# ffmpeg: media preparation, previews, playout. yt-dlp: link imports (the API).
+nixPkgs = ["nodejs_22", "ffmpeg", "yt-dlp"]
 
 [phases.install]
-cmds = ["npm ci"]
+# Dev dependencies too: the build needs TypeScript and Vite, and migrations run with tsx.
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
