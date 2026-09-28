@@ -301,6 +301,12 @@ export class StationRunner {
         .settleAiring({ airingId: seg.airingId, asRunId: row.id, startedAt, endedAt })
         .catch((error) => this.log(`settling ${seg.airingId} failed: ${(error as Error).message}`));
     }
+    // A carried episode under a cash deal: the carrier pays the maker (once per slot, however it's split).
+    if (seg.agreementId && seg.logEntryId && seg.code === "PGM" && !seg.inBreak) {
+      await this.ctx.services.catalog
+        .chargeCarriedAiring({ agreementId: seg.agreementId, carrierStationId: this.stationId, logEntryId: seg.logEntryId })
+        .catch((error) => this.log(`carriage fee for ${seg.logEntryId} failed: ${(error as Error).message}`));
+    }
     return row;
   }
 

@@ -13,7 +13,7 @@ export interface Events {
   "station.signed_off": { stationId: string; permanently: boolean };
   "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance"; stationIds: string[] };
   "spot.resumed": { spotId: string; businessId: string; stationIds: string[] };
-  "business.low_balance": { businessId: string; daysLeft: number };
+  "business.low_balance": { businessId: string; daysLeft: number; /** The last top-up (or "start"): one warning per threshold until the next. */ since: string };
   "sponsorship.requested": { sponsorshipId: string; stationId: string; businessId: string };
   "sponsorship.decided": { sponsorshipId: string; stationId: string; businessId: string; approved: boolean };
   "carriage.requested": { requestId: string; makerStationId: string; carrierStationId: string };

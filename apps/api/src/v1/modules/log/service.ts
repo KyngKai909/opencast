@@ -65,6 +65,8 @@ export interface LogService {
   ensureBreaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
   /** Entries within a window, for sign-on checks and playout. */
   entries(stationId: string, from: Date, to: Date): Promise<Row[]>;
+  /** One entry's slot. */
+  entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
   /** Every station's items on the log in a window, earliest first (the worker cache reads ahead). */
   upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
@@ -399,6 +401,11 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
 
     async entries(stationId, from, to) {
       return load([stationId], from, to);
+    },
+
+    async entrySpan(entryId) {
+      const [row] = await db.select({ startsAt: E.startsAt, endsAt: E.endsAt }).from(E).where(eq(E.id, entryId));
+      return row ?? null;
     },
 
     async upcomingItems(from, to) {

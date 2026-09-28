@@ -134,7 +134,19 @@ export function ownAccountsCustody(account: LedgerAccount, holdAdvertiserId: str
       // Card money lands in Opencast's Stripe balance and is credited on from the treasury.
       return account.label === "stripe" ? "opencast:treasury" : null;
     default:
-      // escrow, creator, creator_fund: on-chain, moved by the chain job.
-      return null;
+      return chainCustody(account);
   }
 }
+
+/**
+ * On-chain wallets: the escrow contract, the creators it has paid, the creator fund. Moves to or
+ * from them are recorded like any other, but the chain moved the money: providers skip them.
+ */
+export function chainCustody(account: LedgerAccount): Wallet | null {
+  if (account.kind === "escrow") return "chain:escrow";
+  if (account.kind === "creator") return `chain:creator:${account.userId}`;
+  if (account.kind === "creator_fund") return "chain:fund";
+  return null;
+}
+
+export const onChain = (wallet: Wallet | null) => Boolean(wallet?.startsWith("chain:"));

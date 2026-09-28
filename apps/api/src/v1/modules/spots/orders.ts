@@ -32,6 +32,8 @@ export interface OrdersPart {
   markOwnMistake(orderId: string, noteId: string): Promise<ProductionOrder>;
   reviewDelivery(orderId: string, decision: "approve" | "request_changes" | "dispute", tellMakerWhenListed?: boolean): Promise<ProductionOrder>;
   cancelOrder(orderId: string): Promise<ProductionOrder>;
+  /** Opencast's review of a disputed order. The hold is paid to the maker, returned, or split. */
+  resolveDispute(orderId: string, input: { outcome: "pay_maker" | "refund" | "split"; makerMicros?: number; note?: string }): Promise<ProductionOrder>;
   /** Approves deliveries with no answer after 7 days. Run by the scheduler. */
   autoApproveOrders(): Promise<number>;
   /** Tells the maker a spot it made is listed, if the business asked. */
@@ -128,7 +130,7 @@ export function createOrders(
     }
   }
 
-  async function approve(order: typeof O.$inferSelect) {
+  async function approve(order: typeof O.$inferSelect, makerMicros?: number) {
     const [delivery] = await db.select().from(F).where(and(eq(F.orderId, order.id), eq(F.role, "delivery"))).orderBy(desc(F.createdAt)).limit(1);
     const probe = delivery?.contentId ? await probeContent(delivery.contentId).catch(() => null) : delivery?.location ? await deps.media.probe(delivery.location).catch(() => null) : null;
     await db.transaction(async (tx) => {
@@ -136,7 +138,7 @@ export function createOrders(
         await services.ledger.settle(tx, {
           holdId: order.holdId,
           stationId: order.makerStationId,
-          costMicros: order.quoteMicros ?? 0,
+          costMicros: makerMicros ?? order.quoteMicros ?? 0,
           kind: "production",
           source: { sourceType: "production_order", sourceId: order.id, memo: `Made for you: ${order.title}`, idempotencyKey: `order:${order.id}` }
         });
@@ -294,6 +296,27 @@ export function createOrders(
         emit(u);
       }
       return part.order(orderId);
+    },
+
+    async resolveDispute(orderId, input) {
+      const found = await row(orderId);
+      if (found.status !== "disputed") throw refused("not_disputed", "That order isn't waiting for a review.");
+      const price = found.quoteMicros ?? 0;
+      if (input.outcome === "refund") {
+        await db.transaction(async (tx) => {
+          if (found.holdId) await services.ledger.release(tx, found.holdId, undefined, { sourceType: "production_order", sourceId: orderId, memo: `Returned after review${input.note ? `: ${input.note}` : ""}` });
+          await tx.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId));
+        });
+        await services.library.content.dropPreview("order", orderId);
+        const updated = await row(orderId);
+        emit(updated);
+        return (await views([updated]))[0];
+      }
+      if (input.outcome === "split" && (!input.makerMicros || input.makerMicros >= price)) throw badRequest("A split pays the maker part of the price.", { makerMicros: `Less than ${price}` });
+      // The maker is paid (all, or their part; the rest goes back) and the business keeps what was delivered.
+      await approve(found, input.outcome === "split" ? input.makerMicros : undefined);
+      const updated = await row(orderId);
+      return (await views([updated]))[0];
     },
 
     async cancelOrder(orderId) {

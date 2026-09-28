@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-185 endpoints in 13 modules.
+187 endpoints in 13 modules.
 
 ## accounts (24)
 
@@ -121,7 +121,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `endAgreement` | POST | `/carriage/agreements/:agreementId/end` | signed in | Give notice to end carriage (either side). It ends after the notice period. |
 | `placeInLog` | POST | `/carriage/agreements/:agreementId/place` | signed in | Put the agreed slots on the carrier's log: next unaired episode, in order, replacing what's there |
 
-## spots (47)
+## spots (48)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -167,13 +167,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `markOwnMistake` | POST | `/orders/:orderId/notes/:noteId/makers-mistake` | signed in | The maker marks a note as its own mistake; it doesn't use up a round |
 | `reviewDelivery` | POST | `/orders/:orderId/review` | signed in | Approve (releases the money and makes it a spot), ask for changes, or ask Opencast to review after the included rounds |
 | `cancelOrder` | POST | `/orders/:orderId/cancel` | signed in | Cancel. After the delivery date passes undelivered, the hold returns in full. |
+| `resolveOrderDispute` | POST | `/admin/orders/:orderId/resolve` | Opencast admin | Opencast's review of a disputed order: pay the maker, refund the business, or split (added 2026-09) |
 | `scanCode` | POST | `/c/:code/scan` | anyone | Count a QR scan (from the page the QR opens) |
 | `saveOffer` | POST | `/c/:code/save` | anyone (personal if signed in) | Save the offer to a phone |
 | `redeemCode` | POST | `/businesses/:businessId/redeem` | signed in | Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use. |
 | `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
 
-## ledger (15)
+## ledger (16)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -187,6 +188,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listStatements` | GET | `/businesses/:businessId/statements` | signed in | Monthly statements with every airing |
 | `getStationEarnings` | GET | `/stations/:stationId/earnings` | signed in | Earnings lines, held money, the account and next payout (owner; operators see only) |
 | `listStationStatements` | GET | `/stations/:stationId/statements` | signed in | Weekly statements; the CSV has the ledger entries behind each line |
+| `getStatementCsv` | GET | `/statements/:statementId/csv` | signed in | A statement's ledger entries as CSV (the business's team, or the station's owners) |
 | `getPayoutAccount` | GET | `/stations/:stationId/payout-account` | signed in | Where the station is paid (its Clear account, or Stripe Connect), and a link if it has to finish setting it up (owner only) |
 | `moveToBank` | POST | `/stations/:stationId/payouts` | signed in | Move earnings to the bank now (owner only) |
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |

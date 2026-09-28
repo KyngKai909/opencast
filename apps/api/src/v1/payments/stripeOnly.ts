@@ -5,7 +5,7 @@
 // a refund of their most recent top-ups.
 
 import type { StripeCards } from "./stripe.js";
-import { stripeCardFeeMicros, type LedgerAccount, type Payments } from "./types.js";
+import { chainCustody, stripeCardFeeMicros, type LedgerAccount, type Payments } from "./types.js";
 
 export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Payments {
   return {
@@ -46,7 +46,7 @@ export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Paym
     endPledge: (ref) => stripe.endSubscription(ref),
 
     // Everything on Opencast's side sits in one Stripe balance: nothing moves between wallets.
-    custody: (account: LedgerAccount) => (account.kind === "external" || ["escrow", "creator", "creator_fund"].includes(account.kind) ? null : "platform"),
+    custody: (account: LedgerAccount) => (account.kind === "external" ? null : (chainCustody(account) ?? "platform")),
 
     async applyMove(move) {
       // Only encumbrances reach here (one wallet, no transfers); the ledger is the hold.

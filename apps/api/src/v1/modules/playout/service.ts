@@ -52,6 +52,8 @@ export interface PlayoutService {
   playlistWithCues(stationId: string): Promise<string | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
+  /** Stations that aired anything in a window (from the as-run log). */
+  stationsThatAired(from: Date, to: Date): Promise<string[]>;
   /** A planned sign-on ("Signs on Monday, 6:00 am"). */
   scheduleSignOn(stationId: string, at: Date): Promise<void>;
   nextSignOn(stationIds: string[]): Promise<Map<string, Date>>;
@@ -287,6 +289,14 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         playlist,
         breaks.map((b) => ({ id: b.id!, startsAt: new Date(b.startsAt), durationMs: b.lengthMs, eventId: parseInt(b.id!.slice(0, 8), 16) }))
       );
+    },
+
+    async stationsThatAired(from, to) {
+      const rows = await db
+        .selectDistinct({ stationId: schema.asRun.stationId })
+        .from(schema.asRun)
+        .where(and(gte(schema.asRun.startedAt, from), lt(schema.asRun.startedAt, to)));
+      return rows.map((r) => r.stationId);
     },
 
     async onAirStations() {

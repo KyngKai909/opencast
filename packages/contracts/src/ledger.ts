@@ -172,6 +172,14 @@ export const ledgerApi = {
     params: StationParams,
     response: z.array(Statement)
   }),
+  getStatementCsv: endpoint({
+    method: "GET",
+    path: "/statements/:statementId/csv",
+    auth: "user",
+    summary: "A statement's ledger entries as CSV (the business's team, or the station's owners)",
+    params: z.object({ statementId: Id }),
+    response: z.object({ filename: z.string(), csv: z.string() })
+  }),
   getPayoutAccount: endpoint({
     method: "GET",
     path: "/stations/:stationId/payout-account",

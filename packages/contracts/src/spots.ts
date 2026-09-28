@@ -654,6 +654,15 @@ export const spotsApi = {
     params: OrderParams,
     response: ProductionOrder
   }),
+  resolveOrderDispute: endpoint({
+    method: "POST",
+    path: "/admin/orders/:orderId/resolve",
+    auth: "admin",
+    summary: "Opencast's review of a disputed order: pay the maker, refund the business, or split (added 2026-09)",
+    params: OrderParams,
+    body: z.object({ outcome: z.enum(["pay_maker", "refund", "split"]), makerMicros: Micros.positive().optional(), note: z.string().max(500).optional() }),
+    response: ProductionOrder
+  }),
 
   scanCode: endpoint({
     method: "POST",

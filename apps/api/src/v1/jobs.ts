@@ -14,6 +14,9 @@ export interface JobResults {
   moves: { sent: number; failed: number };
   chain: { events: number } | null;
   escrowDeposit: { stations: number; micros: number; txHash: string } | null;
+  payouts: { paid: number; micros: number; waiting: number } | null;
+  pledgesRenewed: number;
+  pool: { micros: number; stations: number; fundMicros: number } | null;
   dailyCapsResumed: number;
   sponsorships: { held: number; paid: number; lapsed: number } | null;
 }
@@ -53,6 +56,9 @@ export function createJobs(deps: Deps, services: Services) {
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
     let dailyCapsResumed = 0;
     let escrowDeposit: JobResults["escrowDeposit"] = null;
+    let payouts: JobResults["payouts"] = null;
+    let pledgesRenewed = 0;
+    let pool: JobResults["pool"] = null;
     if (lastDay && day !== lastDay) {
       dailyCapsResumed = await services.spots.resumeDailyCaps();
       // Mondays: claimable stations' earnings go into the escrow contract, in one batch.
@@ -62,7 +68,18 @@ export function createJobs(deps: Deps, services: Services) {
           console.error("[jobs] weekly escrow deposit failed", error);
           return null;
         });
+        // Last week's statements for stations.
+        await services.ledger.issueStatements("week", new Date(Date.parse(`${day}T00:00:00Z`) - 7 * 86_400_000)).catch((error) => console.error("[jobs] statements failed", error));
       }
+      // Payday: weekly (Mondays) unless the schedule says monthly (the 1st).
+      const schedule = (await services.ledger.config()).payoutSchedule;
+      if ((schedule === "weekly" && weekday === "Mon") || (schedule === "monthly" && day.endsWith("-01"))) {
+        payouts = await services.ledger.runPayouts().catch((error) => {
+          console.error("[jobs] payouts failed", error);
+          return null;
+        });
+      }
+      pledgesRenewed = await services.ledger.renewPledges();
     }
     lastDay = day;
 
@@ -70,9 +87,18 @@ export function createJobs(deps: Deps, services: Services) {
     let sponsorships: JobResults["sponsorships"] = null;
     if (month !== lastMonth) {
       sponsorships = await services.spots.rollSponsorships();
+      if (lastMonth) {
+        // Last month: the pool is shared out, and businesses get their statements.
+        const previous = new Date(`${lastMonth}-01T00:00:00Z`);
+        pool = await services.ledger.distributePool(previous).catch((error) => {
+          console.error("[jobs] pool failed", error);
+          return null;
+        });
+        await services.ledger.issueStatements("month", previous).catch((error) => console.error("[jobs] statements failed", error));
+      }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, escrowDeposit, dailyCapsResumed, sponsorships };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships };
   }
 
   let timer: NodeJS.Timeout | undefined;

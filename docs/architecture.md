@@ -78,6 +78,8 @@ scte35.ts           splice_insert cues; the API adds EXT-X-DATERANGE (SCTE35-OUT
 
 Live blocks read the encoder from Livepeer's playback when the source was made with a Livepeer key, or from a local RTMP listener (`LIVE_LISTEN_PORT`) otherwise. The feed opens a minute before the block; with no signal the stand-by slate airs and the station is told, and it switches to the feed as soon as one arrives (and back, if it drops). The local listener serves one live block at a time, since there's one port; production reads through Livepeer.
 
+The money jobs (the worker's minute tick): provider moves sent, the escrow contract's events read, unaired holds returned, deliveries auto-approved; daily: monthly pledge renewals (fake provider); Mondays: the escrow batch and stations' weekly statements; payday (Mondays, or the 1st on a monthly schedule): payouts to stations whose payout account is set up; the 1st: the pool shared out for last month (equal base, watch time, the creator fund on-chain) and businesses' statements. Cash carriage is charged when a carried episode airs (the runner), once per slot.
+
 Held airings that never aired (a file missing from the cache, a station signed off) give their hold back an hour after their slot (`spots.releaseUnaired`, in the jobs tick).
 
 ## Storage

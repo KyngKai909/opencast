@@ -23,7 +23,8 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
   filledMsByBreak(breakIds: string[]): Promise<Map<string, number>>;
   spotSummary(spotId: string): Promise<{ title: string; business: string }>;
   /** Pauses a business's spots it can no longer cover a day of, and resumes ones it now can. */
-  reviewBalance(businessId: string): Promise<void>;
+  /** Pauses spots the balance no longer covers for a day; a top-up (`toppedUp`) also brings paused ones back. */
+  reviewBalance(businessId: string, toppedUp?: boolean): Promise<void>;
   typicalAiringCost(businessId: string): Promise<number | null>;
   heldAirings(stationId: string, from: Date, to: Date): Promise<Array<{ airingId: string; holdId: string; scheduledAt: Date }>>;
   businessesAiredOn(stationId: string, from: Date, to: Date): Promise<number>;
@@ -56,6 +57,8 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
   setRotation(stationId: string, kind: "main" | "backup", spotIds: string[]): Promise<RotationView>;
   /** The spots a station's rotation (then backup) offers for a break, in order. For playout. */
   rotationFor(stationId: string, kind: "main" | "backup"): Promise<Array<{ spotId: string; lengthSec: number; category: string; dayparts: string[] }>>;
+  /** How much break time a spot has filled on a station lately, per day (the last 7 days). */
+  recentAirTimePerDay(spotId: string, stationId: string): Promise<number>;
   /** Held airings more than an hour past their slot that never aired: their holds go back. */
   releaseUnaired(): Promise<number>;
   /** The files of every spot a station could air soon: placed airings, and its rotations. */
@@ -465,14 +468,15 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       return { title: row.title, business };
     },
 
-    async reviewBalance(businessId) {
+    async reviewBalance(businessId, toppedUp = false) {
       const rows = await db.select().from(SP).where(and(eq(SP.advertiserId, businessId), inArray(SP.status, ["listed", "paused"])));
       if (!rows.length) return;
       const { availableMicros } = await services.ledger.balance(businessId);
       for (const row of rows) {
         const needed = oneDayOfBudgetMicros({ totalBudgetMicros: row.totalBudgetMicros, dailyCapMicros: row.dailyCapMicros, startsOn: row.startsOn, endsOn: row.endsOn });
         if (row.status === "listed" && availableMicros < needed) await pauseFor(row, "balance");
-        else if (row.status === "paused" && row.pauseReason === "balance" && availableMicros >= needed) await resumeRow(row);
+        // Only a top-up brings a spot back: money returning from a hold isn't one, and would flap it.
+        else if (toppedUp && row.status === "paused" && row.pauseReason === "balance" && availableMicros >= needed) await resumeRow(row);
       }
     },
 
@@ -857,6 +861,17 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         category: rows.find((r) => r.id === s.spotId)?.category ?? "",
         dayparts: (targeting.find((t) => t.spotId === s.spotId)?.dayparts as string[] | undefined) ?? []
       }));
+    },
+
+    async recentAirTimePerDay(spotId, stationId) {
+      const since = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int`, length: SP.lengthSec })
+        .from(AI)
+        .innerJoin(SP, eq(SP.id, AI.spotId))
+        .where(and(eq(AI.spotId, spotId), eq(AI.stationId, stationId), gte(AI.scheduledAt, since)))
+        .groupBy(SP.lengthSec);
+      return row ? Math.round((row.n * row.length * 1000) / 7) : 0;
     },
 
     async releaseUnaired() {

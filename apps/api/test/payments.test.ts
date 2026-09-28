@@ -46,12 +46,14 @@ describe("the outbox's rules", () => {
     ]);
   });
 
-  it("card money is credited from the treasury; bank money and the chain move themselves", () => {
+  it("card money is credited from the treasury; bank money moves itself; the chain's moves are recorded for it", () => {
     expect(deriveMoves([posting("external", -$(100), { label: "stripe" }), posting("advertiser_available", $(100), { advertiserId: "a1" })], ownAccountsCustody)).toEqual([
       { kind: "transfer", fromWallet: "opencast:treasury", toWallet: "advertiser:a1", holdId: null, amountMicros: $(100) }
     ]);
     expect(deriveMoves([posting("external", -$(50), { label: "clear" }), posting("advertiser_available", $(50), { advertiserId: "a1" })], ownAccountsCustody)).toEqual([]);
-    expect(deriveMoves([posting("escrow_owed", -$(9), { stationId: "s1" }), posting("escrow", $(9), { stationId: "s1" })], ownAccountsCustody)).toEqual([]);
+    expect(deriveMoves([posting("escrow_owed", -$(9), { stationId: "s1" }), posting("escrow", $(9), { stationId: "s1" })], ownAccountsCustody)).toEqual([
+      { kind: "transfer", fromWallet: "opencast:settlement", toWallet: "chain:escrow", holdId: null, amountMicros: $(9) }
+    ]);
   });
 });
 

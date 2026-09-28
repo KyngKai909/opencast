@@ -4,7 +4,7 @@
 // in development) is the working store; IPFS through Pinata is only for the Opencast
 // catalog and a station's own "Export to IPFS".
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -124,7 +124,8 @@ export function localObjectStore(root: string, publicBase = "/objects"): ObjectS
     async put(key, file, { sha256 }) {
       if (!(await sha256Of(file)).equals(sha256)) throw new Error(`sha-256 mismatch storing ${key}`);
       await fs.mkdir(path.dirname(at(key)), { recursive: true });
-      const temp = `${at(key)}.part`;
+      // Its own temporary name: two uploads of the same file can be stored at the same moment.
+      const temp = `${at(key)}.${randomUUID()}.part`;
       await fs.copyFile(file, temp);
       await fs.rename(temp, at(key));
     },
@@ -136,7 +137,7 @@ export function localObjectStore(root: string, publicBase = "/objects"): ObjectS
     },
     async download(key, dest, sha256) {
       await fs.mkdir(path.dirname(dest), { recursive: true });
-      const temp = `${dest}.part`;
+      const temp = `${dest}.${randomUUID()}.part`;
       await fs.copyFile(at(key), temp);
       if (sha256 && !(await sha256Of(temp)).equals(sha256)) {
         await fs.rm(temp, { force: true });
@@ -195,7 +196,7 @@ export function s3ObjectStore(config: S3Config): ObjectStore {
     async download(key, dest, sha256) {
       const result = await client.send(new GetObjectCommand({ Bucket, Key: key }));
       await fs.mkdir(path.dirname(dest), { recursive: true });
-      const temp = `${dest}.part`;
+      const temp = `${dest}.${randomUUID()}.part`;
       const hash = createHash("sha256");
       const body = result.Body as Readable;
       body.on("data", (chunk: Buffer) => hash.update(chunk));

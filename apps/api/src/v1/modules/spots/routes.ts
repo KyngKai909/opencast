@@ -196,6 +196,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await orderSide(user, params.orderId, body.decision === "dispute" ? undefined : "business");
     return spots.reviewDelivery(params.orderId, body.decision, body.tellMakerWhenListed);
   });
+  r.handle(api.resolveOrderDispute, ({ params, body }) => spots.resolveDispute(params.orderId, body));
   r.handle(api.cancelOrder, async ({ user, params }) => {
     await orderSide(user, params.orderId, "business");
     return spots.cancelOrder(params.orderId);

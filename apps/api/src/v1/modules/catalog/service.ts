@@ -41,6 +41,11 @@ export interface CatalogService {
   /** Throws unless this airing is allowed under the agreement (dates, per-episode limit, window, live only). */
   checkAiring(input: { agreementId: string; carrierStationId: string; itemId: string; startsAt: Date; excludeEntryId?: string }): Promise<void>;
   carrierCount(programId: string): Promise<number>;
+  /**
+   * A carried episode aired: under a cash deal the carrier pays the maker, once per log entry
+   * (per airing, or per hour of the slot). Barter is settled with the spots in its breaks.
+   */
+  chargeCarriedAiring(input: { agreementId: string; carrierStationId: string; logEntryId: string }): Promise<number>;
   /** The program's open offer, if it has one. */
   openOfferFor(programId: string): Promise<string | null>;
   /** Active agreements a station is party to, for earnings and playout. */
@@ -296,6 +301,25 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       if (agreement.liveOnly && !(await services.log.airsAt(agreement.makerStationId, itemId, startsAt))) {
         throw refused("live_only", "This program is carried live only, at the same time as the maker airs it.");
       }
+    },
+
+    async chargeCarriedAiring(input) {
+      const agreement = (await service.agreementsByIds([input.agreementId])).get(input.agreementId);
+      if (!agreement || (agreement.term !== "cash" && agreement.term !== "cash_plus_barter") || !agreement.cashPriceMicros) return 0;
+      const span = await services.log.entrySpan(input.logEntryId);
+      if (!span) return 0;
+      const hours = (span.endsAt.getTime() - span.startsAt.getTime()) / 3_600_000;
+      const micros = agreement.cashPriceUnit === "per_hour" ? Math.round(agreement.cashPriceMicros * hours) : agreement.cashPriceMicros;
+      await db.transaction((tx) =>
+        services.ledger.chargeCarriageFee(tx, {
+          agreementId: agreement.id,
+          carrierStationId: input.carrierStationId,
+          makerStationId: agreement.makerStationId,
+          micros,
+          source: { memo: "Carried episode aired", idempotencyKey: `carriage:${input.logEntryId}` }
+        })
+      );
+      return micros;
     },
 
     async openOfferFor(programId) {

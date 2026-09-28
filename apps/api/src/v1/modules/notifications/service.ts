@@ -258,12 +258,16 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       link: `/spots/${e.spotId}`,
       scope: { kind: "business", id: e.businessId }
     });
+    const why = e.reason === "budget_spent" ? "its budget is spent" : "the business's balance ran low";
     for (const stationId of e.stationIds) {
+      const [perDayMs, backup] = await Promise.all([services.spots.recentAirTimePerDay(e.spotId, stationId), services.spots.rotationFor(stationId, "backup")]);
+      const minutes = Math.round(perDayMs / 60_000);
+      const open = perDayMs >= 60_000 ? `about ${minutes} minute${minutes === 1 ? "" : "s"} a day` : perDayMs > 0 ? `about ${Math.round(perDayMs / 1000)} seconds a day` : "a little time";
       await service.notify(await stationTeam(stationId), {
         kind: "spot_paused",
         title: `${spot.title} paused`,
-        body: `${spot.business} paused it. Its time in your breaks goes to your backup rotation, or station ID and bumpers.`,
-        link: `/stations/${stationId}/spot-market`,
+        body: `${spot.business}'s spot paused because ${why}. That leaves ${open} open in your breaks; ${backup.length ? "your backup rotation fills it" : "station ID and bumpers air there until you add a spot"}. Airings already held still air.`,
+        link: `/stations/${stationId}/spot-market?open=1`,
         scope: { kind: "station", id: stationId }
       });
     }
@@ -289,7 +293,7 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       body: "Add money to keep them in the market.",
       link: `/businesses/${e.businessId}/balance`,
       scope: { kind: "business", id: e.businessId },
-      dedupeKey: `low-balance:${e.businessId}:${e.daysLeft}:${deps.clock.now().toISOString().slice(0, 10)}`
+      dedupeKey: `low-balance:${e.businessId}:${e.daysLeft}:${e.since}`
     });
   });
 

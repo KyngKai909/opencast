@@ -48,6 +48,12 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await accounts.requireStation(user, params.stationId, ["owner", "operator"]);
     return ledger.statements({ stationId: params.stationId });
   });
+  r.handle(api.getStatementCsv, async ({ user, params }) => {
+    const statement = await ledger.statementCsv(params.statementId);
+    if (statement.owner.businessId) await accounts.requireBusiness(user, statement.owner.businessId, [...everyone]);
+    else if (statement.owner.stationId) await accounts.requireStation(user, statement.owner.stationId, ["owner"]);
+    return { filename: statement.filename, csv: statement.csv };
+  });
   r.handle(api.getPayoutAccount, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, ["owner"]);
     return ledger.payoutAccount(params.stationId);

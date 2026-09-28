@@ -22,6 +22,8 @@ export interface AudienceService {
   heartbeat(input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean }): Promise<void>;
   /** Tuned in, averaged over a window (e.g. one airing of a spot). */
   averageTunedIn(stationId: string, from: Date, to: Date): Promise<number>;
+  /** People tuned in, added up minute by minute, per station (the pool's watch-time share). */
+  watchMinutes(from: Date, to: Date): Promise<Map<string, number>>;
   /** The usual tuned in for a station at this hour, from the last week: for estimates and holds. */
   typicalTunedIn(stationIds: string[], at: Date): Promise<Map<string, number>>;
   report(stationId: string, from: Date, to: Date): Promise<AudienceReport>;
@@ -87,6 +89,15 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           await count(previous);
         }
       }
+    },
+
+    async watchMinutes(from, to) {
+      const rows = await db
+        .select({ stationId: M.stationId, minutes: sql<string>`coalesce(sum(${M.tunedIn}), 0)` })
+        .from(M)
+        .where(and(gte(M.minute, from), lt(M.minute, to)))
+        .groupBy(M.stationId);
+      return new Map(rows.map((r) => [r.stationId, Number(r.minutes)]));
     },
 
     async averageTunedIn(stationId, from, to) {

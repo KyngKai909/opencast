@@ -10,6 +10,7 @@
 import { randomUUID } from "node:crypto";
 import type { StripeCards } from "./stripe.js";
 import {
+  onChain,
   ownAccountsCustody,
   ownerWallet,
   stripeCardFeeMicros,
@@ -108,6 +109,8 @@ export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fa
     custody: ownAccountsCustody,
 
     async applyMove(move: ProviderMove, accounts) {
+      // The chain moved it (the weekly escrow deposit from the settlement wallet, a claim paid).
+      if (onChain(move.fromWallet) || onChain(move.toWallet)) return { providerRef: "on-chain" };
       const from = await accountForWallet(move.fromWallet, accounts);
       if (move.kind === "encumber") {
         const done = await clear.encumber({ accountId: from, amountMicros: move.amountMicros, reference: `hold:${move.holdId}`, idempotencyKey: move.idempotencyKey });

@@ -11,7 +11,7 @@ import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
-import type { FundingKind, Owner, PaymentEvent } from "../../payments/index.js";
+import { stripeCardFeeMicros, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
 import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
 
 type AccountKind = (typeof schema.accountKind.enumValues)[number];
@@ -47,6 +47,10 @@ export interface RevenueConfig {
   opencastPledgeShareBps: number;
   opencastProductionShareBps: number;
   poolShareBps: number;
+  /** How the pool is shared out each month: an equal base share, a share by watch time, and the creator fund. */
+  poolBaseBps: number;
+  poolWatchTimeBps: number;
+  poolFundBps: number;
   payoutSchedule: "weekly" | "monthly";
   unclaimedPeriodDays: number;
 }
@@ -113,6 +117,16 @@ export interface LedgerService {
   escrowWeekly(): Promise<{ stations: number; micros: number; txHash: string } | null>;
   /** Reads the escrow contract's events since last time: claims paid, releases to the fund, claims approved or cancelled. */
   syncChain(): Promise<{ events: number } | null>;
+  /** Pays every station its earnings (the schedule's day: weekly by default). Stations still setting up payouts wait. */
+  runPayouts(): Promise<{ paid: number; micros: number; waiting: number }>;
+  /** Shares out the pool for a month: equal base, by watch time, and to the creator fund. All 0 until decided. */
+  distributePool(monthStart: Date): Promise<{ micros: number; stations: number; fundMicros: number }>;
+  /** Statements for a period: weekly for stations, monthly for businesses. */
+  issueStatements(period: "week" | "month", start: Date): Promise<number>;
+  /** A statement's ledger entries as CSV. */
+  statementCsv(statementId: string): Promise<{ owner: { businessId: string | null; stationId: string | null }; filename: string; csv: string }>;
+  /** Monthly pledges on the fake provider (Stripe charges real ones itself). */
+  renewPledges(): Promise<number>;
   /** What the ledger says each provider wallet holds (the provider's balances should match). */
   custodyBalances(): Promise<Map<string, number>>;
 }
@@ -178,6 +192,18 @@ const BPS = 10_000;
 
 const dollars = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
 
+/** How a ledger entry reads on a statement. */
+function statementLabel(kind: string, sourceType: string | null, amount: number, accountKind: string): string {
+  if (accountKind === "advertiser_available") {
+    const labels: Record<string, string> = { deposit: "Added", withdrawal: "Taken out", hold: "Held for airings and orders", release: "Returned from holds", settle: "Spent (beyond what was held)", reversal: "Reversed" };
+    return labels[kind] ?? kind;
+  }
+  if (kind === "settle") return sourceType === "sponsorship_month" ? "Sponsors" : sourceType === "production_order" ? "Made for you" : "Spots";
+  if (kind === "carriage_fee" || kind === "barter_split") return amount > 0 ? "Your programs on other stations" : "Programs you carry";
+  const labels: Record<string, string> = { pledge: "Pledges", pool: "The pool", payout: "Paid out", escrow_deposit: "Into escrow", reversal: "Reversed" };
+  return labels[kind] ?? kind;
+}
+
 export function createLedgerService({ deps, services }: ModuleContext): LedgerService {
   const { db } = deps;
 
@@ -230,9 +256,25 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     if (!business) return;
     const balance = await service.balance(businessId);
     if (balance.runwayDays === null) return;
+    const D = schema.deposits;
+    const [lastTopUp] = await db
+      .select({ id: D.id, createdAt: D.createdAt })
+      .from(D)
+      .where(and(eq(D.advertiserId, businessId), inArray(D.status, ["pending", "arrived"])))
+      .orderBy(desc(D.createdAt))
+      .limit(1);
+    // Auto top-up, when it's on: once the runway is short, from the default funding source, at most once a day.
+    if (business.autoTopUp && business.autoTopUpMicros && balance.runwayDays <= business.autoTopUpBelowDays) {
+      const recent = lastTopUp && deps.clock.now().getTime() - lastTopUp.createdAt.getTime() < 86_400_000;
+      const source = balance.fundingSources.find((f) => f.isDefault);
+      if (!recent && source) {
+        await service.addMoney(businessId, { amountMicros: business.autoTopUpMicros, fundingSourceId: source.id }).catch((error) => console.error(`[ledger] auto top-up for ${businessId} failed`, error));
+        return;
+      }
+    }
     const warnAt = [...business.warnDays].sort((a, b) => a - b);
     const threshold = warnAt.find((d) => balance.runwayDays! <= d);
-    if (threshold !== undefined) deps.bus.emit("business.low_balance", { businessId, daysLeft: threshold });
+    if (threshold !== undefined) deps.bus.emit("business.low_balance", { businessId, daysLeft: threshold, since: lastTopUp?.id ?? "start" });
     await services.spots.reviewBalance(businessId);
   }
 
@@ -248,6 +290,29 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       });
       throw refused("payout_failed", `That payout didn't go through: ${(error as Error).message}`);
     }
+  }
+
+  /** Takes a station's earnings out of the ledger and asks the provider to pay them to its bank. */
+  async function payoutStation(stationId: string, micros: number, memo: string, idempotencyKey?: string) {
+    if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
+    const account = await service.account(db, "station_earnings", { stationId });
+    if ((await balanceOf([account])) < micros) throw refused("insufficient_balance", "That's more than the station has.");
+    const scheduledFor = deps.clock.now().toISOString().slice(0, 10);
+    const { payoutId, entryId } = await db.transaction(async (tx) => {
+      const entryId = await service.post(
+        tx,
+        "payout",
+        [
+          { account, micros: -micros },
+          { account: await service.account(tx, "external", { label: "clear" }), micros }
+        ],
+        { sourceType: "payout", memo, idempotencyKey }
+      );
+      const [payout] = await tx.insert(schema.payouts).values({ accountId: account, amountMicros: micros, destination: "bank", scheduledFor, status: "scheduled", entryId }).returning();
+      return { payoutId: payout.id, entryId: entryId! };
+    });
+    await sendPayout(payoutId, entryId, { type: "station", id: stationId }, null, micros);
+    return { payoutId, scheduledFor };
   }
 
   /** A reversal: a new entry with every posting of the original, the other way round. */
@@ -308,6 +373,11 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       if (!real.length) return null;
       const total = real.reduce((sum, l) => sum + l.micros, 0);
       if (total !== 0) throw new Error(`Unbalanced ${kind} entry (${total})`);
+      // The same idempotency key twice is the same entry: the second post does nothing.
+      if (source.idempotencyKey) {
+        const [existing] = await tx.select({ id: E.id }).from(E).where(eq(E.idempotencyKey, source.idempotencyKey));
+        if (existing) return existing.id;
+      }
       const [entry] = await tx
         .insert(E)
         .values({ kind, occurredAt: deps.clock.now(), sourceType: source.sourceType ?? null, sourceId: source.sourceId ?? null, memo: source.memo ?? null, idempotencyKey: source.idempotencyKey ?? null })
@@ -330,6 +400,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         opencastPledgeShareBps: row?.opencastPledgeShareBps ?? 0,
         opencastProductionShareBps: row?.opencastProductionShareBps ?? 0,
         poolShareBps: row?.poolShareBps ?? 0,
+        poolBaseBps: row?.poolBaseBps ?? 0,
+        poolWatchTimeBps: row?.poolWatchTimeBps ?? 0,
+        poolFundBps: row?.poolFundBps ?? 0,
         payoutSchedule: row?.payoutSchedule ?? "weekly",
         unclaimedPeriodDays: row?.unclaimedPeriodDays ?? 1095
       };
@@ -698,7 +771,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         await tx.update(schema.deposits).set({ status: "arrived", entryId }).where(eq(schema.deposits.id, depositId));
         return deposit.advertiserId;
       });
-      if (businessId) await services.spots.reviewBalance(businessId);
+      if (businessId) await services.spots.reviewBalance(businessId, true);
     },
 
     async cancelDeposit(businessId, depositId) {
@@ -761,7 +834,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         closingMicros: s.closingMicros,
         lines: s.lines as StatementView["lines"],
         issuedAt: s.issuedAt.toISOString(),
-        csvUrl: `/v1/statements/${s.id}.csv`,
+        csvUrl: `/v1/statements/${s.id}/csv`,
         pdfUrl: null
       }));
     },
@@ -805,20 +878,37 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.payouts.accountId, account), gte(schema.payouts.createdAt, new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)))));
       const nextMonday = new Date(now);
       nextMonday.setUTCDate(now.getUTCDate() + ((8 - now.getUTCDay()) % 7 || 7));
+      const nextPayoutOn = config.payoutSchedule === "monthly" ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)) : nextMonday;
       const settleCount = rows.filter((r) => r.entry.kind === "settle" && r.entry.sourceType === "as_run").length;
       const pledgeMembers = await service.memberCredits(stationId);
+      // Opencast's share and the pool, from this station's own settlements (0 until decided).
+      const settleIds = [...new Set(rows.filter((r) => r.entry.kind === "settle" && r.amount > 0).map((r) => r.entry.id))];
+      const cuts = settleIds.length
+        ? await db
+            .select({ kind: L.kind, sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
+            .from(P)
+            .innerJoin(L, eq(L.id, P.accountId))
+            .where(and(inArray(P.entryId, settleIds), inArray(L.kind, ["opencast_share", "pool"])))
+            .groupBy(L.kind)
+        : [];
+      const cut = (kind: string) => Number(cuts.find((c) => c.kind === kind)?.sum ?? 0);
+      const [joined] = await db
+        .select({ n: sql<number>`count(distinct ${schema.pledges.userId})::int` })
+        .from(schema.pledges)
+        .where(and(eq(schema.pledges.stationId, stationId), gte(schema.pledges.startedAt, from)));
+      const payoutAccount = kind === "escrow_owed" ? null : await service.payoutAccount(stationId).catch(() => null);
 
       return {
         period,
         lines: {
           spots: { micros: spots, airings: settleCount, businesses: await services.spots.businessesAiredOn(stationId, from, now) },
           sponsors: { micros: sponsors, sponsors: await services.spots.activeSponsorCount(stationId) },
-          pledges: { micros: pledges, members: pledgeMembers.members, newMembers: 0 },
+          pledges: { micros: pledges, members: pledgeMembers.members, newMembers: joined.n },
           carriageIn: { micros: carriageIn, detail: "Your programs on other stations" },
           carriageOut: { micros: carriageOut, detail: "Programs you carry" },
           production: { micros: production, orders: rows.filter((r) => r.entry.sourceType === "production_order").length },
-          opencastShare: { micros: 0, notSetYet: config.opencastSpotShareBps === 0 },
-          pool: { micros: 0, notSetYet: config.poolShareBps === 0 }
+          opencastShare: { micros: -cut("opencast_share"), notSetYet: config.opencastSpotShareBps === 0 },
+          pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 }
         },
         totalMicros: rows.reduce((s, r) => s + r.amount, 0),
         held: {
@@ -828,30 +918,15 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           restOfWeekAirings: rest.length
         },
         account: { availableMicros: await balanceOf([account]), paidOutThisMonthMicros: Number(payouts[0].sum) },
-        nextPayout: kind === "escrow_owed" ? null : { on: nextMonday.toISOString().slice(0, 10), schedule: config.payoutSchedule, destination: null }
+        nextPayout:
+          kind === "escrow_owed"
+            ? null
+            : { on: nextPayoutOn.toISOString().slice(0, 10), schedule: config.payoutSchedule, destination: payoutAccount?.status === "active" ? "Your account" : null }
       };
     },
 
     async moveToBank(stationId, micros) {
-      if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
-      const account = await service.account(db, "station_earnings", { stationId });
-      if ((await balanceOf([account])) < micros) throw refused("insufficient_balance", "That's more than the station has.");
-      const scheduledFor = deps.clock.now().toISOString().slice(0, 10);
-      const { payoutId, entryId } = await db.transaction(async (tx) => {
-        const entryId = await service.post(
-          tx,
-          "payout",
-          [
-            { account, micros: -micros },
-            { account: await service.account(tx, "external", { label: "clear" }), micros }
-          ],
-          { sourceType: "payout", memo: "Moved to bank" }
-        );
-        const [payout] = await tx.insert(schema.payouts).values({ accountId: account, amountMicros: micros, destination: "bank", scheduledFor, status: "scheduled", entryId }).returning();
-        return { payoutId: payout.id, entryId: entryId! };
-      });
-      await sendPayout(payoutId, entryId, { type: "station", id: stationId }, null, micros);
-      return { payoutId, scheduledFor };
+      return payoutStation(stationId, micros, "Moved to bank");
     },
 
     async pledge(userId, stationId, input) {
@@ -1073,6 +1148,156 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .values({ name: "escrow", block: toBlock, updatedAt: deps.clock.now() })
         .onConflictDoUpdate({ target: C.name, set: { block: toBlock, updatedAt: deps.clock.now() } });
       return { events: events.length };
+    },
+
+    async runPayouts() {
+      const rows = await db
+        .select({ stationId: L.stationId, sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
+        .from(L)
+        .innerJoin(P, eq(P.accountId, L.id))
+        .where(eq(L.kind, "station_earnings"))
+        .groupBy(L.stationId);
+      let paid = 0;
+      let micros = 0;
+      let waiting = 0;
+      const week = deps.clock.now().toISOString().slice(0, 10);
+      for (const row of rows) {
+        const amount = Number(row.sum);
+        // Under a dollar waits for next time; a station owing carriage fees isn't paid.
+        if (amount < 1_000_000) continue;
+        const account = await service.payoutAccount(row.stationId!);
+        if (account.status !== "active") {
+          waiting++;
+          continue;
+        }
+        await payoutStation(row.stationId!, amount, "Weekly payout", `payout:${row.stationId}:${week}`).catch((error) => {
+          console.error(`[ledger] payout to ${row.stationId} failed`, error);
+          waiting++;
+        });
+        paid++;
+        micros += amount;
+      }
+      return { paid, micros, waiting };
+    },
+
+    async distributePool(monthStart) {
+      const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
+      const month = monthStart.toISOString().slice(0, 7);
+      const poolAccount = await service.account(db, "pool");
+      const pool = await balanceOf([poolAccount]);
+      const config = await service.config(monthStart);
+      if (pool <= 0) return { micros: 0, stations: 0, fundMicros: 0 };
+      const base = Math.floor((pool * config.poolBaseBps) / BPS);
+      const watch = Math.floor((pool * config.poolWatchTimeBps) / BPS);
+      // The fund's share goes on-chain to the creator fund, so it waits until the chain is set up.
+      const fund = deps.chain?.fund ? Math.floor((pool * config.poolFundBps) / BPS) : 0;
+      const aired = await services.playout.stationsThatAired(monthStart, monthEnd);
+      const minutes = await services.audience.watchMinutes(monthStart, monthEnd);
+      const totalMinutes = aired.reduce((s, id) => s + (minutes.get(id) ?? 0), 0);
+      const shares = new Map<string, number>();
+      for (const id of aired) {
+        const b = aired.length ? Math.floor(base / aired.length) : 0;
+        const w = totalMinutes ? Math.floor((watch * (minutes.get(id) ?? 0)) / totalMinutes) : 0;
+        if (b + w > 0) shares.set(id, b + w);
+      }
+      const paidOut = [...shares.values()].reduce((s, v) => s + v, 0) + fund;
+      if (paidOut <= 0) return { micros: 0, stations: 0, fundMicros: 0 };
+      await db.transaction(async (tx) => {
+        const lines = [{ account: poolAccount, micros: -paidOut }];
+        for (const [stationId, micros] of shares) lines.push({ account: await service.account(tx, await stationAccountKind(stationId), { stationId }), micros });
+        if (fund) lines.push({ account: await service.account(tx, "creator_fund"), micros: fund });
+        await service.post(tx, "pool", lines, { sourceType: "pool", memo: `The pool for ${month}`, idempotencyKey: `pool:${month}` });
+      });
+      if (fund && deps.chain) await deps.chain.contribute(fund, `pool:${month}`);
+      return { micros: paidOut, stations: shares.size, fundMicros: fund };
+    },
+
+    async issueStatements(period, start) {
+      const end = period === "week" ? new Date(start.getTime() + 7 * DAY) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+      const kinds = period === "week" ? (["station_earnings", "escrow_owed"] as const) : (["advertiser_available"] as const);
+      const accounts = await db.select().from(L).where(inArray(L.kind, [...kinds]));
+      const config = await service.config(start);
+      let issued = 0;
+      for (const account of accounts) {
+        const rows = await db
+          .select({ entry: E, amount: P.amountMicros })
+          .from(P)
+          .innerJoin(E, eq(E.id, P.entryId))
+          .where(and(eq(P.accountId, account.id), lt(E.occurredAt, end)));
+        const opening = rows.filter((r) => r.entry.occurredAt < start).reduce((s, r) => s + r.amount, 0);
+        const inPeriod = rows.filter((r) => r.entry.occurredAt >= start);
+        if (!inPeriod.length && opening === 0) continue;
+        const lines = new Map<string, { label: string; detail: string | null; amountMicros: number; count: number }>();
+        for (const r of inPeriod) {
+          const label = statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind);
+          const line = lines.get(label) ?? { label, detail: null, amountMicros: 0, count: 0 };
+          line.amountMicros += r.amount;
+          line.count++;
+          lines.set(label, line);
+        }
+        const out: Array<{ label: string; detail: string | null; amountMicros: number; notSetYet: boolean }> = [...lines.values()].map((l) => ({
+          label: l.label,
+          detail: `${l.count} ${l.count === 1 ? "entry" : "entries"}`,
+          amountMicros: l.amountMicros,
+          notSetYet: false
+        }));
+        if (account.kind !== "advertiser_available") out.push({ label: "Opencast's share", detail: null, amountMicros: 0, notSetYet: config.opencastSpotShareBps === 0 });
+        const [row] = await db
+          .insert(schema.statements)
+          .values({
+            accountId: account.id,
+            period,
+            periodStart: start.toISOString().slice(0, 10),
+            periodEnd: new Date(end.getTime() - DAY).toISOString().slice(0, 10),
+            lines: out,
+            openingMicros: opening,
+            closingMicros: opening + inPeriod.reduce((s, r) => s + r.amount, 0),
+            issuedAt: deps.clock.now()
+          })
+          .onConflictDoNothing()
+          .returning({ id: schema.statements.id });
+        if (row) issued++;
+      }
+      return issued;
+    },
+
+    async statementCsv(statementId) {
+      const [statement] = await db.select().from(schema.statements).where(eq(schema.statements.id, statementId));
+      if (!statement) throw notFound("That statement");
+      const [account] = await db.select().from(L).where(eq(L.id, statement.accountId));
+      const start = new Date(`${statement.periodStart}T00:00:00Z`);
+      const end = new Date(new Date(`${statement.periodEnd}T00:00:00Z`).getTime() + DAY);
+      const rows = await db
+        .select({ entry: E, amount: P.amountMicros })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .where(and(eq(P.accountId, statement.accountId), gte(E.occurredAt, start), lt(E.occurredAt, end)))
+        .orderBy(asc(E.occurredAt));
+      const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+      const csv = [
+        "date,what,memo,amount_usd,entry_id",
+        ...rows.map((r) =>
+          [r.entry.occurredAt.toISOString(), statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind), r.entry.memo ?? "", (r.amount / 1_000_000).toFixed(2), r.entry.id].map((v) => cell(String(v))).join(",")
+        )
+      ].join("\n");
+      return { owner: { businessId: account.advertiserId, stationId: account.stationId }, filename: `opencast-${statement.period}-${statement.periodStart}.csv`, csv: `${csv}\n` };
+    },
+
+    async renewPledges() {
+      if (deps.payments.name !== "fake") return 0;
+      const now = deps.clock.now();
+      const rows = await db.select().from(schema.pledges).where(eq(schema.pledges.cadence, "monthly"));
+      let renewed = 0;
+      for (const pledge of rows) {
+        if (pledge.endsAfter && pledge.endsAfter < now.toISOString().slice(0, 10)) continue;
+        const months = (now.getUTCFullYear() - pledge.startedAt.getUTCFullYear()) * 12 + now.getUTCMonth() - pledge.startedAt.getUTCMonth() - (now.getUTCDate() < pledge.startedAt.getUTCDate() ? 1 : 0);
+        for (let m = 1; m <= months; m++) {
+          const due = new Date(Date.UTC(pledge.startedAt.getUTCFullYear(), pledge.startedAt.getUTCMonth() + m, pledge.startedAt.getUTCDate()));
+          await pledgeReceived(pledge.id, pledge.amountMicros, stripeCardFeeMicros(pledge.amountMicros), `${pledge.id}:${due.toISOString().slice(0, 7)}`);
+          renewed++;
+        }
+      }
+      return renewed;
     },
 
     async custodyBalances() {

@@ -21,6 +21,21 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Sponsorships: held monthly and released at month end (prompt), or accrued weekly (the earnings design shows weekly lines)? | ledger, Phase 6 | the prompt's rule, monthly |
 | Code window: "used within 7 days" of an airing, but a saved offer shows "until" 14 days after saving | `spots.codes.window_days` | 7 |
 
+## Money behaviour decided while building Phase 6 (say if any should change)
+
+| Behaviour | Built as |
+|---|---|
+| What resumes a spot paused for balance | Only a top-up. Money returning from a hold (an airing cheaper than held, one that didn't air) doesn't, or a spot at the edge would flap and notify each time |
+| "How much open time that leaves" in the pause notice | The spot's average daily air time on that station over the last 7 days |
+| Auto top-up | When on: once the runway is under the business's chosen days, from the default funding source, at most once a day |
+| Low-balance warnings | Once per threshold (3 days, 1 day) until the next top-up, not daily |
+| A disputed production order | Opencast reviews it: pay the maker, refund the business, or split (the maker gets part, the rest goes back; the business keeps the spot) |
+| Payouts | Weekly on Mondays by default (`revenue_config.payout_schedule`); stations under $1, owing carriage fees, or without a finished payout account wait |
+| The pool | Shared on the 1st for last month by `pool_base_bps` (equally among stations that aired), `pool_watch_time_bps` (by minutes tuned in) and `pool_fund_bps` (to the creator fund on-chain). All 0 until decided; the rest stays in the pool |
+| Statements | Weekly for stations (Mondays), monthly for businesses (the 1st); CSV at `GET /v1/statements/:id/csv` |
+| Cash carriage | Charged when the episode airs, once per log slot; per hour uses the slot's length |
+| Opencast's settlement wallet | The chain job signs with `SETTLEMENT_PRIVATE_KEY`; with Clear, the settlement Clear account must be that wallet (docs/clear-integration.md) |
+
 ## The escrow contract and the creator fund
 
 | Decision | Now | Default |
