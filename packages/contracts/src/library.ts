@@ -261,7 +261,9 @@ export const libraryApi = {
         advisory: z.enum(["none", "language", "mature"]),
         live: z.boolean(),
         rating: ContentRating.nullable(),
-        childDirected: z.boolean()
+        childDirected: z.boolean(),
+        /** IAB Content Taxonomy 3.0 ids to use instead of the derived ones (added 2026-09-28); null goes back to derived. */
+        iabCategories: z.array(z.string().regex(/^[A-Za-z0-9]{1,8}$/)).min(1).max(10).nullable()
       })
       .partial(),
     response: Program

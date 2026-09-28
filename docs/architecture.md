@@ -129,6 +129,18 @@ Spots, catalog and playout never call a provider: they ask the ledger, which use
 
 **Escrow and the creator fund.** A claimable station's settled earnings are `escrow_owed` (a liability to the station) until the weekly batch into `CreatorEscrow` (`contracts/`) confirms, then `escrow`. The contract pays only an approved creator wallet (a threshold of verifier keys, then 72 hours in public) or, after the unclaimed period, `CreatorFund`, which pays only grants its stewards approve (again a threshold and 72 hours), never to Opencast. Both are upgradeable only through a 7-day timelock any key holder can cancel. See `contracts/README.md`.
 
+## Ads from partners: what's ready
+
+Ads from partners (a programmatic backfill for break time still open after the station's own rotation, backup rotation and thank-you credit, and before bumpers and the station ID) isn't built. Everything it needs from Phases 3 to 5 is, so it can be added without rework:
+
+- **Break markers.** Every break carries SCTE-35 `splice_insert` cues (`playout/engine/scte35.ts`) as `EXT-X-DATERANGE` `SCTE35-OUT`/`SCTE35-IN` in the station's live playlist: stored breaks by their ID, breaks generated from the rule but not stored yet by an ID made from the station and start time (`breakCue`). Cued-live breaks are stored as they happen, so they're cued too. Players on Livepeer's output read the same breaks from the log.
+- **IAB categories.** Every station and program has IAB Content Taxonomy 3.0 ids (`StationSetup.iabCategories`, `Program.iabCategories`): its own override (`iab_categories` on `broadcast.stations` and `broadcast.programs`), else derived from its category (a program falls back to its station's), else Entertainment. A station's blocked spot categories map to IAB Ad Product Taxonomy 2.0 ids for each ad request's block list. The mappings are in `packages/domain/src/ads.ts`; `stations.adProfile` puts a station's together.
+- **Ratings and children.** `Program.rating` (TV-Y to TV-MA) and `Program.childDirected`. A children's rating (TV-Y, TV-Y7) makes a program child-directed unless it says otherwise. Child-directed programs will get no personalized ads.
+- **The station's switch.** `BreakRule.adsFromPartners` (`break_rules.ads_from_partners`), off by default, read and written through the break rule endpoints. It changes nothing in playout yet.
+- **The ledger line.** `StationEarnings.lines.partnerAds` (`{ on, micros, pendingMicros }`, all 0 until it's built): "Ads from partners, paid when received". When it's built it's its own line per station: never held in advance, never escrowed, never counted in held money; paid when the partner pays (30 to 90 days after airing); invalid-traffic deductions recorded when the partner reports them; Opencast's share and the pool applied as they are to spots, once set.
+
+To come: an `adfill` interface in the playout module, so the provider can change (Google Ad Manager's Dynamic Ad Insertion, or AWS Elemental MediaTailor), fed by VAST or VMAP requests at each marked break with the station's and program's IAB categories, the blocked ad products, the rating and the child-directed flag. The as-run log will record a "partner ads" block with its length and impressions, not individual spots; per-viewer ads are allowed only in this backfill; spots in the spot market are still billed on Opencast's own count, with partner impression counts shown beside it. `ads.txt` and `app-ads.txt` get published on the site and the apps' domains. Which provider, whether to start through a FAST aggregator, and Opencast's share are open (docs/open-decisions.md).
+
 ## Still to move (later phases)
 
 - `/api` and `apps/control` stay until the apps prompt's master control replaces them.

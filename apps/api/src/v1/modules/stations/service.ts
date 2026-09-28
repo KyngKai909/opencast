@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { formatChannelNumber, isSubchannel, isValidStationColour, parseChannelNumber, type Band } from "@opencast/domain";
+import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
@@ -20,6 +20,18 @@ export interface BreakRuleView {
   fillOrder: LogCode[];
   openTimeTo: "spot_market" | "station_id_and_bumpers";
   blockedCategories: string[];
+  /** "Ads from partners" (the programmatic backfill): off by default, and only a switch until it's built. */
+  adsFromPartners: boolean;
+}
+
+/** What an ad request for ads from partners would carry about a station (nothing sends one yet). */
+export interface StationAdProfile {
+  /** IAB Content Taxonomy 3.0 ids. */
+  iabCategories: string[];
+  /** IAB Ad Product Taxonomy 2.0 ids for the station's blocked spot categories. */
+  blockedIabAdProducts: string[];
+  adsFromPartners: boolean;
+  spotMsPerHour: number;
 }
 
 export interface StationSetupView {
@@ -37,6 +49,8 @@ export interface StationSetupView {
   pledgesTaxDeductible: boolean | null;
   memberCreditStyle: "voice" | "text";
   orders: { takesOrders: boolean; turnaround: string | null; fromMicros: number | null };
+  /** IAB Content Taxonomy 3.0 ids: the station's own, or derived from its category. */
+  iabCategories: string[];
 }
 
 /** What spot targeting and the market board need about a station. */
@@ -72,6 +86,8 @@ export interface StationsService {
   search(q: string, marketId?: string): Promise<{ tuneTo: StationProfile | null; stations: StationProfile[] }>;
   timezoneOf(stationId: string): Promise<string>;
   breakRule(stationId: string): Promise<BreakRuleView>;
+  /** For ads from partners, once built: the station's IAB categories, blocked IAB ad products and its switch. */
+  adProfile(stationId: string): Promise<StationAdProfile>;
   liveSourceBelongs(stationId: string, sourceId: string): Promise<boolean>;
   /** For playout: where a live source's signal comes from. */
   liveSourceSignal(sourceId: string): Promise<{ streamKey: string | null; livepeerPlaybackId: string | null } | null>;
@@ -98,7 +114,8 @@ export interface StationsService {
   updateSetup(user: CurrentUser, stationId: string, input: SetupPatch): Promise<StationSetupView>;
   availableChannels(marketId: string, band: Band): Promise<Array<{ channel: string; state: "open" | "taken" | "held" }>>;
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string }): Promise<StationSetupView>;
-  setBreakRule(stationId: string, rule: BreakRuleView): Promise<BreakRuleView>;
+  /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
+  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners"> & { adsFromPartners?: boolean }): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -127,6 +144,7 @@ export type SetupPatch = Partial<{
   pledgesTaxDeductible: boolean | null;
   memberCreditStyle: "voice" | "text";
   orders: Partial<{ takesOrders: boolean; turnaround: string | null; fromMicros: number | null }>;
+  iabCategories: string[] | null;
 }>;
 
 export interface TranslatorInput {
@@ -237,7 +255,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       legalContact: station.legalContact,
       pledgesTaxDeductible: station.pledgesTaxDeductible,
       memberCreditStyle: station.memberCreditStyle,
-      orders: { takesOrders: station.kind === "studio" || station.takesOrders, turnaround: station.orderTurnaround, fromMicros: station.orderFromMicros }
+      orders: { takesOrders: station.kind === "studio" || station.takesOrders, turnaround: station.orderTurnaround, fromMicros: station.orderFromMicros },
+      iabCategories: iabContentCategories({ override: station.iabCategories, category: station.category })
     };
   }
 
@@ -381,7 +400,20 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         sameSpotPerHour: rule?.sameSpotPerHour ?? 2,
         fillOrder: (rule?.fillOrder as LogCode[] | undefined) ?? ["SPT", "UND", "BMP", "SID"],
         openTimeTo: rule?.openTimeTo ?? "spot_market",
-        blockedCategories: blocked.map((b) => b.category).sort()
+        blockedCategories: blocked.map((b) => b.category).sort(),
+        adsFromPartners: rule?.adsFromPartners ?? false
+      };
+    },
+
+    async adProfile(stationId) {
+      const [station] = await db.select({ category: S.category, iabCategories: S.iabCategories }).from(S).where(eq(S.id, stationId));
+      if (!station) throw notFound("That station");
+      const rule = await service.breakRule(stationId);
+      return {
+        iabCategories: iabContentCategories({ override: station.iabCategories, category: station.category }),
+        blockedIabAdProducts: blockedIabAdProducts(rule.blockedCategories),
+        adsFromPartners: rule.adsFromPartners,
+        spotMsPerHour: rule.spotMsPerHour
       };
     },
 
@@ -547,6 +579,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (input.bug?.opacity !== undefined) patch.bugOpacity = input.bug.opacity;
         if (input.logoUrl !== undefined) patch.logoUrl = input.logoUrl;
         if (input.category !== undefined) patch.category = input.category;
+        if (input.iabCategories !== undefined) patch.iabCategories = input.iabCategories ? [...new Set(input.iabCategories)] : null;
         if (input.homeCity !== undefined) patch.homeCity = input.homeCity;
         if (input.studioLocation !== undefined) {
           patch.studioLatitude = input.studioLocation?.latitude ?? null;
@@ -622,6 +655,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
             sameSpotPerHour: rule.sameSpotPerHour,
             fillOrder,
             openTimeTo: rule.openTimeTo,
+            adsFromPartners: rule.adsFromPartners ?? false,
             updatedAt: deps.clock.now()
           })
           .onConflictDoUpdate({
@@ -634,6 +668,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
               sameSpotPerHour: rule.sameSpotPerHour,
               fillOrder,
               openTimeTo: rule.openTimeTo,
+              ...(rule.adsFromPartners !== undefined ? { adsFromPartners: rule.adsFromPartners } : {}),
               updatedAt: deps.clock.now()
             }
           });

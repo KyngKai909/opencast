@@ -99,6 +99,13 @@
       "when": 1790634806517,
       "tag": "0013_clear_funding",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790635407060,
+      "tag": "0014_ads_from_partners_ready",
+      "breakpoints": true
     }
   ]
 }

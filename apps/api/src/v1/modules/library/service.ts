@@ -3,6 +3,7 @@ import path from "node:path";
 import { and, asc, eq, ilike, inArray, isNull, max, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { LibraryItem } from "@opencast/contracts";
+import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
@@ -92,8 +93,8 @@ export interface LibraryService {
   createFolder(stationId: string, input: { name: string; parentFolderId: string | null }): Promise<FolderView>;
   updateFolder(folderId: string, input: { name?: string; parentFolderId?: string | null }): Promise<FolderView>;
   deleteFolder(folderId: string): Promise<void>;
-  createProgram(stationId: string, input: { title: string; description?: string; category?: string; advisory: "none" | "language" | "mature"; live: boolean }): Promise<ProgramView>;
-  updateProgram(programId: string, input: Partial<{ title: string; description: string | null; category: string | null; advisory: "none" | "language" | "mature"; live: boolean }>): Promise<ProgramView>;
+  createProgram(stationId: string, input: { title: string; description?: string; category?: string; advisory: "none" | "language" | "mature"; live: boolean } & Omit<ProgramAdFields, "iabCategories">): Promise<ProgramView>;
+  updateProgram(programId: string, input: Partial<{ title: string; description: string | null; category: string | null; advisory: "none" | "language" | "mature"; live: boolean }> & ProgramAdFields): Promise<ProgramView>;
   program(programId: string): Promise<ProgramView>;
   /** Waits for uploads and imports started so far (tests, shutdown). */
   settle(): Promise<void>;
@@ -120,7 +121,13 @@ export interface ProgramView extends Omit<ProgramRef, "stationId"> {
   station: import("@opencast/contracts").StationIdent;
   episodeCount: number;
   listingStatus: "complete" | "needs_description" | "from_the_maker";
+  /** For ads from partners: IAB Content Taxonomy 3.0 ids (its own, or derived), a rating, and whether it's made for children. */
+  iabCategories: string[];
+  rating: ContentRating | null;
+  childDirected: boolean;
 }
+
+type ProgramAdFields = { rating?: ContentRating | null; childDirected?: boolean; iabCategories?: string[] | null };
 
 export interface LibraryView {
   items: LibraryItem[];
@@ -288,8 +295,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
 
   async function programViews(rows: Array<typeof P.$inferSelect>): Promise<ProgramView[]> {
     if (!rows.length) return [];
-    const [idents, counts] = await Promise.all([
+    const [idents, profiles, counts] = await Promise.all([
       services.stations.idents(rows.map((r) => r.stationId)),
+      services.stations.profiles(rows.map((r) => r.stationId)),
       db
         .select({ programId: A.programId, n: sql<number>`count(*)::int` })
         .from(A)
@@ -306,7 +314,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           ...ref,
           station,
           episodeCount: countBy.get(p.id) ?? 0,
-          listingStatus: p.description ? ("complete" as const) : ("needs_description" as const)
+          listingStatus: p.description ? ("complete" as const) : ("needs_description" as const),
+          iabCategories: iabContentCategories({ override: p.iabCategories, category: p.category, fallbackCategory: profiles.get(p.stationId)?.category }),
+          rating: p.rating,
+          childDirected: p.childDirected
         }
       ];
     });
@@ -770,7 +781,17 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     async createProgram(stationId, input) {
       const [row] = await db
         .insert(P)
-        .values({ stationId, title: input.title, description: input.description ?? null, category: input.category ?? null, advisory: input.advisory, isLive: input.live })
+        .values({
+          stationId,
+          title: input.title,
+          description: input.description ?? null,
+          category: input.category ?? null,
+          advisory: input.advisory,
+          isLive: input.live,
+          rating: input.rating ?? null,
+          // A children's rating makes it child-directed unless it says otherwise.
+          childDirected: input.childDirected ?? isChildrensRating(input.rating)
+        })
         .returning();
       return service.program(row.id);
     },
@@ -782,6 +803,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (input.category !== undefined) patch.category = input.category;
       if (input.advisory !== undefined) patch.advisory = input.advisory;
       if (input.live !== undefined) patch.isLive = input.live;
+      if (input.rating !== undefined) patch.rating = input.rating;
+      if (input.childDirected !== undefined) patch.childDirected = input.childDirected;
+      else if (isChildrensRating(input.rating)) patch.childDirected = true;
+      if (input.iabCategories !== undefined) patch.iabCategories = input.iabCategories ? [...new Set(input.iabCategories)] : null;
       if (Object.keys(patch).length) await db.update(P).set(patch).where(eq(P.id, programId));
       return service.program(programId);
     },

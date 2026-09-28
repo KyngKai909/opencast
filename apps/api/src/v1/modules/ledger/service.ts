@@ -187,6 +187,8 @@ export interface StationEarningsView {
     production: { micros: number; orders: number };
     opencastShare: { micros: number; notSetYet: boolean };
     pool: { micros: number; notSetYet: boolean };
+    /** "Ads from partners, paid when received": its own line, never held or escrowed. 0 until the backfill exists. */
+    partnerAds: { on: boolean; micros: number; pendingMicros: number };
   };
   totalMicros: number;
   held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number };
@@ -1072,6 +1074,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .from(schema.pledges)
         .where(and(eq(schema.pledges.stationId, stationId), gte(schema.pledges.startedAt, from)));
       const payoutAccount = kind === "escrow_owed" ? null : await service.payoutAccount(stationId).catch(() => null);
+      const rule = await services.stations.breakRule(stationId);
 
       return {
         period,
@@ -1083,7 +1086,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           carriageOut: { micros: carriageOut, detail: "Programs you carry" },
           production: { micros: production, orders: rows.filter((r) => r.entry.sourceType === "production_order").length },
           opencastShare: { micros: -cut("opencast_share"), notSetYet: config.opencastSpotShareBps === 0 },
-          pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 }
+          pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 },
+          // Paid when the partner pays (30 to 90 days after airing), so nothing is ever held for it.
+          partnerAds: { on: rule.adsFromPartners, micros: 0, pendingMicros: 0 }
         },
         totalMicros: rows.reduce((s, r) => s + r.amount, 0),
         held: {

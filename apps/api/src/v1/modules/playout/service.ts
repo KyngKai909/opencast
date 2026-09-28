@@ -5,7 +5,7 @@ import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { decoratePlaylist } from "./engine/scte35.js";
+import { breakCue, decoratePlaylist } from "./engine/scte35.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output";
@@ -284,10 +284,11 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const playlist = await fs.readFile(file, "utf8").catch(() => null);
       if (playlist === null) return null;
       const now = deps.clock.now();
-      const breaks = (await services.log.breaks(stationId, new Date(now.getTime() - 5 * 60_000), new Date(now.getTime() + 2 * 60_000))).filter((b) => b.id);
+      // Every break in the window, stored or only generated from the rule, carries its cue.
+      const breaks = await services.log.breaks(stationId, new Date(now.getTime() - 5 * 60_000), new Date(now.getTime() + 2 * 60_000));
       return decoratePlaylist(
         playlist,
-        breaks.map((b) => ({ id: b.id!, startsAt: new Date(b.startsAt), durationMs: b.lengthMs, eventId: parseInt(b.id!.slice(0, 8), 16) }))
+        breaks.map((b) => breakCue(stationId, b))
       );
     },
 

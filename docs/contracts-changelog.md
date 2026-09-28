@@ -12,6 +12,8 @@ All additive; nothing existing changed shape.
 - `StationEarnings.lines.partnerAds` (optional): `{ on, micros, pendingMicros }`, "Ads from partners, paid when received".
 - `BreakRule.adsFromPartners` (optional boolean, off by default): the station's switch. Only a flag until partner ads are built.
 - `StationSetup.iabCategories` and `Program.iabCategories` (optional): IAB Content Taxonomy 3.0 ids. `Program.rating` (optional, `ContentRating`: TV-Y to TV-MA) and `Program.childDirected` (optional boolean), also accepted by `createProgram` and `updateProgram`.
+- `updateSetup` and `updateProgram` accept `iabCategories` (optional; 1 to 10 IAB ids, or null to go back to the ones derived from the category), so the overrides can be set. Derived: the program's category, else its station's, else Entertainment (`JLBCU7`); the mapping is `packages/domain/src/ads.ts`.
+- `createProgram` with a children's rating (TV-Y, TV-Y7) and no `childDirected` makes it child-directed; so does `updateProgram` setting one.
 
 How the backend answers (no shape changes):
 

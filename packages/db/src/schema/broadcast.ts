@@ -62,6 +62,8 @@ export const stations = broadcast.table(
     studioLatitude: real("studio_latitude"),
     studioLongitude: real("studio_longitude"),
     category: text("category"),
+    /** IAB Content Taxonomy 3.0 ids, when the station sets its own; null: derived from its category (packages/domain ads.ts). */
+    iabCategories: jsonb("iab_categories").$type<string[]>(),
     status: stationStatus("status").notNull().default("setting_up"),
     firstSignedOnAt: at("first_signed_on_at"),
     signedOffAt: at("signed_off_at"),
@@ -149,6 +151,12 @@ export const programs = broadcast.table(
     description: text("description"),
     category: text("category"),
     advisory: text("advisory", { enum: ["none", "language", "mature"] }).notNull().default("none"),
+    /** US TV parental guidelines (TV-Y to TV-MA), for ad requests. */
+    rating: text("rating", { enum: ["TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA"] }),
+    /** Made for children: no personalized ads from partners. */
+    childDirected: boolean("child_directed").notNull().default(false),
+    /** IAB Content Taxonomy 3.0 ids, when set by hand; null: derived from its category, else the station's. */
+    iabCategories: jsonb("iab_categories").$type<string[]>(),
     isLive: boolean("is_live").notNull().default(false),
     /** Where the rights come from, as the market shows it ("Public domain, restored"). */
     rightsNote: text("rights_note"),
@@ -156,7 +164,10 @@ export const programs = broadcast.table(
     attribution: text("attribution"),
     createdAt: createdAt()
   },
-  (t) => [check("description_length", sql`char_length(${t.description}) <= 160`)]
+  (t) => [
+    check("description_length", sql`char_length(${t.description}) <= 160`),
+    check("program_rating", sql`${t.rating} is null or ${t.rating} in ('TV-Y', 'TV-Y7', 'TV-G', 'TV-PG', 'TV-14', 'TV-MA')`)
+  ]
 );
 
 export const assetFolders = broadcast.table("asset_folders", {
@@ -370,6 +381,8 @@ export const breakRules = broadcast.table(
     openTimeTo: text("open_time_to", { enum: ["spot_market", "station_id_and_bumpers"] })
       .notNull()
       .default("spot_market"),
+    /** "Ads from partners": a programmatic backfill for time still open. Off by default; only a switch until it's built. */
+    adsFromPartners: boolean("ads_from_partners").notNull().default(false),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [
