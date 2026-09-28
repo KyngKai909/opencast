@@ -7,3 +7,4 @@ export * from "./ledger.js";
 export * from "./trust.js";
 export * from "./network.js";
 export * from "./audience.js";
+export * from "./notify.js";

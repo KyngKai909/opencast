@@ -25,6 +25,7 @@ import type {
 } from "@opencast/domain";
 import {
   API_PORT,
+  STORAGE_ROOT,
   DELETE_LOCAL_AFTER_R2,
   HLS_ROOT,
   IPFS_ARCHIVE_DEFAULT,
@@ -49,6 +50,7 @@ import {
   probeMediaKind
 } from "./media.js";
 import { nowIso, slugify } from "./utils.js";
+import { bootV1 } from "./v1/boot.js";
 
 const app = express();
 const upload = multer({ dest: path.join(UPLOAD_ROOT, "tmp") });
@@ -2758,6 +2760,11 @@ app.post("/api/channels/:channelId/control", async (req: Request, res: Response)
   res.status(202).json(payload);
 });
 
+// The new API, on the new schema. The /api routes above stay for the old master
+// control until the apps prompt replaces it.
+const v1 = bootV1(process.env, STORAGE_ROOT);
+app.use("/v1", v1.router);
+
 const serveWebApp = String(process.env.SERVE_WEB_APP ?? "true") !== "false";
 const webIndexPath = path.join(WEB_DIST_DIR, "index.html");
 if (serveWebApp && fsSync.existsSync(webIndexPath)) {
@@ -2769,6 +2776,7 @@ if (serveWebApp && fsSync.existsSync(webIndexPath)) {
 
     if (
       req.path === "/api" ||
+      req.path.startsWith("/v1/") ||
       req.path.startsWith("/api/") ||
       req.path.startsWith("/hls/") ||
       req.path.startsWith("/uploads/")

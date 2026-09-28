@@ -1,6 +1,6 @@
 import { pgSchema } from "drizzle-orm/pg-core";
 
-// The eight Postgres schemas, and the enums more than one of them uses. Kept
+// The Postgres schemas, and the enums more than one of them uses. Kept
 // apart from the tables so the table files can import each other freely.
 
 export const accounts = pgSchema("accounts");
@@ -11,6 +11,7 @@ export const ledger = pgSchema("ledger");
 export const trust = pgSchema("trust");
 export const network = pgSchema("network");
 export const audience = pgSchema("audience");
+export const notify = pgSchema("notify");
 
 export const band = broadcast.enum("band", ["tv", "radio"]);
 

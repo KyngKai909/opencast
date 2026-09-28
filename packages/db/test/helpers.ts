@@ -1,33 +1,7 @@
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import { expect } from "vitest";
 
-const adminUrl = process.env.DATABASE_URL ?? "postgres://opencast:opencast@localhost:54329/opencast";
-const migrationsFolder = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "migrations");
-
-/** A fresh database with every migration applied, dropped by the returned function. */
-export async function freshDatabase() {
-  const name = `opencast_test_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
-  const admin = new pg.Client({ connectionString: adminUrl });
-  await admin.connect();
-  await admin.query(`CREATE DATABASE ${name}`);
-  const url = new URL(adminUrl);
-  url.pathname = `/${name}`;
-  const pool = new pg.Pool({ connectionString: url.toString(), max: 4 });
-  await migrate(drizzle(pool), { migrationsFolder, migrationsSchema: "drizzle" });
-  return {
-    pool,
-    async drop() {
-      await pool.end();
-      await admin.query(`DROP DATABASE ${name} WITH (FORCE)`);
-      await admin.end();
-    }
-  };
-}
+export { freshDatabase } from "../src/testing.js";
 
 /**
  * Runs a test inside a transaction that's always rolled back. Deferred checks
