@@ -39,6 +39,12 @@ export function useInputs(): InputAdapter[] {
   return useContext(InputsContext);
 }
 
+/** Where TV mode is running: the TV app, a Cast receiver, or an iPhone's second screen. */
+const ModeContext = createContext<TvMode>("tv");
+export function useTvMode(): TvMode {
+  return useContext(ModeContext);
+}
+
 export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
   startFocus();
   const ui = useRef<Ui | null>(null);
@@ -58,7 +64,7 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
         if (ui.current && engineRef.current) onPictureCommand(c, ui.current, engineRef.current, s);
       }
     }),
-    // Settings apply when TV mode starts (a change in Settings restarts the player: see Settings).
+    // The starting values; later changes go through engine.setOptions (Wiring).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mode]
   );
@@ -69,11 +75,13 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
       <GroundProvider>
         <PlayerProvider options={options}>
           <Router>
-            <InputsContext.Provider value={adapters}>
-              <Wiring mode={mode} adapters={adapters} path={path} ui={ui} engineRef={engineRef} />
-              {routes}
-              {children}
-            </InputsContext.Provider>
+            <ModeContext.Provider value={mode}>
+              <InputsContext.Provider value={adapters}>
+                <Wiring mode={mode} adapters={adapters} path={path} ui={ui} engineRef={engineRef} />
+                {routes}
+                {children}
+              </InputsContext.Provider>
+            </ModeContext.Provider>
           </Router>
         </PlayerProvider>
       </GroundProvider>
@@ -105,7 +113,20 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   };
 
   // Inputs: every command goes through the one dispatcher.
-  useEffect(() => startInputs(adapters, (c, s) => ui.current && dispatch(c, s, ui.current, engine)), [engine, adapters, ui]);
+  // "Channel up goes down the dial" (Remote and phones) flips the TV remote's channel keys (not a phone's rocker).
+  useEffect(
+    () =>
+      startInputs(adapters, (c, s) => {
+        if (!ui.current) return;
+        const flip = c.type === "channel" && s?.input === "remote" && getDevice().settings.channelUp === "down_the_dial";
+        dispatch(flip ? { type: "channel", dir: c.dir === "up" ? "down" : "up" } : c, s, ui.current, engine);
+      }),
+    [engine, adapters, ui]
+  );
+
+  // Settings take effect at once.
+  const { bannerSeconds, numberWaitSeconds, includeRadioBand } = device.settings;
+  useEffect(() => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand } }), [engine, bannerSeconds, numberWaitSeconds, includeRadioBand]);
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);
   useEffect(() => engine.setPresets(Object.fromEntries(presets.map((p) => [p.key, p.stationId]))), [engine, presets]);

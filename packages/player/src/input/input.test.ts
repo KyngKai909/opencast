@@ -17,7 +17,7 @@ describe("the TV remote", () => {
   it("in the guide and menus: arrows move focus, Back closes", () => {
     expect(commandForKey(key("ArrowUp"), "tv", "overlay")).toEqual({ type: "focus", dir: "up" });
     expect(commandForKey(key("Escape"), "tv", "overlay")).toEqual({ type: "back" });
-    expect(commandForKey(key("5"), "tv", "overlay")).toBeNull();
+    expect(commandForKey(key("5"), "tv", "overlay")).toEqual({ type: "digit", digit: 5 });
   });
   it("knows the TVs' channel keys by name and by code", () => {
     expect(commandForKey(key("ChannelDown"), "tv")).toEqual({ type: "channel", dir: "down" });

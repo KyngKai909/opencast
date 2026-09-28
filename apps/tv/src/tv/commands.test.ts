@@ -3,7 +3,8 @@ import type { PlayerEngine } from "@opencast/player";
 
 vi.mock("./focus", () => ({ moveFocus: vi.fn(), pressFocused: vi.fn() }));
 import { moveFocus, pressFocused } from "./focus";
-import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
+import { renderHook } from "@testing-library/react";
+import { clearLayers, contextFor, dispatch, onPictureCommand, useCommandLayer, type Ui } from "./commands";
 
 function setup(path: string) {
   const ui: Ui = { path: () => path, go: vi.fn(), close: vi.fn() };
@@ -48,6 +49,31 @@ describe("TV commands", () => {
     dispatch({ type: "menu" }, undefined, ui, engine);
     expect(ui.close).toHaveBeenCalledTimes(1);
     expect(ui.go).toHaveBeenCalledWith("/menu", { replace: true });
+  });
+
+  it("lets the newest layer take commands first", () => {
+    clearLayers();
+    const { ui, engine, handle } = setup("/presets");
+    const first = vi.fn(() => false);
+    const top = vi.fn((c: { type: string }) => c.type === "digit");
+    renderHook(() => useCommandLayer(first));
+    const h = renderHook(() => useCommandLayer(top, { keys: "overlay" }));
+    dispatch({ type: "digit", digit: 3 }, undefined, ui, engine);
+    expect(top).toHaveBeenCalled();
+    expect(first).not.toHaveBeenCalled();
+    dispatch({ type: "channel", dir: "up" }, undefined, ui, engine);
+    expect(first).toHaveBeenCalled();
+    expect(handle).toHaveBeenCalledWith({ type: "channel", dir: "up" }, undefined);
+    expect(contextFor("/")).toBe("overlay");
+    h.unmount();
+    expect(contextFor("/")).toBe("picture");
+    clearLayers();
+  });
+
+  it("ignores numbers in an overlay no layer takes", () => {
+    const { ui, engine, handle } = setup("/menu");
+    dispatch({ type: "digit", digit: 4 }, undefined, ui, engine);
+    expect(handle).not.toHaveBeenCalled();
   });
 
   it("gives the keyboard its context", () => {

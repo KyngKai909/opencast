@@ -56,8 +56,9 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
     if (key === "i") return { type: "info" };
     return null;
   }
-  if (/^[0-9]$/.test(key)) return where === "picture" ? { type: "digit", digit: Number(key) } : null;
-  if (key === "." || key === "Decimal") return where === "picture" ? { type: "dot" } : null;
+  // Numbers mean something in overlays too (presets 1 to 6, jumping in the guide): the app decides.
+  if (/^[0-9]$/.test(key)) return { type: "digit", digit: Number(key) };
+  if (key === "." || key === "Decimal") return { type: "dot" };
   const arrows: Record<string, "up" | "down" | "left" | "right"> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
   if (arrows[key]) {
     if (where === "overlay") return { type: "focus", dir: arrows[key] };
