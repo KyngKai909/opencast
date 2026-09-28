@@ -1,0 +1,183 @@
+# Contract requests (from the apps)
+
+Fields and endpoints the reference designs need that `packages/contracts` doesn't have yet. The apps prompt never edits the contracts: it asks here, and builds against Mock Service Worker fixtures until each lands. The platform side answers by adding the field (and a line in `docs/contracts-changelog.md`), or by marking the request **declined** with a reason, in which case the apps change the screen.
+
+Found in Phase 0 by checking every frame against the Zod schemas; the frame-by-frame evidence is in [docs/apps/inventory.md](apps/inventory.md). Frame IDs are `<file> <section>.<frame>`.
+
+**Mock** says whether the apps can fake it safely in `dev:mock` until it lands. "Yes" means the fixture shape is obvious. "UI only" means the screen can be drawn but not used for real. "No" means a placeholder would be wrong somewhere else, so the request blocks the flow.
+
+**Phase** is the apps phase that first needs it. Numbers in brackets count how many frames depend on it.
+
+## Blocking a flow as drawn
+
+These change what the API accepts, or add something no fixture can stand in for. They're listed first because a mock would hide a real problem.
+
+| # | Request | Why | Frames | Mock | Phase |
+|---|---|---|---|---|---|
+| B1 | **A draft spot without a rate or budget.** `createSpot` requires positive `rate.micros` and `budget.totalMicros`, and `Spot.rate` and `budget` aren't nullable. Allow null while `state = draft` (or `createSpot` with only title, length and category) | Upload (spots 02) comes before rate and budget (spots 03). An approved production order "becomes a spot waiting for a rate and budget". A placeholder rate would show in stations' markets | biz-spots 02.1, 03.1; orders 05.1, 06.2 (4) | No | 5 |
+| B2 | **TV sign-in by code, and TVs on the account.** Needed: `POST /tv/codes` (public: code, QR URL, expiry, poll token); `GET /tv/codes/:pollToken` (pending, approved with a TV session, expired); `POST /tv/codes/:code/approve` (user); the API accepting a TV session as `user`; `listTvs`, `signOutTv`, and the TV signing itself out | A TV has no Privy token, so it can't read presets or reminders after "sign in on your phone". You shows "Your TVs" with Sign out and "Add a TV, enter a code" | tv 05.3; you 02.1, 06.2; tv-update 04.1 (5) | UI only | 6 |
+| B3 | **Browser and phone go-live ingest.** `addLiveSource` returns no WHIP or WebRTC endpoint or token for a browser source | Going live from a browser or phone can't send video | live-listings 01.1, 02.1, 05.1, 05.2 (4) | UI only | 4 |
+| B4 | **Listed airings can be reminded.** `Airing` has `logEntryId` but no `listedAiringId`, which `addReminder` needs for a listed stream | Remind me on city meetings (RDLS) in home, the guide and search | home 01.1, 05.1; station-pages 03.1; tv 03.2 (4) | No | 3 |
+| B5 | **Check a code before redeeming.** `redeemCode` validates and counts in one call. Add a dry run (`confirm: false` or `/redeem/check`), returning when and where the offer was saved and its text | Calling it to show the check would count the use | biz-results 05.1; biz-settings 05.1 (2) | No | 5 |
+| B6 | **Answer a claim with a file.** `answerClaim` takes `attachmentUrl`, but nothing uploads the attachment | "Attach the permission" | rights 03.1 (1) | UI only | 4 |
+| B7 | **Ticked works, and a preview before sending.** `askPermission` has no `workIds`, and nothing edits a work after `addWorks`. Its schedule preview exists only in the response, after sending. Add `workIds` and a `dryRun` or preview endpoint | The desk ticks works and previews the message before it goes out, and "only ticked works are covered by the yes" | desk 03.1 (1) | No | 7 |
+| B8 | **Stop from the permission link, and Claim now before there's a station.** `answerPermission` refuses a second answer, and `startHandover` needs a user and a `stationId` | 06.2: "This link works to stop it at any time"; "Claim it now and skip the team-run part" | desk 06.2 (1) | No | 7 |
+| B9 | **No K or W prefix on call signs.** `CallSign` is `/^[A-Z]{3,5}$/` in contracts and domain | The style guide's dial rules. `KBEA` passes `checkCallSign` and `join` today | site S.10; control A.1; desk 04.1 (3) | Client pre-check | 1 |
+
+## accounts
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| A1 | **Sign out everywhere** (Settings, Account) | you 05.1 | UI only | 3 |
+| A2 | **Watch history and last channel**: store (when `keepWatchHistory`), read the last channel, clear. The heartbeat carries no user, by design | you 05.1; tv 02.1 ("It opens tuned in") | Device-local for one device | 3 |
+| A3 | **Your data**: download (export) and delete the account | you 05.1 | UI only | 3 |
+| A4 | **Host blocks readable, and invites that carry them.** `setHosts` is write-only, and `inviteToStation` can't name blocks. Add a GET (or `blocks` on `TeamMember`), and `programIds` on host invites | station-settings 03.1, 03.2; every host-scoped screen | Yes | 4 |
+| A5 | **Station switcher status**: on air and needs attention ("Dead air in 40 min") per membership in `Me` | station-settings 04.1, 05.2 | Fan-out per station | 4 |
+| A6 | **Opencast team list** for `setUpClaimable.operatorUserId` ("Run by Dee A.") | desk 04.1 | Yes | 7 |
+| A7 | **`ViewerSettings` sections are strict**: nested `watching`, `market` and the rest strip unknown keys. Type the TV-only rows (channel-up direction, banner seconds, number-entry wait, include radio band, picture quality, audio evening-out) and quiet hours, or make the sections `.loose()` | tv-update 04.1; you 06.3 | Top-level keys | 3 |
+| A8 | (minor) `TeamMember.role` is `z.string()`; make it `StationRole` or `BusinessRole` | station-settings 03.1 | n/a | 4 |
+
+## stations
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| S1 | **Station category on `StationIdent`** (or on dial and search rows): the home chips, "Public affairs." in the preview, and search results | home 01.1, 06.1; station-pages 03.1, 05.2 | Yes | 3 |
+| S2 | **Carried widely**: programs carried widely in a market, with maker, carrier count and the in-market airing now and next (on `Dial`, or public) | home 01.1, 02.1 | Yes | 3 |
+| S3 | **Coming up live**: live airings past the guide's 24-hour window (`Dial.comingUpLive`) | home 01.1, 02.1 | Several guide calls | 3 |
+| S4 | **A note per airing** (`Airing.note`): "Overnight repeat", "Full meeting, unedited", "Live from Redlands City Hall". Also used by the TV banner and the site tuner | home 01.1, 03.1, 06.1; tv 06.1; site S.01 | Yes | 3 |
+| S5 | **A station's schedule by range** (`from`/`to` on `getStation`): the week by day, and tonight from 8:00 | station-pages 01.1; home 03.1 | Guide per station, in market only | 3 |
+| S6 | **Station page fields**: member count, about text, on the dial since, broadcast hours, bug (mode, position, logo) for the viewer player | station-pages 01.1; home 03.1, 06.1 | Yes | 3 |
+| S7 | **Public carriage for a station**: what it carries (with slot text), what it makes that others carry, and carrier counts | station-pages 01.1; home 06.1, 06.2 | Yes | 3 |
+| S8 | **Made possible by**: public credits (credited sponsorships and the members' credit) | station-pages 01.1 | Yes | 3 |
+| S9 | **Station counts per market** on `listMarkets` | home 08.1 | Yes | 3 |
+| S10 | **Market from where you are**: from coordinates ("Use my location") and from the request's IP (TV first launch), neither stored | home 08.1; tv 05.3 | Fixture market | 3 |
+| S11 | **Open channels for signed-out viewers**: a thin market's "Any channel from 2 to 69 is open except 5" (`availableChannels` is `user`) | home 08.2 | Yes | 3 |
+| S12 | **One airing by id, public**: for share links that tune in or offer a reminder | home 07.1 | Yes | 3 |
+| S13 | **Stand by as a state**: a live block waiting for its signal (`DialRow.signal` or `Airing.kind: standby`) | tv 05.2 | Yes | 6 |
+| S14 | **Live source detail**: signal quality ("Receiving, 1080p", bitrate), and a private rehearsal preview for encoders | live-listings 01.1 | Yes | 4 |
+| S15 | **Live lower third state**: which speaker is showing, or free text, or hidden, readable by a second device (and composited for encoder sources) | live-listings 02.1, 05.2 | Client-side for the browser source | 4 |
+| S16 | **Translator Connect** (YouTube and Twitch OAuth), or the design moves to a key form | master-control A.5 | UI only | 4 |
+| S17 | **Spot categories**: one list of valid categories, for blocked categories, market filters and a business's category | station-settings 02.1; master-control C.2; biz-funding 01.1 | Constant | 4 |
+| S18 | **Studio to station**: claiming a channel as a studio | market 04.1 | UI only | 4 |
+
+## library
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| L1 | **Program format**: typical episode length, cadence ("Weekly", "Nightly"), series or one-off, band or media kind (audio only). Used by the market, offers, sponsorships and the program page | market 01.1, 05.1; offering 01.1; master-control B.1; sponsorships 01.1, 04.1 | Yes | 4 |
+| L2 | **Carriers of a program**: total, outside the market, and the list | station-pages 02.1; home 07.1 | Yes | 3 |
+| L3 | **Where to watch**: `upcoming[]` with `endsAt`, on now, episode, slot text ("Saturdays at 8:30 pm") | station-pages 02.1; home 07.1 | Yes | 3 |
+| L4 | **Episode airings**: aired or not, last airing, next airing (with its `logEntryId`), episode description | station-pages 02.1 | Yes | 3 |
+| L5 | **An item's history**: scheduled and aired, including on carrying stations; usage counts; cached on playout; audio layout; caption language | live-listings 04.1 | Yes | 4 |
+| L6 | **Replace an item's file**, keeping its history and schedule | live-listings 04.1 | UI only | 4 |
+| L7 | **Captions mode and language** on a program | live-listings 03.1 | Yes | 4 |
+
+## log and playout
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| G1 | **Break contents**: each break's rows (code, title, start, length, whose time: the station's, the maker's barter, backup). Used by the Monitor rundown, Breaks, "then 6 more" and the paused notice | master-control A.7, C.1, C.3, P.1; biz-spots 05.1 | Yes | 4 |
+| G2 | **Monitor status**: the next item and its picture for the preview monitor, on air since, output bitrate | master-control A.7 | Yes | 4 |
+| G3 | **End early** during a live block (hands back to the log) | live-listings 02.1, 05.2 | UI only | 4 |
+| G4 | **Fill a gap by carrying**: a `carry` option on `fillGap` for one night | master-control A.4, P.2; market 06.1 | No | 4 |
+| G5 | **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1 | Yes | 4 |
+| G6 | **Test output before sign-on**: a playback URL for "Watch it" | master-control A.6 | Yes | 4 |
+
+## catalog
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| C1 | **Why it fits**: the slot label and range, the reason (dead air, library repeats, weak slot), length, exact fit. Also offers that fit a given gap (from, to, minimum length) | market 01.1, 02.1, 06.1; master-control A.4, A.7 | Dead air only | 4 |
+| C2 | **Browse**: filters for kind, maker kind, maker station (Offered by BEAT, studio, catalog), approval, gap window; sort (fits, carried by most, newest); facet counts | market 01.1, 04.1, 05.1, 06.1; offering 01.1 | Client-side on fixtures | 4 |
+| C3 | **A price per deal**: cash and cash plus barter each with a fee and a barter split; the program's break time per hour | master-control B.2; offering 02.1 | No | 4 |
+| C4 | **Carry in one step, and undo**: `requestCarriage` returning the agreement when approval isn't needed; withdraw a request (the enum has `withdrawn`); mark an airing as the repeat of an episode | master-control B.3; market 06.1 | Delayed send | 4 |
+| C5 | **Episodes**: first aired (date and station), captions | market 02.1, 03.1 | Yes | 4 |
+| C6 | **Slots on agreements and carriers**: when each carrier airs it | market 02.1; offering 04.1 | Yes | 4 |
+| C7 | **Carrier profile on a request**: members, how many programs it carries, blocked categories | offering 03.1 | Yes | 4 |
+| C8 | **A default deal** on an offer (one-tap carry) | market 06.1 | `termsOffered[0]` | 4 |
+| C9 | **Catalog underwriter** and upcoming shelves | market 05.1 | Static | 4 |
+
+## spots
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| P1 | **Upload check regions**: a typed `detail` with a box in frame coordinates and a time range, and where the code and QR sit | biz-spots 02.1 | Yes | 5 |
+| P2 | **Shrink to fit on the stored file** | biz-spots 02.1 | Re-upload | 5 |
+| P3 | **Captions**: the track, and editing it | biz-spots 02.1 | UI only | 5 |
+| P4 | **Code placement and limits**: position, timing, "once per customer", and who picks the code string (the design says Opencast generates it; the contract takes it from the business) | biz-spots 02.1; biz-results 03.1 | Yes | 5 |
+| P5 | **Which stations a spot is in rotation on** (`StationIdent[]`, not a count) | biz-spots 04.1, 06.1 | Yes | 5 |
+| P6 | **The pause story**: when and why it paused, the last hold, held airings that still aired, what each station did with the time, told when back. The station-side notice needs the same data: the reason, time held tonight, the backup that filled it, the resume reason | biz-spots 04.1, 05.1 | From notice text | 5 |
+| P7 | **Estimates**: airings a day and days of budget; days for a raise ("$200 more is about 17 days") | biz-spots 03.1, 04.1, 06.2 | Client-side | 5 |
+| P8 | **Band in targeting** ("Radio band" as a kind of station) | biz-spots 03.1 | No | 5 |
+| P9 | **Category reach**: how many stations in a market can carry a category, and which block it | biz-funding 01.1; biz-settings 01.1 | Yes | 5 |
+| P10 | **Address to coordinates**: `LocationInput` needs latitude and longitude, and the frames take an address, or a city and radius | biz-funding 01.1; biz-settings 01.1 | Fixture | 5 |
+| P11 | **Logo upload** for a business | biz-settings 01.1 | UI only | 5 |
+| P12 | **The Redeem tool**: a setting to turn it on, and today's count | biz-settings 05.1 | Yes | 5 |
+| P13 | **Codes by code, and by how uses were counted** (Clear Pay, marked, online checkout) | biz-results 03.1 | Yes | 5 |
+| P14 | **Results periods**: week and all time, not only month | biz-results 01.1, 05.2 | Yes | 5 |
+| P15 | **Results CSV**, why an airing was short, when the proof frame was captured; paging | biz-results 02.1 | Yes | 5 |
+| P16 | **What a business can sponsor**: stations and programs with minimum, room left and schedule line (`listStationSponsorships` is the station's own) | sponsorships 02.1 | Yes | 5 |
+| P17 | **Credit preview**: the members' credit name, and co-sponsors | sponsorships 02.1, 03.1, 05.1 | Yes | 5 |
+| P18 | **Makers**: history with this business, specialty, the samples themselves; brief files before sending (multipart `orderSpot`, or a draft order) | orders 02.1 | Yes | 5 |
+| P19 | **Delivery checks and length**; `approvedAt` and `quotedAt` | orders 01.1, 05.1 | Yes | 5 |
+| P20 | **Connections**: Clear Pay and an online checkout (fields and connect endpoints) | biz-settings 04.1; biz-results 03.1 | UI only | 5 |
+| P21 | **Close account** (business) | biz-settings rail | UI only | 5 |
+| P22 | **Sponsor profile** for the station: business category, city, distance, sponsors elsewhere; and members who asked to be named | sponsorships 03.1 | Yes | 4 |
+| P23 | **Market spot preview URL** for stations | master-control C.2 | Yes | 4 |
+| P24 | **Maker "Tell me when it's listed"** on the station side | orders 06.2 | Drop the button | 4 |
+
+## ledger
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| E1 | **Pledges**: the card on file and changing it; receipts (list and documents); changing monthly or once | you 04.1, 02.1 | UI only | 3 |
+| E2 | **Station earnings detail**: sponsor names, the airings and breaks held tonight, the next payout amount | earnings 02.1 | Derived | 4 |
+| E3 | **Statement structure**: line groups, per-thousand fields (rate, airings, average tuned in), paid-on date and destination, in progress or final, closing split into available and held | earnings 03.1; biz-results 04.1 | Detail strings | 4 |
+| E4 | **Receipts for a business**: prepayment, expense or statement, with a PDF each | biz-settings 03.1 | Yes | 5 |
+| E5 | **Funding sources**: remove, make default | biz-settings 03.1; biz-funding 03.1 | UI only | 5 |
+| E6 | (minor) **Deposit quote basis** (rate, reference station); **withdrawal arrival**; the usual top-up amount | biz-funding 02.1, 04.1, 06.1 | Copy or derived | 5 |
+
+## audience
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| U1 | **By program, per airing**: aired at, source, average, peak, stayed to the end, on now | earnings 01.1, 04.1 | Yes | 4 |
+| U2 | **Mirroring as a platform** (`Platform` has phone, cast, web, tv_app) | tv-update 01.1 | Send `phone` | 8 |
+
+## trust
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| T1 | **Takedown airing times** ("Monday, 8:00 pm on BEAT") and what carriers were told | rights 02.1, 04.1, 06.1 | Template | 4 |
+| T2 | **Replace a claimed item with a cut**, tied to the claim | rights 02.1 | Drop the footnote | 4 |
+| T3 | **Label fixes in `states.ts`**: "Removed" is shared by `removed` and `expired`, but an expired claim "counts as removed, not upheld" and the frame says "Removed by BEAT"; the frame says "Answered, back on air". The rights basis reads "We made it" in the claim and "I made it" in the library, and the note says they must match | rights 01.1, 03.1; master-control A.3 | n/a | 4 |
+
+## network
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| N1 | **Several proposed channels, or a band only** ("38.1 or 45.1", "Radio band") | desk 02.1, 03.1 | Yes | 7 |
+| N2 | **The reminder** (one, then `no_answer`) | desk 02.1 | UI only | 7 |
+| N3 | **Pipeline dates**: said yes, claim invite sent, claim link sent, claimed, said no, sign-on time; and a claim-invite endpoint (`heldEarnings` never produces `invited` or `claim_link_sent`) | desk 02.1, 07.1 | Yes | 7 |
+| N4 | **Permission page**: the source platform, grouped work counts, a copy emailed by default, the wording version recorded with the answer | desk 06.1, 06.2 | Yes | 7 |
+| N5 | **A claimable station's setup, read back**: recipe, operator, sign-on time, import progress; drafts prepared before the yes | desk 04.1 | Client draft | 7 |
+| N6 | **Recipe detail**: carried programs in blocks, labels, a typed `breakRule` | desk 04.1 | Parse client-side | 7 |
+| N7 | **Board stats for the whole market** (both bands), and structured slot status | desk 01.1 | Yes | 7 |
+| N8 | **A listed source without a channel** yet | desk 05.1 | Yes | 7 |
+| N9 | **Held earnings**: unclaimed period and date, licence name, pending handovers (so `approveHandover` is reachable), chain | desk 07.1 | Config | 7 |
+| N10 | **The creator's claim page**: said-yes date, days on air, presets, held amount, source platform to connect, and a GET for the handover's status after starting | rights 05.1 | Yes | 4 |
+| N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
+
+## notifications
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| O1 | **New kinds**: a preset goes live, station news, signed on or off (station team), a station added your spot (business) | you 06.3; station-settings 05.1; biz-settings 04.1 | Yes | 3 |
+| O2 | **Preference detail**: lead time, email timing, quiet hours window (on by default, honoured by the sender) | you 06.3 | Yes | 3 |
+| O3 | **Push registration**: web push subscriptions, and APNs and FCM tokens | every push frame | UI only | 3 |
+
+## waitlist
+
+| # | Request | Frames | Mock | Phase |
+|---|---|---|---|---|
+| W1 | **Message for a station without a call sign**: the API says "Your station is on the list."; the site says "You're on the list." One of them changes | site S.11 | n/a | 7 |
