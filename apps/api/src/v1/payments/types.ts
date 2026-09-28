@@ -53,6 +53,24 @@ export type ProviderAccountKind = "clear" | "stripe_customer" | "stripe_connect"
 
 export type Owner = { type: "advertiser" | "station"; id: string; name?: string } | { type: "opencast"; label: "settlement" | "treasury" };
 
+/** Whether a transfer happened as asked. Pending until it's mined, or while the chain can't be read. */
+export type TransferCheck = { status: "confirmed" } | { status: "pending" } | { status: "failed"; reason: string };
+
+/**
+ * Money to and from a person's linked Clear wallet (a Privy global wallet: Clear's Privy app is
+ * the provider, Opencast's the requester). Clear and the fake have it; Stripe-only doesn't.
+ */
+export interface ClearWalletRail {
+  /** The business's balance account on chain: where a transfer from a Clear wallet is sent. */
+  depositAddress(owner: Owner & { type: "advertiser" }, accounts: AccountDirectory): Promise<string>;
+  /** Checks a transfer: from the linked wallet, to the business's account, at least the amount (USDC, 6 decimals). */
+  verifyTransfer(input: { businessId: string; txHash: string; from: string; to: string; amountMicros: number }): Promise<TransferCheck>;
+}
+
+/** A payout's destination when it's a linked Clear wallet rather than a bank: `wallet:<address>`. */
+export const walletDestination = (address: string) => `wallet:${address}`;
+export const destinationWallet = (ref: string | null) => (ref?.startsWith("wallet:") ? ref.slice("wallet:".length) : null);
+
 /** What a provider tells us happened (from a webhook). */
 export type PaymentEvent =
   | { kind: "deposit_arrived"; depositId: string }
@@ -71,7 +89,7 @@ export interface Payments {
   linkFundingSource(input: { businessId: string; businessName: string; kind: FundingKind; token: string }, accounts: AccountDirectory): Promise<{ providerRef: string; label: string }>;
   startDeposit(input: { depositId: string; businessId: string; kind: FundingKind; sourceRef: string | null; amountMicros: number; feeMicros: number }, accounts: AccountDirectory): Promise<DepositStarted>;
   cancelDeposit(providerRef: string): Promise<void>;
-  /** Money out to a bank: an advertiser's withdrawal, or a station's payout. */
+  /** Money out to a bank (or, with `wallet:<address>`, a linked Clear wallet): an advertiser's withdrawal, or a station's payout. */
   startPayout(input: { payoutId: string; from: Owner; destinationRef: string | null; amountMicros: number }, accounts: AccountDirectory): Promise<{ providerRef: string }>;
   /** A viewer's pledge by card. Returns a checkout URL when the provider needs one. */
   startPledge(input: { pledgeId: string; stationId: string; stationName: string; amountMicros: number; cadence: "monthly" | "once"; returnUrl: string }): Promise<{
@@ -89,6 +107,8 @@ export interface Payments {
   applyMove(move: ProviderMove, accounts: AccountDirectory): Promise<{ providerRef: string }>;
   /** The account a station (or business) is paid into: opened if needed, with a link if the owner must finish it. */
   payoutAccount(owner: Owner & { type: "station" | "advertiser" }, accounts: AccountDirectory): Promise<{ status: "active" | "needs_onboarding"; url: string | null }>;
+  /** Funding from and payouts to linked Clear wallets; absent when the provider can't (Stripe-only). */
+  readonly clearWallet?: ClearWalletRail;
   /** Reads a provider's webhook. Null when it's not something the ledger acts on. Throws when the signature is wrong. */
   webhook(provider: "stripe" | "clear", rawBody: Buffer, headers: Record<string, string | undefined>): Promise<PaymentEvent | null>;
 }

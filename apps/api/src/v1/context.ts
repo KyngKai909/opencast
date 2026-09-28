@@ -55,6 +55,8 @@ export interface Deps {
     appOrigin: string;
     /** The escrow contract, shown on station and claim pages. */
     escrowContractAddress: string | null;
+    /** USDC on the configured chain (CHAIN_ID, USDC_ADDRESS): what a transfer from a linked Clear wallet sends. Null until set. */
+    usdc: { chainId: number; address: string } | null;
     production: boolean;
   };
 }

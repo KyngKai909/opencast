@@ -17,7 +17,7 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.addFundingSource, async ({ user, params, body }) => {
     // Managers add money and approve orders, but never change funding.
     await accounts.requireBusiness(user, params.businessId, ["owner"]);
-    return ledger.addFundingSource(params.businessId, body);
+    return ledger.addFundingSource(params.businessId, body, user.id);
   });
   r.handle(api.quoteDeposit, async ({ user, params, body }) => {
     await accounts.requireBusiness(user, params.businessId, ["owner", "manager"]);
@@ -26,6 +26,14 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.addMoney, async ({ user, params, body }) => {
     await accounts.requireBusiness(user, params.businessId, ["owner", "manager"]);
     return ledger.addMoney(params.businessId, body);
+  });
+  r.handle(api.quoteClearTransfer, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner", "manager"]);
+    return ledger.quoteClearTransfer(params.businessId, user.id, body.amountMicros);
+  });
+  r.handle(api.confirmClearTransfer, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner", "manager"]);
+    return ledger.confirmClearTransfer(params.businessId, user.id, body);
   });
   r.handle(api.cancelDeposit, async ({ user, params }) => {
     await accounts.requireBusiness(user, params.businessId, ["owner", "manager"]);
@@ -57,6 +65,10 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.getPayoutAccount, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, ["owner"]);
     return ledger.payoutAccount(params.stationId);
+  });
+  r.handle(api.setPayoutDestination, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, ["owner"]);
+    return ledger.setPayoutDestination(params.stationId, user.id, body.kind);
   });
   r.handle(api.moveToBank, async ({ user, params, body }) => {
     await accounts.requireStation(user, params.stationId, ["owner"]);

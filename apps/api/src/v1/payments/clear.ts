@@ -10,9 +10,12 @@
 // missing is listed in docs/clear-integration.md. Until a real client is written against Clear's
 // endpoints, `fakeClear()` stands in (in memory).
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { getAddress, type Hex } from "viem";
+import type { UsdcTransfers } from "../chain/usdc.js";
 import type { StripeCards } from "./stripe.js";
 import {
+  destinationWallet,
   onChain,
   ownAccountsCustody,
   ownerWallet,
@@ -48,9 +51,13 @@ export interface ClearClient {
   payout(input: { accountId: string; bankRef: string | null; amountMicros: number; idempotencyKey: string; memo: string }): Promise<{ payoutId: string }>;
   /** Reads Clear's webhook (deposit arrived or failed, payout confirmed or failed, account verified). */
   parseWebhook(rawBody: Buffer, headers: Record<string, string | undefined>): Promise<PaymentEvent | null>;
+  /** The account's address on chain (USDC on Base): where a transfer from a person's linked Clear wallet is sent. */
+  accountAddress(accountId: string): Promise<string>;
+  /** Sends USDC from the account to an address on chain: a payout or withdrawal to an owner's linked Clear wallet. */
+  sendToWallet(input: { accountId: string; address: string; amountMicros: number; idempotencyKey: string; memo: string }): Promise<{ transferId: string }>;
 }
 
-export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fallbackCard: Payments): Payments {
+export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fallbackCard: Payments, options: { usdc?: UsdcTransfers | null } = {}): Payments {
   async function accountFor(owner: Owner, accounts: AccountDirectory): Promise<string> {
     const known = await accounts.get(owner, "clear");
     if (known) return known.ref;
@@ -100,8 +107,25 @@ export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fa
 
     async startPayout(input, accounts) {
       const accountId = await accountFor(input.from, accounts);
+      // To an owner's linked Clear wallet: USDC on chain, no bank.
+      const wallet = destinationWallet(input.destinationRef);
+      if (wallet) {
+        const sent = await clear.sendToWallet({ accountId, address: wallet, amountMicros: input.amountMicros, idempotencyKey: `payout:${input.payoutId}`, memo: "Opencast" });
+        return { providerRef: sent.transferId };
+      }
       const out = await clear.payout({ accountId, bankRef: input.destinationRef, amountMicros: input.amountMicros, idempotencyKey: `payout:${input.payoutId}`, memo: "Opencast" });
       return { providerRef: out.payoutId };
+    },
+
+    clearWallet: {
+      async depositAddress(owner, accounts) {
+        return clear.accountAddress(await accountFor(owner, accounts));
+      },
+      async verifyTransfer({ txHash, from, to, amountMicros }) {
+        // Without the chain configured the transfer can't be checked yet: the deposit waits.
+        if (!options.usdc) return { status: "pending" };
+        return options.usdc.check({ txHash: txHash as Hex, from, to, minUnits: BigInt(amountMicros) });
+      }
     },
 
     async startPledge(input) {
@@ -206,6 +230,15 @@ export function fakeClear(): ClearClient & { balances: Map<string, number>; encu
         calls.push(`payout ${amountMicros}`);
         return { payoutId: `po_${randomUUID().slice(0, 8)}` };
       }),
+    async accountAddress(accountId) {
+      return fakeAddress(accountId);
+    },
+    sendToWallet: ({ accountId, amountMicros, idempotencyKey }) =>
+      once(idempotencyKey, () => {
+        add(accountId, -amountMicros);
+        calls.push(`send to wallet ${amountMicros}`);
+        return { transferId: `wallet_${randomUUID().slice(0, 8)}` };
+      }),
     async parseWebhook(rawBody) {
       const event = JSON.parse(rawBody.toString("utf8")) as PaymentEvent & { transferId?: string };
       if (event.kind === "deposit_arrived" && event.transferId && pulls.has(event.transferId)) {
@@ -217,3 +250,6 @@ export function fakeClear(): ClearClient & { balances: Map<string, number>; encu
     }
   };
 }
+
+/** A stable, made-up address for a fake account (never a real wallet). */
+export const fakeAddress = (seed: string) => getAddress(`0x${createHash("sha256").update(`opencast-fake:${seed}`).digest("hex").slice(0, 40)}`);

@@ -13,6 +13,8 @@ export interface JobResults {
   /** Provider moves sent (and failed, to retry) from the outbox. */
   moves: { sent: number; failed: number };
   chain: { events: number } | null;
+  /** Pending transfers from linked Clear wallets, checked again. */
+  clearTransfers: { arrived: number; failed: number } | null;
   escrowDeposit: { stations: number; micros: number; txHash: string } | null;
   payouts: { paid: number; micros: number; waiting: number } | null;
   pledgesRenewed: number;
@@ -47,6 +49,11 @@ export function createJobs(deps: Deps, services: Services) {
     // The escrow contract's news (claims approved, cancelled, paid; releases to the fund).
     const chain = await services.ledger.syncChain().catch((error) => {
       console.error("[jobs] escrow sync failed", error);
+      return null;
+    });
+    // Transfers from Clear wallets that weren't mined yet when they were confirmed.
+    const clearTransfers = await services.ledger.recheckClearTransfers().catch((error) => {
+      console.error("[jobs] checking Clear transfers failed", error);
       return null;
     });
     // Last: whatever the ledger wrote this minute goes to the provider.
@@ -98,7 +105,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships };
   }
 
   let timer: NodeJS.Timeout | undefined;

@@ -116,6 +116,8 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
       storageRoot,
       appOrigin: "https://app.opencast.test",
       escrowContractAddress: options.chain?.escrow ?? null,
+      // Base Sepolia's test USDC: only its address is used here, nothing is sent.
+      usdc: { chainId: 84532, address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
       production: false
     }
   };

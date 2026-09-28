@@ -49,6 +49,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       storageRoot,
       appOrigin,
       escrowContractAddress: chain?.escrow ?? (env.ESCROW_CONTRACT_ADDRESS || null),
+      usdc: env.CHAIN_ID && env.USDC_ADDRESS ? { chainId: Number(env.CHAIN_ID), address: env.USDC_ADDRESS } : null,
       production: env.NODE_ENV === "production"
     }
   };

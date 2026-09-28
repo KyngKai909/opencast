@@ -3,6 +3,7 @@
 // wallet and encumbrance as the outbox tells it, so tests can check the provider side always
 // matches the ledger.
 
+import { fakeAddress } from "./clear.js";
 import { ownAccountsCustody, stripeCardFeeMicros, type Payments, type ProviderMove } from "./types.js";
 
 export interface FakeMirror {
@@ -73,6 +74,20 @@ export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeM
 
     async payoutAccount() {
       return { status: "active", url: null };
+    },
+
+    // A transfer from a linked Clear wallet is taken as sent (nothing is on chain here), once per transaction.
+    clearWallet: {
+      async depositAddress(owner) {
+        return fakeAddress(`advertiser:${owner.id}`);
+      },
+      async verifyTransfer({ businessId, txHash, amountMicros }) {
+        if (!mirror.applied.has(`clear-transfer:${txHash}`)) {
+          mirror.applied.add(`clear-transfer:${txHash}`);
+          add(`advertiser:${businessId}`, amountMicros);
+        }
+        return { status: "confirmed" };
+      }
     },
 
     async webhook(_provider, rawBody) {
