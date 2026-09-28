@@ -67,6 +67,28 @@ Per-service examples: `apps/<service>/.env.example`.
 | site | https://site-staging-77bf.up.railway.app |
 | tv | https://tv-staging.up.railway.app |
 
+Staging's database is fresh. For markets on the dial, seed it once from inside the api service (`railway ssh -s api -- npm run seed -w @opencast/db`); the seed is safe to rerun.
+
+## Cutting production over
+
+Production is empty until this runs. Nothing here touches `glistening-truth` until the last step.
+
+1. **Plan.** Upgrade the Railway plan so the worker's 100 GB volume fits (Hobby stops at 5 GB).
+2. **Code.** Merge `monorepo` into `main` (a PR; never force-push `main`). Production builds `main`.
+3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs.
+4. **Keys.** Make fresh ones for production. Don't reuse the old project's Livepeer or Pinata keys, which are to be rotated:
+   - Privy: a production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed;
+   - Livepeer: a new API key;
+   - Stripe: live `STRIPE_SECRET_KEY`, plus a webhook to `https://<api>/v1/webhooks/stripe` for its `STRIPE_WEBHOOK_SECRET`;
+   - `PAYMENTS_PROVIDER`: `stripe_only` until Clear has what docs/clear-integration.md lists, then `clear`.
+5. **Contracts, on Base.** Decide the verifier and steward keys (2 of 3 each, different people) and the admin Safe (docs/open-decisions.md). Then run `contracts/script/DeployEscrow.s.sol` against Base with `ADMIN_SAFE`, `ESCROW_VERIFIERS`, `FUND_STEWARDS`, `USDC_ADDRESS` (Base USDC) and `FUND_EXCLUDED` (the settlement wallet and the Safe). Fund a settlement wallet with a little ETH for gas. Set `CHAIN_RPC_URL`, `CHAIN_ID=8453`, `ESCROW_CONTRACT_ADDRESS`, `CREATOR_FUND_ADDRESS` and `USDC_ADDRESS` on api and worker, and `SETTLEMENT_PRIVATE_KEY` on the worker only. Try it on Base Sepolia first, on staging.
+6. **Create production.** `railway link --environment production`, then `config plan` and `config apply`. Then set every `preserve()` secret above with `railway variables --set` on api and worker (the R2 ones on those two only).
+7. **Check it.** Every service's `/health`; the API's pre-deploy log says "Migrations applied"; seed the markets; the worker's `/health` shows the leader and the cache. Sign in on the viewer, and put one test station on air end to end.
+8. **Move off Pinata.** With production's storage variables and `PINATA_JWT`, run `npm run storage:move-off-pinata -w @opencast/api`, which reports. Then `--copy`, which copies each pin in and verifies it by hash. Check Pinata's dashboard total matches (the old key sees only v3 files), mark any catalog pins, and only then `--unpin --yes-unpin`. Unpinning can't be undone.
+9. **Domains.** Add the custom domains to the production services and update DNS. Update `WEB_ORIGIN`, `APP_ORIGIN`, Privy's allowed origins and Stripe's webhook URL if they were the Railway ones.
+10. **Retire the old project.** Stop pointing anything at `glistening-truth`. Leave its Postgres alone: it holds the only copy of the old `opencast_state`, which production doesn't import (a fresh start).
+11. **Rotate and tidy.** Rotate the old Livepeer and Pinata keys, and anything else reused on staging. Delete the Livepeer test streams the early tests made. In the Railway dashboard, delete the stray project bucket `media-probe` (empty, no instance).
+
 ## Plan limits (Hobby)
 
 - Volumes stop at 5 GB. The worker's cache in production wants 100 GB (the file asks for it when the environment is `production`), so production needs a plan above Hobby.
