@@ -66,7 +66,12 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       for (const f of [...ids, ...bumpers]) if (f.contentId) wanted.push({ cid: f.contentId, airsAt: now });
       for (const r of await services.library.repeatable(stationId, 5)) if (r.contentId) wanted.push({ cid: r.contentId, airsAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
-    for (const s of await services.spots.upcomingSpotContent(stationIds, now, new Date(now.getTime() + CACHE_AHEAD_MS))) {
+    // Barter breaks inside carried programs air the producer's spots: their rotations too.
+    const producers = new Set<string>();
+    for (const stationId of stationIds) {
+      for (const a of await services.catalog.activeAgreements(stationId)) if (a.carrierStationId === stationId && a.term !== "cash") producers.add(a.makerStationId);
+    }
+    for (const s of await services.spots.upcomingSpotContent([...new Set([...stationIds, ...producers])], now, new Date(now.getTime() + CACHE_AHEAD_MS))) {
       wanted.push({ cid: s.contentId, airsAt: s.airsAt ?? now });
     }
     const info = await services.library.content.info([...wanted.map((w) => w.cid), ...cache.ids()]);
@@ -214,7 +219,11 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         if (now - (lastFill.get(stationId) ?? 0) >= FILL_EVERY_MS) {
           lastFill.set(stationId, now);
           const results = await filler.fillAhead(stationId, deps.clock.now(), FILL_AHEAD_MS);
-          if (results.some((r) => r.placed.length)) runners.get(stationId)?.replan();
+          if (results.some((r) => r.placed.length)) {
+            runners.get(stationId)?.replan();
+            // Newly placed spots: make sure their files are here.
+            void syncCache().catch((error) => log(`[cache] sync failed: ${(error as Error).message}`));
+          }
         }
       }
     },

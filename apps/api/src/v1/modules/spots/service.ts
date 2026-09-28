@@ -126,6 +126,7 @@ export interface SpotInput {
 export interface BreakAiring {
   airingId: string;
   spotId: string;
+  title: string;
   lengthSec: number;
   /** The spot's file by content ID (the worker cache has it), or a legacy path. */
   contentId: string | null;
@@ -913,6 +914,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         list.push({
           airingId: r.airing.id,
           spotId: r.spot.id,
+          title: r.spot.title,
           lengthSec: r.spot.lengthSec,
           contentId: r.file?.contentId ?? null,
           location: r.file?.location ?? null,

@@ -83,6 +83,8 @@ export class StationRunner {
   private skipped = new Set<string>();
   private plan: Segment[] = [];
   private planUntil = 0;
+  /** Bumped by replan(): a plan started before it is stale when it lands. */
+  private planVersion = 0;
   private loop?: Promise<void>;
   private feeds = new Map<string, LiveFeed>();
   private feedTimer?: NodeJS.Timeout;
@@ -126,6 +128,7 @@ export class StationRunner {
 
   /** The run sheet changed (a break cued, the log edited): read it again. */
   replan(interruptCurrent = false) {
+    this.planVersion++;
     this.planUntil = 0;
     if (interruptCurrent) this.producer?.process.kill("SIGTERM");
   }
@@ -158,9 +161,13 @@ export class StationRunner {
   }
 
   private async segmentAt(now: Date): Promise<Segment | null> {
-    if (now.getTime() >= this.planUntil - 60_000) {
+    while (now.getTime() >= this.planUntil - 60_000) {
+      const version = this.planVersion;
       const to = new Date(now.getTime() + 15 * 60_000);
-      this.plan = await this.options.plan(new Date(now.getTime() - 1000), to);
+      const plan = await this.options.plan(new Date(now.getTime() - 1000), to);
+      // The log changed while this was being read (a break filled, a spot placed): read it again.
+      if (version !== this.planVersion) continue;
+      this.plan = plan;
       this.planUntil = to.getTime();
     }
     return this.plan.find((s) => s.startsAt <= now && s.endsAt > now) ?? null;
@@ -428,10 +435,15 @@ export class StationRunner {
       }
       // Live: switch to the slate when the signal drops, and back when it returns.
       const producer = this.producer;
-      const watch = liveSourceId
+      const watch: NodeJS.Timeout | undefined = liveSourceId
         ? setInterval(() => {
             const connected = this.feeds.get(liveSourceId)?.connected ?? false;
-            if (connected !== input.live) producer.process.kill("SIGTERM");
+            if (connected !== input.live) {
+              clearInterval(watch);
+              producer.process.kill("SIGTERM");
+              // ffmpeg waiting on a live input can ignore one polite signal.
+              setTimeout(() => producer.process.exitCode === null && producer.process.signalCode === null && producer.process.kill("SIGKILL"), 1_500);
+            }
           }, 250)
         : undefined;
       const proof = seg.airingId ? this.proofFrame(seg) : Promise.resolve(null);

@@ -77,10 +77,12 @@ Sign-in is Privy: set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have i
 The worker airs every station that's on air from its program log: `npm run dev` runs it. To see an evening end to end in about four and a half minutes (on the dev database, with the dev stack running):
 
 ```bash
-cd apps/worker && npx tsx scripts/demo-evening.ts
+npm run demo:evening -w @opencast/worker
 ```
 
-It prints the station, when it starts, and an RTMP URL to push an encoder to for the live block. Afterwards, `npx tsx scripts/as-run.ts <stationId>` prints what aired.
+It prints the station, when it starts, and an RTMP URL to push an encoder to for the live block. Afterwards, `npm run as-run -w @opencast/worker -- <stationId>` prints what aired.
+
+In development the API and worker run the workspace packages from source (the `source` export condition, `tsx --conditions=source`), so an edit to `packages/db` or the API reloads the worker too. Built services (`npm start`, Railway) use `dist`.
 
 The worker airs files from its cache (`storage/cache` locally, a volume on Railway), which it fills ahead of time from object storage. `curl localhost:8788/health` shows the cache's hit rate, bytes and misses.
 

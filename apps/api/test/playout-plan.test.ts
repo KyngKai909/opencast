@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { createFiller } from "../src/v1/modules/playout/engine/fill.js";
+import { StationRunner, type RunnerOptions } from "../src/v1/modules/playout/engine/runner.js";
 import { createPlanner, type Segment } from "../src/v1/modules/playout/engine/plan.js";
 import { anon, createHarness, itemFixture, market, stationFixture, type Harness, type User } from "./harness.js";
 
@@ -192,5 +193,29 @@ describe("airings that never aired", () => {
     expect(after.body).toMatchObject({ heldAirings: 0, heldMicros: $(25) });
     // Only once.
     expect(await h.services.spots.releaseUnaired()).toBe(0);
+  });
+});
+
+describe("the runner's run sheet", () => {
+  it("reads the log again when it changed while being read (a spot placed mid-plan)", async () => {
+    const at = new Date("2026-10-02T09:00:00.000Z");
+    const stale: Segment = { key: "a", startsAt: at, endsAt: new Date(at.getTime() + 60_000), code: "BMP", label: "stale", source: { kind: "image", path: "x" }, reason: "planned", inBreak: true };
+    const fresh: Segment = { ...stale, key: "b", code: "SPT", label: "fresh" };
+    let calls = 0;
+    let land: () => void = () => undefined;
+    const runner = new StationRunner({ deps: h.deps, services: h.services }, beat.id, {
+      plan: async () => {
+        calls++;
+        if (calls > 1) return [fresh];
+        await new Promise<void>((resolve) => (land = resolve));
+        return [stale];
+      }
+    } as unknown as RunnerOptions);
+    const pending = (runner as unknown as { segmentAt(now: Date): Promise<Segment | null> }).segmentAt(at);
+    await new Promise((r) => setTimeout(r, 10));
+    runner.replan();
+    land();
+    expect((await pending)?.label).toBe("fresh");
+    expect(calls).toBe(2);
   });
 });

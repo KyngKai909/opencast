@@ -140,11 +140,13 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
         const end = start + slot.lengthMs;
         let cursor = start;
         const key = `brk:${slot.id ?? slot.startsAt}`;
+        let missing: Segment["missing"];
         // Spots, producer's share first; already held, so they air even if paused since.
         for (const airing of slot.id ? (airings.get(slot.id) ?? []) : []) {
           const len = airing.lengthSec * 1000;
           const at = fileAt(airing);
           // Not in the cache: it doesn't air (its hold goes back), and the break fills as usual.
+          if (!at && airing.contentId && !missing) missing = { itemId: airing.spotId, title: airing.title, contentId: airing.contentId, airsAt: new Date(start) };
           if (!at || cursor + len > end) continue;
           out.push({
             key: `${key}:spt:${airing.airingId}`,
@@ -184,6 +186,9 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
           cursor += len;
         }
         out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station)));
+        // Reported when the break airs; if the file arrives first, the break is planned again with it.
+        const firstAfterSpots = out.findIndex((s) => s.code !== "SPT");
+        if (missing && firstAfterSpots >= 0) out[firstAfterSpots] = { ...out[firstAfterSpots], missing };
         return out;
       };
 

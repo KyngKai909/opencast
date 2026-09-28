@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "if [ -n \"$RAILWAY_ENVIRONMENT\" ]; then node dist/worker.js; else tsx watch src/worker.ts; fi",
+    "dev": "if [ -n \"$RAILWAY_ENVIRONMENT\" ]; then node dist/worker.js; else tsx watch --conditions=source src/worker.ts; fi",
     "start": "node dist/worker.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"No lint configured for worker\""
+    "lint": "echo \"No lint configured for worker\"",
+    "demo:evening": "tsx --conditions=source scripts/demo-evening.ts",
+    "as-run": "tsx --conditions=source scripts/as-run.ts"
   },
   "dependencies": {
     "@opencast/domain": "0.1.0",
