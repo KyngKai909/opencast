@@ -65,6 +65,9 @@ export type LibraryItem = z.infer<typeof LibraryItem>;
 
 export const Folder = z.object({ id: Id, name: z.string(), parentFolderId: Id.nullable(), itemCount: z.number().int() });
 
+/** US TV parental guidelines, for ad requests (ads from partners). */
+export const ContentRating = z.enum(["TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA"]);
+
 export const Program = z.object({
   id: Id,
   station: StationIdent,
@@ -77,7 +80,11 @@ export const Program = z.object({
   attribution: z.string().nullable(),
   rightsNote: z.string().nullable(),
   episodeCount: z.number().int(),
-  listingStatus: z.enum(["complete", "needs_description", "from_the_maker"])
+  listingStatus: z.enum(["complete", "needs_description", "from_the_maker"]),
+  /** Added 2026-09-28, for ads from partners: IAB Content Taxonomy 3.0 ids, a content rating, and whether it's aimed at children (no personalized ads). */
+  iabCategories: z.array(z.string()).optional(),
+  rating: ContentRating.nullable().optional(),
+  childDirected: z.boolean().optional()
 });
 
 export const Library = z.object({
@@ -233,7 +240,9 @@ export const libraryApi = {
       description: z.string().max(160).optional(),
       category: z.string().optional(),
       advisory: z.enum(["none", "language", "mature"]).default("none"),
-      live: z.boolean().default(false)
+      live: z.boolean().default(false),
+      rating: ContentRating.nullable().optional(),
+      childDirected: z.boolean().optional()
     }),
     response: Program,
     status: 201
@@ -250,7 +259,9 @@ export const libraryApi = {
         description: z.string().max(160).nullable(),
         category: z.string().nullable(),
         advisory: z.enum(["none", "language", "mature"]),
-        live: z.boolean()
+        live: z.boolean(),
+        rating: ContentRating.nullable(),
+        childDirected: z.boolean()
       })
       .partial(),
     response: Program

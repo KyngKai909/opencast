@@ -2,6 +2,17 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-28: Clear as a Privy global wallet, and ads from partners (new fields and endpoints)
+
+All additive; nothing existing changed shape.
+
+- `Me.clear` (optional, nullable): the Clear account linked through Privy's cross-app linking, `{ address, access: "read_only" | "full", linkedAt }`. `accounts.linkClear` (`POST /me/clear`) records it after the app links it with Privy; `accounts.unlinkClear` (`DELETE /me/clear`) forgets it.
+- `ledger.quoteClearTransfer` (`POST /businesses/:businessId/deposits/clear-transfer/quote`) and `ledger.confirmClearTransfer` (`POST /businesses/:businessId/deposits/clear-transfer`): funding a business from a linked Clear wallet with full access. The person confirms the transfer on Clear's page; the API checks it on chain before crediting.
+- `ledger.getPayoutAccount` gains `destination` (optional); `ledger.setPayoutDestination` (`PUT /stations/:stationId/payout-account`) pays a station out to the owner's linked Clear wallet.
+- `StationEarnings.lines.partnerAds` (optional): `{ on, micros, pendingMicros }`, "Ads from partners, paid when received".
+- `BreakRule.adsFromPartners` (optional boolean, off by default): the station's switch. Only a flag until partner ads are built.
+- `StationSetup.iabCategories` and `Program.iabCategories` (optional): IAB Content Taxonomy 3.0 ids. `Program.rating` (optional, `ContentRating`: TV-Y to TV-MA) and `Program.childDirected` (optional boolean), also accepted by `createProgram` and `updateProgram`.
+
 ## 2026-09-28: claims on-chain
 
 `POST /v1/admin/handovers/:handoverId/approve` now records the desk's check of the claimant. When the escrow contract is live it also returns `onChain`: `{ contract, escrowStationId, payee, kind, calldata }`, which is what each verifier signs from their own wallet. The chain starts the 72 hours, and the claim's state follows the chain. `payableAfter` is the earliest it could be paid.
