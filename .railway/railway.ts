@@ -58,7 +58,14 @@ export default defineRailway((ctx) => {
     STRIPE_WEBHOOK_SECRET: secret(),
     PRIVY_APP_ID: secret(),
     PRIVY_VERIFICATION_KEY: secret(),
+    PRIVY_APP_SECRET: secret(),
     LIVEPEER_API_KEY: secret(),
+    // The escrow contract and creator fund (Base Sepolia on staging, Base in production); unset, claimable earnings stay owed.
+    CHAIN_RPC_URL: secret(),
+    CHAIN_ID: secret(),
+    ESCROW_CONTRACT_ADDRESS: secret(),
+    CREATOR_FUND_ADDRESS: secret(),
+    USDC_ADDRESS: secret(),
     ...storage
   };
 
@@ -91,10 +98,7 @@ export default defineRailway((ctx) => {
       WORKER_CACHE_GB: String(cacheGB - 0.5),
       // Fresh data: no station is on the old queue model.
       LEGACY_PLAYOUT: "off",
-      CHAIN_RPC_URL: secret(),
-      ESCROW_CONTRACT_ADDRESS: secret(),
-      CREATOR_FUND_ADDRESS: secret(),
-      USDC_ADDRESS: secret(),
+      // Only the worker sends transactions (the weekly escrow batch, the pool's fund share).
       SETTLEMENT_PRIVATE_KEY: secret()
     }
   });

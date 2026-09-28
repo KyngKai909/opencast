@@ -35,19 +35,25 @@ export interface EscrowChain {
 const REASONS = ["claim", "stop", "unclaimed"] as const;
 const KINDS = { 1: "claim", 2: "stop" } as const;
 
-export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Address | null; usdc: Address; settlementKey: Hex; chainId?: number; pollingIntervalMs?: number }): EscrowChain {
-  const account = privateKeyToAccount(config.settlementKey);
+export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Address | null; usdc: Address; settlementKey: Hex | null; chainId?: number; pollingIntervalMs?: number }): EscrowChain {
+  // Without the settlement key (the API), it reads and encodes but never sends: only the worker sends.
+  const account = config.settlementKey ? privateKeyToAccount(config.settlementKey) : null;
+  const signer = () => {
+    if (!account) throw new Error("This process can't send transactions (no SETTLEMENT_PRIVATE_KEY): the worker sends them.");
+    return account;
+  };
   const transport = http(config.rpcUrl);
   const chain = config.chainId ? { id: config.chainId, name: `chain ${config.chainId}`, nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [config.rpcUrl] } } } : undefined;
   // Base makes a block every 2 seconds; anvil makes one per transaction.
   const pub: PublicClient = createPublicClient({ transport, chain, pollingInterval: config.pollingIntervalMs ?? 1_000 });
-  const wallet: WalletClient = createWalletClient({ account, transport, chain });
+  const wallet: WalletClient = createWalletClient({ ...(account ? { account } : {}), transport, chain });
   let chainId = config.chainId ?? 0;
 
   async function ensureAllowance(spender: Address, amount: bigint) {
-    const allowance = (await pub.readContract({ address: config.usdc, abi: erc20Abi, functionName: "allowance", args: [account.address, spender] })) as bigint;
+    const from = signer();
+    const allowance = (await pub.readContract({ address: config.usdc, abi: erc20Abi, functionName: "allowance", args: [from.address, spender] })) as bigint;
     if (allowance >= amount) return;
-    const hash = await wallet.writeContract({ address: config.usdc, abi: erc20Abi, functionName: "approve", args: [spender, 2n ** 256n - 1n], account, chain: wallet.chain ?? null });
+    const hash = await wallet.writeContract({ address: config.usdc, abi: erc20Abi, functionName: "approve", args: [spender, 2n ** 256n - 1n], account: from, chain: wallet.chain ?? null });
     await pub.waitForTransactionReceipt({ hash });
   }
 
@@ -57,7 +63,7 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
     },
     escrow: config.escrow,
     fund: config.fund,
-    settlement: account.address,
+    settlement: account?.address ?? ("0x0000000000000000000000000000000000000000" as Address),
 
     async depositBatch(items) {
       if (!chainId) chainId = await pub.getChainId();
@@ -68,7 +74,7 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
         abi: creatorEscrowAbi,
         functionName: "depositBatch",
         args: [items.map((i) => BigInt(i.escrowId)), items.map((i) => BigInt(i.amountMicros))],
-        account,
+        account: signer(),
         chain: wallet.chain ?? null
       });
       const receipt = await pub.waitForTransactionReceipt({ hash });
@@ -80,7 +86,7 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
       if (!config.fund) throw new Error("CREATOR_FUND_ADDRESS isn't set.");
       await ensureAllowance(config.fund, BigInt(amountMicros));
       const sourceBytes = `0x${Buffer.from(source.slice(0, 32)).toString("hex").padEnd(64, "0")}` as Hex;
-      const hash = await wallet.writeContract({ address: config.fund, abi: creatorFundAbi, functionName: "contribute", args: [BigInt(amountMicros), sourceBytes], account, chain: wallet.chain ?? null });
+      const hash = await wallet.writeContract({ address: config.fund, abi: creatorFundAbi, functionName: "contribute", args: [BigInt(amountMicros), sourceBytes], account: signer(), chain: wallet.chain ?? null });
       const receipt = await pub.waitForTransactionReceipt({ hash });
       if (receipt.status !== "success") throw new Error(`Fund contribution ${hash} reverted`);
       return { txHash: hash };
@@ -132,13 +138,13 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
 /** The chain from the environment, or null (the ledger keeps claimable earnings as owed until it's set). */
 export function chainFromEnv(env: NodeJS.ProcessEnv): EscrowChain | null {
   const { CHAIN_RPC_URL, ESCROW_CONTRACT_ADDRESS, USDC_ADDRESS, SETTLEMENT_PRIVATE_KEY } = env;
-  if (!CHAIN_RPC_URL || !ESCROW_CONTRACT_ADDRESS || !USDC_ADDRESS || !SETTLEMENT_PRIVATE_KEY) return null;
+  if (!CHAIN_RPC_URL || !ESCROW_CONTRACT_ADDRESS || !USDC_ADDRESS) return null;
   return escrowChain({
     rpcUrl: CHAIN_RPC_URL,
     escrow: ESCROW_CONTRACT_ADDRESS as Address,
     fund: (env.CREATOR_FUND_ADDRESS as Address | undefined) ?? null,
     usdc: USDC_ADDRESS as Address,
-    settlementKey: SETTLEMENT_PRIVATE_KEY as Hex,
+    settlementKey: (SETTLEMENT_PRIVATE_KEY as Hex | undefined) || null,
     chainId: env.CHAIN_ID ? Number(env.CHAIN_ID) : undefined
   });
 }
