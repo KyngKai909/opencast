@@ -1,0 +1,26 @@
+/* Notices: .warnbar and .okbar (14 control and business files), .notice (biz spots, the station's side),
+   .req (offering: a request with a channel), .pz-banner (biz spots: a paused spot). */
+.oc-notice { color: var(--ink); font-size: 14px; border: 1px solid var(--standby); border-radius: var(--r-control); }
+.oc-notice--plain { border-color: var(--line); }
+.oc-notice b { font-weight: 600; }
+.oc-notice__ic { color: var(--standby); }
+.oc-notice--plain .oc-notice__ic { color: var(--ink-70); }
+
+/* One line: sign, words, action at the end. */
+.oc-notice--bar { display: flex; gap: 12px; align-items: center; padding: 10px 14px; }
+.oc-notice--bar .oc-notice__end { margin-left: auto; display: flex; gap: 8px; }
+
+/* With a swatch or a second line. */
+.oc-notice--detail { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.oc-notice--detail.oc-notice--channel { grid-template-columns: 14px 52px minmax(0, 1fr) auto; }
+.oc-notice--detail .oc-notice__ic { width: 14px; height: 14px; }
+.oc-notice__sw { width: 14px; height: 14px; border-radius: var(--r-sign); }
+.oc-notice__ch { font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; }
+.oc-notice--detail small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.oc-notice--detail .oc-notice__end { display: flex; gap: 8px; }
+
+/* A larger block: the state tag, a heading, a line. */
+.oc-notice--banner { border-width: 1.5px; border-radius: var(--r-screen); padding: 16px 18px; font-size: 15px; }
+.oc-notice .oc-notice__heading { margin: 6px 0 4px; font: 800 24px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; color: var(--ink); }
+.oc-notice .oc-notice__text { margin: 0; font-size: 14px; color: var(--ink-70); }
+.oc-notice__actions { display: flex; gap: 10px; margin-top: 14px; }

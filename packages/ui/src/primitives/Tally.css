@@ -1,0 +1,36 @@
+/* The tally (style guide, The tally light; sizes from the app frames and master control). */
+.oc-tally {
+  --tally-unlit: var(--ink-50);
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 24px; padding: 0 9px;
+  border-radius: var(--r-sign);
+  border: 1.5px solid currentColor;
+  font: 800 11px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: .09em;
+  color: var(--tally-unlit); background: transparent;
+  white-space: nowrap; flex: none;
+}
+.oc-tally--on-picture { --tally-unlit: var(--on-screen-70); }
+.oc-tally--md { height: 26px; padding: 0 10px; font-size: 12px; }
+.oc-tally--lg { height: 44px; padding: 0 18px; font-size: 18px; }
+.oc-tally--tv { height: 44px; padding: 0 16px; font-size: var(--tv-min-text, 21px); border-width: 2px; }
+.oc-tally--standby { color: var(--standby); }
+.oc-tally--on-picture.oc-tally--standby { color: var(--pic-standby); }
+.oc-tally--lit {
+  background: var(--tally); border-color: var(--tally); color: var(--on-tally);
+  box-shadow: 0 0 12px 2px var(--tally-glow);
+}
+.oc-tally--md.oc-tally--lit,
+.oc-tally--lg.oc-tally--lit,
+.oc-tally--tv.oc-tally--lit { box-shadow: 0 0 14px 2px var(--tally-glow); }
+
+/* Unlit until .88 s, lit at .99 s, the one flicker off at 1.06 s, lit and held from 1.15 s. */
+@keyframes oc-tally-on {
+  0%, 55% { background: transparent; border-color: var(--tally-unlit); color: var(--tally-unlit); box-shadow: none; }
+  62% { background: var(--tally); border-color: var(--tally); color: var(--on-tally); box-shadow: 0 0 14px 2px var(--tally-glow); }
+  66% { background: transparent; border-color: var(--tally-unlit); color: var(--tally-unlit); box-shadow: none; }
+  72%, 100% { background: var(--tally); border-color: var(--tally); color: var(--on-tally); box-shadow: 0 0 14px 2px var(--tally-glow); }
+}
+.oc-tally--switching { animation: oc-tally-on var(--tally-on-duration) ease-out 1 both; }
+@media (prefers-reduced-motion: reduce) {
+  .oc-tally--switching { animation: none; }
+}

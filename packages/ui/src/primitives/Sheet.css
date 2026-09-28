@@ -1,0 +1,31 @@
+/* Sheets (the reference's .sheet, .grab, and .phone .backdrop). Head, body and foot are the modal's. */
+.oc-backdrop--sheet { place-items: end stretch; }
+.oc-sheet {
+  /* The sheet's top corners: 22px, between the control and screen corners (a new token for the reference's value). */
+  --oc-sheet-radius: 22px;
+  width: 100%; max-height: 88%;
+  background: var(--ground); color: var(--ink);
+  border-radius: var(--oc-sheet-radius) var(--oc-sheet-radius) 0 0;
+  box-shadow: 0 0 0 1px var(--line);
+  display: flex; flex-direction: column; overflow: hidden;
+  outline: none;
+  transition: transform .2s ease-out;
+}
+.oc-sheet--dragging { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .oc-sheet { transition: none; }
+}
+.oc-sheet__grab {
+  height: 18px; width: 100%; flex: none;
+  display: grid; place-items: center;
+  margin: 0; padding: 0; border: 0; background: none;
+  cursor: grab; touch-action: none;
+}
+.oc-sheet__grab:focus-visible { outline-offset: -2px; }
+.oc-sheet__grab i { display: block; width: 40px; height: 5px; border-radius: var(--r-sign); background: var(--line); }
+/* After the handle the head starts closer (master control's dead-air sheet). */
+.oc-sheet .oc-modal__head { padding-top: 6px; }
+.oc-sheet .oc-modal__foot { padding-bottom: 28px; }
+/* The band sits inset with rounded corners on a sheet (the station preview, phone). */
+.oc-sheet .oc-modal__band { margin: 0 12px; }
+.oc-sheet .oc-modal__band > :first-child { border-radius: 12px; }

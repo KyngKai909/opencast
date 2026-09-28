@@ -1,0 +1,46 @@
+/* Modals and the parts sheets share (the reference's .backdrop, .modal, .m-head, .m-main, .m-foot, .stn-band). */
+.oc-backdrop {
+  position: fixed; inset: 0; z-index: 10;
+  background: var(--scrim);
+  display: grid; place-items: center;
+}
+.oc-backdrop--container { position: absolute; }
+
+.oc-modal {
+  /* The modal's lift: black, whatever the ground (a new token for the reference's hard-coded shadow). */
+  --oc-modal-lift: 0 24px 60px rgb(0 0 0 / .35);
+  width: 480px; max-width: calc(100% - 32px); max-height: 92%;
+  background: var(--ground); color: var(--ink);
+  border-radius: var(--r-screen);
+  box-shadow: 0 0 0 1px var(--line), var(--oc-modal-lift);
+  display: flex; flex-direction: column; overflow: hidden;
+  outline: none;
+}
+
+.oc-modal__head { padding: 18px 22px 14px; border-bottom: 1px solid var(--hair); display: flex; gap: 12px; align-items: flex-start; flex: none; }
+.oc-modal__titles { min-width: 0; }
+/* The eyebrow sits in a line of the body size, as the reference's inline .quiet span does. */
+.oc-modal__eyebrow > span { font-size: 13px; color: var(--ink-50); }
+.oc-modal__title { margin: 0; font: 800 22px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+.oc-modal__eyebrow + .oc-modal__title { margin-top: 4px; }
+.oc-modal__sub { margin: 4px 0 0; font-size: 14px; color: var(--ink-70); }
+.oc-modal__x { margin-left: auto; }
+
+.oc-modal__main { padding: 16px 22px; overflow-y: auto; flex: 1; }
+.oc-modal__foot { padding: 14px 22px 18px; border-top: 1px solid var(--hair); display: flex; gap: 10px; flex: none; }
+.oc-modal__foot > * { flex: 1; }
+.oc-modal__foot--stacked { flex-direction: column; }
+
+/* A station's colour band in place of the head. The band is the broadcast group's; the close
+   button sits where the reference draws it, at the band's bottom right, in white. */
+.oc-modal__band {
+  /* White at half strength: the close button's outline on a station colour (the reference's .stn-band .x). */
+  --oc-band-line: rgb(255 255 255 / .5);
+  position: relative; flex: none;
+}
+.oc-modal__band > .oc-modal__x {
+  position: absolute; right: 22px; bottom: 18px;
+  color: var(--on-station); border-color: var(--oc-band-line);
+}
+.oc-modal__band > .oc-modal__x:focus-visible { outline-color: var(--on-station); }
+.oc-modal__band:has(> .oc-modal__x) > :first-child { padding-right: calc(22px + 48px); }

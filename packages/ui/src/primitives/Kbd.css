@@ -1,0 +1,15 @@
+/* Keys: the "/" in the search box (.a-search kbd) and the TV's hint keys (.kbd in the TV files). */
+.oc-kbd {
+  display: inline-block; flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--line); border-radius: var(--r-sign);
+  font: 500 12px var(--font-mono); color: var(--ink-50);
+}
+.oc-kbd--tv {
+  /* The TV key's corner: 8px (a new token for the reference's value). */
+  --oc-kbd-tv-radius: 8px;
+  display: inline-grid; place-items: center;
+  min-width: 44px; height: 40px; padding: 0 10px;
+  border-width: 2px; border-radius: var(--oc-kbd-tv-radius);
+  font: 600 20px var(--font-text); color: var(--ink);
+}

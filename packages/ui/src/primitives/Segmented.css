@@ -1,0 +1,16 @@
+/* Segmented controls (the reference's .seg; .seg.sm in viewer settings; .tr-row .seg in tables). */
+.oc-seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: var(--r-control); overflow: hidden; }
+.oc-seg__btn {
+  height: 32px; padding: 0 12px; margin: 0;
+  border: 0; border-radius: 0; background: none;
+  font: 600 13px var(--font-text); color: var(--ink-70);
+  cursor: pointer;
+}
+.oc-seg__btn[aria-checked="true"] { background: var(--ink); color: var(--ground); }
+/* The group clips its corners, so the focus ring sits inside the segment. */
+.oc-seg__btn:focus-visible { outline-offset: -4px; border-radius: var(--r-sign); }
+.oc-seg__btn:disabled { opacity: .45; cursor: not-allowed; }
+.oc-seg--sm .oc-seg__btn { height: 30px; font-size: 12.5px; padding: 0 10px; }
+.oc-seg--compact .oc-seg__btn { font-size: 12px; padding: 0 10px; }
+.oc-seg--block { display: flex; width: 100%; }
+.oc-seg--block .oc-seg__btn { flex: 1; }

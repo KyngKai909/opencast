@@ -1,0 +1,31 @@
+/* Choice lists: .opts/.opt (radio rows), .termopt (deal terms with a price), .meth (funding methods with a fee). */
+.oc-choice { cursor: pointer; }
+.oc-choice--disabled { opacity: .45; cursor: not-allowed; }
+.oc-choice b { display: block; font-weight: 600; font-size: 15px; }
+.oc-choice small { font-size: 13px; color: var(--ink-70); }
+.oc-choice__rad { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; }
+.oc-choice--sel .oc-choice__rad { border-color: var(--signal); }
+.oc-choice--sel .oc-choice__rad::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--signal); }
+
+/* option: ruled rows (.opts has the rule above the first). */
+.oc-choices--option { border-top: 1px solid var(--hair); }
+.oc-choices--option .oc-choice { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.oc-choices--option .oc-choice__words { flex: 1; min-width: 0; }
+.oc-choices--option .oc-choice__end { margin-left: auto; font: 500 13px var(--font-mono); color: var(--ink-50); }
+
+/* term: a price at the end. */
+.oc-choices--term .oc-choice { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--hair); }
+.oc-choices--term .oc-choice__rad { margin-top: 2px; }
+.oc-choices--term small { display: block; margin-top: 2px; }
+.oc-choices--term .oc-choice__end { font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* method: each in its own bordered box, the chosen one raised and outlined in signal. */
+.oc-choices--method { display: flex; flex-direction: column; gap: 10px; }
+.oc-choices--method .oc-choice { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-control); }
+.oc-choices--method small { display: block; margin-top: 2px; }
+.oc-choices--method .oc-choice__rad { display: block; place-items: normal; border-width: 2px; margin-top: 2px; }
+.oc-choices--method .oc-choice--sel { border-color: var(--signal); box-shadow: inset 0 0 0 1px var(--signal); background: var(--raised); }
+.oc-choices--method .oc-choice--sel .oc-choice__rad { box-shadow: inset 0 0 0 4px var(--raised), inset 0 0 0 10px var(--signal); }
+.oc-choices--method .oc-choice--sel .oc-choice__rad::after { content: none; }
+.oc-choices--method .oc-choice__end { font: 500 13.5px var(--font-mono); color: var(--ink-70); text-align: right; }
+.oc-choices--method .oc-choice__end small { font-family: var(--font-text); }

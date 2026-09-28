@@ -1,0 +1,21 @@
+/* Tooltip. New: not drawn in the references. Made from the tokens (raised ground, ink, the control corner, 13px). */
+.oc-tooltip-anchor { position: relative; display: inline-flex; }
+.oc-tooltip {
+  position: absolute; left: 50%; z-index: 20;
+  transform: translateX(-50%);
+  width: max-content; max-width: 260px;
+  padding: 5px 9px;
+  background: var(--raised); color: var(--ink);
+  border-radius: var(--r-control);
+  box-shadow: 0 0 0 1px var(--line);
+  font: 500 13px/1.35 var(--font-text); text-align: center;
+  pointer-events: none;
+  visibility: hidden; opacity: 0;
+  transition: opacity .12s ease-out;
+}
+.oc-tooltip--top { bottom: calc(100% + 8px); }
+.oc-tooltip--bottom { top: calc(100% + 8px); }
+.oc-tooltip--shown { visibility: visible; opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .oc-tooltip { transition: none; }
+}

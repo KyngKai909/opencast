@@ -1,0 +1,36 @@
+/* Buttons (style guide, Components; sizes from the app frames). */
+.oc-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 20px;
+  border-radius: var(--r-control); border: 1px solid transparent;
+  font: 600 15px var(--font-text); text-decoration: none; white-space: nowrap;
+  background: none; color: var(--ink); cursor: pointer;
+}
+.oc-btn--primary { background: var(--signal-fill); color: var(--on-signal); }
+.oc-btn--primary:hover { filter: brightness(1.08); }
+.oc-btn--ghost { color: var(--ink); border-color: var(--line); }
+.oc-btn--ghost:hover { background: var(--raised); }
+.oc-btn--text { color: var(--signal); padding: 0; height: auto; border: 0; font-weight: 600; }
+.oc-btn--text:hover { text-decoration: underline; }
+.oc-btn--ink { background: var(--ink); color: var(--ground); }
+.oc-btn--on-station { background: var(--on-station); color: #0F1830; }
+.oc-btn--line-station { color: var(--on-station); border-color: rgb(255 255 255 / .6); }
+.oc-btn--sm { height: 34px; padding: 0 12px; font-size: 14px; }
+.oc-btn--lg { height: 56px; padding: 0 40px; font-size: 17px; }
+.oc-btn--text.oc-btn--sm, .oc-btn--text.oc-btn--lg { height: auto; padding: 0; }
+.oc-btn--block { width: 100%; }
+.oc-btn--set { border-color: var(--ink); }
+/* Not drawn in the references: a disabled button keeps its shape and fades. */
+.oc-btn:disabled, .oc-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; filter: none; }
+.oc-btn--ghost:disabled:hover { background: none; }
+
+.oc-icon-btn {
+  width: 40px; height: 40px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--r-control); border: 1px solid var(--line);
+  background: transparent; color: var(--ink); cursor: pointer;
+}
+.oc-icon-btn:hover { background: var(--raised); }
+.oc-icon-btn--bare { border-color: transparent; }
+.oc-icon-btn--sm { width: 34px; height: 34px; }
+.oc-icon-btn:disabled { opacity: .45; cursor: not-allowed; }

@@ -1,0 +1,1308 @@
+[
+  {
+    "id": "tally-lit",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".tally.lit:not([style])"
+    },
+    "gallery": {
+      "path": "/tally",
+      "selector": ".gal-state[data-state^='On the ground'] .gal-panel[data-theme='{ground}'] .oc-tally--lit"
+    },
+    "ignore": [
+      "animation",
+      "justify-content"
+    ]
+  },
+  {
+    "id": "tally-md-lit",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".hero-screen .tally.lit"
+    },
+    "gallery": {
+      "path": "/tally",
+      "selector": ".gal-state[data-state^='Sizes'] .gal-panel[data-theme='{ground}'] .oc-tally--md"
+    },
+    "ignore": [
+      "justify-content",
+      "line-height",
+      "white-space",
+      "min-height"
+    ]
+  },
+  {
+    "id": "button-primary",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".feat-info .btn.btn-primary"
+    },
+    "gallery": {
+      "path": "/button",
+      "selector": ".gal-state[data-state='Variants'] .gal-panel[data-theme='{ground}'] .oc-btn--primary"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "button-ghost",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".feat-info .btn.btn-ghost"
+    },
+    "gallery": {
+      "path": "/button",
+      "selector": ".gal-state[data-state='Variants'] .gal-panel[data-theme='{ground}'] .oc-btn--ghost"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "button-sm",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".btn.btn-ghost.btn-sm"
+    },
+    "gallery": {
+      "path": "/button",
+      "selector": ".gal-state[data-state='Sizes and block'] .gal-panel[data-theme='{ground}'] .oc-btn--ghost.oc-btn--sm"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "tag-live",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".kick .tag.tag-live"
+    },
+    "gallery": {
+      "path": "/tag",
+      "selector": ".gal-state[data-state='On the ground'] .gal-panel[data-theme='{ground}'] .oc-tag--live"
+    }
+  },
+  {
+    "id": "tag-listed",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".tag.tag-listed"
+    },
+    "gallery": {
+      "path": "/tag",
+      "selector": ".gal-state[data-state='On the ground'] .gal-panel[data-theme='{ground}'] .oc-tag--listed"
+    }
+  },
+  {
+    "id": "tag-on-picture",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".corner .tag.tag-live"
+    },
+    "gallery": {
+      "path": "/tag",
+      "selector": ".gal-state[data-state='On a picture'] .gal-panel[data-theme='{ground}'] .oc-tag--live"
+    }
+  },
+  {
+    "id": "field-box",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .fld > .field:not([style])"
+    },
+    "gallery": {
+      "path": "/field",
+      "selector": ".gal-state[data-state='Label, value, ok line'] .gal-panel[data-theme='{ground}'] .oc-field__box"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "field-label",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .fld > label:not([style])"
+    },
+    "gallery": {
+      "path": "/field",
+      "selector": ".gal-state[data-state='Label, value, ok line'] .gal-panel[data-theme='{ground}'] .oc-field__label"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "field-ok",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .fld .ok"
+    },
+    "gallery": {
+      "path": "/field",
+      "selector": ".gal-state[data-state='Label, value, ok line'] .gal-panel[data-theme='{ground}'] .oc-field__ok"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "field-help",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .fld .help"
+    },
+    "gallery": {
+      "path": "/field",
+      "selector": ".gal-state[data-state='Help line, placeholder, aside on the label'] .gal-panel[data-theme='{ground}'] .oc-field__help"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "field-textarea",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "#brief .field.ta:not([style])"
+    },
+    "gallery": {
+      "path": "/field",
+      "selector": ".gal-state[data-state='Textarea'] .gal-panel[data-theme='{ground}'] .oc-field__box--area"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "toggle-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#guide .toggle:not(.off)"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='On and off'] .gal-panel[data-theme='{ground}'] .oc-toggle:not(.oc-toggle--off)"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "text-align"
+    ]
+  },
+  {
+    "id": "toggle-on-knob",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#guide .toggle:not(.off)"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='On and off'] .gal-panel[data-theme='{ground}'] .oc-toggle:not(.oc-toggle--off)"
+    },
+    "pseudo": "::after",
+    "ignore": [
+      "font-size",
+      "line-height",
+      "text-align"
+    ]
+  },
+  {
+    "id": "toggle-off",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .toggle.off"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='On and off'] .gal-panel[data-theme='{ground}'] .oc-toggle--off"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "toggle-off-knob",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .toggle.off"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='On and off'] .gal-panel[data-theme='{ground}'] .oc-toggle--off"
+    },
+    "pseudo": "::after",
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "toggle-lock",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#phone .row2 .lock"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='Locked: always on'] .gal-panel[data-theme='{ground}'] .oc-toggle-lock"
+    }
+  },
+  {
+    "id": "toggle-lock-words",
+    "reference": {
+      "file": "business/opencast-biz-settings.html",
+      "selector": "#money .lock"
+    },
+    "gallery": {
+      "path": "/toggle",
+      "selector": ".gal-state[data-state='Locked with words'] .gal-panel[data-theme='{ground}'] .oc-toggle-lock"
+    }
+  },
+  {
+    "id": "seg",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .seg"
+    },
+    "gallery": {
+      "path": "/segmented",
+      "selector": ".gal-state[data-state='Two and three choices'] .gal-panel[data-theme='{ground}'] .oc-seg"
+    }
+  },
+  {
+    "id": "seg-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .seg button[aria-pressed='true']"
+    },
+    "gallery": {
+      "path": "/segmented",
+      "selector": ".gal-state[data-state='Two and three choices'] .gal-panel[data-theme='{ground}'] .oc-seg__btn[aria-checked='true']"
+    }
+  },
+  {
+    "id": "seg-off",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .seg button[aria-pressed='false']"
+    },
+    "gallery": {
+      "path": "/segmented",
+      "selector": ".gal-state[data-state='Two and three choices'] .gal-panel[data-theme='{ground}'] .oc-seg__btn[aria-checked='false']"
+    }
+  },
+  {
+    "id": "seg-sm",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#settings .seg.sm button[aria-pressed='false']"
+    },
+    "gallery": {
+      "path": "/segmented",
+      "selector": ".gal-state[data-state='Small, in a settings row'] .gal-panel[data-theme='{ground}'] .oc-seg__btn[aria-checked='false']"
+    }
+  },
+  {
+    "id": "seg-compact",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .tr-row .seg button[aria-pressed='false']"
+    },
+    "gallery": {
+      "path": "/segmented",
+      "selector": ".gal-state[data-state='Compact, in a table row'] .gal-panel[data-theme='{ground}'] .oc-seg__btn[aria-checked='false']"
+    }
+  },
+  {
+    "id": "chips-row",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .chips"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='One choice, scrolling row'] .gal-panel[data-theme='{ground}'] .oc-chips"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "chip-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .chip.on"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='One choice, scrolling row'] .gal-panel[data-theme='{ground}'] .oc-chip--on"
+    }
+  },
+  {
+    "id": "chip-off",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .chip:not(.on)"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='One choice, scrolling row'] .gal-panel[data-theme='{ground}'] .oc-chip:not(.oc-chip--on)"
+    }
+  },
+  {
+    "id": "chipset",
+    "reference": {
+      "file": "control/opencast-live-listings.html",
+      "selector": "#listings .chipset"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='Several choices, wrapping'] .gal-panel[data-theme='{ground}'] .oc-chips--wrap"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "chip-sm-on",
+    "reference": {
+      "file": "control/opencast-live-listings.html",
+      "selector": "#listings .chipset .chip.on"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='Several choices, wrapping'] .gal-panel[data-theme='{ground}'] .oc-chip--on"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "chip-strike",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#breaks .blocked .chip.on"
+    },
+    "gallery": {
+      "path": "/chip",
+      "selector": ".gal-state[data-state='Kept out: chosen chips struck through'] .gal-panel[data-theme='{ground}'] .oc-chip--strike.oc-chip--on"
+    }
+  },
+  {
+    "id": "tabs",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#browse .tabs"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Underlined, with a count'] .gal-panel[data-theme='{ground}'] .oc-tabs--underline"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "tab-on",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#browse .tabs a.on"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Underlined, with a count'] .gal-panel[data-theme='{ground}'] .oc-tabs__tab--on"
+    },
+    "ignore": [
+      "(box)",
+      "text-align"
+    ]
+  },
+  {
+    "id": "tab-off",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#browse .tabs a:not(.on)"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Underlined, with a count'] .gal-panel[data-theme='{ground}'] .oc-tabs__tab:not(.oc-tabs__tab--on)"
+    },
+    "ignore": [
+      "(box)",
+      "text-align"
+    ]
+  },
+  {
+    "id": "tab-count",
+    "reference": {
+      "file": "control/opencast-offering.html",
+      "selector": "#offered .tabs a .ct"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Underlined, with a count'] .gal-panel[data-theme='{ground}'] .oc-tabs__count"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "days",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .days"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Days'] .gal-panel[data-theme='{ground}'] .oc-tabs--days"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "day-on",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .days button.on"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Days'] .gal-panel[data-theme='{ground}'] .oc-tabs__tab--on"
+    }
+  },
+  {
+    "id": "day-off",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .days button:not(.on)"
+    },
+    "gallery": {
+      "path": "/tabs",
+      "selector": ".gal-state[data-state='Days'] .gal-panel[data-theme='{ground}'] .oc-tabs__tab:not(.oc-tabs__tab--on)"
+    }
+  },
+  {
+    "id": "toast",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .toast"
+    },
+    "gallery": {
+      "path": "/toast",
+      "selector": ".gal-state[data-state='With Undo'] .gal-panel[data-theme='{ground}'] .oc-toast"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "toast-undo",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .toast a"
+    },
+    "gallery": {
+      "path": "/toast",
+      "selector": ".gal-state[data-state='With Undo'] .gal-panel[data-theme='{ground}'] .oc-toast__undo"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "backdrop",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .backdrop"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='Head, body, foot'] .gal-panel[data-theme='{ground}'] .oc-backdrop"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "modal",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .modal"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "modal-head",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .m-head"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='Head, body, foot'] .gal-panel[data-theme='{ground}'] .oc-modal__head"
+    }
+  },
+  {
+    "id": "modal-title",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .m-head h3"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='Head, body, foot'] .gal-panel[data-theme='{ground}'] .oc-modal__title"
+    }
+  },
+  {
+    "id": "modal-sub",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .modal .m-head p"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='Stacked foot'] .gal-panel[data-theme='{ground}'] .oc-modal__sub"
+    }
+  },
+  {
+    "id": "modal-close",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .m-head .x"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='Head, body, foot'] .gal-panel[data-theme='{ground}'] .oc-modal__head .oc-modal__x"
+    }
+  },
+  {
+    "id": "modal-main",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .modal .m-main"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal__main"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "modal-foot",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .modal .m-foot"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal__foot"
+    }
+  },
+  {
+    "id": "modal-foot-btn",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .modal .m-foot .btn-ghost"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal__foot .oc-btn--ghost"
+    }
+  },
+  {
+    "id": "modal-band-close",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .modal .stn-band .x"
+    },
+    "gallery": {
+      "path": "/modal",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal__band > .oc-modal__x"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "sheet",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .sheet"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-sheet"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "sheet-backdrop",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .phone .backdrop"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-backdrop--sheet"
+    }
+  },
+  {
+    "id": "sheet-grab",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .sheet .grab"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-sheet__grab"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "sheet-grab-bar",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .sheet .grab i"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-sheet__grab i"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "sheet-head",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-p .sheet .m-head"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='Head, choices, one button'] .gal-panel[data-theme='{ground}'] .oc-modal__head"
+    }
+  },
+  {
+    "id": "sheet-foot",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-station .sheet .m-foot"
+    },
+    "gallery": {
+      "path": "/sheet",
+      "selector": ".gal-state[data-state='With a station band'] .gal-panel[data-theme='{ground}'] .oc-modal__foot"
+    }
+  },
+  {
+    "id": "notice-warnbar",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .warnbar"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Standby bar with an action'] .gal-panel[data-theme='{ground}'] .oc-notice--bar"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "notice-warnbar-icon",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .warnbar .ic"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Standby bar with an action'] .gal-panel[data-theme='{ground}'] .oc-notice__ic"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "notice-warnbar-b",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .warnbar b"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Standby bar with an action'] .gal-panel[data-theme='{ground}'] .oc-notice--bar b"
+    }
+  },
+  {
+    "id": "notice-detail",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#mirror .notice:not(.ok)"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='With a swatch and a second line'] .gal-panel[data-theme='{ground}'] .oc-notice--detail.oc-notice--standby"
+    },
+    "ignore": [
+      "(box)",
+      "height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "notice-detail-plain",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#mirror .notice.ok"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='With a swatch and a second line'] .gal-panel[data-theme='{ground}'] .oc-notice--detail.oc-notice--plain"
+    },
+    "ignore": [
+      "(box)",
+      "min-height"
+    ]
+  },
+  {
+    "id": "notice-detail-small",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#mirror .notice small"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='With a swatch and a second line'] .gal-panel[data-theme='{ground}'] .oc-notice--detail small"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "notice-swatch",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#mirror .notice .sw"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='With a swatch and a second line'] .gal-panel[data-theme='{ground}'] .oc-notice__sw"
+    }
+  },
+  {
+    "id": "notice-request",
+    "reference": {
+      "file": "control/opencast-offering.html",
+      "selector": "#offered .req"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='A request, with its channel'] .gal-panel[data-theme='{ground}'] .oc-notice--channel"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "notice-request-ch",
+    "reference": {
+      "file": "control/opencast-offering.html",
+      "selector": "#offered .req .ch"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='A request, with its channel'] .gal-panel[data-theme='{ground}'] .oc-notice__ch"
+    }
+  },
+  {
+    "id": "notice-banner",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#paused .pz-banner"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Banner'] .gal-panel[data-theme='{ground}'] .oc-notice--banner"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "notice-banner-h",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#paused .pz-banner h3"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Banner'] .gal-panel[data-theme='{ground}'] .oc-notice__heading"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "notice-banner-p",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "#paused .pz-banner p"
+    },
+    "gallery": {
+      "path": "/notice",
+      "selector": ".gal-state[data-state='Banner'] .gal-panel[data-theme='{ground}'] .oc-notice__text"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "menu-button",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .dots3"
+    },
+    "gallery": {
+      "path": "/menu",
+      "selector": ".gal-state[data-state='Closed'] .gal-panel[data-theme='{ground}'] .oc-menu__btn"
+    }
+  },
+  {
+    "id": "menu-list",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#switch .menu-pop"
+    },
+    "gallery": {
+      "path": "/menu",
+      "selector": ".gal-state[data-state='Open'] .gal-panel[data-theme='{ground}'] .oc-menu__list"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "menu-item",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#switch .mp:not(.on)"
+    },
+    "gallery": {
+      "path": "/menu",
+      "selector": ".gal-state[data-state='Open'] .gal-panel[data-theme='{ground}'] .oc-menu__item"
+    },
+    "ignore": [
+      "(box)",
+      "display",
+      "font-weight",
+      "height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "choices",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-a .opts:not([style])"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choices--option"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "choice-opt",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt:not(.sel)"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice:not(.oc-choice--sel)"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "choice-opt-b",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt b"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice b"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "choice-opt-small",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt small"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice small"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "choice-rad",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt:not(.sel) .rad"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice:not(.oc-choice--sel) .oc-choice__rad"
+    }
+  },
+  {
+    "id": "choice-rad-sel",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt.sel .rad"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice--sel .oc-choice__rad"
+    }
+  },
+  {
+    "id": "choice-rad-dot",
+    "reference": {
+      "file": "viewer/opencast-you.html",
+      "selector": "#presets .opt.sel .rad"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Options'] .gal-panel[data-theme='{ground}'] .oc-choice--sel .oc-choice__rad"
+    },
+    "pseudo": "::after"
+  },
+  {
+    "id": "choice-term",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-b .termopt.sel"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Terms with a price'] .gal-panel[data-theme='{ground}'] .oc-choice--sel"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "choice-term-price",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-b .termopt .p"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Terms with a price'] .gal-panel[data-theme='{ground}'] .oc-choice__end"
+    }
+  },
+  {
+    "id": "choice-term-small",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-b .termopt small"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Terms with a price'] .gal-panel[data-theme='{ground}'] .oc-choice small"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "choice-method-sel",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .meth.sel"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Funding methods with a fee'] .gal-panel[data-theme='{ground}'] .oc-choice--sel"
+    },
+    "ignore": [
+      "(box)",
+      "min-height"
+    ]
+  },
+  {
+    "id": "choice-method",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .meth:not(.sel)"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Funding methods with a fee'] .gal-panel[data-theme='{ground}'] .oc-choice:not(.oc-choice--sel)"
+    },
+    "ignore": [
+      "(box)",
+      "min-height"
+    ]
+  },
+  {
+    "id": "choice-method-rad",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .meth.sel .rad"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Funding methods with a fee'] .gal-panel[data-theme='{ground}'] .oc-choice--sel .oc-choice__rad"
+    }
+  },
+  {
+    "id": "choice-method-fee",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .meth .fee"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Funding methods with a fee'] .gal-panel[data-theme='{ground}'] .oc-choice__end"
+    }
+  },
+  {
+    "id": "choice-method-fee-note",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .meth .fee small"
+    },
+    "gallery": {
+      "path": "/choice-list",
+      "selector": ".gal-state[data-state='Funding methods with a fee'] .gal-panel[data-theme='{ground}'] .oc-choice__end small"
+    }
+  },
+  {
+    "id": "check",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .check"
+    },
+    "gallery": {
+      "path": "/checkbox",
+      "selector": ".gal-state[data-state='Checked, words run on'] .gal-panel[data-theme='{ground}'] .oc-check"
+    },
+    "ignore": [
+      "(box)",
+      "height"
+    ]
+  },
+  {
+    "id": "check-box",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .check .bx"
+    },
+    "gallery": {
+      "path": "/checkbox",
+      "selector": ".gal-state[data-state='Checked, words run on'] .gal-panel[data-theme='{ground}'] .oc-check__bx"
+    }
+  },
+  {
+    "id": "check-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .check b"
+    },
+    "gallery": {
+      "path": "/checkbox",
+      "selector": ".gal-state[data-state='Checked, words run on'] .gal-panel[data-theme='{ground}'] .oc-check b"
+    }
+  },
+  {
+    "id": "check-box-off",
+    "reference": {
+      "file": "control/opencast-offering.html",
+      "selector": "#offer .chk.off .bx"
+    },
+    "gallery": {
+      "path": "/checkbox",
+      "selector": ".gal-state[data-state='Unchecked, with a helper line'] .gal-panel[data-theme='{ground}'] .oc-check__bx"
+    },
+    "ignore": [
+      "color",
+      "font-size",
+      "line-height"
+    ]
+  },
+  {
+    "id": "amounts",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .amts"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Pledge amounts'] .gal-panel[data-theme='{ground}'] .oc-amounts__row"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "amount-sel",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .amt.sel"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Pledge amounts'] .gal-panel[data-theme='{ground}'] .oc-amounts__amt--sel"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "amount",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#m-more .amt:not(.sel)"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Pledge amounts'] .gal-panel[data-theme='{ground}'] .oc-amounts__amt:not(.oc-amounts__amt--sel)"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "amounts-mono",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .amts2"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Business amounts, mono'] .gal-panel[data-theme='{ground}'] .oc-amounts__row"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "amount-mono-sel",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .amts2 button.sel"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Business amounts, mono'] .gal-panel[data-theme='{ground}'] .oc-amounts__amt--sel"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "amount-mono",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "#fund .amts2 button:not(.sel)"
+    },
+    "gallery": {
+      "path": "/amount-picker",
+      "selector": ".gal-state[data-state='Business amounts, mono'] .gal-panel[data-theme='{ground}'] .oc-amounts__amt:not(.oc-amounts__amt--sel)"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "avatar",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .avatar"
+    },
+    "gallery": {
+      "path": "/avatar",
+      "selector": ".gal-state[data-state='Sizes'] .gal-panel[data-theme='{ground}'] .oc-avatar"
+    }
+  },
+  {
+    "id": "avatar-40",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "#team .tm .avatar"
+    },
+    "gallery": {
+      "path": "/avatar",
+      "selector": ".gal-state[data-state='Sizes'] .gal-panel[data-theme='{ground}'] .oc-avatar--40"
+    }
+  },
+  {
+    "id": "kbd",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#home-desk .a-search kbd"
+    },
+    "gallery": {
+      "path": "/kbd",
+      "selector": ".gal-state[data-state='In the search box'] .gal-panel[data-theme='{ground}'] .oc-kbd"
+    }
+  },
+  {
+    "id": "kbd-tv",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": "#watching .kbd"
+    },
+    "gallery": {
+      "path": "/kbd",
+      "selector": ".gal-state[data-state='TV hint keys'] .gal-panel[data-theme='{ground}'] .oc-kbd--tv"
+    },
+    "grounds": [
+      "dark"
+    ],
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  }
+]
