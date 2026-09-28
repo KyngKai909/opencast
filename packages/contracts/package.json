@@ -15,9 +15,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"No lint configured for contracts\""
+    "lint": "echo \"No lint configured for contracts\"",
+    "docs:api": "tsx scripts/api-doc.ts"
   },
   "dependencies": {
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }

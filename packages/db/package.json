@@ -25,7 +25,8 @@
     "migrate": "tsx scripts/migrate.ts",
     "migrate:legacy": "tsx scripts/migrate-legacy.ts",
     "test": "vitest run",
-    "reset": "tsx scripts/reset.ts"
+    "reset": "tsx scripts/reset.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@opencast/domain": "0.1.0",

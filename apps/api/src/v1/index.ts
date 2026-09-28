@@ -31,7 +31,7 @@ import { waitlistRoutes } from "./modules/waitlist/routes.js";
 import { createNetworkService } from "./modules/network/service.js";
 import { networkRoutes } from "./modules/network/routes.js";
 
-export function createV1(deps: Deps): { router: Router; services: Services } {
+export function createV1(deps: Deps): { router: Router; services: Services; deps: Deps } {
   const services = {} as Services;
   const ctx: ModuleContext = { deps, services };
   services.accounts = createAccountsService(ctx);
@@ -64,5 +64,5 @@ export function createV1(deps: Deps): { router: Router; services: Services } {
   waitlistRoutes(registrar, ctx);
   networkRoutes(registrar, ctx);
   router.use(errorHandler(deps.config.production));
-  return { router, services };
+  return { router, services, deps };
 }

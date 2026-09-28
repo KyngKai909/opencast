@@ -55,6 +55,8 @@ export interface LibraryService {
   /** A claimable station's import of a covered creator work (the file comes later). */
   addCreatorWork(db: Executor, input: { stationId: string; creatorWorkId: string; title: string; durationMs: number | null; sourceUrl: string; programId?: string }): Promise<string>;
 
+  /** A claimable station's rights: the permission or licence record that covers the work. */
+  confirmCreatorWorkRights(db: Executor, itemId: string, input: { permissionRecordId?: string; licenceRecordId?: string }): Promise<void>;
   library(stationId: string, filter: { folderId?: string; code?: LogCode; needsAttention?: boolean }): Promise<LibraryView>;
   item(itemId: string): Promise<LibraryItem>;
   stationOfItem(itemId: string): Promise<string>;
@@ -449,6 +451,17 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
         })
         .returning({ id: A.id });
       return row.id;
+    },
+
+    async confirmCreatorWorkRights(tx, itemId, input) {
+      await tx.insert(R).values({
+        assetId: itemId,
+        basis: input.permissionRecordId ? "permission_record" : "licence_record",
+        permissionRecordId: input.permissionRecordId ?? null,
+        licenceRecordId: input.licenceRecordId ?? null,
+        note: input.permissionRecordId ? "Permission from the owner" : "Published under a licence",
+        confirmedAt: deps.clock.now()
+      });
     },
 
     async library(stationId, filter) {

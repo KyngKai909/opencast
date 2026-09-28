@@ -41,6 +41,18 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | When a maker's rotation is empty: is its barter share given back to the carrier, or filled with a station ID? | playout, Phase 5 | a station ID |
 | The revenue split for licensed catalogs | catalog | none |
 
+## Built with a stand-in, to replace
+
+| What | Now | Replace with |
+|---|---|---|
+| Money providers | `payments.ts` local fake: bank deposits arrive when told, cards at once, no real money | Clear (bank, USDC, encumbrances) and Stripe (cards, pledges), Phase 6 |
+| Proving a claimant owns the source account | Recorded; an admin checks it before approving | OAuth with each platform (YouTube, Vimeo, SoundCloud…) |
+| Title-safe and caption checks on spot uploads | Shown as pending, checked in review | Frame analysis and speech-to-text |
+| Push and email delivery | Logged | A push provider and Resend (as the Clear apps use) |
+| Midnight for daily caps | Los Angeles time | Each market's own time zone |
+| Carried episodes' slot length | Rounded up to the next half hour, which leaves the barter break | The maker's own slot length, if the designs want one |
+| Stations that take production orders | `takesOrders` on the station (studios always do) | Confirm with the design |
+
 ## Design conflicts (for the design to correct; the backend follows the prompt)
 
 | Conflict | Backend does |

@@ -71,7 +71,8 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         .where(eq(S.id, input.sessionId));
 
       // Count each session once per minute it's watching.
-      if (counts && minuteOf(existing.lastBeatAt).getTime() !== minuteOf(now).getTime()) {
+      // The first heartbeat never counts, so the second always does; after that, once a minute.
+      if (counts && (existing.beats === 1 || minuteOf(existing.lastBeatAt).getTime() !== minuteOf(now).getTime())) {
         const key = ({ phone: "phone", cast: "cast", web: "web", tv_app: "tvApp" } as const)[input.platform];
         const count = async (minute: Date) => {
           await db

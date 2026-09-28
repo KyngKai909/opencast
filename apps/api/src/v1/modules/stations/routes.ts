@@ -19,7 +19,8 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
       log.nowNext(ids, now),
       playout.statusFor(ids),
       network.listedPlayback(listedIds),
-      network.listedAiringsInWindow(listedIds, now, new Date(now.getTime() + 24 * 3_600_000))
+      // City meetings are often weeks apart: look a month ahead for the next one.
+      network.listedAiringsInWindow(listedIds, now, new Date(now.getTime() + 30 * 24 * 3_600_000))
     ]);
     return profiles.map((p) => {
       if (p.kind === "listed") {

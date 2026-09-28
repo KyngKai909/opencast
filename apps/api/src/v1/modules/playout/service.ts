@@ -45,6 +45,11 @@ export interface PlayoutService {
   asRun(stationId: string, from: Date, to: Date): Promise<AsRunView[]>;
   /** As-run rows for spot airings, for billing and results. */
   asRunForAirings(airingIds: string[]): Promise<Map<string, typeof schema.asRun.$inferSelect>>;
+  /** Every station on air now, for the dead-air check. */
+  onAirStations(): Promise<string[]>;
+  /** A planned sign-on ("Signs on Monday, 6:00 am"). */
+  scheduleSignOn(stationId: string, at: Date): Promise<void>;
+  nextSignOn(stationIds: string[]): Promise<Map<string, Date>>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
@@ -265,6 +270,27 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       if (!airingIds.length) return new Map();
       const rows = await db.select().from(schema.asRun).where(inArray(schema.asRun.airingId, airingIds));
       return new Map(rows.map((r) => [r.airingId!, r]));
+    },
+
+    async onAirStations() {
+      const rows = await db.select({ stationId: P.stationId }).from(P).where(eq(P.onAir, true));
+      return rows.map((r) => r.stationId);
+    },
+
+    async scheduleSignOn(stationId, at) {
+      await db.insert(schema.schedules).values({ stationId, startAt: at, enabled: true });
+    },
+
+    async nextSignOn(stationIds) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select()
+        .from(schema.schedules)
+        .where(and(inArray(schema.schedules.stationId, stationIds), eq(schema.schedules.enabled, true), gte(schema.schedules.startAt, deps.clock.now())))
+        .orderBy(asc(schema.schedules.startAt));
+      const result = new Map<string, Date>();
+      for (const r of rows) if (!result.has(r.stationId)) result.set(r.stationId, r.startAt);
+      return result;
     },
 
     async carriedAirings(agreementIds, from, to) {

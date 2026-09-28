@@ -33,7 +33,9 @@
     "start:runtime": "node scripts/start-runtime.mjs",
     "start:railway": "npm run start:runtime",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "docs:api": "npm run docs:api -w @opencast/contracts",
+    "db:seed": "npm run seed -w @opencast/db"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

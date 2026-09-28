@@ -2,6 +2,7 @@ import { and, asc, eq, gte, ilike, inArray, lt } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Market } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
+import { createDesk, type DeskPart } from "./desk.js";
 
 export interface ListedAiringRef {
   id: string;
@@ -11,7 +12,7 @@ export interface ListedAiringRef {
   endsAt: string | null;
 }
 
-export interface NetworkService {
+export interface NetworkService extends DeskPart {
   marketsByIds(ids: string[]): Promise<Map<string, Market>>;
   marketBySlug(slug: string): Promise<Market | null>;
   allMarkets(): Promise<Market[]>;
@@ -50,11 +51,14 @@ function listedRef(airing: typeof schema.listedAirings.$inferSelect, stationId: 
   };
 }
 
-export function createNetworkService({ deps }: ModuleContext): NetworkService {
+export function createNetworkService(ctx: ModuleContext): NetworkService {
+  const { deps } = ctx;
   const { db } = deps;
   const m = schema.markets;
 
   const service: NetworkService = {
+    ...createDesk(ctx),
+
     async marketsByIds(ids) {
       const unique = [...new Set(ids)];
       if (!unique.length) return new Map();

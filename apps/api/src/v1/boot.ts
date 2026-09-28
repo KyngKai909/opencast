@@ -3,6 +3,7 @@ import { createDb } from "@opencast/db";
 import { privyVerifier } from "./auth.js";
 import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
+import { createJobs } from "./jobs.js";
 import { ffmpegPipeline } from "./media.js";
 import { fakePayments } from "./payments.js";
 
@@ -18,7 +19,7 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
   const clock = { now: () => new Date() };
   // Clear and Stripe adapters arrive in platform Phase 6.
   console.warn("[v1] payments: using the local fake. No real money moves.");
-  return createV1({
+  const v1 = createV1({
     payments: fakePayments(clock),
     db,
     bus: new EventBus(),
@@ -40,4 +41,8 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
       production: env.NODE_ENV === "production"
     }
   });
+  if (env.JOBS !== "off") {
+    createJobs(v1.deps, v1.services).start();
+  }
+  return v1;
 }

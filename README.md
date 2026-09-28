@@ -37,6 +37,7 @@ npm install
 cp .env.example .env
 npm run db:up
 npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
@@ -65,6 +66,12 @@ Each empty app runs on its own with `npm run dev -w @opencast/<name>`. Ports: vi
 
 Before, every app's `build` script rebuilt `shared` first, and the root repeated the same order by hand in `build`, each `build:service:*` and three `pre*` hooks. With nine apps and four packages that doubles. Turborepo's `dependsOn: ["^build"]` replaces all of it. npm workspaces still install everything.
 
+## The API
+
+`/v1` is the new API, built from `packages/contracts`: 183 endpoints in 13 modules, listed in `docs/api.md` (regenerate with `npm run docs:api`). How it's put together is in `docs/architecture.md`. The old `/api` routes stay for the old master control until the apps prompt replaces it.
+
+Sign-in is Privy: set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have it). Without it, signed-in endpoints answer 401; public ones (the dial, guide, station pages, heartbeats) still work. To make someone an Opencast admin: `update accounts.users set is_admin = true where email = '…'`.
+
 ## Environment
 
 `.env.example` at the root is read by the API and the worker. `apps/control/.env.example` holds `VITE_API_BASE`, which you only need when the API is on another origin. Per-service examples arrive with the Railway work (platform Phase 7).
@@ -87,6 +94,8 @@ The browser still stores the connected wallet under `openchannel.creator.wallet.
 
 ## Docs
 
+- `docs/api.md`: every endpoint, generated from the contracts
+- `docs/architecture.md`: services, modules, roles, and how money moves
 - `docs/audit.md`: what the repo did before the restructure
 - `docs/schema.md`: the schema, its constraints, and the migration from the old model
 - `docs/open-decisions.md`: what isn't decided yet, and its default

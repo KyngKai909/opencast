@@ -87,6 +87,10 @@ export interface LedgerService {
   updatePledge(userId: string, pledgeId: string, input: { amountMicros?: number; creditOnAir?: boolean; stop?: true }): Promise<PledgeView>;
   /** Pledges for on-air member credits. */
   memberCredits(stationId: string): Promise<{ members: number; named: string[] }>;
+  /** A claimable station's money: owed to escrow (settled, not yet deposited) and in escrow. */
+  escrowBalances(stationIds: string[]): Promise<Map<string, { owed: number; held: number }>>;
+  /** Anything that ever moved from a claimable station's escrow to an Opencast account. Always 0. */
+  everMovedToOpencast(): Promise<number>;
   /** What each as-run airing cost the business (the station's pay, Opencast's share and the pool together). */
   costsOfAsRun(asRunIds: string[]): Promise<Map<string, number>>;
   /** A spot's budget used: held plus paid (held money counts against the budget), in total and since `dayStart`. */
@@ -851,6 +855,34 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     checkRunway: (businessId) => checkRunway(businessId),
+
+    async escrowBalances(stationIds) {
+      const result = new Map<string, { owed: number; held: number }>(stationIds.map((id) => [id, { owed: 0, held: 0 }]));
+      if (!stationIds.length) return result;
+      const rows = await db
+        .select({ stationId: L.stationId, kind: L.kind, sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
+        .from(L)
+        .leftJoin(P, eq(P.accountId, L.id))
+        .where(and(inArray(L.stationId, stationIds), inArray(L.kind, ["escrow_owed", "escrow"])))
+        .groupBy(L.stationId, L.kind);
+      for (const r of rows) {
+        const entry = result.get(r.stationId!)!;
+        if (r.kind === "escrow_owed") entry.owed = Number(r.sum);
+        else entry.held = Number(r.sum);
+      }
+      return result;
+    },
+
+    async everMovedToOpencast() {
+      const rows = await db.execute<{ sum: string }>(sql`
+        select coalesce(sum(p.amount_micros), 0) as sum
+        from ledger.postings p
+        join ledger.accounts a on a.id = p.account_id and a.kind in ('opencast_share', 'pool', 'opencast_absorbed')
+        where p.entry_id in (
+          select q.entry_id from ledger.postings q join ledger.accounts b on b.id = q.account_id
+          where b.kind = 'escrow' and q.amount_micros < 0)`);
+      return Number(rows.rows[0].sum);
+    },
 
     async costsOfAsRun(asRunIds) {
       if (!asRunIds.length) return new Map();
