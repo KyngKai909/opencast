@@ -17,7 +17,7 @@ export interface SpecimenState {
   note?: string;
 }
 
-export type Group = "Foundation" | "Primitives" | "Broadcast" | "Data" | "Shells";
+export type Group = "Foundation" | "Primitives" | "Broadcast" | "Data" | "Shells" | "Player";
 
 export interface Specimen {
   /** URL slug, unique: "tally". */

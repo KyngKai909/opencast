@@ -45,3 +45,7 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A14 | TV type under 21px in the reference CSS (tally 18px, now-line 20px, sleep times 20px) | tv 03.1; tv-update 05.1 | 21px minimum |
 | A15 | The rules say times are right-aligned in tables; every frame puts the time column first, left-aligned (amounts are right-aligned) | control, business tables | The frames: times first and left, amounts right |
 | A16 | Short durations: the rundown and order review frames write `0:30`, `0:05`; the rules say `:30` | master-control A.7; orders 05.1 | The rules: `:30` |
+| A17 | Pause holds your place for 30 minutes, but a live playlist only reaches back as far as its window | player | The player holds wherever the stream allows and offers Back to live after 30 minutes; the platform's playlists need a 30-minute window for the full hold (contract-requests, platform) |
+| A18 | The radio screen's level meter "moves with the sound" | tv 05.1 | It moves on its own rhythm while playing; real levels need Web Audio on the playing element, which isn't possible everywhere (Chromecast, native HLS on iPhone) |
+| A19 | "No station on 13" names the nearest two: nearest by number, or the channels either side | tv 02 | Nearest by number (12.1 and 9.1 for 13) |
+

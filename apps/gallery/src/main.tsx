@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { GroundProvider } from "@opencast/ui";
 import "@opencast/ui/styles.css";
+import "@opencast/player/styles.css";
 import "./gallery.css";
 import { App } from "./App";
 

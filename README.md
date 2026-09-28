@@ -24,7 +24,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
 | `packages/contracts` | `@opencast/contracts` | Zod request and response schemas | platform; the apps prompt reads it and never edits it |
 | `packages/ui` | `@opencast/ui` | Design system: tokens, primitives, broadcast and data components, shells | apps |
-| `packages/player` | `@opencast/player` | The shared player (empty) | apps |
+| `packages/player` | `@opencast/player` | The one player for the viewer app, TV mode and the Cast receiver: live HLS, channel changes with warm neighbours, the banner, number entry, inputs | apps |
 | `contracts` | | `CreatorEscrow` and `CreatorFund` (Foundry): claimable stations' earnings until claimed, and the fund that backs new stations | platform |
 | `docs/reference` | | HTML design references, one folder per app | |
 
@@ -75,6 +75,18 @@ http://localhost:5180 shows every component in `@opencast/ui` on the dark and li
 `npm run compare -w @opencast/gallery` checks the build against the references: it opens each pair of elements listed in `apps/gallery/scripts/pairs/*.json` in Chrome, on both grounds, and prints every computed style that differs. Add `-- <id or group>` for some, and `-- --shots` for side-by-side screenshots in `apps/gallery/compare-out/`. It uses the installed Chrome; nothing is downloaded.
 
 Apps import the design system's styles once, `import "@opencast/ui/styles.css"`, and take every colour, font, space and radius from its tokens (`packages/ui/src/tokens.css`). The rules every screen follows are in `docs/apps/rules.md`.
+
+### The player
+
+`@opencast/player` is one engine (`PlayerEngine`) with a React surface (`PlayerProvider`, `PlayerSurface`). Inputs (`keyboardInput`, `castInput`, `bridgeInput`, `mediaSessionInput`) all produce the same commands, so the TV's remote, the phone remote over Cast and the iPhone bridge drive it identically.
+
+For development it plays mock stations served as live HLS:
+
+```bash
+npm run mock:streams -w @opencast/player
+```
+
+That makes four 60-second loops (CIVC, BEAT and REEL on the TV band, NITE on radio) with captions, in `packages/player/.mock-streams/` (git-ignored; needs ffmpeg). The gallery serves them live at `/mock-hls/<station>/master.m3u8` (`mockLiveHls` from `@opencast/player/mock`), and its Player pages drive the real engine against them.
 
 ### Why Turborepo
 

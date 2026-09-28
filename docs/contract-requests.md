@@ -181,3 +181,11 @@ These change what the API accepts, or add something no fixture can stand in for.
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
 | W1 | **Message for a station without a call sign**: the API says "Your station is on the list."; the site says "You're on the list." One of them changes | site S.11 | n/a | 7 |
+
+## Platform (not contracts)
+
+| # | Request | Why | Phase |
+|---|---|---|---|
+| X1 | **Live playlists keep 30 minutes** (the worker's HLS and Livepeer's output: a DVR window of at least 30 minutes) | Pause holds your place for up to 30 minutes, then offers Back to live. With a short window the player can only hold what the playlist still lists | 3 |
+| X2 | **A subtitle rendition in the live output** (WebVTT in the HLS, or CEA-608 in the video) | Captions, with the size setting, come from the stream; the player shows whatever rendition it's given | 3 |
+

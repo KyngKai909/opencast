@@ -90,3 +90,15 @@ Words the components say that no frame shows. Screen-reader-only words are marke
 
 Styles with no frame (no new words): a field's error line (standby amber, with the warning sign), disabled controls (faded), the tooltip, and destructive menu items (live red, like the settings' danger links).
 
+### packages/player (Phase 2)
+
+| Where | Words | Note |
+|---|---|---|
+| Paused | "Paused" (tag on the picture) | Not drawn; "Back to live" is the note's own words |
+| Autoplay refused | "Tap for sound" | When a browser won't start with sound |
+| Sleep timer fade | "Turning off in a minute.", "30 more minutes" | The note says the fade offers 30 more minutes; the first line is new |
+| Number entry, no station | "Nearest: 7.1 CIVC, 12.1 BEAT" | The note says "No station on 13" and the nearest two; "Nearest:" is new |
+| Banner, a station off air | "Off air" as the title | From the style guide's slate |
+| Hint row, casting or mirroring with no name | "Playing from a phone", "Mirrored from an iPhone" | When the phone's name isn't known (signed out) |
+| Spoken | "Channel 12.1"; "BEAT 12.1, Inland Beat: Saturday Reel"; "On air", "Not on air" | The panel and banner for screen readers |
+
