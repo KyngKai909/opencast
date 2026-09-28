@@ -1,6 +1,7 @@
 import type { Db } from "@opencast/db";
 import type { EventBus } from "./events.js";
 import type { TokenVerifier } from "./auth.js";
+import type { ClearLinkLookup } from "./clearLink.js";
 import type { MediaPipeline } from "./media.js";
 import type { Storage } from "./storage.js";
 import type { EscrowChain } from "./chain/index.js";
@@ -38,6 +39,8 @@ export interface Deps {
   bus: EventBus;
   clock: Clock;
   auth: TokenVerifier;
+  /** Reads a person's linked Clear global wallet from Privy (Clear is the provider app). */
+  clear: ClearLinkLookup;
   media: MediaPipeline;
   /** Object storage by content ID (R2, or local disk in development), and IPFS for publishing. */
   storage: Storage;

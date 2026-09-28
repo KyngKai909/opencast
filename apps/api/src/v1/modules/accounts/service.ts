@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Me, StationIdent } from "@opencast/contracts";
+import type { ClearLink, Me, StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
-import { badRequest, forbidden, notFound, refused } from "../../errors.js";
+import { ClearLookupUnavailable } from "../../clearLink.js";
+import { badRequest, conflict, forbidden, HttpError, notFound, refused } from "../../errors.js";
 
 export type StationRole = "owner" | "operator" | "host";
 export type BusinessRole = "owner" | "manager" | "viewer";
@@ -52,6 +53,15 @@ export interface AccountsService {
   walletOf(userId: string): Promise<string | null>;
   businessMemberIds(businessId: string, roles?: BusinessRole[]): Promise<string[]>;
 
+  /** The person's linked Clear wallet, or null. `access` is full only while Clear still grants full access. */
+  clearLink(userId: string): Promise<ClearLinkView | null>;
+  /** A link by its ID, still linked or not (funding sources and payout destinations keep the ID). */
+  clearLinkById(linkId: string): Promise<ClearLinkView | null>;
+  /** Records the Clear wallet the person linked in Privy. 409 when Clear isn't linked there, or isn't set up here. */
+  linkClear(user: CurrentUser): Promise<ClearLink>;
+  /** Forgets it. Funding sources and payout destinations that used it stop working. */
+  unlinkClear(userId: string): Promise<void>;
+
   team(scope: TeamScope): Promise<TeamView>;
   invite(user: CurrentUser, scope: TeamScope, input: { email?: string; phone?: string; role: string; note?: string }): Promise<InviteRow>;
   updateMember(scope: TeamScope, userId: string, input: { role?: string; note?: string | null }): Promise<void>;
@@ -62,6 +72,16 @@ export interface AccountsService {
 }
 
 export type TeamScope = { kind: "station"; id: string } | { kind: "business"; id: string };
+
+export interface ClearLinkView {
+  id: string;
+  userId: string;
+  address: string;
+  access: "read_only" | "full";
+  linkedAt: string;
+  /** False once unlinked. */
+  active: boolean;
+}
 
 export interface ReminderRow {
   id: string;
@@ -231,6 +251,20 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
     return rows.map((r) => ({ stationId: r.stationId, key: r.key }));
   }
 
+  function clearLinkView(row: typeof schema.clearLinks.$inferSelect): ClearLinkView {
+    // Full access only while Clear still grants it: if Clear moves Opencast to read-only, every link follows.
+    const access = row.access === "full" && deps.clear.access === "full" ? "full" : "read_only";
+    return { id: row.id, userId: row.userId, address: row.address, access, linkedAt: row.linkedAt.toISOString(), active: row.unlinkedAt === null };
+  }
+
+  async function activeClearLink(userId: string) {
+    const [row] = await db
+      .select()
+      .from(schema.clearLinks)
+      .where(and(eq(schema.clearLinks.userId, userId), isNull(schema.clearLinks.unlinkedAt)));
+    return row ?? null;
+  }
+
   const service: AccountsService = {
     async userForToken(token) {
       const verified = await deps.auth.verify(token);
@@ -243,10 +277,11 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       if (!user) {
         throw notFound("Your account");
       }
-      const [identities, stationRows, businessRows] = await Promise.all([
+      const [identities, stationRows, businessRows, clear] = await Promise.all([
         db.select().from(schema.identities).where(eq(schema.identities.userId, userId)),
         db.select().from(schema.stationMemberships).where(eq(schema.stationMemberships.userId, userId)),
-        db.select().from(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.userId, userId))
+        db.select().from(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.userId, userId)),
+        service.clearLink(userId)
       ]);
       const [idents, businesses, markets] = await Promise.all([
         stationIdents(stationRows.map((r) => r.stationId)),
@@ -270,8 +305,61 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
             return name ? [{ kind: "business" as const, business: { id: r.advertiserId, name }, role: r.role }] : [];
           })
         ],
-        settings: (user.settings ?? {}) as Me["settings"]
+        settings: (user.settings ?? {}) as Me["settings"],
+        clear: clear ? { address: clear.address, access: clear.access, linkedAt: clear.linkedAt } : null
       };
+    },
+
+    async clearLink(userId) {
+      const row = await activeClearLink(userId);
+      return row ? clearLinkView(row) : null;
+    },
+
+    async clearLinkById(linkId) {
+      const [row] = await db.select().from(schema.clearLinks).where(eq(schema.clearLinks.id, linkId));
+      return row ? clearLinkView(row) : null;
+    },
+
+    async linkClear(user) {
+      const providerAppId = deps.clear.providerAppId;
+      if (!providerAppId) throw conflict("clear_not_configured", "Connecting Clear isn't set up on this server.");
+      let found;
+      try {
+        found = user.privyDid ? await deps.clear.find(user.privyDid) : null;
+      } catch (error) {
+        if (error instanceof ClearLookupUnavailable) throw conflict("clear_not_configured", error.message);
+        console.error("[accounts] reading the Clear link from Privy failed", error);
+        throw new HttpError(502, "privy_unavailable", "Couldn't check your Clear link with Privy. Try again in a moment.");
+      }
+      if (!found) throw conflict("clear_not_linked", "Clear isn't linked yet.");
+      const now = deps.clock.now();
+      const row = await db.transaction(async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(schema.clearLinks)
+          .where(and(eq(schema.clearLinks.userId, user.id), isNull(schema.clearLinks.unlinkedAt)))
+          .for("update");
+        if (current && current.address === found.address && current.subject === found.subject) {
+          // The same wallet again: keep when it was linked, take the access Clear grants now.
+          const [updated] = await tx.update(schema.clearLinks).set({ access: deps.clear.access, providerAppId }).where(eq(schema.clearLinks.id, current.id)).returning();
+          return updated;
+        }
+        if (current) await tx.update(schema.clearLinks).set({ unlinkedAt: now }).where(eq(schema.clearLinks.id, current.id));
+        const [created] = await tx
+          .insert(schema.clearLinks)
+          .values({ userId: user.id, address: found.address, subject: found.subject, providerAppId, access: deps.clear.access, linkedAt: now })
+          .returning();
+        return created;
+      });
+      const view = clearLinkView(row);
+      return { address: view.address, access: view.access, linkedAt: view.linkedAt };
+    },
+
+    async unlinkClear(userId) {
+      await db
+        .update(schema.clearLinks)
+        .set({ unlinkedAt: deps.clock.now() })
+        .where(and(eq(schema.clearLinks.userId, userId), isNull(schema.clearLinks.unlinkedAt)));
     },
 
     async updateMe(userId, input) {

@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { freshDatabase } from "@opencast/db/testing";
 import { privyVerifier, type LinkedAccount } from "../src/v1/auth.js";
+import { fakeClearLookup, type FakeClearLookup } from "../src/v1/clearLink.js";
 import { EventBus } from "../src/v1/events.js";
 import { createV1 } from "../src/v1/index.js";
 import { ffmpegPipeline } from "../src/v1/media.js";
@@ -45,6 +46,8 @@ export interface Harness {
   sent: Array<{ channel: "push" | "email"; to: string; title: string }>;
   /** Linked accounts Privy would report for a did. */
   linked: Map<string, LinkedAccount[]>;
+  /** Clear cross-app accounts Privy would report for a did, and the access Clear grants. */
+  clear: FakeClearLookup;
   token(did: string): Promise<string>;
   /** Signs in (creating the user on first use) and returns their id. */
   signIn(name?: string, options?: { admin?: boolean; linked?: LinkedAccount[] }): Promise<User>;
@@ -66,6 +69,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
+  const clear = fakeClearLookup();
   const sent: Harness["sent"] = [];
   const verifier = privyVerifier({ privyAppId: APP_ID, verificationKey: await exportSPKI(publicKey) });
   verifier.linkedAccounts = async (did) => linked.get(did) ?? [];
@@ -107,6 +111,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
     bus: new EventBus(),
     clock,
     auth: verifier,
+    clear,
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",
@@ -135,6 +140,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
     db: database.db,
     clock,
     linked,
+    clear,
     sent,
     token,
     async signIn(name, options = {}) {

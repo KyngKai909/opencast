@@ -1,6 +1,7 @@
 // Builds the v1 API from the environment: the API server and the worker both use this.
 import { createDb } from "@opencast/db";
 import { privyVerifier } from "./auth.js";
+import { clearLookupFromEnv } from "./clearLink.js";
 import type { Deps } from "./context.js";
 import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
@@ -43,6 +44,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       verificationKey: env.PRIVY_VERIFICATION_KEY || undefined,
       privyAppSecret: env.PRIVY_APP_SECRET || undefined
     }),
+    clear: clearLookupFromEnv(env),
     config: {
       storageRoot,
       appOrigin,
