@@ -1,0 +1,9 @@
+/* The radio panel (home 04.2 .radio-panel). */
+.oc-radio-panel { border-radius: var(--r-screen); background: var(--oc-station); color: var(--on-station); padding: 22px 20px; aspect-ratio: 1 / 1; display: flex; flex-direction: column; }
+.oc-radio-panel__top { display: flex; justify-content: space-between; align-items: flex-start; }
+.oc-radio-panel__f { font: 500 88px/1 var(--font-mono); letter-spacing: -.06em; }
+.oc-radio-panel__cs { font-size: 22px; margin-top: 6px; }
+.oc-radio-panel__nm { font-size: 14px; opacity: .85; }
+.oc-radio-panel__meter { margin-top: auto; }
+/* An unlit sign on a station colour reads in white. */
+.oc-radio-panel .oc-tally { --tally-unlit: rgb(255 255 255 / .75); }

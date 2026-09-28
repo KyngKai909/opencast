@@ -1,0 +1,31 @@
+/* Preset keys: home's list (01.1 .presets, .pre) and the phone strip (02.1 .pbtn). */
+.oc-presets { --oc-preset-key-radius: 4px; /* the key's corner, as drawn */ }
+.oc-presets__h { margin: 0 0 8px; font: 700 16px var(--font-display); display: flex; justify-content: space-between; align-items: baseline; }
+.oc-presets__h span { font: 500 13px var(--font-text); color: var(--ink-50); }
+.oc-presets__note { font-size: 13px; color: var(--ink-50); margin: 8px 0 0; }
+
+.oc-pre {
+  display: grid; grid-template-columns: 26px 44px 1fr; gap: 10px; align-items: center;
+  width: 100%; padding: 7px 0; border: 0; border-bottom: 1px solid var(--hair);
+  background: none; color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.oc-pre:first-child { border-top: 1px solid var(--hair); }
+.oc-pre__k { width: 26px; height: 26px; border: 1px solid var(--line); border-radius: var(--oc-preset-key-radius); display: grid; place-items: center; font: 500 13px var(--font-mono); }
+.oc-pre--on .oc-pre__k { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-pre__ch { font-size: 13px; color: var(--ink-50); }
+.oc-pre__w { min-width: 0; }
+.oc-pre__w .oc-cs { font-size: 14px; display: block; line-height: 1.2; }
+.oc-pre__w small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.oc-pre--empty { cursor: default; }
+.oc-pre--empty .oc-pre__k { border-style: dashed; color: var(--ink-50); }
+.oc-pre--empty .oc-pre__w { color: var(--ink-50); font-size: 13px; }
+
+.oc-presets__strip { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.oc-presets__strip::-webkit-scrollbar { display: none; }
+.oc-pbtn { flex: none; width: 96px; border: 1px solid var(--line); border-radius: var(--r-control); padding: 8px 10px; background: none; color: inherit; text-align: left; cursor: pointer; }
+.oc-pbtn--on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-pbtn__k { font: 500 11px var(--font-mono); opacity: .7; }
+.oc-pbtn__ch { display: block; font-size: 18px; font-weight: 500; letter-spacing: -.03em; line-height: 1.15; }
+.oc-pbtn .oc-cs { font-size: 12px; }
+.oc-pbtn--empty { border-style: dashed; color: var(--ink-50); }
+.oc-pbtn__add { font-size: 12px; font-weight: 600; }

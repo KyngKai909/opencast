@@ -1,0 +1,7 @@
+/* The break legend (master control C1, C3 .legend). */
+.oc-legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--ink-70); margin-top: 10px; }
+.oc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.oc-legend i { width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--line); display: inline-block; }
+.oc-legend i.oc-legend__filled { background: var(--ink); border-color: var(--ink); }
+.oc-legend i.oc-legend__added { background: var(--standby-fill); border-color: var(--standby-fill); }
+.oc-legend i.oc-legend__barter { background: repeating-linear-gradient(135deg, var(--line) 0 3px, transparent 3px 6px); }

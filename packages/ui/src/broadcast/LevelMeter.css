@@ -1,0 +1,9 @@
+/* The level meter (style guide .meter; the radio panel's bigger meter; TV .radio-full .meter). */
+.oc-meter { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+.oc-meter i { width: 4px; border-radius: 1px; background: var(--on-screen-70); }
+.oc-meter--on-station i { background: rgb(255 255 255 / .75); }
+.oc-meter--md { height: 36px; }
+.oc-meter--md i { width: 5px; }
+.oc-meter--tv { height: 80px; gap: 8px; }
+.oc-meter--tv i { width: 12px; border-radius: 2px; }
+.oc-meter--tv.oc-meter--on-station i { background: rgb(255 255 255 / .7); }

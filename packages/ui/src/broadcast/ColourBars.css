@@ -1,0 +1,8 @@
+/* Colour bars (style guide .state .bars), from the --bar tokens. */
+.oc-bars { display: grid; grid-template-columns: repeat(6, 1fr); }
+.oc-bars i:nth-child(1) { background: var(--bar-1); }
+.oc-bars i:nth-child(2) { background: var(--bar-2); }
+.oc-bars i:nth-child(3) { background: var(--bar-3); }
+.oc-bars i:nth-child(4) { background: var(--bar-4); }
+.oc-bars i:nth-child(5) { background: var(--bar-5); }
+.oc-bars i:nth-child(6) { background: var(--bar-6); }

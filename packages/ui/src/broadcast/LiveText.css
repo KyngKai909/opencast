@@ -1,0 +1,2 @@
+/* "Live" in red text (home 01.1 rows, guide 05.1, schedules). */
+.oc-live-text { color: var(--live); font-weight: 600; }

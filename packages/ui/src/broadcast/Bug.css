@@ -1,0 +1,7 @@
+/* The bug (home .pic .bug; TV .tv .pic .bug). Drawn at 3.5% and 7%, as the reference does. */
+.oc-bug { position: absolute; right: 3.5%; bottom: 7%; opacity: var(--bug-opacity); text-align: right; line-height: 1; color: var(--on-station); }
+.oc-bug__cs { display: block; font-size: clamp(10px, 2cqw, 18px); }
+.oc-bug__ch { font-size: clamp(8px, 1.1cqw, 11px); }
+.oc-pic--tv .oc-bug { right: 5%; bottom: 6%; }
+.oc-pic--tv .oc-bug__cs { font-size: 40px; }
+.oc-pic--tv .oc-bug__ch { font-size: 22px; }

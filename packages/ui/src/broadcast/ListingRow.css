@@ -1,0 +1,25 @@
+/* Listing (style guide .listing) and the station preview's line (home 06.1 .lst). */
+.oc-listing { font-size: 17px; line-height: 1.6; display: grid; grid-template-columns: 96px 1fr; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--hair); }
+.oc-listing:first-child { border-top: 1px solid var(--hair); }
+.oc-listing__thumb {
+  /* The reference's small-picture corner, as on title cards. */
+  --oc-thumb-radius: 8px;
+  aspect-ratio: 16 / 9; border-radius: var(--oc-thumb-radius);
+  background: var(--oc-station); color: var(--on-station);
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; font-size: 15px;
+}
+.oc-listing__top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 2px; }
+.oc-listing__cs { font-size: 15px; letter-spacing: normal; }
+.oc-listing__ch { font-size: 13px; color: var(--ink-50); }
+.oc-listing__now { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -.01em; line-height: 1.25; }
+.oc-listing__meta { font-size: 14px; color: var(--ink-70); margin: 2px 0 0; max-width: 62ch; }
+.oc-listing__next { font-size: 14px; color: var(--ink-50); margin: 4px 0 0; max-width: 62ch; }
+.oc-listing__next .oc-mono { font-size: 13px; }
+
+.oc-lst { display: grid; grid-template-columns: 70px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.oc-lst:first-child { padding-top: 0; }
+.oc-lst__lbl { font-size: 12.5px; color: var(--ink-50); font-weight: 600; line-height: 1.3; }
+.oc-lst__at { display: block; font-weight: 500; color: var(--ink-70); }
+.oc-lst__title { display: block; font: 700 16px/1.25 var(--font-display); letter-spacing: -.01em; }
+.oc-lst__detail { font-size: 13px; color: var(--ink-70); }

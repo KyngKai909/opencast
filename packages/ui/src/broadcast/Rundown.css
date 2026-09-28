@@ -1,0 +1,12 @@
+/* The rundown (master control A5 .rd, .rd.now; the phone's #pmRun). */
+.oc-rundown { border-top: 1px solid var(--line); }
+.oc-rd { display: grid; grid-template-columns: 78px 50px minmax(0, 1fr) 64px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.oc-rd__d { font: 500 13px var(--font-mono); text-align: right; }
+.oc-rd__t { font: 500 13px var(--font-mono); color: var(--ink-70); }
+.oc-rd__title { font-weight: 600; }
+.oc-rd small { display: block; font-size: 12px; color: var(--ink-50); }
+.oc-rd--now { background: var(--raised); box-shadow: inset 3px 0 0 var(--tally); }
+.oc-rd--now .oc-rd__t { padding-left: 10px; }
+.oc-rundown--compact { border-top: 0; }
+.oc-rundown--compact .oc-rd { grid-template-columns: 66px 44px minmax(0, 1fr) 44px; font-size: 13px; }
+.oc-rundown--compact .oc-rd__t, .oc-rundown--compact .oc-rd__d { font-size: 12px; }

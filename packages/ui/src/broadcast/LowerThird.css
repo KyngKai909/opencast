@@ -1,0 +1,9 @@
+/* Lower third (home .pic .l3; TV .tv .pic .l3). */
+.oc-l3 { position: absolute; left: 5%; bottom: 8%; }
+.oc-l3__nm {
+  display: inline-block; background: var(--l3-name-bg); color: var(--l3-name-ink);
+  font: 800 clamp(10px, 2.2cqw, 20px) var(--font-display); font-stretch: var(--semi-wide); padding: .2em .5em;
+}
+.oc-l3__tt { display: inline-block; background: var(--l3-title-bg); color: var(--l3-title-ink); font-size: clamp(8px, 1.4cqw, 13px); padding: .25em .7em; }
+.oc-pic--tv .oc-l3__nm { font-size: 44px; }
+.oc-pic--tv .oc-l3__tt { font-size: 28px; }

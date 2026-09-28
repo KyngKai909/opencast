@@ -1,0 +1,7 @@
+/* The break bar (master control C1, C3 .brkbar). */
+.oc-brkbar { display: flex; height: 18px; border-radius: var(--r-sign); overflow: hidden; border: 1px solid var(--line); }
+.oc-brkbar i { display: block; height: 100%; }
+.oc-brkbar__filled { background: var(--ink); }
+.oc-brkbar__added { background: var(--standby-fill); }
+.oc-brkbar__open { background: transparent; }
+.oc-brkbar__barter { background: repeating-linear-gradient(135deg, var(--line) 0 4px, transparent 4px 8px); }

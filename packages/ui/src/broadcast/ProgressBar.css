@@ -1,0 +1,8 @@
+/* The progress bar (TV banner .prog; the phone remote's .pr-now .prog). The station page's text form. */
+.oc-prog { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-70); }
+.oc-prog .oc-mono { color: var(--ink); }
+.oc-prog__bar { flex: 1; height: 4px; background: var(--hair); border-radius: 4px; overflow: hidden; }
+.oc-prog__bar i { display: block; height: 100%; background: var(--ink); }
+.oc-prog--tv { gap: 18px; font-size: 24px; line-height: 1.4; }
+.oc-prog--tv .oc-prog__bar { height: 8px; }
+.oc-prog-text { font-size: 13px; color: var(--ink-50); }

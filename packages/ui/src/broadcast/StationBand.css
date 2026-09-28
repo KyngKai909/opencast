@@ -1,0 +1,21 @@
+/* Station band (home 06.1 .stn-band; station pages 01.1 .st-band, 05.1 .ph-band). White on the station's colour. */
+.oc-band { background: var(--oc-station); color: var(--on-station); }
+.oc-band--rounded { border-radius: var(--r-control); }
+
+.oc-band--modal { padding: 18px 22px; display: flex; align-items: flex-end; gap: 14px; flex: none; }
+.oc-band--modal .oc-band__ch { font-size: 30px; font-weight: 500; letter-spacing: -.04em; line-height: 1; }
+.oc-band--modal .oc-band__cs { font-size: 30px; line-height: 1; }
+.oc-band--modal .oc-band__nm { font-size: 14px; opacity: .9; margin-left: auto; text-align: right; line-height: 1.3; }
+.oc-band__x.oc-icon-btn { margin-left: 8px; color: var(--on-station); border-color: rgb(255 255 255 / .5); }
+.oc-band__x.oc-icon-btn:hover { background: rgb(255 255 255 / .12); }
+
+.oc-band--page { padding: 26px 28px 22px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 22px; align-items: end; }
+.oc-band--page .oc-band__ch { font: 500 64px/1 var(--font-mono); letter-spacing: -.05em; grid-row: span 2; padding-right: 22px; border-right: 1px solid rgb(255 255 255 / .45); }
+.oc-band--page .oc-band__cs { font: 800 52px/1 var(--font-display); font-stretch: var(--wide); letter-spacing: -.02em; }
+.oc-band--page .oc-band__nm { font-size: 15px; opacity: .9; }
+.oc-band__acts { grid-row: span 2; display: flex; gap: 10px; align-self: center; }
+
+.oc-band--phone { padding: 18px 18px 16px; }
+.oc-band--phone .oc-band__ch { font: 500 40px/1 var(--font-mono); letter-spacing: -.05em; }
+.oc-band--phone .oc-band__cs { font: 800 34px/1 var(--font-display); font-stretch: var(--wide); margin-left: 10px; }
+.oc-band--phone .oc-band__nm { font-size: 13.5px; opacity: .9; margin-top: 8px; }

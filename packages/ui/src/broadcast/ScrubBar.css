@@ -1,0 +1,10 @@
+/* The scrub bar (market 03 .scrub, .brkmarks; production orders 05 .scrub .pin). */
+.oc-scrub { display: flex; align-items: center; gap: 12px; margin-top: 10px; font: 500 13px var(--font-mono); color: var(--ink-70); }
+.oc-scrub--breaks { padding-bottom: 14px; }
+.oc-scrub__bar { flex: 1; height: 6px; background: var(--hair); border-radius: 3px; position: relative; cursor: pointer; touch-action: none; }
+.oc-scrub__bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--signal); border-radius: 3px; }
+.oc-scrub__bar > b { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--signal); transform: translate(-50%, -50%); }
+.oc-scrub__pin { position: absolute; top: -6px; width: 3px; height: 18px; background: var(--standby); border-radius: 1px; }
+/* Break marks sit under the bar, lined up with it. */
+.oc-scrub__breaks { position: absolute; left: 0; right: 0; top: calc(100% + 4px); height: 10px; }
+.oc-scrub__breaks i { position: absolute; top: 0; width: 2px; height: 10px; background: var(--standby); }
