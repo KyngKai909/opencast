@@ -785,10 +785,10 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 <section class="ref" id="breaks"><div class="wrap">
   <div class="ch-label"><span class="n">02</span><span>Breaks</span></div>
   <h2>How often, how long, and what's never allowed.</h2>
-  <p class="lede">The break rule from sign-on, plus the controls a station uses to protect its audience: the order of what fills every break, a cap on spot time per hour, categories it will never air, and a backup rotation for when a spot pauses.</p>
+  <p class="lede">The break rule from sign-on, plus the controls a station uses to protect its audience: the order of what fills every break, a cap on spot time per hour, categories it will never air, a backup rotation for when a spot pauses, and an optional backfill of ads from partners for time that's still open.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="880"><div class="scaler">
-      <div class="app mc" data-nav="settings" data-air="on" style="height:880px">
+    <div class="fit" data-w="1280" data-h="1160"><div class="scaler">
+      <div class="app mc" data-nav="settings" data-air="on" style="height:1160px">
         <div class="swrap">
           <nav class="snav"><h2>Settings</h2><a href="#identity">Identity</a><a class="on" href="#breaks">Breaks</a><a href="#identity">Sponsorship</a><a href="#identity">Translators</a><a href="#team">Team</a><a href="#phone">Notifications</a><a href="#identity">Station account</a><a class="danger" href="#identity">Ownership</a></nav>
           <div class="spane">
@@ -803,8 +803,9 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
                 <div class="ladder" style="border-top:0">
                   <div class="lad"><span class="n">1</span><span><span class="code spt">SPT</span></span><span>Spots from your rotation<br><small>Up to the hourly cap</small></span><span class="quiet" style="font-size:12.5px">0:00 – 1:30</span></div>
                   <div class="lad"><span class="n">2</span><span><span class="code und">UND</span></span><span>Thank-you credit<br><small>Members who asked to be named, then local sponsors. Made for you automatically</small></span><span class="quiet" style="font-size:12.5px">0:15</span></div>
-                  <div class="lad"><span class="n">3</span><span><span class="code">BMP</span></span><span>A bumper<br><small>Fills any time left over</small></span><span class="quiet" style="font-size:12.5px">0:10</span></div>
-                  <div class="lad"><span class="n">4</span><span><span class="code">SID</span></span><span>Station ID<br><small>Always last, can't be removed</small></span><span class="quiet" style="font-size:12.5px">0:05</span></div>
+                  <div class="lad" style="color:var(--ink-50)"><span class="n">3</span><span><span class="code spt" style="border-style:dashed">SPT</span></span><span>Ads from partners<br><small>Off. Only time still open</small></span><span class="quiet" style="font-size:12.5px">0:00 – 1:00</span></div>
+                  <div class="lad"><span class="n">4</span><span><span class="code">BMP</span></span><span>A bumper<br><small>Fills any time left over</small></span><span class="quiet" style="font-size:12.5px">0:10</span></div>
+                  <div class="lad"><span class="n">5</span><span><span class="code">SID</span></span><span>Station ID<br><small>Always last, can't be removed</small></span><span class="quiet" style="font-size:12.5px">0:05</span></div>
                 </div>
               </div>
               <div>
@@ -815,7 +816,11 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
                 <div class="blocked" style="padding:12px 0;border-bottom:1px solid var(--hair)"><button class="chip on">Alcohol</button><button class="chip on">Gambling</button><button class="chip">Cannabis</button><button class="chip on">Political</button><button class="chip">Payday loans</button><button class="chip">Vaping</button></div>
                 <div class="sec-top"><h3>When a spot pauses</h3></div>
                 <div class="row2"><div><b>Backup rotation</b><small>Redlands Hardware, Citrus Valley Farmers Market</small></div><button class="btn btn-ghost btn-sm">Edit</button></div>
-                <div class="row2"><div><b>If the backups run out too</b><small>Underwriting and bumpers fill the time</small></div><span></span></div>
+                <div class="row2"><div><b>If the backups run out too</b><small>Ads from partners if they're on, then bumpers</small></div><span></span></div>
+                <div class="sec-top"><h3>Ads from partners</h3><span class="end"><span class="toggle off"></span></span></div>
+                <div class="row2"><div><b>Fills only time you haven't</b><small>After your rotation, backups and thank-you credit. Your hourly cap and blocked categories still apply</small></div><span></span></div>
+                <div class="row2"><div><b>You don't pick these ads</b><small>They come from ad exchanges, and viewers may each see a different one</small></div><span></span></div>
+                <div class="row2"><div><b>Paid when partners pay</b><small>Usually 30 to 90 days after airing, and not held in advance like spot market money</small></div><span></span></div>
               </div>
             </div>
           </div>
@@ -826,6 +831,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       <div class="note"><h3>The station ID is fixed last</h3><p>Every break ends with the station ID, so viewers always hear whose station they're on as the program comes back. Everything above it can be reordered.</p></div>
       <div class="note"><h3>An hourly cap, shown against TV</h3><p>A station deciding its own ad load is a real differentiator, so the setting says what broadcast TV does next to what the station chose.</p></div>
       <div class="note"><h3>Blocked means invisible</h3><p>Blocked categories are filtered out of the station's spot market entirely, so an operator can't add one by mistake.</p></div>
+      <div class="note"><h3>Ads from partners is a backfill</h3><p>Off by default. When on, it only fills time the station hasn't filled itself, and says plainly that the station doesn't choose these ads and that they pay later. It's a way to earn from open time while the local spot market grows.</p></div>
       <div class="note open"><h3>Political spots</h3><p>Political advertising has its own disclosure and equal-time rules in broadcasting. Whether Opencast allows it at all, and on what terms, needs a decision and probably a lawyer.</p></div>
     </div>
   </div>

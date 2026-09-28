@@ -39,7 +39,7 @@ How to read them:
 - Mock Service Worker for every endpoint until the real one exists, with fixtures built from the reference files' illustration data and validated against the contract schemas. Each app runs fully on mocks with `npm run dev:mock`.
 - Styling: the tokens are CSS custom properties, defined once in `packages/ui` from the style guide's Colour, Type, Space and Shape chapters. Every colour, size, radius and font in every app comes from those tokens. If you keep Tailwind (the repo has it), configure it to read the tokens; no hard-coded values.
 - Fonts: Archivo (display, width 125 for idents and headlines), Public Sans (text and buttons), IBM Plex Mono (clock, channel numbers, amounts, log codes only), self-hosted with fallback stacks.
-- Sign-in: Privy, email first, then Apple, Google and wallets, as in `viewer/opencast-you.html`.
+- Sign-in: Opencast's own Privy app (its app ID from configuration, never Clear's), email first, then Apple, Google and wallets, as in `viewer/opencast-you.html`. "Connect Clear" uses Privy's cross-app linking (`useCrossAppAccounts`) with Clear as the provider; show the linked Clear account in settings, and handle Clear sharing read-only (payout address only) as well as full access (funding by a transfer the user confirms).
 - Tests: Vitest for components and logic, Playwright for the flows listed in Phase 9, axe for accessibility.
 
 ## Rules that apply everywhere
@@ -130,7 +130,7 @@ From `control/`, plus the station halves of `business/opencast-sponsorships.html
 - **Audience and Earnings,** with held money and statements.
 - **Rights** with claims and answers.
 - **Translators.**
-- **Settings:** identity, breaks, sponsorship, translators, team, notifications, station account, ownership.
+- **Settings:** identity, breaks (including the "Ads from partners" switch, which only sets a flag until the backend supports it), sponsorship, translators, team, notifications, station account, ownership.
 - **The station switcher.**
 
 Roles decide what's visible: owner, operator (sees earnings, can't move money) and host (only their assigned live blocks, lower thirds and cue break). A studio (a station with no channel) gets the studio shell with no on-air pages.
