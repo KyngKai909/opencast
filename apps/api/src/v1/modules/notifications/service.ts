@@ -217,6 +217,17 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     });
   });
 
+  deps.bus.on("station.signal_lost", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "signal_lost",
+      title: "Signal lost",
+      body: "The live source isn't sending. A slate is airing until it's back.",
+      link: `/stations/${e.stationId}/live`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: `signal:${e.stationId}:${deps.clock.now().toISOString().slice(0, 16)}`
+    });
+  });
+
   deps.bus.on("spot.paused", async (e) => {
     // Daily-cap pauses tell no one; they resume by themselves at midnight.
     if (e.reason === "daily_cap") return;

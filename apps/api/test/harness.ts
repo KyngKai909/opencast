@@ -44,7 +44,7 @@ export interface User {
   delete(url: string): request.Test;
 }
 
-export async function createHarness(): Promise<Harness> {
+export async function createHarness(options: { realTime?: boolean } = {}): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
@@ -52,16 +52,28 @@ export async function createHarness(): Promise<Harness> {
   const verifier = privyVerifier({ privyAppId: APP_ID, verificationKey: await exportSPKI(publicKey) });
   verifier.linkedAccounts = async (did) => linked.get(did) ?? [];
 
+  // Frozen unless a test needs real time (playout runs ffmpeg in real time).
   let now = new Date("2026-10-01T19:00:00.000Z");
-  const clock = {
-    now: () => new Date(now),
-    set: (iso: string) => {
-      now = new Date(iso);
-    },
-    advance: (ms: number) => {
-      now = new Date(now.getTime() + ms);
-    }
-  };
+  let offset = 0;
+  const clock = options.realTime
+    ? {
+        now: () => new Date(Date.now() + offset),
+        set: (iso: string) => {
+          offset = Date.parse(iso) - Date.now();
+        },
+        advance: (ms: number) => {
+          offset += ms;
+        }
+      }
+    : {
+        now: () => new Date(now),
+        set: (iso: string) => {
+          now = new Date(iso);
+        },
+        advance: (ms: number) => {
+          now = new Date(now.getTime() + ms);
+        }
+      };
 
   const storageRoot = path.join(os.tmpdir(), `opencast-test-${randomUUID()}`);
   const deps: Deps = {
@@ -202,7 +214,7 @@ export function testClip(seconds: number, kind: "video" | "audio" = "video"): Pr
 export async function itemFixture(
   h: Harness,
   stationId: string,
-  fields: { title?: string; durationMs?: number; code?: "PGM" | "SPT" | "UND" | "BMP" | "SID"; programId?: string; source?: "upload" | "link"; rights?: boolean; episodeNumber?: number } = {}
+  fields: { title?: string; durationMs?: number; code?: "PGM" | "SPT" | "UND" | "BMP" | "SID"; programId?: string; source?: "upload" | "link"; rights?: boolean; episodeNumber?: number; location?: string } = {}
 ) {
   const [item] = await h.db
     .insert(schema.assets)
@@ -222,5 +234,6 @@ export async function itemFixture(
   if (fields.rights !== false) {
     await h.db.insert(schema.rightsConfirmations).values({ assetId: item.id, basis: "made_it" });
   }
+  await h.db.insert(schema.assetFiles).values({ assetId: item.id, version: 1, storage: "local", location: fields.location ?? `/fixtures/${item.id}.mp4` });
   return item;
 }

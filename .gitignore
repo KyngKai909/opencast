@@ -14,3 +14,8 @@ storage/db.lock
 apps/*/storage/
 *.log
 .turbo
+storage/demo/
+storage/proof/
+storage/slates/
+storage/cache/
+storage/objects/

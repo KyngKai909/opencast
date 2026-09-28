@@ -321,6 +321,7 @@ export const liveSources = broadcast.table("live_sources", {
   kind: text("kind", { enum: ["encoder", "browser"] }).notNull(),
   name: text("name").notNull(),
   livepeerStreamId: text("livepeer_stream_id"),
+  livepeerPlaybackId: text("livepeer_playback_id"),
   /** Secret. Reset replaces it and the old key stops working. */
   streamKey: text("stream_key"),
   createdAt: createdAt()
@@ -393,6 +394,8 @@ export const breaks = broadcast.table(
     origin: text("origin", { enum: ["rule", "cued_live", "carried_barter"] }).notNull(),
     /** Break time owed to the producer inside a carried program, under barter. */
     producerShareMs: millis("producer_share_ms").notNull().default(0),
+    /** When spots were placed in it (money held). After this it isn't refilled. */
+    filledAt: at("filled_at"),
     createdAt: createdAt()
   },
   (t) => [index("breaks_station_time").on(t.stationId, t.startsAt)]

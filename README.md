@@ -72,6 +72,16 @@ Before, every app's `build` script rebuilt `shared` first, and the root repeated
 
 Sign-in is Privy: set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have it). Without it, signed-in endpoints answer 401; public ones (the dial, guide, station pages, heartbeats) still work. To make someone an Opencast admin: `update accounts.users set is_admin = true where email = '…'`.
 
+## Playout
+
+The worker airs every station that's on air from its program log: `npm run dev` runs it. To see an evening end to end in about four and a half minutes (on the dev database, with the dev stack running):
+
+```bash
+cd apps/worker && npx tsx scripts/demo-evening.ts
+```
+
+It prints the station, when it starts, and an RTMP URL to push an encoder to for the live block. Afterwards, `npx tsx scripts/as-run.ts <stationId>` prints what aired.
+
 ## Environment
 
 `.env.example` at the root is read by the API and the worker. `apps/control/.env.example` holds `VITE_API_BASE`, which you only need when the API is on another origin. Per-service examples arrive with the Railway work (platform Phase 7).

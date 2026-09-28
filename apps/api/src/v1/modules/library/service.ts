@@ -52,6 +52,10 @@ export interface LibraryService {
   /** For sign-on checks: items and how many have confirmed rights; programs missing a listing. */
   readiness(stationId: string): Promise<{ items: number; rightsConfirmed: number; programsNeedingDescription: number }>;
   hasLinkImports(programId: string): Promise<boolean>;
+  /** A station's own station IDs and bumpers, ready for air with rights confirmed. */
+  fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[] }>;
+  /** Programs ready to repeat (for filling dead air), most recent first. */
+  repeatable(stationId: string, limit: number): Promise<ItemRef[]>;
   /** A claimable station's import of a covered creator work (the file comes later). */
   addCreatorWork(db: Executor, input: { stationId: string; creatorWorkId: string; title: string; durationMs: number | null; sourceUrl: string; programId?: string }): Promise<string>;
 
@@ -432,6 +436,27 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
     async hasLinkImports(programId) {
       const [row] = await db.select({ id: A.id }).from(A).where(and(eq(A.programId, programId), eq(A.source, "link"))).limit(1);
       return Boolean(row);
+    },
+
+    async fillers(stationId) {
+      const rows = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), inArray(A.code, ["SID", "BMP"]), eq(A.status, "ready"), isNull(A.archivedAt)))
+        .orderBy(asc(A.createdAt));
+      const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.location && r.durationMs);
+      return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
+    },
+
+    async repeatable(stationId, limit) {
+      const rows = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), eq(A.code, "PGM"), eq(A.status, "ready"), isNull(A.archivedAt)))
+        .orderBy(sql`${A.createdAt} desc`)
+        .limit(limit * 3);
+      const offAir = await services.trust.offAirItems(rows.map((r) => r.id));
+      return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !offAir.has(r.id)).slice(0, limit);
     },
 
     async addCreatorWork(tx, input) {

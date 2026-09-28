@@ -1,0 +1,3 @@
+ALTER TABLE "broadcast"."live_sources" ADD COLUMN "livepeer_playback_id" text;--> statement-breakpoint
+ALTER TABLE "spots"."airings" ADD COLUMN "carriage_agreement_id" uuid;--> statement-breakpoint
+ALTER TABLE "spots"."airings" ADD CONSTRAINT "airings_carriage_agreement_id_agreements_id_fk" FOREIGN KEY ("carriage_agreement_id") REFERENCES "catalog"."agreements"("id") ON DELETE no action ON UPDATE no action;

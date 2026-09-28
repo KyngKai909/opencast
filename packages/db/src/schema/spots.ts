@@ -19,6 +19,7 @@ import {
 import { at, createdAt, id, micros, millis } from "./columns.js";
 import { spots } from "./namespaces.js";
 import { breaks, programs, stations } from "./broadcast.js";
+import { agreements } from "./catalog.js";
 import { markets } from "./network.js";
 import { users } from "./accounts.js";
 import { holds } from "./ledger.js";
@@ -247,6 +248,8 @@ export const airings = spots.table(
       .unique()
       .references(() => holds.id),
     scheduledAt: at("scheduled_at").notNull(),
+    /** Set when it filled a producer's barter share inside a carried program: the producer is paid. */
+    carriageAgreementId: uuid("carriage_agreement_id").references(() => agreements.id),
     /** The rate as it was at placement. */
     rateKind: text("rate_kind", { enum: ["per_thousand", "per_airing"] }).notNull(),
     rateMicros: micros("rate_micros").notNull(),

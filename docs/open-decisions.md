@@ -53,6 +53,16 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Carried episodes' slot length | Rounded up to the next half hour, which leaves the barter break | The maker's own slot length, if the designs want one |
 | Stations that take production orders | `takesOrders` on the station (studios always do) | Confirm with the design |
 
+## Playout, to settle in deploy (Phase 7)
+
+| Question | Now | Proposal |
+|---|---|---|
+| Where HLS lives when the worker and API are separate services | Same disk locally; the API serves `/hls` with cues | The worker writes HLS to R2 (or serves it itself); viewers play Livepeer's output, which carries the same stream |
+| SCTE-35 through Livepeer | Livepeer takes RTMP in, and RTMP has no place for SCTE-35, so cues can't pass through it | Cues come from us: the API's playlist for our HLS, and the as-run/breaks for players on Livepeer's output |
+| Pre-warming neighbouring channels | Not on the server | In the player: it loads the next and previous stations' playlists and first segments in the dial order (the apps prompt's `packages/player`) |
+| Proof frames kept a year | Written to `storage/proof` | A retention job, and R2 in production |
+| Several worker replicas | One leader airs everything | Shard stations across replicas when one machine can't encode them all |
+
 ## Design conflicts (for the design to correct; the backend follows the prompt)
 
 | Conflict | Backend does |

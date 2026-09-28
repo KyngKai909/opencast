@@ -53,6 +53,8 @@ import { nowIso, slugify } from "./utils.js";
 import { bootV1 } from "./v1/boot.js";
 
 const app = express();
+// The new API, on the new schema (mounted at /v1 below).
+const v1 = bootV1(process.env, STORAGE_ROOT);
 const upload = multer({ dest: path.join(UPLOAD_ROOT, "tmp") });
 
 function addCorsOriginWithAliases(input: string, allowed: Set<string>) {
@@ -116,6 +118,20 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// Live playlists carry SCTE-35 cues for breaks; segments are served as files below.
+app.get("/hls/:stationId/index.m3u8", async (req, res, next) => {
+  try {
+    const playlist = await v1.services.playout.playlistWithCues(req.params.stationId);
+    if (playlist === null) return next();
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-store");
+    res.send(playlist);
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.use(
   "/hls",
@@ -2762,7 +2778,6 @@ app.post("/api/channels/:channelId/control", async (req: Request, res: Response)
 
 // The new API, on the new schema. The /api routes above stay for the old master
 // control until the apps prompt replaces it.
-const v1 = bootV1(process.env, STORAGE_ROOT);
 app.use("/v1", v1.router);
 
 const serveWebApp = String(process.env.SERVE_WEB_APP ?? "true") !== "false";

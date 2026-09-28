@@ -4,6 +4,7 @@ import { schema } from "@opencast/db";
 import { formatChannelNumber, isSubchannel, isValidStationColour, parseChannelNumber, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
+import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 
@@ -72,11 +73,15 @@ export interface StationsService {
   timezoneOf(stationId: string): Promise<string>;
   breakRule(stationId: string): Promise<BreakRuleView>;
   liveSourceBelongs(stationId: string, sourceId: string): Promise<boolean>;
+  /** For playout: where a live source's signal comes from. */
+  liveSourceSignal(sourceId: string): Promise<{ streamKey: string | null; livepeerPlaybackId: string | null } | null>;
   isHost(userId: string, stationId: string, programId: string | null): Promise<boolean>;
   /** For sign-on checks. */
   identityReady(stationId: string): Promise<{ callSign: boolean; channel: boolean }>;
   markSignedOn(db: Executor, stationId: string): Promise<{ first: boolean }>;
   markSignedOff(db: Executor, stationId: string, permanently: boolean): Promise<void>;
+  /** How playout draws the station: colour, bug, city. */
+  look(stationId: string): Promise<{ callSign: string | null; channel: string | null; name: string; homeCity: string | null; colour: string | null; bug: { mode: "off" | "call_sign_and_channel" | "logo"; opacity: number }; logoUrl: string | null } | null>;
   /** Stations that take orders, and studios. */
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key. */
@@ -162,7 +167,7 @@ const S = schema.stations;
 const C = schema.channels;
 const DEFAULT_TZ = "America/Los_Angeles";
 const PUBLIC_STATUSES = new Set(["on_air", "off_air"]);
-const INGEST_SERVER = process.env.LIVE_INGEST_SERVER ?? "rtmps://ingest.useopencast.org/live";
+const INGEST_SERVER = process.env.LIVE_INGEST_SERVER ?? (hasLivepeerApiKey() ? "rtmp://rtmp.livepeer.com/live" : "rtmp://localhost:1935/live");
 
 export function createStationsService({ deps, services }: ModuleContext): StationsService {
   const { db } = deps;
@@ -384,6 +389,14 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       return Boolean(row);
     },
 
+    async liveSourceSignal(sourceId) {
+      const [row] = await db
+        .select({ streamKey: schema.liveSources.streamKey, livepeerPlaybackId: schema.liveSources.livepeerPlaybackId })
+        .from(schema.liveSources)
+        .where(eq(schema.liveSources.id, sourceId));
+      return row ?? null;
+    },
+
     async isHost(userId, stationId, programId) {
       if (!programId) return false;
       const [row] = await db
@@ -417,6 +430,21 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .update(S)
         .set({ status: permanently ? "signed_off" : "off_air", signedOffAt: permanently ? deps.clock.now() : null, updatedAt: deps.clock.now() })
         .where(eq(S.id, stationId));
+    },
+
+    async look(stationId) {
+      const [found] = await rows([stationId]);
+      if (!found) return null;
+      const [profile] = await build([found]);
+      return {
+        callSign: profile.ident.callSign,
+        channel: profile.ident.channel,
+        name: profile.ident.name,
+        homeCity: profile.ident.homeCity,
+        colour: profile.ident.colour,
+        bug: { mode: found.station.bugMode, opacity: found.station.bugOpacity },
+        logoUrl: found.station.logoUrl
+      };
     },
 
     async makers() {
@@ -641,8 +669,18 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
 
     async addLiveSource(stationId, input) {
       const [station] = await db.select({ callSign: S.callSign, name: S.name }).from(S).where(eq(S.id, stationId));
-      const streamKey = input.kind === "encoder" ? newKey(`${station?.callSign ?? station?.name ?? "live"}-${input.name}`) : null;
-      const [row] = await db.insert(schema.liveSources).values({ stationId, kind: input.kind, name: input.name, streamKey }).returning();
+      let streamKey = input.kind === "encoder" ? newKey(`${station?.callSign ?? station?.name ?? "live"}-${input.name}`) : null;
+      let livepeer: { streamId: string; playbackId: string } | null = null;
+      if (input.kind === "encoder" && hasLivepeerApiKey()) {
+        // Encoders send to Livepeer; playout reads the source back from Livepeer's playback.
+        const stream = await createLivepeerStream(`${station?.callSign ?? station?.name} live: ${input.name}`);
+        streamKey = stream.streamKey;
+        livepeer = { streamId: stream.streamId, playbackId: stream.playbackId };
+      }
+      const [row] = await db
+        .insert(schema.liveSources)
+        .values({ stationId, kind: input.kind, name: input.name, streamKey, livepeerStreamId: livepeer?.streamId ?? null, livepeerPlaybackId: livepeer?.playbackId ?? null })
+        .returning();
       return { source: liveSourceView(row), streamKey };
     },
 

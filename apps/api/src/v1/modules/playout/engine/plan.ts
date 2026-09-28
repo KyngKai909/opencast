@@ -1,0 +1,252 @@
+// The run sheet: what airs, second by second, from the program log. Programs play
+// at their times, split around the breaks inside them; each break airs its spots
+// (already placed and paid for), then the credit, bumpers and the station ID,
+// which is always last. Open time airs station ID and bumpers, never nothing.
+
+import path from "node:path";
+import type { ModuleContext } from "../../../context.js";
+import type { ItemRef } from "../../library/service.js";
+import type { BreakSlotView } from "../../log/service.js";
+import { clockTime } from "../../../lib/time.js";
+import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
+import { Slates, type StationLook } from "./slates.js";
+
+type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
+export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
+
+export type SegmentSource =
+  | { kind: "file"; location: string; seekMs: number; mediaKind: "video" | "audio" }
+  | { kind: "image"; path: string }
+  | { kind: "live"; liveSourceId: string };
+
+export interface Segment {
+  key: string;
+  startsAt: Date;
+  endsAt: Date;
+  code: LogCode;
+  label: string;
+  source: SegmentSource;
+  reason: AsRunReason;
+  inBreak: boolean;
+  breakId?: string;
+  logEntryId?: string;
+  itemId?: string;
+  programId?: string;
+  airingId?: string;
+  agreementId?: string;
+  liveSourceId?: string;
+  /** A spot's code and QR, drawn for its last :10. */
+  code10?: { code: string; offer: string };
+}
+
+import { DEAD_AIR_NOTE } from "../../log/service.js";
+const BUMPER_MIN_MS = 1_000;
+
+export function createPlanner({ deps, services }: ModuleContext) {
+  const slates = new Slates(path.join(deps.config.storageRoot, "slates"));
+
+  async function look(stationId: string): Promise<StationLook & { bug: { mode: string; opacity: number } }> {
+    const l = await services.stations.look(stationId);
+    return l ?? { callSign: null, channel: null, name: "Opencast", homeCity: null, colour: null, bug: { mode: "off", opacity: 78 } };
+  }
+
+  /** Station IDs and bumpers to fill `ms`, the station ID last. */
+  async function filler(
+    stationId: string,
+    startsAt: Date,
+    ms: number,
+    context: { key: string; reason: AsRunReason; inBreak: boolean; breakId?: string },
+    fillers: { stationIds: ItemRef[]; bumpers: ItemRef[] },
+    station: StationLook,
+    withBumpers = true
+  ): Promise<Segment[]> {
+    const out: Segment[] = [];
+    if (ms <= 0) return out;
+    const sid = fillers.stationIds[0];
+    const sidMs = Math.min(ms, sid?.durationMs ?? STATION_ID_MS);
+    let cursor = startsAt.getTime();
+    let left = ms - sidMs;
+    let n = 0;
+    while (withBumpers && left >= BUMPER_MIN_MS && fillers.bumpers.length) {
+      const bumper = fillers.bumpers[n % fillers.bumpers.length];
+      // A bumper is never cut short; what's left holds on the station ID slate.
+      if (bumper.durationMs! > left) break;
+      const len = bumper.durationMs!;
+      out.push({ key: `${context.key}:bmp:${n}`, startsAt: new Date(cursor), endsAt: new Date(cursor + len), code: "BMP", label: bumper.title, source: { kind: "file", location: bumper.location!, seekMs: 0, mediaKind: bumper.mediaKind }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId, itemId: bumper.id });
+      cursor += len;
+      left -= len;
+      n++;
+      if (n > 500) break;
+    }
+    if (left > 0) {
+      // Holds on the station ID slate.
+      out.push({ key: `${context.key}:open`, startsAt: new Date(cursor), endsAt: new Date(cursor + left), code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await slates.stationId(station) }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId });
+      cursor += left;
+    }
+    out.push({
+      key: `${context.key}:sid`,
+      startsAt: new Date(cursor),
+      endsAt: new Date(cursor + sidMs),
+      code: "SID",
+      label: sid?.title ?? `${station.callSign ?? station.name} ${station.channel ?? ""}`.trim(),
+      source: sid ? { kind: "file", location: sid.location!, seekMs: 0, mediaKind: sid.mediaKind } : { kind: "image", path: await slates.stationId(station) },
+      reason: context.reason,
+      inBreak: context.inBreak,
+      breakId: context.breakId,
+      itemId: sid?.id
+    });
+    return out;
+  }
+
+  return {
+    slates,
+
+    /** Everything that airs on a station between `from` and `to`, in order, with no gaps. */
+    async plan(stationId: string, from: Date, to: Date): Promise<Segment[]> {
+      const lookback = new Date(from.getTime() - 6 * 3_600_000);
+      const [entries, breaks, fillers, station, credits, members] = await Promise.all([
+        services.log.entries(stationId, lookback, to),
+        services.log.breaks(stationId, lookback, to),
+        services.library.fillers(stationId),
+        look(stationId),
+        services.spots.creditsFor(stationId),
+        services.ledger.memberCredits(stationId)
+      ]);
+      const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
+      const [items, airings, programs, offAir] = await Promise.all([
+        services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v))),
+        services.spots.breakAirings(stored.map((b) => b.id)),
+        services.library.programsByIds(entries.map((e) => e.programId).filter((v): v is string => Boolean(v))),
+        services.trust.offAirItems(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v)))
+      ]);
+      const tz = await services.stations.timezoneOf(stationId);
+      const segments: Segment[] = [];
+
+      const composeBreak = async (slot: BreakSlotView, entryId: string | null): Promise<Segment[]> => {
+        const out: Segment[] = [];
+        const start = Date.parse(slot.startsAt);
+        const end = start + slot.lengthMs;
+        let cursor = start;
+        const key = `brk:${slot.id ?? slot.startsAt}`;
+        // Spots, producer's share first; already held, so they air even if paused since.
+        for (const airing of slot.id ? (airings.get(slot.id) ?? []) : []) {
+          const len = airing.lengthSec * 1000;
+          if (!airing.location || cursor + len > end) continue;
+          out.push({
+            key: `${key}:spt:${airing.airingId}`,
+            startsAt: new Date(cursor),
+            endsAt: new Date(cursor + len),
+            code: "SPT",
+            label: "Spot",
+            source: { kind: "file", location: airing.location, seekMs: 0, mediaKind: "video" },
+            reason: "rotation",
+            inBreak: true,
+            breakId: slot.id ?? undefined,
+            airingId: airing.airingId,
+            agreementId: airing.carriageAgreementId ?? undefined,
+            code10: airing.code ?? undefined
+          });
+          cursor += len;
+        }
+        // The thank-you credit: sponsors of this program, of the station, and members who asked to be named.
+        const entry = entries.find((e) => e.id === entryId);
+        const programId = entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
+        const sponsors = credits.filter((c) => c.programId === null || c.programId === programId);
+        if ((sponsors.length || members.named.length) && end - cursor >= STATION_ID_MS + 10_000) {
+          const len = Math.min(CREDIT_MS, end - cursor - STATION_ID_MS);
+          const programSponsors = sponsors.some((c) => c.programId && c.programId === programId);
+          const subject = programSponsors && programId ? (programs.get(programId)?.title ?? station.name) : station.name;
+          out.push({
+            key: `${key}:und`,
+            startsAt: new Date(cursor),
+            endsAt: new Date(cursor + len),
+            code: "UND",
+            label: `${subject} is made possible by`,
+            source: { kind: "image", path: await slates.credit(station, { subject, sponsors: sponsors.map((s) => ({ business: s.business, creditText: s.creditText })), members: members.named }) },
+            reason: "planned",
+            inBreak: true,
+            breakId: slot.id ?? undefined
+          });
+          cursor += len;
+        }
+        out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station)));
+        return out;
+      };
+
+      const openTime = async (a: number, b: number) => {
+        if (b <= a) return;
+        segments.push(...(await filler(stationId, new Date(a), b - a, { key: `open:${a}`, reason: "station_id_fill", inBreak: false }, fillers, station)));
+      };
+
+      let cursor = from.getTime();
+      for (const entry of entries) {
+        const s = entry.startsAt.getTime();
+        const e = entry.endsAt.getTime();
+        if (e <= cursor) continue;
+        await openTime(cursor, s);
+        const inside = breaks.filter((b) => b.logEntryId === entry.id).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
+        const reason: AsRunReason = entry.localNote === DEAD_AIR_NOTE ? "dead_air_fill" : "planned";
+
+        if (entry.kind === "off_air") {
+          const back = entries.find((x) => x.startsAt.getTime() >= e && x.kind !== "off_air");
+          segments.push({ key: `entry:${entry.id}`, startsAt: entry.startsAt, endsAt: entry.endsAt, code: "OPEN", label: "Off air", source: { kind: "image", path: await slates.offAir(station, back ? clockTime(back.startsAt, tz) : null) }, reason: "slate", inBreak: false, logEntryId: entry.id });
+        } else if (entry.kind === "live") {
+          let t = s;
+          for (const b of inside) {
+            const bs = Date.parse(b.startsAt);
+            if (bs > t) segments.push({ key: `entry:${entry.id}:${t}`, startsAt: new Date(t), endsAt: new Date(bs), code: "PGM", label: "Live", source: { kind: "live", liveSourceId: entry.liveSourceId! }, reason: "live", inBreak: false, logEntryId: entry.id, programId: entry.programId ?? undefined, liveSourceId: entry.liveSourceId ?? undefined });
+            segments.push(...(await composeBreak(b, entry.id)));
+            t = bs + b.lengthMs;
+          }
+          if (t < e) segments.push({ key: `entry:${entry.id}:${t}`, startsAt: new Date(t), endsAt: new Date(e), code: "PGM", label: "Live", source: { kind: "live", liveSourceId: entry.liveSourceId! }, reason: "live", inBreak: false, logEntryId: entry.id, programId: entry.programId ?? undefined, liveSourceId: entry.liveSourceId ?? undefined });
+        } else {
+          const item = entry.assetId ? items.get(entry.assetId) : undefined;
+          const playable = item && item.location && item.durationMs && !offAir.has(item.id) && !item.archived;
+          if (!playable) {
+            // Pulled by a claim, or not ready: station ID and bumpers, never nothing.
+            await openTime(s, e);
+          } else {
+            let t = s;
+            let pos = 0;
+            const title = entry.programId ? (programs.get(entry.programId)?.title ?? item.title) : item.title;
+            const program = (from: number, to: number, seek: number): Segment => ({
+              key: `entry:${entry.id}:${from}`,
+              startsAt: new Date(from),
+              endsAt: new Date(to),
+              code: entry.code,
+              label: title,
+              source: { kind: "file", location: item.location!, seekMs: seek, mediaKind: item.mediaKind },
+              reason,
+              inBreak: false,
+              logEntryId: entry.id,
+              itemId: item.id,
+              programId: entry.programId ?? item.programId ?? undefined,
+              agreementId: entry.carriageAgreementId ?? undefined
+            });
+            for (const b of inside) {
+              const bs = Date.parse(b.startsAt);
+              if (bs > t && pos < item.durationMs!) {
+                const len = Math.min(bs - t, item.durationMs! - pos);
+                segments.push(program(t, t + len, pos));
+                pos += len;
+                t += len;
+              }
+              if (bs > t) await openTime(t, bs);
+              segments.push(...(await composeBreak(b, entry.id)));
+              t = Math.max(t, bs + b.lengthMs);
+            }
+            if (pos < item.durationMs! && t < e) {
+              const len = Math.min(e - t, item.durationMs! - pos);
+              segments.push(program(t, t + len, pos));
+              t += len;
+            }
+            await openTime(t, e);
+          }
+        }
+        cursor = Math.max(cursor, e);
+      }
+      await openTime(cursor, to.getTime());
+      return segments.filter((seg) => seg.endsAt.getTime() > from.getTime() && seg.startsAt.getTime() < to.getTime() && seg.endsAt > seg.startsAt);
+    }
+  };
+}

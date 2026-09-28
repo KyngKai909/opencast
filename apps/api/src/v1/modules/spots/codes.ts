@@ -174,7 +174,7 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
         const airedMs = Math.min(run.endedAt.getTime() - run.startedAt.getTime(), spot.lengthSec * 1000);
         const tunedIn = await services.audience.averageTunedIn(airing.stationId, run.startedAt, run.endedAt);
         const cost = costs.get(run.id) ?? 0;
-        const partial = airedMs < spot.lengthSec * 1000 - 100;
+        const partial = airedMs < spot.lengthSec * 1000 - 500;
         const working =
           airing.rateKind === "per_thousand"
             ? `${Math.round(tunedIn)} × ${fmt(airing.rateMicros)} ÷ 1,000${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`

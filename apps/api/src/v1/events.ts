@@ -7,6 +7,7 @@ export interface Events {
   "station.dead_air_warning": { stationId: string; gapStartsAt: string; minutesBefore: 30 | 12 };
   "station.dead_air_filled": { stationId: string; gapStartsAt: string; gapEndsAt: string };
   "station.signed_on": { stationId: string; first: boolean };
+  "station.signal_lost": { stationId: string; liveSourceId: string | null };
   "station.signed_off": { stationId: string; permanently: boolean };
   "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance"; stationIds: string[] };
   "spot.resumed": { spotId: string; businessId: string; stationIds: string[] };

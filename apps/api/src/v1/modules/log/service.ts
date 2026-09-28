@@ -4,6 +4,9 @@ import type { Airing, LogEntry } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 import { addDays, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+
+/** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
+export const DEAD_AIR_NOTE = "Filled automatically: dead air";
 import type { ItemRef } from "../library/service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
@@ -18,6 +21,7 @@ export interface AiringRef {
 
 export interface BreakSlotView {
   id: string | null;
+  filledAt: string | null;
   startsAt: string;
   lengthMs: number;
   context: string;
@@ -63,6 +67,14 @@ export interface LogService {
   entries(stationId: string, from: Date, to: Date): Promise<Row[]>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
+  markBreakFilled(breakId: string): Promise<void>;
+  /**
+   * Nobody filled the gap: repeat from the library, in order, and record that it happened.
+   * Whatever doesn't fit airs station ID and bumpers.
+   */
+  fillDeadAir(stationId: string, gap: Gap): Promise<number>;
+  /** Adds a break now, cued from a live block. */
+  cueBreak(stationId: string, at: Date, lengthMs: number, logEntryId: string | null): Promise<BreakSlotView>;
   /** "During Saturday Reel" / "After Late Crate, ep. 14" for stored breaks. */
   breakContexts(breakIds: string[]): Promise<Map<string, string>>;
   countCarried(input: { carrierStationId: string; agreementId: string; itemId: string; excludeEntryId?: string }): Promise<number>;
@@ -174,11 +186,11 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     return gaps.filter((g) => Date.parse(g.endsAt) > Date.parse(g.startsAt));
   }
 
-  async function generateBreaks(stationId: string, from: Date, to: Date): Promise<Array<Omit<BreakSlotView, "id" | "filledMs" | "openMs">>> {
+  async function generateBreaks(stationId: string, from: Date, to: Date): Promise<Array<Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">>> {
     const rule = await services.stations.breakRule(stationId);
     const rows = await load([stationId], new Date(from.getTime() - 6 * HOUR), to);
     const ctx = await context(rows);
-    const slots: Array<Omit<BreakSlotView, "id" | "filledMs" | "openMs">> = [];
+    const slots: Array<Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">> = [];
     for (const row of rows) {
       if (row.kind !== "program") continue; // Live programs cue their own; off-air has none.
       const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
@@ -237,17 +249,23 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     return slots.filter((s) => Date.parse(s.startsAt) >= from.getTime() && Date.parse(s.startsAt) < to.getTime());
   }
 
-  async function withStored(stationId: string, generated: Awaited<ReturnType<typeof generateBreaks>>, from: Date, to: Date): Promise<BreakSlotView[]> {
+  async function withStored(stationId: string, generatedIn: Awaited<ReturnType<typeof generateBreaks>>, from: Date, to: Date): Promise<BreakSlotView[]> {
+    let generated = generatedIn;
     const stored = await db
       .select()
       .from(B)
       .where(and(eq(B.stationId, stationId), gte(B.startsAt, from), lt(B.startsAt, to)));
     const byTime = new Map(stored.map((b) => [b.startsAt.toISOString(), b]));
     const filled = await services.spots.filledMsByBreak(stored.map((b) => b.id));
+    // Breaks cued from a live block aren't generated from the rule; they're stored as they happen.
+    const cued = stored
+      .filter((b) => b.origin === "cued_live")
+      .map((b) => ({ startsAt: b.startsAt.toISOString(), lengthMs: b.lengthMs, context: "Cued live", origin: "cued_live" as const, producerShareMs: 0, logEntryId: b.logEntryId }));
+    generated = [...generated, ...cued].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     return generated.map((slot) => {
       const row = byTime.get(slot.startsAt);
       const filledMs = row ? (filled.get(row.id) ?? 0) : 0;
-      return { ...slot, id: row?.id ?? null, filledMs, openMs: Math.max(0, slot.lengthMs - slot.producerShareMs - filledMs) };
+      return { ...slot, id: row?.id ?? null, filledAt: row?.filledAt?.toISOString() ?? null, filledMs, openMs: Math.max(0, slot.lengthMs - slot.producerShareMs - filledMs) };
     });
   }
 
@@ -358,7 +376,7 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       const wanted = new Set(generated.map((g) => g.startsAt));
       const filled = await services.spots.filledMsByBreak(stored.map((b) => b.id));
       // Stale breaks with nothing placed in them go; ones with airings stay (those airings are paid for).
-      const stale = stored.filter((b) => !wanted.has(b.startsAt.toISOString()) && !filled.get(b.id));
+      const stale = stored.filter((b) => b.origin !== "cued_live" && !wanted.has(b.startsAt.toISOString()) && !filled.get(b.id));
       if (stale.length) await db.delete(B).where(inArray(B.id, stale.map((b) => b.id)));
       const have = new Set(stored.map((b) => b.startsAt.toISOString()));
       const missing = generated.filter((g) => !have.has(g.startsAt));
@@ -390,6 +408,60 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       const counts = new Map<string, number>();
       for (const p of pulled) counts.set(p.stationId, (counts.get(p.stationId) ?? 0) + 1);
       return [...counts].map(([stationId, entries]) => ({ stationId, entries }));
+    },
+
+    async fillDeadAir(stationId, gap) {
+      const startsAt = new Date(gap.startsAt);
+      const endsAt = new Date(gap.endsAt);
+      const items = await services.library.repeatable(stationId, 20);
+      let cursor = startsAt.getTime();
+      let placed = 0;
+      for (let i = 0; items.length && i < 200; i++) {
+        const item = items[i % items.length];
+        const length = roundUpToMinute(item.durationMs!);
+        if (cursor + length > endsAt.getTime()) break;
+        await db.insert(E).values({
+          stationId,
+          startsAt: new Date(cursor),
+          endsAt: new Date(cursor + length),
+          kind: "program",
+          code: item.code,
+          assetId: item.id,
+          programId: item.programId,
+          localNote: DEAD_AIR_NOTE
+        });
+        cursor += length;
+        placed++;
+      }
+      const now = deps.clock.now();
+      const [event] = await db
+        .select()
+        .from(schema.deadAirEvents)
+        .where(and(eq(schema.deadAirEvents.stationId, stationId), eq(schema.deadAirEvents.gapStartsAt, startsAt)));
+      if (event) await db.update(schema.deadAirEvents).set({ autoFilledAt: now }).where(eq(schema.deadAirEvents.id, event.id));
+      else await db.insert(schema.deadAirEvents).values({ stationId, gapStartsAt: startsAt, gapEndsAt: endsAt, autoFilledAt: now });
+      deps.bus.emit("station.dead_air_filled", { stationId, gapStartsAt: gap.startsAt, gapEndsAt: gap.endsAt });
+      return placed;
+    },
+
+    async markBreakFilled(breakId) {
+      await db.update(B).set({ filledAt: deps.clock.now() }).where(eq(B.id, breakId));
+    },
+
+    async cueBreak(stationId, at, lengthMs, logEntryId) {
+      const [row] = await db.insert(B).values({ stationId, startsAt: at, lengthMs, logEntryId, origin: "cued_live" }).returning();
+      return {
+        id: row.id,
+        filledAt: null,
+        startsAt: row.startsAt.toISOString(),
+        lengthMs,
+        context: "Cued live",
+        origin: "cued_live",
+        producerShareMs: 0,
+        filledMs: 0,
+        openMs: lengthMs,
+        logEntryId
+      };
     },
 
     async breakContexts(breakIds) {

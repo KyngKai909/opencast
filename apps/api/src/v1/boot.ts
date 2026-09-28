@@ -1,13 +1,14 @@
-// Builds the v1 API from the environment, for the running server.
+// Builds the v1 API from the environment: the API server and the worker both use this.
 import { createDb } from "@opencast/db";
 import { privyVerifier } from "./auth.js";
+import type { Deps } from "./context.js";
 import { EventBus } from "./events.js";
 import { createV1 } from "./index.js";
 import { createJobs } from "./jobs.js";
 import { ffmpegPipeline } from "./media.js";
 import { fakePayments } from "./payments.js";
 
-export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
+export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -19,8 +20,7 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
   const clock = { now: () => new Date() };
   // Clear and Stripe adapters arrive in platform Phase 6.
   console.warn("[v1] payments: using the local fake. No real money moves.");
-  const v1 = createV1({
-    payments: fakePayments(clock),
+  return {
     db,
     bus: new EventBus(),
     clock,
@@ -29,6 +29,7 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
       email: async (to, n) => console.log(`[notify] email to ${to}: ${n.title}`)
     },
+    payments: fakePayments(clock),
     auth: privyVerifier({
       privyAppId: env.PRIVY_APP_ID ?? "unset",
       verificationKey: env.PRIVY_VERIFICATION_KEY || undefined,
@@ -40,8 +41,13 @@ export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
       escrowContractAddress: env.ESCROW_CONTRACT_ADDRESS || null,
       production: env.NODE_ENV === "production"
     }
-  });
-  if (env.JOBS !== "off") {
+  };
+}
+
+/** The API server's v1. The jobs tick belongs to the worker now; JOBS=on runs it here instead. */
+export function bootV1(env: NodeJS.ProcessEnv, storageRoot: string) {
+  const v1 = createV1(createDeps(env, storageRoot));
+  if (env.JOBS === "on") {
     createJobs(v1.deps, v1.services).start();
   }
   return v1;

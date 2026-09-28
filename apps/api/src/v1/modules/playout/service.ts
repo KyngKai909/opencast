@@ -3,6 +3,9 @@ import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { decoratePlaylist } from "./engine/scte35.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output";
@@ -45,6 +48,8 @@ export interface PlayoutService {
   asRun(stationId: string, from: Date, to: Date): Promise<AsRunView[]>;
   /** As-run rows for spot airings, for billing and results. */
   asRunForAirings(airingIds: string[]): Promise<Map<string, typeof schema.asRun.$inferSelect>>;
+  /** A station's live HLS playlist with SCTE-35 cues for its breaks (EXT-X-DATERANGE). */
+  playlistWithCues(stationId: string): Promise<string | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** A planned sign-on ("Signs on Monday, 6:00 am"). */
@@ -270,6 +275,18 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       if (!airingIds.length) return new Map();
       const rows = await db.select().from(schema.asRun).where(inArray(schema.asRun.airingId, airingIds));
       return new Map(rows.map((r) => [r.airingId!, r]));
+    },
+
+    async playlistWithCues(stationId) {
+      const file = path.join(deps.config.storageRoot, "hls", stationId, "index.m3u8");
+      const playlist = await fs.readFile(file, "utf8").catch(() => null);
+      if (playlist === null) return null;
+      const now = deps.clock.now();
+      const breaks = (await services.log.breaks(stationId, new Date(now.getTime() - 5 * 60_000), new Date(now.getTime() + 2 * 60_000))).filter((b) => b.id);
+      return decoratePlaylist(
+        playlist,
+        breaks.map((b) => ({ id: b.id!, startsAt: new Date(b.startsAt), durationMs: b.lengthMs, eventId: parseInt(b.id!.slice(0, 8), 16) }))
+      );
     },
 
     async onAirStations() {

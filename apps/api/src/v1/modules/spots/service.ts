@@ -55,13 +55,17 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
   rotations(stationId: string): Promise<{ main: RotationView; backup: RotationView }>;
   setRotation(stationId: string, kind: "main" | "backup", spotIds: string[]): Promise<RotationView>;
   /** The spots a station's rotation (then backup) offers for a break, in order. For playout. */
-  rotationFor(stationId: string, kind: "main" | "backup"): Promise<Array<{ spotId: string; lengthSec: number }>>;
+  rotationFor(stationId: string, kind: "main" | "backup"): Promise<Array<{ spotId: string; lengthSec: number; category: string; dayparts: string[] }>>;
+  /** What's placed in each break, in order, with what playout needs to air it. */
+  breakAirings(breakIds: string[]): Promise<Map<string, BreakAiring[]>>;
+  /** Spots placed on a station in a window (for the hourly cap and same-spot limit). */
+  placedOnStation(stationId: string, from: Date, to: Date): Promise<Array<{ spotId: string; lengthSec: number; scheduledAt: Date }>>;
   /**
    * Places a spot in a stored break, holding the money first. Refused (and nothing
    * changes) if the spot can't be placed or the money can't be held; playout then
    * tries the next spot, the backup rotation, then station ID and bumpers.
    */
-  place(input: { spotId: string; stationId: string; breakId: string; scheduledAt: Date }): Promise<{ airingId: string; holdMicros: number }>;
+  place(input: { spotId: string; stationId: string; breakId: string; scheduledAt: Date; carriageAgreementId?: string }): Promise<{ airingId: string; holdMicros: number }>;
   /** Pays for an airing from the as-run log: prorated if cut short, per thousand from the tuned-in numbers. */
   settleAiring(input: { airingId: string; asRunId: string; startedAt: Date; endedAt: Date; barter?: { producerStationId: string; producerShare: number; agreementId: string } }): Promise<{ costMicros: number; working: string }>;
   /** Resumes spots paused for their daily cap. Run at each market's midnight. */
@@ -113,6 +117,16 @@ export interface SpotInput {
   endsOn: string | null;
   targeting: Partial<Targeting>;
   code: { code: string; offer: string; windowDays: number } | null;
+}
+
+export interface BreakAiring {
+  airingId: string;
+  spotId: string;
+  lengthSec: number;
+  location: string | null;
+  code: { code: string; offer: string } | null;
+  carriageAgreementId: string | null;
+  scheduledAt: Date;
 }
 
 export interface RotationView {
@@ -813,10 +827,57 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
     async rotationFor(stationId, kind) {
       const view = (await service.rotations(stationId))[kind];
-      return view.spots.filter((s) => !s.paused).map((s) => ({ spotId: s.spotId, lengthSec: s.lengthSec }));
+      const live = view.spots.filter((s) => !s.paused);
+      if (!live.length) return [];
+      const [rows, targeting] = await Promise.all([
+        db.select().from(SP).where(inArray(SP.id, live.map((s) => s.spotId))),
+        db.select().from(schema.targeting).where(inArray(schema.targeting.spotId, live.map((s) => s.spotId)))
+      ]);
+      return live.map((s) => ({
+        spotId: s.spotId,
+        lengthSec: s.lengthSec,
+        category: rows.find((r) => r.id === s.spotId)?.category ?? "",
+        dayparts: (targeting.find((t) => t.spotId === s.spotId)?.dayparts as string[] | undefined) ?? []
+      }));
     },
 
-    async place({ spotId, stationId, breakId, scheduledAt }) {
+    async breakAirings(breakIds) {
+      const result = new Map<string, BreakAiring[]>();
+      if (!breakIds.length) return result;
+      const rows = await db
+        .select({ airing: AI, spot: SP, file: schema.spotFiles, code: schema.codes })
+        .from(AI)
+        .innerJoin(SP, eq(SP.id, AI.spotId))
+        .leftJoin(schema.spotFiles, and(eq(schema.spotFiles.spotId, AI.spotId), eq(schema.spotFiles.current, true)))
+        .leftJoin(schema.codes, eq(schema.codes.spotId, AI.spotId))
+        .where(inArray(AI.breakId, breakIds))
+        .orderBy(asc(AI.createdAt));
+      for (const r of rows) {
+        const list = result.get(r.airing.breakId) ?? [];
+        list.push({
+          airingId: r.airing.id,
+          spotId: r.spot.id,
+          lengthSec: r.spot.lengthSec,
+          location: r.file?.location ?? null,
+          code: r.code ? { code: r.code.code, offer: r.code.offer } : null,
+          carriageAgreementId: r.airing.carriageAgreementId,
+          scheduledAt: r.airing.scheduledAt
+        });
+        result.set(r.airing.breakId, list);
+      }
+      return result;
+    },
+
+    async placedOnStation(stationId, from, to) {
+      const rows = await db
+        .select({ spotId: AI.spotId, lengthSec: SP.lengthSec, scheduledAt: AI.scheduledAt })
+        .from(AI)
+        .innerJoin(SP, eq(SP.id, AI.spotId))
+        .where(and(eq(AI.stationId, stationId), gte(AI.scheduledAt, from), lt(AI.scheduledAt, to)));
+      return rows;
+    },
+
+    async place({ spotId, stationId, breakId, scheduledAt, carriageAgreementId }) {
       const row = await spotRow(spotId);
       if (row.status !== "listed") throw refused("not_listed", "Only spots in the market are placed.");
       const spent = (await services.ledger.spotSpend([spotId], await dayStartFor(row.advertiserId))).get(spotId) ?? { used: 0, usedToday: 0 };
@@ -850,7 +911,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           });
           const [airing] = await tx
             .insert(AI)
-            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros })
+            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros, carriageAgreementId: carriageAgreementId ?? null })
             .returning({ id: AI.id });
           return airing.id;
         })
@@ -865,7 +926,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     async settleAiring({ airingId, asRunId, startedAt, endedAt, barter }) {
       const [airing] = await db.select({ airing: AI, spot: SP }).from(AI).innerJoin(SP, eq(SP.id, AI.spotId)).where(eq(AI.id, airingId));
       if (!airing) throw notFound("That airing");
-      const airedMs = Math.max(0, Math.min(endedAt.getTime() - startedAt.getTime(), airing.spot.lengthSec * 1000));
+      // Within half a second of its length is in full (process timing, not a cut).
+      const measured = endedAt.getTime() - startedAt.getTime();
+      const airedMs = Math.max(0, measured >= airing.spot.lengthSec * 1000 - 500 ? airing.spot.lengthSec * 1000 : measured);
       const fraction = airedMs / (airing.spot.lengthSec * 1000);
       let cost: number;
       let working: string;
@@ -879,6 +942,11 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         working = `${Math.round(tunedIn)} × ${fmt(airing.airing.rateMicros)} ÷ 1,000${fraction < 1 ? ` × ${Math.round(airedMs / 1000)}/${airing.spot.lengthSec}s` : ""} = ${fmt(cost)}`;
       }
       const station = (await services.stations.idents([airing.airing.stationId])).get(airing.airing.stationId);
+      if (!barter && airing.airing.carriageAgreementId) {
+        // It filled the producer's barter share: the producer is paid.
+        const agreement = (await services.catalog.agreementsByIds([airing.airing.carriageAgreementId])).get(airing.airing.carriageAgreementId);
+        if (agreement) barter = { producerStationId: agreement.makerStationId, producerShare: 1, agreementId: agreement.id };
+      }
       await db.transaction((tx) =>
         services.ledger.settle(tx, {
           holdId: airing.airing.holdId,

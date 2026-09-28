@@ -5,7 +5,7 @@
 | Service | What it is | State |
 |---|---|---|
 | `apps/api` | Express. `/v1` is the new API on the new schema; `/api` is the old one, kept for the old master control until the apps prompt replaces it | Postgres |
-| `apps/worker` | Playout: ffmpeg to HLS and Livepeer. Still reads the old `opencast_state` blob until platform Phase 5 moves it onto the program log | Postgres, Redis lock |
+| `apps/worker` | Playout: the engine (below) airs every station from its program log; the minute tick. Also runs the old queue loop for stations still on the old model (`LEGACY_PLAYOUT`) | Postgres, Redis lock |
 | `apps/control`, `viewer`, `tv`, `site`, `spots`, `desk` | The apps (the apps prompt) | none; they call `/v1` |
 | Postgres | One database, nine schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`), plus the old `public.opencast_state` | |
 | Redis | The worker's leader lock | |
@@ -48,6 +48,30 @@ apps/api/src/v1/
 
 **Roles** are checked in each route through `accounts.requireStation` / `requireBusiness`: station owner, operator, host (their own live blocks only); business owner, manager (never withdraws or changes funding), viewer (results, airings, statements); Opencast admin (the desk, and owner of the stations Opencast runs). A station you're not on answers 404, not 403, so its existence isn't revealed.
 
+## Playout
+
+The engine lives in the playout module (`apps/api/src/v1/modules/playout/engine`) and runs in the worker, on the Redis leader only.
+
+```
+engine tick (1 s)   commands → runners follow who's on air → fill breaks 20 min ahead → fill dead air
+fill.ts             places spots in stored breaks, holding the money first: rotation, then backup rotation,
+                    within the hourly cap, same-spot limit, blocked categories and dayparts; the
+                    producer's barter share from the producer's rotation (the producer is paid)
+plan.ts             the run sheet: programs at their times, split around breaks and resumed where they
+                    stopped; each break = spots, credit, bumpers, station ID last; live blocks; off air;
+                    open time = station ID and bumpers, never nothing
+runner.ts           per station: one long-running muxer (MPEG-TS in, `-c copy` out) to HLS, Livepeer and
+                    relays; relays set to "Station ID slate" get their own feed with the slate in breaks.
+                    Each segment is encoded in real time with the bug (and a spot's code and QR for its
+                    last :10), timestamps carried on, so outputs never reconnect between items. Spots,
+                    credits, bumpers and IDs air in full; programs are joined late instead. When a segment
+                    ends: an as-run row with its real times, a proof frame for spots, and settlement.
+slates.ts           station ID, credit, off-air, stand-by, bug, code + QR: SVG rendered with sharp
+scte35.ts           splice_insert cues; the API adds EXT-X-DATERANGE (SCTE35-OUT/IN) to live playlists
+```
+
+Live blocks read the encoder from Livepeer's playback when the source was made with a Livepeer key, or from a local RTMP listener (`LIVE_LISTEN_PORT`) otherwise; no signal airs the stand-by slate and tells the station.
+
 ## Money
 
 Double-entry in `ledger`: every movement is an entry whose postings sum to zero; nothing is edited. The database enforces balance, non-negative advertiser balances and holds, funded holds, and escrow paying only the creator or the fund.
@@ -70,7 +94,6 @@ Spots, catalog and playout never call a provider: they ask the ledger, which use
 
 ## Still to move (later phases)
 
-- The worker reads the old blob: Phase 5 moves it onto the program log, breaks, rotations and the as-run log, and calls `spots.place` and `spots.settleAiring`.
 - `/api` and `apps/control` stay until the apps prompt's master control replaces them.
 - `payments.ts` is a local fake: Phase 6 adds the Clear and Stripe adapters and the escrow contract.
-- The jobs tick runs in one API process (`JOBS=on`); it moves to the worker, under its Redis lock, in Phase 5.
+- The old queue loop in the worker stays (`LEGACY_PLAYOUT=on`) until nothing is on the old model.
