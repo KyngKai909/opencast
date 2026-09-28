@@ -1,0 +1,25 @@
+// The guide: every station in a band, for a window of at most 24 hours.
+
+import { http } from "msw";
+import { stationsApi } from "@opencast/contracts";
+import { GuideX } from "../../api/ext";
+import { inWindow } from "../fixtures/schedule";
+import { inMarket } from "../fixtures/stations";
+import { fail, path, reply } from "../respond";
+import { airingX, identX, marketOf } from "../view";
+
+export const guideHandlers = [
+  http.get(path(stationsApi.getGuide), ({ params, request }) => {
+    const slug = String(params.marketSlug);
+    const market = marketOf(slug);
+    if (!market) return fail(404, "not_found", "That market wasn't found.");
+    const q = new URL(request.url).searchParams;
+    const band = (q.get("band") ?? "tv") as "tv" | "radio";
+    const from = q.get("from");
+    const to = q.get("to");
+    if (!from || !to) return fail(400, "bad_request", "A guide needs a window.");
+    if (Date.parse(to) - Date.parse(from) > 24 * 3600e3) return fail(400, "bad_request", "A guide window is at most 24 hours.");
+    const rows = inMarket(slug, band).map((s) => ({ station: identX(s), airings: inWindow(s.ident.id, from, to).map(airingX) }));
+    return reply(GuideX, { market, from, to, rows });
+  })
+];

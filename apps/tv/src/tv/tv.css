@@ -1,0 +1,7 @@
+/* TV mode's glue. Always dark (data-ground="tv" on <html>); the ten-foot canvas is TvShell's.
+   Page styles use the prefix tv- ; tokens only; nothing under 21px at 1080p (A14). */
+html, body, #root { height: 100%; margin: 0; background: #000; overflow: hidden; }
+#root { display: flex; }
+#root > * { flex: 1; }
+/* The one focus ring: 4px signal outline outside the element (style guide, TV). */
+.tv-focus { outline: 4px solid var(--signal); outline-offset: 4px; }
