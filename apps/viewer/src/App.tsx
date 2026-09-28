@@ -4,6 +4,7 @@ import { GroundProvider, ToastProvider } from "@opencast/ui";
 import { AuthProvider } from "./auth/AuthProvider";
 import { PlayerRoot } from "./player/PlayerRoot";
 import { ShellOptionsProvider } from "./layout/shell";
+import { SettingsSync } from "./layout/SettingsSync";
 import { AppRoutes } from "./routes";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } });
@@ -14,6 +15,7 @@ export function App() {
       <GroundProvider>
         <ToastProvider>
           <AuthProvider>
+            <SettingsSync />
             <PlayerRoot>
               <BrowserRouter>
                 <ShellOptionsProvider>

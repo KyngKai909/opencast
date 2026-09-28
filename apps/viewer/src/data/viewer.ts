@@ -3,14 +3,18 @@
 // offered to the account at sign-in.
 
 import { useCallback, useMemo } from "react";
+import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { accountsApi, stationsApi, type StationIdent } from "@opencast/contracts";
 import { call } from "../api/client";
 import { DialX, MarketsX, type AiringX, type DialRowX, type StationIdentX } from "../api/ext";
 import { keyFor, useApi } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
-import { setDevice, useDevice } from "../device/store";
-import { useToast } from "@opencast/ui";
+import { getDevice, setDevice, useDevice } from "../device/store";
+import { clock, useToast } from "@opencast/ui";
+import type { SignInReason } from "../auth/types";
+import { MARKET_TZ } from "../lib/clock";
+import { addPreset, lowestFreeKey, placePreset, removePresetFrom } from "../components/you/presetRules";
 
 export function useMarkets() {
   return useApi(stationsApi.listMarkets, {}, { schema: MarketsX, staleTime: 3600e3 });
@@ -76,49 +80,75 @@ function identLabel(s: Pick<StationIdent, "callSign" | "channel">) {
 }
 
 /**
+ * Why sign-in opened, with where "go back" returns to: "Two things before you go back to CIVC."
+ * (`backTo` rides along on the reason; SignInModal reads it.)
+ */
+export type SignInReasonX = SignInReason;
+
+/** The replace dialog's search params over the current page: ?modal=replace-key&station=<id>. */
+export function replaceKeySearch(search: string, stationId: string): string {
+  const p = new URLSearchParams(search);
+  // Over the station preview (?station= alone): remember which, to go back to it on close.
+  const preview = p.get("modal") ? null : p.get("station");
+  if (preview) p.set("preview", preview);
+  p.set("modal", "replace-key");
+  p.set("station", stationId);
+  return `?${p}`;
+}
+
+/**
  * Save, remind, pledge: each asks for sign-in at the moment it's needed and finishes afterwards;
- * signed out, saving and reminding can be kept on this device instead.
+ * signed out, saving and reminding can be kept on this device instead (closing sign-in keeps it,
+ * with a toast that can undo it). Needs the router: with all six keys taken, saving opens the
+ * replace dialog over the current page unless `onFull` says otherwise.
  */
 export function useViewerActions() {
   const auth = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const navigate = useNavigate();
   const refresh = useCallback(() => {
     void qc.invalidateQueries({ queryKey: keyFor(accountsApi.listPresets).slice(0, 2) });
     void qc.invalidateQueries({ queryKey: keyFor(accountsApi.listReminders).slice(0, 2) });
   }, [qc]);
 
-  /** The lowest free key 1 to 6, or null when all six are taken. */
+  /** Opens "All six keys are taken" for a station, over whatever page is showing. */
+  const openReplaceKey = useCallback((stationId: string) => navigate({ search: replaceKeySearch(window.location.search, stationId) }), [navigate]);
+
+  /** The lowest free key 1 to 6, or null when all six are taken (the account's, or this device's). */
   const freeKey = useCallback(async (): Promise<number | null> => {
-    const list = auth.signedIn ? await call(accountsApi.listPresets) : (await Promise.resolve(null), null);
-    const taken = new Set((list ?? []).map((p) => p.key).filter((k): k is number => k !== null));
-    for (let k = 1; k <= 6; k++) if (!taken.has(k)) return k;
-    return null;
+    if (!auth.signedIn) return lowestFreeKey(getDevice().presets);
+    const list = await call(accountsApi.listPresets);
+    return lowestFreeKey(list.map((p) => ({ stationId: p.station.id, key: p.key })));
   }, [auth.signedIn]);
 
   const savePreset = useCallback(
     (station: Pick<StationIdent, "id" | "callSign" | "channel">, opts: { key?: number | null; onFull?: () => void } = {}) => {
+      const label = identLabel(station);
+      const onFull = opts.onFull ?? (() => void openReplaceKey(station.id));
       const run = async () => {
         let key = opts.key;
         if (key === undefined) {
-          key = await freeKey();
-          if (key === null && opts.onFull) return opts.onFull(); // The replace dialog asks which key.
+          const list = await call(accountsApi.listPresets);
+          if (list.some((p) => p.station.id === station.id)) return; // Already a preset.
+          key = lowestFreeKey(list.map((p) => ({ stationId: p.station.id, key: p.key })));
+          if (key === null) return onFull(); // The replace dialog asks which key.
         }
         await call(accountsApi.savePreset, { body: { stationId: station.id, key: key ?? null } });
         refresh();
       };
       const onDevice = () => {
-        setDevice((d) => {
-          if (d.presets.some((p) => p.stationId === station.id)) return {};
-          const taken = new Set(d.presets.map((p) => p.key));
-          const key = [1, 2, 3, 4, 5, 6].find((k) => !taken.has(k)) ?? null;
-          return { presets: [...d.presets, { stationId: station.id, key }] };
-        });
+        const before = getDevice().presets;
+        if (before.some((p) => p.stationId === station.id)) return;
+        const next = opts.key !== undefined ? placePreset(before, station.id, opts.key) : addPreset(before, station.id);
+        if (!next) return onFull(); // All six keys on this device are taken: the dialog asks here too.
+        setDevice({ presets: next });
+        toast.show({ message: `${label} saved on this device`, onUndo: () => setDevice({ presets: before }) });
       };
-      const label = identLabel(station);
-      return auth.requireSignIn({ kind: "preset", label: `save ${label} as a preset`, finish: `Save ${label} and go back` }, run, onDevice);
+      const reason: SignInReasonX = { kind: "preset", label: `save ${label} as a preset`, finish: `Save ${label} and go back`, backTo: station.callSign ?? label };
+      return auth.requireSignIn(reason, run, onDevice);
     },
-    [auth, freeKey, refresh]
+    [auth, refresh, toast, openReplaceKey]
   );
 
   const removePreset = useCallback(
@@ -126,7 +156,7 @@ export function useViewerActions() {
       if (auth.signedIn) {
         await call(accountsApi.removePreset, { params: { stationId } });
         refresh();
-      } else setDevice((d) => ({ presets: d.presets.filter((p) => p.stationId !== stationId) }));
+      } else setDevice((d) => ({ presets: removePresetFrom(d.presets, stationId) }));
     },
     [auth.signedIn, refresh]
   );
@@ -134,23 +164,31 @@ export function useViewerActions() {
   const remind = useCallback(
     (target: ReminderTarget, switchMeOver = false) => {
       const ids = target.airing.listedAiringId ? { listedAiringId: target.airing.listedAiringId } : { logEntryId: target.airing.logEntryId ?? undefined };
+      const at = clock(target.airing.startsAt, { timeZone: MARKET_TZ });
       const run = async () => {
         const r = await call(accountsApi.addReminder, { body: { ...ids, switchMeOver } });
         refresh();
         // A toast with Undo, not a modal.
         toast.show({
-          message: `Reminder set for ${target.airing.title}, ${new Date(target.airing.startsAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).toLowerCase()}`,
+          message: `Reminder set for ${target.airing.title}, ${at}`,
           onUndo: async () => {
             await call(accountsApi.removeReminder, { params: { reminderId: r.id } });
             refresh();
           }
         });
       };
-      const onDevice = () => setDevice((d) => ({ reminders: [...d.reminders, { ...ids, switchMeOver, title: target.airing.title, startsAt: target.airing.startsAt, stationId: target.station.id }] }));
-      return auth.requireSignIn({ kind: "remind", label: `be reminded about ${target.airing.title}`, finish: `Remind me and go back` }, run, onDevice);
+      const onDevice = () => {
+        const before = getDevice().reminders;
+        const id = ids.listedAiringId ?? ids.logEntryId;
+        if (before.some((r) => (r.listedAiringId ?? r.logEntryId) === id)) return;
+        setDevice({ reminders: [...before, { ...ids, switchMeOver, title: target.airing.title, startsAt: target.airing.startsAt, stationId: target.station.id }] });
+        toast.show({ message: `Reminder set on this device for ${target.airing.title}, ${at}`, onUndo: () => setDevice({ reminders: before }) });
+      };
+      const reason: SignInReasonX = { kind: "remind", label: `be reminded about ${target.airing.title}`, finish: `Remind me and go back`, backTo: target.station.callSign ?? identLabel(target.station) };
+      return auth.requireSignIn(reason, run, onDevice);
     },
     [auth, refresh, toast]
   );
 
-  return { savePreset, removePreset, remind, freeKey };
+  return { savePreset, removePreset, remind, freeKey, openReplaceKey };
 }

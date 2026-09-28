@@ -1,0 +1,5 @@
+/* Station preview (home 06.1 .m-note; 06.2 the band inset in the sheet). */
+.vw-preview__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.vw-preview__msg { font-size: 14px; color: var(--ink-70); margin: 0; }
+.vw-preview .oc-sheet .oc-modal__band { padding: 0 12px; }
+.vw-preview__quiet > div { height: 52px; border-bottom: 1px solid var(--hair); background: linear-gradient(90deg, var(--raised) 0 56px, transparent 56px 80px, var(--raised) 80px 72%, transparent 72%); background-size: 100% 14px; background-repeat: no-repeat; background-position: 0 40%; opacity: .6; }

@@ -12,9 +12,12 @@ export function RadioScreen({
   playing,
   onAirHere,
   tally = true,
-  levels
+  levels,
+  size = "tv"
 }: {
   channel: Channel;
+  /** tv (05.1): "Night Desk, Radio dramas from the 1940s. Now: The Hollow Door, part 2". web (04.2): "Night Desk, Riverside". */
+  size?: "web" | "tv";
   playing: boolean;
   onAirHere: boolean;
   /** Hidden while the banner (which carries the tally) is up: one tally per view. */
@@ -39,8 +42,10 @@ export function RadioScreen({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [levels, playing]);
-  const now = c.now?.title;
-  const sub = [c.station.name, now].filter(Boolean).join(", ");
+  const sub =
+    size === "tv"
+      ? `${[c.station.name, c.now?.title].filter(Boolean).join(", ")}${c.now?.episodeTitle ? `. Now: ${c.now.episodeTitle}` : ""}`
+      : [c.station.name, c.station.homeCity].filter(Boolean).join(", ");
   return (
     <div className={cx("oc-radio", playing && "oc-radio--playing")} style={{ background: c.station.colour ?? "#33507A" }}>
       <div className="oc-radio__drift">

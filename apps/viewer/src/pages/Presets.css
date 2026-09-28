@@ -1,0 +1,15 @@
+/* Presets (you 03.1: .pg-h, .keys, .more-row). */
+.vw-presets-page__lede { margin: 12px 0 14px; font-size: 14.5px; color: var(--ink-70); }
+.vw-presets-page__device { display: flex; align-items: center; gap: var(--s3); margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--hair); font-size: 14px; color: var(--ink-70); }
+.vw-presets-page__device p { margin: 0; flex: 1; }
+.vw-presets-page__loading { height: 106px; border: 1px dashed var(--hair); border-radius: var(--r-control); }
+.vw-y-more { display: grid; grid-template-columns: 52px 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-more__ch { font: 500 15px var(--font-mono); }
+.vw-y-more__cs { font-size: 14px; }
+.vw-y-more__w { min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vw-y-more__w b { font-weight: 600; }
+.vw-y-more__w small { font-size: 13px; color: var(--ink-70); }
+.vw-y-more__end { display: flex; gap: var(--s2); align-items: center; }
+@media (max-width: 767px) {
+  .vw-y-more { grid-template-columns: 48px 52px minmax(0, 1fr) auto; gap: 10px; }
+}

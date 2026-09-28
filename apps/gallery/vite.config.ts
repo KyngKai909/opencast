@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { defaultClientConditions, defineConfig, type Plugin } from "vite";
+import { fileURLToPath } from "node:url";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error: a plain .mjs module with no types
 import { mockLiveHls } from "@opencast/player/mock";
@@ -27,7 +28,8 @@ function referenceFiles(): Plugin {
 
 export default defineConfig({
   plugins: [react(), referenceFiles()],
-  // Workspace packages export their TypeScript under "source"; keep Vite's own conditions after it.
-  resolve: { conditions: ["source", ...defaultClientConditions] },
+  // @opencast/contracts exports its TypeScript under the "source" condition. Point at it directly:
+  // the condition itself would also pick third-party "source" exports (react-aria's) that don't build.
+  resolve: { alias: [{ find: /^@opencast\/contracts$/, replacement: fileURLToPath(new URL("../../packages/contracts/src/index.ts", import.meta.url)) }] },
   server: { port: 5180, strictPort: true }
 });

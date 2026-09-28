@@ -1,0 +1,8 @@
+/* The code boxes (you 01.2, .codebox). */
+.vw-otp__boxes { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--s2); margin: 18px 0 8px; }
+.vw-otp__box { height: 58px; border: 1px solid var(--line); border-radius: var(--r-control); display: grid; place-items: center; font: 500 26px var(--font-mono); background: var(--raised); color: var(--ink); }
+/* The input sits over the boxes, invisible; the ring on the next box is its focus. */
+.vw-otp__input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; font-size: 16px; color: transparent; caret-color: transparent; background: none; cursor: text; }
+.vw-otp__boxes:focus-within .vw-otp__box--cur { box-shadow: 0 0 0 2px var(--signal); }
+.vw-otp--error .vw-otp__box { border-color: var(--standby); }
+.vw-otp__error { margin: 0 0 8px; font-size: 13px; color: var(--standby); }

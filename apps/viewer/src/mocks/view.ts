@@ -12,7 +12,7 @@ export function identX(s: MockStation): StationIdentX {
 export function airingX(x: MockAiring): AiringX {
   const a = toAiring(x);
   const from = a.carriedFrom ? stationById(a.carriedFrom.id) : undefined;
-  return { ...a, note: x.note ?? null, carriedFrom: from ? identX(from) : null, listedAiringId: x.listed ? x.id : null };
+  return { ...a, note: x.note ?? null, episodeDescription: x.episodeDescription ?? null, carriedFrom: from ? identX(from) : null, listedAiringId: x.listed ? x.id : null };
 }
 
 export function dialRow(s: MockStation, t = now()): DialRowX {

@@ -46,7 +46,9 @@ function AuthState({ children }: { children: ReactNode }) {
   const pending = useRef<(() => void | Promise<void>) | null>(null);
   const fallback = useRef<(() => void) | null>(null);
 
-  useEffect(() => setTokenSource(adapter.getToken), [adapter.getToken]);
+  // During render, not in an effect: the pages' first queries start in their own effects, which
+  // run before this provider's, and would go out without the token.
+  setTokenSource(adapter.getToken);
   // Signing in or out changes what every "me" query answers.
   useEffect(() => {
     void qc.invalidateQueries();

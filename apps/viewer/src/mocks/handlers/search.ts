@@ -1,37 +1,64 @@
-// Search: a channel or frequency tunes; a call sign or name finds the station; anything else
-// finds programs, airing next first (what's on now comes first).
+// Search: a channel or frequency tunes; a call sign, name or what a station is finds the station;
+// anything else finds programs, airing next first (what's on now comes first), with your market's
+// own before carried copies elsewhere. The rules are search's own (components/search/searchLogic).
 
 import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
-import { SearchX } from "../../api/ext";
+import { SearchFull } from "../../api/ext/station";
+import { matchChannel, numberQuery, orderAirings } from "../../components/search/searchLogic";
+import { channelValue } from "../../components/station/when";
 import { now } from "../../lib/clock";
-import { AIRINGS } from "../fixtures/schedule";
-import { STATIONS } from "../fixtures/stations";
+import { STATION_EXTRA, programById, weekAirings } from "../fixtures/station";
+import { STATIONS, stationById } from "../fixtures/stations";
 import { path, reply } from "../respond";
 import { airingX, identX } from "../view";
+
+/** At most this many programs. */
+const PROGRAMS_MAX = 12;
+
+export function searchResults(qRaw: string, market: string | null) {
+  const q = qRaw.trim().toLowerCase();
+  const inMkt = STATIONS.filter((s) => !market || s.ident.marketSlug === market);
+  const m = matchChannel(q, inMkt.map((s) => s.ident.channel ?? ""));
+  const tuneTo = m?.found ? identX(inMkt.find((s) => s.ident.channel === m.channel)!) : null;
+
+  const lineOf = (s: (typeof STATIONS)[number]) => STATION_EXTRA[s.ident.callSign ?? ""]?.searchLine ?? `${s.category}. ${s.description.replace(/\.$/, "")}`;
+  const stations = inMkt
+    .filter((s) => [s.ident.callSign, s.ident.name, s.ident.handle, s.category, lineOf(s), s.description].some((v) => v?.toLowerCase().includes(q)) || (s.ident.channel ?? "").startsWith(q))
+    .sort((a, b) => channelValue(a.ident.channel) - channelValue(b.ident.channel))
+    .map((s) => ({ ...identX(s), description: lineOf(s) }));
+
+  const t = now();
+  const iso = t.toISOString();
+  const seen = new Set<string>();
+  // A number is a channel first: it finds programs only by a name that starts with it ("24 Hours",
+  // not "Planning Commission, Sept 24").
+  const numeric = numberQuery(q) !== null;
+  const hits = weekAirings()
+    .filter((a) => a.end > iso)
+    .filter((a) => {
+      const p = a.programId ? programById(a.programId) : undefined;
+      if (numeric) return !!p?.title.toLowerCase().startsWith(q) || a.title.toLowerCase().startsWith(q);
+      return a.title.toLowerCase().includes(q) || !!p?.title.toLowerCase().includes(q);
+    })
+    .map((a) => {
+      const s = stationById(a.stationId)!;
+      const p = a.programId ? programById(a.programId) : undefined;
+      return { station: identX(s), airing: airingX(a), listed: !!a.listed, program: p ? { id: p.id, title: p.title } : null };
+    });
+  // The next airing of each program on each station, not every repeat.
+  const airings = orderAirings(hits, t, market)
+    .filter((r) => {
+      const k = `${r.station.id}:${r.program?.id ?? r.airing.title}`;
+      return seen.has(k) ? false : (seen.add(k), true);
+    })
+    .slice(0, PROGRAMS_MAX);
+  return { tuneTo, stations, airings };
+}
 
 export const searchHandlers = [
   http.get(path(stationsApi.search), ({ request }) => {
     const u = new URL(request.url);
-    const q = (u.searchParams.get("q") ?? "").trim().toLowerCase();
-    const market = u.searchParams.get("market");
-    const inMkt = STATIONS.filter((s) => !market || s.ident.marketSlug === market);
-    let tuneTo = null;
-    if (/^\d{1,3}(\.\d)?$/.test(q)) {
-      const want = q.includes(".") ? [q] : [`${q}.1`, q.length >= 3 ? `${q.slice(0, -1)}.${q.slice(-1)}` : ""];
-      const hit = inMkt.find((s) => want.includes(s.ident.channel ?? ""));
-      tuneTo = hit ? identX(hit) : null;
-    }
-    const stations = inMkt
-      .filter((s) => [s.ident.callSign, s.ident.name, s.ident.handle].some((v) => v?.toLowerCase().includes(q)))
-      .map((s) => ({ ...identX(s), description: s.description }));
-    const t = now().toISOString();
-    const airings = AIRINGS.filter((a) => a.end > t && a.title.toLowerCase().includes(q))
-      .map((a) => ({ a, s: STATIONS.find((s) => s.ident.id === a.stationId)! }))
-      .filter(({ s }) => !market || s.ident.marketSlug === market)
-      .sort((x, y) => x.a.start.localeCompare(y.a.start))
-      .slice(0, 20)
-      .map(({ a, s }) => ({ station: identX(s), airing: airingX(a), listed: !!a.listed }));
-    return reply(SearchX, { tuneTo, stations, airings });
+    return reply(SearchFull, searchResults(u.searchParams.get("q") ?? "", u.searchParams.get("market")));
   })
 ];

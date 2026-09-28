@@ -1,0 +1,5 @@
+/* The listing's "Switch me over" row (home 05.1). */
+.vw-listing__switch { display: flex; align-items: center; gap: 12px; }
+.vw-listing__switch > div { flex: 1; }
+.vw-listing__switch b { display: block; font-weight: 600; font-size: 15px; }
+.vw-listing__switch small { font-size: 13px; color: var(--ink-70); }

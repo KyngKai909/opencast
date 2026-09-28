@@ -1,18 +1,24 @@
-// The signed-in person: me, presets, reminders, pledges, notification settings.
+// The signed-in person: me, presets, reminders, pledges, TVs, notification settings, and the
+// proposed endpoints in api/ext/you.ts (B2, E1, A1, A2, A3).
 
 import { http } from "msw";
-import { accountsApi, audienceApi, ledgerApi, notificationsApi } from "@opencast/contracts";
+import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi } from "@opencast/contracts";
 import { now } from "../../lib/clock";
-import { getDb, saveDb, type DbPreset } from "../db";
+import { accountApiX, PledgesX, PledgeX, pledgesApiX, Tv, tvsApi } from "../../api/ext/you";
+import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
+import { getDb, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { AIRINGS, airingById } from "../fixtures/schedule";
-import { STATIONS, stationById, uid } from "../fixtures/stations";
+import { STATIONS, stationById, stationByRef, uid } from "../fixtures/stations";
+import { channelsFor, nextChargeFor, receiptsFor } from "../fixtures/you";
 import { fail, needsUser, path, reply } from "../respond";
 import { marketOf } from "../view";
+import { z } from "zod";
 
 const ident = (id: string) => stationById(id)!.ident;
 
 function meView() {
   const { me } = getDb();
+  const runs = me.runs ? stationByRef(me.runs) : null;
   return {
     id: me.id,
     displayName: me.displayName,
@@ -20,13 +26,19 @@ function meView() {
     market: me.marketSlug ? marketOf(me.marketSlug) : null,
     isAdmin: false,
     identities: [{ kind: "email" as const, value: me.email, verifiedAt: "2026-06-01T19:00:00Z" }],
-    memberships: [],
+    memberships: runs ? [{ kind: "station" as const, station: runs.ident, role: "owner" as const }] : [],
     settings: me.settings
   };
 }
 
 function presetsView() {
   return [...getDb().presets].sort((a, b) => a.position - b.position).map((p) => ({ station: ident(p.stationId), key: p.key, position: p.position }));
+}
+
+/** Writes a list from the preset rules back to the db, positions in order. */
+function setPresets(list: KeyedPreset[]) {
+  getDb().presets = normalise(list).map((p, i): DbPreset => ({ stationId: p.stationId, key: p.key, position: i }));
+  saveDb();
 }
 
 function reminderView(r: { id: string; airingId: string; switchMeOver: boolean; createdAt: string }) {
@@ -39,9 +51,8 @@ function reminderView(r: { id: string; airingId: string; switchMeOver: boolean; 
   };
 }
 
-function pledgeView(p: ReturnType<typeof getDb>["pledges"][number]) {
-  const next = new Date(now());
-  next.setUTCMonth(next.getUTCMonth() + 1, 1);
+export function pledgeView(p: DbPledge): PledgeX {
+  const items = receiptsFor(p, now());
   return {
     id: p.id,
     station: ident(p.stationId),
@@ -49,25 +60,20 @@ function pledgeView(p: ReturnType<typeof getDb>["pledges"][number]) {
     amountMicros: p.amountMicros,
     creditOnAir: p.creditOnAir,
     startedAt: p.startedAt,
-    nextChargeOn: p.cadence === "monthly" && !p.endsAfter ? next.toISOString().slice(0, 10) : null,
+    nextChargeOn: nextChargeFor(p, now()),
     endsAfter: p.endsAfter,
-    receipts: { count: p.receipts, totalMicros: p.receipts * p.amountMicros }
+    card: { label: p.card, expired: false },
+    receipts: { count: items.length, totalMicros: items.reduce((s, r) => s + r.amountMicros, 0), items }
   };
 }
 
-/** Save a station to a key: a station already on that key moves to More presets, never deleted. */
-function savePreset(stationId: string, key: number | null) {
-  const db = getDb();
-  const list = db.presets;
-  const existing = list.find((p) => p.stationId === stationId);
-  if (key !== null) for (const p of list) if (p.key === key && p.stationId !== stationId) p.key = null;
-  if (existing) existing.key = key;
-  else list.push({ stationId, key, position: list.length });
-  // Keys first, in key order, then More presets in the order they were saved.
-  const keyed = list.filter((p) => p.key !== null).sort((a, b) => a.key! - b.key!);
-  const more = list.filter((p) => p.key === null).sort((a, b) => a.position - b.position);
-  [...keyed, ...more].forEach((p, i) => (p.position = i));
-  saveDb();
+/** The last day of the month a stopped pledge was last charged in: it ends after that month. */
+export function endOfThisMonth(t: Date): string {
+  return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+}
+
+function tvsView() {
+  return getDb().tvs.map((t) => Tv.parse(t));
 }
 
 export const meHandlers = [
@@ -96,34 +102,36 @@ export const meHandlers = [
     if (denied) return denied;
     const { stationId, key } = (await request.json()) as { stationId: string; key: number | null };
     if (!stationById(stationId)) return fail(404, "not_found", "That station wasn't found.");
-    savePreset(stationId, key);
+    // A key that's taken moves its station to More presets, never deleted.
+    setPresets(placePreset(getDb().presets, stationId, key));
     return reply(accountsApi.savePreset.response, presetsView(), 201);
   }),
 
   http.put(path(accountsApi.reorderPresets), async ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    const body = (await request.json()) as { presets: Array<{ stationId: string; key: number | null }> };
-    getDb().presets = body.presets.map((p, i): DbPreset => ({ stationId: p.stationId, key: p.key, position: i }));
-    saveDb();
+    const body = (await request.json()) as Array<{ stationId: string; key: number | null }>;
+    const keys = body.map((p) => p.key).filter((k) => k !== null);
+    if (new Set(keys).size !== keys.length) return fail(400, "bad_request", "Two presets can't share a key.");
+    if (body.some((p) => !stationById(p.stationId))) return fail(404, "not_found", "That station wasn't found.");
+    setPresets(body);
     return reply(accountsApi.reorderPresets.response, presetsView());
   }),
 
   http.delete(path(accountsApi.removePreset), ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    const db = getDb();
-    db.presets = db.presets.filter((p) => p.stationId !== params.stationId);
-    db.presets.forEach((p, i) => (p.position = i));
-    saveDb();
+    setPresets(removePresetFrom(getDb().presets, String(params.stationId)));
     return reply(accountsApi.removePreset.response, presetsView());
   }),
 
   http.get(path(accountsApi.suggestPresetKey), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    // The key used least in the last month: the mock says key 6, as the reference does.
-    return reply(accountsApi.suggestPresetKey.response, { key: 6 });
+    // The key used least in the last month: the mock says key 6, as the reference does; null
+    // while a key is free (nothing needs replacing).
+    const full = lowestFreeKey(getDb().presets) === null;
+    return reply(accountsApi.suggestPresetKey.response, { key: full ? 6 : null });
   }),
 
   http.post(path(accountsApi.usePresetKey), ({ request }) => needsUser(request) ?? reply(accountsApi.usePresetKey.response, { ok: true })),
@@ -170,12 +178,20 @@ export const meHandlers = [
     return reply(accountsApi.removeReminder.response, { ok: true });
   }),
 
+  // First sign-in: keep what's on this device. The account's keys win: a device preset whose key
+  // is taken gets the lowest free key, or goes to More presets; nothing on the account moves.
   http.post(path(accountsApi.mergeDevice), async ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const body = (await request.json()) as { presets: Array<{ stationId: string; key: number | null }>; reminders: Array<{ logEntryId?: string; listedAiringId?: string; switchMeOver: boolean }> };
     const db = getDb();
-    for (const p of body.presets) if (!db.presets.some((x) => x.stationId === p.stationId)) savePreset(p.stationId, p.key !== null && db.presets.some((x) => x.key === p.key) ? null : p.key);
+    let list: KeyedPreset[] = db.presets;
+    for (const p of body.presets) {
+      if (!stationById(p.stationId) || list.some((x) => x.stationId === p.stationId)) continue;
+      const key = p.key === null ? null : !list.some((x) => x.key === p.key) ? p.key : lowestFreeKey(list);
+      list = placePreset(list, p.stationId, key);
+    }
+    setPresets(list);
     for (const r of body.reminders) {
       const airingId = r.logEntryId ?? r.listedAiringId;
       if (airingId && AIRINGS.some((a) => a.id === airingId) && !db.reminders.some((x) => x.airingId === airingId)) db.reminders.push({ id: uid(90000 + db.reminders.length), airingId, switchMeOver: r.switchMeOver, createdAt: now().toISOString() });
@@ -185,7 +201,7 @@ export const meHandlers = [
   }),
 
   // ---------- Pledges ----------
-  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(ledgerApi.listMyPledges.response, getDb().pledges.map(pledgeView))),
+  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(PledgesX, getDb().pledges.map(pledgeView))),
 
   http.post(path(ledgerApi.pledge), async ({ request, params }) => {
     const denied = needsUser(request);
@@ -195,29 +211,101 @@ export const meHandlers = [
     const s = STATIONS.find((x) => x.ident.id === params.stationId);
     if (!s) return fail(404, "not_found", "That station wasn't found.");
     const db = getDb();
-    const p = { id: uid(60000 + db.pledges.length + Math.floor(Math.random() * 30000)), stationId: s.ident.id, cadence: body.cadence, amountMicros: body.amountMicros, creditOnAir: !!body.creditOnAir, startedAt: now().toISOString(), endsAfter: null, card: "Visa ending 4417", receipts: 1 };
+    const p: DbPledge = { id: uid(60000 + db.pledges.length + Math.floor(Math.random() * 30000)), stationId: s.ident.id, cadence: body.cadence, amountMicros: body.amountMicros, creditOnAir: !!body.creditOnAir, startedAt: now().toISOString(), endsAfter: null, card: "Visa ending 4417" };
     db.pledges.push(p);
     saveDb();
     // A real pledge goes to Stripe's checkout; the mock is paid at once.
     return reply(ledgerApi.pledge.response, { pledge: pledgeView(p), checkoutUrl: null }, 201);
   }),
 
-  http.patch(path(ledgerApi.updatePledge), async ({ request, params }) => {
+  http.patch(path(pledgesApiX.updatePledge), async ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const p = getDb().pledges.find((x) => x.id === params.pledgeId);
     if (!p) return fail(404, "not_found", "That pledge wasn't found.");
-    const body = (await request.json()) as { amountMicros?: number; creditOnAir?: boolean; stop?: true };
+    const body = (await request.json()) as { amountMicros?: number; creditOnAir?: boolean; cadence?: "monthly" | "once"; stop?: true };
+    if (body.amountMicros !== undefined && body.amountMicros < 1_000_000) return fail(400, "bad_request", "Pledges start at $1.00.");
     if (body.amountMicros !== undefined) p.amountMicros = body.amountMicros;
     if (body.creditOnAir !== undefined) p.creditOnAir = body.creditOnAir;
-    if (body.stop) {
-      // It ends after the current month.
-      const end = new Date(now());
-      end.setUTCMonth(end.getUTCMonth() + 1, 0);
-      p.endsAfter = end.toISOString().slice(0, 10);
-    }
+    // Monthly to once: it isn't charged again, like stopping (E1).
+    if (body.cadence === "once" && p.cadence === "monthly") p.endsAfter = endOfThisMonth(now());
+    if (body.cadence === "monthly" && p.cadence === "monthly") p.endsAfter = null;
+    // Stopping: it ends after the current month.
+    if (body.stop) p.endsAfter = endOfThisMonth(now());
     saveDb();
-    return reply(ledgerApi.updatePledge.response, pledgeView(p));
+    return reply(PledgeX, pledgeView(p));
+  }),
+
+  http.post(path(pledgesApiX.cardSession), ({ request, params }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    if (!getDb().pledges.some((x) => x.id === params.pledgeId)) return fail(404, "not_found", "That pledge wasn't found.");
+    // A real one is Stripe's page, which comes back here. The mock comes straight back.
+    return reply(pledgesApiX.cardSession.response, { url: `/you/pledges/${params.pledgeId}` });
+  }),
+
+  // ---------- TVs (B2) ----------
+  http.get(path(tvsApi.listTvs), ({ request }) => needsUser(request) ?? reply(z.array(Tv), tvsView())),
+
+  http.delete(path(tvsApi.signOutTv), ({ request, params }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    const db = getDb();
+    const tv = db.tvs.find((t) => t.id === params.tvId);
+    if (!tv) return fail(404, "not_found", "That TV wasn't found.");
+    db.tvs = db.tvs.filter((t) => t.id !== tv.id);
+    saveDb();
+    return reply(z.array(Tv), tvsView());
+  }),
+
+  http.post(path(tvsApi.approveTvCode), ({ request, params }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    const code = String(params.code).toUpperCase();
+    // The mock takes any six letters or digits except 000000.
+    if (!/^[A-Z0-9]{6}$/.test(code) || code === "000000") return fail(404, "not_found", "That code didn't work. Check the code on the TV and try again.");
+    const db = getDb();
+    const tv = { id: uid(70000 + db.tvs.length + Math.floor(Math.random() * 9000)), name: "TV", kind: "tv_app" as const, platform: "Android TV", signedIn: true, lastUsedAt: now().toISOString(), castingNow: false };
+    db.tvs.push(tv);
+    saveDb();
+    return reply(Tv, tv, 201);
+  }),
+
+  // ---------- Account (A1, A2, A3) ----------
+  http.post(path(accountApiX.signOutEverywhere), ({ request }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    const db = getDb();
+    db.signedOutEverywhereAt = now().toISOString();
+    db.tvs = db.tvs.filter((t) => t.kind !== "tv_app");
+    saveDb();
+    return reply(accountApiX.signOutEverywhere.response, { ok: true });
+  }),
+
+  http.delete(path(accountApiX.clearWatchHistory), ({ request }) => needsUser(request) ?? reply(accountApiX.clearWatchHistory.response, { ok: true })),
+
+  http.post(path(accountApiX.exportData), ({ request }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    return reply(accountApiX.exportData.response, { email: getDb().me.email, readyBy: new Date(now().getTime() + 86400e3).toISOString() });
+  }),
+
+  http.delete(path(accountApiX.deleteAccount), ({ request }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    // The mock starts over, as if a new person signed in next.
+    resetDb();
+    return reply(accountApiX.deleteAccount.response, { ok: true });
+  }),
+
+  // ---------- Run a station ----------
+  http.get(path(stationsApi.availableChannels), ({ request, params }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    const market = marketOf(String(params.marketSlug));
+    if (!market) return fail(404, "not_found", "That market wasn't found.");
+    const band = new URL(request.url).searchParams.get("band") === "radio" ? "radio" : "tv";
+    return reply(stationsApi.availableChannels.response, { market, band, channels: channelsFor(market.slug, band) });
   }),
 
   // ---------- Notifications ----------
@@ -227,7 +315,7 @@ export const meHandlers = [
     const denied = needsUser(request);
     if (denied) return denied;
     const body = (await request.json()) as { prefs: Record<string, { push: boolean; email: boolean }> };
-    getDb().prefs = body.prefs;
+    getDb().prefs = { ...getDb().prefs, ...body.prefs };
     saveDb();
     return reply(notificationsApi.setPrefs.response, { prefs: getDb().prefs, alwaysOn: [] });
   }),

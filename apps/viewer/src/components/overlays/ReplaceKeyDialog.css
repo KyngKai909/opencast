@@ -1,0 +1,3 @@
+/* The replace dialog (you 03.1: .opts with no rule above, as drawn). */
+.vw-replace__opts.oc-choices--option { border-top: 0; }
+.vw-replace__err { margin: 10px 0 0; font-size: 13px; color: var(--standby); }

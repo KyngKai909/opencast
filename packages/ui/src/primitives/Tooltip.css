@@ -19,3 +19,4 @@
 @media (prefers-reduced-motion: reduce) {
   .oc-tooltip { transition: none; }
 }
+:root[data-motion="reduce"] .oc-tooltip { transition: none; }

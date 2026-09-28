@@ -18,6 +18,7 @@
 @media (prefers-reduced-motion: reduce) {
   .oc-toggle::after { transition: none; }
 }
+:root[data-motion="reduce"] .oc-toggle::after { transition: none; }
 
 .oc-toggle-lock { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-50); flex: none; }
 .oc-toggle-lock .oc-i { width: 13px; height: 13px; }

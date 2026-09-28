@@ -5,6 +5,8 @@ export interface SignInReason {
   label?: string;
   /** The button that finishes it ("Save CIVC 7.1 and go back"). */
   finish?: string;
+  /** Where "go back" returns to: "One thing before you go back to CIVC." */
+  backTo?: string;
 }
 
 /** One way to sign in: Privy, or the mock in `npm run dev:mock`. */

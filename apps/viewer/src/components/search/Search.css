@@ -1,0 +1,74 @@
+/* Search (station-pages 03.1 .srch, .bigfield, .tune-row, .res-h, .res, .recent; 05.2 .ph-srch, .ph-res). Tokens only. */
+
+/* The web overlay: under the header, over the page and the player bar; under modals (10) and toasts (12). */
+.vw-search-layer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; overflow-y: auto; background: var(--ground); color: var(--ink); font-size: 15px; line-height: 1.45; }
+body:has(.vw-search-layer) .oc-viewer-web__search { visibility: hidden; }
+.vw-search { padding: 22px 28px 36px; }
+
+/* The field. */
+.vw-bigfield { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; border: 2px solid var(--ink); border-radius: var(--r-control); font-size: 20px; background: var(--raised); color: var(--ink-50); cursor: text; box-sizing: border-box; }
+.vw-bigfield__input { flex: 1; min-width: 0; height: 100%; border: 0; padding: 0; margin: 0; background: none; font: inherit; color: var(--ink); caret-color: var(--signal); outline: none; }
+.vw-bigfield__input::placeholder { color: var(--ink-50); }
+.vw-bigfield__input::-webkit-search-cancel-button { display: none; }
+.vw-bigfield__hint { margin-left: auto; font-size: 13px; color: var(--ink-50); white-space: nowrap; }
+.vw-bigfield--phone { height: 48px; font-size: 17px; padding: 0 14px; gap: 10px; }
+
+/* The phone's top bar is the field. */
+.vw-search-top { padding: 10px 14px; border-bottom: 1px solid var(--hair); }
+.vw-search--phone { padding: 0 16px 24px; }
+
+/* Tune to (.tune-row). */
+.vw-tune-wrap { margin-top: 14px; }
+.vw-tune { display: flex; align-items: center; gap: 16px; width: 100%; padding: 14px 16px; border: 1px solid var(--signal); border-radius: var(--r-control); background: var(--raised); color: var(--ink); font: inherit; text-align: start; cursor: pointer; box-sizing: border-box; }
+.vw-tune:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.vw-tune--none { border-color: var(--line); cursor: default; }
+.vw-tune__ch { font-size: 34px; line-height: 1; letter-spacing: -.04em; }
+.vw-tune__text { min-width: 0; }
+.vw-tune__text b { display: block; font-weight: 600; }
+.vw-tune__text small { font-size: 13px; color: var(--ink-70); }
+.vw-tune__end { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--signal); }
+.vw-tune__end .oc-kbd { color: var(--ink-50); }
+
+/* Groups (.res-h). */
+.vw-res-h { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.vw-res-h h2 { margin: 0; font: 700 16px var(--font-display); }
+.vw-res-h span { font-size: 13px; color: var(--ink-50); }
+.vw-search__results > .vw-tune-wrap + section .vw-res-h,
+.vw-search__results > section:first-child .vw-res-h { margin-top: 22px; }
+
+/* Rows (.res, .res.st). */
+.vw-res-list { list-style: none; margin: 0; padding: 0; }
+.vw-res { display: grid; grid-template-columns: 112px minmax(0, 1fr) 240px auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.vw-res__tc.oc-tc { padding: 5px 7px; aspect-ratio: 16 / 9; }
+.vw-res__tc .oc-tc__t { font-size: 10.5px; }
+.vw-res__text { min-width: 0; }
+.vw-res__text b { display: block; font: 700 15px/1.25 var(--font-display); }
+.vw-res__text b a { color: inherit; text-decoration: none; }
+.vw-res__text b a:hover { text-decoration: underline; }
+.vw-res__text small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.vw-res__when { font-size: 13px; color: var(--ink-70); }
+.vw-res__when .oc-mono { color: var(--ink); }
+.vw-res__act { justify-self: end; }
+.vw-res--st { grid-template-columns: 56px 80px minmax(0, 1fr) auto; }
+.vw-res__ch { font-size: 17px; }
+.vw-res__cs { font-size: 15px; }
+.vw-res mark { background: none; color: inherit; box-shadow: inset 0 -2px 0 var(--signal); }
+
+/* The phone's rows are one tap each (.ph-res). */
+.vw-res--phone { grid-template-columns: 72px minmax(0, 1fr); width: 100%; background: none; border-width: 0 0 1px; border-style: solid; border-color: var(--hair); color: var(--ink); font: inherit; font-size: 14px; text-align: start; text-decoration: none; cursor: pointer; }
+.vw-res--phone.vw-res--st { grid-template-columns: 48px 60px minmax(0, 1fr); }
+.vw-res--phone:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.vw-res--phone small .oc-mono { color: inherit; font-family: inherit; }
+
+/* Recent searches (.recent). */
+.vw-recent { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.vw-search__hint { margin: 18px 0 0; font-size: 14px; color: var(--ink-70); }
+.vw-skel--res { height: 62px; margin-top: 10px; background: var(--raised); border-radius: 4px; }
+
+/* Narrower than the frame: the time goes under the title. */
+@media (max-width: 1023px) {
+  .vw-res:not(.vw-res--phone):not(.vw-res--st) { grid-template-columns: 96px minmax(0, 1fr) auto; }
+  .vw-res:not(.vw-res--phone):not(.vw-res--st) .vw-res__when { grid-column: 2; grid-row: 2; margin-top: -10px; }
+  .vw-res:not(.vw-res--phone):not(.vw-res--st) .vw-res__act { grid-column: 3; grid-row: 1 / span 2; }
+}

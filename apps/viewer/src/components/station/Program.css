@@ -1,0 +1,62 @@
+/* The program page (station-pages 02.1 .pr-head, .pr-body, .wt, .ep). Uses Station.css's section heads and .vw-lk rows. */
+
+.vw-program__head { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 28px; padding: 24px 28px 20px; border-bottom: 1px solid var(--hair); }
+.vw-program__card.oc-tc { aspect-ratio: 16 / 9; }
+.vw-program__card .oc-tc__t { font-size: 34px; }
+.vw-program__from { font-size: 13.5px; color: var(--ink-50); }
+.vw-program__from b { color: var(--ink); }
+.vw-program__title { margin: 6px 0 8px; font: 800 40px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.035em; }
+.vw-program__meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13.5px; color: var(--ink-70); margin-bottom: 16px; }
+.vw-program__desc { font-size: 15px; color: var(--ink-70); margin: 0 0 14px; max-width: 56ch; }
+.vw-program__acts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.vw-program__none { font-size: 14px; color: var(--ink-70); }
+
+.vw-program__body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; padding: 18px 28px 30px; }
+.vw-program__body > section > .vw-sec-top:first-child { margin-top: 0; }
+.vw-program__quiet { font-size: 13px; color: var(--ink-50); margin: 10px 0 0; }
+.vw-link { all: unset; color: var(--signal); font-weight: 600; cursor: pointer; }
+.vw-link:hover { text-decoration: underline; }
+.vw-link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
+.vw-program__outside { margin-top: 8px; }
+
+/* Where to watch (.wt). */
+.vw-wt-list, .vw-ep-list { list-style: none; margin: 0; padding: 0; }
+.vw-wt { display: grid; grid-template-columns: 52px 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.vw-wt__ch { font-size: 15px; }
+.vw-wt__cs { font-size: 14px; color: var(--ink); text-decoration: none; }
+.vw-wt__cs:hover { text-decoration: underline; }
+.vw-wt b { font-weight: 600; display: block; }
+.vw-wt small { font-size: 12.5px; color: var(--ink-70); }
+
+/* "On now": the ink outline the frame draws (a sign, not the tally). */
+.vw-tag-now.oc-tag { border-color: var(--ink); color: var(--ink); }
+
+/* Episodes (.ep). */
+.vw-ep { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; min-height: 61px; box-sizing: border-box; }
+.vw-ep__n { font-size: 13px; color: var(--ink-50); }
+.vw-ep b { font-weight: 600; display: block; }
+.vw-ep small { font-size: 12.5px; color: var(--ink-70); }
+.vw-ep--aired { color: var(--ink-50); }
+.vw-ep--aired b { color: var(--ink-70); }
+
+/* Loading. */
+.vw-skel--card { aspect-ratio: 16 / 9; border-radius: var(--r-screen); }
+.vw-skel--line { height: 14px; width: 40%; margin: 6px 0 10px; }
+.vw-skel--title { height: 40px; width: 70%; margin-bottom: 12px; }
+.vw-program--error { padding: 24px 28px; }
+.vw-program--error p { margin: 0 0 14px; color: var(--ink-70); }
+
+/* Narrower than the frame, and the phone: one column. */
+@media (max-width: 1023px) {
+  .vw-program__head { grid-template-columns: minmax(0, 280px) minmax(0, 1fr); }
+  .vw-program__body { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .vw-program__body > section + section > .vw-sec-top:first-child { margin-top: 26px; }
+}
+@media (max-width: 767px) {
+  .vw-program__head { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 16px 16px 18px; }
+  .vw-program__title { font-size: 30px; }
+  .vw-program__card .oc-tc__t { font-size: 26px; }
+  .vw-program__card.oc-tc { max-height: 190px; }
+  .vw-program__body { padding: 12px 16px 24px; }
+  .vw-wt { grid-template-columns: 44px 52px minmax(0, 1fr) auto; gap: 10px; }
+}

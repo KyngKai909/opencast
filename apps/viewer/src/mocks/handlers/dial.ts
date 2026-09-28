@@ -2,17 +2,27 @@
 
 import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
-import { DialX, MarketsX } from "../../api/ext";
+import { DialX, type DialRowX } from "../../api/ext";
+import { MarketPlacesX } from "../../api/ext/home";
 import { now } from "../../lib/clock";
-import { AIRINGS, PROGRAMS, nowNext } from "../fixtures/schedule";
-import { MARKETS, STATIONS, ZIPS, inMarket, stationByRef } from "../fixtures/stations";
+import { AIRINGS, PROGRAMS } from "../fixtures/schedule";
+import { MARKETS, STATIONS, ZIPS, inMarket, playbackFor, stationByRef, type MockStation } from "../fixtures/stations";
+import { carriedPick, homeAirings, homeNowNext } from "../fixtures/home";
 import { path, reply, fail } from "../respond";
-import { airingX, dialRow, identX, marketOf, milesBetween } from "../view";
+import { airingX, identX, marketOf, milesBetween } from "../view";
 
 const THIN = 3; // Fewer stations than this and the dial shows the nearest market too.
 
+/** A dial row from home's schedule (the shared one, plus the radio rows' lines and late airings). */
+function dialRow(s: MockStation, t: Date): DialRowX {
+  const nn = homeNowNext(s.ident.id, t);
+  const onAir = !!nn.now;
+  return { station: identX(s), onAir, now: nn.now ? airingX(nn.now) : null, next: nn.next ? airingX(nn.next) : null, playback: onAir ? playbackFor(s) : null };
+}
+
 export const dialHandlers = [
-  http.get(path(stationsApi.listMarkets), () => reply(MarketsX, MARKETS.map(({ lat: _a, lng: _b, ...m }) => m))),
+  // With each market's centre (contract request S10, interim), so "Use my location" picks on the device.
+  http.get(path(stationsApi.listMarkets), () => reply(MarketPlacesX, MARKETS.map(({ lat, lng, ...m }) => ({ ...m, centre: { lat, lng } })))),
 
   http.get(path(stationsApi.marketForZip), ({ params }) => {
     const slug = ZIPS[String(params.zip)];
@@ -39,11 +49,11 @@ export const dialHandlers = [
       const p = PROGRAMS[key];
       const maker = stationByRef(p.maker);
       if (!maker || maker.ident.marketSlug !== slug) return [];
-      const airings = AIRINGS.filter((a) => a.programId === p.id || (key === "night-desk" && a.stationId === maker.ident.id)).filter((a) => a.end > t.toISOString()).sort((x, y) => x.start.localeCompare(y.start));
-      const nowing = airings.find((a) => a.start <= t.toISOString());
-      const pick = nowing ?? airings[0];
-      const st = pick && STATIONS.find((s) => s.ident.id === pick.stationId);
-      return [{ program: { id: p.id, title: p.title }, maker: identX(maker), carriers, where: pick && st ? { station: identX(st), airing: airingX(pick), onNow: !!nowing } : null }];
+      const here = new Set(all.map((s) => s.ident.id));
+      const airings = homeAirings().filter((a) => here.has(a.stationId) && (a.programId === p.id || (key === "night-desk" && a.stationId === maker.ident.id)));
+      const pick = carriedPick(airings, t);
+      const st = pick && STATIONS.find((s) => s.ident.id === pick.airing.stationId);
+      return [{ program: { id: p.id, title: p.title }, maker: identX(maker), carriers, where: pick && st ? { station: identX(st), airing: airingX(pick.airing), onNow: pick.onNow } : null }];
     });
 
     // Coming up live: live airings in this market from now, past the guide's day.
@@ -59,7 +69,6 @@ export const dialHandlers = [
     const takenRadio = new Set(inMarket(slug, "radio").map((s) => s.ident.channel!));
     const openRadio = Array.from({ length: 100 }, (_, i) => (88.1 + i * 0.2).toFixed(1)).filter((c) => !takenRadio.has(c));
 
-    void nowNext;
     return reply(DialX, { market, band, rows, nearby, carriedWidely, comingUpLive, openChannels: { tv: openTv, radio: openRadio } });
   })
 ];

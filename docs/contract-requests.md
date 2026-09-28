@@ -36,6 +36,7 @@ These change what the API accepts, or add something no fixture can stand in for.
 | A6 | **Opencast team list** for `setUpClaimable.operatorUserId` ("Run by Dee A.") | desk 04.1 | Yes | 7 |
 | A7 | **`ViewerSettings` sections are strict**: nested `watching`, `market` and the rest strip unknown keys. Type the TV-only rows (channel-up direction, banner seconds, number-entry wait, include radio band, picture quality, audio evening-out) and quiet hours, or make the sections `.loose()` | tv-update 04.1; you 06.3 | Top-level keys | 3 |
 | A8 | (minor) `TeamMember.role` is `z.string()`; make it `StationRole` or `BusinessRole` | station-settings 03.1 | n/a | 4 |
+| A9 | **A first sign-in marker** (`Me.createdAt`, or a `firstSignIn` flag on the session) so sign-in knows when to ask the two first-time questions (keep what's on this device, the display name). Until it lands, the viewer asks when the device holds presets or reminders, or the account has no name | you 01.3 | Yes | 3 |
 
 ## stations
 
@@ -51,6 +52,9 @@ These change what the API accepts, or add something no fixture can stand in for.
 | S8 | **Made possible by**: public credits (credited sponsorships and the members' credit) | station-pages 01.1 | Yes | 3 |
 | S9 | **Station counts per market** on `listMarkets` | home 08.1 | Yes | 3 |
 | S10 | **Market from where you are**: from coordinates ("Use my location") and from the request's IP (TV first launch), neither stored | home 08.1; tv 05.3 | Fixture market | 3 |
+
+S10 interim (Phase 3): the viewer computes "Use my location" on the device from a market centre (`lat`, `lng` on `listMarkets`, proposed in `apps/viewer/src/api/ext/home.ts`): the nearest open market within 150 miles. The coordinates are never sent. A server-side lookup by IP is still needed for the TV's first launch.
+
 | S11 | **Open channels for signed-out viewers**: a thin market's "Any channel from 2 to 69 is open except 5" (`availableChannels` is `user`) | home 08.2 | Yes | 3 |
 | S12 | **One airing by id, public**: for share links that tune in or offer a reminder | home 07.1 | Yes | 3 |
 | S13 | **Stand by as a state**: a live block waiting for its signal (`DialRow.signal` or `Airing.kind: standby`) | tv 05.2 | Yes | 6 |
@@ -59,6 +63,7 @@ These change what the API accepts, or add something no fixture can stand in for.
 | S16 | **Translator Connect** (YouTube and Twitch OAuth), or the design moves to a key form | master-control A.5 | UI only | 4 |
 | S17 | **Spot categories**: one list of valid categories, for blocked categories, market filters and a business's category | station-settings 02.1; master-control C.2; biz-funding 01.1 | Constant | 4 |
 | S18 | **Studio to station**: claiming a channel as a studio | market 04.1 | UI only | 4 |
+| S19 | **The program on each search airing**: `program {id, title}` on `SearchResult` airings, for the airing's title card and its link to the program page | station-pages 03.1 | Yes | 3 |
 
 ## library
 
@@ -80,7 +85,7 @@ These change what the API accepts, or add something no fixture can stand in for.
 | G2 | **Monitor status**: the next item and its picture for the preview monitor, on air since, output bitrate | master-control A.7 | Yes | 4 |
 | G3 | **End early** during a live block (hands back to the log) | live-listings 02.1, 05.2 | UI only | 4 |
 | G4 | **Fill a gap by carrying**: a `carry` option on `fillGap` for one night | master-control A.4, P.2; market 06.1 | No | 4 |
-| G5 | **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1 | Yes | 4 |
+| G5 | **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1; home 03.1 (tuned in: "Tonight: a steamboat, a haunted barn…", read from `Airing.episodeDescription`) | Yes | 4 |
 | G6 | **Test output before sign-on**: a playback URL for "Watch it" | master-control A.6 | Yes | 4 |
 
 ## catalog
@@ -189,3 +194,15 @@ These change what the API accepts, or add something no fixture can stand in for.
 | X1 | **Live playlists keep 30 minutes** (the worker's HLS and Livepeer's output: a DVR window of at least 30 minutes) | Pause holds your place for up to 30 minutes, then offers Back to live. With a short window the player can only hold what the playlist still lists | 3 |
 | X2 | **A subtitle rendition in the live output** (WebVTT in the HLS, or CEA-608 in the video) | Captions, with the size setting, come from the stream; the player shows whatever rendition it's given | 3 |
 
+
+## How the viewer carries them (Phase 3)
+
+Every proposed field is an optional extension of a contract schema in `apps/viewer/src/api/ext.ts` or `apps/viewer/src/api/ext/<area>.ts`, named by its request id here. The mock responses are validated against those extended schemas. Against the real API the fields are absent until each request lands, and the screens hide what depends on them. The shapes the viewer proposes:
+
+- **S5**: `from`/`to` on `getStation`; the station's schedule over that range.
+- **S7**: `carries[] {from, program, slot}` and `madeHere[] {program, carriers}` on the station page.
+- **S8**: `madePossibleBy[] {kind: "members" | "underwriter", text}`.
+- **L1**: `typicalLengthMs` on the program. **L2**: `carriers {total, outsideMarket, outside[] {station, market}}`. **L3**: `whereToWatch[] {station, slot, now, next}`, with a `market` query on `getProgram`. **L4**: on each episode `aired`, `lastAiring`, `onNow`, `nextAiring`, `description`, and `airedCount` on the program.
+- **B2**: `listTvs`, `signOutTv`, `approveTvCode`; `Tv {kind, platform, signedIn, lastUsedAt, castingNow}`. Only the casting device really knows "Casting now".
+- **E1**: `card {label, expired}` on a pledge, `receipts.items`, `cadence` on `updatePledge` (switching a monthly pledge to once ends it after this month), and a card-session endpoint for Change.
+- **O1**: kinds `preset_live` and `station_news`. **O2 / A7**: quiet hours and email timing in `settings.notifications`.

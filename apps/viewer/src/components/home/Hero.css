@@ -1,0 +1,20 @@
+/* Home's hero (home 01.1 .feat-info, 02.1 .p-feat). The grid it sits in is the page's (Home.css). */
+.vw-hero__pic { min-width: 0; }
+/* The still fills the picture when there's nothing to preview. */
+.vw-hero__still.oc-tc { position: absolute; inset: 0; border-radius: 0; display: flex; flex-direction: column; justify-content: space-between; }
+
+.vw-hero__info { display: flex; flex-direction: column; min-width: 0; }
+.vw-hero__kick { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--ink-50); }
+.vw-hero__info .vw-hero__title { font: 800 30px/1.02 var(--font-display); font-stretch: 112%; letter-spacing: -.03em; margin: 0 0 10px; }
+.vw-hero__info .vw-hero__by { font-size: 14px; color: var(--ink-70); margin: 0 0 6px; }
+.vw-hero__info .vw-hero__by b { color: var(--ink); }
+.vw-hero__desc { font-size: 15px; color: var(--ink-70); margin: 0; }
+.vw-hero__acts { margin-top: auto; padding-top: var(--s3); display: flex; gap: 10px; }
+
+/* Phone */
+.vw-hero--phone .vw-hero__pic { margin-bottom: 12px; }
+.vw-hero__line { font-size: 13px; color: var(--ink-50); }
+.vw-hero--phone .vw-hero__title { font: 800 23px/1.05 var(--font-display); font-stretch: 112%; letter-spacing: -.03em; margin: 6px 0; }
+.vw-hero--phone .vw-hero__by { font-size: 13.5px; color: var(--ink-70); margin: 0 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.vw-hero--phone .vw-hero__acts { padding-top: 0; }
+.vw-hero--phone .vw-hero__acts > * { flex: 1; }

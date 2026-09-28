@@ -80,6 +80,20 @@
 .oc-banner--web { grid-template-columns: auto minmax(0, 1fr) auto; gap: max(calc(44 * var(--u)), 14px); padding: max(calc(26 * var(--u)), 10px) max(calc(34 * var(--u)), 12px); left: 3%; right: 3%; bottom: 4%; }
 .oc-banner--web .oc-banner__ch { padding-right: max(calc(22 * var(--u)), 10px); }
 
+/* A narrow picture (a phone's full player): the ident over what's on, the clock and tally beside. */
+@container (max-width: 560px) {
+  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
+  .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
+  .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
+  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
+  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 6px; }
+  .oc-banner--web .oc-banner__ch { font-size: 20px; }
+  .oc-banner--web .oc-banner__cs { font-size: 15px; }
+  .oc-banner--web .oc-banner__clock { font-size: 13px; }
+  .oc-banner--web .oc-banner__nx { font-size: 12px; }
+  .oc-banner--web .oc-banner__hints { display: none; }
+}
+
 /* ---------- Number entry (tv 02.2: .numpad) ---------- */
 .oc-numpad { top: calc(54 * var(--u)); right: calc(96 * var(--u)); padding: calc(26 * var(--u)) calc(36 * var(--u)); text-align: right; }
 .oc-numpad__num { font: 500 max(calc(150 * var(--u)), 40px)/1 var(--font-mono); letter-spacing: -.06em; }
@@ -100,7 +114,7 @@
 .oc-player__unmute { cursor: pointer; }
 .oc-player__sleep { display: flex; gap: 14px; align-items: center; top: auto; bottom: 8%; transform: translateX(-50%); }
 @media (prefers-reduced-motion: no-preference) {
-  .oc-banner, .oc-numpad { animation: oc-panel-in .18s ease-out; }
+  :root:not([data-motion="reduce"]) .oc-banner, :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
   @keyframes oc-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
 
@@ -128,9 +142,9 @@
 .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: oc-level calc(.55s + var(--i) * 37ms) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -91ms); }
 @keyframes oc-level { from { height: 30%; } to { height: 92%; } }
 @media (prefers-reduced-motion: reduce) {
-  .oc-radio__meter--measured i { animation: none !important; transition: height 60ms linear; }
-.oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
+  .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
 }
+:root[data-motion="reduce"] .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
 .oc-radio__tally { position: absolute; top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
 
 /* The dock: videos wait here, playing, while no surface shows them. */

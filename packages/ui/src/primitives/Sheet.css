@@ -15,6 +15,7 @@
 @media (prefers-reduced-motion: reduce) {
   .oc-sheet { transition: none; }
 }
+:root[data-motion="reduce"] .oc-sheet { transition: none; }
 .oc-sheet__grab {
   height: 18px; width: 100%; flex: none;
   display: grid; place-items: center;

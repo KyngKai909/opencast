@@ -14,7 +14,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/api` | `@opencast/api` | Express API: stations, library, uploads, playout control | platform |
 | `apps/worker` | `@opencast/worker` | Playout: airs every station from its log, from its file cache; HLS and Livepeer out | platform |
 | `apps/control` | `@opencast/control` | Master control (the old `apps/web`, unchanged) | apps |
-| `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone (empty) | apps |
+| `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA | apps |
 | `apps/tv` | `@opencast/tv` | TV mode and the Cast receiver (empty) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
 | `apps/spots` | `@opencast/spots` | Opencast for business (empty) | apps |
@@ -86,7 +86,17 @@ For development it plays mock stations served as live HLS:
 npm run mock:streams -w @opencast/player
 ```
 
-That makes four 60-second loops (CIVC, BEAT and REEL on the TV band, NITE on radio) with captions, in `packages/player/.mock-streams/` (git-ignored; needs ffmpeg). The gallery serves them live at `/mock-hls/<station>/master.m3u8` (`mockLiveHls` from `@opencast/player/mock`), and its Player pages drive the real engine against them.
+That makes nine 60-second loops (CIVC, BEAT, REEL, SAZN and PREP on the TV band; NITE, HALL, CRAT and VOZE on radio) with captions, in `packages/player/.mock-streams/` (git-ignored; needs ffmpeg). The gallery serves them live at `/mock-hls/<station>/master.m3u8` (`mockLiveHls` from `@opencast/player/mock`), and its Player pages drive the real engine against them.
+
+### The viewer
+
+```bash
+npm run dev:mock -w @opencast/viewer
+```
+
+Runs the viewer at http://localhost:5174 against mock data (Mock Service Worker), with the mock stations playing live and the clock held at Saturday 8:42 pm Pacific, as the reference frames are drawn. It signs in with any email and any six digits except 000000. The mock remembers what you change in `localStorage` (`oc-mock-db`); remove that key to start again. `npm run dev -w @opencast/viewer` runs it against the API instead: copy `apps/viewer/.env.example` to `.env.local` and set `VITE_API_BASE` and `VITE_PRIVY_APP_ID`.
+
+Every mock response is checked against the contract schemas, extended with the fields the viewer has asked for (`apps/viewer/src/api/ext*`, named by their ids in `docs/contract-requests.md`).
 
 ### Why Turborepo
 

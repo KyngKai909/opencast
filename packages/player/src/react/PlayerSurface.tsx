@@ -12,23 +12,27 @@ export interface PlayerSurfaceProps {
   timeZone?: string;
   /** The hint row on the banner (TV): from the input adapter in use. */
   hints?: Hint[];
+  /** The time to show (the banner's clock and progress). Defaults to the device's clock. */
+  clock?: () => Date;
   className?: string;
 }
 
-function useClock(ms = 1000): Date {
-  const [now, setNow] = useState(() => new Date());
+const deviceClock = () => new Date();
+
+function useClock(clock: () => Date, ms = 1000): Date {
+  const [now, setNow] = useState(clock);
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), ms);
+    const t = setInterval(() => setNow(clock()), ms);
     return () => clearInterval(t);
-  }, [ms]);
+  }, [clock, ms]);
   return now;
 }
 
 /** The picture and everything drawn over it. Needs a PlayerProvider above it. */
-export function PlayerSurface({ size = "web", timeZone, hints, className }: PlayerSurfaceProps) {
+export function PlayerSurface({ size = "web", timeZone, hints, clock = deviceClock, className }: PlayerSurfaceProps) {
   const [s, engine] = usePlayer();
   const stage = useRef<HTMLDivElement>(null);
-  const now = useClock();
+  const now = useClock(clock);
 
   const dock = usePlayerDock();
   useEffect(() => {
@@ -63,7 +67,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, className }: Play
     >
       <div ref={stage} className="oc-player__stage" />
 
-      {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} levels={levelsFor} />}
+      {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} size={size} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} levels={levelsFor} />}
 
       {current && s.status === "off_air" && (
         <div className="oc-player__cover">

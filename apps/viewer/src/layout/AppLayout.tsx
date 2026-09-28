@@ -22,7 +22,9 @@ function sectionFor(path: string): ViewerSection | "you" | null {
   if (path.startsWith("/radio")) return "radio";
   if (path.startsWith("/presets")) return "presets";
   if (path.startsWith("/you") || path.startsWith("/settings")) return "you";
-  return null;
+  // A station's page and a program's page belong to the dial (the frames show Dial selected).
+  if (path.startsWith("/search")) return null;
+  return "dial";
 }
 function tabFor(path: string): ViewerTab | null {
   if (path === "/" || path.startsWith("/radio") || path.startsWith("/watch")) return "dial";
@@ -34,6 +36,25 @@ function tabFor(path: string): ViewerTab | null {
 
 function initials(name: string | null | undefined): string {
   return (name ?? "").split(/\s+/).filter(Boolean).map((w) => w[0]!.toUpperCase()).join("").slice(0, 2) || "?";
+}
+
+/**
+ * In-app links: the shells and components draw plain <a href="/…">; a click on one navigates
+ * inside the app instead of reloading it (which would stop the player).
+ */
+function useInAppLinks() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download") || a.origin !== window.location.origin) return;
+      e.preventDefault();
+      navigate(a.pathname + a.search + a.hash);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [navigate]);
 }
 
 /** Keys from anywhere outside a text field: 1 to 6 tune presets. ("/" is the shell's.) */
@@ -66,12 +87,17 @@ export function AppLayout() {
   const shell = useShellState();
   const np = useNowPlaying();
   usePresetKeys();
+  useInAppLinks();
 
   const marketName = markets.data?.find((m) => m.slug === slug)?.name ?? "Choose a market";
   const openMarket = () => setParams((p) => (p.set("modal", "market"), p));
+  // With search open over the page (?q=), no section is current (station-pages 03.1).
   const openSearch = () => (phone ? navigate("/search") : setParams((p) => (p.set("q", ""), p)));
   const row = np.row;
-  const stationLine = row ? [[row.station.callSign, row.station.channel].filter(Boolean).join(" "), row.now?.carriedFrom?.callSign ? `carried from ${row.now.carriedFrom.callSign}` : null].filter(Boolean).join(", ") : "";
+  // "BEAT 12.1, carried from REEL"; on radio, the episode: "NITE 88.3, The Hollow Door, part 2".
+  const stationLine = row
+    ? [[row.station.callSign, row.station.channel].filter(Boolean).join(" "), row.now?.carriedFrom?.callSign ? `carried from ${row.now.carriedFrom.callSign}` : row.station.band === "radio" ? row.now?.episodeTitle : null].filter(Boolean).join(", ")
+    : "";
   const openPlayer = row ? () => navigate(`/watch/${row.station.callSign?.toLowerCase() ?? row.station.id}`) : undefined;
   const showPlayer = shell.player !== false && !!row;
   const radio = row?.station.band === "radio";
@@ -86,7 +112,6 @@ export function AppLayout() {
       <ReplaceKeyDialog />
     </>
   );
-  void params;
 
   if (phone) {
     return (
@@ -95,6 +120,7 @@ export function AppLayout() {
         linkTo={(t) => TAB_HREF[t]}
         tabs={shell.tabs !== false}
         market={{ name: marketName, onClick: openMarket }}
+        onSearch={() => navigate("/search")}
         back={shell.back}
         top={shell.top}
         padded={shell.padded !== false}
@@ -111,7 +137,7 @@ export function AppLayout() {
   }
   return (
     <ViewerWebShell
-      active={sectionFor(loc.pathname)}
+      active={params.has("q") ? null : sectionFor(loc.pathname)}
       linkTo={(s) => SECTION_HREF[s]}
       homeHref="/"
       market={{ name: marketName, onClick: openMarket }}

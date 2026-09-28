@@ -1,7 +1,7 @@
 // `npm run dev:mock`: signing in works with any six-digit code except 000000 (to see the error).
 
 import { useCallback, useMemo, useState } from "react";
-import { MOCK_TOKEN } from "../mocks/respond";
+import { MOCK_TOKEN } from "./mockToken";
 import type { AuthAdapter } from "./types";
 
 const KEY = "oc-mock-signed-in";

@@ -102,3 +102,58 @@ Styles with no frame (no new words): a field's error line (standby amber, with t
 | Hint row, casting or mirroring with no name | "Playing from a phone", "Mirrored from an iPhone" | When the phone's name isn't known (signed out) |
 | Spoken | "Channel 12.1"; "BEAT 12.1, Inland Beat: Saturday Reel"; "On air", "Not on air" | The panel and banner for screen readers |
 
+
+### apps/viewer (Phase 3)
+
+Settings' undrawn panes (Account, Market, TVs and casting, Appearance, Privacy, Your data) are written in full in `apps/viewer/src/components/settings/panes.tsx`; review them there. Everything else is below.
+
+**Home, first visit, the radio band**
+
+| Where | Words |
+|---|---|
+| Hero, nothing live | "Nothing is live in {market} right now. Your market's stations are below, in channel order." |
+| Hero kickers | "Carried from {BEAT 12.1}", "Preset 1" |
+| Category chips, no match | "Nothing on the dial is live right now.", "Nothing on the dial is in {Category} right now.", "Show all stations" |
+| Empty band | "No stations on the TV band yet."; radio: "No stations on the radio band here yet. Open frequencies run from 88 to 108." |
+| Reminder done | "Reminder set" (web), "Set" (phone) |
+| Day labels | "Today", "Tomorrow", "Yesterday", "Mon, Oct 5" |
+| Preset key sheet | "Preset {N}", "Choose a station for this key.", "Remove {CIVC 7.1}" |
+| Thin market | "No stations so far", "{N} channels from 2 to 69 are open." |
+| Market picker | "Enter a five-digit ZIP code."; "{ZIP} isn't in a market yet. The nearest is {market}, {N} miles away. Pick it below, or any other."; "There's no market near you yet. Pick the nearest one below, or enter a ZIP code."; "Location is off for this site. Enter a ZIP code or pick a market instead."; "Your location couldn't be found. Enter a ZIP code or pick a market instead."; "Not open yet" |
+
+**Tuned in, the guide, the preview, pledge, share**
+
+| Where | Words |
+|---|---|
+| Off air | "Off air", "{CIVC 7.1} signs on again at {6:00 am}."; preview: "Signs on at {6:00 am}" |
+| Unknown station | "That station wasn't found.", "Back to the dial" |
+| Controls | "Play", "Mute", "Unmute"; spoken "Down is {X}, up is {Y}" / "Down is {X}, up wraps to {Y}" |
+| Share link, not started | "{Title} starts at {9:00 pm} on {BEAT 12.1}.", "Remind me" |
+| Share link, ended | "{Title} has ended. {BEAT 12.1} is on now.", "OK"; share sheet: "{Title} has ended, so this shares the station." |
+| Guide, presets filter | "None of your presets are on the TV band." (and the radio band) |
+| Carried from | "In your market:", "No station in your market has it on the schedule.", "1 station carries it" |
+| Pledge | "Enter an amount in dollars, like 12.50.", "Pledges start at $1.00.", "$20.00 goes to Inland Beat, once.", "Your name on air", "Stations read it as you write it.", "Pledge $10.00 and go back" |
+| Pledge toasts | "Pledged $10.00 a month to Inland Beat", "Pledged $20.00 to Inland Beat" |
+| Share | "{Title}, on now" / "tomorrow at {time}" / "{Weekday} at {time}", "On BEAT 12.1 now", "On Opencast", "BEAT 12.1, Redlands", "Link copied", "Couldn't copy the link. Select it and copy it instead." |
+
+**Station, program, search**
+
+| Where | Words |
+|---|---|
+| Station page | "In your presets", "Nothing is listed for this day yet.", "Nothing else tonight.", "Off air", "Listed from the city's stream", "Back to the dial" |
+| Program page | "Not scheduled yet", "Not scheduled in your market yet.", "Aired", "Tonight at {time}" / "Today at {time}", "Program" (phone back bar) |
+| Search | "Type a channel, a call sign or a program."; "Nothing on the dial matches “{x}”. Try a call sign, a channel or a program's name."; "No station on 13", "Nearest: 9.1 RDLS and 12.1 BEAT"; "On now, until {time}"; "live now" / "on now" (phone rows); "Enter" and "Off air" on the Tune to row |
+| Spoken | "Loading the station", "Loading the program", "Searching", "Preset {N}. Open presets", "Remind me: {episode}" |
+
+**Sign-in, You, presets, pledges, settings**
+
+| Where | Words |
+|---|---|
+| Sign-in | "Enter your email address, like name@example.com."; "We sent a new code to {email}."; "One thing before you go back to CIVC." / "…before you go back."; "Keep what's on this device" (web); "Done" (sign-in from the header) |
+| Kept on the device | "CIVC 7.1 saved on this device", "Reminder set on this device for {title}, {time}" |
+| Presets | "You have {N} on this device. Keep it/them on your TV too."; "Stations saved with no key are kept here."; "Move left", "Move right", "Remove"; "{X} moved to key {N}"; "Removed {X} from presets"; "{X} is on key {N}[. {Y} moved to More presets.]"; "{X} saved to More presets"; "Key {N}" / "Free" |
+| You | "Nothing coming up. Press Remind me on anything in the guide."; "No pledges yet. Pledge from a station's page, monthly or once."; "Since June", "Ends after September"; "Keys 1 to 6 on the web, your phone and your TV."; "Reminder removed for {title}, {station}"; "{TV} is signed out"; "{station}, on air" / "off air" |
+| Add a TV | "Open Opencast on the TV. It shows a code; enter it here.", "Code on the TV", "Sign in the TV", "The code on the TV has six letters and numbers.", "The TV is signed in" |
+| Manage a pledge | "It won't be charged again after {month}."; "Add the name stations call you in Settings, Account, first"; "{card}, expired"; "Keep pledging"; "Ends", "After {month}. You won't be charged again."; "Hide"; "Your pledge to {station} is saved" |
+| Receipt | "on {date}", "Amount", "Once"; "{Station} says pledges to it are tax-deductible" / "aren't tax-deductible" / "hasn't said whether pledges to it are tax-deductible" |
+| Settings, signed out | "These apply on this device until you sign in.", "Saved on this device until you sign in."; "In this browser" (web Notifications); the note when the browser blocks notifications |

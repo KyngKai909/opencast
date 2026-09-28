@@ -1,0 +1,26 @@
+/* The guide (home 05.1 .gd-tools, .gd-wrap; 05.2 the phone's top bar). The grid is @opencast/ui's. */
+.vw-guide__tools { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.vw-guide__h { margin: 0; font: 800 30px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.vw-guide__date { color: var(--ink-50); }
+.vw-guide__end { margin-left: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.vw-guide__msg { color: var(--ink-70); font-size: 14px; margin: 24px 0; }
+.vw-guide--phone .vw-guide__msg { padding: 0 18px; }
+
+.vw-guide__ptop .oc-seg { margin-left: auto; }
+.vw-guide__ph { margin: 0; font: 800 24px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+
+/* Loading: the grid's rows, quiet. */
+.vw-guide__quiet > div { height: 62px; border-bottom: 1px solid var(--hair); background: linear-gradient(90deg, transparent 0 150px, var(--raised) 150px); opacity: .5; }
+
+/* The listing beside its cell: no scrim, and the grid stays usable around it. */
+.vw-gl-pop.oc-backdrop { background: transparent; display: block; pointer-events: none; }
+.vw-gl-pop .oc-modal { position: absolute; left: var(--vw-pop-x, auto); top: var(--vw-pop-y, 120px); right: auto; pointer-events: auto; }
+.vw-gl-anchor:not([style]) .oc-modal { right: 70px; left: auto; }
+
+.vw-gl-switch { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.vw-gl-switch > div { flex: 1; }
+.vw-gl-switch b { display: block; font-weight: 600; font-size: 15px; }
+.vw-gl-switch small { font-size: 13px; color: var(--ink-70); }
+
+/* The phone (home 05.2): 760px for three hours, as drawn; the phone's window is six, so twice that. */
+.vw-guide--phone .oc-guide--phone { min-width: 1520px; }

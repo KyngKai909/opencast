@@ -1,0 +1,29 @@
+/* The radio band (station-pages 04.1 .rb-*, 05.3). The scale and rows are the ui's BandScale and DialRow. */
+.vw-radio__h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 var(--s3); flex-wrap: wrap; }
+.vw-radio__h h1 { margin: 0; font: 700 20px/1.2 var(--font-display); letter-spacing: -.015em; }
+.vw-radio__sub { color: var(--ink-50); font-size: 14px; }
+.vw-radio__keys { margin-left: auto; color: var(--ink-50); font-size: 13px; }
+.vw-radio__scale { margin-bottom: var(--s3); }
+.vw-radio__rows { border-top: 1px solid var(--line); }
+.vw-radio__msg { margin: 0; padding: var(--s3) 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-70); }
+.vw-radio__wait { height: 420px; border-top: 1px solid var(--line); }
+
+/* The phone's own top bar: the page's name and the count (05.3). */
+.vw-radio__top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 18px 12px; border-bottom: 1px solid var(--hair); }
+.vw-radio__top h1 { margin: 0; font: 700 20px/1.2 var(--font-display); letter-spacing: -.015em; }
+.vw-radio__top span { color: var(--ink-50); font-size: 13px; }
+
+/* Phone rows: frequency, then call sign over what's on. Next moves into the station preview,
+   and the row itself tunes, so its button goes; "You're here" stays, in words. */
+.vw-radio--phone .vw-radio__scale { margin: 0 -18px var(--s3); border-bottom: 1px solid var(--hair); }
+.vw-radio--phone .vw-radio__rows { border-top: 0; }
+.vw-radio--phone .oc-dial-row--band { grid-template-columns: 94px minmax(0, 1fr) auto; grid-template-areas: "f cs end" "f w end"; gap: 2px 12px; padding: 14px 0; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__who { grid-area: f; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__cs { grid-area: cs; font-size: 13px; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__w { grid-area: w; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__w b { font-size: 15px; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__w small,
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__nx,
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__end .oc-btn { display: none; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__end { grid-area: end; }
+.vw-radio--phone .oc-dial-row--band .oc-dial-row__f { font-size: 26px; }

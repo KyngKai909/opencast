@@ -34,3 +34,4 @@
 @media (prefers-reduced-motion: reduce) {
   .oc-tally--switching { animation: none; }
 }
+:root[data-motion="reduce"] .oc-tally--switching { animation: none; }

@@ -49,3 +49,10 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A18 | The level meter moves with the sound | tv 05.1 | Decided (2026-09-28): real levels, measured with Web Audio on whichever device plays the sound (the TV app, the Cast receiver, the phone). It falls back to a rhythm only where the browser gives no samples (native HLS on iPhone) |
 | A19 | "No station on 13" names the nearest two: nearest by number, or the channels either side | tv 02 | Nearest by number (12.1 and 9.1 for 13) |
 
+| A20 | The replace dialog ("All six keys are taken") draws two keys to replace (3 and 6), with no rule for picking two, and the API suggests only one | you 03.1; inventory worth raising 7 | All six keys and No key, with the suggested key preselected |
+| A21 | Home 01.1 draws key 6 Empty; the You frames draw all six taken | home 01.1; you 02.1, 03.1 | The mock follows You (all six taken, so the replace dialog is reachable). Home's Empty state appears after a Remove |
+| A22 | Saving while signed out: the notes say it's "kept on the device and offered to the account afterwards", but no frame draws a "keep on this device" button | you 01.1 | Closing sign-in for a save or a reminder keeps it on the device, with a toast that can undo it. The first sign-in offers what the device holds |
+| A23 | Preset tiles draw short titles ("Radio dramas", "Cartoons, 1928 to 1934") that no field holds | home 01.1; you 02.1, 03.1 | The airing's full title, clipped with an ellipsis |
+| A24 | The phone guide has no Earlier and Later | home 05.2 | Six hours from the hour before now, scrolled sideways, at the drawn width per hour |
+| A25 | The station page's "This week" day tabs: the calendar week, or the next seven days | station-pages 01.1 | The next seven days (a schedule, not the calendar week) |
+| A26 | A monthly pledge switched to Once, and pausing a pledge | you 04.1; inventory worth raising 8 | Switching to Once ends it after this month. No pause control (none is drawn) |

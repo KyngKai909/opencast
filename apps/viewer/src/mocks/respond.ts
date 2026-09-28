@@ -4,8 +4,9 @@
 import { HttpResponse } from "msw";
 import type { EndpointDef } from "@opencast/contracts";
 import type { z } from "zod";
+import { MOCK_TOKEN } from "../auth/mockToken";
 
-export const MOCK_TOKEN = "mock-access-token";
+export { MOCK_TOKEN };
 
 /** The MSW path for an endpoint (Express-style params are MSW's too). */
 export function path(e: EndpointDef): string {

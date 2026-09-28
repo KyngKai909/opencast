@@ -13,8 +13,9 @@ export type StationIdentX = z.infer<typeof StationIdentX>;
 /**
  * S4: the line under an airing's title ("Overnight repeat", "Live from Redlands City Hall").
  * B4: a listed city meeting's own id, so it can be reminded.
+ * G5: tonight's episode, described ("Tonight: a steamboat, a haunted barn…").
  */
-export const AiringX = Airing.extend({ note: z.string().nullable().optional(), carriedFrom: StationIdentX.nullable(), listedAiringId: z.string().nullable().optional() });
+export const AiringX = Airing.extend({ note: z.string().nullable().optional(), episodeDescription: z.string().nullable().optional(), carriedFrom: StationIdentX.nullable(), listedAiringId: z.string().nullable().optional() });
 export type AiringX = z.infer<typeof AiringX>;
 
 export const DialRowX = DialRow.extend({ station: StationIdentX, now: AiringX.nullable(), next: AiringX.nullable() });

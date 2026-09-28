@@ -1,6 +1,6 @@
-// The mock API's changeable state: the person, their presets, reminders, pledges and settings.
+// The mock API's changeable state: the person, their presets, reminders, pledges, TVs and settings.
 // Kept in localStorage so a reload keeps what you did; "Reset mock data" in the console:
-// localStorage.removeItem("oc-mock-db").
+// localStorage.removeItem("oc-mock-db"). Seeded from the You file's frames (viewer/opencast-you.html).
 
 import type { ViewerSettings } from "@opencast/contracts";
 import { now } from "../lib/clock";
@@ -9,49 +9,86 @@ import { stationByRef, uid } from "./fixtures/stations";
 
 export interface DbPreset { stationId: string; key: number | null; position: number }
 export interface DbReminder { id: string; airingId: string; switchMeOver: boolean; createdAt: string }
-export interface DbPledge { id: string; stationId: string; cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean; startedAt: string; endsAfter: string | null; card: string; receipts: number }
-export interface DbTv { id: string; name: string; kind: "tv_app" | "cast" | "airplay"; lastUsed: string; castingNow: boolean }
+export interface DbPledge { id: string; stationId: string; cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean; startedAt: string; endsAfter: string | null; card: string }
+export interface DbTv { id: string; name: string; kind: "tv_app" | "chromecast" | "airplay"; platform: string | null; signedIn: boolean; lastUsedAt: string | null; castingNow: boolean }
 
 export interface Db {
-  me: { id: string; displayName: string | null; email: string; marketSlug: string | null; settings: ViewerSettings };
+  /** Bumped when the seed changes shape, so an old saved mock is replaced. */
+  version: number;
+  me: {
+    id: string;
+    displayName: string | null;
+    email: string;
+    marketSlug: string | null;
+    settings: ViewerSettings;
+    /** A station this person runs (You's last block), by call sign. Kai runs none; set "BEAT" to see an owner's You. */
+    runs: string | null;
+  };
   presets: DbPreset[];
   reminders: DbReminder[];
   pledges: DbPledge[];
   tvs: DbTv[];
   prefs: Record<string, { push: boolean; email: boolean }>;
+  /** When "Sign out everywhere" was last pressed (A1). */
+  signedOutEverywhereAt: string | null;
 }
 
+export const DB_VERSION = 3;
 const KEY = "oc-mock-db";
 const id = (s: string) => stationByRef(s)!.ident.id;
 const airing = (station: string, title: string) => AIRINGS.find((a) => a.stationId === id(station) && a.title.startsWith(title))!.id;
 
-function seed(): Db {
-  const t = now().toISOString();
+export function seed(): Db {
+  const t = now();
+  const daysAgo = (n: number) => new Date(t.getTime() - n * 86400e3).toISOString();
   return {
+    version: DB_VERSION,
     // Kai M., signed in, in the Inland Empire (the reference's person).
-    me: { id: uid(1), displayName: "Kai M.", email: "kai@example.com", marketSlug: "inland-empire", settings: { watching: { captions: "off", captionSize: "medium", startOn: "dial", mutedPreviews: true, mobileQuality: "auto", backgroundPlay: true }, market: { showNearby: true }, appearance: { ground: "system", reducedMotion: false }, privacy: { keepWatchHistory: true }, tvs: { lockScreenRemote: true, othersOnWifiCanChange: true } } },
+    me: {
+      id: uid(1),
+      displayName: "Kai M.",
+      email: "kai@example.com",
+      marketSlug: "inland-empire",
+      settings: {
+        watching: { captions: "on", captionSize: "medium", startOn: "dial", mutedPreviews: true, mobileQuality: "data_saver", backgroundPlay: true },
+        market: { showNearby: true },
+        appearance: { ground: "system", reducedMotion: false },
+        privacy: { keepWatchHistory: true },
+        tvs: { lockScreenRemote: true, othersOnWifiCanChange: true },
+        notifications: { emailWhen: "evening_before", leadMinutes: 0, quietHours: true }
+      },
+      runs: null
+    },
+    // You 02.1 and 03.1: all six keys taken, two in More presets.
     presets: [
       { stationId: id("BEAT"), key: 1, position: 0 },
       { stationId: id("CIVC"), key: 2, position: 1 },
       { stationId: id("NITE"), key: 3, position: 2 },
       { stationId: id("REEL"), key: 4, position: 3 },
-      { stationId: id("CRAT"), key: 5, position: 4 }
+      { stationId: id("CRAT"), key: 5, position: 4 },
+      { stationId: id("HALL"), key: 6, position: 5 },
+      { stationId: id("SAZN"), key: null, position: 6 },
+      { stationId: id("VOZE"), key: null, position: 7 }
     ],
     reminders: [
-      { id: uid(501), airingId: airing("BEAT", "Beat Tape Live"), switchMeOver: true, createdAt: t },
-      { id: uid(502), airingId: airing("RDLS", "City Council, regular"), switchMeOver: false, createdAt: t },
-      { id: uid(503), airingId: airing("CIVC", "Co-op town hall"), switchMeOver: false, createdAt: t }
+      { id: uid(501), airingId: airing("BEAT", "Beat Tape Live"), switchMeOver: true, createdAt: t.toISOString() },
+      { id: uid(502), airingId: airing("RDLS", "City Council, regular"), switchMeOver: false, createdAt: t.toISOString() },
+      { id: uid(503), airingId: airing("CIVC", "Co-op town hall"), switchMeOver: false, createdAt: t.toISOString() }
     ],
+    // You 02.1: $10.00 a month to Inland Beat since June, credited on air; $25.00 once to Inland Civic on August 14.
     pledges: [
-      { id: uid(601), stationId: id("BEAT"), cadence: "monthly", amountMicros: 10_000_000, creditOnAir: true, startedAt: "2026-06-01T19:00:00Z", endsAfter: null, card: "Visa ending 4417", receipts: 4 },
-      { id: uid(602), stationId: id("CIVC"), cadence: "monthly", amountMicros: 5_000_000, creditOnAir: false, startedAt: "2026-08-12T19:00:00Z", endsAfter: null, card: "Visa ending 4417", receipts: 2 },
-      { id: uid(603), stationId: id("REEL"), cadence: "once", amountMicros: 25_000_000, creditOnAir: false, startedAt: "2026-07-04T19:00:00Z", endsAfter: null, card: "Visa ending 4417", receipts: 1 }
+      { id: uid(601), stationId: id("BEAT"), cadence: "monthly", amountMicros: 10_000_000, creditOnAir: true, startedAt: "2026-06-14T19:00:00Z", endsAfter: null, card: "Visa ending 4417" },
+      { id: uid(602), stationId: id("CIVC"), cadence: "once", amountMicros: 25_000_000, creditOnAir: false, startedAt: "2026-08-14T19:00:00Z", endsAfter: null, card: "Visa ending 4417" }
     ],
+    // You 02.1: Your TVs.
     tvs: [
-      { id: uid(701), name: "Living room TV", kind: "cast", lastUsed: t, castingNow: false },
-      { id: uid(702), name: "Den TV", kind: "tv_app", lastUsed: "2026-09-25T04:10:00Z", castingNow: false }
+      { id: uid(701), name: "Living room TV", kind: "chromecast", platform: null, signedIn: false, lastUsedAt: t.toISOString(), castingNow: true },
+      { id: uid(702), name: "Den TV", kind: "tv_app", platform: "Fire TV", signedIn: true, lastUsedAt: daysAgo(2), castingNow: false },
+      { id: uid(703), name: "Bedroom TV", kind: "airplay", platform: null, signedIn: false, lastUsedAt: daysAgo(4), castingNow: false }
     ],
-    prefs: { reminder: { push: true, email: false }, switch_over: { push: true, email: false } }
+    // You 06.3: reminders on this phone, not by email; presets going live on; station news off.
+    prefs: { reminder: { push: true, email: false }, switch_over: { push: true, email: false }, preset_live: { push: true, email: false }, station_news: { push: false, email: false } },
+    signedOutEverywhereAt: null
   };
 }
 
@@ -61,7 +98,8 @@ export function getDb(): Db {
   if (db) return db;
   try {
     const raw = localStorage.getItem(KEY);
-    db = raw ? (JSON.parse(raw) as Db) : seed();
+    const saved = raw ? (JSON.parse(raw) as Db) : null;
+    db = saved && saved.version === DB_VERSION ? saved : seed();
   } catch {
     db = seed();
   }
