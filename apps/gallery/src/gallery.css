@@ -1,0 +1,39 @@
+/* The gallery's own layout. Only the gallery uses these; components use @opencast/ui tokens. */
+.gal { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; font-size: 15px; line-height: 1.45; }
+.gal-nav { position: sticky; top: 0; height: 100vh; overflow: auto; border-right: 1px solid var(--hair); padding: var(--s3); display: flex; flex-direction: column; gap: 2px; }
+.gal-nav__brand { display: flex; align-items: center; gap: 8px; text-decoration: none; margin-bottom: var(--s3); }
+.gal-nav a { text-decoration: none; color: var(--ink-70); padding: 3px 8px; border-radius: var(--r-control); font-size: 14px; }
+.gal-nav a.active { background: var(--raised); color: var(--ink); }
+.gal-nav__group { display: flex; flex-direction: column; margin-top: var(--s3); }
+.gal-nav__g { font-weight: 600; color: var(--ink-50) !important; font-size: 12.5px !important; }
+.gal-ground { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.gal-ground select { font: inherit; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-control); padding: 2px 6px; }
+.gal-main { padding: var(--s4) var(--s5) var(--s6); min-width: 0; }
+.gal-home ul { list-style: none; padding: 0; margin: 0; columns: 3; }
+.gal-home li { padding: 3px 0; }
+.gal-home__group { margin-top: var(--s5); border-top: 1px solid var(--hair); padding-top: var(--s3); }
+.gal-spec { border-top: 2px solid var(--ink); padding-top: var(--s3); margin-bottom: var(--s6); }
+.gal-spec__head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+.gal-spec__head h2 { margin: 0; font: 800 28px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.gal-compare-link { margin-left: auto; color: var(--signal); font-weight: 600; text-decoration: none; font-size: 14px; }
+.gal-spec__notes { color: var(--ink-70); max-width: 72ch; margin: var(--s2) 0; }
+.gal-sources { list-style: none; padding: 0; margin: 0 0 var(--s3); font: 500 12.5px var(--font-mono); }
+.gal-sources a { color: var(--signal); }
+.gal-state { margin-top: var(--s4); }
+.gal-state h3 { margin: 0 0 var(--s2); font: 600 14px var(--font-text); color: var(--ink-70); }
+.gal-state__note { margin: -4px 0 var(--s2); font-size: 13px; color: var(--ink-50); }
+.gal-grounds { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--s3); }
+.gal-grounds--stacked { grid-template-columns: 1fr; }
+.gal-panel { background: var(--ground); color: var(--ink); border-radius: var(--r-control); box-shadow: 0 0 0 1px var(--line); overflow: hidden; }
+.gal-panel__label { font: 500 11.5px var(--font-mono); color: var(--ink-50); padding: 6px 12px; border-bottom: 1px solid var(--hair); }
+.gal-panel__body { padding: var(--s4); }
+.gal-frame { position: relative; width: 100%; overflow: hidden; }
+.gal-frame__inner { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.gal-compare__cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); margin-top: var(--s3); }
+.gal-compare__ref { width: 100%; height: 80vh; border: 1px solid var(--line); border-radius: var(--r-control); background: #fff; color-scheme: normal; }
+.gal-compare__state + .gal-compare__state { margin-top: var(--s4); }
+.gal-ground-btn { font: 500 14px var(--font-text); color: var(--ink-70); background: none; border: 1px solid var(--line); border-radius: var(--r-control); height: 32px; padding: 0 12px; }
+/* A row of examples inside a panel. */
+.gal-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.gal-col { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.gal-screen { position: relative; background: var(--screen); color: var(--on-screen); border-radius: var(--r-screen); padding: var(--s4); display: grid; place-items: center; min-height: 120px; }

@@ -1,0 +1,28 @@
+{
+  "name": "@opencast/gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "compare": "node scripts/compare.mjs",
+    "lint": "echo \"No lint configured for gallery\""
+  },
+  "dependencies": {
+    "@opencast/ui": "*",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router": "^7.13.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.1",
+    "playwright-core": "^1.55.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3"
+  }
+}

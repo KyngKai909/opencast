@@ -1,0 +1,175 @@
+/*
+ * Opencast tokens, from the style guide's Colour, Type, Space and Shape chapters
+ * (docs/reference/brand/opencast-style.html). Every colour, font, space and radius in every
+ * app comes from here.
+ *
+ * Grounds: dark is the default. Light follows the system setting, and data-theme="light" or
+ * "dark" on any element overrides it for that subtree (the gallery shows both side by side).
+ * TV mode is always dark: data-ground="tv" pins the dark values whatever its parents say.
+ */
+
+/* ---------- Dark ground (default) ---------- */
+:root,
+[data-theme="dark"],
+[data-ground="tv"] {
+  color-scheme: dark;
+  --ground: #0F1830;
+  --raised: #18244A;
+  --ink: #ECE9E1;
+  --ink-70: #B1B8C9;
+  --ink-50: #8F98AE;
+  --line: #67759A;
+  --hair: #26345A;
+  --tally: #D9301F;
+  --on-tally: #FFFFFF;
+  --tally-glow: rgb(217 48 31 / .55);
+  --live: #FF7A69;
+  --standby: #F0B43C;
+  --standby-fill: #F0B43C;
+  --on-standby: #0F1830;
+  --signal: #6CCFEA;
+  --signal-fill: #6CCFEA;
+  --on-signal: #0F1830;
+  --screen: #0A1124;
+  --on-screen: #ECE9E1;
+  --on-screen-70: #B1B8C9;
+  --scrim: rgb(4 8 20 / .7);
+}
+
+/* ---------- Light ground ---------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-ground="tv"]) {
+    color-scheme: light;
+    --ground: #E3E6EC;
+    --raised: #F3F5F8;
+    --ink: #0F1830;
+    --ink-70: #3F4960;
+    --ink-50: #525C73;
+    --line: #737D92;
+    --hair: #C6CCD7;
+    --tally: #C42A1C;
+    --on-tally: #FFFFFF;
+    --tally-glow: rgb(196 42 28 / .35);
+    --live: #B02518;
+    --standby: #8A5A00;
+    --standby-fill: #E9A93A;
+    --on-standby: #0F1830;
+    --signal: #0A6883;
+    --signal-fill: #0A6883;
+    --on-signal: #FFFFFF;
+    --screen: #0F1830;
+    --on-screen: #ECE9E1;
+    --on-screen-70: #B1B8C9;
+    --scrim: rgb(15 24 48 / .55);
+  }
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --ground: #E3E6EC;
+  --raised: #F3F5F8;
+  --ink: #0F1830;
+  --ink-70: #3F4960;
+  --ink-50: #525C73;
+  --line: #737D92;
+  --hair: #C6CCD7;
+  --tally: #C42A1C;
+  --on-tally: #FFFFFF;
+  --tally-glow: rgb(196 42 28 / .35);
+  --live: #B02518;
+  --standby: #8A5A00;
+  --standby-fill: #E9A93A;
+  --on-standby: #0F1830;
+  --signal: #0A6883;
+  --signal-fill: #0A6883;
+  --on-signal: #FFFFFF;
+  --screen: #0F1830;
+  --on-screen: #ECE9E1;
+  --on-screen-70: #B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+}
+/* TV is always dark, even when it or a parent asks for light: this comes after the light rules. */
+[data-ground="tv"],
+[data-ground="tv"][data-theme="light"] {
+  color-scheme: dark;
+  --ground: #0F1830;
+  --raised: #18244A;
+  --ink: #ECE9E1;
+  --ink-70: #B1B8C9;
+  --ink-50: #8F98AE;
+  --line: #67759A;
+  --hair: #26345A;
+  --tally: #D9301F;
+  --on-tally: #FFFFFF;
+  --tally-glow: rgb(217 48 31 / .55);
+  --live: #FF7A69;
+  --standby: #F0B43C;
+  --standby-fill: #F0B43C;
+  --on-standby: #0F1830;
+  --signal: #6CCFEA;
+  --signal-fill: #6CCFEA;
+  --on-signal: #0F1830;
+  --screen: #0A1124;
+  --on-screen: #ECE9E1;
+  --on-screen-70: #B1B8C9;
+  --scrim: rgb(4 8 20 / .7);
+}
+
+/* ---------- The same on every ground ---------- */
+:root {
+  /* Type. The self-hosted variable faces first, then the names the reference files use. */
+  --font-display: "Archivo Variable", "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-text: "Public Sans Variable", "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  /* Archivo widths: 125 for idents and headlines, 112 for headings, 100 for titles. */
+  --wide: 125%;
+  --semi-wide: 112%;
+
+  /* Space: seven steps. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 16px;
+  --s4: 24px;
+  --s5: 40px;
+  --s6: 64px;
+  --s7: 104px;
+
+  /* Shape: three corners. */
+  --r-sign: 3px;
+  --r-control: 6px;
+  --r-screen: 14px;
+
+  /* On a picture: the same on both grounds, because a picture is always dark. */
+  --pic-scrim: rgb(15 24 48 / .72);
+  --pic-line: rgb(236 233 225 / .5);
+  --pic-live: #FF7A69;
+  --pic-ink: #ECE9E1;
+  --pic-ink-70: #B1B8C9;
+  --pic-standby: #F0B43C;
+  --bug-opacity: .78;
+  --l3-name-bg: #ECE9E1;
+  --l3-name-ink: #0F1830;
+  --l3-title-bg: #0F1830;
+  --l3-title-ink: #ECE9E1;
+  --on-station: #FFFFFF;
+  /* Colour bars (stand by), left to right. */
+  --bar-1: #ECE9E1;
+  --bar-2: #F0B43C;
+  --bar-3: #6CCFEA;
+  --bar-4: #D9301F;
+  --bar-5: #26345A;
+  --bar-6: #0A1124;
+
+  /* Broadcast safe areas, as insets. */
+  --action-safe: 3.5%;
+  --title-safe: 5%;
+
+  /* The tally's switch-on: one flicker, then held. */
+  --tally-on-duration: 1.6s;
+}
+
+/* ---------- Ten feet (TV mode) ---------- */
+[data-ground="tv"] {
+  /* Nothing under 21px at 1080p; one focus ring, in signal cyan. */
+  --tv-min-text: 21px;
+  --tv-focus: 4px solid var(--signal);
+}

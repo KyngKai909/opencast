@@ -1,0 +1,9 @@
+/* Everything @opencast/ui draws. Apps import this once: import "@opencast/ui/styles.css". */
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./icons/icons.css";
+@import "./primitives/styles.css";
+@import "./broadcast/styles.css";
+@import "./data/styles.css";
+@import "./shells/styles.css";
