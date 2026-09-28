@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { Pool } from "pg";
 import type { Asset, Channel, DatabaseSchema, PlayoutState } from "@opencast/domain";
-import { DATABASE_URL, DB_LOCK_PATH, DB_PATH, HLS_ROOT, UPLOAD_ROOT } from "./config.js";
+import { DATABASE_URL, HLS_ROOT, UPLOAD_ROOT } from "./config.js";
 
 const DEFAULT_DB: DatabaseSchema = {
   channels: [],
@@ -17,15 +17,16 @@ const DEFAULT_DB: DatabaseSchema = {
   externalIngestJobs: []
 };
 
-const LOCK_STALE_MS = 30_000;
-const DB_LOCK_TIMEOUT_MS = 15_000;
 const POSTGRES_STATE_TABLE = "opencast_state";
 const POSTGRES_ROW_ID = 1;
 
-let fileWriteQueue: Promise<void> = Promise.resolve();
 let postgresInitPromise: Promise<void> | undefined;
 
-const postgresPool = DATABASE_URL ? new Pool({ connectionString: DATABASE_URL }) : undefined;
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL is required. Locally: `npm run db:up`, then set it from .env.example.");
+}
+
+const postgresPool = new Pool({ connectionString: DATABASE_URL });
 
 function guessMediaKindFromPath(localPath: string | undefined): "video" | "audio" {
   if (!localPath) {
@@ -59,10 +60,6 @@ function normalizeInsertionCategory(value: unknown, assetType: Asset["type"]): A
     return value;
   }
   return "ad";
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeDb(input: unknown): DatabaseSchema {
@@ -130,93 +127,13 @@ function normalizeDb(input: unknown): DatabaseSchema {
 }
 
 async function ensureStorageRoots(): Promise<void> {
-  await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
   await fs.mkdir(UPLOAD_ROOT, { recursive: true });
   await fs.mkdir(HLS_ROOT, { recursive: true });
 }
 
-async function readLegacyFileDb(): Promise<DatabaseSchema> {
-  try {
-    const raw = await fs.readFile(DB_PATH, "utf8");
-    return normalizeDb(JSON.parse(raw));
-  } catch {
-    return DEFAULT_DB;
-  }
-}
-
-async function ensureFileDbExists(): Promise<void> {
-  await ensureStorageRoots();
-  try {
-    await fs.access(DB_PATH);
-  } catch {
-    await fs.writeFile(DB_PATH, `${JSON.stringify(DEFAULT_DB, null, 2)}\n`, "utf8");
-  }
-}
-
-async function withFileLock<T>(fn: () => Promise<T>): Promise<T> {
-  const startedAt = Date.now();
-
-  while (true) {
-    try {
-      const handle = await fs.open(DB_LOCK_PATH, "wx");
-      try {
-        return await fn();
-      } finally {
-        await handle.close();
-        await fs.unlink(DB_LOCK_PATH).catch(() => undefined);
-      }
-    } catch (error) {
-      if (Date.now() - startedAt > DB_LOCK_TIMEOUT_MS) {
-        throw new Error(`Timed out acquiring DB lock at ${DB_LOCK_PATH}`);
-      }
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
-        throw error;
-      }
-      try {
-        const lockStat = await fs.stat(DB_LOCK_PATH);
-        if (Date.now() - lockStat.mtimeMs > LOCK_STALE_MS) {
-          await fs.unlink(DB_LOCK_PATH).catch(() => undefined);
-          continue;
-        }
-      } catch {
-        // Lock file may have been released between retries.
-      }
-      await sleep(25);
-    }
-  }
-}
-
-async function writeDbToFile(db: DatabaseSchema): Promise<void> {
-  await ensureFileDbExists();
-  const tmpPath = `${DB_PATH}.tmp`;
-  await fs.writeFile(tmpPath, `${JSON.stringify(db, null, 2)}\n`, "utf8");
-  await fs.rename(tmpPath, DB_PATH);
-}
-
-async function readDbFromFile(): Promise<DatabaseSchema> {
-  await ensureFileDbExists();
-  const raw = await fs.readFile(DB_PATH, "utf8");
-  return normalizeDb(JSON.parse(raw));
-}
-
-async function transactionOnFile<T>(fn: (db: DatabaseSchema) => T | Promise<T>): Promise<T> {
-  let result!: T;
-  await (fileWriteQueue = fileWriteQueue
-    .catch(() => undefined)
-    .then(async () => {
-      await withFileLock(async () => {
-        const db = await readDbFromFile();
-        result = await fn(db);
-        await writeDbToFile(db);
-      });
-    }));
-  return result;
-}
-
+// The old model's single state row. New work goes into the packages/db tables;
+// this stays until each module moves over (platform Phase 4).
 async function ensurePostgresInitialized(): Promise<void> {
-  if (!postgresPool) {
-    return;
-  }
   if (!postgresInitPromise) {
     postgresInitPromise = (async () => {
       await ensureStorageRoots();
@@ -228,23 +145,12 @@ async function ensurePostgresInitialized(): Promise<void> {
           CONSTRAINT ${POSTGRES_STATE_TABLE}_single_row CHECK (id = ${POSTGRES_ROW_ID})
         )`
       );
-
-      const seed = await readLegacyFileDb();
-      await postgresPool.query(
-        `INSERT INTO ${POSTGRES_STATE_TABLE} (id, state, updated_at)
-         VALUES ($1, $2::jsonb, NOW())
-         ON CONFLICT (id) DO NOTHING`,
-        [POSTGRES_ROW_ID, JSON.stringify(seed)]
-      );
     })();
   }
   await postgresInitPromise;
 }
 
-async function readDbFromPostgres(): Promise<DatabaseSchema> {
-  if (!postgresPool) {
-    throw new Error("Postgres pool is not configured.");
-  }
+export async function readDb(): Promise<DatabaseSchema> {
   await ensurePostgresInitialized();
   const result = await postgresPool.query<{ state: unknown }>(
     `SELECT state FROM ${POSTGRES_STATE_TABLE} WHERE id = $1`,
@@ -253,33 +159,17 @@ async function readDbFromPostgres(): Promise<DatabaseSchema> {
   return normalizeDb(result.rows[0]?.state ?? DEFAULT_DB);
 }
 
-export async function readDb(): Promise<DatabaseSchema> {
-  await ensureStorageRoots();
-  if (postgresPool) {
-    return readDbFromPostgres();
-  }
-  return readDbFromFile();
-}
-
 export async function writeDb(db: DatabaseSchema): Promise<void> {
-  if (postgresPool) {
-    await ensurePostgresInitialized();
-    await postgresPool.query(
-      `INSERT INTO ${POSTGRES_STATE_TABLE} (id, state, updated_at)
-       VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW()`,
-      [POSTGRES_ROW_ID, JSON.stringify(normalizeDb(db))]
-    );
-    return;
-  }
-  await writeDbToFile(normalizeDb(db));
+  await ensurePostgresInitialized();
+  await postgresPool.query(
+    `INSERT INTO ${POSTGRES_STATE_TABLE} (id, state, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = NOW()`,
+    [POSTGRES_ROW_ID, JSON.stringify(normalizeDb(db))]
+  );
 }
 
 export async function transaction<T>(fn: (db: DatabaseSchema) => T | Promise<T>): Promise<T> {
-  if (!postgresPool) {
-    return transactionOnFile(fn);
-  }
-
   await ensurePostgresInitialized();
   const client = await postgresPool.connect();
   try {

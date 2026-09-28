@@ -20,6 +20,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/spots` | `@opencast/spots` | Opencast for business (empty) | apps |
 | `apps/desk` | `@opencast/desk` | Network desk, internal (empty) | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
+| `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
 | `packages/contracts` | `@opencast/contracts` | Zod request and response schemas | platform; the apps prompt reads it and never edits it |
 | `packages/ui` | `@opencast/ui` | Design system (empty) | apps |
 | `packages/player` | `@opencast/player` | The shared player (empty) | apps |
@@ -29,11 +30,13 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 
 ## Run locally
 
-You need Node 22 (or 20.19+), npm 10+, and `ffmpeg` and `ffprobe` on `PATH`. `yt-dlp` is only needed for link imports.
+You need Node 22 (or 20.19+), npm 10+, Docker, and `ffmpeg` and `ffprobe` on `PATH`. `yt-dlp` is only needed for link imports.
 
 ```bash
 npm install
 cp .env.example .env
+npm run db:up
+npm run db:migrate
 npm run dev
 ```
 
@@ -42,14 +45,17 @@ npm run dev
 - the worker
 - master control on http://localhost:5173, which proxies `/api`, `/hls` and `/uploads` to the API
 
-With no `DATABASE_URL`, state lives in `storage/db.json`. `scripts/create-sample-media.sh` makes a 45 s program and a 12 s spot to upload.
+Postgres is required; there is no JSON fallback any more. The API and worker still keep their state in the old `opencast_state` table until each module moves onto the new schema (`docs/schema.md`) in platform Phase 4. `scripts/create-sample-media.sh` makes a 45 s program and a 12 s spot to upload.
 
 Each empty app runs on its own with `npm run dev -w @opencast/<name>`. Ports: viewer 5174, tv 5175, site 5176, spots 5177, desk 5178.
 
 | Script | Does |
 |---|---|
 | `npm run build` | Builds everything with Turborepo, dependencies first |
-| `npm run typecheck`, `npm run lint` | Every workspace |
+| `npm run typecheck`, `npm run lint`, `npm test` | Every workspace. The db tests need `npm run db:up` |
+| `npm run db:up`, `db:down` | Postgres and Redis in Docker |
+| `npm run db:migrate`, `db:reset`, `db:generate` | Apply migrations; drop and re-apply (local only); write a migration after editing the schema |
+| `npm run db:migrate:legacy -- [files]` | One-time move from `opencast_state` and JSON files into the new tables |
 | `npm run build:service:{api,worker,control}` | One service and what it depends on (`turbo --filter=<pkg>...`) |
 | `npm run start:service:{api,worker,control}` | Starts one built service |
 | `npm run start:runtime` | API and worker in one process (single-service mode); the API also serves `apps/control/dist` |
@@ -82,5 +88,8 @@ The browser still stores the connected wallet under `openchannel.creator.wallet.
 ## Docs
 
 - `docs/audit.md`: what the repo did before the restructure
+- `docs/schema.md`: the schema, its constraints, and the migration from the old model
+- `docs/open-decisions.md`: what isn't decided yet, and its default
+- `docs/migration-report.md`: the last legacy migration run
 - `docs/technical-implementation-guide.md`: the MVP's design and cost notes (predates the reference designs)
 - `docs/contracts-changelog.md`: changes to published contracts

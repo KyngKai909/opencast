@@ -9,6 +9,13 @@
   "scripts": {
     "env:check": "node scripts/env-check.mjs",
     "env:check:railway": "node scripts/env-check.mjs --railway",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "turbo run build --filter=@opencast/domain && npm run migrate -w @opencast/db",
+    "db:migrate:legacy": "npm run migrate:legacy -w @opencast/db --",
+    "db:reset": "npm run reset -w @opencast/db && npm run migrate -w @opencast/db",
+    "db:generate": "npm run generate -w @opencast/db",
+    "test": "turbo run test",
     "predev": "turbo run build --filter=@opencast/domain --filter=@opencast/contracts",
     "dev": "concurrently -n API,WORKER,CONTROL -c blue,magenta,green \"PORT=8787 API_PORT=8787 npm run dev -w @opencast/api\" \"npm run dev -w @opencast/worker\" \"npm run dev -w @opencast/control\"",
     "predev:runtime": "turbo run build --filter=@opencast/domain --filter=@opencast/contracts",

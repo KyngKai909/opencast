@@ -67,10 +67,8 @@ const checks = [
   {
     key: "DATABASE_URL",
     scope: "root",
-    required: railwayDetected,
-    note: railwayDetected
-      ? "Required for PostgreSQL-backed state in production."
-      : "Optional locally; when unset, JSON file storage is used."
+    required: true,
+    note: "Required. Locally: npm run db:up, then the value in .env.example."
   },
   {
     key: "REDIS_URL",

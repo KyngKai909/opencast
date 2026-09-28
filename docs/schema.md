@@ -1,0 +1,83 @@
+# Schema
+
+One Postgres database, eight schemas, 89 tables. It's defined in Drizzle (`packages/db/src/schema/`), and the SQL migrations are checked in (`packages/db/migrations/`). The old `public.opencast_state` table sits beside them, untouched, until each API module moves over in Phase 4.
+
+```bash
+npm run db:up        # Postgres 17 and Redis 7 in Docker (ports 54329, 63799)
+npm run db:migrate   # apply migrations
+npm test             # includes the constraint tests, against a throwaway database
+npm run db:generate  # after editing packages/db/src/schema, write the next migration
+```
+
+## Conventions
+
+- **Money** is `bigint` micro-dollars (1 USDC base unit). "262 × $8.00 ÷ 1,000" is 2,096,000, exactly, and rounding happens once where a rule says so (see `open-decisions.md`).
+- **Durations** are milliseconds. **Channel numbers** are stored in tenths: `12.2` is `122`, `88.1` is `881`.
+- **Ids** are UUIDs. Migrated rows keep their old ids.
+- **Times** are `timestamptz`.
+
+## Tables
+
+| Schema | Tables |
+|---|---|
+| `accounts` (10) | users, identities, station_memberships, advertiser_memberships, invites, presets, preset_key_use, reminders, notification_prefs, devices |
+| `broadcast` (24) | stations, channels, programs, assets, asset_files, asset_folders, asset_break_points, rights_confirmations, log_entries, repeat_groups, breaks, break_rules, blocked_categories, live_sources, host_assignments, speakers, schedules, playout_state, commands, translators, livepeer_config, import_jobs, as_run, dead_air_events |
+| `catalog` (4) | offers, requests, agreements, offer_previews |
+| `spots` (18) | advertisers, advertiser_locations, advertiser_markets, spots, spot_files, upload_checks, targeting, codes, code_events, rotations, rotation_spots, airings, sponsorship_settings, sponsorships, sponsorship_months, production_orders, order_files, order_notes |
+| `ledger` (11) | accounts, entries, postings, holds, funding_sources, deposits, payouts, statements, pledges, escrow_deposits, revenue_config |
+| `trust` (4) | claims, answers, takedowns, policy |
+| `network` (15) | markets, zip_markets, waitlist_signups, call_sign_reservations, channel_holds, creators, creator_works, permission_requests, permission_records, permission_record_works, licence_records, recipes, listed_sources, listed_airings, handovers |
+| `audience` (3) | sessions, minute_samples, translator_samples |
+
+### Shapes worth knowing
+
+- **Every occupant of the dial is a station row.** `stations.kind` is `station`, `studio`, `claimable`, `listed` (a city stream) or `catalog` (OCAT). One call-sign rule and one channel rule then cover all of them. A studio has a `handle` and no call sign or channel.
+- **Programs are series.** A program is what listings, sponsorships and carriage offers attach to. `assets` are its episodes, and every library item carries a log code (`PGM`, `SPT`, `UND`, `BMP`, `SID`; `OPEN` is the slate filler).
+- **The program log** (`log_entries`) holds programs, live blocks and planned off-air time, each with exact start and end times. **Breaks** are generated from the break rule into `breaks`. What aired goes to `as_run`, which is append-only and is the only thing billing reads.
+- **Ledger.** It's double-entry: `entries` each have two or more `postings` that sum to zero. Balances are sums of postings, so nothing is ever updated.
+  - Holds are rows in `holds` plus postings on the shared `holds` account tagged with the hold. A hold's open amount is the sum of its postings, which is why a hold never changes.
+  - `deposits`, `payouts` and `pledges` track the provider's progress (pending, sent, …). Money only moves through entries.
+- **Undecided rates** live in `ledger.revenue_config`, one row per effective date, all zero by default.
+
+## The Phase 3 constraints, where they live, and the test that proves each
+
+| Rule | Enforced by | Test (`packages/db/test/constraints.test.ts`) |
+|---|---|---|
+| Call sign is 3 to 5 capital letters, unique platform-wide | `call_sign_format` check, `stations_call_sign` unique index | call signs › are 3 to 5 capital letters; are unique |
+| Call sign immutable after first sign-on | `stations_guard` trigger | call signs › are fixed after first sign-on |
+| Channel number unique within market and band | `channels_number_in_market` partial unique index (unreleased channels) | channels › are unique within a market and band |
+| Channel number immutable after first sign-on | `channels_guard` trigger (no update, no delete) | channels › are fixed after first sign-on |
+| Channel number in its band's range | `channel_number_in_band` check (TV 2.1 to 69.9, radio 88.1 to 107.9 in odd tenths) | channels › TV is 2.1 to 69.9; radio… |
+| Station colour holds 4.5:1 against white | `colour_contrast` check calling `public.contrast_on_white`, and `isValidStationColour` in `packages/domain` | stations › colour must hold 4.5:1 |
+| A log entry can't reference an asset without a rights confirmation | the foreign key from `log_entries.asset_id` goes to `rights_confirmations`, not `assets` | program log › can't reference an asset without a rights confirmation |
+| (added) The log never overlaps on a station | `log_entries_no_overlap` exclusion constraint | program log › never overlaps |
+| (added) Another station's program airs only under a carriage agreement | `log_entries_guard` trigger | program log › airs another station's program only under… |
+| A link import can never have a carriage offer | `offers_guard` and `assets_guard` triggers, both directions | link imports › (2 tests) |
+| A claimable station's works each point at a permission or licence record, and only covered works can be imported; nothing is copied before a record exists | `assets_guard` (source must be `creator_work`, and the work must be covered) and `rights_confirmations_guard` (the record must cover that exact work) | claimable stations › only import works covered by a yes… |
+| A licence only counts if it allows commercial use | `licence_records.allows_carriage` generated column (CC0, CC BY, CC BY-SA), used by the guards | claimable stations › a licence only counts if… |
+| Escrow money only goes to the verified creator or the creator fund | `entry_checks` constraint trigger. Escrow is paid into only from that station's owed earnings, and escrow accounts exist only for claimable stations | escrow › (6 tests, including every other account kind and a one-cent split) |
+| A channel held for the waitlist can't go to another station | `channels_guard` and `channel_holds_guard`, plus reservations checked against station call signs | channels › held for a waitlist reservation…; call signs › held for the waitlist… |
+| A studio has no channel and never signs on | `channels_guard`, `studio_never_signs_on` check | stations › a studio has no channel… |
+| Ledger rows are never updated or deleted | `append_only` triggers on entries, postings, holds, accounts, statements (and `broadcast.as_run`) | ledger › rows are never updated or deleted |
+| (added) Every entry balances; an advertiser's balance and every hold stay ≥ 0 | `entry_checks` (deferred to commit) | ledger › entries must balance; can't spend more than is available |
+| A spot can't be placed in a break unless money for that airing is held | `airings.hold_id` is required and unique; `airings_guard` (hold is for this spot and station); `hold_is_funded` (the hold's amount moved in the same transaction) | spots › can't be placed in a break unless… |
+| A spot can't be listed until the available balance covers a day of its budget | `spots_guard` with `spots.one_day_of_budget`, mirrored by `oneDayOfBudgetMicros` in `packages/domain` | spots › can't be listed until… |
+
+## Migration from the old model
+
+`npm run db:migrate:legacy -- [--report docs/migration-report.md] [file.json …]` reads `public.opencast_state` (from `LEGACY_DATABASE_URL`, default `DATABASE_URL`) and any JSON files, and writes into the new tables.
+
+- It never writes to the old table or files.
+- It's safe to rerun: the second run writes nothing, and a run at cutover picks up newer rows.
+- The last run is in `docs/migration-report.md`.
+
+| Old | New | Notes |
+|---|---|---|
+| channels | stations (in setup), break_rules, station_memberships (owner) | No call sign, market, band or channel exists in the old data, so every station signs on again. Colours under 4.5:1 are left unset |
+| owner wallets | users + identities (`wallet`) | Matched to a Privy user when they sign in and link that wallet |
+| assets | assets + asset_files | Code from the old category: program→PGM, ad→SPT, sponsor→UND, bumper→BMP. `external`→`link` |
+| creator-library items | through their station copies | A library item never imported into a station has nowhere to go and is reported |
+| assetFolders, streamSchedules, destinations, livepeerConfigs, externalIngestJobs | asset_folders, schedules, translators, livepeer_config, import_jobs | One to one |
+| playlistItems | not migrated | No air times and no rights confirmations. The report lists each station's old order |
+| playoutStates | playout_state, off air | |
+| commands | dropped | They only mean something to the old worker |

@@ -1,0 +1,36 @@
+{
+  "name": "@opencast/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "lint": "echo \"No lint configured for db\"",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx scripts/migrate.ts",
+    "migrate:legacy": "tsx scripts/migrate-legacy.ts",
+    "test": "vitest run",
+    "reset": "tsx scripts/reset.ts"
+  },
+  "dependencies": {
+    "@opencast/domain": "0.1.0",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.20.6",
+    "vitest": "^3.2.4"
+  }
+}

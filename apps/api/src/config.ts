@@ -13,8 +13,6 @@ export const STORAGE_ROOT = resolveStorageRoot(process.env.STORAGE_ROOT);
 export const DATABASE_URL = process.env.DATABASE_URL?.trim() ?? "";
 export const UPLOAD_ROOT = path.join(STORAGE_ROOT, "uploads");
 export const HLS_ROOT = path.join(STORAGE_ROOT, "hls");
-export const DB_PATH = path.join(STORAGE_ROOT, "db.json");
-export const DB_LOCK_PATH = path.join(STORAGE_ROOT, "db.lock");
 export const WEB_DIST_DIR = resolveWebDistDir(process.env.WEB_DIST_DIR);
 export const KEEP_ORIGINAL_UPLOADS = String(process.env.KEEP_ORIGINAL_UPLOADS ?? "false") === "true";
 export const MAX_COMPRESSION_INPUT_BYTES = parseOptionalPositiveIntEnv(process.env.MAX_COMPRESSION_INPUT_BYTES);
