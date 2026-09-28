@@ -60,7 +60,10 @@ export function clockRange(
   const a = clockParts(start, options.timeZone);
   const b = clockParts(end, options.timeZone);
   const sep = options.separator === "–" ? " – " : " to ";
-  const first = clock(start, { ...options, suffix: a.period !== b.period });
+  // Across midnight ("6:00 am to 1:00 am"), both ends need their am/pm even when they match.
+  const minutes = (p: ClockParts) => ((p.hour % 12) + (p.period === "pm" ? 12 : 0)) * 60 + Number(p.minute);
+  const crossesMidnight = minutes(b) < minutes(a) || toDate(end).getTime() - toDate(start).getTime() >= 12 * 3600e3;
+  const first = clock(start, { ...options, suffix: a.period !== b.period || crossesMidnight });
   return `${first}${sep}${clock(end, { ...options, suffix: true })}`;
 }
 

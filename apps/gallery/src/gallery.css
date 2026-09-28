@@ -20,7 +20,7 @@
 .gal-sources { list-style: none; padding: 0; margin: 0 0 var(--s3); font: 500 12.5px var(--font-mono); }
 .gal-sources a { color: var(--signal); }
 .gal-state { margin-top: var(--s4); }
-.gal-state h3 { margin: 0 0 var(--s2); font: 600 14px var(--font-text); color: var(--ink-70); }
+.gal-state > h3 { margin: 0 0 var(--s2); font: 600 14px var(--font-text); color: var(--ink-70); }
 .gal-state__note { margin: -4px 0 var(--s2); font-size: 13px; color: var(--ink-50); }
 .gal-grounds { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--s3); }
 .gal-grounds--stacked { grid-template-columns: 1fr; }

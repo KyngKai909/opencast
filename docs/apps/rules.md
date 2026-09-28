@@ -8,7 +8,7 @@ From the apps prompt, the style guide and the reference files' intros and notes.
 - **Tokens only.** Every colour, size, space, radius and font comes from the tokens in `packages/ui` (the style guide's Colour, Type, Space and Shape chapters). No hard-coded values in apps. [prompt]
 - **Rules, not boxes.** Content is separated by rules. The picture is the only box. No cards where a frame has rules. [prompt; style guide "The picture is the only box."]
 - **Fonts.** Archivo for display (width 125 for idents and headlines), Public Sans for text and buttons, IBM Plex Mono only for the clock, channel numbers, amounts and log codes. All three are self-hosted, with fallback stacks. [prompt]
-- **Amounts and times in mono,** right-aligned in tables. [prompt]
+- **Amounts and times in mono.** Amounts are right-aligned in tables; a time column comes first and sits left, as every frame draws it (open question A15). [prompt; frames]
 - **Station colours** carry white text everywhere, and must hold 4.5:1 against white. A colour that fails can't be saved, and the reason is shown. Check it wherever a station colour is chosen. [prompt; master control A1; station settings]
 - **Buttons on a station's colour** use white and outline, so they pass on any station colour. [station pages 01]
 - **Standby amber** means "committed, not yet on air" or "needs attention": holds, newly added spots, incomplete listings, unconfirmed rights, requests with a deadline. Don't use it for anything else. [biz funding 03; master control C; live-listings 03; offering 01]

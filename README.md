@@ -19,10 +19,11 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
 | `apps/spots` | `@opencast/spots` | Opencast for business (empty) | apps |
 | `apps/desk` | `@opencast/desk` | Network desk, internal (empty) | apps |
+| `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
 | `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
 | `packages/contracts` | `@opencast/contracts` | Zod request and response schemas | platform; the apps prompt reads it and never edits it |
-| `packages/ui` | `@opencast/ui` | Design system (empty) | apps |
+| `packages/ui` | `@opencast/ui` | Design system: tokens, primitives, broadcast and data components, shells | apps |
 | `packages/player` | `@opencast/player` | The shared player (empty) | apps |
 | `contracts` | | `CreatorEscrow` and `CreatorFund` (Foundry): claimable stations' earnings until claimed, and the fund that backs new stations | platform |
 | `docs/reference` | | HTML design references, one folder per app | |
@@ -62,6 +63,18 @@ Each empty app runs on its own with `npm run dev -w @opencast/<name>`. Ports: vi
 | `npm run start:service:{api,worker,control}` | Starts one built service |
 | `npm run start:runtime` | API and worker in one process (single-service mode); the API also serves `apps/control/dist` |
 | `npm run env:check` | Lists which variables are set |
+
+### The gallery
+
+```bash
+npm run dev -w @opencast/gallery
+```
+
+http://localhost:5180 shows every component in `@opencast/ui` on the dark and light grounds side by side, each linked to the reference frame it comes from (served from `docs/reference` at `/reference/`). "Compare with the reference" puts a component next to its reference section.
+
+`npm run compare -w @opencast/gallery` checks the build against the references: it opens each pair of elements listed in `apps/gallery/scripts/pairs/*.json` in Chrome, on both grounds, and prints every computed style that differs. Add `-- <id or group>` for some, and `-- --shots` for side-by-side screenshots in `apps/gallery/compare-out/`. It uses the installed Chrome; nothing is downloaded.
+
+Apps import the design system's styles once, `import "@opencast/ui/styles.css"`, and take every colour, font, space and radius from its tokens (`packages/ui/src/tokens.css`). The rules every screen follows are in `docs/apps/rules.md`.
 
 ### Why Turborepo
 
@@ -121,3 +134,5 @@ The browser still stores the connected wallet under `openchannel.creator.wallet.
 - `docs/migration-report.md`: the last legacy migration run
 - `docs/technical-implementation-guide.md`: the MVP's design and cost notes (predates the reference designs)
 - `docs/contracts-changelog.md`: changes to published contracts
+- `docs/apps/`: the apps prompt's inventory of the reference designs, the rules for every screen, open questions, and copy waiting for review
+- `docs/contract-requests.md`: fields and endpoints the apps need from the contracts

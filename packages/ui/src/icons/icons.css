@@ -1,5 +1,6 @@
+/* line-height 1.1 keeps the wordmark inside the mark's height, as the reference headers measure (the self-hosted variable Archivo reports taller "normal" metrics than the Google-served face). */
 .oc-i { flex: none; }
-.oc-lockup { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--ink); }
+.oc-lockup { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; color: var(--ink); }
 .oc-lockup .oc-mark { width: 26px; height: 21px; }
 .oc-lockup--app { font-size: 19px; }
 .oc-lockup--phone { font-size: 18px; }

@@ -80,9 +80,13 @@ for (const pair of pairs) {
   for (const ground of pair.grounds ?? ["dark", "light"]) {
     const ctx = await browser.newContext({ colorScheme: ground, viewport: { width: pair.viewport?.[0] ?? 1440, height: pair.viewport?.[1] ?? 1000 }, deviceScaleFactor: 2 });
     const ref = await ctx.newPage();
+    // Wide enough that the reference draws its 1280px frames at full size (it scales them to fit).
+    await ref.setViewportSize({ width: pair.referenceViewport?.[0] ?? 1840, height: pair.referenceViewport?.[1] ?? 1200 });
     await ref.goto("file://" + path.join(referenceRoot, pair.reference.file));
     // The reference files follow the system setting and a data-theme override on <html>.
     await ref.evaluate((g) => document.documentElement.setAttribute("data-theme", g), ground);
+    // Draw the reference's frames at full size: they're scaled to fit their column with a transform.
+    await ref.addStyleTag({ content: ".fit > .scaler { transform: none !important; position: relative !important; } .fit { height: auto !important; }" });
     await ref.evaluate(() => document.fonts.ready);
     // Measure the end state: the tally's switch-on and any other animation, finished.
     await ref.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
@@ -112,12 +116,17 @@ for (const pair of pairs) {
     if (shots) {
       const pad = pair.shotPadding ?? 12;
       const shot = async (page, sel, file) => {
-        const el = page.locator(sel).first();
-        const box = await el.boundingBox();
-        if (!box) return;
-        const target = pair.shotSelector ? page.locator(pair.shotSelector.replaceAll("{ground}", ground)).first() : el;
-        const tb = (await target.boundingBox()) ?? box;
-        await page.screenshot({ path: file, clip: { x: Math.max(0, tb.x - pad), y: Math.max(0, tb.y - pad), width: tb.width + pad * 2, height: tb.height + pad * 2 } });
+        const target = page.locator(sel).first();
+        if (!(await target.count())) return;
+        // Bring it into the viewport first: the clip is measured in viewport coordinates.
+        await target.scrollIntoViewIfNeeded();
+        const tb = await target.boundingBox();
+        if (!tb) return;
+        const vp = page.viewportSize();
+        const x = Math.max(0, tb.x - pad);
+        const y = Math.max(0, tb.y - pad);
+        const clip = { x, y, width: Math.min(tb.width + pad * 2, vp.width - x), height: Math.min(tb.height + pad * 2, vp.height - y) };
+        await page.screenshot({ path: file, clip, animations: "disabled" });
       };
       await shot(ref, pair.reference.shotSelector ?? pair.reference.selector, path.join(outDir, `${pair.id}-${ground}-reference.png`));
       await shot(built, pair.gallery.shotSelector?.replaceAll("{ground}", ground) ?? builtSel, path.join(outDir, `${pair.id}-${ground}-built.png`));

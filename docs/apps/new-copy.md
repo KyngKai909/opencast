@@ -59,4 +59,34 @@ Phase 0 found where new copy will be needed. The words are added as each phase b
 
 ## Written
 
-None yet.
+### packages/ui (Phase 1)
+
+Words the components say that no frame shows. Screen-reader-only words are marked (spoken).
+
+| Component | Words | Where |
+|---|---|---|
+| Tally | "On air", "Not on air", "Stand by", "Off air" (spoken) | The sign's accessible name; the visible words are the frames' ("ON AIR", "STAND BY", "OFF AIR") |
+| Notice (standby) | "Needs attention." (spoken, before the notice) | Master control's frames use the phrase on screen |
+| Toggle (locked) | "Always on" (spoken) | The frames use it as row text |
+| AmountPicker | "Other amount" | The label of the Other field |
+| Menu | "More" (spoken) | The "···" button |
+| Timeline, StepRail | "Done: ", "Not yet: " (spoken) | Before each step |
+| Checks (sign-on) | "Ready", "Needs attention" (spoken) | Each check's state |
+| Checks (upload) | "Fine", "Fixed", "For you" (spoken) | From the frame's summary words ("4 fine, 1 fixed, 1 for you") |
+| Movements | "When", "What", "Amount" (spoken column heads) | The table has no visible header in the frame |
+| LineChart | "Time", "{value}, {series}" (spoken table heads) | The hidden table of the chart's numbers |
+| Runway | "Auto top-up is on.", "about 1 day" | The singular of the frame's "about 44 days" |
+| Station switcher | "Switch station" (tooltip) | The header's station button |
+| Business switcher | "Switch business" (tooltip) | The header's business button |
+| PlayerBar | "Play" | Pause, while paused |
+| PlayerBar, MiniPlayer | "Player" (spoken); "Open player, {title}, {station}" (spoken) | The player regions and the mini player's open button |
+| ShellSteps | ", done" (spoken) | After a finished step |
+| DialRow | "Off air" (title), "Signs on again at 6:00 am" | An off-air row; the words are the style guide's slate |
+| DialRow (radio band list) | "You're here" | The row you're tuned to, instead of a lit tally (open question A2); the words are the carried-from modal's |
+| ProgressBar | "{h} hr {m} min left" | An hour or more left (the frames only show "18 min left") |
+| BreakBar | "Under barter" | Barter time with no maker named |
+| Broadcast (spoken) | "Tune in to BEAT 12.1: {title}", "BEAT 12.1, Inland Beat: station preview", "On now: ", "On air: ", "Break 2:00, 8:28 to 8:30 pm", "Dead air", "Position", "Radio band", "Preset 2, empty: add", "Preset 1, BEAT 12.1", "7, taken", code names "Program", "Spot", "Underwriting", "Bumper", "Station ID", "Open" | Row, slider, scale, key and channel names for screen readers |
+| ShellRail (host) | A disabled item's reason, e.g. "Hosts see only their live blocks" (tooltip) | Rail items a host can't open (open question A6) |
+
+Styles with no frame (no new words): a field's error line (standby amber, with the warning sign), disabled controls (faded), the tooltip, and destructive menu items (live red, like the settings' danger links).
+

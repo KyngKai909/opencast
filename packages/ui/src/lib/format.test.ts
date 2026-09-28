@@ -24,6 +24,10 @@ describe("clockRange", () => {
   it("says both when they differ", () => {
     expect(clockRange("2026-09-27T06:40:00Z", "2026-09-27T09:00:00Z", { timeZone: LA })).toBe("11:40 pm to 2:00 am");
   });
+  it("says both across midnight, even when they match", () => {
+    // On air 6:00 am to 1:00 am the next morning.
+    expect(clockRange("2026-09-26T13:00:00Z", "2026-09-27T08:00:00Z", { timeZone: LA })).toBe("6:00 am to 1:00 am");
+  });
 });
 
 describe("duration", () => {

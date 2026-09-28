@@ -43,3 +43,5 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A12 | The bug position vs title safe | style guide ch. 06, 11 | Inside title safe (5%) |
 | A13 | Menu on a basic remote: Home can't reach an app on Android TV or Fire TV | tv 01 | Long-press Back |
 | A14 | TV type under 21px in the reference CSS (tally 18px, now-line 20px, sleep times 20px) | tv 03.1; tv-update 05.1 | 21px minimum |
+| A15 | The rules say times are right-aligned in tables; every frame puts the time column first, left-aligned (amounts are right-aligned) | control, business tables | The frames: times first and left, amounts right |
+| A16 | Short durations: the rundown and order review frames write `0:30`, `0:05`; the rules say `:30` | master-control A.7; orders 05.1 | The rules: `:30` |
