@@ -42,7 +42,7 @@ Each entry balances: money into an account is positive, out is negative.
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
-| 11:00 PM | barter_split | The producer's barter share (aired on beat 12.1) | BEAT: earnings −$4.00<br>REEL: earnings $4.00 |
+| 11:00 PM | barter_split | The producer's barter share: Aired on BEAT 12.1 | BEAT: earnings −$4.00<br>REEL: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.65<br>Orange Street Coffee: available $0.65 |
@@ -67,13 +67,13 @@ Each entry balances: money into an account is positive, out is negative.
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$1.90<br>Held (all businesses) $1.90 |
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$4.00<br>Held (all businesses) $4.00 |
-| 11:00 PM | settle | Aired on REEL 24.1 | Held (all businesses) −$4.00<br>REEL: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
+| 11:00 PM | settle | Aired on REEL 24.1 | Held (all businesses) −$4.00<br>REEL: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.54<br>Orange Street Coffee: available $0.54 |
-| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
 | 11:00 PM | settle | Aired on REEL 24.1 | Held (all businesses) −$4.00<br>REEL: earnings $4.00 |
+| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$4.00<br>BEAT: earnings $4.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.50<br>Orange Street Coffee: available $0.50 |
 
@@ -107,8 +107,8 @@ Each entry balances: money into an account is positive, out is negative.
 | 11:00 PM | release |  | Held (all businesses) −$0.35<br>Orange Street Coffee: available $0.35 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
-| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.30<br>Orange Street Coffee: available $0.30 |
+| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
 
 ### Friday, October 9
@@ -118,8 +118,8 @@ Each entry balances: money into an account is positive, out is negative.
 | 6:00 PM | hold | Held for an airing | Orange Street Coffee: available −$1.65<br>Held (all businesses) $1.65 |
 | 6:00 PM | hold | Held for an airing | Redlands Bikes: available −$3.00<br>Held (all businesses) $3.00 |
 | 6:00 PM | hold | Held for an airing | Redlands Bikes: available −$3.00<br>Held (all businesses) $3.00 |
-| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | release |  | Held (all businesses) −$0.25<br>Orange Street Coffee: available $0.25 |
+| 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$1.40<br>BEAT: earnings $1.40 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
 | 11:00 PM | settle | Aired on BEAT 12.1 | Held (all businesses) −$3.00<br>BEAT: earnings $3.00 |
 
@@ -146,8 +146,8 @@ Each entry balances: money into an account is positive, out is negative.
 | Time | Entry | What | Postings |
 |---|---|---|---|
 | 9:00 AM | escrow_deposit | Weekly deposit into escrow (0x9dc9c758…) | LUPE: owed to escrow −$23.98<br>LUPE: in escrow $23.98 |
-| 9:00 AM | payout | Weekly payout | BEAT: earnings −$225.50<br>Outside (clear) $225.50 |
 | 9:00 AM | payout | Weekly payout | REEL: earnings −$26.91<br>Outside (clear) $26.91 |
+| 9:00 AM | payout | Weekly payout | BEAT: earnings −$225.50<br>Outside (clear) $225.50 |
 
 ### Thursday, October 15
 
