@@ -100,7 +100,9 @@ export const StationSetup = z.object({
   pledgesTaxDeductible: z.boolean().nullable(),
   memberCreditStyle: z.enum(["voice", "text"]),
   /** Makes spots to order ("Made for you"). */
-  orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().nullable(), fromMicros: z.number().int().nullable() })
+  orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().nullable(), fromMicros: z.number().int().nullable() }),
+  /** IAB Content Taxonomy 3.0 ids for the station (added 2026-09-28), derived from its category unless set. */
+  iabCategories: z.array(z.string()).optional()
 });
 
 export const BreakRule = z.object({
@@ -114,7 +116,12 @@ export const BreakRule = z.object({
   /** After SPT. SID is always last and can't be removed. */
   fillOrder: z.array(LogCode),
   openTimeTo: z.enum(["spot_market", "station_id_and_bumpers"]),
-  blockedCategories: z.array(z.string())
+  blockedCategories: z.array(z.string()),
+  /**
+   * "Ads from partners" (added 2026-09-28): a programmatic backfill for time still open after
+   * the rotation, backups and thank-you credit. Only a flag until the backend supports it; off by default.
+   */
+  adsFromPartners: z.boolean().optional()
 });
 
 export const Translator = z.object({

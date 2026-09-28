@@ -38,6 +38,19 @@ export const ViewerSettings = z
   })
   .loose();
 
+/**
+ * A Clear account linked through Privy's cross-app linking (Clear is the provider app, Opencast
+ * the requester). `read_only`: Opencast can verify the address and pay out to it; funding happens
+ * inside Clear. `full`: Opencast can also request a transfer from it, which the person confirms
+ * on Clear's page. Nothing about a Clear account is known until the person links it.
+ */
+export const ClearLink = z.object({
+  address: z.string(),
+  access: z.enum(["read_only", "full"]),
+  linkedAt: Timestamp
+});
+export type ClearLink = z.infer<typeof ClearLink>;
+
 export const Me = z.object({
   id: Id,
   displayName: z.string().nullable(),
@@ -46,7 +59,9 @@ export const Me = z.object({
   isAdmin: z.boolean(),
   identities: z.array(Identity),
   memberships: z.array(Membership),
-  settings: ViewerSettings
+  settings: ViewerSettings,
+  /** The linked Clear account (added 2026-09-28), or null. Absent from older servers. */
+  clear: ClearLink.nullable().optional()
 });
 export type Me = z.infer<typeof Me>;
 
@@ -103,6 +118,20 @@ export const accountsApi = {
     auth: "user",
     summary: "The signed-in person, their identities, stations and businesses",
     response: Me
+  }),
+  linkClear: endpoint({
+    method: "POST",
+    path: "/me/clear",
+    auth: "user",
+    summary: "After the app links Clear with Privy's cross-app linking, record it: the API reads the person's Clear cross-app account from Privy and stores its address and access. 409 if Privy has no Clear account linked.",
+    response: ClearLink
+  }),
+  unlinkClear: endpoint({
+    method: "DELETE",
+    path: "/me/clear",
+    auth: "user",
+    summary: "Forget the linked Clear account (the app also unlinks it in Privy). Funding sources and payout destinations that used it stop working.",
+    response: Ok
   }),
   updateMe: endpoint({
     method: "PATCH",

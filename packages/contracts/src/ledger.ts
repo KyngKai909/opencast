@@ -58,7 +58,12 @@ export const StationEarnings = z.object({
     carriageOut: z.object({ micros: Micros, detail: z.string() }),
     production: z.object({ micros: Micros, orders: z.number().int() }),
     opencastShare: Undecided,
-    pool: Undecided
+    pool: Undecided,
+    /**
+     * Ads from partners (programmatic backfill, added 2026-09-28): paid when the partner pays,
+     * 30 to 90 days after airing; never held, never escrowed. `on` mirrors the break rule's switch.
+     */
+    partnerAds: z.object({ on: z.boolean(), micros: Micros, pendingMicros: Micros }).optional()
   }),
   totalMicros: Micros,
   /** "Held for airings… Tonight 9 airings in 4 breaks". Becomes the station's when each airing runs. */
@@ -129,6 +134,33 @@ export const ledgerApi = {
     response: z.object({ depositId: Id, status: z.enum(["pending", "arrived"]), balance: Balance }),
     status: 201
   }),
+  quoteClearTransfer: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/deposits/clear-transfer/quote",
+    auth: "user",
+    summary: "Funding from a linked Clear wallet with full access (owner, manager): where to send it. The app asks Clear to send it (the person confirms on Clear's page), then confirms with the transaction hash. 409 when the person's Clear link is read-only or missing.",
+    params: BusinessParams,
+    body: z.object({ amountMicros: Micros.positive() }),
+    response: z.object({
+      /** The business's balance account to send to. */
+      to: z.string(),
+      token: z.object({ address: z.string(), symbol: z.literal("USDC"), decimals: z.literal(6) }),
+      chainId: z.number().int(),
+      /** The amount in the token's units (USDC has 6 decimals, so the same as micros). */
+      amountUnits: z.string(),
+      from: z.string()
+    })
+  }),
+  confirmClearTransfer: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/deposits/clear-transfer",
+    auth: "user",
+    summary: "The transfer from Clear was sent: the API checks it on chain (from the person's linked Clear wallet, to the business's account, at least the amount) and credits the balance once it confirms",
+    params: BusinessParams,
+    body: z.object({ amountMicros: Micros.positive(), txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/) }),
+    response: z.object({ depositId: Id, status: z.enum(["pending", "arrived"]), balance: Balance }),
+    status: 201
+  }),
   cancelDeposit: endpoint({
     method: "POST",
     path: "/businesses/:businessId/deposits/:depositId/cancel",
@@ -186,6 +218,23 @@ export const ledgerApi = {
     auth: "user",
     summary: "Where the station is paid (its Clear account, or Stripe Connect), and a link if it has to finish setting it up (owner only)",
     params: StationParams,
+    response: z.object({
+      status: z.enum(["active", "needs_onboarding"]),
+      url: z.string().nullable(),
+      /** Where payouts go (added 2026-09-28): the station's Clear account, an owner's linked Clear wallet, or Stripe Connect. */
+      destination: z
+        .object({ kind: z.enum(["clear_account", "clear_wallet", "stripe_connect"]), label: z.string(), address: z.string().nullable() })
+        .nullable()
+        .optional()
+    })
+  }),
+  setPayoutDestination: endpoint({
+    method: "PUT",
+    path: "/stations/:stationId/payout-account",
+    auth: "user",
+    summary: "Pay the station out to the owner's linked Clear wallet (read-only access is enough), or back to its Clear account (owner only)",
+    params: StationParams,
+    body: z.object({ kind: z.enum(["clear_account", "clear_wallet"]) }),
     response: z.object({ status: z.enum(["active", "needs_onboarding"]), url: z.string().nullable() })
   }),
   moveToBank: endpoint({
