@@ -62,7 +62,7 @@ export interface User {
   delete(url: string): request.Test;
 }
 
-export async function createHarness(options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"] } = {}): Promise<Harness> {
+export async function createHarness(options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"]; chain?: Deps["chain"] } = {}): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
@@ -98,6 +98,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
     db: database.db,
     media: ffmpegPipeline(storageRoot),
     storage: { objects: localObjectStore(path.join(storageRoot, "objects")), ipfs: fakeIpfs() },
+    chain: options.chain ?? null,
     payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
       push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
@@ -109,7 +110,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",
-      escrowContractAddress: null,
+      escrowContractAddress: options.chain?.escrow ?? null,
       production: false
     }
   };

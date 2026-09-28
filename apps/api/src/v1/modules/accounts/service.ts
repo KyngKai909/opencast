@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Me, StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -48,6 +48,8 @@ export interface AccountsService {
   stationMemberIds(stationId: string, roles?: StationRole[]): Promise<string[]>;
   /** Opencast admins (Network desk). */
   adminIds(): Promise<string[]>;
+  /** The wallet a user signed in with or linked (Privy), if any: where the escrow can pay them. */
+  walletOf(userId: string): Promise<string | null>;
   businessMemberIds(businessId: string, roles?: BusinessRole[]): Promise<string[]>;
 
   team(scope: TeamScope): Promise<TeamView>;
@@ -512,6 +514,16 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         target: [schema.advertiserMemberships.advertiserId, schema.advertiserMemberships.userId],
         set: { role }
       });
+    },
+
+    async walletOf(userId) {
+      const [row] = await db
+        .select({ value: schema.identities.value })
+        .from(schema.identities)
+        .where(and(eq(schema.identities.userId, userId), eq(schema.identities.kind, "wallet")))
+        .orderBy(desc(schema.identities.createdAt))
+        .limit(1);
+      return row?.value ?? null;
     },
 
     async adminIds() {

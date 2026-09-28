@@ -3,6 +3,7 @@ import type { EventBus } from "./events.js";
 import type { TokenVerifier } from "./auth.js";
 import type { MediaPipeline } from "./media.js";
 import type { Storage } from "./storage.js";
+import type { EscrowChain } from "./chain/index.js";
 import type { Payments } from "./payments/index.js";
 import type { AccountsService } from "./modules/accounts/service.js";
 import type { StationsService } from "./modules/stations/service.js";
@@ -40,6 +41,8 @@ export interface Deps {
   media: MediaPipeline;
   /** Object storage by content ID (R2, or local disk in development), and IPFS for publishing. */
   storage: Storage;
+  /** The escrow contract and creator fund (Base; anvil locally). Null until configured. */
+  chain: EscrowChain | null;
   notifier: Notifier;
   payments: Payments;
   config: {

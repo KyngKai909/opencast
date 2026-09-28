@@ -2,6 +2,10 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-28: claims on-chain
+
+`POST /v1/admin/handovers/:handoverId/approve` now records the desk's check of the claimant. When the escrow contract is live it also returns `onChain`: `{ contract, escrowStationId, payee, kind, calldata }`, which is what each verifier signs from their own wallet. The chain starts the 72 hours, and the claim's state follows the chain. `payableAfter` is the earliest it could be paid.
+
 ## 2026-09-28: the station's payout account
 
 - `GET /v1/stations/:stationId/payout-account` (owner only): `{ status: "active" | "needs_onboarding", url }`. Where the station is paid (its Clear account, or Stripe Connect Express in the Stripe-only setup). When `needs_onboarding`, send the owner to `url` to finish it.

@@ -261,6 +261,8 @@ export const handovers = network.table("handovers", {
     .references(() => creators.id),
   kind: text("kind", { enum: ["claim", "stop"] }).notNull(),
   claimantUserId: uuid("claimant_user_id").references(() => users.id),
+  /** The creator's wallet the verifiers approve on-chain; the escrow pays nowhere else. */
+  payeeAddress: text("payee_address"),
   sourceAccountVerifiedAt: at("source_account_verified_at"),
   approvedAt: at("approved_at"),
   /** Approval plus the 72-hour public waiting period. */

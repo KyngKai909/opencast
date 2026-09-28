@@ -32,7 +32,15 @@ export interface DeskPart {
   setUpClaimable(creatorId: string, input: { recipeId: string; marketId: string; band: Band; channel: string; callSign: string; name: string; colour?: string; operatorUserId: string; signOnAt?: string }): Promise<{ station: import("@opencast/contracts").StationIdent; importable: number }>;
   heldEarnings(): Promise<HeldEarnings>;
   startHandover(user: CurrentUser, stationId: string, input: { kind: "claim" | "stop"; sourceAccountProof: string }): Promise<{ handoverId: string; status: "verifying" | "approved" | "waiting_period" | "completed" | "cancelled"; payableAfter: string | null }>;
-  approveHandover(handoverId: string): Promise<{ handoverId: string; payableAfter: string }>;
+  approveHandover(handoverId: string): Promise<{
+    handoverId: string;
+    payableAfter: string;
+    onChain: { contract: string; escrowStationId: number; payee: string; kind: "claim" | "stop"; calldata: string } | null;
+  }>;
+  /** Who a claimed station's escrow was paid to (its creator's user), for the ledger. */
+  claimantOf(stationId: string): Promise<{ userId: string; kind: "claim" | "stop" } | null>;
+  /** The escrow contract said something about a claim: approved and waiting, cancelled, or paid. */
+  onEscrowEvent(stationId: string, event: import("../../chain/index.js").EscrowEvent): Promise<void>;
   listedSources(marketId?: string): Promise<ListedSource[]>;
   addListedSource(input: { marketId: string; band: Band; channel: string; callSign: string; name: string; description?: string; streamUrl: string; embedTerms: "allowed" | "unclear"; calendarUrl?: string }): Promise<ListedSource>;
   syncListedSource(sourceId: string): Promise<ListedSource>;
@@ -518,10 +526,65 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       const [row] = await db.select().from(HO).where(eq(HO.id, handoverId));
       if (!row || row.cancelledAt || row.completedAt) throw notFound("That claim");
       const now = deps.clock.now();
-      // The verifier's approval, then the 72-hour public waiting period during which it can be cancelled.
+      // The escrow pays only the creator's own wallet, the one they signed in with.
+      const payee = row.claimantUserId ? await services.accounts.walletOf(row.claimantUserId) : null;
+      if (deps.chain && !payee) throw refused("no_wallet", "The creator needs to sign in first: their wallet is where the escrow pays.");
+      // The earliest it can be paid; with the contract live, the verifiers' approvals on-chain start the 72 hours.
       const payableAfter = new Date(now.getTime() + WAITING_PERIOD_MS);
-      await db.update(HO).set({ approvedAt: now, sourceAccountVerifiedAt: row.sourceAccountVerifiedAt ?? now, payableAfter }).where(eq(HO.id, handoverId));
-      return { handoverId, payableAfter: payableAfter.toISOString() };
+      await db.update(HO).set({ approvedAt: now, sourceAccountVerifiedAt: row.sourceAccountVerifiedAt ?? now, payableAfter, payeeAddress: payee }).where(eq(HO.id, handoverId));
+      const escrowId = (await services.stations.profiles([row.stationId])).get(row.stationId)?.escrowId;
+      const onChain =
+        deps.chain && payee && escrowId !== undefined
+          ? { contract: deps.chain.escrow, escrowStationId: escrowId, payee, kind: row.kind, calldata: deps.chain.approveCalldata(escrowId, payee as `0x${string}`, row.kind) }
+          : null;
+      return { handoverId, payableAfter: payableAfter.toISOString(), onChain };
+    },
+
+    async claimantOf(stationId) {
+      const [row] = await db
+        .select()
+        .from(HO)
+        .where(and(eq(HO.stationId, stationId), isNull(HO.cancelledAt), sql`${HO.approvedAt} is not null`))
+        .orderBy(desc(HO.approvedAt))
+        .limit(1);
+      return row?.claimantUserId ? { userId: row.claimantUserId, kind: row.kind } : null;
+    },
+
+    async onEscrowEvent(stationId, event) {
+      const [open] = await db
+        .select()
+        .from(HO)
+        .where(and(eq(HO.stationId, stationId), isNull(HO.cancelledAt), isNull(HO.completedAt)))
+        .orderBy(desc(HO.createdAt))
+        .limit(1);
+      if (!open) return;
+      if (event.type === "claim_proposed" && open.payeeAddress && event.payee.toLowerCase() !== open.payeeAddress.toLowerCase()) {
+        // Not the wallet the desk checked. The verifiers can cancel it during the 72 hours; make sure they know.
+        console.warn(`[escrow] station ${stationId}: a claim on-chain names ${event.payee}, not the creator's ${open.payeeAddress}`);
+        const admins = await services.accounts.adminIds();
+        await services.notifications.notify(admins, {
+          kind: "rights_claim",
+          title: "A claim names the wrong wallet",
+          body: `A claim on the escrow contract would pay ${event.payee}, not the creator's wallet. Cancel it before its 72 hours are up.`,
+          link: `/desk/held-earnings`,
+          scope: { kind: "station", id: stationId },
+          dedupeKey: `wrong-payee:${event.tx}`
+        });
+      }
+      if (event.type === "ready") await db.update(HO).set({ payableAfter: event.readyAt }).where(eq(HO.id, open.id));
+      if (event.type === "cancelled") await db.update(HO).set({ cancelledAt: deps.clock.now(), cancelReason: "Cancelled by a verifier" }).where(eq(HO.id, open.id));
+      if (event.type === "paid" && event.reason !== "unclaimed") {
+        await db.transaction(async (tx) => {
+          await tx.update(HO).set({ completedAt: deps.clock.now() }).where(eq(HO.id, open.id));
+          await tx.update(CR).set({ stage: "claimed", nextAction: null }).where(eq(CR.id, open.creatorId));
+          if (event.reason === "claim") {
+            // The station is theirs now: an ordinary station, earning into its own account.
+            await services.stations.handOver(tx, stationId);
+            if (open.claimantUserId) await services.accounts.addStationMember(tx, stationId, open.claimantUserId, "owner");
+          }
+        });
+        if (event.reason === "stop") await services.playout.signOff(stationId, true);
+      }
     },
 
     async listedSources(marketId) {

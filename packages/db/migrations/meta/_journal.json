@@ -71,6 +71,20 @@
       "when": 1790576898609,
       "tag": "0009_provider_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790578617846,
+      "tag": "0010_chain_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790578692550,
+      "tag": "0011_escrow_batches",
+      "breakpoints": true
     }
   ]
 }

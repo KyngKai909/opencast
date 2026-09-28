@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, boolean, check, date, index, integer, jsonb, smallint, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, smallint, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, micros } from "./columns.js";
 import { ledger } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -240,6 +240,10 @@ export const escrowDeposits = ledger.table("escrow_deposits", {
   id: id(),
   chainId: integer("chain_id").notNull(),
   contractAddress: text("contract_address").notNull(),
+  /** What was sent, per station: written before the transaction, so a crash never sends it twice. */
+  items: jsonb("items").notNull().default([]),
+  status: text("status", { enum: ["sending", "sent", "confirmed", "failed"] }).notNull().default("sending"),
+  error: text("error"),
   txHash: text("tx_hash"),
   confirmedAt: at("confirmed_at"),
   entryId: uuid("entry_id").references(() => entries.id),
@@ -323,3 +327,10 @@ export const providerMoves = ledger.table(
     check("transfer_has_destination", sql`(${t.kind} = 'transfer') = (${t.toWallet} is not null)`)
   ]
 );
+
+/** How far the chain has been read (escrow events), so each event is applied once. */
+export const chainCursor = ledger.table("chain_cursor", {
+  name: text("name").primaryKey(),
+  block: bigint("block", { mode: "bigint" }).notNull(),
+  updatedAt: at("updated_at").notNull().defaultNow()
+});

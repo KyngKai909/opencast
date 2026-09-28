@@ -80,6 +80,10 @@ export interface StationsService {
   identityReady(stationId: string): Promise<{ callSign: boolean; channel: boolean }>;
   markSignedOn(db: Executor, stationId: string): Promise<{ first: boolean }>;
   markSignedOff(db: Executor, stationId: string, permanently: boolean): Promise<void>;
+  /** Stations by their escrow IDs (the escrow contract's keys). */
+  byEscrowIds(ids: number[]): Promise<Map<number, string>>;
+  /** A claimed station becomes its creator's own: an ordinary station, earning into its own account. */
+  handOver(db: Executor, stationId: string): Promise<void>;
   /** How playout draws the station: colour, bug, city. */
   look(stationId: string): Promise<{ callSign: string | null; channel: string | null; name: string; homeCity: string | null; colour: string | null; bug: { mode: "off" | "call_sign_and_channel" | "logo"; opacity: number }; logoUrl: string | null } | null>;
   /** Stations that take orders, and studios. */
@@ -423,6 +427,16 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .set({ status: "on_air", updatedAt: deps.clock.now(), ...(first ? { firstSignedOnAt: deps.clock.now() } : {}) })
         .where(eq(S.id, stationId));
       return { first };
+    },
+
+    async byEscrowIds(ids) {
+      if (!ids.length) return new Map();
+      const rows = await db.select({ id: schema.stations.id, escrowId: schema.stations.escrowId }).from(schema.stations).where(inArray(schema.stations.escrowId, ids));
+      return new Map(rows.map((r) => [r.escrowId, r.id]));
+    },
+
+    async handOver(tx, stationId) {
+      await tx.update(schema.stations).set({ kind: "station" }).where(and(eq(schema.stations.id, stationId), eq(schema.stations.kind, "claimable")));
     },
 
     async markSignedOff(tx, stationId, permanently) {

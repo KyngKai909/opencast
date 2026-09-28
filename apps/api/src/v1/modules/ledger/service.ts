@@ -106,6 +106,13 @@ export interface LedgerService {
   payoutAccount(stationId: string): Promise<{ status: "active" | "needs_onboarding"; url: string | null }>;
   /** Sends the outbox's pending moves to the provider. */
   sendMoves(): Promise<{ sent: number; failed: number }>;
+  /**
+   * The weekly deposit: every claimable station's owed earnings go into the escrow contract in one
+   * batch, and once it confirms they're held there. Null when the chain isn't set up.
+   */
+  escrowWeekly(): Promise<{ stations: number; micros: number; txHash: string } | null>;
+  /** Reads the escrow contract's events since last time: claims paid, releases to the fund, claims approved or cancelled. */
+  syncChain(): Promise<{ events: number } | null>;
   /** What the ledger says each provider wallet holds (the provider's balances should match). */
   custodyBalances(): Promise<Map<string, number>>;
 }
@@ -971,6 +978,102 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     sendMoves: () => sendMoves(deps),
+
+    async escrowWeekly() {
+      const chain = deps.chain;
+      if (!chain) return null;
+      const D = schema.escrowDeposits;
+      type Item = { stationId: string; escrowId: number; amountMicros: number };
+      const confirm = async (depositId: string, items: Item[], txHash: string) => {
+        await db.transaction(async (tx) => {
+          const lines = [];
+          for (const i of items) {
+            lines.push({ account: await service.account(tx, "escrow_owed", { stationId: i.stationId }), micros: -i.amountMicros });
+            lines.push({ account: await service.account(tx, "escrow", { stationId: i.stationId }), micros: i.amountMicros });
+          }
+          const entryId = await service.post(tx, "escrow_deposit", lines, { sourceType: "escrow_deposit", sourceId: depositId, memo: `Weekly deposit into escrow (${txHash.slice(0, 10)}…)`, idempotencyKey: `escrow-deposit:${depositId}` });
+          await tx.update(D).set({ status: "confirmed", confirmedAt: deps.clock.now(), entryId }).where(eq(D.id, depositId));
+        });
+      };
+
+      // A batch sent but not recorded (a crash in between) is recorded, never sent again.
+      const [unfinished] = await db.select().from(D).where(and(eq(D.status, "sent"), sql`${D.entryId} is null`)).limit(1);
+      if (unfinished?.txHash) {
+        await confirm(unfinished.id, unfinished.items as Item[], unfinished.txHash);
+        return { stations: (unfinished.items as Item[]).length, micros: (unfinished.items as Item[]).reduce((s, i) => s + i.amountMicros, 0), txHash: unfinished.txHash };
+      }
+      const [sending] = await db.select().from(D).where(eq(D.status, "sending")).limit(1);
+      if (sending) throw refused("escrow_in_flight", "An escrow deposit was being sent when something stopped; check it on-chain before sending another.");
+
+      const owed = await db
+        .select({ stationId: L.stationId, sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
+        .from(L)
+        .innerJoin(P, eq(P.accountId, L.id))
+        .where(eq(L.kind, "escrow_owed"))
+        .groupBy(L.stationId);
+      const positive = owed.filter((o) => Number(o.sum) > 0);
+      if (!positive.length) return { stations: 0, micros: 0, txHash: "" };
+      const profiles = await services.stations.profiles(positive.map((o) => o.stationId!));
+      const items: Item[] = positive.map((o) => ({ stationId: o.stationId!, escrowId: profiles.get(o.stationId!)!.escrowId, amountMicros: Number(o.sum) }));
+      const [row] = await db.insert(D).values({ chainId: chain.chainId, contractAddress: chain.escrow, items, status: "sending" }).returning();
+      let txHash: string;
+      try {
+        txHash = (await chain.depositBatch(items.map((i) => ({ escrowId: i.escrowId, amountMicros: i.amountMicros })))).txHash;
+      } catch (error) {
+        await db.update(D).set({ status: "failed", error: (error as Error).message.slice(0, 500) }).where(eq(D.id, row.id));
+        throw error;
+      }
+      await db.update(D).set({ status: "sent", txHash, chainId: chain.chainId }).where(eq(D.id, row.id));
+      await confirm(row.id, items, txHash);
+      return { stations: items.length, micros: items.reduce((s, i) => s + i.amountMicros, 0), txHash };
+    },
+
+    async syncChain() {
+      const chain = deps.chain;
+      if (!chain) return null;
+      const C = schema.chainCursor;
+      const [cursor] = await db.select().from(C).where(eq(C.name, "escrow"));
+      const { toBlock, events } = await chain.events(cursor ? cursor.block + 1n : 0n);
+      const stations = await services.stations.byEscrowIds([...new Set(events.map((e) => e.escrowId))]);
+      for (const event of events) {
+        const stationId = stations.get(event.escrowId);
+        if (!stationId) continue;
+        const key = `chain:${event.tx}:${event.logIndex}`;
+        // Money that left the escrow: to the creator (claim, stop, or a later deposit forwarded to them) or to the fund.
+        const out =
+          event.type === "paid" && event.amountMicros > 0
+            ? { micros: event.amountMicros, toFund: event.reason === "unclaimed", kind: event.reason === "unclaimed" ? ("escrow_unclaimed" as const) : event.reason === "stop" ? ("escrow_stop" as const) : ("escrow_claim" as const) }
+            : event.type === "deposited" && event.forwardedTo
+              ? { micros: event.amountMicros, toFund: event.forwardedTo.toLowerCase() === (chain.fund ?? "").toLowerCase(), kind: "escrow_claim" as const }
+              : null;
+        const [seen] = out ? await db.select({ id: E.id }).from(E).where(eq(E.idempotencyKey, key)) : [];
+        if (out && !seen) {
+          const claimant = out.toFund ? null : await services.network.claimantOf(stationId);
+          if (!out.toFund && !claimant) {
+            console.error(`[escrow] ${key}: paid a creator for station ${stationId}, but no approved claim names who; not recorded`);
+          } else {
+            await db.transaction(async (tx) => {
+              const to = out.toFund ? await service.account(tx, "creator_fund") : await service.account(tx, "creator", { stationId, userId: claimant!.userId });
+              await service.post(
+                tx,
+                out.toFund ? "escrow_unclaimed" : out.kind,
+                [
+                  { account: await service.account(tx, "escrow", { stationId }), micros: -out.micros },
+                  { account: to, micros: out.micros }
+                ],
+                { sourceType: "chain", memo: out.toFund ? "Unclaimed: paid to the creator fund" : "Paid to the creator", idempotencyKey: key }
+              );
+            });
+          }
+        }
+        await services.network.onEscrowEvent(stationId, event);
+      }
+      await db
+        .insert(C)
+        .values({ name: "escrow", block: toBlock, updatedAt: deps.clock.now() })
+        .onConflictDoUpdate({ target: C.name, set: { block: toBlock, updatedAt: deps.clock.now() } });
+      return { events: events.length };
+    },
 
     async custodyBalances() {
       const rows = await db

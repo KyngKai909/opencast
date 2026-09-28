@@ -8,6 +8,7 @@ import { createJobs } from "./jobs.js";
 import { ffmpegPipeline } from "./media.js";
 import { paymentsFromEnv } from "./payments/index.js";
 import { storageFromEnv } from "./storage.js";
+import { chainFromEnv } from "./chain/index.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -20,12 +21,14 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const { db } = createDb(databaseUrl);
   const clock = { now: () => new Date() };
   const appOrigin = env.APP_ORIGIN ?? "http://localhost:5174";
+  const chain = chainFromEnv(env);
   return {
     db,
     bus: new EventBus(),
     clock,
     media: ffmpegPipeline(storageRoot),
     storage: storageFromEnv(env, storageRoot),
+    chain,
     notifier: {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
       email: async (to, n) => console.log(`[notify] email to ${to}: ${n.title}`)
@@ -39,7 +42,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     config: {
       storageRoot,
       appOrigin,
-      escrowContractAddress: env.ESCROW_CONTRACT_ADDRESS || null,
+      escrowContractAddress: chain?.escrow ?? (env.ESCROW_CONTRACT_ADDRESS || null),
       production: env.NODE_ENV === "production"
     }
   };

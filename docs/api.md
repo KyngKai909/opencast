@@ -249,7 +249,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `setUpClaimable` | POST | `/admin/creators/:creatorId/station` | Opencast admin | Set up a claimable station from a recipe: channel, call sign, and the rights record attached |
 | `heldEarnings` | GET | `/admin/held-earnings` | Opencast admin | Held earnings per claimable station |
 | `startHandover` | POST | `/stations/:stationId/claim` | signed in | Claim (or stop) a claimable station: connect the source account to prove it's you |
-| `approveHandover` | POST | `/admin/handovers/:handoverId/approve` | Opencast admin | Record the verifier's approval; the 72-hour public waiting period starts |
+| `approveHandover` | POST | `/admin/handovers/:handoverId/approve` | Opencast admin | Record the desk's check of the claimant. With the escrow contract live, the verifiers then approve on-chain (what they sign is in `onChain`) and the 72 hours start there |
 | `listListedSources` | GET | `/admin/listed-sources` | Opencast admin | City and county streams |
 | `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a city stream on the dial. Viewers get the source's own player. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |

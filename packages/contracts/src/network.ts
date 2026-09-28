@@ -285,9 +285,18 @@ export const networkApi = {
     method: "POST",
     path: "/admin/handovers/:handoverId/approve",
     auth: "admin",
-    summary: "Record the verifier's approval; the 72-hour public waiting period starts",
+    summary: "Record the desk's check of the claimant. With the escrow contract live, the verifiers then approve on-chain (what they sign is in `onChain`) and the 72 hours start there",
     params: z.object({ handoverId: Id }),
-    response: z.object({ handoverId: Id, payableAfter: Timestamp })
+    response: z.object({
+      handoverId: Id,
+      /** The earliest it can be paid. With the contract live, the chain decides (after the verifiers' approvals). */
+      payableAfter: Timestamp,
+      /** Added 2026-09: what each verifier signs, when the escrow contract is live. */
+      onChain: z
+        .object({ contract: z.string(), escrowStationId: z.number().int(), payee: z.string(), kind: z.enum(["claim", "stop"]), calldata: z.string() })
+        .nullable()
+        .optional()
+    })
   }),
   listListedSources: endpoint({ method: "GET", path: "/admin/listed-sources", auth: "admin", summary: "City and county streams", query: z.object({ marketId: Id.optional() }), response: z.array(ListedSource) }),
   addListedSource: endpoint({
