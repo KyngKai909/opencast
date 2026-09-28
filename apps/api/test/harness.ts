@@ -12,6 +12,7 @@ import { privyVerifier, type LinkedAccount } from "../src/v1/auth.js";
 import { EventBus } from "../src/v1/events.js";
 import { createV1 } from "../src/v1/index.js";
 import { ffmpegPipeline } from "../src/v1/media.js";
+import { fakePayments } from "../src/v1/payments.js";
 import type { Deps, Services } from "../src/v1/context.js";
 
 export const APP_ID = "test-app";
@@ -22,6 +23,8 @@ export interface Harness {
   services: Services;
   db: Deps["db"];
   clock: { set(iso: string): void; now(): Date; advance(ms: number): void };
+  /** Pushes and emails sent, in order. */
+  sent: Array<{ channel: "push" | "email"; to: string; title: string }>;
   /** Linked accounts Privy would report for a did. */
   linked: Map<string, LinkedAccount[]>;
   token(did: string): Promise<string>;
@@ -45,6 +48,7 @@ export async function createHarness(): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
+  const sent: Harness["sent"] = [];
   const verifier = privyVerifier({ privyAppId: APP_ID, verificationKey: await exportSPKI(publicKey) });
   verifier.linkedAccounts = async (did) => linked.get(did) ?? [];
 
@@ -63,6 +67,11 @@ export async function createHarness(): Promise<Harness> {
   const deps: Deps = {
     db: database.db,
     media: ffmpegPipeline(storageRoot),
+    payments: fakePayments(clock),
+    notifier: {
+      push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
+      email: async (to, n) => void sent.push({ channel: "email", to, title: n.title })
+    },
     bus: new EventBus(),
     clock,
     auth: verifier,
@@ -94,6 +103,7 @@ export async function createHarness(): Promise<Harness> {
     db: database.db,
     clock,
     linked,
+    sent,
     token,
     async signIn(name, options = {}) {
       const did = `did:privy:${randomUUID()}`;

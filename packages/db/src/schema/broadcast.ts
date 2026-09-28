@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   date,
@@ -76,6 +77,12 @@ export const stations = broadcast.table(
     legalContact: text("legal_contact"),
     /** "What the station told us" about pledges being tax-deductible. */
     pledgesTaxDeductible: boolean("pledges_tax_deductible"),
+    /** Makes spots to order for businesses ("Made for you"). Studios always do. */
+    takesOrders: boolean("takes_orders").notNull().default(false),
+    /** "About a week". */
+    orderTurnaround: text("order_turnaround"),
+    /** "From $100". */
+    orderFromMicros: bigint("order_from_micros", { mode: "number" }),
     /** The member credit: read by the station ID voice, or text over bumper music. */
     memberCreditStyle: text("member_credit_style", { enum: ["voice", "text"] }).notNull().default("text"),
     /** The owner in the old model; kept so migrated stations can be matched to a user. */

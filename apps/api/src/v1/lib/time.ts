@@ -53,3 +53,9 @@ export const addDays = (date: string, days: number) =>
   new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 export const roundUpToMinute = (ms: number) => Math.ceil(ms / MINUTE) * MINUTE;
+
+/** "8:30 pm": the 12-hour clock the apps use, in a station's time zone. */
+export function clockTime(at: Date, tz: string): string {
+  const text = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit", hour12: true }).format(at);
+  return text.replace(" AM", " am").replace(" PM", " pm");
+}

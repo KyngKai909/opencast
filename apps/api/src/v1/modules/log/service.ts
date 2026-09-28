@@ -63,6 +63,8 @@ export interface LogService {
   entries(stationId: string, from: Date, to: Date): Promise<Row[]>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
+  /** "During Saturday Reel" / "After Late Crate, ep. 14" for stored breaks. */
+  breakContexts(breakIds: string[]): Promise<Map<string, string>>;
   countCarried(input: { carrierStationId: string; agreementId: string; itemId: string; excludeEntryId?: string }): Promise<number>;
   /** When an item first aired (or airs) on a station's log. */
   firstAiring(stationId: string, itemId: string): Promise<Date | null>;
@@ -388,6 +390,23 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       const counts = new Map<string, number>();
       for (const p of pulled) counts.set(p.stationId, (counts.get(p.stationId) ?? 0) + 1);
       return [...counts].map(([stationId, entries]) => ({ stationId, entries }));
+    },
+
+    async breakContexts(breakIds) {
+      if (!breakIds.length) return new Map();
+      const rows = await db.select().from(B).where(inArray(B.id, [...new Set(breakIds)]));
+      const entries = await db.select().from(E).where(inArray(E.id, rows.map((r) => r.logEntryId).filter((v): v is string => Boolean(v))));
+      const ctx = await context(entries);
+      return new Map(
+        rows.map((b) => {
+          const entry = entries.find((e) => e.id === b.logEntryId);
+          if (!entry) return [b.id, "Between programs"];
+          const item = entry.assetId ? ctx.items.get(entry.assetId) : undefined;
+          const during = b.startsAt.getTime() < entry.startsAt.getTime() + (item?.durationMs ?? 0) - 1000;
+          const episode = item?.episodeNumber ? `, ep. ${item.episodeNumber}` : "";
+          return [b.id, `${during ? "During" : "After"} ${titleOf(entry, ctx)}${episode}`];
+        })
+      );
     },
 
     async countCarried({ carrierStationId, agreementId, itemId, excludeEntryId }) {

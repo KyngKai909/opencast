@@ -63,6 +63,8 @@ export interface LibraryService {
   upload(stationId: string, file: UploadedFile, fields: ItemFields): Promise<LibraryItem>;
   updateItem(itemId: string, fields: Partial<ItemFields>): Promise<LibraryItem>;
   archiveItem(itemId: string): Promise<void>;
+  /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
+  archiveForClaim(itemId: string): Promise<void>;
   confirmRights(user: CurrentUser, itemId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string }): Promise<LibraryItem>;
   importLinks(stationId: string, input: { urls: string[]; expandPlaylists: boolean; code: LogCode; programId?: string }): Promise<ImportJobView>;
   importJob(stationId: string, jobId: string): Promise<ImportJobView>;
@@ -564,6 +566,10 @@ export function createLibraryService({ deps, services }: ModuleContext): Library
         ].filter(Boolean);
         throw refused("in_use", `Can't be deleted yet: ${parts.join(" and ")}.`);
       }
+      await db.update(A).set({ archivedAt: deps.clock.now() }).where(eq(A.id, itemId));
+    },
+
+    async archiveForClaim(itemId) {
       await db.update(A).set({ archivedAt: deps.clock.now() }).where(eq(A.id, itemId));
     },
 

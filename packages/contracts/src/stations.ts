@@ -98,7 +98,9 @@ export const StationSetup = z.object({
   legalName: z.string().nullable(),
   legalContact: z.string().nullable(),
   pledgesTaxDeductible: z.boolean().nullable(),
-  memberCreditStyle: z.enum(["voice", "text"])
+  memberCreditStyle: z.enum(["voice", "text"]),
+  /** Makes spots to order ("Made for you"). */
+  orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().nullable(), fromMicros: z.number().int().nullable() })
 });
 
 export const BreakRule = z.object({
@@ -245,7 +247,8 @@ export const stationsApi = {
       legalName: z.string().nullable().optional(),
       legalContact: z.string().nullable().optional(),
       pledgesTaxDeductible: z.boolean().nullable().optional(),
-      memberCreditStyle: z.enum(["voice", "text"]).optional()
+      memberCreditStyle: z.enum(["voice", "text"]).optional(),
+      orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().max(80).nullable(), fromMicros: z.number().int().nonnegative().nullable() }).partial().optional()
     }),
     response: StationSetup
   }),

@@ -100,6 +100,16 @@ export const ledgerApi = {
     query: z.object({ filter: z.enum(["all", "money", "airings"]).default("all"), before: Timestamp.optional(), limit: z.coerce.number().int().min(1).max(200).default(50) }),
     response: z.array(Movement)
   }),
+  addFundingSource: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/funding-sources",
+    auth: "user",
+    summary: "Link a bank through Clear, a card through Stripe, or a Clear business account (owner only). The token comes from the provider's own widget.",
+    params: BusinessParams,
+    body: z.object({ kind: z.enum(["clear_bank", "card", "clear_account"]), token: z.string().min(1), makeDefault: z.boolean().default(false) }),
+    response: z.array(FundingSource),
+    status: 201
+  }),
   quoteDeposit: endpoint({
     method: "POST",
     path: "/businesses/:businessId/deposits/quote",

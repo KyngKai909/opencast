@@ -73,3 +73,24 @@ describe("one day of a spot's budget", () => {
     expect(oneDayOfBudgetMicros({ totalBudgetMicros: 300_000_000 })).toBe(300_000_000);
   });
 });
+
+describe("credit text", () => {
+  it("passes who, where and what they do", async () => {
+    const { checkCreditText } = await import("../src/index.js");
+    expect(checkCreditText("Orange Street Coffee, roasting in Redlands since 2009.").passes).toBe(true);
+    expect(checkCreditText("Redlands Hardware, a family hardware store on Orange Street.").passes).toBe(true);
+  });
+
+  it("flags prices and offers, comparisons, and calls to action, with a fix for each", async () => {
+    const { checkCreditText } = await import("../src/index.js");
+    const result = checkCreditText("The best coffee in Redlands. Come by this weekend for 10% off.");
+    expect(result.passes).toBe(false);
+    expect(result.flags.map((f) => [f.kind, f.text])).toEqual([
+      ["comparison", "best"],
+      ["call_to_action", "Come by"],
+      ["price_or_offer", "10%"],
+      ["price_or_offer", "off"]
+    ]);
+    expect(result.flags.every((f) => f.suggestion.length > 0)).toBe(true);
+  });
+});

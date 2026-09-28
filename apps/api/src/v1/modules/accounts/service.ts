@@ -21,6 +21,8 @@ export interface AccountsService {
   displayNames(userIds: string[]): Promise<Map<string, string | null>>;
   /** Every email the user has, lower-cased (their account email and linked ones). */
   emailsOf(userId: string): Promise<string[]>;
+  notificationPrefs(userId: string, scope: "viewer" | "station" | "business", scopeId: string | null): Promise<Record<string, unknown>>;
+  saveNotificationPrefs(userId: string, scope: "viewer" | "station" | "business", scopeId: string | null, prefs: Record<string, unknown>): Promise<void>;
 
   presets(userId: string): Promise<Array<{ station: StationIdent; key: number | null; position: number }>>;
   savePreset(userId: string, input: PresetInput): Promise<void>;
@@ -300,6 +302,22 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         .from(schema.identities)
         .where(and(eq(schema.identities.userId, userId), inArray(schema.identities.kind, ["email", "google", "apple"])));
       return [...new Set([user?.email, ...linked.map((l) => l.value)].filter((v): v is string => Boolean(v)).map((v) => v.toLowerCase()))];
+    },
+
+    async notificationPrefs(userId, scope, scopeId) {
+      const P = schema.notificationPrefs;
+      const [row] = await db
+        .select()
+        .from(P)
+        .where(and(eq(P.userId, userId), eq(P.scope, scope === "business" ? "advertiser" : scope), scopeId ? eq(P.scopeId, scopeId) : isNull(P.scopeId)));
+      return (row?.prefs as Record<string, unknown>) ?? {};
+    },
+
+    async saveNotificationPrefs(userId, scope, scopeId, prefs) {
+      const P = schema.notificationPrefs;
+      const dbScope = scope === "business" ? "advertiser" : scope;
+      await db.delete(P).where(and(eq(P.userId, userId), eq(P.scope, dbScope), scopeId ? eq(P.scopeId, scopeId) : isNull(P.scopeId)));
+      await db.insert(P).values({ userId, scope: dbScope, scopeId, prefs });
     },
 
     async presets(userId) {

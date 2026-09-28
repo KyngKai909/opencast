@@ -35,6 +35,7 @@ export interface StationSetupView {
   legalContact: string | null;
   pledgesTaxDeductible: boolean | null;
   memberCreditStyle: "voice" | "text";
+  orders: { takesOrders: boolean; turnaround: string | null; fromMicros: number | null };
 }
 
 /** What spot targeting and the market board need about a station. */
@@ -76,6 +77,8 @@ export interface StationsService {
   identityReady(stationId: string): Promise<{ callSign: boolean; channel: boolean }>;
   markSignedOn(db: Executor, stationId: string): Promise<{ first: boolean }>;
   markSignedOff(db: Executor, stationId: string, permanently: boolean): Promise<void>;
+  /** Stations that take orders, and studios. */
+  makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key. */
   relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate" }>>;
   /** Used by Network desk to set up claimable, listed and catalog stations. */
@@ -114,6 +117,7 @@ export type SetupPatch = Partial<{
   legalContact: string | null;
   pledgesTaxDeductible: boolean | null;
   memberCreditStyle: "voice" | "text";
+  orders: Partial<{ takesOrders: boolean; turnaround: string | null; fromMicros: number | null }>;
 }>;
 
 export interface TranslatorInput {
@@ -223,7 +227,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       legalName: station.legalName,
       legalContact: station.legalContact,
       pledgesTaxDeductible: station.pledgesTaxDeductible,
-      memberCreditStyle: station.memberCreditStyle
+      memberCreditStyle: station.memberCreditStyle,
+      orders: { takesOrders: station.kind === "studio" || station.takesOrders, turnaround: station.orderTurnaround, fromMicros: station.orderFromMicros }
     };
   }
 
@@ -414,6 +419,18 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .where(eq(S.id, stationId));
     },
 
+    async makers() {
+      const rows = await db
+        .select({ id: S.id, turnaround: S.orderTurnaround, fromMicros: S.orderFromMicros })
+        .from(S)
+        .where(or(eq(S.kind, "studio"), eq(S.takesOrders, true)));
+      const profiles = await service.profiles(rows.map((r) => r.id));
+      return rows.flatMap((r) => {
+        const profile = profiles.get(r.id);
+        return profile ? [{ profile, turnaround: r.turnaround, fromMicros: r.fromMicros }] : [];
+      });
+    },
+
     async relays(stationId) {
       const rows = await db
         .select()
@@ -497,6 +514,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (input.legalContact !== undefined) patch.legalContact = input.legalContact;
         if (input.pledgesTaxDeductible !== undefined) patch.pledgesTaxDeductible = input.pledgesTaxDeductible;
         if (input.memberCreditStyle !== undefined) patch.memberCreditStyle = input.memberCreditStyle;
+        if (input.orders?.takesOrders !== undefined) patch.takesOrders = input.orders.takesOrders;
+        if (input.orders?.turnaround !== undefined) patch.orderTurnaround = input.orders.turnaround;
+        if (input.orders?.fromMicros !== undefined) patch.orderFromMicros = input.orders.fromMicros;
         await tx.update(S).set(patch).where(eq(S.id, stationId));
       });
       return service.setup(stationId);
