@@ -24,6 +24,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `packages/contracts` | `@opencast/contracts` | Zod request and response schemas | platform; the apps prompt reads it and never edits it |
 | `packages/ui` | `@opencast/ui` | Design system (empty) | apps |
 | `packages/player` | `@opencast/player` | The shared player (empty) | apps |
+| `contracts` | | `CreatorEscrow` (Foundry): claimable stations' earnings until the creator claims | platform |
 | `docs/reference` | | HTML design references, one folder per app | |
 
 `domain` and `contracts` build to `dist/` because the API and worker import their JavaScript at runtime. `ui` and `player` are source-only, since Vite compiles them into each app.

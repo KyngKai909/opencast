@@ -21,6 +21,17 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Sponsorships: held monthly and released at month end (prompt), or accrued weekly (the earnings design shows weekly lines)? | ledger, Phase 6 | the prompt's rule, monthly |
 | Code window: "used within 7 days" of an airing, but a saved offer shows "until" 14 days after saving | `spots.codes.window_days` | 7 |
 
+## The escrow contract
+
+| Decision | Now | Default |
+|---|---|---|
+| Who holds the verifier keys, how many, and the threshold | Set once at deployment; the contract enforces the multi-signature itself (at least 2) | 2 of 3, held by different people at Opencast |
+| Rotating a verifier key | Not possible: nothing in the contract can change after deployment, by design | Deploy a new escrow for new deposits; balances already held stay claimable with the old keys |
+| When the unclaimed clock starts | The station's first deposit | 3 years after it |
+| The creator fund's address | Fixed at deployment | none yet: needed before Base Sepolia |
+| USDC sent to the contract directly (not through `deposit`) | Stays there for good; there's no rescue function, because a rescue is a way out | none |
+| Chain | Base, Clear's chain; tested locally on anvil | Base Sepolia for staging |
+
 ## Rights and trust
 
 | Decision | Where it lives | Default |
@@ -60,7 +71,7 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Content IDs "in the IPFS CID format ... so any file can move to IPFS later without renaming" | Every object is keyed by a CIDv1 (raw codec, sha-256) of the whole file. That's a valid CID and dedupes exactly, but IPFS itself stores files over ~1 MB as chunked UnixFS, so pinning a video gives it a *different* CID (`bafybei…`) | Keep the raw CID as our key (it names the bytes; nothing renames). On publish, record the IPFS CID beside it (`contents.ipfs_cid`), as built. Say so in the Export to IPFS copy: "published as bafybei…" |
 | Which Pinata pins are catalog items | None yet: the catalog station has published nothing, and the migration keeps any `--keep <cid>` or `ipfs_reason = catalog` | Mark catalog pins before running `--unpin` |
 | Pins made through Pinata's legacy API | The old project's key is scoped to the v3 Files API; the legacy pin list answers 403, so only v3 files were counted (1 file, 0.1 GB) | Check the Pinata dashboard's total, or use an admin key, before unpinning |
-| R2 bucket | Not created: no R2 keys in the new setup yet, so development stores on local disk | Create `opencast-media` in Phase 7, with a custom domain for previews; set keys on api and worker only |
+| R2 bucket | Decided: development stays on local disk (test uploads never reach a real bucket). No Cloudflare access is set up yet | Phase 7 creates `opencast-media-staging` and `opencast-media`, each with its own keys on api and worker only. At the production cutover, the pinned file is copied in (verified by hash) and unpinned after, since the old app still reads it from the gateway until then |
 | Proof frames and previews on R2's lifecycle rules | Previews are deleted by the API when their need ends | Also a bucket lifecycle rule on `previews/` (30 days) as a backstop |
 | Worker cache size | 100 GB volume, 90% used | Size from real libraries: 48 hours of 24/7 carriage at 2.5 Mbps is ~54 GB per station before deduplication |
 
@@ -85,4 +96,4 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Hosts go live on their blocks, but the browser source is "Owners and operators" only | Hosts get go-live on their assigned programs (`host_assignments`) |
 | A radio-band station is listed as a station "kind" in spot targeting | Band is its own field; categories stay categories |
 | The waitlist has four roles, Phase 4 lists three | All four: viewer, station, producer, business |
-| Stop pays an unclaimed creator "within a week", but they have no wallet until they sign in | Not built yet (Phase 6). The escrow only pays a creator account, which exists only after they sign in |
+| Stop pays an unclaimed creator "within a week", but they have no wallet until they sign in | The escrow pays Stop only to an approved creator wallet, after 72 hours in public. A creator signs in first (Privy makes the wallet), then the verifiers approve it |

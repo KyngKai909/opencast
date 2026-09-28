@@ -121,6 +121,8 @@ payout         station earnings → external
 
 Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments.ts`.
 
+**Escrow.** A claimable station's settled earnings are `escrow_owed` (a liability to the station) until the weekly batch into `CreatorEscrow` (`contracts/`) confirms, then `escrow`. The contract pays only an approved creator wallet (a threshold of verifier keys, then 72 hours in public) or, after the unclaimed period, the creator fund; it has no owner and can't be upgraded. See `contracts/README.md`.
+
 ## Still to move (later phases)
 
 - `/api` and `apps/control` stay until the apps prompt's master control replaces them.
