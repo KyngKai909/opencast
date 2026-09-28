@@ -9,7 +9,7 @@ import { createReadStream, createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type StorageClass = "standard" | "infrequent";
@@ -173,19 +173,32 @@ export interface S3Config {
   presignSeconds?: number;
   /** Path-style URLs (bucket in the path): MinIO and other self-hosted S3 stores need it; R2 doesn't. */
   forcePathStyle?: boolean;
+  /** Create the bucket on first use (a fresh self-hosted store); R2 buckets are made in Cloudflare. */
+  createBucket?: boolean;
+  /** Send storage classes (R2's Standard and Infrequent Access). Off for stores that don't know them (MinIO). */
+  storageClasses?: boolean;
 }
 
 export function s3ObjectStore(config: S3Config): ObjectStore {
   const client = new S3Client({ region: "auto", endpoint: config.endpoint, forcePathStyle: config.forcePathStyle ?? false, credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey } });
   const Bucket = config.bucket;
+  let bucketReady: Promise<void> | null = null;
+  const ensureBucket = () =>
+    (bucketReady ??= config.createBucket
+      ? client.send(new HeadBucketCommand({ Bucket })).then(
+          () => undefined,
+          () => client.send(new CreateBucketCommand({ Bucket })).then(() => undefined)
+        )
+      : Promise.resolve());
   // R2 maps STANDARD_IA to Infrequent Access.
   const cls = (c: StorageClass) => (c === "infrequent" ? "STANDARD_IA" : "STANDARD");
   const store: ObjectStore = {
     name: "r2",
     async put(key, file, { contentType, storageClass, sha256 }) {
+      await ensureBucket();
       const { size } = await fs.stat(file);
       // The store recomputes the checksum and refuses the write if the bytes differ.
-      await client.send(new PutObjectCommand({ Bucket, Key: key, Body: createReadStream(file), ContentLength: size, ContentType: contentType, StorageClass: cls(storageClass), ChecksumSHA256: sha256.toString("base64") }));
+      await client.send(new PutObjectCommand({ Bucket, Key: key, Body: createReadStream(file), ContentLength: size, ContentType: contentType, ...(config.storageClasses === false ? {} : { StorageClass: cls(storageClass) }), ChecksumSHA256: sha256.toString("base64") }));
     },
     async has(key) {
       try {
@@ -274,7 +287,7 @@ export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string): Sto
   const endpoint = env.R2_ENDPOINT?.trim() || (env.R2_ACCOUNT_ID ? `https://${env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com` : "");
   const r2 = endpoint && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET;
   const objects = r2
-    ? s3ObjectStore({ endpoint, accessKeyId: env.R2_ACCESS_KEY_ID!.trim(), secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(), bucket: env.R2_BUCKET!.trim(), publicBase: env.R2_PUBLIC_BASE?.trim() || undefined, presignSeconds: Number(env.R2_PRESIGN_TTL_SEC) || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === "true" })
+    ? s3ObjectStore({ endpoint, accessKeyId: env.R2_ACCESS_KEY_ID!.trim(), secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(), bucket: env.R2_BUCKET!.trim(), publicBase: env.R2_PUBLIC_BASE?.trim() || undefined, presignSeconds: Number(env.R2_PRESIGN_TTL_SEC) || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === "true", createBucket: env.S3_CREATE_BUCKET === "true", storageClasses: env.S3_STORAGE_CLASSES !== "false" })
     : localObjectStore(path.join(storageRoot, "objects"));
   const ipfs = env.PINATA_JWT ? pinataPublisher({ jwt: env.PINATA_JWT, uploadUrl: env.PINATA_UPLOAD_URL || undefined, gatewayBase: env.PINATA_GATEWAY_BASE || undefined }) : noIpfs;
   return { objects, ipfs };

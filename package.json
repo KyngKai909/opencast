@@ -40,8 +40,9 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "typescript": "^5.9.2",
-    "turbo": "^2.11.5"
+    "railway": "^3.11.0",
+    "turbo": "^2.11.5",
+    "typescript": "^5.9.2"
   },
   "packageManager": "npm@11.3.0"
 }
