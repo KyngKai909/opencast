@@ -1,0 +1,5 @@
+/* 04.1: fields 16px apart, the .kv facts, the note (.m-note). */
+.bz-out { display: flex; flex-direction: column; gap: 16px; }
+.bz-out__kv { margin: 4px 0 0; }
+.bz-out__note { font-size: 13px; color: var(--ink-70); margin: 0; }
+.oc-modal .bz-out__note:only-child { margin: 0; }

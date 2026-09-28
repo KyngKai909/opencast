@@ -1,6 +1,8 @@
 // Orange Street Coffee (every business frame): a coffee house on Orange Street in Redlands,
 // opening in Colton. Its three live spots and one ended (biz-spots 01.1), its balance and the
-// movements the Balance frame draws (biz-funding 03.1). And Cypress Dental, which Devon M.'s
+// movements the Balance frame draws (biz-funding 03.1); its profile and money settings as
+// biz-settings 01.1 and 03.1 draw them. (Colton is seeded as a second location, where 01.1
+// suggests adding it: "Now open in Colton" targets it.) And Cypress Dental, which Devon M.'s
 // agency also manages, so the business switcher has somewhere to go.
 
 import type { Balance, Business, Movement, Spot } from "@opencast/contracts";
@@ -13,7 +15,7 @@ export const CYPRESS_ID = uid(60002);
 
 /** The logo square: letters and colour (the shell's switcher, "OSC"). */
 export const LOGOS: Record<string, { initials: string; colour: string }> = {
-  [OSC_ID]: { initials: "OSC", colour: "#5a3a22" },
+  [OSC_ID]: { initials: "OSC", colour: "#6B4A2B" },
   [CYPRESS_ID]: { initials: "CD", colour: "#1D6A70" }
 };
 
@@ -24,8 +26,8 @@ export function seedBusinesses(): Business[] {
     {
       id: OSC_ID,
       name: "Orange Street Coffee",
-      category: "Food",
-      about: "A family coffee house on Orange Street in downtown Redlands, and home of the pumpkin bread.",
+      category: "Coffee and food",
+      about: "A family coffee house in downtown Redlands since 2014.",
       website: "orangestreet.example",
       logoUrl: null,
       customersWhere: "location",
@@ -36,9 +38,9 @@ export function seedBusinesses(): Business[] {
       marketIds: [MARKET.id],
       warnDays: [3, 1],
       autoTopUp: { on: false, amountMicros: null, belowDays: 3 },
-      receiptsEmail: "ana@ledgerline.example",
+      receiptsEmail: "books@orangestreet.example",
       legalName: "Orange Street Coffee LLC",
-      einLast4: "4417",
+      einLast4: "4471",
       createdAt: at("-120 10:00")
     },
     {
@@ -72,7 +74,10 @@ export function seedBalances(): Record<string, Balance> {
       pacePerDayMicros: $(9.2),
       runwayDays: 44,
       pendingDeposits: [],
-      fundingSources: [{ id: uid(62001), kind: "clear_bank", label: "Clear, Chase ending 8810", isDefault: true }]
+      fundingSources: [
+        { id: uid(62001), kind: "clear_bank", label: "Clear, Chase ending 8810", isDefault: true },
+        { id: uid(62002), kind: "card", label: "Visa ending 4417", isDefault: false }
+      ]
     },
     [CYPRESS_ID]: {
       availableMicros: $(186.0),

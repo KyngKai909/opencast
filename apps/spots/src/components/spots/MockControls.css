@@ -1,0 +1,5 @@
+/* Mock mode's stand-in for review and stations: set apart by a dashed rule, quiet. */
+.bz-spmock { margin-top: 28px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.bz-spmock__h { margin: 0 0 4px; font: 500 12px var(--font-mono); color: var(--ink-50); }
+.bz-spmock__p { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-50); }
+.bz-spmock__row { display: flex; flex-wrap: wrap; gap: 8px; }

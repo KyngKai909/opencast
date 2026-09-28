@@ -9,3 +9,4 @@
 .bz-phonebar__link--off { color: var(--ink-50); cursor: default; }
 .bz-phonebar__count { font: 500 13px var(--font-mono); color: var(--ink-50); }
 .bz-phone-main { padding: 16px; }
+.bz-phone-main--flush { padding: 0; }

@@ -1,0 +1,4 @@
+/* .sec-top (biz-funding): 17px display heading, a line rule under it, 8px below. */
+.bz-sectop { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-sectop__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.bz-sectop__end { margin-left: auto; display: flex; gap: 8px; }

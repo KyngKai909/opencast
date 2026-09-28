@@ -108,6 +108,16 @@ Runs master control at http://localhost:5179 against mock data, with the clock h
 
 `npm run dev -w @opencast/control` runs it on :5173 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`; see `apps/control/.env.example`). In production `server.mjs` serves the build and proxies `/v1` to the API.
 
+### Opencast for business
+
+```bash
+npm run dev:mock -w @opencast/spots
+```
+
+Runs the business app at http://localhost:5181 on mock data, at the same Saturday evening as master control's mock. Sign in with any six digits except 000000; the email picks who you are: `jess@orangestreet.example` owns Orange Street Coffee, `tomas@orangestreet.example` manages it, `ana@ledgerline.example` is its bookkeeper (a viewer), `devon@inlandcreative.example` manages it and Cypress Dental, and any other address is someone new who starts a business. Mock-only panels (marked "Mock") play the station's side: approving a sponsorship, quoting and delivering an order, airing a spot until its budget is spent. The mock remembers what you change in `localStorage` (keys starting `oc-mock-spots-`).
+
+`npm run dev -w @opencast/spots` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/spots/.env.example`).
+
 ### Why Turborepo
 
 Before, every app's `build` script rebuilt `shared` first, and the root repeated the same order by hand in `build`, each `build:service:*` and three `pre*` hooks. With nine apps and four packages that doubles. Turborepo's `dependsOn: ["^build"]` replaces all of it. npm workspaces still install everything.

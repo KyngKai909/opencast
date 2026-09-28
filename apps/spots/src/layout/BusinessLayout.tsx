@@ -79,7 +79,7 @@ function Frame() {
     return (
       <div className="bz-phone">
         <PhoneBar initials={logo.initials} colour={logo.colour} name={b.business.name} title={opts.title} items={items} linkTo={linkTo} active={active} onSwitch={openSwitcher} />
-        <main className="bz-phone-main">
+        <main className={opts.flush ? "bz-phone-main bz-phone-main--flush" : "bz-phone-main"}>
           <Outlet />
         </main>
         <BusinessSwitcher />

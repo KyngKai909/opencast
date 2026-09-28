@@ -1,0 +1,31 @@
+/* production orders 05.1 (.review: the picture, then 360px of notes; .note-tc, .countdown2) and 06.1. */
+.bz-review { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 26px; }
+.bz-review__checks { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: center; margin: 10px 0 0; font-size: 13.5px; }
+.bz-review__ok { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--ground); display: grid; place-items: center; }
+
+.bz-review__sec { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-review__sec h2 { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.bz-review__sec span { font-size: 13px; color: var(--ink-50); }
+.bz-review__quiet { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; color: var(--ink-70); }
+
+.bz-review__notes { list-style: none; margin: 0; padding: 0; }
+.bz-review__note { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.bz-review__note small { display: block; color: var(--ink-50); font-size: 12px; margin-top: 2px; }
+.bz-review__tc { justify-self: start; align-self: start; padding: 0; border: 0; background: none; font: 500 13px var(--font-mono); color: var(--standby); cursor: pointer; }
+.bz-review__mistake { color: var(--ink-70); }
+
+.bz-review__add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; margin-top: 12px; }
+.bz-review__acts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.bz-review__auto { font-size: 13px; color: var(--ink-70); margin: 10px 0 0; }
+.bz-review__auto b { color: var(--ink); }
+
+/* 06.1 */
+.bz-review-phone { padding-top: 12px; }
+.bz-review-phone__from { font-size: 14px; margin: 14px 0 4px; }
+.bz-review-phone__auto { margin-top: 0; }
+.bz-review-phone__approve { margin-top: 14px; }
+.bz-review-phone__later { margin-top: 8px; }
+
+@media (max-width: 1023px) {
+  .bz-review { grid-template-columns: 1fr; }
+}

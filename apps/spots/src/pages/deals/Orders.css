@@ -1,0 +1,11 @@
+/* production orders 01.1 (.po). */
+.bz-or__what b { display: block; font-weight: 600; }
+.bz-or__what small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.bz-or__none { font-family: var(--font-text); font-size: 13px; color: var(--ink-50); }
+.bz-or__empty { margin: 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--hair); font-size: 14px; color: var(--ink-70); }
+
+.bz-or-phone { list-style: none; margin: 0; padding: 0; }
+.bz-or-phone__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  padding: 14px 0; border-bottom: 1px solid var(--hair); color: inherit; text-decoration: none; font-size: 14px;
+}

@@ -1,0 +1,10 @@
+/* biz-results 04.1 the statement (.stm): the balance and spent by spot and station, side by side. */
+.bz-stmt__split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.bz-stmt__split > .bz-sec { margin-top: 0; }
+.bz-stmt__foot { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-50); }
+.bz-stmt__quiet { margin: 0 0 14px; font-size: 14px; color: var(--ink-70); }
+
+@media (max-width: 900px) {
+  .bz-stmt__split { grid-template-columns: minmax(0, 1fr); }
+  .bz-stmt__split > .bz-sec + .bz-sec { margin-top: 22px; }
+}

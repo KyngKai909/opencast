@@ -1,0 +1,14 @@
+/* biz-spots 04.1 (.pz, .pz-banner, .timeline, .row2). */
+.bz-spot__grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; }
+.bz-spot__banner { margin-bottom: 16px; }
+.bz-spot__tag.oc-tag { height: 24px; padding: 0 9px; }
+.bz-spot__told { font-size: 13px; color: var(--ink-50); }
+.bz-spot__state { margin-bottom: 14px; }
+.bz-spot__notice { margin-bottom: 16px; }
+.bz-spot__est { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.bz-spot__go { margin-top: 14px; }
+.bz-spot__more { margin: 14px 0 0; font-size: 14px; }
+.bz-spot__more a { color: var(--signal); }
+@media (max-width: 1023px) {
+  .bz-spot__grid { grid-template-columns: minmax(0, 1fr); }
+}

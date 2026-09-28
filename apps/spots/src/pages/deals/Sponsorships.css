@@ -1,0 +1,30 @@
+/* sponsorships 01.1 (.sh, .diff) and 06.2 (the phone's .row2 list). */
+.bz-sp__sw { display: block; width: 14px; height: 14px; border-radius: 3px; }
+.bz-sp__what b { display: block; font-weight: 600; }
+.bz-sp__what small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.bz-sp__empty { margin: 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--hair); font-size: 14px; color: var(--ink-70); }
+
+.bz-sp__diff { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 22px; border-top: 2px solid var(--ink); }
+.bz-sp__diff > div { padding-top: 12px; }
+.bz-sp__diff h2 { margin: 0 0 4px; font: 700 16px var(--font-display); }
+.bz-sp__diff p { margin: 0; font-size: 13.5px; color: var(--ink-70); }
+
+/* The phone (06.2): ruled rows, 14px apart, the tag at the end. */
+.bz-sp-phone__list { list-style: none; margin: 0; padding: 0; }
+.bz-sp-phone__row, .bz-sp-phone__next {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  width: 100%; padding: 14px 0; border: 0; border-bottom: 1px solid var(--hair); background: none;
+  font: inherit; font-size: 14px; color: inherit; text-align: left; cursor: pointer;
+}
+.bz-sp-phone__next { padding: 10px 0; cursor: default; }
+.bz-sp-phone__words b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-sp-phone__words small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-sp-phone__m { font: 500 14.5px var(--font-mono); text-align: right; }
+
+.bz-sp-detail { display: grid; gap: 14px; }
+.bz-sp-detail__end { display: grid; gap: 8px; justify-items: start; padding-top: 4px; }
+.bz-sp-detail__end p { margin: 0; font-size: 13px; color: var(--ink-70); }
+
+@media (max-width: 767px) {
+  .bz-sp__diff { grid-template-columns: 1fr; gap: 0; }
+}

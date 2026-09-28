@@ -19,6 +19,12 @@ export const STATIONS: StationIdent[] = [
   ident(1043, "VOZE", "104.3", "La Voz", "#1D6A70", "radio", "San Bernardino")
 ];
 
+/**
+ * LUPE 33.1 joins the market on Monday (biz-spots 03.1): targeting names it ("From Monday"), but
+ * it isn't on the dial yet, so it isn't in STATIONS.
+ */
+export const LUPE: StationIdent = { id: uid(33), kind: "station", callSign: "LUPE", handle: "lupe", name: "Lupe", colour: "#7A2E5C", band: "tv", channel: "33.1", marketSlug: "inland-empire", homeCity: "San Bernardino" };
+
 export function stationByRef(ref: string): StationIdent | undefined {
   const r = ref.toLowerCase();
   return STATIONS.find((s) => s.id === ref || s.callSign?.toLowerCase() === r || s.handle === r);

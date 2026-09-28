@@ -1,0 +1,11 @@
+/* The new spot's name and file (fields as .fld: 13px semibold labels, 16px apart). */
+.bz-newspot { max-width: 520px; display: flex; flex-direction: column; gap: 16px; }
+.bz-newspot__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.bz-newspot__pick { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.bz-newspot__input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.bz-newspot__input:focus-visible + .bz-newspot__choose { outline: 2px solid var(--signal); outline-offset: 2px; }
+.bz-newspot__input:disabled + .bz-newspot__choose { opacity: .45; cursor: not-allowed; }
+.bz-newspot__choose { cursor: pointer; flex: none; }
+.bz-newspot__name { font: 500 13px var(--font-mono); color: var(--ink-70); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bz-newspot__help { margin: 6px 0 0; font-size: 13px; color: var(--ink-50); }
+.bz-newspot__error { margin: 0; font-size: 13px; color: var(--standby); }

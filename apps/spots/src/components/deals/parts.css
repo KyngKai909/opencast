@@ -1,0 +1,17 @@
+/* Shared pieces of Sponsorships and Made for you (sponsorships and production-orders .mc-title,
+   .st8, and the quiet states). */
+.bz-dl-head__trail { margin: 0 0 1px; font-size: 13px; color: var(--ink-50); }
+.bz-dl-head .oc-control-title { margin-bottom: 18px; }
+
+/* .st8: 24px tags, filling their column in the lists. */
+.bz-dl-tag.oc-tag { height: 24px; padding: 0 9px; }
+.bz-dl-tag--you.oc-tag { border-color: var(--signal); color: var(--signal); }
+.bz-dl-tag--fill.oc-tag { display: flex; width: 100%; }
+
+.bz-dl-noaccess { display: grid; place-items: start; gap: 14px; padding: 8px 0; }
+.bz-dl-noaccess__h { margin: 0; font: 700 20px/1.25 var(--font-display); letter-spacing: -.01em; }
+
+.bz-dl-error { margin: 8px 0 0; font-size: 13px; color: var(--standby); }
+
+.bz-dl-quiet__row { height: 52px; border-bottom: 1px solid var(--hair); }
+.bz-dl-quiet { border-top: 1px solid var(--line); }

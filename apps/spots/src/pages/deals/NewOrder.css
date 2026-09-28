@@ -1,0 +1,29 @@
+/* production orders 02.1 (.split at 440px, .brief, .fld, .assets, .maker, .m-note). */
+.bz-no__grid { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 28px; }
+.bz-no__sec { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-no__sec h2 { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.bz-no__sub { font-size: 13px; color: var(--ink-50); }
+
+.bz-no__fld { margin-bottom: 12px; }
+.bz-no__fld--first { margin-top: 12px; }
+.bz-no__fld--short .oc-field__box--area { min-height: 52px; }
+.bz-no__lb { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.bz-no__date { width: 220px; }
+
+.bz-no__assets { display: flex; gap: 8px; flex-wrap: wrap; }
+.bz-no__asset {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--hair); border-radius: var(--r-control); background: none;
+  font: inherit; font-size: 13px; color: var(--ink-70);
+}
+.bz-no__asset--add { border-style: dashed; cursor: pointer; }
+.bz-no__x { display: inline-grid; place-items: center; border: 0; background: none; padding: 2px; color: var(--ink-50); cursor: pointer; }
+
+.bz-no__makers { margin-top: 10px; }
+.bz-no__passed { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-70); }
+.bz-no__terms { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.bz-no__send { margin-top: 14px; }
+
+@media (max-width: 1023px) {
+  .bz-no__grid { grid-template-columns: 1fr; }
+}

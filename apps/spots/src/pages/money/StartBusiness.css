@@ -1,0 +1,34 @@
+/* biz-funding 01.1 (.su): the form, and a 360px column for the preview, the reach and Continue. */
+.bz-start__grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 30px; align-items: start; }
+.bz-start__form > .oc-field,
+.bz-start__form > .bz-start__two,
+.bz-start__where { margin-bottom: 14px; }
+.bz-start__two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bz-start__two--area { grid-template-columns: minmax(0, 1fr) 140px; }
+.bz-start__lb { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.bz-start__seg { margin-bottom: 8px; }
+.bz-start__help { font-size: 12.5px; color: var(--ink-50); margin: 6px 0 0; }
+.bz-start__where .oc-field__help { font-size: 12.5px; }
+.bz-start__err { font-size: 13px; color: var(--standby); margin: 6px 0 0; }
+.bz-start__unit { font: 500 13px var(--font-mono); color: var(--ink-50); }
+
+/* The Clear row (.row2 with a rule above). */
+.bz-start__clear { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-start__clear b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-start__clear small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+
+/* How stations see you (.adv-card). */
+.bz-start__card { border-top: 2px solid var(--ink); padding-top: 14px; }
+.bz-start__quiet { font-size: 12.5px; color: var(--ink-50); }
+.bz-start__nm { margin-top: 6px; font: 800 24px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.bz-start__card small { display: block; font-size: 13px; color: var(--ink-70); margin-top: 2px; }
+.bz-start__reach { margin-top: 14px; }
+.bz-start__go { margin-top: 18px; }
+
+@media (max-width: 900px) {
+  .bz-start__grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .bz-start__two { grid-template-columns: minmax(0, 1fr); }
+  .bz-start__two--area { grid-template-columns: minmax(0, 1fr) 110px; }
+}

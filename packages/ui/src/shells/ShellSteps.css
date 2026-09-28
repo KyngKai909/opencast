@@ -13,3 +13,17 @@
 .oc-shell-steps__step--done { color: var(--ink-70); }
 .oc-shell-steps__step--done .oc-shell-steps__n { background: var(--ink); border-color: var(--ink); color: var(--ground); }
 .oc-shell-steps__hint { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); line-height: 1.45; }
+
+/* The phone (no frame draws setup there): the rail becomes a strip of numbered steps above the
+   page, naming only the current one; the hint moves out of the way. */
+@media (max-width: 767px) {
+  .oc-business-setup .oc-shell__body, .oc-control-setup .oc-shell__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .oc-shell-steps { border-right: 0; border-bottom: 1px solid var(--hair); padding: 10px 16px; overflow: visible; }
+  .oc-shell-steps__list { display: flex; gap: 8px; align-items: center; }
+  .oc-shell-steps__step { padding: 0; }
+  .oc-shell-steps__step:not(.oc-shell-steps__step--current) > :not(.oc-shell-steps__n):not(.oc-sr-only) { display: none; }
+  .oc-shell-steps__step:not(.oc-shell-steps__step--current) { font-size: 0; }
+  .oc-shell-steps__step .oc-shell-steps__n { font-size: 12px; }
+  .oc-shell-steps__hint { display: none; }
+  .oc-business-setup .oc-shell-head__note, .oc-control-setup .oc-shell-head__note { display: none; }
+}

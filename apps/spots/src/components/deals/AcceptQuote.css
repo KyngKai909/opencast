@@ -1,0 +1,4 @@
+/* production orders 04.1: the .kv, then the .promise 14px under it. */
+.bz-accept__promise { margin-top: 14px; }
+.bz-accept__short { margin: 12px 0 0; font-size: 13px; color: var(--standby); }
+.bz-accept__short a { color: inherit; font-weight: 600; }

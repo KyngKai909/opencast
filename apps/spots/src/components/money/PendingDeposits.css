@@ -1,0 +1,6 @@
+/* 06.2: a .row2 with the Pending tag, then the sentence (13px, quiet). */
+.bz-pending { margin-top: 14px; }
+.bz-pending__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-pending__row b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-pending__row small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-pending__p { font-size: 13px; color: var(--ink-50); margin: 12px 0 0; }

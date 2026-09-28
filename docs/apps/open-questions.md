@@ -92,3 +92,7 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A60 | The street address on a saved offer, though the contract says it's private | biz-results 03.1 | Shown on the offer (customers need it to come in); stations still see only the city |
 | A61 | A whole-station sponsorship credit with co-sponsors | sponsorships 02.1, 05.1 | Each sponsor's own credit; co-sponsors listed on the station's slate (P17) |
 | A62 | "Open" on a sponsorship in the list | sponsorships 01.1 | A detail view (credit, amount, dates, End it) as a Modal on the web and a Sheet on the phone |
+| A63 | The paused tag: "Paused, budget spent" (biz-spots 04.1) or "Paused (budget spent)" (states.ts) | biz-spots 04.1 | states.ts's label, so both apps say the same |
+| A64 | A spot the business pauses itself | biz-spots (undrawn) | "Pause it" on the spot page: state `waiting_for_you`; stations are told and fill its time. Bringing it back lists it again; stations add it back themselves |
+| A65 | After a balance top-up, does an in-rotation spot go straight back into rotations? | biz-spots 05 (station side) | No: it's back in the market, stations get "It's back" and add it themselves (never re-added automatically) |
+| A66 | Leaving out named stations, choosing which location a spot targets, editing captions, the code's placement | biz-spots 03.1, 02.1 | Not drawn and no endpoints: the first location is used; P3 and P4 stay open |

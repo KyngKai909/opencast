@@ -5,6 +5,7 @@ import { useAuth } from "./auth/AuthProvider";
 import { BusinessLayout } from "./layout/BusinessLayout";
 import { SetupLayout } from "./layout/SetupLayout";
 import { NotFound } from "./pages/common";
+import AcceptInvite from "./pages/AcceptInvite";
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
 import { dealsBusinessRoutes } from "./pages/deals/routes";
@@ -20,6 +21,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route index element={<Home />} />
+      <Route path="invites/:inviteId" element={<AcceptInvite />} />
       <Route element={<SetupLayout />}>{moneyStartRoutes}</Route>
       <Route path=":businessId/start" element={<SetupLayout />}>
         <Route index element={<Navigate to="fund" replace />} />

@@ -1,0 +1,15 @@
+/* biz-funding 02.1 (.su with a 380px column): methods, how much, auto top-up; the promise and the button. */
+.bz-fund__grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 30px; align-items: start; }
+.bz-fund__much { margin-top: 22px; }
+.bz-fund__amounts { margin: 6px 0 4px; }
+.bz-fund__est { font-size: 13px; color: var(--ink-50); margin: 8px 0 0; }
+.bz-fund__auto { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; padding: 10px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-fund__auto b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-fund__auto small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-fund__go { margin-top: 18px; }
+.bz-fund__foot { font-size: 12.5px; color: var(--ink-50); margin: 10px 0 0; }
+.bz-fund__err { font-size: 13px; color: var(--standby); margin: 10px 0 0; }
+
+@media (max-width: 900px) {
+  .bz-fund__grid { grid-template-columns: minmax(0, 1fr); }
+}

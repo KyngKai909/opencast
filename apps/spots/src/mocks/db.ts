@@ -7,7 +7,7 @@
 // area's own data (airings and proof, codes, sponsorships, orders, notification prefs…) lives in
 // its own mocks/fixtures/<area>.ts, and may keep its own saved state.
 
-import type { Balance, Business, Movement, Spot } from "@opencast/contracts";
+import type { ClearLink, Balance, Business, Movement, Spot } from "@opencast/contracts";
 import { CYPRESS_ID, OSC_ID, seedBalances, seedBusinesses, seedMovements, seedSpots } from "./fixtures/businesses";
 import { ANA, DEVON, JESS, TOMAS } from "./fixtures/people";
 import { at } from "./fixtures/time";
@@ -30,9 +30,11 @@ export interface Db {
   balances: Record<string, Balance>;
   movements: Record<string, Movement[]>;
   spots: Spot[];
+  /** Linked Clear accounts, by person id (Connect Clear). */
+  clearLinks: Record<string, ClearLink>;
 }
 
-export const DB_VERSION = 1;
+export const DB_VERSION = 3;
 const KEY = "oc-mock-spots-db";
 
 export function seed(): Db {
@@ -48,7 +50,8 @@ export function seed(): Db {
     ],
     balances: seedBalances(),
     movements: seedMovements(),
-    spots: seedSpots()
+    spots: seedSpots(),
+    clearLinks: {}
   };
 }
 
@@ -120,6 +123,36 @@ export function move(businessId: string, m: Omit<Movement, "id" | "at"> & { at?:
       b.spentThisMonthAirings += 1;
     }
   }
+  b.runwayDays = runway(b);
+  (d.movements[businessId] ??= []).unshift(entry);
+  saveDb();
+  return entry;
+}
+
+/**
+ * Spends held money: the hold becomes a payment in one line ("Paid to BEAT 12.1"), as an airing's
+ * hold turns into "Aired on …". Held goes down; available doesn't change (it left when held).
+ */
+export function spendHeld(businessId: string, m: Omit<Movement, "id" | "at" | "amountMicros"> & { amountMicros: number; at?: string }): Movement {
+  const d = getDb();
+  const b = balanceOf(businessId);
+  const amount = Math.abs(m.amountMicros);
+  b.heldMicros = Math.max(0, b.heldMicros - amount);
+  const entry: Movement = { id: `00000000-0000-4000-9000-${String(Date.now() % 1e9).padStart(9, "0")}${String(++seq).padStart(3, "0")}`, at: m.at ?? now().toISOString(), kind: m.kind, label: m.label, detail: m.detail, amountMicros: -amount };
+  b.runwayDays = runway(b);
+  (d.movements[businessId] ??= []).unshift(entry);
+  saveDb();
+  return entry;
+}
+
+/** Returns held money to available (a cancelled order, an airing that didn't run): money coming back. */
+export function returnHeld(businessId: string, m: Omit<Movement, "id" | "at" | "amountMicros" | "kind"> & { amountMicros: number; at?: string }): Movement {
+  const d = getDb();
+  const b = balanceOf(businessId);
+  const amount = Math.abs(m.amountMicros);
+  b.heldMicros = Math.max(0, b.heldMicros - amount);
+  b.availableMicros += amount;
+  const entry: Movement = { id: `00000000-0000-4000-9000-${String(Date.now() % 1e9).padStart(9, "0")}${String(++seq).padStart(3, "0")}`, at: m.at ?? now().toISOString(), kind: "returned", label: m.label, detail: m.detail, amountMicros: amount };
   b.runwayDays = runway(b);
   (d.movements[businessId] ??= []).unshift(entry);
   saveDb();

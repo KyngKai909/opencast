@@ -6,6 +6,7 @@ import Code from "./Code";
 import Redeem from "./Redeem";
 import Results from "./Results";
 import Statement from "./Statement";
+import Statements from "./Statements";
 
 export const resultsBusinessRoutes = (
   <>
@@ -13,6 +14,7 @@ export const resultsBusinessRoutes = (
     <Route path="results/airings" element={<Airings />} />
     <Route path="results/airings/:asRunId" element={<Airings />} />
     <Route path="results/codes/:code" element={<Code />} />
+    <Route path="balance/statements" element={<Statements />} />
     <Route path="balance/statements/:statementId" element={<Statement />} />
     <Route path="redeem" element={<Redeem />} />
   </>

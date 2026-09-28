@@ -1,0 +1,11 @@
+/* production orders 05.1 .pic (640 wide: title 40px, line 17px, 9% sides) and 06.1 (358 wide:
+   22px and 12px), as widths of the picture. */
+.bz-deliv video { width: 100%; height: 100%; object-fit: cover; display: block; background: var(--screen); }
+.bz-deliv__card {
+  position: absolute; inset: 0; background: var(--bz-deliv); color: var(--on-station);
+  display: flex; flex-direction: column; justify-content: center; padding: 0 9%;
+}
+.bz-deliv__card b { font: 800 6.27cqw/1 var(--font-display); font-stretch: var(--semi-wide); }
+.bz-deliv__card span { font-size: 2.66cqw; margin-top: 1.25cqw; opacity: .9; }
+.bz-deliv--phone .bz-deliv__card b { font-size: 6.15cqw; }
+.bz-deliv--phone .bz-deliv__card span { font-size: 3.35cqw; margin-top: 1.68cqw; }

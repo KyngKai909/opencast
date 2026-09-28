@@ -1,0 +1,8 @@
+/* Settings, Close account (not drawn: the settings rows and a field, as the other sections). */
+.bz-close { max-width: 470px; }
+.bz-close__form { display: grid; gap: 14px; justify-items: start; margin-top: 22px; }
+.bz-close__form .oc-field { width: 100%; }
+
+@media (max-width: 767px) {
+  .bz-close { padding: 16px 16px 24px; max-width: none; }
+}
