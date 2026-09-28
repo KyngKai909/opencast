@@ -21,15 +21,16 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Sponsorships: held monthly and released at month end (prompt), or accrued weekly (the earnings design shows weekly lines)? | ledger, Phase 6 | the prompt's rule, monthly |
 | Code window: "used within 7 days" of an airing, but a saved offer shows "until" 14 days after saving | `spots.codes.window_days` | 7 |
 
-## The escrow contract
+## The escrow contract and the creator fund
 
 | Decision | Now | Default |
 |---|---|---|
-| Who holds the verifier keys, how many, and the threshold | Set once at deployment; the contract enforces the multi-signature itself (at least 2) | 2 of 3, held by different people at Opencast |
-| Rotating a verifier key | Not possible: nothing in the contract can change after deployment, by design | Deploy a new escrow for new deposits; balances already held stay claimable with the old keys |
+| Upgradeable? | Yes, at the owner's request (2026-09-28), UUPS like the Clear protocol's contracts. The prompt asked for no upgrade path; a 7-day timelock that any verifier or steward can cancel keeps upgrades public and stoppable | 7-day delay |
+| Who holds the verifier and steward keys, and the thresholds | Set at deployment, changeable only through the timelock | 2 of 3 each, held by different people; stewards needn't be the verifiers |
+| The admin Safe | Proposes and executes admin changes through the timelock | Opencast's Safe |
 | When the unclaimed clock starts | The station's first deposit | 3 years after it |
-| The creator fund's address | Fixed at deployment | none yet: needed before Base Sepolia |
-| USDC sent to the contract directly (not through `deposit`) | Stays there for good; there's no rescue function, because a rescue is a way out | none |
+| What the creator fund pays for | Grants to new stations and programs, each with a public record (its hash on-chain) | Stewards decide; the rules for who qualifies aren't written yet |
+| USDC sent to either contract directly | Escrow: stays there. Fund: counts toward grants | none |
 | Chain | Base, Clear's chain; tested locally on anvil | Base Sepolia for staging |
 
 ## Rights and trust

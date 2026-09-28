@@ -9,7 +9,7 @@
   "scripts": {
     "env:check": "node scripts/env-check.mjs",
     "env:check:railway": "node scripts/env-check.mjs --railway",
-    "contracts:test": "cd contracts && forge test",
+    "contracts:test": "cd contracts && forge clean && forge test",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:migrate": "turbo run build --filter=@opencast/domain && npm run migrate -w @opencast/db",

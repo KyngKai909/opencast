@@ -121,7 +121,7 @@ payout         station earnings → external
 
 Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments.ts`.
 
-**Escrow.** A claimable station's settled earnings are `escrow_owed` (a liability to the station) until the weekly batch into `CreatorEscrow` (`contracts/`) confirms, then `escrow`. The contract pays only an approved creator wallet (a threshold of verifier keys, then 72 hours in public) or, after the unclaimed period, the creator fund; it has no owner and can't be upgraded. See `contracts/README.md`.
+**Escrow and the creator fund.** A claimable station's settled earnings are `escrow_owed` (a liability to the station) until the weekly batch into `CreatorEscrow` (`contracts/`) confirms, then `escrow`. The contract pays only an approved creator wallet (a threshold of verifier keys, then 72 hours in public) or, after the unclaimed period, `CreatorFund`, which pays only grants its stewards approve (again a threshold and 72 hours), never to Opencast. Both are upgradeable only through a 7-day timelock any key holder can cancel. See `contracts/README.md`.
 
 ## Still to move (later phases)
 

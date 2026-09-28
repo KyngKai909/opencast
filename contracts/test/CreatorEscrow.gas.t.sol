@@ -1,29 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test, console} from "forge-std/Test.sol";
-import {CreatorEscrow, IERC20} from "../src/CreatorEscrow.sol";
-import {MockUSDC} from "./mocks/MockUSDC.sol";
+import {console} from "forge-std/Test.sol";
+import {CreatorEscrow} from "../src/CreatorEscrow.sol";
+import {Deployed} from "./Deployed.sol";
 
-/// The weekly deposit batch, measured: the first week a station appears (new storage) and a
-/// normal week after (updating it). Run: forge test --mc CreatorEscrowGas -vv
-contract CreatorEscrowGas is Test {
-    MockUSDC usdc;
-    CreatorEscrow escrow;
-    address opencast = makeAddr("opencast");
-
-    function setUp() public {
-        usdc = new MockUSDC();
-        address[] memory verifiers = new address[](3);
-        verifiers[0] = makeAddr("v1");
-        verifiers[1] = makeAddr("v2");
-        verifiers[2] = makeAddr("v3");
-        escrow = new CreatorEscrow(IERC20(address(usdc)), makeAddr("fund"), verifiers, 2, 1095 days);
-        usdc.mint(opencast, 1e18);
-        vm.prank(opencast);
-        usdc.approve(address(escrow), type(uint256).max);
-    }
-
+/// The weekly deposit batch through the proxy, measured: the first week a station appears (new
+/// storage) and a normal week after (updating it). Run: forge test --mc CreatorEscrowGas -vv
+contract CreatorEscrowGas is Deployed {
     function _batch(uint256 n, uint256 offset) internal returns (uint256 gas) {
         uint256[] memory ids = new uint256[](n);
         uint256[] memory amounts = new uint256[](n);
@@ -51,11 +35,11 @@ contract CreatorEscrowGas is Test {
     function test_claimPathGas() public {
         vm.prank(opencast);
         escrow.deposit(1, 1e6);
-        vm.prank(makeAddr("v1"));
-        escrow.approve(1, makeAddr("creator"), CreatorEscrow.Kind.Claim);
+        vm.prank(v1);
+        escrow.approve(1, creator, CreatorEscrow.Kind.Claim);
         console.log("approve (first key)", vm.lastFrameGas().gasTotalUsed);
-        vm.prank(makeAddr("v2"));
-        escrow.approve(1, makeAddr("creator"), CreatorEscrow.Kind.Claim);
+        vm.prank(v2);
+        escrow.approve(1, creator, CreatorEscrow.Kind.Claim);
         console.log("approve (threshold)", vm.lastFrameGas().gasTotalUsed);
         vm.warp(block.timestamp + 72 hours);
         escrow.execute(1);

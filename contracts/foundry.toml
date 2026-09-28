@@ -10,8 +10,19 @@ optimizer = true
 optimizer_runs = 10_000
 # No upgrade path, no delegatecall: nothing to configure for proxies.
 bytecode_hash = "none"
-# Tests read the build output to check the contract's ABI.
+# Tests read the build output to check the contracts' ABIs.
 fs_permissions = [{ access = "read", path = "./out" }]
+# OpenZeppelin's upgrade checker (storage layout, initializers) runs through ffi.
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+remappings = [
+  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+  "openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/",
+  "forge-std/=lib/forge-std/src/",
+]
 
 [profile.default.fuzz]
 runs = 1000
@@ -25,3 +36,8 @@ fail_on_revert = false
 local = "http://127.0.0.1:8545"
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 base = "${BASE_RPC_URL}"
+
+[lint]
+# False positives here: every event is emitted before the one USDC transfer at the end of its
+# function; the lint counts internal and SafeERC20 library calls as external calls.
+exclude_lints = ["reentrancy-events"]

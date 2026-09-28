@@ -13,9 +13,10 @@ contract MockUSDC {
     /// Addresses a real USDC would refuse to send to (its blocklist).
     mapping(address => bool) public blocked;
 
-    address public watched;
+    mapping(address => bool) public watched;
 
     struct Out {
+        address from;
         address to;
         uint256 amount;
         uint256 at;
@@ -26,7 +27,7 @@ contract MockUSDC {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
     function watch(address who) external {
-        watched = who;
+        watched[who] = true;
     }
 
     function block_(address who, bool on) external {
@@ -66,7 +67,7 @@ contract MockUSDC {
         require(balanceOf[from] >= amount, "balance");
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
-        if (from == watched && amount != 0) outs.push(Out(to, amount, block.timestamp));
+        if (watched[from] && amount != 0) outs.push(Out(from, to, amount, block.timestamp));
         emit Transfer(from, to, amount);
     }
 }
