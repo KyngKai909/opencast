@@ -1,0 +1,1293 @@
+[
+  {
+    "id": "stats-xl",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal3"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Balance: available, held, spent (xl)'] .gal-panel[data-theme='{ground}'] .oc-stats"
+    }
+  },
+  {
+    "id": "stats-xl-item",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal3 > div:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Balance: available, held, spent (xl)'] .gal-panel[data-theme='{ground}'] .oc-stats__item:nth-child(2)"
+    }
+  },
+  {
+    "id": "stats-xl-value",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal3 > div:first-child .v"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Balance: available, held, spent (xl)'] .gal-panel[data-theme='{ground}'] .oc-stats__value"
+    }
+  },
+  {
+    "id": "stats-xl-dot",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal3 .dot"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Balance: available, held, spent (xl)'] .gal-panel[data-theme='{ground}'] .oc-stats__dot"
+    }
+  },
+  {
+    "id": "stats-xl-caption",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal3 small"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Balance: available, held, spent (xl)'] .gal-panel[data-theme='{ground}'] .oc-stats__caption"
+    }
+  },
+  {
+    "id": "stats-lg-value",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .big4 > div:nth-child(2) .v"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Audience: tuned in now (lg)'] .gal-panel[data-theme='{ground}'] .oc-stats__item:nth-child(2) .oc-stats__value"
+    }
+  },
+  {
+    "id": "stats-lg-caption",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .big4 small"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Audience: tuned in now (lg)'] .gal-panel[data-theme='{ground}'] .oc-stats__caption"
+    }
+  },
+  {
+    "id": "stats-md-value",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .sum4 .v"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Results: the month (md)'] .gal-panel[data-theme='{ground}'] .oc-stats__value"
+    }
+  },
+  {
+    "id": "stats-md-caption",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .sum4 small"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Results: the month (md)'] .gal-panel[data-theme='{ground}'] .oc-stats__caption"
+    }
+  },
+  {
+    "id": "stats-sm-item",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "section#board .cov > div:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Desk: the market board (sm)'] .gal-panel[data-theme='{ground}'] .oc-stats__item:nth-child(2)"
+    }
+  },
+  {
+    "id": "stats-sm-value",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "section#board .cov .v"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Desk: the market board (sm)'] .gal-panel[data-theme='{ground}'] .oc-stats__value"
+    }
+  },
+  {
+    "id": "stats-sm-caption",
+    "reference": {
+      "file": "desk/opencast-network-desk.html",
+      "selector": "section#board .cov small"
+    },
+    "gallery": {
+      "path": "/stat-row",
+      "selector": ".gal-state[data-state='Desk: the market board (sm)'] .gal-panel[data-theme='{ground}'] .oc-stats__caption"
+    }
+  },
+  {
+    "id": "kv",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#airings .kv"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Pairs'] .gal-panel[data-theme='{ground}'] .oc-kv"
+    }
+  },
+  {
+    "id": "kv-row",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#airings .kv > div"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Pairs'] .gal-panel[data-theme='{ground}'] .oc-kv__row"
+    }
+  },
+  {
+    "id": "kv-key",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#airings .kv > div > span:first-child"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Pairs'] .gal-panel[data-theme='{ground}'] .oc-kv__key"
+    }
+  },
+  {
+    "id": "kv-value",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#airings .kv > div > span:last-child"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Pairs'] .gal-panel[data-theme='{ground}'] .oc-kv__value"
+    }
+  },
+  {
+    "id": "rows-row",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2:not(.open):not(.total)"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row"
+    }
+  },
+  {
+    "id": "rows-title",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2 b"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-lines__title"
+    }
+  },
+  {
+    "id": "rows-detail",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2 small"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-lines__detail"
+    }
+  },
+  {
+    "id": "rows-amount",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2 .m:not(.neg)"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__m"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rows-amount-neg",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2 .m.neg"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row:nth-child(2) .oc-kvrows__m"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rows-open-amount",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2.open .m"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row:nth-child(3) .oc-kvrows__m"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rows-total",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2.total"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row--total"
+    }
+  },
+  {
+    "id": "rows-total-amount",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2.total .m"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row--total .oc-kvrows__m"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rows-total-title",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#earnings .row2.total b"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: amounts, money out, Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-kvrows__row--total .oc-lines__title"
+    }
+  },
+  {
+    "id": "rows-end",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .row2 .btn"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Rows: money in, values and actions'] .gal-panel[data-theme='{ground}'] .oc-kvrows__end .oc-btn"
+    }
+  },
+  {
+    "id": "health",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .health"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Health'] .gal-panel[data-theme='{ground}'] .oc-health"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "health-row",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .health .hl-row:not([style])"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Health'] .gal-panel[data-theme='{ground}'] .oc-health__row"
+    }
+  },
+  {
+    "id": "health-value",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .health .hl-row:not([style]) span:last-child:not([style])"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Health'] .gal-panel[data-theme='{ground}'] .oc-health__value"
+    }
+  },
+  {
+    "id": "health-good",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .hl-row .good"
+    },
+    "gallery": {
+      "path": "/key-value-list",
+      "selector": ".gal-state[data-state='Health'] .gal-panel[data-theme='{ground}'] .oc-health__good"
+    },
+    "pseudo": "::before"
+  },
+  {
+    "id": "table-head",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .bs-h"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Header, mono amounts, total row'] .gal-panel[data-theme='{ground}'] .oc-table__head"
+    }
+  },
+  {
+    "id": "table-row",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .bs:not(.total)"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Header, mono amounts, total row'] .gal-panel[data-theme='{ground}'] .oc-table__row:not(.oc-table__row--total)"
+    }
+  },
+  {
+    "id": "table-amount",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .bs .m"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Header, mono amounts, total row'] .gal-panel[data-theme='{ground}'] .oc-table__cell--amount"
+    }
+  },
+  {
+    "id": "table-title",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .bs b"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Header, mono amounts, total row'] .gal-panel[data-theme='{ground}'] .oc-lines__title"
+    }
+  },
+  {
+    "id": "table-total",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .bs.total"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Header, mono amounts, total row'] .gal-panel[data-theme='{ground}'] .oc-table__row--total"
+    }
+  },
+  {
+    "id": "table-selected",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#airings .ai.sel"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Choosable rows, one selected'] .gal-panel[data-theme='{ground}'] .oc-table__row--selected"
+    }
+  },
+  {
+    "id": "table-now",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .pt.now"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='On now: the tally edge'] .gal-panel[data-theme='{ground}'] .oc-table__row--now"
+    },
+    "ignore": [
+      "height"
+    ]
+  },
+  {
+    "id": "table-time",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .pt:not(.now) .t"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='On now: the tally edge'] .gal-panel[data-theme='{ground}'] .oc-table__row:not(.oc-table__row--now) .oc-table__cell--time"
+    }
+  },
+  {
+    "id": "table-attention",
+    "reference": {
+      "file": "control/opencast-rights.html",
+      "selector": "section#rights .cl.sel"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Waiting on you: the standby edge'] .gal-panel[data-theme='{ground}'] .oc-table__row--attention"
+    }
+  },
+  {
+    "id": "table-group-head",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#payout .sec-top:not([style])"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Groups (a statement) with Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-table__group:nth-child(2) .oc-table__group-cell"
+    }
+  },
+  {
+    "id": "table-group-title",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#payout .sec-top:not([style]) h3"
+    },
+    "gallery": {
+      "path": "/table",
+      "selector": ".gal-state[data-state='Groups (a statement) with Not set yet and a total'] .gal-panel[data-theme='{ground}'] .oc-table__group:nth-child(2) .oc-table__group-title"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "moves-row",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-table__row"
+    }
+  },
+  {
+    "id": "moves-when",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act .t"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-moves__when"
+    }
+  },
+  {
+    "id": "moves-out",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act .m.out"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-moves__m--out"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "moves-hold",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act .m.hold"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-moves__m--hold"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "moves-held",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act .m.hold small"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-moves__m--hold small"
+    }
+  },
+  {
+    "id": "moves-in",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .act .m.in"
+    },
+    "gallery": {
+      "path": "/movements",
+      "selector": ".gal-state[data-state='Every movement'] .gal-panel[data-theme='{ground}'] .oc-moves__m--in"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "timeline",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#paused .timeline"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A paused spot: done, then waiting for you'] .gal-panel[data-theme='{ground}'] .oc-timeline"
+    }
+  },
+  {
+    "id": "timeline-done",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#paused .tl-r.done"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A paused spot: done, then waiting for you'] .gal-panel[data-theme='{ground}'] .oc-timeline__item--done"
+    }
+  },
+  {
+    "id": "timeline-done-dot",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#paused .tl-r.done .dot"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A paused spot: done, then waiting for you'] .gal-panel[data-theme='{ground}'] .oc-timeline__item--done .oc-timeline__dot"
+    }
+  },
+  {
+    "id": "timeline-current-dot",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#paused .tl-r.cur .dot"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A paused spot: done, then waiting for you'] .gal-panel[data-theme='{ground}'] .oc-timeline__item--current .oc-timeline__dot"
+    }
+  },
+  {
+    "id": "timeline-when",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#paused .tl-r .when"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A paused spot: done, then waiting for you'] .gal-panel[data-theme='{ground}'] .oc-timeline__when"
+    }
+  },
+  {
+    "id": "timeline-future",
+    "reference": {
+      "file": "control/opencast-rights.html",
+      "selector": "section#claim .tl-r.future"
+    },
+    "gallery": {
+      "path": "/timeline",
+      "selector": ".gal-state[data-state='A claim: done, current, future'] .gal-panel[data-theme='{ground}'] .oc-timeline__item--future"
+    }
+  },
+  {
+    "id": "steps",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps"
+    },
+    "ignore": [
+      "border-right-width",
+      "height",
+      "min-height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "steps-current",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps .st.cur"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps__step--current"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "steps-current-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps .st.cur .n"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps__step--current .oc-steps__n"
+    }
+  },
+  {
+    "id": "steps-todo",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps .st:not(.cur):not(.done)"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps__step--todo"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "steps-todo-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps .st:not(.cur):not(.done) .n"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps__step--todo .oc-steps__n"
+    }
+  },
+  {
+    "id": "steps-done-n",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .mc-steps .st.done .n"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 2, business'] .gal-panel[data-theme='{ground}'] .oc-steps__step--done .oc-steps__n"
+    }
+  },
+  {
+    "id": "steps-hint",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .mc-steps .hint"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Setup rail: step 1'] .gal-panel[data-theme='{ground}'] .oc-steps__hint"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "steprow",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "section#pay .steps5"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Order steps: quoted'] .gal-panel[data-theme='{ground}'] .oc-steprow"
+    }
+  },
+  {
+    "id": "steprow-current",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "section#pay .steps5 .cur"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Order steps: quoted'] .gal-panel[data-theme='{ground}'] .oc-steprow__step--current"
+    }
+  },
+  {
+    "id": "steprow-todo",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "section#pay .steps5 > div:nth-child(3)"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Order steps: quoted'] .gal-panel[data-theme='{ground}'] .oc-steprow__step:nth-child(3)"
+    }
+  },
+  {
+    "id": "steprow-n",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "section#pay .steps5 b"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Order steps: quoted'] .gal-panel[data-theme='{ground}'] .oc-steprow__n"
+    }
+  },
+  {
+    "id": "steplist-current",
+    "reference": {
+      "file": "control/opencast-rights.html",
+      "selector": "section#handover .steps3 li.cur"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Claim steps (list)'] .gal-panel[data-theme='{ground}'] .oc-steplist__step--current"
+    }
+  },
+  {
+    "id": "steplist-current-n",
+    "reference": {
+      "file": "control/opencast-rights.html",
+      "selector": "section#handover .steps3 li.cur .n"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Claim steps (list)'] .gal-panel[data-theme='{ground}'] .oc-steplist__step--current .oc-steplist__n"
+    }
+  },
+  {
+    "id": "steplist-done-n",
+    "reference": {
+      "file": "control/opencast-rights.html",
+      "selector": "section#handover .steps3 li.done .n"
+    },
+    "gallery": {
+      "path": "/step-rail",
+      "selector": ".gal-state[data-state='Claim steps (list)'] .gal-panel[data-theme='{ground}'] .oc-steplist__step--done .oc-steplist__n"
+    }
+  },
+  {
+    "id": "perm",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "section#team .perm"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Station roles'] .gal-panel[data-theme='{ground}'] .oc-perm"
+    }
+  },
+  {
+    "id": "perm-role",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "section#team .perm th:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Station roles'] .gal-panel[data-theme='{ground}'] thead th"
+    }
+  },
+  {
+    "id": "perm-ability",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "section#team .perm tbody td:first-child"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Station roles'] .gal-panel[data-theme='{ground}'] .oc-perm__ability"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "perm-yes",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "section#team .perm td.y"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Station roles'] .gal-panel[data-theme='{ground}'] .oc-perm__yes"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "perm-no",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": "section#team .perm td.n"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Station roles'] .gal-panel[data-theme='{ground}'] .oc-perm__no"
+    }
+  },
+  {
+    "id": "perm-biz-yes",
+    "reference": {
+      "file": "business/opencast-biz-settings.html",
+      "selector": "section#team .perm td.y"
+    },
+    "gallery": {
+      "path": "/permissions-table",
+      "selector": ".gal-state[data-state='Business roles'] .gal-panel[data-theme='{ground}'] .oc-perm__yes"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "chart-axis",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .chart .axis"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__axis"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "chart-label",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .chart .blbl"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__label"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "chart-legend",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .legend2"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__legend"
+    }
+  },
+  {
+    "id": "chart-legend-key",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .legend2 i:not(.d):not(.b)"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__legend span:first-child i"
+    }
+  },
+  {
+    "id": "chart-legend-prev",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .legend2 i.d"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__key--prev"
+    }
+  },
+  {
+    "id": "chart-legend-break",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .legend2 i.b"
+    },
+    "gallery": {
+      "path": "/line-chart",
+      "selector": ".gal-state[data-state='Tonight against last Saturday'] .gal-panel[data-theme='{ground}'] .oc-chart__key--break"
+    }
+  },
+  {
+    "id": "balbar",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .balbar"
+    },
+    "gallery": {
+      "path": "/balance-bar",
+      "selector": ".gal-state[data-state='Under the balance numbers'] .gal-panel[data-theme='{ground}'] .oc-balbar"
+    }
+  },
+  {
+    "id": "bal-chip",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal-chip"
+    },
+    "gallery": {
+      "path": "/balance-chip",
+      "selector": ".gal-state[data-state='In the header'] .gal-panel[data-theme='{ground}'] .oc-bal-chip"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "bal-chip-amount",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .bal-chip b"
+    },
+    "gallery": {
+      "path": "/balance-chip",
+      "selector": ".gal-state[data-state='In the header'] .gal-panel[data-theme='{ground}'] .oc-bal-chip b"
+    }
+  },
+  {
+    "id": "checks",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .check-list"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-checks"
+    }
+  },
+  {
+    "id": "checks-row",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .ck.ok"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-checks__item--fine"
+    }
+  },
+  {
+    "id": "checks-mark-ok",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .ck.ok .m"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-checks__item--fine .oc-checks__mark"
+    }
+  },
+  {
+    "id": "checks-mark-warn",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .ck.warn .m"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-checks__item--attention .oc-checks__mark"
+    }
+  },
+  {
+    "id": "checks-title",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .ck b"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-lines__title"
+    }
+  },
+  {
+    "id": "checks-detail",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "section#flow-a .ck small"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Sign-on checks'] .gal-panel[data-theme='{ground}'] .oc-lines__detail"
+    }
+  },
+  {
+    "id": "uchecks-row",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#upload .chk2.ok"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Upload checks: fine, fixed, for you'] .gal-panel[data-theme='{ground}'] .oc-uchecks__item--fine"
+    }
+  },
+  {
+    "id": "uchecks-mark-fixed",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#upload .chk2.auto .ic"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Upload checks: fine, fixed, for you'] .gal-panel[data-theme='{ground}'] .oc-uchecks__item--fixed .oc-uchecks__mark"
+    }
+  },
+  {
+    "id": "uchecks-mark-attention",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#upload .chk2.fix .ic"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Upload checks: fine, fixed, for you'] .gal-panel[data-theme='{ground}'] .oc-uchecks__item--attention .oc-uchecks__mark"
+    }
+  },
+  {
+    "id": "uchecks-detail",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#upload .chk2 small"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Upload checks: fine, fixed, for you'] .gal-panel[data-theme='{ground}'] .oc-lines__detail"
+    }
+  },
+  {
+    "id": "promise",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .promise"
+    },
+    "gallery": {
+      "path": "/promise-list",
+      "selector": ".gal-state[data-state='What happens to your money'] .gal-panel[data-theme='{ground}'] .oc-promise"
+    }
+  },
+  {
+    "id": "promise-title",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .promise h4"
+    },
+    "gallery": {
+      "path": "/promise-list",
+      "selector": ".gal-state[data-state='What happens to your money'] .gal-panel[data-theme='{ground}'] .oc-promise__title"
+    }
+  },
+  {
+    "id": "promise-line",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .promise li"
+    },
+    "gallery": {
+      "path": "/promise-list",
+      "selector": ".gal-state[data-state='What happens to your money'] .gal-panel[data-theme='{ground}'] .oc-promise__line"
+    }
+  },
+  {
+    "id": "promise-number",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .promise li"
+    },
+    "gallery": {
+      "path": "/promise-list",
+      "selector": ".gal-state[data-state='What happens to your money'] .gal-panel[data-theme='{ground}'] .oc-promise__line"
+    },
+    "pseudo": "::before"
+  },
+  {
+    "id": "promise-lead",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#fund .promise li b"
+    },
+    "gallery": {
+      "path": "/promise-list",
+      "selector": ".gal-state[data-state='What happens to your money'] .gal-panel[data-theme='{ground}'] .oc-promise__line b"
+    }
+  },
+  {
+    "id": "funnel",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#codes .funnel"
+    },
+    "gallery": {
+      "path": "/funnel",
+      "selector": ".gal-state[data-state='Codes and customers'] .gal-panel[data-theme='{ground}'] .oc-funnel"
+    }
+  },
+  {
+    "id": "funnel-row",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#codes .fn"
+    },
+    "gallery": {
+      "path": "/funnel",
+      "selector": ".gal-state[data-state='Codes and customers'] .gal-panel[data-theme='{ground}'] .oc-funnel__row"
+    }
+  },
+  {
+    "id": "funnel-bar",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#codes .fn .bar"
+    },
+    "gallery": {
+      "path": "/funnel",
+      "selector": ".gal-state[data-state='Codes and customers'] .gal-panel[data-theme='{ground}'] .oc-funnel__bar"
+    }
+  },
+  {
+    "id": "funnel-count",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#codes .fn .m"
+    },
+    "gallery": {
+      "path": "/funnel",
+      "selector": ".gal-state[data-state='Codes and customers'] .gal-panel[data-theme='{ground}'] .oc-funnel__count"
+    }
+  },
+  {
+    "id": "split-row",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .dp"
+    },
+    "gallery": {
+      "path": "/split-bar",
+      "selector": ".gal-state[data-state='Airings by time of day (rows)'] .gal-panel[data-theme='{ground}'] .oc-split__row"
+    }
+  },
+  {
+    "id": "split-bar",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .dp .bar"
+    },
+    "gallery": {
+      "path": "/split-bar",
+      "selector": ".gal-state[data-state='Airings by time of day (rows)'] .gal-panel[data-theme='{ground}'] .oc-split__bar"
+    }
+  },
+  {
+    "id": "split-count",
+    "reference": {
+      "file": "business/opencast-biz-results.html",
+      "selector": "section#overview .dp .m"
+    },
+    "gallery": {
+      "path": "/split-bar",
+      "selector": ".gal-state[data-state='Airings by time of day (rows)'] .gal-panel[data-theme='{ground}'] .oc-split__m"
+    }
+  },
+  {
+    "id": "split-stacked",
+    "reference": {
+      "file": "control/opencast-earnings.html",
+      "selector": "section#audience .split-bar"
+    },
+    "gallery": {
+      "path": "/split-bar",
+      "selector": ".gal-state[data-state='Watching on (stacked)'] .gal-panel[data-theme='{ground}'] .oc-splitbar"
+    }
+  },
+  {
+    "id": "runway",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .runway"
+    },
+    "gallery": {
+      "path": "/runway",
+      "selector": ".gal-state[data-state='Auto top-up off'] .gal-panel[data-theme='{ground}'] .oc-runway"
+    }
+  },
+  {
+    "id": "runway-days",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#balance .runway b"
+    },
+    "gallery": {
+      "path": "/runway",
+      "selector": ".gal-state[data-state='Auto top-up off'] .gal-panel[data-theme='{ground}'] .oc-runway b"
+    }
+  },
+  {
+    "id": "reach",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#business .reach"
+    },
+    "gallery": {
+      "path": "/reach",
+      "selector": ".gal-state[data-state='Every station can carry'] .gal-panel[data-theme='{ground}'] .oc-reach"
+    }
+  },
+  {
+    "id": "reach-bar",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#business .reach .bar"
+    },
+    "gallery": {
+      "path": "/reach",
+      "selector": ".gal-state[data-state='Every station can carry'] .gal-panel[data-theme='{ground}'] .oc-reach__bar"
+    }
+  },
+  {
+    "id": "reach-title",
+    "reference": {
+      "file": "business/opencast-biz-funding.html",
+      "selector": "section#business .reach b"
+    },
+    "gallery": {
+      "path": "/reach",
+      "selector": ".gal-state[data-state='Every station can carry'] .gal-panel[data-theme='{ground}'] .oc-reach__title"
+    }
+  },
+  {
+    "id": "uchecks-title",
+    "reference": {
+      "file": "business/opencast-biz-spots.html",
+      "selector": "section#upload .chk2 b"
+    },
+    "gallery": {
+      "path": "/checks",
+      "selector": ".gal-state[data-state='Upload checks: fine, fixed, for you'] .gal-panel[data-theme='{ground}'] .oc-uchecks__item .oc-lines__title"
+    }
+  }
+]

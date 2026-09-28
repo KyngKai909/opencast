@@ -1,0 +1,6 @@
+/* A title and a detail line (the reference's b + small inside every data row). */
+.oc-lines { display: block; min-width: 0; }
+.oc-lines__title { display: block; font-weight: 600; }
+.oc-lines__detail { display: block; font-size: 12.5px; color: var(--ink-70); }
+/* "Not set yet" after an undecided money line (earnings .row2.open b::after). */
+.oc-lines__open { font-weight: 500; font-size: 12px; color: var(--standby); margin-left: 6px; }

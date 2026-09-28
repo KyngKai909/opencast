@@ -1,0 +1,3 @@
+/* The header balance (.bal-chip). */
+.oc-bal-chip { display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-70); }
+.oc-bal-chip b { font: 500 16px var(--font-mono); color: var(--ink); }

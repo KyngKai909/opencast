@@ -1,0 +1,28 @@
+/* Checks. Sign-on (master control .check-list, .ck) and upload (biz spots .chk2). */
+.oc-checks, .oc-uchecks { list-style: none; margin: 0; padding: 0; }
+
+/* Sign-on */
+.oc-checks { border-top: 1px solid var(--line); }
+.oc-checks__item {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center;
+  padding: 12px 0; border-bottom: 1px solid var(--hair);
+}
+.oc-checks__mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; }
+.oc-checks__item .oc-lines__title { font-size: 14.5px; }
+.oc-checks__item .oc-lines__detail { display: inline; font-size: 13px; }
+.oc-checks__item--fine .oc-checks__mark,
+.oc-checks__item--fixed .oc-checks__mark { background: var(--ink); color: var(--ground); }
+.oc-checks__item--attention .oc-checks__mark { border: 1.5px solid var(--standby); color: var(--standby); font: 700 13px var(--font-text); }
+
+/* Upload */
+.oc-uchecks__item {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px;
+  padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; align-items: start;
+}
+.oc-uchecks__mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+/* The upload frame sets its check titles in the display face (biz spots .up b). */
+.oc-uchecks__item .oc-lines__title { font: 600 15px/1.25 var(--font-display); }
+.oc-uchecks__item .oc-lines__detail { margin-top: 2px; }
+.oc-uchecks__item--fine .oc-uchecks__mark { background: var(--ink); color: var(--ground); }
+.oc-uchecks__item--fixed .oc-uchecks__mark { border: 1.5px solid var(--signal); color: var(--signal); }
+.oc-uchecks__item--attention .oc-uchecks__mark { background: var(--standby-fill); color: var(--on-standby); font: 800 12px var(--font-text); }

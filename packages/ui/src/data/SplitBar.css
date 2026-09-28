@@ -1,0 +1,15 @@
+/* The daypart split (biz results .dp) and the stacked split (earnings .split-bar). */
+.oc-split__row {
+  display: grid; grid-template-columns: 120px minmax(0, 1fr) 70px; gap: 12px; align-items: center;
+  padding: 7px 0; font-size: 13.5px;
+}
+.oc-split__bar { display: block; height: 12px; border-radius: 3px; background: var(--hair); overflow: hidden; }
+.oc-split__bar i { display: block; height: 100%; background: var(--ink); }
+.oc-split__m { font: 500 13px var(--font-mono); text-align: right; }
+
+.oc-splitbar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; }
+.oc-splitbar i { display: block; height: 100%; }
+.oc-splitbar__part--ink { background: var(--ink); }
+.oc-splitbar__part--ink-70 { background: var(--ink-70); }
+.oc-splitbar__part--ink-50 { background: var(--ink-50); }
+.oc-splitbar__part--line { background: var(--line); }

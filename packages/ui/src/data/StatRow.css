@@ -1,0 +1,37 @@
+/* The ruled number group (.bal3, .big4, .sum4, .standing, .cov, .claim-stats). */
+.oc-stats {
+  display: grid; grid-template-columns: repeat(var(--oc-stats-n, 3), 1fr);
+  border-top: 2px solid var(--ink);
+}
+.oc-stats__item { padding: 14px 18px 0 0; min-width: 0; }
+.oc-stats__item + .oc-stats__item { padding-left: 18px; border-left: 1px solid var(--hair); }
+.oc-stats__value { font: 500 32px/1.1 var(--font-mono); letter-spacing: -.03em; }
+.oc-stats__caption { display: block; font-size: 13px; color: var(--ink-70); margin-top: 4px; }
+
+/* lg: the audience (earnings .big4). */
+.oc-stats--lg .oc-stats__value { font-size: 30px; }
+.oc-stats--lg .oc-stats__caption { font-size: 12.5px; }
+/* md: results (.sum4) and rights standing. */
+.oc-stats--md .oc-stats__value { font-size: 28px; }
+.oc-stats--md .oc-stats__caption { font-size: 12.5px; }
+/* sm: the desk's coverage and held earnings (.cov). */
+.oc-stats--sm .oc-stats__item { padding: 12px 16px 0 0; }
+.oc-stats--sm .oc-stats__item + .oc-stats__item { padding-left: 16px; }
+.oc-stats--sm .oc-stats__value { font-size: 26px; line-height: normal; }
+.oc-stats--sm .oc-stats__caption { font-size: 12.5px; margin-top: 2px; }
+
+/* The square that ties a number to its BalanceBar segment. */
+.oc-stats__dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 1px; }
+.oc-stats__dot--ink { background: var(--ink); }
+.oc-stats__dot--standby { background: var(--standby-fill); }
+.oc-stats__dot--line { background: var(--line); }
+
+/* Counted right now (earnings .big4 .v.live::before). */
+.oc-stats__live {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--live); margin-right: 10px; vertical-align: 6px; box-shadow: 0 0 6px var(--live);
+}
+
+/* Undecided money: $0.00 in ink-70, with "Not set yet" in standby (as earnings .row2.open). */
+.oc-stats__item--open .oc-stats__value { color: var(--ink-70); }
+.oc-stats__open { font-weight: 500; font-size: 12px; color: var(--standby); margin-left: 6px; }

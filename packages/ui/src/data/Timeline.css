@@ -1,0 +1,13 @@
+/* Timelines: a paused spot, a claim, an order (.timeline, .tl-r). */
+.oc-timeline { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.oc-timeline__item {
+  display: grid; grid-template-columns: 22px var(--oc-timeline-when, 120px) minmax(0, 1fr); gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; align-items: start;
+}
+.oc-timeline__dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); margin-top: 4px; }
+.oc-timeline__item--done .oc-timeline__dot { background: var(--ink); border-color: var(--ink); }
+.oc-timeline__item--current .oc-timeline__dot { border-color: var(--standby); background: var(--standby-fill); }
+.oc-timeline__item--future { color: var(--ink-50); }
+/* The detail runs inline under the title, as .tl-r small does. */
+.oc-timeline__item .oc-lines__detail { display: inline; }
+.oc-timeline__when { font: 500 12.5px var(--font-mono); color: var(--ink-70); }
