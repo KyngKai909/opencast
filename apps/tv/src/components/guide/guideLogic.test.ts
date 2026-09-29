@@ -70,8 +70,8 @@ const tv: GuideRowData[] = [
   row(station("PREP", "31.1"), [airing("19:30", "22:00", "Football"), airing("22:00", "22:30", "Friday scoreboard")])
 ];
 const radio: GuideRowData[] = [
-  row(station("CRAT", "101.9", "radio"), [airing("20:00", "21:00", "The Producers' Hour", { live: true, kind: "live" })]),
-  row(station("NITE", "88.3", "radio"), [airing("20:00", "30:00", "Radio dramas")])
+  row(station("CRAT", "102.0", "radio"), [airing("20:00", "21:00", "The Producers' Hour", { live: true, kind: "live" })]),
+  row(station("NITE", "88.4", "radio"), [airing("20:00", "30:00", "Radio dramas")])
 ];
 const model = buildModel(tv, radio, FROM, TO);
 const rowOf = (cs: string) => model.rows.findIndex((r) => r.station.callSign === cs);
@@ -200,9 +200,14 @@ describe("focus", () => {
     const j = jump(right, rowForTyped(model, "18"));
     expect(focusedCell(model, j)!.airing!.title).toBe("Orange Street after hours");
     expect(rowForTyped(model, "7")).toBe(rowOf("CIVC"));
-    expect(rowForTyped(model, "883")).toBe(rowOf("NITE"));
-    expect(rowForTyped(model, "88.3")).toBe(rowOf("NITE"));
+    expect(rowForTyped(model, "884")).toBe(rowOf("NITE"));
+    expect(rowForTyped(model, "88.4")).toBe(rowOf("NITE"));
     expect(rowForTyped(model, "13")).toBe(-1);
+    // A real FM number is never on the radio band (even tenths): no row.
+    expect(rowForTyped(model, "883")).toBe(-1);
+    expect(rowForTyped(model, "1019")).toBe(-1);
+    expect(rowForTyped(model, "1020")).toBe(rowOf("CRAT"));
+    expect(rowForTyped(model, "102.")).toBe(rowOf("CRAT"));
     expect(jump(open, -1)).toBe(open);
     expect(typeKey("10199", 1)).toBe("01991");
   });

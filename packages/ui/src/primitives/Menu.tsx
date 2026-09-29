@@ -18,7 +18,7 @@ export interface MenuItem {
 
 export interface MenuProps {
   items: ReadonlyArray<MenuItem>;
-  /** The button's name. "More" by default, as in the reference; name the row when there are many ("More for NITE 88.3"). */
+  /** The button's name. "More" by default, as in the reference; name the row when there are many ("More for NITE 88.4"). */
   label?: string;
   /** Which edge of the button the list lines up with. End by default (row menus sit at the row's end). */
   align?: "start" | "end";

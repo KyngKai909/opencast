@@ -37,7 +37,7 @@ const h1 = (name: string | RegExp) => async (page: Page) => {
 const ROUTES: Route[] = [
   { path: `${IE}/board`, ready: async (p) => { await h1("Inland Empire")(p); await expect(p.getByRole("heading", { name: "TV band" })).toBeVisible(); } },
   { path: `${IE}/board?ch=33`, ready: async (p) => { await h1("Inland Empire")(p); await expect(p.getByRole("button", { pressed: true }).first()).toBeVisible(); } },
-  { path: `${IE}/board?ch=91.9`, ready: async (p) => { await h1("Inland Empire")(p); await expect(p.getByRole("heading", { name: "Radio band" })).toBeVisible(); } },
+  { path: `${IE}/board?ch=92.0`, ready: async (p) => { await h1("Inland Empire")(p); await expect(p.getByRole("heading", { name: "Radio band" })).toBeVisible(); } },
   { path: `${IE}/pipeline`, ready: async (p) => { await h1("Creator pipeline")(p); await expect(p.getByRole("table", { name: "Creators" })).toBeVisible(); } },
   { path: `${IE}/pipeline?stage=said_yes`, ready: async (p) => { await h1("Creator pipeline")(p); await expect(p.getByRole("group", { name: "Stages" }).getByRole("button", { pressed: true })).toContainText("Said yes"); } },
   { path: `${IE}/pipeline?add=1`, ready: async (p) => { await expect(p.getByRole("dialog", { name: "Add a creator" })).toBeVisible(); } },

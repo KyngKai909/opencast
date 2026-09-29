@@ -14,9 +14,9 @@ export const STATIONS: StationIdent[] = [
   ident(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", "Fontana"),
   ident(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", "Riverside"),
   ident(31, "PREP", "31.1", "Inland Preps", "#1F5E8C", "tv", "Rialto"),
-  ident(883, "NITE", "88.3", "Night Desk", "#33507A", "radio", "Riverside"),
-  ident(907, "HALL", "90.7", "Study Hall", "#56508A", "radio"),
-  ident(1043, "VOZE", "104.3", "La Voz", "#1D6A70", "radio", "San Bernardino")
+  ident(883, "NITE", "88.4", "Night Desk", "#33507A", "radio", "Riverside"),
+  ident(907, "HALL", "90.8", "Study Hall", "#56508A", "radio"),
+  ident(1043, "VOZE", "104.4", "La Voz", "#1D6A70", "radio", "San Bernardino")
 ];
 
 /**

@@ -60,8 +60,8 @@ describe("Slate", () => {
   });
   it("gives stand by its bars and radio its frequency", () => {
     expect(render(<Slate kind="standby" />).container.querySelector(".oc-bars")).not.toBeNull();
-    const radio = render(<Slate kind="radio" frequency="88.3" callSign="NITE" name="Night Desk" />);
-    expect(radio.container.textContent).toContain("88.3NITE, Night Desk");
+    const radio = render(<Slate kind="radio" frequency="88.4" callSign="NITE" name="Night Desk" />);
+    expect(radio.container.textContent).toContain("88.4NITE, Night Desk");
   });
 });
 

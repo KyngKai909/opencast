@@ -10,7 +10,7 @@ export interface PlayerBarProps {
   station: string;
   /** The station's colour for the title card. */
   colour: string;
-  /** The words on the title card. Defaults to the title; radio shows the frequency ("88.3"). */
+  /** The words on the title card. Defaults to the title; radio shows the frequency ("88.4"). */
   card?: string;
   /** Playing on this screen: the tally is lit only then. */
   playing: boolean;

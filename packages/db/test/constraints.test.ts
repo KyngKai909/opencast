@@ -58,13 +58,14 @@ describe("call signs", () => {
 });
 
 describe("channels", () => {
-  test("TV is 2.1 to 69.9; radio is 88.1 to 107.9 in odd tenths", async (tx) => {
+  test("TV is 2.1 to 69.9; radio is 88.2 to 107.8 in even tenths", async (tx) => {
     const m = await market(tx);
     const s = await station(tx);
-    for (const [band, tenths] of [["tv", 21], ["tv", 699], ["radio", 881], ["radio", 1079]] as const) {
+    for (const [band, tenths] of [["tv", 21], ["tv", 699], ["radio", 882], ["radio", 1000], ["radio", 1078]] as const) {
       await tx.accepts(() => channel(tx, s.id, m.id, band, tenths));
     }
-    for (const [band, tenths] of [["tv", 20], ["tv", 120], ["tv", 701], ["radio", 882], ["radio", 1081]] as const) {
+    // Every odd tenth is a real FM number, so none is on the band.
+    for (const [band, tenths] of [["tv", 20], ["tv", 120], ["tv", 701], ["radio", 880], ["radio", 881], ["radio", 991], ["radio", 1079], ["radio", 1080]] as const) {
       await tx.rejects(/channel_number_in_band/, () => channel(tx, s.id, m.id, band, tenths));
     }
   });
@@ -77,7 +78,7 @@ describe("channels", () => {
     await channel(tx, a.id, ie.id, "tv", 121);
     await tx.rejects(/channels_number_in_market/, () => channel(tx, b.id, ie.id, "tv", 121));
     await tx.accepts(() => channel(tx, b.id, la.id, "tv", 121));
-    await tx.accepts(() => channel(tx, b.id, ie.id, "radio", 1071));
+    await tx.accepts(() => channel(tx, b.id, ie.id, "radio", 1072));
   });
 
   test("are fixed after first sign-on", async (tx) => {

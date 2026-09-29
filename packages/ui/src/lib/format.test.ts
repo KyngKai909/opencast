@@ -61,7 +61,7 @@ describe("money", () => {
 describe("channel", () => {
   it("joins major and minor", () => {
     expect(channel(12, 1)).toBe("12.1");
-    expect(channel(88, 3)).toBe("88.3");
+    expect(channel(88, 4)).toBe("88.4");
   });
 });
 

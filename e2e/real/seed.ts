@@ -84,7 +84,7 @@ export async function seed(ctx: SeedContext): Promise<Seed> {
     beat: await station("BEAT", "Inland Beat", 121, "#8C3B7A", { owner: "kai", category: "Music", description: "Beat makers, crate diggers and the Inland Empire's producers." }),
     sazn: await station("SAZN", "Sazón", 181, "#A3402A", { category: "Food", description: "Home cooking from Inland Empire kitchens.", homeCity: "Fontana" }),
     reel: await station("REEL", "Saturday Reel", 241, "#9A5412", { owner: "jess", category: "Classic", description: "Restored public-domain films, cartoons and newsreels.", homeCity: "Riverside" }),
-    nite: await station("NITE", "Night Desk", 883, "#33507A", { band: "radio", category: "Classic", description: "Old-time radio overnight.", homeCity: "Riverside" }),
+    nite: await station("NITE", "Night Desk", 884, "#33507A", { band: "radio", category: "Classic", description: "Old-time radio overnight.", homeCity: "Riverside" }),
     mojv: await station("MOJV", "Mojave Community", 51, "#4F5B2A", { market: marketId("high-desert"), category: "Public affairs", description: "Victorville and the High Desert.", homeCity: "Victorville" })
   };
   // A claimable station airs only its creator's covered works, so CRAT is set up the way the desk
@@ -99,10 +99,10 @@ export async function seed(ctx: SeedContext): Promise<Seed> {
     const asked = await as<{ link: string }>("dee", "POST", `/admin/creators/${creatorId}/permission-requests`, { sentVia: ["email"], note });
     await as(null, "POST", `/permission/${asked.link.split("/permission/")[1]}/answer`, { answer: "yes" }, 200);
   };
-  await permission(crate.id, "We'd love to put you on 101.9.");
+  await permission(crate.id, "We'd love to put you on 102.0.");
   const radioRecipe = await as<{ id: string }>("dee", "POST", "/admin/recipes", { name: "Music, radio band", category: "Music", band: "radio", blocks: [{ start: "00:00", end: "24:00", source: "creator" }], maxAiringsPerWorkPerWeek: 21, breakRule: { mode: "every_n_minutes", everyMinutes: 30 } });
-  const cratSetUp = await as<{ station: { id: string } }>("dee", "POST", `/admin/creators/${crate.id}/station`, { recipeId: radioRecipe.id, marketId: ie, band: "radio", channel: "101.9", callSign: "CRAT", name: "Crate", operatorUserId: users.dee, signOnAt: new Date(now.getTime() - 24 * HOUR).toISOString() });
-  const crat = { id: cratSetUp.station.id, callSign: "CRAT", channel: "101.9", name: "Crate" };
+  const cratSetUp = await as<{ station: { id: string } }>("dee", "POST", `/admin/creators/${crate.id}/station`, { recipeId: radioRecipe.id, marketId: ie, band: "radio", channel: "102.0", callSign: "CRAT", name: "Crate", operatorUserId: users.dee, signOnAt: new Date(now.getTime() - 24 * HOUR).toISOString() });
+  const crat = { id: cratSetUp.station.id, callSign: "CRAT", channel: "102.0", name: "Crate" };
   await db.update(schema.stations).set({ colour: "#7E2F35", category: "Music", description: "Producers and their tapes.", homeCity: "Redlands", status: "on_air", firstSignedOnAt: new Date(now.getTime() - 24 * HOUR) }).where(eq(schema.stations.id, crat.id));
 
   await db.insert(schema.stationMemberships).values({ stationId: stations.beat.id, userId: users.marcus, role: "operator" });

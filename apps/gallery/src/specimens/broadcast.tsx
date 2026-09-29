@@ -73,10 +73,10 @@ const S = {
   SAZN: { channel: "18.1", callSign: "SAZN", name: "Sazón", colour: "#A3402A" },
   REEL: { channel: "24.1", callSign: "REEL", name: "Saturday Reel", colour: "#9A5412" },
   PREP: { channel: "31.1", callSign: "PREP", name: "Inland Preps", colour: "#1F5E8C" },
-  NITE: { channel: "88.3", callSign: "NITE", name: "Night Desk", colour: "#33507A" },
-  HALL: { channel: "90.7", callSign: "HALL", name: "Study Hall", colour: "#56508A" },
-  CRAT: { channel: "101.9", callSign: "CRAT", name: "Crate", colour: "#7E2F35" },
-  VOZE: { channel: "104.3", callSign: "VOZE", name: "La Voz", colour: "#1D6A70" }
+  NITE: { channel: "88.4", callSign: "NITE", name: "Night Desk", colour: "#33507A" },
+  HALL: { channel: "90.8", callSign: "HALL", name: "Study Hall", colour: "#56508A" },
+  CRAT: { channel: "102.0", callSign: "CRAT", name: "Crate", colour: "#7E2F35" },
+  VOZE: { channel: "104.4", callSign: "VOZE", name: "La Voz", colour: "#1D6A70" }
 };
 
 const LEVELS = [0.4, 0.7, 0.55, 0.92, 0.62, 0.34, 0.74, 0.48, 0.8, 0.38, 0.66, 0.52];
@@ -180,12 +180,12 @@ function DialDemo() {
 }
 
 function BandDemo({ scroll }: { scroll?: boolean }) {
-  const [tuned, setTuned] = useState(88.3);
+  const [tuned, setTuned] = useState(88.4);
   const stations = [
-    { frequency: 88.3, callSign: "NITE", colour: S.NITE.colour },
-    { frequency: 90.7, callSign: "HALL", colour: S.HALL.colour },
-    { frequency: 101.9, callSign: "CRAT", colour: S.CRAT.colour },
-    { frequency: 104.3, callSign: "VOZE", colour: S.VOZE.colour }
+    { frequency: 88.4, callSign: "NITE", colour: S.NITE.colour },
+    { frequency: 90.8, callSign: "HALL", colour: S.HALL.colour },
+    { frequency: 102.0, callSign: "CRAT", colour: S.CRAT.colour },
+    { frequency: 104.4, callSign: "VOZE", colour: S.VOZE.colour }
   ];
   return (
     <>
@@ -394,7 +394,7 @@ const TIMELINE: TimelineBlock[] = [
   { id: "b3", kind: "brk", start: at(21, 58), end: at(22) },
   { id: "t5", kind: "pgm", start: at(22), end: at(22, 28, 30), title: "Late Crate, ep. 15", source: "From your library" },
   { id: "b4", kind: "brk", start: at(22, 28, 30), end: at(22, 30, 30) },
-  { id: "t6", kind: "car", start: at(22, 30, 30), end: at(23, 40), title: "Slow Hours", source: "Carried from HALL 90.7" },
+  { id: "t6", kind: "car", start: at(22, 30, 30), end: at(23, 40), title: "Slow Hours", source: "Carried from HALL 90.8" },
   { id: "dead", kind: "dead", start: at(23, 40), end: at(26) }
 ];
 
@@ -403,7 +403,7 @@ const TONIGHT: ScheduleItem[] = [
   { id: "s2", start: at(20, 30), title: "Saturday Reel", subtitle: "Carried from REEL 24.1" },
   { id: "s3", start: at(21), title: "Beat Tape Live", subtitle: <><LiveText />, from the Redlands studio</> },
   { id: "s4", start: at(22), title: "Late Crate, ep. 15", subtitle: "Beat showcase" },
-  { id: "s5", start: at(23), end: at(24), title: "Slow Hours", subtitle: "Carried from HALL 90.7" }
+  { id: "s5", start: at(23), end: at(24), title: "Slow Hours", subtitle: "Carried from HALL 90.8" }
 ];
 
 const WEEK: ScheduleItem[] = [
@@ -412,7 +412,7 @@ const WEEK: ScheduleItem[] = [
   { id: "w3", start: at(20, 30), title: "Saturday Reel", subtitle: "Carried from REEL 24.1" },
   { id: "w4", start: at(21), title: "Beat Tape Live", subtitle: <><LiveText /> from the Redlands studio</> },
   { id: "w5", start: at(22), title: "Late Crate, ep. 15", subtitle: "Beat showcase" },
-  { id: "w6", start: at(23), title: "Slow Hours", subtitle: "Carried from HALL 90.7" },
+  { id: "w6", start: at(23), title: "Slow Hours", subtitle: "Carried from HALL 90.8" },
   { id: "w7", start: at(24), end: at(26), title: "Late Crate, eps. 12 to 15", subtitle: "Overnight repeat" }
 ];
 /** The station page's week with planned off air: nothing to be reminded of, so no bell. */
@@ -562,7 +562,7 @@ export const broadcast = specimens([
               <TitleCard colour={S.REEL.colour} title="Saturday Reel" bottom="From REEL 24.1" size="lg" />
             </W>
             <W w={291}>
-              <TitleCard colour={S.CRAT.colour} title="The Producers’ Hour" bottom="From CRAT 101.9" size="lg" />
+              <TitleCard colour={S.CRAT.colour} title="The Producers’ Hour" bottom="From CRAT 102.0" size="lg" />
             </W>
           </div>
         )
@@ -777,7 +777,7 @@ export const broadcast = specimens([
             <DialRow variant="phone" station={S.CIVC} now={{ title: "Town Hall: backyard homes and ADUs", live: true, until: at(21, 30) }} timeZone={TZ} onTune={() => undefined} onOpenStation={() => undefined} />
             <DialRow variant="phone" station={S.RDLS} now={{ title: "City Council, Sept 16 meeting", listed: true, until: at(21, 15) }} timeZone={TZ} onTune={() => undefined} />
             <DialRow variant="phone" station={S.BEAT} now={{ title: "Saturday Reel", carriedFrom: "REEL", until: at(21) }} timeZone={TZ} onTune={() => undefined} />
-            <DialRow variant="phone" station={{ channel: "96.1", callSign: "DUST", colour: "#7E2F35" }} now={{ title: "Desert country, all night", detail: "Radio band" }} timeZone={TZ} onTune={() => undefined} />
+            <DialRow variant="phone" station={{ channel: "96.2", callSign: "DUST", colour: "#7E2F35" }} now={{ title: "Desert country, all night", detail: "Radio band" }} timeZone={TZ} onTune={() => undefined} />
             <DialRow variant="phone" station={S.SAZN} now={{ title: "Off air", offAir: true, until: at(30) }} timeZone={TZ} onTune={() => undefined} />
           </W>
         )
@@ -1259,10 +1259,10 @@ export const broadcast = specimens([
     notes: "The phone's full player on the radio band: the station colour fills, the frequency is the picture, the meter moves with the sound. This is the player, so its tally lights.",
     states: [
       {
-        label: "NITE 88.3, playing",
+        label: "NITE 88.4, playing",
         render: () => (
           <W w={354}>
-            <RadioPanel {...S.NITE} frequency="88.3" name="Night Desk, Riverside" levels={LEVELS} />
+            <RadioPanel {...S.NITE} frequency="88.4" name="Night Desk, Riverside" levels={LEVELS} />
           </W>
         )
       },
@@ -1270,7 +1270,7 @@ export const broadcast = specimens([
         label: "Paused",
         render: () => (
           <W w={354}>
-            <RadioPanel {...S.CRAT} frequency="101.9" name="Crate, Riverside" tally="unlit" levels={LEVELS.map(() => 0.08)} />
+            <RadioPanel {...S.CRAT} frequency="102.0" name="Crate, Riverside" tally="unlit" levels={LEVELS.map(() => 0.08)} />
           </W>
         )
       }
@@ -1321,7 +1321,7 @@ export const broadcast = specimens([
         label: "Radio band",
         render: () => (
           <W w={564}>
-            <Slate kind="radio" frequency="88.3" callSign="NITE" name="Night Desk" levels={GUIDE_LEVELS}>
+            <Slate kind="radio" frequency="88.4" callSign="NITE" name="Night Desk" levels={GUIDE_LEVELS}>
               Radio dramas from the 1940s, until <span className="oc-mono">6:00 am</span>
             </Slate>
           </W>

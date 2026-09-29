@@ -24,7 +24,7 @@ describe("PlayerBar", () => {
     const { rerender } = render(<PlayerBar {...reel} station="BEAT 12.1" playing onChannelDown={down} />);
     fireEvent.click(screen.getByRole("button", { name: "Channel down" }));
     expect(down).toHaveBeenCalledOnce();
-    rerender(<PlayerBar title="Radio dramas" station="NITE 88.3" colour="#33507A" card="88.3" playing radio />);
+    rerender(<PlayerBar title="Radio dramas" station="NITE 88.4" colour="#33507A" card="88.4" playing radio />);
     expect(screen.getByRole("button", { name: "Up the band" })).toBeTruthy();
   });
 

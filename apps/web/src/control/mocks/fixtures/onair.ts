@@ -12,10 +12,10 @@ import type { DbBreak, DbFill, DbLogEntry } from "./evening";
 /** The TV band's main channels as the frame draws them: 2 to 41, ten to a row. */
 export const TV_CHANNELS = { first: 2, last: 41 };
 
-/** Radio: FM frequencies, 88.1 to 107.9. */
+/** Radio: FM frequencies, 88.2 to 107.8. */
 export function radioFrequencies(): string[] {
   const out: string[] = [];
-  for (let f = 881; f <= 1079; f += 2) out.push((f / 10).toFixed(1));
+  for (let f = 882; f <= 1078; f += 2) out.push((f / 10).toFixed(1));
   return out;
 }
 

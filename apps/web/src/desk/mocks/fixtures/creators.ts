@@ -109,16 +109,16 @@ export function seedCreators(): DbCreator[] {
       contactEmail: "hello@desertskate.example", sourceUrl: "https://vimeo.com/desertskatefilms", proposedOptions: { band: "tv", channels: ["38.1", "45.1"] }, nextAction: "Ask", createdAt: at("2026-09-20T17:00:00Z")
     }),
     c(I.mojave, "Mojave Field Recordings", "Desert soundscapes, CC BY 4.0", "internet_archive", "already_licensed", {
-      stationId: STATION_IDS.FLDR, licenceName: "CC BY 4.0", proposedOptions: { band: "radio", channels: ["91.9"] }, claimInviteSentAt: at("2026-09-24T17:00:00Z"), nextAction: "Claim invite", createdAt: at("2026-09-01T17:00:00Z")
+      stationId: STATION_IDS.FLDR, licenceName: "CC BY 4.0", proposedOptions: { band: "radio", channels: ["92.0"] }, claimInviteSentAt: at("2026-09-24T17:00:00Z"), nextAction: "Claim invite", createdAt: at("2026-09-01T17:00:00Z")
     }),
     c(I.poetry, "Riverside Poetry Collective", "Readings and open mics", "instagram", "asked", {
       contactEmail: null, proposedOptions: { band: "radio", channels: [] }, askedAt: at("2026-09-19T18:00:00Z"), nextAction: "Reminder", nextActionDue: "2026-09-26", createdAt: at("2026-09-10T17:00:00Z")
     }),
     c(I.gospel, "Inland Gospel Choirs", "Sunday services and rehearsals", "facebook", "said_yes", {
-      contactEmail: "choirs@inlandgospel.example", proposedOptions: { band: "radio", channels: ["95.5"] }, askedAt: at("2026-09-18T18:00:00Z"), answeredAt: at("2026-09-25T16:20:00Z"), nextAction: "Set up", createdAt: at("2026-09-08T17:00:00Z")
+      contactEmail: "choirs@inlandgospel.example", proposedOptions: { band: "radio", channels: ["95.6"] }, askedAt: at("2026-09-18T18:00:00Z"), answeredAt: at("2026-09-25T16:20:00Z"), nextAction: "Set up", createdAt: at("2026-09-08T17:00:00Z")
     }),
     c(I.marcus, "Marcus Reyes", "Mixes and producer interviews", "soundcloud", "on_air", {
-      personName: "Marcus Reyes", pronoun: "he", contactEmail: "marcus@reyes.example", stationId: STATION_IDS.CRAT, proposedOptions: { band: "radio", channels: ["101.9"] },
+      personName: "Marcus Reyes", pronoun: "he", contactEmail: "marcus@reyes.example", stationId: STATION_IDS.CRAT, proposedOptions: { band: "radio", channels: ["102.0"] },
       askedAt: at("2026-07-28T18:00:00Z"), answeredAt: at("2026-08-03T18:00:00Z"), claimLinkSentAt: at("2026-09-20T17:00:00Z"), nextAction: "Claim link", createdAt: at("2026-07-20T17:00:00Z"),
       setup: { recipeId: RECIPE_IDS.music, operatorId: DEE.id, importTotal: 20, importDone: 20, setupAt: at("2026-08-05T18:00:00Z") }
     }),
@@ -131,16 +131,16 @@ export function seedCreators(): DbCreator[] {
     c(I.lowriders, "Colton Lowriders", "Car club films and meets", "youtube", "found", { proposedOptions: { band: "tv", channels: ["55.1"] }, nextAction: "Ask", createdAt: at("2026-09-16T17:00:00Z") }),
     c(I.wrestling, "Fontana Wrestling Hour", "Local wrestling cards", "facebook", "found", { proposedOptions: { band: "tv", channels: ["63.1"] }, nextAction: "Ask", createdAt: at("2026-09-14T17:00:00Z") }),
     c(I.birding, "Chino Hills Birding", "Bird walks and field notes", "vimeo", "found", { contactEmail: "walks@chinobirds.example", proposedOptions: { band: "tv", channels: ["57.1"] }, nextAction: "Ask", createdAt: at("2026-09-12T17:00:00Z") }),
-    c(I.stories, "San Jacinto Storytellers", "Stories from elders, San Jacinto", "soundcloud", "found", { proposedOptions: { band: "radio", channels: ["98.5"] }, nextAction: "Ask", createdAt: at("2026-09-11T17:00:00Z") }),
+    c(I.stories, "San Jacinto Storytellers", "Stories from elders, San Jacinto", "soundcloud", "found", { proposedOptions: { band: "radio", channels: ["98.6"] }, nextAction: "Ask", createdAt: at("2026-09-11T17:00:00Z") }),
     // Already licensed, not set up yet
-    c(I.oral, "Inland Empire Oral Histories", "Interviews from the 1970s, CC BY 4.0", "internet_archive", "already_licensed", { licenceName: "CC BY 4.0", proposedOptions: { band: "radio", channels: ["97.7"] }, nextAction: "Set up", createdAt: at("2026-09-09T17:00:00Z") }),
+    c(I.oral, "Inland Empire Oral Histories", "Interviews from the 1970s, CC BY 4.0", "internet_archive", "already_licensed", { licenceName: "CC BY 4.0", proposedOptions: { band: "radio", channels: ["97.8"] }, nextAction: "Set up", createdAt: at("2026-09-09T17:00:00Z") }),
     // Asked
     c(I.robotics, "Rialto Robotics Club", "Build nights and competitions", "youtube", "asked", { contactEmail: "team@rialtorobotics.example", proposedOptions: { band: "tv", channels: ["49.1"] }, askedAt: at("2026-09-24T18:00:00Z"), nextAction: "Reminder", nextActionDue: "2026-10-01", createdAt: at("2026-09-06T17:00:00Z") }),
     c(I.spotters, "Ontario Airport Spotters", "Plane spotting from the fence", "youtube", "asked", { proposedOptions: { band: "tv", channels: ["58.1"] }, askedAt: at("2026-09-21T18:00:00Z"), nextAction: "Reminder", nextActionDue: "2026-09-28", createdAt: at("2026-09-05T17:00:00Z") }),
     // Said yes
     c(I.mariachi, "Moreno Valley Mariachi", "Mariachi school recitals", "youtube", "said_yes", { contactEmail: "maestro@mvmariachi.example", proposedOptions: { band: "tv", channels: ["27.1"] }, askedAt: at("2026-09-17T18:00:00Z"), answeredAt: at("2026-09-24T19:00:00Z"), nextAction: "Set up", createdAt: at("2026-09-04T17:00:00Z") }),
     c(I.garden, "Corona Garden Club", "Gardening in the heat", "instagram", "said_yes", { proposedOptions: { band: "tv", channels: ["46.1"] }, askedAt: at("2026-09-16T18:00:00Z"), answeredAt: at("2026-09-23T18:00:00Z"), nextAction: "Set up", createdAt: at("2026-09-03T17:00:00Z") }),
-    c(I.fiddlers, "Yucaipa Fiddlers", "Old-time fiddle sessions", "bandcamp", "said_yes", { proposedOptions: { band: "radio", channels: ["99.3"] }, askedAt: at("2026-09-14T18:00:00Z"), answeredAt: at("2026-09-21T18:00:00Z"), nextAction: "Set up", createdAt: at("2026-08-30T17:00:00Z") }),
+    c(I.fiddlers, "Yucaipa Fiddlers", "Old-time fiddle sessions", "bandcamp", "said_yes", { proposedOptions: { band: "radio", channels: ["99.4"] }, askedAt: at("2026-09-14T18:00:00Z"), answeredAt: at("2026-09-21T18:00:00Z"), nextAction: "Set up", createdAt: at("2026-08-30T17:00:00Z") }),
     // Claimed
     c(I.prep, "Prep Sports Weekly", "High school games, Riverside", "youtube", "claimed", { stationId: STATION_IDS.PREP, answeredAt: at("2026-05-10T18:00:00Z"), claimedAt: at("2026-07-14T18:00:00Z"), createdAt: at("2026-05-01T17:00:00Z") }),
     c(I.nite, "Night Shift Radio", "Late-night call-in", "soundcloud", "claimed", { stationId: STATION_IDS.NITE, answeredAt: at("2026-04-20T18:00:00Z"), claimedAt: at("2026-06-30T18:00:00Z"), createdAt: at("2026-04-10T17:00:00Z") }),
@@ -220,13 +220,13 @@ export function seedRequests(): DbRequest[] {
   return [
     { id: U(601), token: "req-tia-lupes-kitchen-0922", creatorId: I.lupe, sentVia: ["YouTube message", "lupe@tialupe.example"], note: null, proposed: { band: "tv", channel: "33.1" }, recipeId: RECIPE_IDS.cooking, sentAt: at("2026-09-15T18:00:00Z"), answer: yes(at("2026-09-22T17:40:00Z")) },
     { id: U(602), token: "req-riverside-poetry-0919", creatorId: I.poetry, sentVia: ["Instagram message"], note: null, proposed: null, recipeId: RECIPE_IDS.music, sentAt: at("2026-09-19T18:00:00Z"), answer: null },
-    { id: U(603), token: "req-inland-gospel-choirs-0918", creatorId: I.gospel, sentVia: ["Facebook message", "choirs@inlandgospel.example"], note: null, proposed: { band: "radio", channel: "95.5" }, recipeId: RECIPE_IDS.community, sentAt: at("2026-09-18T18:00:00Z"), answer: yes(at("2026-09-25T16:20:00Z")) },
-    { id: U(604), token: "req-marcus-reyes-0728", creatorId: I.marcus, sentVia: ["SoundCloud message", "marcus@reyes.example"], note: null, proposed: { band: "radio", channel: "101.9" }, recipeId: RECIPE_IDS.music, sentAt: at("2026-07-28T18:00:00Z"), answer: yes(at("2026-08-03T18:00:00Z")) },
+    { id: U(603), token: "req-inland-gospel-choirs-0918", creatorId: I.gospel, sentVia: ["Facebook message", "choirs@inlandgospel.example"], note: null, proposed: { band: "radio", channel: "95.6" }, recipeId: RECIPE_IDS.community, sentAt: at("2026-09-18T18:00:00Z"), answer: yes(at("2026-09-25T16:20:00Z")) },
+    { id: U(604), token: "req-marcus-reyes-0728", creatorId: I.marcus, sentVia: ["SoundCloud message", "marcus@reyes.example"], note: null, proposed: { band: "radio", channel: "102.0" }, recipeId: RECIPE_IDS.music, sentAt: at("2026-07-28T18:00:00Z"), answer: yes(at("2026-08-03T18:00:00Z")) },
     { id: U(605), token: "req-inland-jazz-society-0826", creatorId: I.jazz, sentVia: ["Bandcamp message"], note: null, proposed: null, recipeId: null, sentAt: at("2026-08-26T18:00:00Z"), answer: { answer: "no", answeredAt: at("2026-09-02T18:00:00Z"), workIds: [] } },
     { id: U(606), token: "req-rialto-robotics-0924", creatorId: I.robotics, sentVia: ["YouTube message", "team@rialtorobotics.example"], note: null, proposed: { band: "tv", channel: "49.1" }, recipeId: RECIPE_IDS.films, sentAt: at("2026-09-24T18:00:00Z"), answer: null },
     { id: U(607), token: "req-ontario-spotters-0921", creatorId: I.spotters, sentVia: ["YouTube message"], note: null, proposed: { band: "tv", channel: "58.1" }, recipeId: RECIPE_IDS.films, sentAt: at("2026-09-21T18:00:00Z"), answer: null },
     { id: U(608), token: "req-moreno-mariachi-0917", creatorId: I.mariachi, sentVia: ["YouTube message", "maestro@mvmariachi.example"], note: null, proposed: { band: "tv", channel: "27.1" }, recipeId: RECIPE_IDS.films, sentAt: at("2026-09-17T18:00:00Z"), answer: yes(at("2026-09-24T19:00:00Z")) },
     { id: U(609), token: "req-corona-garden-0916", creatorId: I.garden, sentVia: ["Instagram message"], note: null, proposed: { band: "tv", channel: "46.1" }, recipeId: RECIPE_IDS.films, sentAt: at("2026-09-16T18:00:00Z"), answer: yes(at("2026-09-23T18:00:00Z")) },
-    { id: U(610), token: "req-yucaipa-fiddlers-0914", creatorId: I.fiddlers, sentVia: ["Bandcamp message"], note: null, proposed: { band: "radio", channel: "99.3" }, recipeId: RECIPE_IDS.music, sentAt: at("2026-09-14T18:00:00Z"), answer: yes(at("2026-09-21T18:00:00Z")) }
+    { id: U(610), token: "req-yucaipa-fiddlers-0914", creatorId: I.fiddlers, sentVia: ["Bandcamp message"], note: null, proposed: { band: "radio", channel: "99.4" }, recipeId: RECIPE_IDS.music, sentAt: at("2026-09-14T18:00:00Z"), answer: yes(at("2026-09-21T18:00:00Z")) }
   ];
 }

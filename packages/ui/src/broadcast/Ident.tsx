@@ -10,7 +10,7 @@ export type IdentVariant =
   | "switch";   /* the station switcher's contents: colour, channel, call sign */
 
 export interface IdentProps {
-  /** Where it sits on the dial: "12.1", or a frequency on the radio band, "88.3". */
+  /** Where it sits on the dial: "12.1", or a frequency on the radio band, "88.4". */
   channel: string;
   /** Who it is: "BEAT". */
   callSign: string;

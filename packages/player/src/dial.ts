@@ -8,7 +8,7 @@ export function channelNumber(c: Channel): string | null {
   return c.station.channel;
 }
 
-/** Sorts by channel number (7.1 < 9.1 < 12.1 < 88.3), stations without a channel last. */
+/** Sorts by channel number (7.1 < 9.1 < 12.1 < 88.4), stations without a channel last. */
 export function inChannelOrder(channels: Channel[]): Channel[] {
   const key = (c: Channel) => {
     const [maj, min] = (c.station.channel ?? "9999.9").split(".").map(Number);

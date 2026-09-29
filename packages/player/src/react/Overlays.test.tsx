@@ -9,7 +9,7 @@ import { PlayerProvider } from "./context";
 import { PlayerSurface } from "./PlayerSurface";
 
 const BEAT = station("BEAT", "12.1");
-const NITE = station("NITE", "88.3", { band: "radio" });
+const NITE = station("NITE", "88.4", { band: "radio" });
 const bug: NonNullable<OnScreen["bug"]> = { id: "bug-1", mode: "call_sign_and_channel", callSign: "BEAT", channel: "12.1", logoUrl: null, position: "bottom_right", opacity: 78 };
 const l3: NonNullable<OnScreen["lowerThird"]> = { id: "l3-1", name: "Dana Whitfield", title: "Chair, Planning Commission" };
 const code: NonNullable<OnScreen["code"]> = { id: "code-1", spotId: "s1", code: "ORANGE10", offer: "10% off", qrUrl: "https://useopencast.org/c/ORANGE10", until: 0 };

@@ -39,10 +39,10 @@ export function channelsFor(marketSlug: string, band: "tv" | "radio") {
       return { channel, state: used.has(channel) ? ("taken" as const) : n === 13 ? ("held" as const) : open.has(n) ? ("open" as const) : ("taken" as const) };
     });
   }
-  // FM: 88.1 to 107.9 in 0.2 steps. Most are licensed stations; every third free one is open, up to 30.
+  // FM: 88.2 to 107.8 in 0.2 steps. Most are licensed stations; every third free one is open, up to 30.
   let opened = 0;
-  return Array.from({ length: 100 }, (_, i) => {
-    const tenths = 881 + i * 2;
+  return Array.from({ length: 99 }, (_, i) => {
+    const tenths = 882 + i * 2;
     const channel = `${Math.floor(tenths / 10)}.${tenths % 10}`;
     const open = !used.has(channel) && i % 3 === 0 && opened < 30;
     if (open) opened++;

@@ -44,7 +44,7 @@ function row(o: { id: string; callSign: string; channel: string; name: string; c
 const REEL = row({ id: "00000000-0000-4000-8000-000000000024", callSign: "REEL", channel: "24.1", name: "Saturday Reel", colour: "#9A5412", title: "Cartoons from 1928 to 1934", next: "Newsreel hour" });
 const CIVC = row({ id: "00000000-0000-4000-8000-000000000007", callSign: "CIVC", channel: "7.1", name: "Inland Civic", colour: "#2E6B5A", title: "Town Hall: backyard homes and ADUs", live: true, next: "Planning Commission, Sept 24" });
 const BEAT = row({ id: "00000000-0000-4000-8000-000000000012", callSign: "BEAT", channel: "12.1", name: "Inland Beat", colour: "#8C3B7A", title: "Saturday Reel", carriedFrom: REEL.station, next: "Beat Tape Live", nextLive: true });
-const NITE = row({ id: "00000000-0000-4000-8000-000000000883", callSign: "NITE", channel: "88.3", name: "Night Desk", colour: "#33507A", band: "radio", title: "Radio dramas from the 1940s", next: "The Hollow Door, part 3" });
+const NITE = row({ id: "00000000-0000-4000-8000-000000000883", callSign: "NITE", channel: "88.4", name: "Night Desk", colour: "#33507A", band: "radio", title: "Radio dramas from the 1940s", next: "The Hollow Door, part 3" });
 
 const TV_DIAL = [CIVC, BEAT, REEL];
 const ALL_DIAL = [CIVC, BEAT, REEL, NITE];
@@ -184,7 +184,7 @@ export const player = specimens([
     group: "Player",
     from: [{ file: TV, anchor: "watching", frames: ["02.1", "02.2"] }, { file: TV, anchor: "states", frames: ["05.1"] }],
     notes:
-      "The same player at ten feet, driven by the remote's keys (click it, then ▲ ▼, digits and OK; Back is the last channel). The banner is the TV reference's, to the pixel at 1920 by 1080. The radio band is its own dial: 88.3 has no picture, so its frequency and colour fill the screen.",
+      "The same player at ten feet, driven by the remote's keys (click it, then ▲ ▼, digits and OK; Back is the last channel). The banner is the TV reference's, to the pixel at 1920 by 1080. The radio band is its own dial: 88.4 has no picture, so its frequency and colour fill the screen.",
     grounds: ["tv"],
     frame: { width: 1920, height: 1080 },
     states: [
@@ -216,7 +216,7 @@ export const player = specimens([
     states: [
       { label: "1, 2: BEAT 12.1", render: () => <StaticPicture colour="#2E6B5A"><NumberPanel entry={readEntry("12", ALL_DIAL)} size="web" /></StaticPicture> },
       { label: "1, 3: no station", render: () => <StaticPicture colour="#2E6B5A"><NumberPanel entry={readEntry("13", ALL_DIAL)} size="web" /></StaticPicture> },
-      { label: "8, 8, 3: radio", render: () => <StaticPicture colour="#33507A"><NumberPanel entry={readEntry("883", ALL_DIAL)} size="web" /></StaticPicture> }
+      { label: "8, 8, 4: radio", render: () => <StaticPicture colour="#33507A"><NumberPanel entry={readEntry("884", ALL_DIAL)} size="web" /></StaticPicture> }
     ]
   }
 ]);

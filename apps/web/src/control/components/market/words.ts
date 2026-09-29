@@ -67,7 +67,7 @@ export function formatLine(p: { episodeCount: number; live: boolean; format?: Pr
   return parts.join(", ");
 }
 
-/** "HALL 90.7", "Inland Sound Lab", "Opencast catalog". */
+/** "HALL 90.8", "Inland Sound Lab", "Opencast catalog". */
 export function makerName(maker: StationIdent): string {
   if (maker.kind === "catalog") return "Opencast catalog";
   if (maker.callSign) return maker.channel ? `${maker.callSign} ${maker.channel}` : maker.callSign;
@@ -236,7 +236,7 @@ export function slotText(slots: readonly Slot[], style: "at" | "comma" = "at"): 
     .join("; ");
 }
 
-/** A station's name in a list: "BEAT 12.1", "HALL, Study Hall" (`named`), "DUST 96.1, High Desert". */
+/** A station's name in a list: "BEAT 12.1", "HALL, Study Hall" (`named`), "DUST 96.2, High Desert". */
 export function stationWords(s: StationIdent, style: "channel" | "named" = "channel"): string {
   if (style === "named") return `${s.callSign ?? s.name}, ${s.name}`;
   return s.callSign ? `${s.callSign}${s.channel ? ` ${s.channel}` : ""}` : s.name;
@@ -262,7 +262,7 @@ export interface CarrierRow {
 
 /**
  * "Also carried by" (market 02.1): the viewing station first ("You"), then stations in its market
- * by name, then other markets: a lone station by name with its market ("DUST 96.1, High Desert"),
+ * by name, then other markets: a lone station by name with its market ("DUST 96.2, High Desert"),
  * several as a count ("3 stations in Los Angeles"). Viewers only ever see the count.
  */
 export function carrierRows(carriedBy: readonly { station: StationIdent; since: string; slots?: Slot[] }[], viewer: Pick<StationIdent, "id" | "marketSlug">, since: (iso: string) => string): CarrierRow[] {

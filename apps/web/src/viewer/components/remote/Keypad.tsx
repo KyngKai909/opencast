@@ -91,7 +91,7 @@ export function Keypad({ channels, onTune, onDone }: { channels: DialRowX[]; onT
           Tune
         </button>
       </div>
-      <p className="vw-kp__foot">Radio frequencies work too: 8, 8, 3 tunes 88.3.</p>
+      <p className="vw-kp__foot">Radio frequencies work too: 8, 8, 4 tunes 88.4.</p>
     </div>
   );
 }

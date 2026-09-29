@@ -18,7 +18,7 @@ export const MarketBoard = z.object({
   band: Band,
   slots: z.array(
     z.object({
-      /** The main channel, e.g. "12"; subchannels live inside a slot. */
+      /** The main channel, e.g. "12"; subchannels live inside a slot. Radio: the frequency in tenths, 882 to 1078 in even tenths. */
       major: z.number().int(),
       state: SlotState,
       stations: z.array(StationIdent),

@@ -58,11 +58,11 @@ describe("the board", () => {
     const tv = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "tv" } })).json);
     const radio = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "radio" } })).json);
     expect(tv.slots).toHaveLength(68);
-    expect(radio.slots).toHaveLength(100);
+    expect(radio.slots).toHaveLength(99);
     const slot = (b: typeof tv, major: number) => b.slots.find((s) => s.major === major)!;
     expect(slot(tv, 9).stations.map((s) => s.callSign)).toEqual(["RDLS", "COLT", "SBCO"]);
     expect(slot(tv, 33)).toMatchObject({ state: "claimable", signOnAt: "2026-09-28T13:00:00.000Z", creatorId: LUPE });
-    expect([slot(tv, 41).heldFor, slot(tv, 44).heldFor, slot(tv, 52).heldFor, slot(radio, 955).heldFor]).toEqual(["TACO", "SKAT", "HOOP", "GOSP"]);
+    expect([slot(tv, 41).heldFor, slot(tv, 44).heldFor, slot(tv, 52).heldFor, slot(radio, 956).heldFor]).toEqual(["TACO", "SKAT", "HOOP", "GOSP"]);
     expect(slot(tv, 60).state).toBe("catalog");
     expect(tv.stats.market).toMatchObject({ localShareOfTonightPercent: 71, claimableOnAir: 2 });
     expect(tv.stats.saidYesNotSetUp).toBe(4);
@@ -138,10 +138,10 @@ describe("a creator, found to claimed", () => {
     const recipe = (await api("GET", "/admin/recipes")).json[0].id;
     const base = { recipeId: recipe, marketId: IE, band: "radio", name: "Inland Gospel Choirs", operatorUserId: DEE };
     expect((await api("POST", `/admin/creators/${SKATE}/station`, { body: { ...base, band: "tv", channel: "38.1", callSign: "DSF" } })).json.error.code).toBe("no_permission");
-    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.5", callSign: "INGC" } })).json.error).toMatchObject({ code: "channel_held", message: "The waitlist holds 95.5 for GOSP. Pick another." });
-    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.7", callSign: "LUPE" } })).json.error.code).toBe("call_sign_taken");
-    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.6", callSign: "INGC" } })).json.error.code).toBe("bad_channel");
-    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.7", callSign: "INGC" } })).status).toBe(201);
+    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.6", callSign: "INGC" } })).json.error).toMatchObject({ code: "channel_held", message: "The waitlist holds 95.6 for GOSP. Pick another." });
+    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.8", callSign: "LUPE" } })).json.error.code).toBe("call_sign_taken");
+    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.5", callSign: "INGC" } })).json.error.code).toBe("bad_channel"); // a real FM number
+    expect((await api("POST", `/admin/creators/${GOSPEL}/station`, { body: { ...base, channel: "95.8", callSign: "INGC" } })).status).toBe(201);
   });
 
   it("sends one reminder, then only No answer is left", async () => {

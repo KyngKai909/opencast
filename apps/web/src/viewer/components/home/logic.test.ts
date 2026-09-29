@@ -37,11 +37,11 @@ describe("the hero", () => {
     expect(pickHero(rows, "ie")?.row.station.channel).toBe("40.1");
   });
   it("then whatever preset 1 is airing", () => {
-    const p1 = row("88.3", { band: "radio" });
+    const p1 = row("88.4", { band: "radio" });
     expect(pickHero([row("7.1")], "ie", p1)).toMatchObject({ why: "preset", row: p1 });
   });
   it("skips live radio (there's no picture to preview) and off-air rows", () => {
-    expect(pickHero([row("101.9", { band: "radio", live: true }), row("7.1", { onAir: false })], "ie")).toBeNull();
+    expect(pickHero([row("102.0", { band: "radio", live: true }), row("7.1", { onAir: false })], "ie")).toBeNull();
   });
   it("is empty when nothing is live and preset 1 is off air or unset", () => {
     expect(pickHero([row("7.1")], "ie", row("9.1", { onAir: false }))).toBeNull();
@@ -71,12 +71,12 @@ describe("thin markets", () => {
     expect(isThin({ rows: [row("5.1"), row("6.1"), row("7.1")], nearby: [{ market, miles: 40, rows: [] }] }, { rows: [], nearby: [] })).toBe(true);
   });
   it("is thin with fewer than three stations on both bands together", () => {
-    expect(isThin({ rows: [row("5.1")], nearby: [] }, { rows: [row("96.1", { band: "radio" })], nearby: [] })).toBe(true);
-    expect(isThin({ rows: [row("5.1"), row("6.1")], nearby: [] }, { rows: [row("96.1", { band: "radio" })], nearby: [] })).toBe(false);
+    expect(isThin({ rows: [row("5.1")], nearby: [] }, { rows: [row("96.2", { band: "radio" })], nearby: [] })).toBe(true);
+    expect(isThin({ rows: [row("5.1"), row("6.1")], nearby: [] }, { rows: [row("96.2", { band: "radio" })], nearby: [] })).toBe(false);
     expect(isThin(undefined, undefined)).toBe(false);
   });
   it("lists the TV band, then the radio band, each in channel order", () => {
-    expect(thinRows([row("9.1"), row("5.1")], [row("96.1", { band: "radio" })]).map((r) => r.station.channel)).toEqual(["5.1", "9.1", "96.1"]);
+    expect(thinRows([row("9.1"), row("5.1")], [row("96.2", { band: "radio" })]).map((r) => r.station.channel)).toEqual(["5.1", "9.1", "96.2"]);
   });
   it("says so plainly", () => {
     expect(soFarText(2)).toBe("2 stations so far");
@@ -120,7 +120,7 @@ describe("wording", () => {
   });
   it("says where a widely carried program is on", () => {
     const beat = { id: "beat", callSign: "BEAT", channel: "12.1" };
-    const nite = { id: "nite", callSign: "NITE", channel: "88.3" };
+    const nite = { id: "nite", callSign: "NITE", channel: "88.4" };
     expect(carriedWhere({ station: beat, airing: airing(), onNow: true }, "reel", TZ)).toEqual({ live: false, text: "On BEAT 12.1 now" });
     expect(carriedWhere({ station: nite, airing: airing({ endsAt: "2026-09-27T13:00:00Z" }), onNow: true }, "nite", TZ)).toEqual({ live: false, text: "On NITE until 6:00 am" });
     expect(carriedWhere({ station: nite, airing: airing({ live: true }), onNow: true }, "nite", TZ)).toEqual({ live: true, text: "Live on NITE now" });

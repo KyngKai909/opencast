@@ -116,7 +116,7 @@ test("the creator's claim page, signed out", async ({ page }) => {
   const page_ = await api<{ station: { callSign: string }; personName: string; saidYesAt: string | null }>(`/claim/${token}`);
   expect(page_).toMatchObject({ station: { callSign: "CRAT" }, personName: "Andre Vega" });
   await page.goto(`/control/claim/${token}`);
-  await expect(page.getByRole("heading", { level: 1, name: "CRAT 101.9 is ready for you." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "CRAT 102.0 is ready for you." })).toBeVisible();
   await expect(page.getByText(/Opencast's team has run/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible();
   await expect(page.getByText(/Something went wrong/)).toHaveCount(0);

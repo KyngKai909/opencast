@@ -46,7 +46,7 @@ describe("off air: the station to offer instead", () => {
   });
 
   it("offers the other band only when this band has nothing on, and nothing when nothing is on", () => {
-    const radio = row("NITE", "88.3", { band: "radio" });
+    const radio = row("NITE", "88.4", { band: "radio" });
     expect(suggestion([off(dial[0]!), off(dial[2]!), radio], "CIVC")?.station.callSign).toBe("NITE");
     expect(suggestion([off(dial[0]!), off(dial[2]!)], "CIVC")).toBeNull();
     expect(suggestion([dial[0]!], "nope")).toBeNull();
@@ -269,7 +269,7 @@ describe("the menu rail", () => {
 
 describe("crossing bands", () => {
   afterEach(() => localStorage.clear());
-  const rows = [row("CIVC", "7.1"), off(row("NITE", "88.3", { band: "radio" })), row("HALL", "90.7", { band: "radio" }), row("CRAT", "101.9", { band: "radio" })];
+  const rows = [row("CIVC", "7.1"), off(row("NITE", "88.4", { band: "radio" })), row("HALL", "90.8", { band: "radio" }), row("CRAT", "102.0", { band: "radio" })];
 
   it("goes to the station last heard on the band, else the first on the air", () => {
     expect(bandTarget(rows, "radio", null)?.station.callSign).toBe("HALL");

@@ -15,7 +15,7 @@ export type DialRowVariant =
   | "band";    /* the radio band page's list (.rbr) */
 
 export interface DialStation {
-  /** "12.1", or a frequency on the radio band, "88.3". */
+  /** "12.1", or a frequency on the radio band, "88.4". */
   channel: string;
   callSign: string;
   /** "Inland Beat". */

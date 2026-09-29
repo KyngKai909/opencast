@@ -24,7 +24,7 @@ const STATIONS: Array<[string, string, string]> = [
   ["CIVC", "7.1", "#2E6B5A"],
   ["BEAT", "12.1", "#8C3B7A"],
   ["REEL", "24.1", "#9A5412"],
-  ["NITE", "88.3", "#33507A"]
+  ["NITE", "88.4", "#33507A"]
 ];
 
 const TYPE: Array<[string, string, string]> = [

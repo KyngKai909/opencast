@@ -212,7 +212,7 @@ describe("claim invites, stopping from the link, held earnings (N3, N9, B8, A125
     expect(before.body.error.code).toBe("no_station");
 
     const setUp = await dee
-      .post(`/v1/admin/creators/${crate.id}/station`, { recipeId, marketId, band: "radio", channel: "101.9", callSign: "CRAT", name: "Crate", operatorUserId: dee.id })
+      .post(`/v1/admin/creators/${crate.id}/station`, { recipeId, marketId, band: "radio", channel: "102.0", callSign: "CRAT", name: "Crate", operatorUserId: dee.id })
       .expect(201);
     stationId = setUp.body.station.id;
     await h.db.update(schema.stations).set({ status: "on_air", firstSignedOnAt: h.clock.now() }).where(eq(schema.stations.id, stationId));

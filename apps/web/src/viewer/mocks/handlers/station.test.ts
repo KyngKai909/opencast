@@ -24,7 +24,7 @@ describe("the station page mock", () => {
     expect(page.upNext[0]?.title).toBe("Beat Tape Live");
     expect(page.members).toBe(214);
     expect(page.onDialSince).toBe("2026-09-05");
-    expect(page.carries.map((c) => `${c.from.channel} ${c.program.title}, ${c.slot}`)).toEqual(["24.1 Saturday Reel, Saturdays 8:30 pm", "90.7 Slow Hours, nightly 11:00 pm"]);
+    expect(page.carries.map((c) => `${c.from.channel} ${c.program.title}, ${c.slot}`)).toEqual(["24.1 Saturday Reel, Saturdays 8:30 pm", "90.8 Slow Hours, nightly 11:00 pm"]);
     expect(page.madeHere).toEqual([{ program: expect.objectContaining({ title: "Late Crate" }), carriers: 2 }]);
     expect(page.madePossibleBy.map((c) => c.text)).toEqual(["Members of Inland Beat", "Redlands Hardware", "Orange Street Coffee"]);
   });
@@ -90,7 +90,7 @@ describe("the search mock", () => {
     expect(r.tuneTo?.callSign).toBe("REEL");
     expect(r.stations.map((s) => s.callSign)).toEqual(["REEL"]);
     expect(r.airings.map((a) => a.airing.title)).toEqual(["24 hours at the fair"]);
-    expect(m.search.searchResults("883", IE).tuneTo?.callSign).toBe("NITE");
+    expect(m.search.searchResults("884", IE).tuneTo?.callSign).toBe("NITE");
     expect(m.search.searchResults("13", IE).tuneTo).toBeNull();
   });
 
