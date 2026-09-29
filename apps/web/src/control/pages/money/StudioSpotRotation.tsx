@@ -3,9 +3,9 @@
 // barter, and the break time it keeps in them is filled from this rotation. Built from the same
 // rotation editor as a station's, with the market to add from underneath.
 
+import { type MarketSpot } from "@opencast/contracts";
 import { Navigate } from "react-router";
 import { Button, ControlTitle, Lines, Table, Tag, useToast, type Column } from "@opencast/ui";
-import type { MarketSpotExt } from "../../api/ext/spots";
 import { errorText, useMarket, useRotations, useSetRotation } from "../../components/spots/data";
 import { milesText, rateParts, runwayParts, spotLength } from "../../components/spots/format";
 import { ErrorLine, SpotThumb } from "../../components/spots/parts";
@@ -33,7 +33,7 @@ function StudioRotation() {
   if (rotations.error || market.error) return <ErrorLine>{errorText(rotations.error ?? market.error)}</ErrorLine>;
   const main = rotations.data!.main.spots.map((x) => x.spotId);
   const canEdit = s.can("spots");
-  const columns: Column<MarketSpotExt>[] = [
+  const columns: Column<MarketSpot>[] = [
     { key: "thumb", width: "96px", cell: (m) => <SpotThumb spot={m} short /> },
     { key: "spot", header: "Spot", cell: (m) => <Lines title={m.business.name} detail={[m.spot.category, milesText(m.miles), spotLength(m.spot.lengthSec)].filter(Boolean).join(", ")} /> },
     {

@@ -1,8 +1,8 @@
+import { type Offer } from "@opencast/contracts";
 import { describe, expect, it } from "vitest";
-import type { OfferX } from "../../api/ext/market";
 import { browse, facetCounts, fitRank, readFilters, resultWords, writeFilters } from "./browse";
 
-function offer(title: string, o: Partial<OfferX> & { kind?: "series" | "one_off"; bands?: ("tv" | "radio")[]; live?: boolean; category?: string } = {}): OfferX {
+function offer(title: string, o: Partial<Offer> & { kind?: "series" | "one_off"; bands?: ("tv" | "radio")[]; live?: boolean; category?: string } = {}): Offer {
   const { kind = "series", bands = ["tv"], live = false, category = "Music", ...rest } = o;
   return {
     id: title,

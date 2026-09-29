@@ -1,9 +1,9 @@
 // How the Spots pages write things: rates, distances, runways, break summaries, sponsorship lines
 // and dates. Pure, so the rules are tested (format.test.ts).
 
+import { type BreakContent } from "@opencast/contracts";
 import { duration, money } from "@opencast/ui";
 import type { BreakPart } from "@opencast/ui";
-import type { BreakContent } from "../../api/ext/spots";
 
 // ---- Money and the market ----
 

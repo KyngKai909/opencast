@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LogEntry } from "@opencast/contracts";
-import type { BreakSlotG1 } from "../../api/ext/onair";
+import type { BreakSlot } from "@opencast/contracts";
 import { breakLine, buildRundown, currentIndex, entrySource, nextBreak, rundownFrom } from "./rundown";
 
 const T = (hhmmss: string) => `2026-09-27T${hhmmss}.000Z`;
@@ -13,7 +13,7 @@ function entry(o: Partial<LogEntry> & Pick<LogEntry, "id" | "startsAt" | "endsAt
 // Saturday Reel 8:30 to 8:59 (UTC 03:30 to 03:59) with REEL's break at 8:44.
 const reel = entry({ id: "e1", title: "Saturday Reel", startsAt: T("03:30:00"), endsAt: T("03:59:00"), carriedFrom: REEL });
 const live = entry({ id: "e2", title: "Beat Tape Live", kind: "live", startsAt: T("04:01:00"), endsAt: T("04:58:00") });
-const brk: BreakSlotG1 = {
+const brk: BreakSlot = {
   id: "b1",
   startsAt: T("03:44:00"),
   lengthMs: 120_000,
@@ -29,7 +29,7 @@ const brk: BreakSlotG1 = {
     { code: "SID", title: "BEAT station ID", lengthMs: 5_000, whose: "station", note: null }
   ]
 };
-const after: BreakSlotG1 = { id: "b2", startsAt: T("03:59:00"), lengthMs: 120_000, context: "After Saturday Reel", origin: "rule", producerShareMs: 0, filledMs: 15_000, openMs: 105_000 };
+const after: BreakSlot = { id: "b2", startsAt: T("03:59:00"), lengthMs: 120_000, context: "After Saturday Reel", origin: "rule", producerShareMs: 0, filledMs: 15_000, openMs: 105_000 };
 
 describe("buildRundown", () => {
   const rows = buildRundown([reel, live], [brk, after]);

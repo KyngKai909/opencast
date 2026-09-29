@@ -1,10 +1,10 @@
 // Small pieces every market page shares: the section heading over a rule (.sec-top), the maker
 // line with its swatch (.from) and kind tag (.kind), the amber fit tag (.fit-tag), the market tabs.
 
+import { type Offer } from "@opencast/contracts";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { Tabs, Tag, TitleCard, type TitleCardSize } from "@opencast/ui";
-import type { OfferX } from "../../api/ext/market";
 import { useStation } from "../../station/StationContext";
 import { makerKindWord, makerName } from "./words";
 import "./parts.css";
@@ -20,7 +20,7 @@ export function SectionTop({ title, sub, end, first, as: H = "h2" }: { title: Re
 }
 
 /** "From HALL 90.7" with the maker's kind after it. A catalog maker links to the catalog. */
-export function MakerLine({ offer, named, swatch, kind = true, base }: { offer: OfferX; named?: boolean; swatch?: boolean; kind?: boolean; base?: string }) {
+export function MakerLine({ offer, named, swatch, kind = true, base }: { offer: Offer; named?: boolean; swatch?: boolean; kind?: boolean; base?: string }) {
   const words = `From ${makerName(offer.maker)}${named && offer.makerKind === "station" ? `, ${offer.maker.name}` : ""}`;
   return (
     <span className="cc-mk-from">
@@ -40,7 +40,7 @@ export function FitTag({ children }: { children: ReactNode }) {
 }
 
 /** The program's title card, in its colour (the maker's, or its catalog shelf's). */
-export function ProgramCard({ offer, title, bottom, size, className }: { offer: Pick<OfferX, "program" | "maker">; title?: ReactNode; bottom?: ReactNode; size?: TitleCardSize; className?: string }) {
+export function ProgramCard({ offer, title, bottom, size, className }: { offer: Pick<Offer, "program" | "maker">; title?: ReactNode; bottom?: ReactNode; size?: TitleCardSize; className?: string }) {
   return <TitleCard colour={offer.program.colour ?? offer.maker.colour ?? "#26345A"} title={title ?? offer.program.title} bottom={bottom} size={size} decorative className={className} />;
 }
 

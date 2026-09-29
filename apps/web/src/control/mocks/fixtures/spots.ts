@@ -24,8 +24,6 @@ export interface PlaceRule {
 export const DEFAULT_RULE: PlaceRule = { spotMsPerHour: 3 * MIN, sameSpotPerHour: 2 };
 /** Blocked in station-settings 02.1 until the Station area's break rule says otherwise. */
 export const DEFAULT_BLOCKED = ["Alcohol", "Gambling", "Political"];
-/** S17: the spot categories (market filters, blocked categories). A constant until the API lists them. */
-export const SPOT_CATEGORIES = ["Food", "Auto", "Health", "Services", "Underwriting", "Alcohol", "Gambling", "Cannabis", "Political", "Payday loans", "Vaping"];
 
 /** The note a backup spot carries in a break (the rundown's source line). */
 export const BACKUP_NOTE = "Backup rotation";

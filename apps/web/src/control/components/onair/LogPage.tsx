@@ -3,9 +3,10 @@
 // break rule and repeat the day. The same page is setup step 3 and the station's Program log;
 // on the phone the fill choices open as a sheet (P.2, `?fill=<gapStart>`).
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
-import { logApi, stationsApi, type StationIdent } from "@opencast/contracts";
+import { logApi, stationsApi, type ProgramLog, type StationIdent } from "@opencast/contracts";
 import {
   Button,
   ControlFoot,
@@ -22,8 +23,8 @@ import {
   useToast,
   type TimelineBlock
 } from "@opencast/ui";
+import { call } from "../../../api/client";
 import { useApi, useApiMutation } from "../../../api/hooks";
-import type { ProgramLogOnAir } from "../../api/ext/onair";
 import { useIsPhone } from "../../layout/shell";
 import { now, STATION_TZ, useNow } from "../../../lib/clock";
 import { Quiet } from "../../pages/common";
@@ -45,7 +46,7 @@ export interface LogPageProps {
 }
 
 /** Blocks for the timeline, from the log's entries, breaks and gaps inside a window. */
-export function timelineBlocks(log: Pick<ProgramLogOnAir, "entries" | "breaks" | "gaps">, from: string, to: string, now = Date.now()): TimelineBlock[] {
+export function timelineBlocks(log: Pick<ProgramLog, "entries" | "breaks" | "gaps">, from: string, to: string, now = Date.now()): TimelineBlock[] {
   const a = Date.parse(from);
   const z = Date.parse(to);
   const clip = (s: string, e: string) => ({ start: new Date(Math.max(a, Date.parse(s))).toISOString(), end: new Date(Math.min(z, Date.parse(e))).toISOString() });
@@ -98,7 +99,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const playout = usePlayout(stationId);
   const rule = useApi(stationsApi.getBreakRule, { params: { stationId } }, { retry: false });
   const setRule = useApiMutation(stationsApi.setBreakRule, { invalidates: [stationsApi.getBreakRule, ...LOG_READS] });
-  const repeat = useApiMutation(logApi.repeatDay, { invalidates: LOG_READS });
+  const qc = useQueryClient();
+  const [repeating, setRepeating] = useState(false);
 
   const set = (k: string, v: string | null) =>
     setParams(
@@ -122,19 +124,27 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
 
   const first = gaps[0];
   const dayWord = DAY_WORDS[weekdayOf(day)];
-  const repeatValue = log.data?.repeats?.find((r) => r.day === isoDate(day))?.pattern ?? "once";
+  // G7: this day's repeats. Choosing another pattern takes the old one off first; "Once" only does that.
+  const dayRepeats = (log.data?.repeats ?? []).filter((r) => r.day === isoDate(day) && r.pattern !== "once");
+  const repeatValue = dayRepeats[dayRepeats.length - 1]?.pattern ?? "once";
   const until = addDays(day, 56);
 
-  const onRepeat = (pattern: "once" | "daily" | "weekly") =>
-    repeat.mutate(
-      { params: { stationId }, body: { day: isoDate(day), pattern, until: isoDate(until) } },
-      {
-        onSuccess: () => {
-          if (pattern !== "once") toast.show({ message: `${pattern === "weekly" ? `Repeats every ${dayWord}` : "Repeats every day"} through ${monthDay(localTime(until, 12))}.` });
-        },
-        onError: (e) => toast.show({ message: e.message })
+  const onRepeat = async (pattern: "once" | "daily" | "weekly") => {
+    if (repeating || pattern === repeatValue) return;
+    setRepeating(true);
+    try {
+      for (const r of dayRepeats) await call(logApi.removeRepeat, { params: { stationId, repeatId: r.id } });
+      if (pattern !== "once") {
+        await call(logApi.repeatDay, { params: { stationId }, body: { day: isoDate(day), pattern, until: isoDate(until) } });
+        toast.show({ message: `${pattern === "weekly" ? `Repeats every ${dayWord}` : "Repeats every day"} through ${monthDay(localTime(until, 12))}.` });
       }
-    );
+    } catch (e) {
+      toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
+    } finally {
+      await Promise.all(LOG_READS.map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })));
+      setRepeating(false);
+    }
+  };
 
   const onRule = (mode: "after_every_program" | "every_n_minutes" | "none") => {
     if (!rule.data) return;
@@ -220,7 +230,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
       <Segmented
         label="Repeat this day"
         value={repeatValue}
-        onChange={onRepeat}
+        onChange={(v) => void onRepeat(v)}
         options={[
           { value: "weekly", label: `Every ${dayWord}` },
           { value: "daily", label: "Every day" },

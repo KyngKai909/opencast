@@ -4,12 +4,12 @@
 
 import { useState, type FormEvent } from "react";
 import { accountsApi, libraryApi } from "@opencast/contracts";
+import type { z } from "zod";
 import { Button, ChoiceList, Field, Modal, SelectField, Sheet, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../../api/client";
 import { ApiError } from "../../../../api/client";
 import { useApi } from "../../../../api/hooks";
-import type { InviteBodyX } from "../../../api/ext/station";
 import type { StationState } from "../../../station/StationContext";
 import "./InviteModal.css";
 
@@ -45,7 +45,7 @@ export function InviteModal({ s, open, onClose, phone }: { s: StationState; open
     if (!contact) return setError({ field: "to", message: "Enter an email address or a phone number." });
     if (role === "host" && !chosen) return setError({ field: "blocks", message: "Choose the blocks they'll host." });
     const program = live.find((p) => p.id === chosen);
-    const body: InviteBodyX = { ...contact, role, ...(role === "host" && program ? { programIds: [program.id], note: program.title } : {}) };
+    const body: z.input<typeof accountsApi.inviteToStation.body> = { ...contact, role, ...(role === "host" && program ? { programIds: [program.id], note: program.title } : {}) };
     setBusy(true);
     try {
       await call(accountsApi.inviteToStation, { params: { stationId: s.id }, body });

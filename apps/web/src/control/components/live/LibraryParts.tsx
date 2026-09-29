@@ -3,11 +3,10 @@
 // summary, the table of items, and the rights pane (A.3, "Can BEAT air Crate Session 03?").
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { libraryApi, type Folder, type LibraryItem } from "@opencast/contracts";
+import { libraryApi, type Folder, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
 import { Button, ChoiceList, CodeSelect, Field, Icon, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
-import { LibraryItemExt, type LibraryItemExt as Item } from "../../api/ext/live";
 import { useAuth } from "../../../auth/AuthProvider";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { librarySummary, readyLine } from "./logic";
@@ -220,7 +219,7 @@ export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, 
   const toast = useToast();
   const setCode = async (i: Item, code: SelectableCode) => {
     try {
-      await call(libraryApi.updateItem, { params: { itemId: i.id }, body: { code } }, LibraryItemExt);
+      await call(libraryApi.updateItem, { params: { itemId: i.id }, body: { code } });
       await refreshLibrary(qc);
     } catch (e) {
       toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
@@ -322,7 +321,7 @@ export function RightsPane({ item, callSign, phone, onClose }: { item: Item | nu
     if (!basis) return;
     setBusy(true);
     try {
-      await call(libraryApi.confirmRights, { params: { itemId: item.id }, body: { basis } }, LibraryItemExt);
+      await call(libraryApi.confirmRights, { params: { itemId: item.id }, body: { basis } });
       await refreshLibrary(qc);
       toast.show({ message: `${callSign} can air ${item.title}.` });
       onClose();

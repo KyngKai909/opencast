@@ -3,13 +3,12 @@
 
 import { useState } from "react";
 import { Button, SelectField } from "@opencast/ui";
-import { spotsApi } from "@opencast/contracts";
-import type { MarketSpotExt } from "../../api/ext/spots";
+import { type MarketSpot, spotsApi } from "@opencast/contracts";
 import { config } from "../../../config";
 import { BREAK_READERS, errorText, useWrite } from "./data";
 import "./parts.css";
 
-export function MockPauseControls({ spots }: { spots: MarketSpotExt[] }) {
+export function MockPauseControls({ spots }: { spots: MarketSpot[] }) {
   const pause = useWrite(spotsApi.pauseSpot, BREAK_READERS);
   const resume = useWrite(spotsApi.resumeSpot, BREAK_READERS);
   const inRotation = spots.filter((s) => s.inRotation === "main");

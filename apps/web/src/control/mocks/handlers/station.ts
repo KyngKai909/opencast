@@ -3,7 +3,7 @@
 
 import { http, type HttpHandler } from "msw";
 import { accountsApi, networkApi, notificationsApi, stationsApi, trustApi, type BreakRule, type LogCode, type TeamMember } from "@opencast/contracts";
-import { ClaimPageX, ClaimsX, ClaimX, InviteBodyX, stationExtApi } from "../../api/ext/station";
+import { ClaimsX, ClaimX } from "../../api/ext/station";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { PEOPLE, type MockPerson } from "../fixtures/people";
@@ -34,7 +34,7 @@ function callSignOf(stationId: string): string {
 // ---- team ----
 
 function toInvite(i: StationInvite) {
-  return { id: i.id, email: i.email, phone: i.phone, role: i.role, expiresAt: i.expiresAt, acceptedAt: i.acceptedAt, createdAt: i.createdAt };
+  return { id: i.id, email: i.email, phone: i.phone, role: i.role, expiresAt: i.expiresAt, acceptedAt: i.acceptedAt, createdAt: i.createdAt, ...(i.role === "host" ? { programIds: i.programIds } : {}) };
 }
 
 function team(stationId: string, me: MockPerson) {
@@ -49,6 +49,8 @@ function team(stationId: string, me: MockPerson) {
         email: person?.email ?? null,
         role: m.role,
         note: m.hosts,
+        // A4: a host's live programs.
+        ...(m.role === "host" ? { programIds: m.hostProgramIds ?? [] } : {}),
         // Whoever is looking is in master control right now.
         lastInAt: m.personId === me.id ? new Date(t).toISOString() : m.lastInAt
       };
@@ -79,7 +81,7 @@ const teamHandlers = [
     const id = String(params.stationId);
     const r = roleOn(id, p, ["owner"], OWNER_ONLY_TEAM);
     if (r instanceof Response) return r;
-    const parsed = InviteBodyX.safeParse(await request.json().catch(() => null));
+    const parsed = accountsApi.inviteToStation.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "Enter an email address or a phone number.");
     const body = parsed.data;
     const email = body.email?.trim().toLowerCase() ?? null;
@@ -202,7 +204,7 @@ export function firstGap(entries: { startsAt: string; endsAt: string }[], from: 
 }
 
 const statusHandlers = [
-  http.get(path(stationExtApi.myStationStatus), ({ request }) => {
+  http.get(path(accountsApi.myStationStatus), ({ request }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const db = getDb();
@@ -211,9 +213,12 @@ const statusHandlers = [
       .map((m) => {
         const st = dbStation(m.stationId);
         const studio = st?.ident.kind === "studio";
-        return { stationId: m.stationId, onAir: !!st?.onAir && !studio, deadAirAt: studio || !st?.onAir ? null : nextDeadAir(m.stationId) };
+        const deadAirAt = studio || !st?.onAir ? null : nextDeadAir(m.stationId);
+        // How long it lasts: until the next thing on the log, when the mock keeps one.
+        const deadAirEndsAt = deadAirAt ? (stationLog(m.stationId).find((e) => e.startsAt > deadAirAt)?.startsAt ?? null) : null;
+        return { stationId: m.stationId, onAir: !!st?.onAir && !studio, deadAirAt, deadAirEndsAt };
       });
-    return reply(stationExtApi.myStationStatus.response, rows);
+    return reply(accountsApi.myStationStatus.response, rows);
   })
 ];
 
@@ -371,14 +376,14 @@ const trustHandlers = [
     return reply(ClaimsX, { claims, standing: standingOf(claims) });
   }),
 
-  http.post(path(stationExtApi.attachToClaim), async ({ request, params }) => {
+  http.post(path(trustApi.attachToClaim), async ({ request, params }) => {
     const found = claimFor(request, String(params.claimId), ["owner"], "Only the owner can answer a claim.");
     if (found instanceof Response) return found;
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
     if (!file || typeof file === "string") return fail(400, "invalid", "Choose the file to attach.");
     const name = (file as File).name || "attachment";
-    return reply(stationExtApi.attachToClaim.response, { attachmentUrl: `https://files.opencast.example/claims/${found.claim.id}/${encodeURIComponent(name)}`, fileName: name }, 201);
+    return reply(trustApi.attachToClaim.response, { attachmentUrl: `https://files.opencast.example/claims/${found.claim.id}/${encodeURIComponent(name)}`, fileName: name }, 201);
   }),
 
   http.post(path(trustApi.answerClaim), async ({ request, params }) => {
@@ -472,14 +477,14 @@ function advance() {
 }
 
 const networkHandlers = [
-  http.get(path(stationExtApi.getClaimPage), ({ params }) => {
+  http.get(path(networkApi.getClaimPage), ({ params }) => {
     const tok = stationState().claimTokens.find((c) => c.token === String(params.token));
     if (!tok) return fail(404, "not_found", "This claim link isn't right. Check it against the email we sent.");
     const st = dbStation(tok.stationId);
     if (!st) return fail(404, "not_found", "This claim link isn't right. Check it against the email we sent.");
     advance();
     const h = [...stationState().handovers].reverse().find((x) => x.stationId === tok.stationId && x.status !== "cancelled");
-    return reply(ClaimPageX, {
+    return reply(networkApi.getClaimPage.response, {
       station: st.ident,
       ...tok.page,
       handover: h ? { handoverId: h.handoverId, kind: h.kind, status: h.status, payableAfter: h.payableAfter } : null

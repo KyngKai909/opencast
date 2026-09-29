@@ -114,6 +114,17 @@ describe("going live", () => {
     expect((await api(`${block}/lower-third`, { as: "jen" })).status).toBe(403);
   });
 
+  it("takes a speaker's name and title from the list, and refuses one that isn't on it (S15)", async () => {
+    await api(`${S}/live-sources`);
+    const first = await api(`${block}/lower-third`, { as: "marcus" });
+    expect(first.body.updatedAt).toBeNull();
+    const set = await api(`${block}/lower-third`, { method: "PUT", as: "marcus", body: { hidden: false, speakerId: first.body.speakerId, name: "Anything", title: null } });
+    expect(set.body).toMatchObject({ name: "Marcus Reyes", title: "Host, Crate Talk" });
+    expect(set.body.updatedAt).toEqual(expect.any(String));
+    const wrong = await api(`${block}/lower-third`, { method: "PUT", as: "marcus", body: { hidden: false, speakerId: crypto.randomUUID(), name: "X", title: null } });
+    expect(wrong.status).toBe(400);
+  });
+
   it("ends early only while on air", async () => {
     await api(`${S}/live-sources`);
     const r = await api(`${block}/end-early`, { method: "POST", as: "marcus" });

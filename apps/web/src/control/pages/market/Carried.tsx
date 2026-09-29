@@ -2,8 +2,8 @@
 // makers, on what deal and when it airs. No frame draws it; it's the Browse row's layout with the
 // station's own schedule (see the report).
 
+import { type Agreement, type Offer } from "@opencast/contracts";
 import { Button, ControlTitle, Table, TitleCard, type Column } from "@opencast/ui";
-import type { AgreementX, OfferX } from "../../api/ext/market";
 import { useAgreements, useBrowse, useRequests } from "../../components/market/api";
 import { MarketTabs, Quietly } from "../../components/market/parts";
 import { localDate, monthDay } from "../../components/market/time";
@@ -22,11 +22,11 @@ export default function Carried() {
   if (agreements.isLoading) return <Quiet />;
   if (agreements.error) return <Quietly role="alert">{agreements.error.message}</Quietly>;
   const name = s.station.callSign ?? s.station.name;
-  const offerOf = (a: AgreementX): OfferX | undefined => offers.data?.find((o) => o.id === a.offerId);
+  const offerOf = (a: Agreement): Offer | undefined => offers.data?.find((o) => o.id === a.offerId);
   const rows = agreements.data?.carrying ?? [];
   const waiting = requests.data?.incoming.filter((r) => r.status === "asked").length ?? 0;
   const asked = requests.data?.outgoing.filter((r) => r.status === "asked") ?? [];
-  const columns: Column<AgreementX>[] = [
+  const columns: Column<Agreement>[] = [
     { key: "card", width: "112px", cell: (a) => <TitleCard colour={offerOf(a)?.program.colour ?? a.maker.colour ?? "#26345A"} title={a.program.title} decorative className="cc-mk__tc" /> },
     {
       key: "program",

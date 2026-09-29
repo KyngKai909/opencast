@@ -1,9 +1,9 @@
 // Market 04.1 a studio: Your programs (/:handle/programs). A studio makes programs and doesn't
 // broadcast: what it offers, who carries it, what it earned, and the way to a channel of its own.
 
+import { type Offer } from "@opencast/contracts";
 import { Navigate } from "react-router";
 import { Button, ControlTitle, StatRow, Table, type Column } from "@opencast/ui";
-import type { OfferX } from "../../api/ext/market";
 import { useAgreements, useBrowse } from "../../components/market/api";
 import { ProgramCard, Quietly } from "../../components/market/parts";
 import { monthName } from "../../components/market/time";
@@ -25,7 +25,7 @@ export default function StudioPrograms() {
   const carriedBy = (agreements.data?.carriedBy ?? []).filter((a) => !a.endsAt || a.endsAt > now().toISOString());
   const stations = new Set(carriedBy.map((a) => a.carrier.id)).size;
   const earned = carriedBy.reduce((n, a) => n + a.paidThisMonthMicros, 0);
-  const columns: Column<OfferX>[] = [
+  const columns: Column<Offer>[] = [
     { key: "card", width: "104px", cell: (o) => <ProgramCard offer={o} className="cc-mk-studio__tc" /> },
     {
       key: "program",

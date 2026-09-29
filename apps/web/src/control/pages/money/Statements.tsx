@@ -4,7 +4,7 @@
 import { useNavigate } from "react-router";
 import { ledgerApi } from "@opencast/contracts";
 import { ControlTitle, Lines, Table, money, type Column } from "@opencast/ui";
-import { StatementsX, type StatementX } from "../../api/ext/earnings";
+import type { Statement } from "@opencast/contracts";
 import { useApi } from "../../../api/hooks";
 import { statementSubtitle, statementTitle } from "../../components/earnings/lines";
 import { useShellOptions } from "../../layout/shell";
@@ -16,9 +16,9 @@ export default function Statements() {
   const s = useStation();
   const navigate = useNavigate();
   useShellOptions({ context: "Earnings" });
-  const list = useApi(ledgerApi.listStationStatements, { params: { stationId: s.id } }, { schema: StatementsX });
+  const list = useApi(ledgerApi.listStationStatements, { params: { stationId: s.id } });
   const rows = [...(list.data ?? [])].sort((a, b) => b.periodStart.localeCompare(a.periodStart));
-  const columns: Column<StatementX>[] = [
+  const columns: Column<Statement>[] = [
     { key: "week", header: "Week", cell: (r) => <Lines title={statementTitle(r)} detail={statementSubtitle(r).replace(/\.$/, "")} /> },
     { key: "amount", header: "Paid out", width: "140px", kind: "amount", cell: (r) => money(r.lines.reduce((a, l) => a + l.amountMicros, 0)) }
   ];
@@ -34,7 +34,7 @@ export default function Statements() {
       ) : rows.length === 0 ? (
         <p className="cc-stmt__error">No statements yet. The first comes the Monday after a week of earnings is paid out.</p>
       ) : (
-        <Table<StatementX> label="Statements" columns={columns} rows={rows} rowKey={(r) => r.id} onSelect={(r) => navigate(`${s.base}/earnings/statements/${r.id}`)} rowPadding={10} gap={16} />
+        <Table<Statement> label="Statements" columns={columns} rows={rows} rowKey={(r) => r.id} onSelect={(r) => navigate(`${s.base}/earnings/statements/${r.id}`)} rowPadding={10} gap={16} />
       )}
     </div>
   );

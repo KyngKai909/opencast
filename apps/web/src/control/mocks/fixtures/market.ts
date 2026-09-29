@@ -7,8 +7,9 @@
 // Offers, agreements and requests change (carrying, offering, approving), so they're kept in
 // localStorage under their own versioned key. Reset: localStorage.removeItem("oc-mock-control-market").
 
-import type { Band, CarriageTerm, Slot, StationIdent } from "@opencast/contracts";
-import type { CarriageRequestX, CarrierProfileX, CashPlusBarterX, EpisodeX, OfferX, ProgramFormatX } from "../../api/ext/market";
+import type { Band, CarriageRequest, CarriageTerm, CashPlusBarter, Offer, Slot, StationIdent } from "@opencast/contracts";
+import type { EpisodeX } from "../../api/ext/market";
+import type { CarrierProfile, ProgramFormat } from "../../api/types";
 import { PROGRAM_IDS } from "./library";
 import { BEAT, HALL, LAB, stationByRef, uid } from "./stations";
 import { MIN, OFFSET_HOURS, SEC, at } from "./time";
@@ -47,7 +48,7 @@ export function marketStation(id: string): StationIdent | undefined {
 }
 
 /** C7: what a maker sees of a station asking to carry (offering 03.1). */
-export const CARRIER_PROFILES: Record<string, CarrierProfileX> = {
+export const CARRIER_PROFILES: Record<string, CarrierProfile> = {
   [NITE.id]: { description: "Old-time radio overnight", members: 96, carriesPrograms: 3, blockedCategories: ["Alcohol"] },
   [HALL.id]: { description: "Slow beats for late work", members: 64, carriesPrograms: 2, blockedCategories: [] },
   [SAZN.id]: { description: "Home cooking from Inland Empire kitchens", members: 96, carriesPrograms: 2, blockedCategories: [] }
@@ -55,26 +56,26 @@ export const CARRIER_PROFILES: Record<string, CarrierProfileX> = {
 
 // ---- the offers ----
 
-export interface MkOffer extends Omit<OfferX, "fit" | "carriers"> {
+export interface MkOffer extends Omit<Offer, "fit" | "carriers"> {
   /** Slots the offer fits besides tonight's dead air, for BEAT (library repeats). Dead air is worked out from the log. */
   repeatFit: { label: string; title: string } | null;
 }
 
-type Deal = Partial<{ cash: number; unit: "per_airing" | "per_hour"; barter: number; cpb: CashPlusBarterX; creditOnly: boolean }>;
+type Deal = Partial<{ cash: number; unit: "per_airing" | "per_hour"; barter: number; cpb: CashPlusBarter; creditOnly: boolean }>;
 
 let offerN = 0;
 let programN = 0;
 function offer(o: {
   title: string;
   maker: StationIdent;
-  kind?: OfferX["makerKind"];
+  kind?: Offer["makerKind"];
   programId?: string;
   colour: string;
   description?: string;
   category: string;
   live?: boolean;
   episodes: number;
-  format: ProgramFormatX;
+  format: ProgramFormat;
   rightsNote: string;
   terms: CarriageTerm[];
   deal?: Deal;
@@ -128,10 +129,10 @@ function offer(o: {
   };
 }
 
-const series = (len: number, bands: Band[] = ["tv"]): ProgramFormatX => ({ kind: "series", cadence: null, episodeLengthMs: len, bands });
-const weekly = (len: number, bands: Band[] = ["tv"]): ProgramFormatX => ({ kind: "series", cadence: "weekly", episodeLengthMs: len, bands });
-const nightly = (len: number, bands: Band[]): ProgramFormatX => ({ kind: "series", cadence: "nightly", episodeLengthMs: len, bands });
-const oneOff = (len: number, bands: Band[] = ["tv"]): ProgramFormatX => ({ kind: "one_off", cadence: null, episodeLengthMs: len, bands });
+const series = (len: number, bands: Band[] = ["tv"]): ProgramFormat => ({ kind: "series", cadence: null, episodeLengthMs: len, bands });
+const weekly = (len: number, bands: Band[] = ["tv"]): ProgramFormat => ({ kind: "series", cadence: "weekly", episodeLengthMs: len, bands });
+const nightly = (len: number, bands: Band[]): ProgramFormat => ({ kind: "series", cadence: "nightly", episodeLengthMs: len, bands });
+const oneOff = (len: number, bands: Band[] = ["tv"]): ProgramFormat => ({ kind: "one_off", cadence: null, episodeLengthMs: len, bands });
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
 const REPEATS = { label: "weeknights 1:00 am", title: "Weeknights after 1:00 am" };
 const CLEAR = "Clear, the member-owned co-op";
@@ -324,8 +325,8 @@ export interface MkRequest {
   slots: Slot[];
   startsOn: string;
   audioOnly: boolean;
-  status: CarriageRequestX["status"];
-  declineReason: CarriageRequestX["declineReason"];
+  status: CarriageRequest["status"];
+  declineReason: CarriageRequest["declineReason"];
   carrierSpotMsPerHour: number;
   createdAt: string;
   decidedAt: string | null;

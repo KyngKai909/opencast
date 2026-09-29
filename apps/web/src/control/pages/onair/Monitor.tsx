@@ -5,10 +5,9 @@
 // filled from the spot market shows here as soon as it's saved.
 
 import { useMemo, type ReactNode } from "react";
-import { audienceApi, catalogApi, playoutApi, stationsApi } from "@opencast/contracts";
+import { audienceApi, catalogApi, type Offer, playoutApi, stationsApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Notice, PictureFrame, Rundown, Tally, clock, duration, useToast, type HealthRow, type RundownItem } from "@opencast/ui";
 import { useApi, useApiMutation } from "../../../api/hooks";
-import { BrowseX, type OfferX } from "../../api/ext/market";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "../../components/onair/data";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
 import { breakLine, buildRundown, currentIndex, nextBreak, rundownFrom, type RundownRow } from "../../components/onair/rundown";
@@ -52,7 +51,7 @@ export default function Monitor() {
   const setup = useApi(stationsApi.getSetup, { params }, { retry: false });
   const translators = useApi(stationsApi.listTranslators, { params }, { retry: false });
   const audience = useApi(audienceApi.getAudience, { params, query: { from: iso(quarter - HOUR), to: iso(quarter + QUARTER) } }, { retry: false, refetchInterval: 30_000 });
-  const market = useApi(catalogApi.browse, { query: { forStation: s.id, fitsSchedule: true } }, { schema: BrowseX, retry: false });
+  const market = useApi(catalogApi.browse, { query: { forStation: s.id, fitsSchedule: true } }, { retry: false });
   const claimable = s.station.kind === "claimable";
   const page = useApi(stationsApi.getStation, { params: { stationRef: s.station.callSign ?? s.id } }, { enabled: claimable, retry: false });
 
@@ -147,18 +146,18 @@ export default function Monitor() {
   const gapAt = deadAir.data?.nextGapAt ?? null;
   const offers = (market.data ?? []).filter((o) => o.fitsYourSchedule).slice(0, 2);
   // The slot each fits (C1, the Market area's field): "Sat, 11:40 pm gap", "Weeknights after 1:00 am".
-  const fitOf = (o: OfferX) => o.fit?.find((f) => f.reason === "dead_air") ?? o.fit?.[0] ?? null;
-  const fitLabel = (o: OfferX) => {
+  const fitOf = (o: Offer) => o.fit?.find((f) => f.reason === "dead_air") ?? o.fit?.[0] ?? null;
+  const fitLabel = (o: Offer) => {
     const f = fitOf(o);
     if (!f) return "";
     return f.reason === "dead_air" && f.startsAt ? `${dayClock(f.startsAt).split(" ")[0]}, ${f.label}` : f.title;
   };
-  const offerHref = (o: OfferX) => {
+  const offerHref = (o: Offer) => {
     const f = fitOf(o);
     const g = f ? (f.reason === "dead_air" ? f.startsAt : null) : gapAt;
     return g ? `${s.base}/market?gap=${encodeURIComponent(g)}` : `${s.base}/market/offers/${o.id}`;
   };
-  const maker = (o: OfferX) => (o.makerKind === "catalog" ? "catalog" : `from ${o.maker.callSign ?? o.maker.name}`);
+  const maker = (o: Offer) => (o.makerKind === "catalog" ? "catalog" : `from ${o.maker.callSign ?? o.maker.name}`);
   const marketRows: HealthRow[] = offers.map((o) => ({
     label: (
       <>

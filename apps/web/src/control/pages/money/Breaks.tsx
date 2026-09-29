@@ -2,13 +2,12 @@
 // paused notice (handled by the backup rotation) and "It's back".
 //
 // The rows are tonight's breaks from the log (log.getLog); what fills each one comes from
-// spots.getAvails (G1, proposed). Totals are computed from the rows (A28).
+// spots.getAvails (G1). Totals are computed from the rows (A28).
 
 import { Navigate, useSearchParams } from "react-router";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { logApi, type BreakSlot, type LogEntry } from "@opencast/contracts";
+import { type BreakContent, type BreakSlot, logApi, type LogEntry, type MarketSpot } from "@opencast/contracts";
 import { BreakBar, BreakLegend, Button, ControlTitle, Lines, Table, clock, duration, useToast, type BreakPartKind, type Column } from "@opencast/ui";
-import type { BreakContent, MarketSpotExt } from "../../api/ext/spots";
 import { useApi } from "../../../api/hooks";
 import { BreakDetails } from "../../components/spots/BreakDetails";
 import { errorText, useAvails, useMarket, useRotations, useSetRotation } from "../../components/spots/data";
@@ -146,7 +145,7 @@ function BreaksPage() {
   const canAct = s.can("spots");
   const open = rows.find((r) => r.id === details);
 
-  const addBack = (m: MarketSpotExt) => {
+  const addBack = (m: MarketSpot) => {
     const before = main.map((x) => x.spotId);
     setRotation.mutate(
       { params: { stationId: s.id, kind: "main" }, body: { spotIds: [...before, m.spot.id] } },

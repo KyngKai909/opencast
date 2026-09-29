@@ -8,7 +8,6 @@
 import { http } from "msw";
 import { audienceApi, ledgerApi, networkApi } from "@opencast/contracts";
 import { money } from "@opencast/ui";
-import { AudienceReportX, StationEarningsX, StatementsX } from "../../api/ext/earnings";
 import { dbStation, getDb, membership } from "../db";
 import { audienceReport, hasAudience, heldEarnings, moveToBank, payoutAccount, setPayoutTo, stationEarnings, stationStatements, statementCsv, statementOwner } from "../fixtures/earnings";
 import type { MockPerson } from "../fixtures/people";
@@ -40,7 +39,7 @@ export const earningsHandlers = [
     if (!e) return fail(404, "not_found", "There are no earnings for this station yet.");
     // Ads from partners: the switch in Breaks settings; nothing earned until the backfill exists.
     const on = !!stationState().breakRules[id]?.adsFromPartners;
-    return reply(StationEarningsX, { ...e, lines: { ...e.lines, partnerAds: { on, micros: 0, pendingMicros: 0 } } });
+    return reply(ledgerApi.getStationEarnings.response, { ...e, lines: { ...e.lines, partnerAds: { on, micros: 0, pendingMicros: 0 } } });
   }),
 
   http.get(path(ledgerApi.listStationStatements), ({ request, params }) => {
@@ -49,7 +48,7 @@ export const earningsHandlers = [
     const id = String(params.stationId);
     const no = guard(p, id, "see");
     if (no) return no;
-    return reply(StatementsX, stationStatements(id));
+    return reply(ledgerApi.listStationStatements.response, stationStatements(id));
   }),
 
   http.get(path(ledgerApi.getStatementCsv), ({ request, params }) => {
@@ -114,7 +113,7 @@ export const earningsHandlers = [
     const q = audienceApi.getAudience.query.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!q.success) return fail(422, "invalid", "Ask for a window with a start and an end.");
     if (!hasAudience(id)) return fail(404, "not_found", "There's no audience for this station yet.");
-    return reply(AudienceReportX, audienceReport(id, q.data.from, q.data.to)!);
+    return reply(audienceApi.getAudience.response, audienceReport(id, q.data.from, q.data.to)!);
   }),
 
   // Admin only in the API. The mock has no admins, so it answers anyone signed in (the network desk

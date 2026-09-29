@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StationIdent } from "@opencast/contracts";
-import type { OfferX } from "../../api/ext/market";
+import type { Offer, StationIdent } from "@opencast/contracts";
 import { airingsText, breakPointsText, captionsText, carrierRows, dealLines, formatFromLibrary, formatLine, lengthLong, lengthText, readDuration, readMoney, slotText, termNames, termsTwoLines } from "./words";
 
 const MIN = 60_000;
@@ -8,7 +7,7 @@ const st = (callSign: string, channel: string, market: string, o: Partial<Statio
 const HALL = st("HALL", "90.7", "inland-empire", { name: "Study Hall", band: "radio" });
 const BEAT = st("BEAT", "12.1", "inland-empire", { name: "Inland Beat" });
 
-function offer(o: Partial<OfferX> = {}): OfferX {
+function offer(o: Partial<Offer> = {}): Offer {
   return {
     id: "o1",
     program: { id: "p1", title: "Slow Hours", description: null, category: "Music", live: false, episodeCount: 22, rightsNote: null, format: { kind: "series", cadence: null, episodeLengthMs: 140 * MIN, bands: ["tv", "radio"] } },

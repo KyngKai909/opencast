@@ -109,7 +109,8 @@ export function Hero({ pick, phone, timeZone }: { pick: HeroPick; phone: boolean
   const now = row.now!;
   const programId = now.programId;
   const program = useApi(libraryApi.getProgram, { params: { programId: programId ?? "" } }, { enabled: !!programId, staleTime: 300_000 });
-  const description = program.data?.description ?? null;
+  // G5: tonight's episode, described, before the program's own description.
+  const description = now.episodeDescription ?? program.data?.description ?? null;
   const until = <span className="oc-mono">{clock(now.endsAt, { timeZone })}</span>;
   const lead = now.note ?? (now.carriedFrom ? `Carried from ${now.carriedFrom.callSign ?? ""}` : null);
   const acts = (

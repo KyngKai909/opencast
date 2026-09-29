@@ -16,7 +16,8 @@
 // (312 now, a peak of 318 at 8:36 pm, programs averaging 184, 262 and 305), against last
 // Saturday's line; after 8:42 pm it follows last week's shape, and dead air counts nobody.
 
-import type { AudienceProgram, AudienceReportX, StatementGroup, StatementX, StationEarningsX } from "../../api/ext/earnings";
+import type { AudienceReport, Statement, StationEarnings } from "@opencast/contracts";
+import type { AudienceProgram, StatementGroup } from "../../api/types";
 import { STATION_TZ, now } from "../../../lib/clock";
 import { weekStart, zoned } from "../../components/earnings/periods";
 import { dbStation, stationBreaks, stationLog } from "../db";
@@ -454,7 +455,7 @@ export function sponsorsOf(stationId: string, fallback: Ledger["sponsors"]): Led
   }
 }
 
-export function stationEarnings(stationId: string, period: Period): StationEarningsX | null {
+export function stationEarnings(stationId: string, period: Period): StationEarnings | null {
   const l = ledgerOf(stationId);
   if (!l) return null;
   const p = l.periods[period];
@@ -523,7 +524,7 @@ export function moveToBank(stationId: string, amountMicros: number, money: (m: n
 
 // ---------------------------------------------------------------- statements
 
-export function stationStatements(stationId: string): StatementX[] {
+export function stationStatements(stationId: string): Statement[] {
   const l = ledgerOf(stationId);
   if (!l) return [];
   return l.statements.map((s) => {
@@ -546,7 +547,7 @@ export function stationStatements(stationId: string): StatementX[] {
 }
 
 /** Which station a statement belongs to. */
-export function statementOwner(statementId: string): { stationId: string; statement: StatementX } | null {
+export function statementOwner(statementId: string): { stationId: string; statement: Statement } | null {
   for (const id of Object.keys(LEDGERS)) {
     const s = stationStatements(id).find((x) => x.id === statementId);
     if (s) return { stationId: id, statement: s };
@@ -564,7 +565,7 @@ const dollars = (micros: number) => (micros / 1_000_000).toFixed(2);
  * The statement's ledger entries as CSV: each line, then the entries behind it (each airing of a
  * spot line, with what it was billed on), so the lines add up to the page and the entries to the lines.
  */
-export function statementCsv(s: StatementX, callSign: string): { filename: string; csv: string } {
+export function statementCsv(s: Statement, callSign: string): { filename: string; csv: string } {
   const rows: Array<Array<string | number>> = [["group", "line", "detail", "entry", "at", "tuned_in", "amount"]];
   const start = Date.parse(`${s.periodStart}T00:00:00-07:00`);
   s.lines.forEach((l, li) => {
@@ -738,7 +739,7 @@ function shares(total: number): { phone: number; cast: number; web: number; tv_a
 }
 
 /** The station's own audience between `from` and `to` (to now): tonight minute by minute, a week or a month added up. */
-export function audienceReport(stationId: string, fromIso: string, toIso: string): AudienceReportX | null {
+export function audienceReport(stationId: string, fromIso: string, toIso: string): AudienceReport | null {
   const make = AUDIENCE[stationId];
   if (!make) return null;
   const a = make();
@@ -783,8 +784,8 @@ export function audienceReport(stationId: string, fromIso: string, toIso: string
   }
 
   // Tonight: the window's minutes, tonight's line to now, last week's across the whole window.
-  const series: AudienceReportX["series"] = [];
-  const comparison: NonNullable<AudienceReportX["comparison"]> = [];
+  const series: AudienceReport["series"] = [];
+  const comparison: NonNullable<AudienceReport["comparison"]> = [];
   for (let m = Math.ceil((from - evening) / MIN); minuteAt(m) <= to; m++) {
     const iso = new Date(minuteAt(m)).toISOString();
     const lastWeek = Math.round(lastWeekAt(m) * a.scale);

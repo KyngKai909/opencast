@@ -1,21 +1,19 @@
 // 03.1 Listings (/:callSign/listings?range=week; one airing's editor at /listings/:entryId): every
 // airing this week with whether its listing is complete, and an editor with previews of how it
 // reads on the dial and on a TV banner. Carried programs are the maker's words: read-only, with a
-// local note. Per-airing listings are the proposed G5; captions the proposed L7.
+// local note. Per-airing listings are G5; captions L7.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { libraryApi } from "@opencast/contracts";
+import { libraryApi, logApi, type Listing } from "@opencast/contracts";
 import { ChipRow, ControlTitle, DialRow, Field, Icon, KeyValueList, LiveText, Segmented, Table, TextAreaField, Toggle, clock, cx, type Column } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { listListings, updateListing, updateProgramCaptions, type Listing } from "../../api/ext/live";
-import { notYet } from "../../api/ext";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { dayLabel, descriptionCount } from "../../components/live/logic";
-import { CATEGORIES, isEpisodeNumber, listingLine, STATUS } from "../../components/live/listings";
+import { CATEGORIES, isEpisodeNumber, languageName, listingLine, STATUS } from "../../components/live/listings";
 import { Quiet } from "../common";
 import "./Listings.css";
 
@@ -35,7 +33,7 @@ export default function Listings() {
     const t = clockNow();
     return { from: t.toISOString(), to: new Date(t.getTime() + 7 * 86400e3).toISOString() };
   }, []);
-  const q = useApi(listListings, { params: { stationId: s.id }, query: window }, { retry: false });
+  const q = useApi(logApi.listListings, { params: { stationId: s.id }, query: window }, { retry: false });
   const now = clockNow();
 
   const rows = useMemo(() => {
@@ -108,10 +106,7 @@ export default function Listings() {
           />
         }
       />
-      {notYet(q.error) ? (
-        // The listings endpoint is proposed (G5): until the API has it, say so plainly.
-        <p className="cc-listings__empty">Listings can't be edited here yet. Viewers see each program's own description.</p>
-      ) : q.isError ? (
+      {q.isError ? (
         <p role="alert" className="cc-listings__empty">
           {q.error.message}
         </p>
@@ -152,7 +147,7 @@ function Editor({ listing }: { listing: Listing }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setError(null), [listing.entryId]);
   const count = descriptionCount(desc);
-  const refresh = () => qc.invalidateQueries({ queryKey: ["GET", listListings.path] });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["GET", logApi.listListings.path] });
 
   const run = async (fn: () => Promise<unknown>) => {
     try {
@@ -164,12 +159,12 @@ function Editor({ listing }: { listing: Listing }) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
     }
   };
-  const patchListing = (body: Record<string, string | null>) => run(() => call(updateListing, { params: { stationId: s.id, entryId: listing.entryId }, body }));
+  const patchListing = (body: Record<string, string | null>) => run(() => call(logApi.updateListing, { params: { stationId: s.id, entryId: listing.entryId }, body }));
   const patchProgram = (body: Record<string, unknown>) => program && run(() => call(libraryApi.updateProgram, { params: { programId: program.id }, body }));
 
   const captions = program?.captions ?? null;
   const captionsOn = !!captions && captions.mode !== "none";
-  const captionWords = captions && captionsOn ? `${captions.mode === "generated_live" ? "Generated live" : captions.mode === "generated" ? "Generated" : "Uploaded"}${captions.language ? `, ${captions.language}` : ""}` : "Off";
+  const captionWords = captions && captionsOn ? `${captions.mode === "generated_live" ? "Generated live" : captions.mode === "generated" ? "Generated" : "Uploaded"}${captions.language ? `, ${languageName(captions.language)}` : ""}` : "Off";
   const categories = program?.category && !CATEGORIES.includes(program.category) ? [...CATEGORIES, program.category] : CATEGORIES;
   const seriesTitle = program?.title ?? listing.title;
   const shownDescription = desc || program?.description || "";
@@ -241,7 +236,7 @@ function Editor({ listing }: { listing: Listing }) {
                     label="Captions"
                     disabled={carried}
                     onChange={(v) =>
-                      void run(() => call(updateProgramCaptions, { params: { programId: program.id }, body: v ? { mode: program.live ? "generated_live" : "generated", language: "English" } : { mode: "none", language: null } }))
+                      void run(() => call(libraryApi.updateProgramCaptions, { params: { programId: program.id }, body: v ? { mode: program.live ? "generated_live" : "generated", language: captions?.language ?? "en" } : { mode: "none", language: null } }))
                     }
                   />
                 )

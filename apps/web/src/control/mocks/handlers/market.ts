@@ -3,9 +3,10 @@
 // program writes entries into the shared db's log, so the Program log and the Monitor show them.
 
 import { http } from "msw";
-import { catalogApi, type Slot, type StationIdent } from "@opencast/contracts";
+import { type Agreement, type CarriageRequest, catalogApi, type FitSlot, type Offer, type Slot, type StationIdent } from "@opencast/contracts";
 import { clock } from "@opencast/ui";
-import { AgreementsX, AgreementX, BrowseX, CarriageRequestX, OfferDetailX, OfferX, RequestsX, type FitSlotX, type TermsBodyX } from "../../api/ext/market";
+import { OfferDetailX } from "../../api/ext/market";
+import type { TermsBody } from "../../api/types";
 import { fitRank } from "../../components/market/browse";
 import { formatFromLibrary } from "../../components/market/words";
 import { now, STATION_TZ } from "../../../lib/clock";
@@ -36,7 +37,7 @@ function mayAct(p: MockPerson, stationId: string): boolean {
 // ---- where an offer fits (C1) ----
 
 /** Dead air bounded by the log in the next day, and library repeats if the station runs any. */
-export function fitFor(o: MkOffer, stationId: string | null): { fit: FitSlotX[]; fits: boolean | null } {
+export function fitFor(o: MkOffer, stationId: string | null): { fit: FitSlot[]; fits: boolean | null } {
   if (!stationId) return { fit: [], fits: null };
   const st = dbStation(stationId);
   if (!st || st.ident.kind === "studio") return { fit: [], fits: null };
@@ -45,7 +46,7 @@ export function fitFor(o: MkOffer, stationId: string | null): { fit: FitSlotX[];
   const gaps = gapsIn(stationId, from, to).filter((g) => g.endsAt < to);
   const repeats = stationLog(stationId).some((e) => e.localNote === "Overnight repeat");
   const len = o.program.format?.episodeLengthMs ?? null;
-  const fit: FitSlotX[] = [];
+  const fit: FitSlot[] = [];
   if (len) {
     for (const g of gaps) {
       const gapLen = Date.parse(g.endsAt) - Date.parse(g.startsAt);
@@ -232,7 +233,7 @@ export const marketHandlers = [
       .map((o) => toOffer(o, forStation));
     if (fitsOnly) list = list.filter((o) => o.fit.length).sort((a, b) => fitRank(a.fit) - fitRank(b.fit) || b.carriers - a.carriers);
     if (gap) list = list.filter((o) => o.fit.some((f) => f.reason === "dead_air" && f.startsAt && Date.parse(f.startsAt) === Date.parse(gap)));
-    return reply(BrowseX, list);
+    return reply(catalogApi.browse.response, list);
   }),
 
   http.get(path(catalogApi.getOffer), ({ request, params }) => {
@@ -267,7 +268,7 @@ export const marketHandlers = [
     if (!mayAct(p, program.station.id)) return fail(403, "forbidden", "Only owners and operators can offer a program.");
     if (db.library.items.some((i) => i.programId === program.id && i.source === "link"))
       return fail(409, "link_import", `${program.title} can't be offered: an episode was imported from a link. Link imports stay local.`);
-    const body = (await request.json()) as TermsBodyX;
+    const body = (await request.json()) as TermsBody;
     if (!body.termsOffered?.length) return fail(400, "no_deal", "Choose at least one deal.");
     const m = getMarket();
     const items = db.library.items.filter((i) => i.programId === program.id);
@@ -320,7 +321,7 @@ export const marketHandlers = [
       m.offers.push(o);
     }
     saveMarket();
-    return reply(OfferX, toOffer(o, null), 201);
+    return reply(catalogApi.offerProgram.response, toOffer(o, null), 201);
   }),
 
   http.patch(path(catalogApi.updateOffer), async ({ request, params }) => {
@@ -329,11 +330,11 @@ export const marketHandlers = [
     const o = offerOf(String(params.offerId));
     if (!o) return fail(404, "not_found", "That program isn't offered.");
     if (!mayAct(p, o.maker.id)) return fail(403, "forbidden", "Only the maker's owners and operators can change its terms.");
-    const body = (await request.json()) as Partial<TermsBodyX> & { status?: "offered" | "withdrawn" };
+    const body = (await request.json()) as Partial<TermsBody> & { status?: "offered" | "withdrawn" };
     for (const [k, v] of Object.entries(body)) if (v !== undefined) (o as unknown as Record<string, unknown>)[k] = v;
     if (body.termsOffered?.length) o.defaultTerm = body.termsOffered[0];
     saveMarket();
-    return reply(OfferX, toOffer(o, null));
+    return reply(catalogApi.updateOffer.response, toOffer(o, null));
   }),
 
   http.post(path(catalogApi.requestCarriage), async ({ request, params }) => {
@@ -377,7 +378,7 @@ export const marketHandlers = [
     };
     m.requests.push(r);
     saveMarket();
-    return reply(CarriageRequestX, toRequest(r), 201);
+    return reply(catalogApi.requestCarriage.response, toRequest(r), 201);
   }),
 
   http.get(path(catalogApi.listRequests), ({ request, params }) => {
@@ -387,7 +388,7 @@ export const marketHandlers = [
     if (!membership(id, p.id)) return fail(403, "forbidden", "That station isn't one of yours.");
     const m = getMarket();
     const makerOf = (r: MkRequest) => offerOf(r.offerId)?.maker.id;
-    return reply(RequestsX, {
+    return reply(catalogApi.listRequests.response, {
       incoming: m.requests.filter((r) => makerOf(r) === id && r.carrierId !== id).map(toRequest),
       outgoing: m.requests.filter((r) => r.carrierId === id).map(toRequest)
     });
@@ -415,7 +416,21 @@ export const marketHandlers = [
       r.declineReason = body.reason ?? null;
     }
     saveMarket();
-    return reply(CarriageRequestX, toRequest(r));
+    return reply(catalogApi.decideRequest.response, toRequest(r));
+  }),
+
+  // C4: the carrier withdraws a request the maker hasn't answered.
+  http.post(path(catalogApi.withdrawRequest), ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const r = getMarket().requests.find((x) => x.id === String(params.requestId));
+    if (!r) return fail(404, "not_found", "That request wasn't found.");
+    if (!mayAct(p, r.carrierId)) return fail(403, "forbidden", "Only the asking station's owners and operators can withdraw it.");
+    if (r.status !== "asked") return fail(409, "decided", "The maker has already answered it.");
+    r.status = "withdrawn";
+    r.decidedAt = now().toISOString();
+    saveMarket();
+    return reply(catalogApi.withdrawRequest.response, toRequest(r));
   }),
 
   http.get(path(catalogApi.listAgreements), ({ request, params }) => {
@@ -424,7 +439,7 @@ export const marketHandlers = [
     const id = String(params.stationId);
     if (!membership(id, p.id)) return fail(403, "forbidden", "That station isn't one of yours.");
     const m = getMarket();
-    return reply(AgreementsX, {
+    return reply(catalogApi.listAgreements.response, {
       carrying: m.agreements.filter((a) => a.carrierId === id).map(toAgreement),
       carriedBy: m.agreements.filter((a) => offerOf(a.offerId)?.maker.id === id).map(toAgreement)
     });
@@ -442,7 +457,7 @@ export const marketHandlers = [
     a.endNoticeGivenAt = t.toISOString();
     a.endsAt = new Date(t.getTime() + o.noticeDays * DAY).toISOString();
     saveMarket();
-    return reply(AgreementX, toAgreement(a));
+    return reply(catalogApi.endAgreement.response, toAgreement(a));
   }),
 
   http.post(path(catalogApi.placeInLog), async ({ request, params }) => {

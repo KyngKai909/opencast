@@ -5,12 +5,11 @@
 
 import { useState } from "react";
 import { useParams } from "react-router";
-import { networkApi } from "@opencast/contracts";
+import { networkApi, type ClaimPage } from "@opencast/contracts";
 import { Avatar, Button, KeyValueList, Lockup, Modal, StationBand, StatRow, StepRail, clock, money, type Step } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call, ApiError } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { stationExtApi, type ClaimPageX } from "../../api/ext/station";
 import { useAuth } from "../../../auth/AuthProvider";
 import { longDate, marketName, shortAddress } from "../../components/station/format";
 import { STATION_TZ, useNow } from "../../../lib/clock";
@@ -20,7 +19,7 @@ import SignIn from "../SignIn";
 import "./ClaimStation.css";
 import { controlPath } from "../../../areas";
 
-const PLATFORM: Record<ClaimPageX["sourcePlatform"], string> = {
+const PLATFORM: Record<ClaimPage["sourcePlatform"], string> = {
   youtube: "YouTube",
   vimeo: "Vimeo",
   internet_archive: "Internet Archive",
@@ -34,7 +33,7 @@ const PLATFORM: Record<ClaimPageX["sourcePlatform"], string> = {
 const DAY = 86_400_000;
 
 /** Where the handover stands, for the page: the steps' states and what the third one says. */
-export function claimSteps(p: Pick<ClaimPageX, "handover">, signedInAsThem: boolean): { signIn: Step["state"]; prove: Step["state"]; takeOver: Step["state"] } {
+export function claimSteps(p: Pick<ClaimPage, "handover">, signedInAsThem: boolean): { signIn: Step["state"]; prove: Step["state"]; takeOver: Step["state"] } {
   const h = p.handover?.kind === "claim" ? p.handover : null;
   if (!signedInAsThem) return { signIn: "current", prove: "todo", takeOver: "todo" };
   if (!h || h.status === "cancelled") return { signIn: "done", prove: "current", takeOver: "todo" };
@@ -53,10 +52,10 @@ export default function ClaimStation() {
   const [stopping, setStopping] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const page = useApi(stationExtApi.getClaimPage, { params: { token } }, {
+  const page = useApi(networkApi.getClaimPage, { params: { token } }, {
     retry: false,
     // While the desk checks the account, look again every couple of seconds.
-    refetchInterval: (q) => ((q.state.data as ClaimPageX | undefined)?.handover?.status === "verifying" ? 2000 : false)
+    refetchInterval: (q) => ((q.state.data as ClaimPage | undefined)?.handover?.status === "verifying" ? 2000 : false)
   });
 
   if (signingIn && !auth.signedIn) return <SignIn />;
@@ -92,7 +91,7 @@ export default function ClaimStation() {
     try {
       // The real connect is the source platform's sign-in (request N10); the mock takes its word.
       await call(networkApi.startHandover, { params: { stationId: st.id }, body: { kind, sourceAccountProof: `${p.sourcePlatform}:connected` } });
-      await qc.invalidateQueries({ queryKey: [stationExtApi.getClaimPage.method, stationExtApi.getClaimPage.path] });
+      await qc.invalidateQueries({ queryKey: [networkApi.getClaimPage.method, networkApi.getClaimPage.path] });
       setStopping(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
@@ -130,7 +129,7 @@ export default function ClaimStation() {
         <p className="cc-claimpage__kick">For {p.personName}</p>
         <h1 className="cc-claimpage__h">{steps.takeOver === "done" ? `${cs} ${st.channel} is yours.` : `${cs} ${st.channel} is ready for you.`}</h1>
         <p className="cc-claimpage__lede">
-          You said yes on {longDate(p.saidYesAt, STATION_TZ)}. Since then, Opencast's team has run {p.works} on the {marketName(st.marketSlug)} dial. Everything below becomes yours when you claim it.
+          {p.saidYesAt ? `You said yes on ${longDate(p.saidYesAt, STATION_TZ)}. Since then, Opencast's team has run` : "Opencast's team has run"} {p.works} on the {marketName(st.marketSlug)} dial. Everything below becomes yours when you claim it.
         </p>
         <StationBand channel={st.channel ?? ""} callSign={cs} colour={st.colour ?? "#7E2F35"} name={st.name} place={band} rounded className="cc-claimpage__band" />
         <StatRow

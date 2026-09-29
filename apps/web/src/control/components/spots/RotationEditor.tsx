@@ -4,9 +4,8 @@
 // from station-settings 02.1 ("Backup rotation") and C.3 ("Rotation: 3 spots", "Edit rotation").
 
 import { useEffect, useRef, useState } from "react";
-import type { Rotation } from "@opencast/contracts";
+import type { MarketSpot, Rotation } from "@opencast/contracts";
 import { Button, IconButton, Lines, SelectField, Table, Tag, useToast, type Column } from "@opencast/ui";
-import type { MarketSpotExt } from "../../api/ext/spots";
 import { errorText, useSetRotation } from "./data";
 import { rateParts, spotLength } from "./format";
 import { noteRemoved } from "./justAdded";
@@ -14,12 +13,12 @@ import { SpotThumb } from "./parts";
 import "./RotationEditor.css";
 
 type Kind = "main" | "backup";
-type Row = Rotation["spots"][number] & { market: MarketSpotExt | undefined };
+type Row = Rotation["spots"][number] & { market: MarketSpot | undefined };
 
 export interface RotationEditorProps {
   stationId: string;
   rotations: { main: Rotation; backup: Rotation };
-  market: MarketSpotExt[];
+  market: MarketSpot[];
   /** Owners and operators change rotations. */
   canEdit: boolean;
   /** Where "Add from the market" goes. */

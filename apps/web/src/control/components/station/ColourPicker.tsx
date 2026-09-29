@@ -2,7 +2,7 @@
 // A colour that can't carry white text at 4.5:1 can't be saved, and the line says why (rules,
 // station colours; master-control A.1; station-settings 01.1).
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { contrastRatio, Icon, ratioLabel, stationColourPasses } from "@opencast/ui";
 import "./ColourPicker.css";
 
@@ -29,7 +29,13 @@ export interface ColourPickerProps {
 export function ColourPicker({ value, onChange, disabled }: ColourPickerProps) {
   const id = useId();
   const [text, setText] = useState(value.toUpperCase());
-  useEffect(() => setText(value.toUpperCase()), [value]);
+  const field = useRef<HTMLInputElement>(null);
+  // Follow the saved colour, except while someone is typing: each passing colour is saved as it's
+  // typed, and a save's answer arriving late would otherwise put back the colour before.
+  useEffect(() => {
+    if (typeof document !== "undefined" && document.activeElement === field.current) return;
+    setText(value.toUpperCase());
+  }, [value]);
   const check = colourCheck(text);
   const choose = (hex: string) => {
     setText(hex.toUpperCase());
@@ -57,6 +63,7 @@ export function ColourPicker({ value, onChange, disabled }: ColourPickerProps) {
           })}
         </div>
         <input
+          ref={field}
           id={`${id}-hex`}
           className="cc-colour__hex"
           aria-label="Colour, as a hex code"

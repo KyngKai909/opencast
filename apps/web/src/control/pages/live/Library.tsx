@@ -4,17 +4,16 @@
 // upload and Import from a link. ?rights=:itemId opens "Can BEAT air …?" (A.3).
 
 import { useParams, useSearchParams } from "react-router";
-import { libraryApi } from "@opencast/contracts";
+import { libraryApi, type LibraryItem } from "@opencast/contracts";
 import { ControlTitle } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
-import { LibraryExt, type LibraryItemExt } from "../../api/ext/live";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { FolderRail, LibrarySummary, LibraryTable, RightsPane, UploadDrop } from "../../components/live/LibraryParts";
 import { Quiet } from "../common";
 import "./Library.css";
 
-const SPECIAL: Record<string, { title: string; keep: (i: LibraryItemExt) => boolean; empty: string }> = {
+const SPECIAL: Record<string, { title: string; keep: (i: LibraryItem) => boolean; empty: string }> = {
   links: { title: "Imported from links", keep: (i) => i.source === "link", empty: "Nothing imported from a link." },
   rights: { title: "Rights to confirm", keep: (i) => !i.rights, empty: "Every item's rights are confirmed." },
   preparing: { title: "Preparing for air", keep: (i) => i.status === "preparing", empty: "Nothing is being prepared for air." }
@@ -29,7 +28,7 @@ export default function Library() {
   const lib = useApi(
     libraryApi.getLibrary,
     { params: { stationId: s.id }, query: {} },
-    { schema: LibraryExt, refetchInterval: (q) => (q.state.data?.items.some((i) => i.status === "preparing") ? 2000 : false) }
+    { refetchInterval: (q) => (q.state.data?.items.some((i) => i.status === "preparing") ? 2000 : false) }
   );
   if (lib.isLoading) return <Quiet />;
   const callSign = s.station.callSign ?? s.station.name;

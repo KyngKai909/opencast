@@ -1,12 +1,12 @@
 // Carrying a program, and approving a request, with a toast and Undo instead of a confirmation.
-// The API can't take either back (no withdraw, contract request C4; decideRequest is final), so the
-// change is sent when the toast goes, or when the next one replaces it; Undo stops it being sent.
+// Neither can be taken back once sent (a carry that needs no approval is approved and placed at
+// once; decideRequest is final; only a request still waiting can be withdrawn, C4), so the change
+// is sent when the toast goes, or when the next one replaces it; Undo stops it being sent.
 
 import type { ReactNode } from "react";
-import { catalogApi, type CarriageTerm, type Slot } from "@opencast/contracts";
+import { type CarriageTerm, catalogApi, type Slot } from "@opencast/contracts";
 import { clock, TOAST_TIMEOUT, useToast } from "@opencast/ui";
 import { call } from "../../../api/client";
-import { CarriageRequestX } from "../../api/ext/market";
 import { STATION_TZ } from "../../../lib/clock";
 import { useRefreshMarket } from "./api";
 import { localDate, localSlot } from "./time";
@@ -72,8 +72,7 @@ export interface CarryPlan {
 export async function carry(plan: CarryPlan) {
   const r = await call(
     catalogApi.requestCarriage,
-    { params: { offerId: plan.offerId }, body: { carrierStationId: plan.carrierStationId, term: plan.term, slots: plan.slots, repeatSlots: plan.repeatSlots, startsOn: plan.startsOn, audioOnly: plan.audioOnly ?? false } },
-    CarriageRequestX
+    { params: { offerId: plan.offerId }, body: { carrierStationId: plan.carrierStationId, term: plan.term, slots: plan.slots, repeatSlots: plan.repeatSlots, startsOn: plan.startsOn, audioOnly: plan.audioOnly ?? false } }
   );
   if (r.status === "approved" && r.agreementId) {
     await call(catalogApi.placeInLog, { params: { agreementId: r.agreementId }, body: { from: plan.startsOn, weeks: plan.weeks, replaceExisting: plan.replaceExisting } });

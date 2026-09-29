@@ -2,9 +2,9 @@
 // sentence, when a carrier airs it. One place, so the market row, the program page, the maker's
 // preview ("word for word what a carrying station sees") and the carriers page say the same thing.
 
-import type { CarriageTerm, Slot, StationIdent } from "@opencast/contracts";
+import type { CarriageTerm, CashPlusBarter, Offer, Slot, StationIdent } from "@opencast/contracts";
 import { duration, money } from "@opencast/ui";
-import type { CashPlusBarterX, OfferX, ProgramFormatX } from "../../api/ext/market";
+import type { ProgramFormat } from "../../api/types";
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -40,14 +40,14 @@ export function lengthLong(ms: number): string {
   return `${h} ${h === 1 ? "hour" : "hours"}${m ? ` ${m} minutes` : ""}`;
 }
 
-const CADENCE: Record<NonNullable<ProgramFormatX["cadence"]>, string> = { weekly: "Weekly", nightly: "Nightly", weeknights: "Weeknights" };
+const CADENCE: Record<NonNullable<ProgramFormat["cadence"]>, string> = { weekly: "Weekly", nightly: "Nightly", weeknights: "Weeknights" };
 
 /**
  * The program's format line: "Series, 22 episodes of 2 hr 20 min", "Weekly, live, 60 min",
  * "Weekly, live, 60 min, radio band", "One-off, 2 hr 15 min". Without the L1 format it falls back
  * to what the contract has ("Series, 15 episodes").
  */
-export function formatLine(p: { episodeCount: number; live: boolean; format?: ProgramFormatX }, opts: { band?: boolean; long?: boolean } = {}): string {
+export function formatLine(p: { episodeCount: number; live: boolean; format?: ProgramFormat }, opts: { band?: boolean; long?: boolean } = {}): string {
   const f = p.format;
   const len = f?.episodeLengthMs ? (opts.long ? lengthLong(f.episodeLengthMs) : lengthText(f.episodeLengthMs)) : null;
   const parts: string[] = [];
@@ -75,12 +75,12 @@ export function makerName(maker: StationIdent): string {
 }
 
 /** The maker's kind tag: Station, Studio, Catalog. */
-export function makerKindWord(kind: OfferX["makerKind"]): string {
+export function makerKindWord(kind: Offer["makerKind"]): string {
   return kind === "station" ? "Station" : kind === "studio" ? "Studio" : "Catalog";
 }
 
 /** Who fills the barter share, from where the reader stands: "You", "HALL", "The studio". */
-export function whoFills(offer: Pick<OfferX, "maker" | "makerKind">, viewerId: string | null): string {
+export function whoFills(offer: Pick<Offer, "maker" | "makerKind">, viewerId: string | null): string {
   if (viewerId && offer.maker.id === viewerId) return "You";
   if (offer.makerKind === "studio") return "The studio";
   if (offer.makerKind === "catalog") return "Opencast";
@@ -102,7 +102,7 @@ export function priceText(micros: number, unit: "per_airing" | "per_hour" | null
 }
 
 /** One deal's detail for the market row: "HALL fills 2:00 an hour", "$2.50 an airing". */
-export function termDetail(offer: OfferX, term: CarriageTerm, viewerId: string | null): string | null {
+export function termDetail(offer: Offer, term: CarriageTerm, viewerId: string | null): string | null {
   const who = whoFills(offer, viewerId);
   const len = offer.program.format?.episodeLengthMs;
   switch (term) {
@@ -121,7 +121,7 @@ export function termDetail(offer: OfferX, term: CarriageTerm, viewerId: string |
 }
 
 /** The terms in two lines, as the market row and the maker's list draw them. */
-export function termsTwoLines(offer: OfferX, viewerId: string | null): { names: string; detail: string } {
+export function termsTwoLines(offer: Offer, viewerId: string | null): { names: string; detail: string } {
   const details = offer.termsOffered
     .map((t) => termDetail(offer, t, viewerId))
     .filter((d): d is string => !!d)
@@ -141,7 +141,7 @@ export interface DealLine {
  * Each deal in a sentence, with its price. `short` is the program page's Deals (market 02.1);
  * `long` is Choose terms (master-control B.2).
  */
-export function dealLines(offer: OfferX, style: "short" | "long"): DealLine[] {
+export function dealLines(offer: Offer, style: "short" | "long"): DealLine[] {
   const perHour = offer.breakMsPerHour ?? 4 * MIN;
   const who = whoFills(offer, null);
   const all = duration(perHour);
@@ -168,7 +168,7 @@ export function dealLines(offer: OfferX, style: "short" | "long"): DealLine[] {
         price: offer.cashPriceMicros != null ? priceText(offer.cashPriceMicros, offer.cashPriceUnit) : money(0)
       };
     if (term === "cash_plus_barter") {
-      const c: CashPlusBarterX | null | undefined = offer.cashPlusBarter;
+      const c: CashPlusBarter | null | undefined = offer.cashPlusBarter;
       const maker = c?.makerMsPerHour ?? 0;
       const rest = duration(Math.max(0, perHour - maker));
       return {
@@ -195,7 +195,7 @@ export function noticeText(days: number, either = false): string {
 }
 
 /** "Any station", or "Approved by BEAT" / "You approve each". */
-export function approvalText(offer: Pick<OfferX, "approval" | "maker">, viewerId: string | null, style: "carrier" | "maker-list" = "carrier"): string {
+export function approvalText(offer: Pick<Offer, "approval" | "maker">, viewerId: string | null, style: "carrier" | "maker-list" = "carrier"): string {
   if (offer.approval === "any_station") return "Any station";
   if (style === "maker-list" && viewerId === offer.maker.id) return "You approve each";
   return `Approved by ${offer.maker.callSign ?? offer.maker.name}`;
@@ -305,7 +305,7 @@ export const ADVISORY_WORDS = { none: "None", language: "Language", mature: "Mat
  * series; live programs run weekly (the live block's cadence); the length is the longest episode
  * rounded up to a 30-minute block ("29:10" airs in a 30 min slot, "44:20" in 60 min).
  */
-export function formatFromLibrary(program: { live: boolean; episodeCount: number }, durationsMs: readonly (number | null)[]): ProgramFormatX {
+export function formatFromLibrary(program: { live: boolean; episodeCount: number }, durationsMs: readonly (number | null)[]): ProgramFormat {
   const longest = Math.max(0, ...durationsMs.map((d) => d ?? 0));
   const block = 30 * MIN;
   return { kind: program.episodeCount > 1 || program.live ? "series" : "one_off", cadence: program.live ? "weekly" : null, episodeLengthMs: longest ? Math.ceil(longest / block) * block : null, bands: ["tv", "radio"] };

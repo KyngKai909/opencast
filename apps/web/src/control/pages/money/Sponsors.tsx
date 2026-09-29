@@ -6,9 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { libraryApi, SPONSORSHIP_DECLINE_LABELS, SPONSORSHIP_STATE_LABELS, spotsApi, type SponsorshipDeclineReason } from "@opencast/contracts";
+import { libraryApi, type Sponsorship, SPONSORSHIP_DECLINE_LABELS, SPONSORSHIP_STATE_LABELS, type SponsorshipDeclineReason, spotsApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Lines, Menu, Modal, Sheet, Tag, money, useToast } from "@opencast/ui";
-import type { SponsorshipExt } from "../../api/ext/spots";
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import { CreditSlate } from "../../components/spots/CreditSlate";
@@ -61,7 +60,7 @@ function SponsorsPage() {
     if (sponsorshipId && !phone) focus.current?.focus();
   }, [sponsorshipId, phone, data.data]);
 
-  const decide = (x: SponsorshipExt, d: Decision) => {
+  const decide = (x: Sponsorship, d: Decision) => {
     setHeld((h) => ({ ...h, [x.id]: d }));
     setDeclining(null);
     if (sponsorshipId) navigate(`${s.base}/sponsors`, { replace: true });
@@ -87,35 +86,35 @@ function SponsorsPage() {
   if (data.isLoading) return <Quiet />;
   if (data.error) return <ErrorLine>{errorText(data.error)}</ErrorLine>;
 
-  const monthly = (x: SponsorshipExt) => {
+  const monthly = (x: Sponsorship) => {
     const min = setting(x.program?.id ?? null)?.minMonthlyMicros;
     return `${money(x.monthlyMicros)}${min !== undefined && min === x.monthlyMicros ? ", your minimum" : ""}`;
   };
-  const alsoOn = (x: SponsorshipExt) => {
+  const alsoOn = (x: Sponsorship) => {
     const spot = market.data?.find((m) => m.business.id === x.business.id);
     if (!spot) return null;
     const where = spot.state === "in_rotation" ? "in rotation" : spot.state === "paused" ? "paused" : "in the market";
     return `${spot.spot.title} spot, ${where}`;
   };
-  const businessLine = (x: SponsorshipExt) => {
+  const businessLine = (x: Sponsorship) => {
     const p = x.profile;
     if (!p) return null;
     return [p.category, p.city, p.miles !== null ? `${p.miles.toFixed(1)} mi` : null].filter(Boolean).join(", ");
   };
-  const facts = (x: SponsorshipExt, short = false) =>
+  const facts = (x: Sponsorship, short = false) =>
     [
       { label: "A month", value: short ? money(x.monthlyMicros) : monthly(x) },
       { label: "From", value: dateText(x.startsOn) },
       ...(short ? [] : [businessLine(x) ? { label: "Business", value: businessLine(x)! } : null, alsoOn(x) ? { label: `Also on ${call_}`, value: alsoOn(x)! } : null, x.profile?.elsewhere.length ? { label: "Sponsors elsewhere", value: x.profile.elsewhere.join(", ") } : null])
     ].filter((r): r is { label: string; value: string } => !!r);
 
-  const slateFor = (x: SponsorshipExt | undefined, variant: "preview" | "air" = "preview") => {
+  const slateFor = (x: Sponsorship | undefined, variant: "preview" | "air" = "preview") => {
     const lead = x ? creditLead(x.program, s.station.name) : creditLead(null, s.station.name);
     const sponsors = x ? [{ name: x.business.name, line: x.creditText }] : current.filter((c) => !c.program).map((c) => ({ name: c.business.name, line: c.creditText }));
     return <CreditSlate colour={s.station.colour ?? "var(--line)"} lead={lead} sponsors={sponsors} members={members?.creditName} callSign={call_} channel={s.station.channel ?? ""} variant={variant} />;
   };
 
-  const decline = (x: SponsorshipExt) =>
+  const decline = (x: Sponsorship) =>
     declining === x.id ? (
       <div className="cc-spn__why" role="group" aria-label="Why you're declining. The business sees this reason.">
         <span>The business sees the reason:</span>

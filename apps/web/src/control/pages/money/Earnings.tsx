@@ -8,7 +8,6 @@ import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { ledgerApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Segmented, money } from "@opencast/ui";
-import { StationEarningsX } from "../../api/ext/earnings";
 import { useApi } from "../../../api/hooks";
 import { ClearAccount } from "../../components/earnings/ClearAccount";
 import { earningsSections, heldTonightDetail, payoutDetail, phoneRows, plural } from "../../components/earnings/lines";
@@ -37,7 +36,7 @@ export default function Earnings() {
   // The phone's page names itself under the top bar, as the notice opens it (04.2).
   useShellOptions({ context: phone ? "" : undefined });
 
-  const earnings = useApi(ledgerApi.getStationEarnings, { params: { stationId: s.id }, query: { period } }, { schema: StationEarningsX, refetchInterval: 60_000 });
+  const earnings = useApi(ledgerApi.getStationEarnings, { params: { stationId: s.id }, query: { period } }, { refetchInterval: 60_000 });
   const account = useApi(ledgerApi.getPayoutAccount, { params: { stationId: s.id } }, { enabled: owner, retry: false });
   const e = earnings.data;
   const setUp = account.data?.status === "needs_onboarding" ? account.data : null;

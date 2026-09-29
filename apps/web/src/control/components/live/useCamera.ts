@@ -1,6 +1,6 @@
 // The browser studio's camera and microphone (live-listings 02.1, 05.x): the local picture, the
 // device lists for the two selects, a level for the microphone meter, and sharing the screen.
-// Nothing is sent anywhere: browser ingest has no endpoint yet (docs/contract-requests.md B3).
+// On air, the studio sends this stream to the browser source's ingest (whip.ts, B3).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

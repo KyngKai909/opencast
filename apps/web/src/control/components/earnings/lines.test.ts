@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { StationEarningsX, StatementX } from "../../api/ext/earnings";
+import type { Statement, StationEarnings } from "@opencast/contracts";
 import { andList, earningsSections, heldTonightDetail, parseAmount, perThousandMicros, phoneRows, pledgesDetail, plural, sponsorsDetail, spotsDetail, statementLineDetail, statementSections, statementSubtitle, statementTitle } from "./lines";
 import { airedTimes, sourceLine } from "./audience";
 
 const $ = (d: number) => Math.round(d * 1_000_000);
 
-const september: StationEarningsX = {
+const september: StationEarnings = {
   period: "month",
   lines: {
     spots: { micros: $(486.2), airings: 212, businesses: 5 },
@@ -74,7 +74,7 @@ describe("earnings lines", () => {
 });
 
 describe("statements", () => {
-  const week: StatementX = {
+  const week: Statement = {
     id: "00000000-0000-4000-8000-000000630003",
     period: "week",
     periodStart: "2026-09-14",

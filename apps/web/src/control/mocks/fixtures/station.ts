@@ -3,8 +3,8 @@
 // A.5). Team members themselves live in the shared db (db.members). Saved under its own key; it
 // starts again whenever the shared mock db does (a --fresh run, or "Reset mock data").
 
-import type { BreakRule, Invite, NotificationPrefs, Translator } from "@opencast/contracts";
-import type { ClaimPageX, ClaimX } from "../../api/ext/station";
+import type { BreakRule, ClaimPage, Invite, NotificationPrefs, Translator } from "@opencast/contracts";
+import type { ClaimX } from "../../api/ext/station";
 import { getDb, saveDb } from "../db";
 import { BEAT, CRAT, HALL, stationByRef, uid } from "./stations";
 import { at, MIN, SEC } from "./time";
@@ -30,7 +30,7 @@ export interface ClaimToken {
   token: string;
   stationId: string;
   personEmail: string;
-  page: Omit<ClaimPageX, "station" | "handover">;
+  page: Omit<ClaimPage, "station" | "handover">;
 }
 
 export interface StationState {

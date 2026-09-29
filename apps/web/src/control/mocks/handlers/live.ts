@@ -2,19 +2,7 @@
 // area also owns). The Live and programming area owns this file.
 
 import { http, type HttpHandler } from "msw";
-import { stationsApi } from "@opencast/contracts";
-import {
-  endEarly,
-  getLiveBlock,
-  getLowerThird,
-  listHosts,
-  listListings,
-  LiveSourcesExt,
-  setLowerThird,
-  updateListing,
-  updateProgramCaptions,
-  type Listing
-} from "../../api/ext/live";
+import { libraryApi, logApi, stationsApi, type Listing } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import type { DbLogEntry } from "../fixtures/evening";
@@ -70,6 +58,7 @@ function sourcesOf(stationId: string, hostView: boolean) {
     ...(hostView ? { server: null, streamKeyPreview: null } : {}),
     quality: s.signal === "receiving" ? SOURCE_QUALITY[s.id] ?? null : null,
     previewUrl: s.signal === "receiving" ? SOURCE_PREVIEW[s.id] ?? null : null,
+    // B3: the mock has no Livepeer, so a browser source has nowhere to publish (the API says null too).
     ingest: null
   }));
 }
@@ -112,7 +101,7 @@ export const liveHandlers: HttpHandler[] = [
     const id = String(params.stationId);
     const m = roleOn(id, p);
     if (!m) return fail(403, "forbidden", "That station isn't one of yours.");
-    return reply(LiveSourcesExt, sourcesOf(id, m.role === "host"));
+    return reply(stationsApi.listLiveSources.response, sourcesOf(id, m.role === "host"));
   }),
 
   http.post(path(stationsApi.addLiveSource), async ({ request, params }) => {
@@ -168,7 +157,7 @@ export const liveHandlers: HttpHandler[] = [
     return reply(stationsApi.removeLiveSource.response, { ok: true });
   }),
 
-  http.get(path(listHosts), ({ request, params }) => {
+  http.get(path(stationsApi.listHosts), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     ensureLiveSeed();
@@ -184,7 +173,7 @@ export const liveHandlers: HttpHandler[] = [
         title: pr.title,
         hosts: members.filter((x) => x.hostProgramIds.includes(pr.id)).map((x) => ({ userId: x.personId, displayName: PEOPLE.find((pp) => pp.id === x.personId)?.displayName ?? null }))
       }));
-    return reply(listHosts.response, { programs });
+    return reply(stationsApi.listHosts.response, { programs });
   }),
 
   http.put(path(stationsApi.setHosts), async ({ request, params }) => {
@@ -244,7 +233,7 @@ export const liveHandlers: HttpHandler[] = [
     return reply(stationsApi.setSpeakers.response, list);
   }),
 
-  http.get(path(getLowerThird), ({ request, params }) => {
+  http.get(path(stationsApi.getLowerThird), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.stationId);
@@ -253,12 +242,12 @@ export const liveHandlers: HttpHandler[] = [
     const denied = goesLive(id, e.programId, p);
     if (denied) return denied;
     const saved = liveState().lowerThirds[e.id];
-    if (saved) return reply(getLowerThird.response, saved);
+    if (saved) return reply(stationsApi.getLowerThird.response, saved);
     const first = (e.programId ? liveState().speakers[e.programId] : undefined)?.[0];
-    return reply(getLowerThird.response, { entryId: e.id, hidden: false, speakerId: first?.id ?? null, name: first?.name ?? "", title: first?.title ?? null });
+    return reply(stationsApi.getLowerThird.response, { entryId: e.id, hidden: false, speakerId: first?.id ?? null, name: first?.name ?? "", title: first?.title ?? null, updatedAt: null });
   }),
 
-  http.put(path(setLowerThird), async ({ request, params }) => {
+  http.put(path(stationsApi.setLowerThird), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.stationId);
@@ -266,15 +255,23 @@ export const liveHandlers: HttpHandler[] = [
     if (e instanceof Response) return e;
     const denied = goesLive(id, e.programId, p);
     if (denied) return denied;
-    const parsed = setLowerThird.body.safeParse(await request.json().catch(() => null));
+    const parsed = stationsApi.setLowerThird.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "A name fits in 80 characters, a title in 120.");
-    const next = { entryId: e.id, ...parsed.data };
+    const t = now().toISOString();
+    let { name, title } = parsed.data;
+    // A speaker's name and title are the list's.
+    if (parsed.data.speakerId) {
+      const sp = (e.programId ? liveState().speakers[e.programId] : undefined)?.find((x) => x.id === parsed.data.speakerId);
+      if (!sp) return fail(400, "speakerId", "That speaker isn't on the program's list.");
+      ({ name, title } = sp);
+    } else if (!parsed.data.hidden && !name.trim()) return fail(400, "name", "Give the lower third a name.");
+    const next = { entryId: e.id, hidden: parsed.data.hidden, speakerId: parsed.data.speakerId, name, title, updatedAt: t };
     liveState().lowerThirds[e.id] = next;
     saveLive();
-    return reply(setLowerThird.response, next);
+    return reply(stationsApi.setLowerThird.response, next);
   }),
 
-  http.get(path(getLiveBlock), ({ request, params }) => {
+  http.get(path(logApi.getLiveBlock), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.stationId);
@@ -282,10 +279,16 @@ export const liveHandlers: HttpHandler[] = [
     if (e instanceof Response) return e;
     const denied = goesLive(id, e.programId, p);
     if (denied) return denied;
-    return reply(getLiveBlock.response, { entryId: e.id, endedEarlyAt: liveState().endedEarly[e.id] ?? null });
+    const t = now().toISOString();
+    const endedEarlyAt = liveState().endedEarly[e.id] ?? null;
+    const onAir = !endedEarlyAt && e.startsAt <= t && t < e.endsAt;
+    // While it's on air: its signal, or the stand-by slate while it waits for one.
+    const source = getDb().liveSources.find((x) => x.id === e.liveSourceId);
+    const signal = onAir ? (source?.signal === "receiving" ? "receiving" : "standby") : null;
+    return reply(logApi.getLiveBlock.response, { entryId: e.id, endedEarlyAt, startsAt: e.startsAt, endsAt: e.endsAt, signal });
   }),
 
-  http.post(path(endEarly), ({ request, params }) => {
+  http.post(path(logApi.endEarly), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.stationId);
@@ -297,11 +300,15 @@ export const liveHandlers: HttpHandler[] = [
     if (!(e.startsAt <= t && t < e.endsAt)) return fail(409, "not_on_air", "It can end early only while it's on air.");
     if (liveState().endedEarly[e.id]) return fail(409, "ended", "It has already ended.");
     liveState().endedEarly[e.id] = t;
+    // The block ends here; the mock leaves what follows where it is (the API moves it up).
+    e.endsAt = t;
+    e.endedEarlyAt = t;
+    saveDb();
     saveLive();
-    return reply(endEarly.response, { entryId: e.id, endedAt: t });
+    return reply(logApi.endEarly.response, { entryId: e.id, endedAt: t, movedUp: 0 });
   }),
 
-  http.get(path(listListings), ({ request, params }) => {
+  http.get(path(logApi.listListings), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     ensureLiveSeed();
@@ -315,10 +322,10 @@ export const liveHandlers: HttpHandler[] = [
     const listings = stationLog(id, from, to)
       .filter((e) => e.kind !== "off_air" && e.code === "PGM" && e.startsAt >= from)
       .map(listingOf);
-    return reply(listListings.response, { listings, needDescription: listings.filter((l) => l.status === "needs_description").length });
+    return reply(logApi.listListings.response, { listings, needDescription: listings.filter((l) => l.status === "needs_description").length });
   }),
 
-  http.patch(path(updateListing), async ({ request, params }) => {
+  http.patch(path(logApi.updateListing), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.stationId);
@@ -326,7 +333,7 @@ export const liveHandlers: HttpHandler[] = [
     if (denied) return denied;
     const e = getDb().log.find((x) => x.id === String(params.entryId) && x.stationId === id);
     if (!e) return fail(404, "not_found", "That airing isn't on the log.");
-    const parsed = updateListing.body.safeParse(await request.json().catch(() => null));
+    const parsed = logApi.updateListing.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "too_long", "A description fits in 160 characters.");
     const b = parsed.data;
     if (e.carriedFrom && (b.episodeTitle !== undefined || b.episodeDescription !== undefined)) {
@@ -336,20 +343,20 @@ export const liveHandlers: HttpHandler[] = [
     if (b.localNote !== undefined) e.localNote = b.localNote || null;
     if (b.episodeDescription !== undefined) liveState().descriptions[e.id] = b.episodeDescription || null;
     saveLive();
-    return reply(updateListing.response, listingOf(e));
+    return reply(logApi.updateListing.response, listingOf(e));
   }),
 
-  http.patch(path(updateProgramCaptions), async ({ request, params }) => {
+  http.patch(path(libraryApi.updateProgramCaptions), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const program = getDb().library.programs.find((pr) => pr.id === String(params.programId));
     if (!program) return fail(404, "not_found", "That program wasn't found.");
     const denied = manages(program.station.id, p);
     if (denied) return denied;
-    const parsed = updateProgramCaptions.body.safeParse(await request.json().catch(() => null));
+    const parsed = libraryApi.updateProgramCaptions.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "Choose how it's captioned.");
     liveState().captions[program.id] = parsed.data;
     saveLive();
-    return reply(updateProgramCaptions.response, parsed.data);
+    return reply(libraryApi.updateProgramCaptions.response, parsed.data);
   })
 ];

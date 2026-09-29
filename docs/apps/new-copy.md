@@ -471,3 +471,16 @@ Words for what the API answers now (P11, P12, P20, P21, E4). The API's own messa
 | Settings, Connections, the Redeem tool | "Redeem in the app", "Owners and managers mark codes used at the counter, from Redeem on their phone"; managers and viewers see "On" / "Off" |
 | Redeem, while it's off | the "Settings" button under "Redeem is off for this business…" |
 | Settings, Close account | "{$20.00} can't go back to a card. Add a bank or Clear account in Money and receipts first." (money available, only cards); "What's available goes back to your bank or Clear account." (nothing to name); after a refusal, "Made for you" (an order being made) or "Money and receipts" (nowhere to send the money) |
+### apps/web: master control on its new endpoints (contracts of 2026-09-29)
+
+Words for what the API answers now (A4, A5, B3, B6, C4, G3, G5, G7, L5 to L7, N10, P24, S15, S17). The API's own messages are shown as they come for its refusals (`not_live`, `not_on_air`, `ended`, `from_the_maker`, `speakerId`, `not_an_upload`, `claim_open`, `preparing`, `unreadable_file`, `wrong_kind`, `too_long_for_log`, `not_open`, `wrong_file_type`, `too_big`, `decided`). "Listings can't be edited here yet." is gone: the listings always load.
+
+| Where | Words |
+|---|---|
+| The claim page, a station set up under a licence (N10 `saidYesAt` null) | lede without the yes: "Opencast's team has run {works} on the {Inland Empire} dial. Everything below becomes yours when you claim it." |
+| Place in the log, a request that needs the maker's approval (C4) | the toast "{Maker} has your request. {Program} goes in your log when they approve it." now has Undo, which withdraws the request |
+| Listings, Captions (L7) | the language by name from its code ("Generated live, English" from `en`); turning captions on keeps the program's language, else English |
+| A library item, Prepared for air, Captions (L7) | "Uploaded, English" (the caption track's language, by name) |
+| Audience, By program, Stayed to the end (U1) | an airing that has ended with no one at its first minute: "–" |
+| The studio, a lower third the API refuses (S15) | toast with the API's message; the lower third stays as set on the screen |
+| Program log, Repeat this day, Once (G7) | no new words: choosing "Once" takes the day's repeat off the log from now on (another pattern replaces it) |

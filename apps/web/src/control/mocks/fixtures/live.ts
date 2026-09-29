@@ -19,9 +19,7 @@
 // Its own state (speakers, lower thirds, ended-early blocks, per-airing descriptions, captions,
 // link imports) is kept under its own key: localStorage "oc-mock-control-live".
 
-import type { Captions, LowerThirdState } from "../../api/ext/live";
-import type { z } from "zod";
-import type { ImportJob, LibraryItem, LogEntry } from "@opencast/contracts";
+import type { Captions, ImportJob, LibraryItem, LogEntry, LowerThird } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { getDb, saveDb } from "../db";
 import { LIVE_SOURCE_IDS, type DbLogEntry } from "./evening";
@@ -54,18 +52,18 @@ export interface Speaker {
 export interface LiveState {
   version: number;
   speakers: Record<string, Speaker[]>;
-  lowerThirds: Record<string, LowerThirdState>;
+  lowerThirds: Record<string, LowerThird>;
   endedEarly: Record<string, string>;
   /** Per airing (log entry id): its own description (G5). */
   descriptions: Record<string, string | null>;
-  captions: Record<string, z.infer<typeof Captions>>;
+  captions: Record<string, Captions>;
   imports: (ImportJob & { stationId: string })[];
   /** Items being prepared for air: when their preparation started (ms). */
   preparing: Record<string, number>;
 }
 
 const KEY = "oc-mock-control-live";
-export const LIVE_VERSION = 1;
+export const LIVE_VERSION = 2;
 
 function seedState(): LiveState {
   return {
@@ -83,10 +81,10 @@ function seedState(): LiveState {
       [LIVE_ENTRY_IDS.crateTalkSunday]: "Marcus and two local producers on clearing samples, what fair use does and doesn't cover, and where to find records nobody owns."
     },
     captions: {
-      [PROGRAM_IDS.crateTalk]: { mode: "generated_live", language: "English" },
-      [PROGRAM_IDS.beatTapeLive]: { mode: "generated_live", language: "English" },
-      [PROGRAM_IDS.lateCrate]: { mode: "generated", language: "English" },
-      [PROGRAM_IDS.crateSession]: { mode: "generated", language: "English" }
+      [PROGRAM_IDS.crateTalk]: { mode: "generated_live", language: "en" },
+      [PROGRAM_IDS.beatTapeLive]: { mode: "generated_live", language: "en" },
+      [PROGRAM_IDS.lateCrate]: { mode: "generated", language: "en" },
+      [PROGRAM_IDS.crateSession]: { mode: "generated", language: "en" }
     },
     imports: [],
     preparing: {}

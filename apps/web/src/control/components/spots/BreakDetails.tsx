@@ -1,8 +1,8 @@
 // A break's contents, to the second (the Details button on Breaks): the same rows, codes and
 // source lines as the Monitor's rundown (A.7). A modal on the web, a sheet on the phone.
 
+import { type BreakContent } from "@opencast/contracts";
 import { clock, duration, Modal, Rundown, Sheet, type LogCodeName, type RundownItem } from "@opencast/ui";
-import type { BreakContent } from "../../api/ext/spots";
 import { STATION_TZ } from "../../../lib/clock";
 import { useIsPhone } from "../../layout/shell";
 

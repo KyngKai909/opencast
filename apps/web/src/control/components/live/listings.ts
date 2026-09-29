@@ -1,11 +1,21 @@
 // Listings words (live-listings 03.1): the status, and the line under each program.
 
-import type { Listing } from "../../api/ext/live";
+import type { Listing } from "@opencast/contracts";
 
 /** The categories a listing can be in (one list for now; S17 asks for it from the API). */
 export const CATEGORIES = ["Music", "Talk", "Public affairs", "Food", "Classic"];
 
 export const STATUS: Record<Listing["status"], string> = { complete: "Complete", needs_description: "Needs a description", from_the_maker: "From the maker" };
+
+/** L7: a caption language's name ("en" reads "English"); what the API has when the browser can't say. */
+export function languageName(code: string | null): string | null {
+  if (!code) return null;
+  try {
+    return new Intl.DisplayNames(["en-US"], { type: "language" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 export const isEpisodeNumber = (t: string | null) => !!t && /^ep\. \d+$/.test(t);
 

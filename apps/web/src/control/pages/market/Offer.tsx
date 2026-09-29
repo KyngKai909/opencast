@@ -5,9 +5,9 @@
 
 import { useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import type { CarriageTerm } from "@opencast/contracts";
+import type { Agreement, CarriageTerm, FitSlot } from "@opencast/contracts";
 import { Button, clock, clockRange, duration, KeyValueList, Tag, TitleCard, ChoiceList } from "@opencast/ui";
-import type { AgreementX, FitSlotX, OfferDetailX } from "../../api/ext/market";
+import type { OfferDetailX } from "../../api/ext/market";
 import { useAgreements, useOffer } from "../../components/market/api";
 import { gapPlan, useCarryIntoGap } from "../../components/market/carry";
 import { ChooseTerms } from "../../components/market/ChooseTerms";
@@ -52,11 +52,11 @@ export default function Offer() {
 }
 
 /** The dead-air slot the main button offers: an exact fit. */
-function exactGap(o: OfferDetailX): FitSlotX | null {
+function exactGap(o: OfferDetailX): FitSlot | null {
   return o.fit?.find((f) => f.reason === "dead_air" && f.exact && f.startsAt) ?? null;
 }
 
-function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX; carrying: AgreementX | null; initialTerm: CarriageTerm | null }) {
+function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX; carrying: Agreement | null; initialTerm: CarriageTerm | null }) {
   const s = useStation();
   const mine = o.maker.id === s.id;
   const [term, setTerm] = useState<CarriageTerm>(initialTerm && o.termsOffered.includes(initialTerm) ? initialTerm : carrying?.term ?? o.defaultTerm ?? o.termsOffered[0]!);
@@ -159,7 +159,7 @@ function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX;
   );
 }
 
-function fitReason(f: FitSlotX): string {
+function fitReason(f: FitSlot): string {
   if (f.reason === "dead_air") {
     const len = f.startsAt && f.endsAt ? Date.parse(f.endsAt) - Date.parse(f.startsAt) : 0;
     return `Dead air right now. ${lengthText(len)}`;
@@ -174,7 +174,7 @@ function firstAired(iso: string, callSign: string | null, withStation: boolean):
 }
 
 /** What the station can do with it: carry it into tonight's gap, choose terms, choose a slot, or (its own) edit terms. */
-function MainAction({ offer: o, carrying, term, inModal }: { offer: OfferDetailX; carrying: AgreementX | null; term: CarriageTerm; inModal?: boolean }) {
+function MainAction({ offer: o, carrying, term, inModal }: { offer: OfferDetailX; carrying: Agreement | null; term: CarriageTerm; inModal?: boolean }) {
   const s: StationState = useStation();
   const navigate = useNavigate();
   const carryIntoGap = useCarryIntoGap();

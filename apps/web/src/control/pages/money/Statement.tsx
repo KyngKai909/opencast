@@ -8,7 +8,6 @@ import { useParams } from "react-router";
 import { ledgerApi } from "@opencast/contracts";
 import { Button, ControlTitle, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
-import { StatementsX } from "../../api/ext/earnings";
 import { useApi } from "../../../api/hooks";
 import { saveText } from "../../components/earnings/download";
 import { statementSections, statementSubtitle, statementTitle } from "../../components/earnings/lines";
@@ -25,7 +24,7 @@ export default function Statement() {
   const [saving, setSaving] = useState(false);
   useShellOptions({ context: "Earnings" });
 
-  const list = useApi(ledgerApi.listStationStatements, { params: { stationId: s.id } }, { schema: StatementsX });
+  const list = useApi(ledgerApi.listStationStatements, { params: { stationId: s.id } });
   const st = list.data?.find((x) => x.id === statementId);
 
   if (list.isLoading) return <Quiet />;

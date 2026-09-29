@@ -104,6 +104,13 @@ describe("carrying", () => {
     expect(r.json).toEqual(expect.objectContaining({ status: "asked", agreementId: null }));
   });
 
+  it("withdraws a request the maker hasn't answered, once (C4)", async () => {
+    const r = await api("POST", `/catalog/offers/${DOUBLE_FEATURE}/requests`, { body: { carrierStationId: BEAT, term: "cash", slots: [{ weekday: 6, time: "23:40" }], startsOn: "2026-09-26" } });
+    const out = await api("POST", `/carriage/requests/${r.json.id}/withdraw`);
+    expect(out.json).toEqual(expect.objectContaining({ id: r.json.id, status: "withdrawn" }));
+    expect((await api("POST", `/carriage/requests/${r.json.id}/withdraw`)).json.error.code).toBe("decided");
+  });
+
   it("lets owners and operators carry, not hosts", async () => {
     const body = { carrierStationId: BEAT, term: "cash", slots: [{ weekday: 0, time: "20:00" }], startsOn: "2026-09-27" };
     expect((await api("POST", `/catalog/offers/${NEWSREEL}/requests`, { as: "jen", body })).status).toBe(403);
