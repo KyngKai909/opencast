@@ -306,3 +306,52 @@ Sign-in reuses the reference's words; its foot line "Local spots on local statio
 | A spot | "Raise the budget"; "Pause {title}", "Stations are told and fill its time. Bring it back when you like", "Pause it"; "End {title}?", "…and it can't be listed again.", "Keep it"; "That's more than your $X available. Add money first, or raise it by less."; "{title} is paused until you add money.", "Your available balance is under a day of airings…", "Add money and it's back in the market by itself…"; "You paused {title}."; "It comes back by itself at midnight."; timeline "Balance under a day of airings", "Still to air", "1 airing already held still airs", "No station had it in rotation", "Won't be told" |
 | List | "No spots yet. Upload one and Opencast checks it will air cleanly, then you set a rate and a budget." (phone "No spots yet."); phone tags "Budget spent", "Balance", "Back"; "Its $300 budget is spent", "Not listed yet", "Not uploaded yet"; "In rotation on 1 station" |
 | Viewers | "…Spots are run by the owner and managers." |
+
+### apps/tv and the phone remote (Phase 6)
+
+TV screens no frame draws follow the drawn ones' pattern: About a station, choosing a market, four of the five settings sections, the reminder card, stand by, after the sleep timer. Mock-only switches and mock error messages aren't listed.
+
+**TV: watching and menus**
+
+| Where | Words |
+|---|---|
+| Menu rail | "Sleep timer", "Off", "Until 12:22 am"; "TV band" (on the radio band); "Pledge" with the station's name; "Sign in" (signed out) |
+| Off air | "CIVC 7.1 signs on again Tuesday at 7:00 pm." (more than a day away); "CIVC 7.1 is off air." (no sign-on time, nothing else on) |
+| Stand by | "CIVC 7.1 is waiting for its signal. BEAT 12.1 is on now." (under Slate's "Please stand by") |
+| Reminder card | "Beat Tape Live is starting on BEAT 12.1. OK to switch." (from the tv 02 note) |
+| Sleep timer | "It's 11:52 pm. Turning off at 12:22 am." (a timer already set); after it: "Turned off by the sleep timer.", "OK to watch again." |
+| Presets strip | "Off air" on a key |
+| Pledge | QR label "A code that opens BEAT's pledge on your phone" |
+| Casting chip | "Playing from a phone" (signed out); "Mirrored from an iPhone" (no name) |
+
+**TV: the guide**
+
+| Where | Words |
+|---|---|
+| Guide | "Tune in" (the OK hint on something on now); cells "Off air", "Signs on at {time}" |
+| Options | "Off air now" (Tune detail); "Reminder set" / "OK to remove"; "Switching over at {9:00}" / "OK to turn off" |
+| Signed out | "Reminders are kept with your account. Sign in on your phone, and this one is set for you.", "Sign in on your phone", "Not now" |
+| About | "On now", "Next at {9:00 pm}", "Tune to {CALL} now", "Pledge to {station}", "About the station" (loading) |
+
+**TV: settings and sign-in**
+
+| Where | Words |
+|---|---|
+| First launch | "That code ran out, so here's a new one. Scan it, or go to useopencast.org/tv and enter:"; "Your market: {name}. Change it any time in the menu."; "No market is open near this TV's connection yet, so it's showing {name}. Change it any time in the menu." |
+| Settings line | "Saved on this TV. Sign in to use them on your other TVs too." (signed out) |
+| Watching | Captions "Off", "On", "Muted only"; Caption size "Small", "Medium", "Large"; "Down the dial" / "Down the dial, 9.1 to 7.1"; "3 seconds", "8 seconds"; "1 second", "1.5 seconds", "3 seconds" |
+| Remote and phones | "Who on the Wi-Fi can change the channel" / "While a phone is playing to this TV" / "Any phone", "The phone that started"; "Open the menu" / "On a remote without a Menu key, hold Back" / "Menu" |
+| Picture and sound | "Picture quality" / "Auto follows your connection" / "Auto", "Data saver", "Best"; "Even out the sound" / "So one station isn't much louder than the next" |
+| Account | "Signed in as" (the email as help); "Sign out of this TV" / "Your presets and reminders stay on your account"; "Not signed in" / "Signing in adds your presets, reminders and pledges from your phone"; "Sign in" / "With a code, on your phone" |
+| About this TV | "Version", "Your market", "This TV"; "Opencast app on Fire TV", "Web browser", "TV browser" |
+| Market | "Your market", "{n} stations", "OK to choose, Back to close", "No markets are open yet." |
+
+**Phone: casting and mirroring**
+
+| Where | Words |
+|---|---|
+| Watch on | "Playing here" (This phone, not casting); "Open the remote"; "Watch on this phone"; "Connecting to {TV}"; "Cast to {TV}", "Mirror to {TV}", "Open the app on {TV}"; "A TV with Chromecast", "Cast to a TV", "Opencast app"; "No TVs found on this Wi-Fi." |
+| Can't cast | "Casting isn't available here.", "Casting isn't available in this browser.", "Casting didn't start." |
+| Mirroring | "Turn on Screen Mirroring and choose {TV}." (toast), "How to turn on Screen Mirroring"; "Battery: {n}%, charging." |
+| Remote | "{name} changed the channel."; "Remote" (no TV); "Not casting", "Choose a TV with the cast button on the tuned-in page.", "Choose a TV" |
+| /tv | "Done" after "The TV is signed in" |

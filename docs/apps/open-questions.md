@@ -106,4 +106,13 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A74 | The hint row hiding after a week of use | tv 02 | Device-local; the "Playing from…" and "Mirrored from…" chips never hide |
 | A75 | The name in the casting chip: iOS no longer gives apps the phone's name | tv 06.1; tv-update 01.1 | Built from the account's first name ("Kai's phone"); signed out, "Playing from a phone" |
 | A76 | Settings while casting | tv-update 04 | They come from the phone; the receiver has no Settings |
-| A77 | Watch on's labels: "Chromecast"/"AirPlay" with one "Play on" button (06.2) or "Cast", "Mirror", "Open the app" (update 02 note) | tv 06.2; tv-update 02 | The note's labels, from a table of target kinds, so a Roku or Apple TV app row is one entry |
+| A77 | Watch on's labels: "Chromecast"/"AirPlay" with one "Play on" button (06.2) or "Cast", "Mirror", "Open the app" (update 02 note) | tv 06.2; tv-update 02 | The note's actions on the button ("Cast to Living room TV", "Mirror to Bedroom TV"), the kinds as each row's second line, from a table of target kinds so a Roku or Apple TV app row is one entry |
+| A78 | Should the TV guide list the radio band after the TV band? | tv 03.1 | Yes: CH pages through both, and typing 88.3 jumps to it |
+| A79 | Pledge by QR: the frame shifts the picture left full-bleed (cropping it); the build squeezes it into the space beside the panel | tv 05.4 | Squeezed, so nothing is cropped |
+| A80 | Captions set on the TV change the account's captions for the phone and web too | tv-update 04.1 | Shared (`settings.watching.captions`), as the settings line says; a TV-only caption setting if people ask |
+| A81 | While casting, does the phone play too? It follows the TV muted, so choosing in the phone's guide tunes the TV, but its heartbeat also counts as "phone" | tv 06.3 | Follows muted; the double count is noted for the audience figures (Phase 9) |
+| A82 | Presets on a Cast receiver: it has no account | tv 06.3 | The phone sends a preset key as `{type:"tune", channel}` |
+| A83 | A sleep timer on the phone remote (06 note; not drawn) | tv 06 | The command exists; no phone UI until drawn |
+| A84 | Captions over the banner and the presets strip | tv 02.1 | Lifted above them while they're up (counted in caption lines, so every size clears) |
+| A85 | Picture quality and evening out the sound are stored and synced, but the player has no option for either yet | tv-update 04.1 | Kept as settings; wired in Phase 9 with the real streams |
+| A86 | Pairing a phone with the TV app ("who on the Wi-Fi can change the channel" on a TV that isn't a Chromecast) needs Cast Connect or a relay | tv-update 04 | The setting is saved; it works on Cast (the phone sends it); the TV app waits for the relay decision |
