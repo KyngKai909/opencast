@@ -2,8 +2,7 @@
 // breaks inside them ("Saturday Reel, part 1"), each break's rows in the order they air, and
 // time with nothing on the log. Shared with the mock, which answers "what's on now" from it.
 
-import type { LogCode, LogEntry } from "@opencast/contracts";
-import type { BreakRow, BreakSlotG1 } from "../../api/ext/onair";
+import type { BreakRow, BreakSlot, LogCode, LogEntry } from "@opencast/contracts";
 
 export interface RundownRow {
   id: string;
@@ -46,7 +45,7 @@ export function entrySource(e: Pick<LogEntry, "kind" | "carriedFrom" | "itemId" 
 }
 
 /** A break's rows. Without break contents (G1), the break is one row of its length. */
-export function breakRows(b: BreakSlotG1): RundownRow[] {
+export function breakRows(b: BreakSlot): RundownRow[] {
   const start = t(b.startsAt);
   const id = b.id ?? `brk:${b.startsAt}`;
   const rows: BreakRow[] = b.rows ?? [{ code: "OPEN", title: "Break", lengthMs: b.lengthMs, whose: "station", note: b.context }];
@@ -62,10 +61,10 @@ export function breakRows(b: BreakSlotG1): RundownRow[] {
 }
 
 /** Everything on the log in time order, to the second. */
-export function buildRundown(entries: LogEntry[], breaks: BreakSlotG1[], gapMinMs = GAP_MIN_MS): RundownRow[] {
+export function buildRundown(entries: LogEntry[], breaks: BreakSlot[], gapMinMs = GAP_MIN_MS): RundownRow[] {
   const sortedBreaks = [...breaks].sort((a, b) => t(a.startsAt) - t(b.startsAt));
   const rows: RundownRow[] = [];
-  const used = new Set<BreakSlotG1>();
+  const used = new Set<BreakSlot>();
 
   for (const e of [...entries].sort((a, b) => t(a.startsAt) - t(b.startsAt))) {
     const s = t(e.startsAt);

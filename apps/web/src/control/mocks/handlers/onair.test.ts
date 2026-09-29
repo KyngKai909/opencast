@@ -8,6 +8,8 @@ import type { LibraryItem } from "@opencast/contracts";
 import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN_PREFIX } from "../../../auth/mockToken";
 import { handlers } from "./index";
+import { now } from "../../../lib/clock";
+import { addDays, broadcastDay, isoDate } from "../../components/onair/time";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -100,6 +102,25 @@ describe("the log", () => {
     expect((await api(`/stations/${beat}/log/${made.body[0].id}`, { method: "DELETE", as: "jen@example.com" })).status).toBe(403);
     expect((await api(`/stations/${beat}/log/${made.body[0].id}`, { method: "DELETE", as: "kai@example.com" })).status).toBe(200);
     expect(await starts()).toContain(gap.startsAt);
+  });
+
+  it("repeats a day, lists the repeat, and takes it off again (G7)", async () => {
+    const beat = getDb().stations.find((x) => x.ident.callSign === "BEAT")!.ident.id;
+    // The day of BEAT's next program, copied onto the next three days.
+    const next = getDb().log.filter((e) => e.stationId === beat && e.startsAt > now().toISOString()).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0]!;
+    const day = isoDate(broadcastDay(next.startsAt));
+    const until = isoDate(addDays(broadcastDay(next.startsAt), 3));
+    const made = await api(`/stations/${beat}/log/repeat`, { method: "POST", as: "kai@example.com", body: { day, pattern: "daily", until } });
+    expect(made.body.created).toBeGreaterThan(0);
+    const window = `from=${encodeURIComponent(now().toISOString())}&to=${encodeURIComponent(new Date(now().getTime() + 4 * 86_400_000).toISOString())}`;
+    const log = await api(`/stations/${beat}/log?${window}`, { as: "kai@example.com" });
+    const rep = log.body.repeats.find((r: { day: string; pattern: string }) => r.day === day && r.pattern === "daily");
+    expect(rep).toMatchObject({ until, entries: expect.any(Number) });
+    expect(rep.entries).toBeGreaterThan(0);
+    const out = await api(`/stations/${beat}/log/repeats/${rep.id}`, { method: "DELETE", as: "kai@example.com" });
+    expect(out.body.removed).toBe(rep.entries);
+    const after = await api(`/stations/${beat}/log?${window}`, { as: "kai@example.com" });
+    expect(after.body.repeats.some((r: { id: string }) => r.id === rep.id)).toBe(false);
   });
 
   it("returns what each break holds (G1), the station ID last", async () => {

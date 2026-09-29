@@ -3,7 +3,6 @@
 import { logApi, stationsApi } from "@opencast/contracts";
 import { useMemo } from "react";
 import { useApi } from "../../../api/hooks";
-import { listHosts, LiveSourcesExt } from "../../api/ext/live";
 import { now } from "../../../lib/clock";
 import { useMe, useStation } from "../../station/StationContext";
 
@@ -21,13 +20,13 @@ export function useLogWindow(days = 8, back = 12) {
 
 export function useLiveSources() {
   const s = useStation();
-  return useApi(stationsApi.listLiveSources, { params: { stationId: s.id } }, { schema: LiveSourcesExt, refetchInterval: 15_000 });
+  return useApi(stationsApi.listLiveSources, { params: { stationId: s.id } }, { refetchInterval: 15_000 });
 }
 
-/** A4 (proposed): who hosts each live program. Absent on the real API until it lands. */
+/** A4: who hosts each live program (a host gets only their own). */
 export function useHosts() {
   const s = useStation();
-  return useApi(listHosts, { params: { stationId: s.id } }, { retry: false });
+  return useApi(stationsApi.listHosts, { params: { stationId: s.id } }, { retry: false });
 }
 
 /** The live programs this person hosts (a host sees only these, A27). */

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { defaultDriver } from "@opencast/player";
 import { Button, Field, KeyValueList, Modal, PictureFrame, SelectField, Sheet, Slate, Tag, Tally, Toggle, clock } from "@opencast/ui";
-import type { LowerThirdState } from "../../api/ext/live";
+import type { LowerThird } from "@opencast/contracts";
 import { STATION_TZ } from "../../../lib/clock";
 import type { Camera } from "./useCamera";
 import "./Studio.css";
@@ -36,7 +36,7 @@ function CameraVideo({ stream, mirror }: { stream: MediaStream; mirror?: boolean
   return <video ref={ref} autoPlay muted playsInline className={mirror ? "cc-studio__mirror" : undefined} />;
 }
 
-/** An encoder's signal, as it arrives (S14's private preview; a mock stream stands in). */
+/** An encoder's signal, as it arrives (S14's private preview, the source's own playback). */
 function SignalVideo({ url }: { url: string }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -56,7 +56,7 @@ export interface StudioPictureProps {
   /** Encoders: what's arriving, or null when nothing is. */
   signalUrl?: string | null;
   bug: { callSign: string; channel: string };
-  lowerThird: LowerThirdState | null;
+  lowerThird: LowerThird | null;
   /** Before the block: the amber sign on the picture. */
   standby: boolean;
   /** The connection dropped while on air: viewers see the stand by slate. */
@@ -176,7 +176,7 @@ export function CountdownBox({ phase, title, startsAt, endsAt, count, elapsedTex
 }
 
 /** The lower third: shown or hidden, and the words (02.1). */
-export function LowerThirdEditor({ value, onChange, disabled }: { value: LowerThirdState | null; onChange: (next: Partial<LowerThirdState>, commit: boolean) => void; disabled?: boolean }) {
+export function LowerThirdEditor({ value, onChange, disabled }: { value: LowerThird | null; onChange: (next: Partial<LowerThird>, commit: boolean) => void; disabled?: boolean }) {
   return (
     <section aria-labelledby="cc-l3-h">
       <SecTop

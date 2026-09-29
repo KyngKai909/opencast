@@ -3,7 +3,8 @@
 // Amounts stay in micros here; the pages write them with money().
 
 import { money } from "@opencast/ui";
-import type { StatementGroup, StatementLineX, StatementX, StationEarningsX } from "../../api/ext/earnings";
+import type { Statement, StationEarnings } from "@opencast/contracts";
+import type { StatementGroup, StatementLine } from "../../api/types";
 import { dayOf, weekdayOf, type EarningsPeriod } from "./periods";
 
 export interface MoneyRow {
@@ -34,12 +35,12 @@ export function andList(names: string[]): string {
 
 const PERIOD_WORD: Record<EarningsPeriod, string> = { week: "this week", month: "this month", year: "this year" };
 
-export function spotsDetail(l: StationEarningsX["lines"]["spots"]): string {
+export function spotsDetail(l: StationEarnings["lines"]["spots"]): string {
   if (l.airings === 0) return "No airings yet";
   return `${plural(l.airings, "airing")} from ${plural(l.businesses, "business", "businesses")}, settled after each airing`;
 }
 
-export function sponsorsDetail(l: StationEarningsX["lines"]["sponsors"]): string {
+export function sponsorsDetail(l: StationEarnings["lines"]["sponsors"]): string {
   const list = l.list;
   if (!list) return plural(l.sponsors, "sponsor");
   if (list.length === 0) return "No sponsors yet";
@@ -49,7 +50,7 @@ export function sponsorsDetail(l: StationEarningsX["lines"]["sponsors"]): string
   return `${names}, ${money(list[0].monthlyMicros)} a month${list.length > 1 ? " each" : ""}`;
 }
 
-export function pledgesDetail(l: StationEarningsX["lines"]["pledges"], period: EarningsPeriod): string {
+export function pledgesDetail(l: StationEarnings["lines"]["pledges"], period: EarningsPeriod): string {
   return `${plural(l.members, "member")}, ${l.newMembers.toLocaleString("en-US")} new ${PERIOD_WORD[period]}. After card fees`;
 }
 
@@ -57,13 +58,13 @@ export function pledgesDetail(l: StationEarningsX["lines"]["pledges"], period: E
  * Ads from partners (earnings 02.1): paid when partners pay, never held. Off, it says where to turn
  * it on; on, what's still to come.
  */
-export function partnerAdsDetail(p: NonNullable<StationEarningsX["lines"]["partnerAds"]>): string {
+export function partnerAdsDetail(p: NonNullable<StationEarnings["lines"]["partnerAds"]>): string {
   if (!p.on) return "Off. Turn it on in Breaks settings. Paid when partners pay, 30 to 90 days after airing";
   return p.pendingMicros > 0 ? `${money(p.pendingMicros)} to come. Paid when partners pay, 30 to 90 days after airing` : "Paid when partners pay, 30 to 90 days after airing";
 }
 
 /** The earnings page's groups. A studio has no breaks or members of its own, and carries nothing. */
-export function earningsSections(e: StationEarningsX, period: EarningsPeriod, studio: boolean): MoneySection[] {
+export function earningsSections(e: StationEarnings, period: EarningsPeriod, studio: boolean): MoneySection[] {
   const l = e.lines;
   const sections: MoneySection[] = [];
   if (!studio) {
@@ -100,7 +101,7 @@ export function earningsSections(e: StationEarningsX, period: EarningsPeriod, st
  * less out. The shared lines are left off while they're not set yet, as drawn; once decided they
  * come back as one line, so the total always adds up.
  */
-export function phoneRows(e: StationEarningsX, studio: boolean): MoneyRow[] {
+export function phoneRows(e: StationEarnings, studio: boolean): MoneyRow[] {
   const l = e.lines;
   const rows: MoneyRow[] = [];
   if (!studio) {
@@ -116,13 +117,13 @@ export function phoneRows(e: StationEarningsX, studio: boolean): MoneyRow[] {
 }
 
 /** "9 airings in 4 breaks"; "9 airings" when the API doesn't say how many breaks. */
-export function heldTonightDetail(h: StationEarningsX["held"]): string {
+export function heldTonightDetail(h: StationEarnings["held"]): string {
   const a = plural(h.tonightAirings, "airing");
   return h.tonightBreaks !== undefined ? `${a} in ${plural(h.tonightBreaks, "break")}` : a;
 }
 
 /** "Weekly, to Chase ending 2231". */
-export function payoutDetail(p: NonNullable<StationEarningsX["nextPayout"]>): string {
+export function payoutDetail(p: NonNullable<StationEarnings["nextPayout"]>): string {
   const schedule = p.schedule === "weekly" ? "Weekly" : "Monthly";
   return p.destination ? `${schedule}, to ${p.destination}` : schedule;
 }
@@ -140,7 +141,7 @@ const GROUPS: Array<{ group: StatementGroup; title: string }> = [
 ];
 
 /** A statement line's detail: per-thousand lines show their math ("18 airings, $8.00 per 1,000 tuned in, average 262"). */
-export function statementLineDetail(l: StatementLineX): string | undefined {
+export function statementLineDetail(l: StatementLine): string | undefined {
   if (l.rate && l.airings !== undefined) {
     const airings = plural(l.airings, "airing");
     if (l.rate.kind === "per_airing") return `${airings}, ${money(l.rate.micros)} an airing`;
@@ -160,8 +161,8 @@ export interface StatementSection extends MoneySection {
 }
 
 /** The statement's lines under their headings. Without groups from the API, one list with no heading. */
-export function statementSections(s: StatementX): StatementSection[] {
-  const rowOf = (l: StatementLineX, i: number): MoneyRow => ({ key: `${i}`, title: l.label, detail: statementLineDetail(l), amount: l.amountMicros, notSetYet: l.notSetYet });
+export function statementSections(s: Statement): StatementSection[] {
+  const rowOf = (l: StatementLine, i: number): MoneyRow => ({ key: `${i}`, title: l.label, detail: statementLineDetail(l), amount: l.amountMicros, notSetYet: l.notSetYet });
   if (!s.lines.some((l) => l.group)) return [{ key: "lines", title: "", column: "left", rows: s.lines.map(rowOf) }];
   const out: StatementSection[] = [];
   for (const g of GROUPS) {
@@ -180,12 +181,12 @@ export function statementSections(s: StatementX): StatementSection[] {
 }
 
 /** "Week of September 14" (or "September" for a monthly statement). */
-export function statementTitle(s: Pick<StatementX, "period" | "periodStart">): string {
+export function statementTitle(s: Pick<Statement, "period" | "periodStart">): string {
   return s.period === "week" ? `Week of ${dayOf(s.periodStart)}` : dayOf(s.periodStart).split(" ")[0];
 }
 
 /** "Paid Monday, September 21, to Chase ending 2231." or, before it's paid, "September 21 to 27." */
-export function statementSubtitle(s: Pick<StatementX, "paidOn" | "destination" | "periodStart" | "periodEnd">): string {
+export function statementSubtitle(s: Pick<Statement, "paidOn" | "destination" | "periodStart" | "periodEnd">): string {
   if (s.paidOn) return `Paid ${weekdayOf(s.paidOn)}${s.destination ? `, to ${s.destination}` : ""}.`;
   return `${dayOf(s.periodStart)} to ${dayOf(s.periodEnd)}.`;
 }

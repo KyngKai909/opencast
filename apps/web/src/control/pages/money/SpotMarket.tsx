@@ -8,9 +8,8 @@
 
 import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import { stationsApi } from "@opencast/contracts";
+import { type MarketSpot, stationsApi } from "@opencast/contracts";
 import { Button, ChipRow, ControlTitle, KeyValueList, Lines, Modal, Segmented, Sheet, Table, Tag, useToast, type Column } from "@opencast/ui";
-import type { MarketSpotExt } from "../../api/ext/spots";
 import { useApi } from "../../../api/hooks";
 import { errorText, useAvails, useMarket, useRotations, useSetRotation } from "../../components/spots/data";
 import { dateText, milesText, rateParts, rateText, runwayParts, runsText, upToText, spotLength } from "../../components/spots/format";
@@ -23,10 +22,10 @@ import { Quiet } from "../common";
 import "./SpotMarket.css";
 
 type Length = "any" | "15" | "30" | "60";
-/** The market's filter chips (S17: the category list is a constant until the API has one). */
+/** The market's filter chips, as drawn: four of the spot categories (S17's list). */
 const FILTER_CATEGORIES = ["Food", "Auto", "Health", "Services"];
 
-const STATE_TAG: Record<MarketSpotExt["state"], { words: string; variant: "plain" | "standby" | "solid" } | null> = {
+const STATE_TAG: Record<MarketSpot["state"], { words: string; variant: "plain" | "standby" | "solid" } | null> = {
   in_the_market: null,
   in_rotation: { words: "In rotation", variant: "plain" },
   paused: { words: "Paused", variant: "standby" },
@@ -75,7 +74,7 @@ function MarketTab() {
   const [length, setLength] = useState<Length>("any");
   const [near, setNear] = useState(true);
   const [category, setCategory] = useState<string | null>(null);
-  const [preview, setPreview] = useState<MarketSpotExt | null>(null);
+  const [preview, setPreview] = useState<MarketSpot | null>(null);
   const market = useMarket(s.id, { withinMiles: near ? 10 : undefined, category: category ?? undefined });
   const rotations = useRotations(s.id);
   const avails = useAvails(s.id);
@@ -89,7 +88,7 @@ function MarketTab() {
   const canAdd = s.can("spots");
   const main = rotations.data?.main.spots.map((x) => x.spotId) ?? [];
 
-  const add = (m: MarketSpotExt) => {
+  const add = (m: MarketSpot) => {
     const upcoming = (avails.data?.breaks ?? []).flatMap((b) => (b.contents ?? []).filter((c) => c.kind === "spot").map((c) => c.id));
     setRotation.mutate(
       { params: { stationId: s.id, kind: "main" }, body: { spotIds: [...main, m.spot.id] } },
@@ -99,7 +98,7 @@ function MarketTab() {
       }
     );
   };
-  const takeOut = (m: MarketSpotExt) => {
+  const takeOut = (m: MarketSpot) => {
     const kind = m.inRotation ?? "main";
     const ids = (kind === "main" ? main : rotations.data?.backup.spots.map((x) => x.spotId) ?? []).filter((x) => x !== m.spot.id);
     setRotation.mutate({ params: { stationId: s.id, kind }, body: { spotIds: ids } }, { onError: (e) => toast.show({ message: errorText(e) }) });
@@ -136,24 +135,24 @@ function MarketTab() {
     </div>
   );
 
-  const pays = (m: MarketSpotExt) => {
+  const pays = (m: MarketSpot) => {
     const p = rateParts(m.rate);
     return <Lines className="cc-spm__rate" title={<span className="cc-sp-mono">{p.amount}</span>} detail={p.unit} />;
   };
-  const stateTag = (m: MarketSpotExt) => {
+  const stateTag = (m: MarketSpot) => {
     const t = STATE_TAG[m.state];
     return t ? <Tag variant={t.variant}>{t.words}</Tag> : null;
   };
 
   // C.2: the list beside the pane.
-  const narrow: Column<MarketSpotExt>[] = [
+  const narrow: Column<MarketSpot>[] = [
     { key: "thumb", width: "100px", cell: (m) => <SpotThumb spot={m} /> },
     { key: "spot", header: "Spot", cell: (m) => <Lines title={m.business.name} detail={[m.spot.category, milesText(m.miles)].filter(Boolean).join(", ")} /> },
     { key: "runs", header: "Runs", width: "54px", kind: "mono", cell: (m) => spotLength(m.spot.lengthSec) },
     { key: "pays", header: "Pays", width: "150px", cell: pays }
   ];
   // biz-funding 05.1: the wide list with runway.
-  const wide: Column<MarketSpotExt>[] = [
+  const wide: Column<MarketSpot>[] = [
     { key: "thumb", width: "96px", cell: (m) => <SpotThumb spot={m} short /> },
     {
       key: "spot",
@@ -199,7 +198,7 @@ function MarketTab() {
         )
     }
   ];
-  const phoneCols: Column<MarketSpotExt>[] = [
+  const phoneCols: Column<MarketSpot>[] = [
     { key: "thumb", width: "84px", cell: (m) => <SpotThumb spot={m} short /> },
     { key: "spot", header: "Spot", cell: (m) => <Lines title={m.business.name} detail={[m.spot.category, milesText(m.miles), spotLength(m.spot.lengthSec)].filter(Boolean).join(", ")} /> },
     { key: "pays", header: "Pays", width: "108px", align: "end", cell: pays }
@@ -225,7 +224,7 @@ function MarketTab() {
   ) : list.length === 0 ? (
     <p className="cc-spm__empty">{market.data?.length ? "Nothing matches. Try a wider distance or another length." : `No businesses have listed spots near ${call} yet.`}</p>
   ) : (
-    <Table<MarketSpotExt>
+    <Table<MarketSpot>
       label="Spots in the market"
       columns={phone ? phoneCols : chosen ? narrow : wide}
       rows={list}
@@ -292,7 +291,7 @@ function SpotPane({
   onPreview,
   error
 }: {
-  m: MarketSpotExt;
+  m: MarketSpot;
   call: string;
   canAdd: boolean;
   busy: boolean;

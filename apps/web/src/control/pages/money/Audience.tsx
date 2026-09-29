@@ -7,7 +7,8 @@
 import { useSearchParams } from "react-router";
 import { audienceApi } from "@opencast/contracts";
 import { ControlTitle, KeyValueList, LineChart, Lines, Segmented, SplitBar, StatRow, Table, clock, splitShares, type Column, type KeyValueRow } from "@opencast/ui";
-import { AudienceReportX, type AudienceProgram } from "../../api/ext/earnings";
+import type { AudienceReport } from "@opencast/contracts";
+import type { AudienceProgram } from "../../api/types";
 import { useApi } from "../../../api/hooks";
 import { audiencePeriodLabel, audienceWindow, hoursCaption, isAudiencePeriod, lastWeekLabel, peakCaption, phoneNowLine, type AudiencePeriod } from "../../components/earnings/periods";
 import { airedTimes, sourceLine } from "../../components/earnings/audience";
@@ -28,7 +29,7 @@ const PLATFORMS = [
 ] as const;
 
 /** Tonight's breaks as shaded spans: the report's own list, or runs of break minutes in its line. */
-function breakSpans(a: AudienceReportX): Array<{ start: string; end: string }> {
+function breakSpans(a: AudienceReport): Array<{ start: string; end: string }> {
   if (a.breaks) return a.breaks.map((b) => ({ start: b.startsAt, end: b.endsAt }));
   const out: Array<{ start: string; end: string }> = [];
   a.series.forEach((p, i) => {
@@ -57,7 +58,7 @@ export default function Audience() {
   const win = audienceWindow(period, t, STATION_TZ);
   const from = win.from.toISOString();
   const to = new Date(Math.floor(win.to.getTime() / 60_000) * 60_000).toISOString();
-  const q = useApi(audienceApi.getAudience, { params: { stationId: s.id }, query: { from, to } }, { schema: AudienceReportX, refetchInterval: 60_000, placeholderData: (prev) => prev });
+  const q = useApi(audienceApi.getAudience, { params: { stationId: s.id }, query: { from, to } }, { refetchInterval: 60_000, placeholderData: (prev) => prev });
   const a = q.data;
 
   const tonight = period === "tonight";
@@ -131,7 +132,7 @@ export default function Audience() {
     { key: "program", header: "Program", cell: (r) => <Lines title={r.title} detail={sourceLine(r)} /> },
     { key: "average", header: "Average", width: "110px", kind: "amount", cell: (r) => r.averageTunedIn.toLocaleString("en-US") },
     { key: "peak", header: "Peak", width: "110px", kind: "amount", cell: (r) => r.peakTunedIn.toLocaleString("en-US") },
-    { key: "stayed", header: "Stayed to the end", width: "130px", kind: "amount", cell: (r) => (r.onNow || r.stayedToTheEnd === null ? <span className="cc-aud__quiet">On now</span> : pct(r.stayedToTheEnd)) }
+    { key: "stayed", header: "Stayed to the end", width: "130px", kind: "amount", cell: (r) => (r.onNow ? <span className="cc-aud__quiet">On now</span> : r.stayedToTheEnd === null ? <span className="cc-aud__quiet">–</span> : pct(r.stayedToTheEnd)) }
   ];
 
   const shares = splitShares(PLATFORMS.map((p) => ({ amount: a.byPlatform[p.key] })));

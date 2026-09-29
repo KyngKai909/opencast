@@ -3,10 +3,10 @@
 // and cash apart. Nested: a station asks (03.1, /requests/:requestId). On the phone, 05.2 and the
 // request as a sheet (05.1).
 
+import { type Agreement, type Offer } from "@opencast/contracts";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Button, ControlTitle, KeyValueList, money, Notice, Table, Tag, TitleCard, type Column } from "@opencast/ui";
-import type { AgreementX, OfferX } from "../../api/ext/market";
 import { useAgreements, useBrowse, useLibrary, useRequests } from "../../components/market/api";
 import { useApproving } from "../../components/market/approvals";
 import { MarketTabs, ProgramCard, Quietly, SectionTop } from "../../components/market/parts";
@@ -26,7 +26,7 @@ interface Row {
   colour: string | null;
   format: string;
   state: "offered" | "not_offered" | "cannot";
-  offer: OfferX | null;
+  offer: Offer | null;
 }
 
 export default function Offered() {
@@ -216,14 +216,14 @@ export default function Offered() {
 }
 
 /** "This month from carriage": barter share and cash fees apart, because a maker choosing between them needs to see which pays. */
-function CarriageMoney({ name, carriedBy }: { name: string; carriedBy: AgreementX[] }) {
+function CarriageMoney({ name, carriedBy }: { name: string; carriedBy: Agreement[] }) {
   const barter = carriedBy.filter((a) => a.term === "barter" || a.term === "cash_plus_barter");
   const cash = carriedBy.filter((a) => a.term === "cash");
-  const who = (list: AgreementX[]) => [...new Set(list.map((a) => a.carrier.callSign ?? a.carrier.name))];
+  const who = (list: Agreement[]) => [...new Set(list.map((a) => a.carrier.callSign ?? a.carrier.name))];
   const and = (l: string[]) => (l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} and ${l.at(-1)}`);
-  const sum = (list: AgreementX[]) => list.reduce((n, a) => n + a.paidThisMonthMicros, 0);
-  const airings = (list: AgreementX[]) => list.reduce((n, a) => n + a.airingsThisMonth, 0);
-  const paying = (list: AgreementX[]) => list.filter((a) => a.paidThisMonthMicros > 0);
+  const sum = (list: Agreement[]) => list.reduce((n, a) => n + a.paidThisMonthMicros, 0);
+  const airings = (list: Agreement[]) => list.reduce((n, a) => n + a.airingsThisMonth, 0);
+  const paying = (list: Agreement[]) => list.filter((a) => a.paidThisMonthMicros > 0);
   const cashDetail =
     paying(cash).length === 1
       ? `${paying(cash)[0]!.program.title} on ${paying(cash)[0]!.carrier.callSign ?? paying(cash)[0]!.carrier.name}, ${airings(paying(cash))} airings`

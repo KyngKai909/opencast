@@ -8,7 +8,8 @@ import { Button, Field, Notice, Segmented, SelectField, TitleCard } from "@openc
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { BusinessSettingsX, settingsExtApi } from "../../api/ext/settings";
+import { settingsExtApi } from "../../api/ext/settings";
+import { BusinessX } from "../../api/ext";
 import { logoOf } from "../../business/logo";
 import type { BusinessState } from "../../business/BusinessContext";
 import { Quiet } from "../../pages/common";
@@ -50,7 +51,7 @@ function oops(e: unknown): string {
 }
 
 export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLocation: () => void }) {
-  const q = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessSettingsX });
+  const q = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessX });
   const qc = useQueryClient();
   const edit = accessFor(b.role).profile === "edit";
   const [name, setName] = useState("");

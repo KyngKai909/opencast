@@ -1,7 +1,8 @@
 // Master control against the real API (playwright.real.config.ts): every route opens, as Kai (BEAT's
-// owner), and shows its page, not an error. What the API doesn't answer yet (the proposed
-// endpoints in apps/web/src/control/api/ext) is listed on each test as `api-miss` annotations, so the
-// run says what still runs on mocks; a page error or a blank page fails the test.
+// owner), and shows its page, not an error. A 404 or 5xx from the API, or a response that doesn't
+// match its contract, is listed on each test as an `api-miss` annotation (master control's
+// proposed endpoints all landed on 2026-09-29, so there should be none); a page error or a blank
+// page fails the test.
 
 import type { Page } from "@playwright/test";
 import { api, expect, seed, signIn, test } from "../lib/real";
@@ -108,8 +109,20 @@ test("the unanswered sponsorship opens", async ({ page }) => {
 });
 
 test("the creator's claim page, signed out", async ({ page }) => {
-  // The claim page (N10, GET /claim/:token) is proposed: without it, the page says it wasn't found.
-  await page.goto("/control/claim/not-a-real-token");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  // N10: the claim page reads GET /claim/:token, the permission link's token. Crate said yes and
+  // CRAT is set up, so a new permission link for Crate opens CRAT's claim page.
+  const asked = await api<{ link: string }>(`/admin/creators/${seed.creators.crate}/permission-requests`, { as: "dee", method: "POST", body: { sentVia: ["email"], note: "Your claim link." } });
+  const token = asked.link.split("/permission/")[1]!;
+  const page_ = await api<{ station: { callSign: string }; personName: string; saidYesAt: string | null }>(`/claim/${token}`);
+  expect(page_).toMatchObject({ station: { callSign: "CRAT" }, personName: "Andre Vega" });
+  await page.goto(`/control/claim/${token}`);
+  await expect(page.getByRole("heading", { level: 1, name: "CRAT 101.9 is ready for you." })).toBeVisible();
+  await expect(page.getByText(/Opencast's team has run/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" }).first()).toBeVisible();
   await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
+});
+
+test("a claim link that isn't one says there's nothing there", async ({ page }) => {
+  await page.goto("/control/claim/not-a-real-token");
+  await expect(page.getByRole("heading", { level: 1, name: "There's nothing here." })).toBeVisible();
 });

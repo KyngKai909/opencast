@@ -4,9 +4,8 @@
 // in the log, on the Monitor's rundown and on the rail's badge at once.
 
 import { http } from "msw";
-import { logApi, playoutApi, type LogEntry } from "@opencast/contracts";
+import { logApi, playoutApi, type BreakSlot, type LogEntry } from "@opencast/contracts";
 import { stationColourPasses } from "@opencast/ui";
-import { PlayoutStatusG2, ProgramLogOnAir, SignOnChecksG6, type BreakSlotG1 } from "../../api/ext/onair";
 import { buildRundown, currentIndex, type RundownRow } from "../../components/onair/rundown";
 import { addDays, broadcastDay, isoDate, localTime, timeOn } from "../../components/onair/time";
 import { now } from "../../../lib/clock";
@@ -32,7 +31,7 @@ export function gapsIn(stationId: string, from: string, to: string) {
 }
 
 /** A break with its rows, as the contract's BreakSlot plus G1. */
-function slotWithRows(b: DbBreak): BreakSlotG1 {
+function slotWithRows(b: DbBreak): BreakSlot {
   return { ...breakSlot(b), rows: rowsOfBreak(b) };
 }
 
@@ -214,7 +213,7 @@ export const logHandlers = [
     if (p instanceof Response) return p;
     const st = dbStation(String(params.stationId));
     if (!st) return fail(404, "not_found", "That station wasn't found.");
-    return reply(PlayoutStatusG2, status(st));
+    return reply(playoutApi.getStatus.response, status(st));
   }),
 
   http.get(path(logApi.getLog), ({ request, params }) => {
@@ -229,8 +228,12 @@ export const logHandlers = [
     const last = broadcastDay(new Date(Date.parse(to) - 1).toISOString());
     const days = new Set<string>();
     for (let d = first; isoDate(d) <= isoDate(last); d = addDays(d, 1)) days.add(isoDate(d));
-    const repeats = onAirState().repeats.filter((r) => r.stationId === id && days.has(r.day)).map(({ day, pattern }) => ({ day, pattern }));
-    return reply(ProgramLogOnAir, {
+    // G7: what "Repeat this day" set up, with its entries still to come (a day in the window counts too).
+    const repeats = onAirState()
+      .repeats.filter((r) => r.stationId === id)
+      .map((r) => ({ id: r.id, day: r.day, pattern: r.pattern, until: r.until, entries: getDb().log.filter((e) => e.stationId === id && e.repeatGroupId === r.id && e.startsAt >= from).length }))
+      .filter((r) => r.entries > 0 || days.has(r.day));
+    return reply(logApi.getLog.response, {
       from,
       to,
       entries: stationLog(id, from, to),
@@ -329,6 +332,7 @@ export const logHandlers = [
       const step = pattern === "weekly" ? 7 : 1;
       for (let n = step; isoDate(addDays(src, n)) <= until; n += step) targets.push(n);
     }
+    const groupId = uuid();
     const dayEntries = stationLog(id, from, to).filter((e) => e.startsAt >= from);
     const dayBreaks = stationBreaks(id, from, to);
     let created = 0;
@@ -342,7 +346,7 @@ export const logHandlers = [
           skipped++;
           continue;
         }
-        getDb().log.push({ ...e, id: uuid(), startsAt: s, endsAt: f, repeatGroupId: e.repeatGroupId ?? e.id });
+        getDb().log.push({ ...e, id: uuid(), startsAt: s, endsAt: f, repeatGroupId: groupId });
         created++;
       }
       for (const b of dayBreaks) {
@@ -353,10 +357,27 @@ export const logHandlers = [
       }
     }
     const st = onAirState();
-    st.repeats = [...st.repeats.filter((x) => !(x.stationId === id && x.day === day)), { stationId: id, day, pattern }];
+    st.repeats = [...st.repeats, { id: groupId, stationId: id, day, pattern, until: pattern === "once" ? (onto ?? null) : until }];
     saveDb();
     saveOnAirState();
     return reply(logApi.repeatDay.response, { created, skippedForConflicts: skipped });
+  }),
+
+  // G7: take a repeat's entries off the log from now on.
+  http.delete(path(logApi.removeRepeat), ({ request, params }) => {
+    const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
+    if (r instanceof Response) return r;
+    const id = r.station.ident.id;
+    const st = onAirState();
+    const rep = st.repeats.find((x) => x.stationId === id && x.id === String(params.repeatId));
+    if (!rep) return fail(404, "not_found", "That repeat wasn't found.");
+    const t = now().toISOString();
+    const gone = getDb().log.filter((e) => e.stationId === id && e.repeatGroupId === rep.id && e.startsAt > t);
+    for (const e of gone) removeWithBreaks(e.id);
+    st.repeats = st.repeats.filter((x) => x !== rep);
+    saveDb();
+    saveOnAirState();
+    return reply(logApi.removeRepeat.response, { removed: gone.length });
   }),
 
   http.post(path(logApi.fillGap), async ({ request, params }) => {
@@ -417,7 +438,7 @@ export const logHandlers = [
   http.get(path(playoutApi.getSignOnChecks), ({ request, params }) => {
     const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
     if (r instanceof Response) return r;
-    return reply(SignOnChecksG6, signOnChecks(r.station));
+    return reply(playoutApi.getSignOnChecks.response, signOnChecks(r.station));
   }),
 
   http.post(path(playoutApi.signOn), ({ request, params }) => {
@@ -433,7 +454,7 @@ export const logHandlers = [
     st.onAirSince = t;
     st.setup = { ...st.setup, status: "on_air", fixed: true, firstSignedOnAt: st.setup.firstSignedOnAt ?? t };
     saveDb();
-    return reply(PlayoutStatusG2, status(st), 202);
+    return reply(playoutApi.getStatus.response, status(st), 202);
   }),
 
   http.post(path(playoutApi.signOff), async ({ request, params }) => {
@@ -446,7 +467,7 @@ export const logHandlers = [
     st.onAirSince = null;
     st.setup = { ...st.setup, status: body.permanently ? "signed_off" : "off_air" };
     saveDb();
-    return reply(PlayoutStatusG2, status(st), 202);
+    return reply(playoutApi.getStatus.response, status(st), 202);
   }),
 
   http.post(path(playoutApi.cueBreak), ({ request, params }) => {

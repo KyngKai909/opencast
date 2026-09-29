@@ -4,13 +4,12 @@
 // backfill for time still open: only a flag until the backend supports it). Owners and operators change it.
 
 import { useState, type DragEvent, type KeyboardEvent } from "react";
-import { spotsApi, stationsApi, type BreakRule } from "@opencast/contracts";
+import { SPOT_CATEGORIES, spotsApi, stationsApi, type BreakRule } from "@opencast/contracts";
 import { Button, ChipRow, LogCode, Segmented, Toggle } from "@opencast/ui";
 import { duration } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi, useApiMutation, keyFor } from "../../../../api/hooks";
 import { ApiError } from "../../../../api/client";
-import { SPOT_CATEGORIES } from "../../../api/ext/station";
 import type { StationState } from "../../../station/StationContext";
 import { Quiet } from "../../../pages/common";
 import { capCells, capMinutes, ladderWithPartners, moveFill, placeFill, ruleLabel, TV_MINUTES_PER_HOUR, type FillCode } from "../breakRule";
@@ -30,6 +29,8 @@ export function BreaksSection({ s }: { s: StationState }) {
   const params = { stationId: s.id };
   const rule = useApi(stationsApi.getBreakRule, { params });
   const rotations = useApi(spotsApi.getRotations, { params }, { retry: false });
+  // S17: the categories a station can block, from the API (the same list as the constant).
+  const categories = useApi(spotsApi.listSpotCategories, {}, { staleTime: Infinity, retry: false });
   const qc = useQueryClient();
   const set = useApiMutation(stationsApi.setBreakRule, { invalidates: [stationsApi.getBreakRule, spotsApi.getAvails] });
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,9 @@ export function BreaksSection({ s }: { s: StationState }) {
   if (rule.isLoading) return <Quiet />;
   if (!rule.data) return <p className="cc-error" role="alert">{(rule.error as Error | null)?.message ?? "Something went wrong. Try again."}</p>;
   const r = rule.data;
+  const blockable = (categories.data ?? SPOT_CATEGORIES).filter((c) => c.blockable).map((c) => c.name);
+  // A category blocked before the list changed stays, so it can be unblocked.
+  const never = [...blockable, ...r.blockedCategories.filter((c) => !blockable.includes(c))];
 
   const change = (patch: Partial<BreakRule>) => {
     const next = { ...r, ...patch };
@@ -202,7 +206,7 @@ export function BreaksSection({ s }: { s: StationState }) {
             layout="wrap"
             label={`Never on ${cs}`}
             value={r.blockedCategories}
-            options={SPOT_CATEGORIES.map((c) => ({ value: c, label: c, disabled: !canEdit }))}
+            options={never.map((c) => ({ value: c, label: c, disabled: !canEdit }))}
             onChange={(blockedCategories) => change({ blockedCategories })}
           />
         </div>

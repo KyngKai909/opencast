@@ -4,10 +4,9 @@
 
 import { useState } from "react";
 import { useParams } from "react-router";
-import { catalogApi } from "@opencast/contracts";
+import { type Agreement, type CarriageRequest, catalogApi, type Offer } from "@opencast/contracts";
 import { Button, ControlTitle, Menu, Modal, money, StatRow, Table, useToast, type Column } from "@opencast/ui";
 import { call } from "../../../api/client";
-import { AgreementX, OfferX, type CarriageRequestX } from "../../api/ext/market";
 import { useAgreements, useOffer, useRefreshMarket, useRequests } from "../../components/market/api";
 import { Quietly } from "../../components/market/parts";
 import { localDate, monthDay, monthName } from "../../components/market/time";
@@ -18,7 +17,7 @@ import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Carriers.css";
 
-type Row = { kind: "carrier"; a: AgreementX } | { kind: "asked"; r: CarriageRequestX };
+type Row = { kind: "carrier"; a: Agreement } | { kind: "asked"; r: CarriageRequest };
 
 function dayWords(iso: string): string {
   const d = localDate(iso);
@@ -35,7 +34,7 @@ export default function Carriers() {
   const requests = useRequests(s.id);
   const refresh = useRefreshMarket();
   const toast = useToast();
-  const [ending, setEnding] = useState<AgreementX | null>(null);
+  const [ending, setEnding] = useState<Agreement | null>(null);
   const [busy, setBusy] = useState(false);
   useShellOptions({ context: "Syndication market" });
 
@@ -56,7 +55,7 @@ export default function Carriers() {
 
   const stop = async (status: "offered" | "withdrawn") => {
     try {
-      await call(catalogApi.updateOffer, { params: { offerId: o.id }, body: { status } }, OfferX);
+      await call(catalogApi.updateOffer, { params: { offerId: o.id }, body: { status } });
       refresh();
       if (status === "withdrawn")
         toast.show({ message: `${o.program.title} is no longer offered. Stations carrying it keep it until they end.`, onUndo: () => void stop("offered") });
@@ -69,7 +68,7 @@ export default function Carriers() {
     if (!ending) return;
     setBusy(true);
     try {
-      const a = await call(catalogApi.endAgreement, { params: { agreementId: ending.id } }, AgreementX);
+      const a = await call(catalogApi.endAgreement, { params: { agreementId: ending.id } });
       refresh();
       toast.show({ message: `Notice given. ${a.carrier.callSign ?? a.carrier.name} carries ${o.program.title} until ${a.endsAt ? monthDay(localDate(a.endsAt)) : "the notice ends"}.` });
       setEnding(null);

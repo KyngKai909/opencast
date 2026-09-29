@@ -108,3 +108,44 @@ test("someone new starts a station", async ({ page }) => {
   await expect(page.getByText("The log covers the next 24 hours")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign on", exact: true })).toBeDisabled();
 });
+
+test("the switcher says each station is on air (A5)", async ({ page }) => {
+  await signIn(page, "kai");
+  const status = await api<{ stationId: string; onAir: boolean; deadAirAt: string | null }[]>("/me/stations/status", { as: "kai" });
+  expect(status.find((x) => x.stationId === beatId())).toMatchObject({ onAir: true });
+  await page.goto("/control/beat/monitor?switch=1");
+  await expect(page.getByRole("menu").getByText("Owner. On air").first()).toBeVisible();
+});
+
+test("BEAT describes an airing in Listings (G5)", async ({ page }) => {
+  await signIn(page, "kai");
+  const t = Date.now();
+  const window = `from=${encodeURIComponent(new Date(t).toISOString())}&to=${encodeURIComponent(new Date(t + 7 * 86_400_000).toISOString())}`;
+  type L = { entryId: string; title: string; carriedFrom: unknown; episodeDescription: string | null };
+  const before = await api<{ listings: L[] }>(`/stations/${beatId()}/listings?${window}`, { as: "kai" });
+  const mine = before.listings.find((l) => !l.carriedFrom);
+  test.skip(!mine, "nothing of BEAT's own airs this week");
+  await page.goto(`/control/beat/listings/${mine!.entryId}`);
+  await expect(page.getByRole("heading", { name: "Listings" })).toBeVisible();
+  const editor = page.getByRole("complementary", { name: `Listing for ${mine!.title}` });
+  const words = "Tonight: tapes from the Redlands basement.";
+  await editor.getByLabel("Description").fill(words);
+  await editor.getByLabel("Description").blur();
+  await expect
+    .poll(async () => (await api<{ listings: L[] }>(`/stations/${beatId()}/listings?${window}`, { as: "kai" })).listings.find((l) => l.entryId === mine!.entryId)?.episodeDescription)
+    .toBe(words);
+  await expect(page.getByText(/can't be edited here yet/)).toHaveCount(0);
+});
+
+test("a library item shows where it's scheduled and where it aired (L5)", async ({ page }) => {
+  await signIn(page, "kai");
+  const lib = await api<{ items: { id: string; title: string }[] }>(`/stations/${beatId()}/library`, { as: "kai" });
+  const item = lib.items[0]!;
+  const history = await api<{ itemId: string; scheduled: unknown[] }>(`/library/${item.id}/history`, { as: "kai" });
+  expect(history.itemId).toBe(item.id);
+  await page.goto(`/control/beat/library/items/${item.id}`);
+  await expect(page.getByRole("heading", { name: item.title, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^In the log/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Aired/ })).toBeVisible();
+  await expect(page.getByText(history.scheduled.length ? /scheduled$/ : "Nothing scheduled")).toBeVisible();
+});

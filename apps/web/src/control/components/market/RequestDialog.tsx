@@ -4,10 +4,9 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { CARRIAGE_DECLINE_LABELS, catalogApi, type CarriageDeclineReason } from "@opencast/contracts";
+import { CARRIAGE_DECLINE_LABELS, type CarriageDeclineReason, type CarriageRequest, catalogApi, type Offer } from "@opencast/contracts";
 import { Button, ChoiceList, duration, KeyValueList, Modal, Sheet, StationBand, useToast } from "@opencast/ui";
 import { call } from "../../../api/client";
-import { CarriageRequestX, type OfferX } from "../../api/ext/market";
 import { useIsPhone } from "../../layout/shell";
 import { now } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
@@ -26,7 +25,7 @@ export function startingWords(startsOn: string, today: string, short: boolean): 
   return dayMonthDay(startsOn);
 }
 
-export function RequestDialog({ request: r, offer, onClose }: { request: CarriageRequestX; offer: OfferX | null; onClose: () => void }) {
+export function RequestDialog({ request: r, offer, onClose }: { request: CarriageRequest; offer: Offer | null; onClose: () => void }) {
   const s = useStation();
   const phone = useIsPhone();
   const navigate = useNavigate();
@@ -54,7 +53,7 @@ export function RequestDialog({ request: r, offer, onClose }: { request: Carriag
     send(
       `${cs} can carry ${title} from ${startingWords(r.startsOn, today, true).split(",")[0]}`,
       async () => {
-        await call(catalogApi.decideRequest, { params: { requestId: r.id }, body: { decision: "approve" } }, CarriageRequestX);
+        await call(catalogApi.decideRequest, { params: { requestId: r.id }, body: { decision: "approve" } });
         refresh();
         markApproving(r.id, false);
       },
@@ -70,7 +69,7 @@ export function RequestDialog({ request: r, offer, onClose }: { request: Carriag
     setBusy(true);
     setFailure(null);
     try {
-      await call(catalogApi.decideRequest, { params: { requestId: r.id }, body: { decision: "decline", reason: reason === "none" ? null : reason } }, CarriageRequestX);
+      await call(catalogApi.decideRequest, { params: { requestId: r.id }, body: { decision: "decline", reason: reason === "none" ? null : reason } });
       refresh();
       toast.show({ message: reason === "none" ? `Declined. ${cs} is told, with no reason.` : `Declined. ${cs} sees “${CARRIAGE_DECLINE_LABELS[reason]}”.` });
       navigate(`${s.base}/market/offered`);

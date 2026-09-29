@@ -5,9 +5,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { accountsApi, type StationStatus } from "@opencast/contracts";
 import { Icon, Sheet, Tag } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
-import { stationExtApi, type StationStatusX } from "../../api/ext/station";
 import { deadAirMinutes } from "../station/format";
 import { useIsPhone } from "../../layout/shell";
 import { useNow } from "../../../lib/clock";
@@ -31,7 +31,7 @@ export interface SwitchRow {
 }
 
 /** One row of the switcher, from a membership and its status (A5). */
-export function switchRow(m: StationMembership, status: StationStatusX | undefined, currentId: string, now: Date, phone: boolean): SwitchRow {
+export function switchRow(m: StationMembership, status: StationStatus | undefined, currentId: string, now: Date, phone: boolean): SwitchRow {
   const studio = m.station.kind === "studio";
   const slug = stationSlug(m.station);
   const minutes = deadAirMinutes(status?.deadAirAt ?? null, now);
@@ -70,7 +70,7 @@ function useRows(phone: boolean): SwitchRow[] {
   const s = useStation();
   const mine = useMyStations();
   const now = useNow(30_000);
-  const status = useApi(stationExtApi.myStationStatus, {}, { refetchInterval: 60_000, retry: false });
+  const status = useApi(accountsApi.myStationStatus, {}, { refetchInterval: 60_000, retry: false });
   return mine.map((m) => switchRow(m, status.data?.find((x) => x.stationId === m.station.id), s.id, now, phone));
 }
 

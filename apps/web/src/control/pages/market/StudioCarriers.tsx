@@ -2,9 +2,9 @@
 // with when each airs it and what it paid this month. No frame draws it; it's the carriers page
 // (offering 04.1) for all of the studio's programs at once.
 
+import { type Agreement } from "@opencast/contracts";
 import { Navigate } from "react-router";
 import { Button, ControlTitle, money, Table, type Column } from "@opencast/ui";
-import type { AgreementX } from "../../api/ext/market";
 import { useAgreements } from "../../components/market/api";
 import { Quietly } from "../../components/market/parts";
 import { localDate, monthDay, monthName } from "../../components/market/time";
@@ -42,7 +42,7 @@ export default function StudioCarriers() {
       rows
     };
   });
-  const columns: Column<AgreementX>[] = [
+  const columns: Column<Agreement>[] = [
     { key: "sw", width: "14px", cell: (a) => <span className="cc-mk-car__sw" style={{ background: a.carrier.colour ?? undefined }} aria-hidden="true" /> },
     { key: "ch", header: "Ch.", width: "50px", kind: "mono", cell: (a) => a.carrier.channel ?? "" },
     {

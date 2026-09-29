@@ -9,7 +9,6 @@
 import { useState } from "react";
 import { ledgerApi } from "@opencast/contracts";
 import { Button, KeyValueList, Notice, type KeyValueRow } from "@opencast/ui";
-import { StationEarningsX } from "../../api/ext/earnings";
 import { useApi } from "../../../api/hooks";
 import { useStation } from "../../station/StationContext";
 import { ClearWallet } from "../clear/ClearWallet";
@@ -23,7 +22,7 @@ export default function StationAccount() {
   const owner = s.can("moveMoney");
   const name = s.station.callSign ?? s.station.name;
   const [moving, setMoving] = useState(false);
-  const earnings = useApi(ledgerApi.getStationEarnings, { params: { stationId: s.id }, query: { period: "month" } }, { schema: StationEarningsX, enabled: s.can("seeMoney") });
+  const earnings = useApi(ledgerApi.getStationEarnings, { params: { stationId: s.id }, query: { period: "month" } }, { enabled: s.can("seeMoney") });
   const account = useApi(ledgerApi.getPayoutAccount, { params: { stationId: s.id } }, { enabled: owner, retry: false });
   const e = earnings.data;
 

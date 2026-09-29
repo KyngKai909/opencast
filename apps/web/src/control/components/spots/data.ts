@@ -1,17 +1,16 @@
-// The Spots pages' reads and writes, each through the contract (with the area's proposed fields).
+// The Spots pages' reads and writes, each through the contract.
 // A write refreshes everything that shows its result: the rotations, the market, tonight's breaks
 // (the Breaks page, the Program log, the Monitor's rundown, the rail's badge).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { logApi, playoutApi, spotsApi, type EndpointDef } from "@opencast/contracts";
+import { type EndpointDef, logApi, playoutApi, spotsApi } from "@opencast/contracts";
 import { call, type CallArgs } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { AvailsExt, MakerOrdersExt, ProductionOrderExt, StationMarketExt, StationSponsorshipsExt } from "../../api/ext/spots";
 
 export const BREAK_READERS: EndpointDef[] = [spotsApi.getRotations, spotsApi.stationMarket, spotsApi.getAvails, logApi.getLog, playoutApi.getStatus];
 
 export function useMarket(stationId: string, query: { withinMiles?: number; category?: string } = {}, enabled = true) {
-  return useApi(spotsApi.stationMarket, { params: { stationId }, query }, { schema: StationMarketExt, enabled });
+  return useApi(spotsApi.stationMarket, { params: { stationId }, query }, { enabled });
 }
 
 export function useRotations(stationId: string, enabled = true) {
@@ -19,19 +18,19 @@ export function useRotations(stationId: string, enabled = true) {
 }
 
 export function useAvails(stationId: string, enabled = true) {
-  return useApi(spotsApi.getAvails, { params: { stationId }, query: { hours: 24 } }, { schema: AvailsExt, enabled });
+  return useApi(spotsApi.getAvails, { params: { stationId }, query: { hours: 24 } }, { enabled });
 }
 
 export function useSponsorships(stationId: string) {
-  return useApi(spotsApi.listStationSponsorships, { params: { stationId } }, { schema: StationSponsorshipsExt });
+  return useApi(spotsApi.listStationSponsorships, { params: { stationId } });
 }
 
 export function useMakerOrders(stationId: string) {
-  return useApi(spotsApi.listMakerOrders, { params: { stationId } }, { schema: MakerOrdersExt });
+  return useApi(spotsApi.listMakerOrders, { params: { stationId } });
 }
 
 export function useOrder(orderId: string | undefined) {
-  return useApi(spotsApi.getOrder, { params: { orderId: orderId ?? "" } }, { schema: ProductionOrderExt, enabled: !!orderId });
+  return useApi(spotsApi.getOrder, { params: { orderId: orderId ?? "" } }, { enabled: !!orderId });
 }
 
 /** A write, then a refresh of `invalidates` (by endpoint path, any arguments). */

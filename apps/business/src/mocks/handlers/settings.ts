@@ -4,7 +4,8 @@
 
 import { http, HttpResponse, type HttpHandler } from "msw";
 import { accountsApi, Me, notificationsApi, spotsApi, type Business, type Invite, type NotificationPrefs } from "@opencast/contracts";
-import { ConnectionsX, BusinessSettingsX, settingsExtApi } from "../../api/ext/settings";
+import { ConnectionsX, settingsExtApi } from "../../api/ext/settings";
+import { BusinessX } from "../../api/ext";
 import { roleOn } from "../access";
 import { balanceOf, dbBusiness, getDb, move, saveDb } from "../db";
 import { LOGOS } from "../fixtures/businesses";
@@ -40,7 +41,8 @@ function business(id: string): Business | Response {
 }
 
 function profile(b: Business) {
-  return { ...b, logoMark: LOGOS[b.id], shortName: settingsState().shortNames[b.id] ?? null };
+  // P25: its own short name, else the name.
+  return { ...b, logoMark: LOGOS[b.id], shortName: settingsState().shortNames[b.id] ?? b.name };
 }
 
 function badBody(message = "Check what you entered and try again.") {
@@ -120,7 +122,7 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
-    return reply(BusinessSettingsX, profile(b));
+    return reply(BusinessX, profile(b));
   }),
 
   http.patch(path(spotsApi.updateBusiness), async ({ request, params }) => {
@@ -135,12 +137,19 @@ export const settingsHandlers: HttpHandler[] = [
     const money = ["autoTopUp", "receiptsEmail", "legalName", "ein"].some((k) => k in body);
     const r = roleOn(id, p, money ? "manage" : "advertise", money ? "Only the owner can change money settings and tax details." : "Viewers can't change the business.");
     if (r instanceof Response) return r;
-    const { ein, ...rest } = body;
+    const { ein, shortName, ...rest } = body;
     Object.assign(b, rest);
+    // P25: null goes back to the name.
+    if (shortName !== undefined) {
+      const names = settingsState().shortNames;
+      if (shortName === null) delete names[id];
+      else names[id] = shortName;
+      saveSettings();
+    }
     if (ein !== undefined) b.einLast4 = ein === null ? null : ein.replace(/\D/g, "").slice(-4);
     if (body.customersWhere === "online" && !b.marketIds.length) b.marketIds = [MARKET.id];
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(BusinessX, profile(b));
   }),
 
   http.post(path(spotsApi.addLocation), async ({ request, params }) => {
@@ -164,7 +173,7 @@ export const settingsHandlers: HttpHandler[] = [
       radiusMiles: body.radiusMiles ?? null
     });
     saveDb();
-    return reply(BusinessSettingsX, profile(b), 201);
+    return reply(BusinessX, profile(b), 201);
   }),
 
   http.patch(path(settingsExtApi.updateLocation), async ({ request, params }) => {
@@ -182,7 +191,7 @@ export const settingsHandlers: HttpHandler[] = [
     Object.assign(loc, body);
     if (loc.kind === "location") loc.radiusMiles = null;
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(BusinessX, profile(b));
   }),
 
   http.delete(path(spotsApi.removeLocation), ({ request, params }) => {
@@ -202,7 +211,7 @@ export const settingsHandlers: HttpHandler[] = [
     if (!check.ok) return fail(409, "location_in_use", check.message);
     b.locations = b.locations.filter((l) => l.id !== locationId);
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(BusinessX, profile(b));
   }),
 
   http.post(path(settingsExtApi.uploadLogo), async ({ request, params }) => {
@@ -231,7 +240,7 @@ export const settingsHandlers: HttpHandler[] = [
       return badBody("That image couldn't be read. Try a PNG or JPEG.");
     }
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(BusinessX, profile(b));
   }),
 
   // ---- The team ----

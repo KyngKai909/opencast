@@ -5,9 +5,8 @@
 // Owners change it; operators see it (proposed, A5). Saved as each field is left.
 
 import { useEffect, useState } from "react";
-import { spotsApi } from "@opencast/contracts";
+import { type SponsorshipSetting, spotsApi } from "@opencast/contracts";
 import { Lines, Toggle, money, useToast } from "@opencast/ui";
-import type { SponsorshipSettingExt } from "../../api/ext/spots";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../../pages/common";
 import { errorText, useSponsorships, useWrite } from "./data";
@@ -25,7 +24,7 @@ interface Draft {
   max: string;
 }
 
-const draftOf = (x: SponsorshipSettingExt): Draft => ({ min: x.closed ? "None" : money(x.minMonthlyMicros), max: x.closed ? "" : String(x.maxSponsors) });
+const draftOf = (x: SponsorshipSetting): Draft => ({ min: x.closed ? "None" : money(x.minMonthlyMicros), max: x.closed ? "" : String(x.maxSponsors) });
 
 /** A row's words: "None" closes it; otherwise a dollar amount and a whole number. Null when it doesn't read. */
 export function readRow(d: Draft): { minMonthlyMicros: number; maxSponsors: number; closed: boolean } | null {
@@ -45,7 +44,7 @@ export default function SponsorshipSettings() {
   const call = s.station.callSign ?? s.station.name;
   const canEdit = s.can("manage");
   const rows = data.data?.settings ?? [];
-  const key = (x: SponsorshipSettingExt) => x.programId ?? "station";
+  const key = (x: SponsorshipSetting) => x.programId ?? "station";
 
   useEffect(() => {
     if (data.data) setDrafts(Object.fromEntries(data.data.settings.map((x) => [x.programId ?? "station", draftOf(x)])));
@@ -54,7 +53,7 @@ export default function SponsorshipSettings() {
   if (data.isLoading) return <Quiet />;
   if (data.error) return <ErrorLine>{errorText(data.error)}</ErrorLine>;
 
-  const commit = (x: SponsorshipSettingExt) => {
+  const commit = (x: SponsorshipSetting) => {
     const d = drafts[key(x)];
     const row = d && readRow(d);
     if (!row) return;
@@ -65,7 +64,7 @@ export default function SponsorshipSettings() {
     save.mutate({ params: { stationId: s.id }, body }, { onSuccess: () => toast.show({ message: "Saved." }), onError: (e) => toast.show({ message: errorText(e) }) });
   };
 
-  const sub = (x: SponsorshipSettingExt) => (x.sponsoredThrough ? `Carried from ${x.sponsoredThrough.callSign ?? x.sponsoredThrough.name}` : x.programId === null ? "Credited in every break" : x.format ?? undefined);
+  const sub = (x: SponsorshipSetting) => (x.sponsoredThrough ? `Carried from ${x.sponsoredThrough.callSign ?? x.sponsoredThrough.name}` : x.programId === null ? "Credited in every break" : x.format ?? undefined);
 
   return (
     <div className="cc-sps">

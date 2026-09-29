@@ -6,18 +6,8 @@
 
 import { Business, endpoint, FundingSource, Id, Micros, Timestamp } from "@opencast/contracts";
 import { z } from "zod";
-import { BusinessX } from "../ext";
 
 const BusinessParams = z.object({ businessId: Id });
-
-// ---- spots: the business ----
-
-/**
- * P25: a business's short name, for title cards ("Orange Street" on the "As stations see you"
- * card, biz-settings 01.1). Falls back to the name.
- */
-export const BusinessSettingsX = BusinessX.extend({ shortName: z.string().nullable().optional() });
-export type BusinessSettingsX = z.infer<typeof BusinessSettingsX>;
 
 /**
  * P20: what the business is connected to (biz-settings 04.1): Clear Pay and an online checkout,

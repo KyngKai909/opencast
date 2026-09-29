@@ -8,7 +8,7 @@ import { API_PREFIX, buildPath, trustApi } from "@opencast/contracts";
 import { Button, Checkbox, ChoiceList, Icon, Modal, Sheet, TextAreaField, useToast } from "@opencast/ui";
 import { useApiMutation } from "../../../api/hooks";
 import { ApiError } from "../../../api/client";
-import { stationExtApi, type ClaimX } from "../../api/ext/station";
+import type { ClaimX } from "../../api/ext/station";
 import { useAuth } from "../../../auth/AuthProvider";
 import { config } from "../../../config";
 import type { StationState } from "../../station/StationContext";
@@ -20,14 +20,14 @@ import "./AnswerClaim.css";
 async function attach(claimId: string, file: File, token: string | null): Promise<string> {
   const form = new FormData();
   form.set("file", file);
-  const res = await fetch(`${config.apiBase}${API_PREFIX}${buildPath(stationExtApi.attachToClaim.path, { claimId })}`, {
+  const res = await fetch(`${config.apiBase}${API_PREFIX}${buildPath(trustApi.attachToClaim.path, { claimId })}`, {
     method: "POST",
     headers: token ? { authorization: `Bearer ${token}` } : {},
     body: form
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, json?.error?.code ?? "error", json?.error?.message ?? "The file didn't upload. Try again.");
-  const parsed = stationExtApi.attachToClaim.response.safeParse(json);
+  const parsed = trustApi.attachToClaim.response.safeParse(json);
   if (!parsed.success) throw new ApiError(500, "bad_response", "The file didn't upload. Try again.");
   return parsed.data.attachmentUrl;
 }

@@ -5,7 +5,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { libraryApi, stationsApi } from "@opencast/contracts";
 import { Button, ControlFoot, ControlTitle } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
-import { LibraryExt } from "../../api/ext/live";
 import { useIsPhone } from "../../layout/shell";
 import { useMyStations } from "../../station/StationContext";
 import { LibrarySummary, LibraryTable, RightsPane, UploadDrop } from "../../components/live/LibraryParts";
@@ -24,7 +23,7 @@ export default function SetupLibrary() {
   const lib = useApi(
     libraryApi.getLibrary,
     { params: { stationId }, query: {} },
-    { schema: LibraryExt, refetchInterval: (q) => (q.state.data?.items.some((i) => i.status === "preparing") ? 2000 : false) }
+    { refetchInterval: (q) => (q.state.data?.items.some((i) => i.status === "preparing") ? 2000 : false) }
   );
   if (setup.isLoading || lib.isLoading) return <Quiet />;
   const st = setup.data?.station ?? mine?.station;

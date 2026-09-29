@@ -1,4 +1,4 @@
-// Sending a file: library.upload and the proposed replaceFile (L6) are multipart, which the JSON
+// Sending a file: library.upload and replaceFile (L6) are multipart, which the JSON
 // client doesn't do. Same path, token and error shape as api/client.ts.
 
 import { API_PREFIX, buildPath, ErrorResponse, type EndpointDef } from "@opencast/contracts";

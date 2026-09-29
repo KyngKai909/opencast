@@ -1,9 +1,8 @@
-// library: items, folders, programs, uploads and link imports, rights, IPFS export; and the
-// proposed item history (L5) and file replacement (L6). The Live and programming area owns this file.
+// library: items, folders, programs, uploads and link imports, rights, IPFS export; an item's
+// history (L5) and replacing its file (L6). The Live and programming area owns this file.
 
 import { http } from "msw";
 import { libraryApi, type LibraryItem, type Program } from "@opencast/contracts";
-import { getItemHistory, LibraryExt, LibraryItemExt, replaceFile } from "../../api/ext/live";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
@@ -32,7 +31,8 @@ function audioLayout(i: LibraryItem) {
   return i.status === "ready" ? ("stereo" as const) : null;
 }
 
-const withExt = (i: LibraryItem) => ({ ...i, audioLayout: audioLayout(i) });
+/** L5, L7: the audio layout and caption language, as the API adds them. */
+const withProbe = (i: LibraryItem): LibraryItem => ({ ...i, audioLayout: audioLayout(i), captionLanguage: i.captions === "none" ? null : "en" });
 
 /** Programs with their listing status computed from what they air this week. */
 function programsOf(stationId: string): Program[] {
@@ -104,8 +104,8 @@ export const libraryHandlers = [
     if (q.get("folderId")) items = items.filter((i) => i.folderId === q.get("folderId"));
     if (q.get("code")) items = items.filter((i) => i.code === q.get("code"));
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
-    return reply(LibraryExt, {
-      items: items.map(withExt),
+    return reply(libraryApi.getLibrary.response, {
+      items: items.map(withProbe),
       folders: lib.folders.map((f) => ({ ...f, itemCount: all.filter((i) => i.folderId === f.id).length })),
       programs: programsOf(id),
       needsAttention: { rightsToConfirm: all.filter((i) => !i.rights).length, preparing: all.filter((i) => i.status === "preparing").length },
@@ -169,7 +169,7 @@ export const libraryHandlers = [
     return reply(libraryApi.getImport.response, out);
   }),
 
-  http.get(path(getItemHistory), ({ request, params }) => {
+  http.get(path(libraryApi.getItemHistory), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     ensureLiveSeed();
@@ -187,7 +187,7 @@ export const libraryHandlers = [
     const day = new Date(Date.parse(t) + 24 * 3600e3).toISOString();
     const carriage = item.programId ? PROGRAM_CARRIAGE[item.programId] : undefined;
     const program = item.programId ? getDb().library.programs.find((pr) => pr.id === item.programId) : undefined;
-    return reply(getItemHistory.response, {
+    return reply(libraryApi.getItemHistory.response, {
       itemId: item.id,
       scheduled: future.map((e) => ({ entryId: e.id, startsAt: e.startsAt, station: st, note: e.repeatGroupId || /repeat/i.test(e.localNote ?? "") ? e.localNote : null })),
       aired,
@@ -195,12 +195,12 @@ export const libraryHandlers = [
       carriers: u.carriers,
       cachedForAir: item.status === "ready" && future.some((e) => e.startsAt < day),
       audioLayout: audioLayout(item),
-      captionLanguage: item.captions === "none" ? null : "English",
+      captionLanguage: item.captions === "none" ? null : "en",
       carriage: { offered: !!carriage && item.offerable, program: program?.title ?? null, terms: carriage?.terms ?? null }
     });
   }),
 
-  http.post(path(replaceFile), async ({ request, params }) => {
+  http.post(path(libraryApi.replaceFile), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const item = itemById(String(params.itemId));
@@ -210,10 +210,12 @@ export const libraryHandlers = [
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
     if (!(file instanceof File)) return fail(400, "no_file", "Choose a video or audio file.");
+    if (item.source === "link") return fail(409, "not_an_upload", "It came from a link, so there's no file of ours to replace.");
+    if (item.status === "preparing") return fail(409, "preparing", "It's still being prepared. Replace it once it's ready.");
     Object.assign(item, { originalFilename: file.name, status: "preparing", prepProgress: 0, storage: null });
     liveState().preparing[item.id] = Date.now();
     saveLive();
-    return reply(LibraryItemExt, withExt(item));
+    return reply(libraryApi.getItem.response, withProbe(item));
   }),
 
   http.get(path(libraryApi.getItem), ({ request, params }) => {
@@ -224,7 +226,7 @@ export const libraryHandlers = [
     if (!item) return fail(404, "not_found", "That item wasn't found.");
     const denied = programs(item.stationId, p);
     if (denied) return denied;
-    return reply(LibraryItemExt, withExt(item));
+    return reply(libraryApi.getItem.response, withProbe(item));
   }),
 
   http.patch(path(libraryApi.updateItem), async ({ request, params }) => {
@@ -238,7 +240,7 @@ export const libraryHandlers = [
     if (!parsed.success) return fail(400, "invalid", "Check the item's details and try again.");
     Object.assign(item, parsed.data);
     saveDb();
-    return reply(LibraryItemExt, withExt(item));
+    return reply(libraryApi.getItem.response, withProbe(item));
   }),
 
   http.delete(path(libraryApi.deleteItem), ({ request, params }) => {
@@ -286,7 +288,7 @@ export const libraryHandlers = [
     if (!parsed.success) return fail(400, "choose", "Choose which of the three is true.");
     item.rights = { basis: parsed.data.basis, confirmedBy: p.displayName ?? p.email, confirmedAt: now().toISOString(), note: parsed.data.note ?? null };
     saveDb();
-    return reply(LibraryItemExt, withExt(item));
+    return reply(libraryApi.getItem.response, withProbe(item));
   }),
 
   http.post(path(libraryApi.createFolder), async ({ request, params }) => {

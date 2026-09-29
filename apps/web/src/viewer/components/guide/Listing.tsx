@@ -53,7 +53,8 @@ function useListingContent({ airing: a, station, onDone }: { airing: AiringX; st
   const navigate = useNavigate();
   const qc = useQueryClient();
   const cs = callSignOf(station);
-  const text = listingText(a.note, program.data?.description);
+  // G5: the airing's own description (else its episode's), then the program's.
+  const text = listingText(a.note, a.episodeDescription ?? program.data?.description);
   const at = clock(a.startsAt, { timeZone: MARKET_TZ, suffix: false });
   const switchValue = existing ? existing.switchMeOver : switchOver;
 

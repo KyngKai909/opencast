@@ -5,9 +5,8 @@
 
 import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { accountsApi, ORDER_STATE_LABELS, spotsApi, type OrderState } from "@opencast/contracts";
+import { accountsApi, ORDER_STATE_LABELS, type OrderState, type ProductionOrder, spotsApi } from "@opencast/contracts";
 import { Button, ControlTitle, Field, KeyValueList, Lines, Segmented, Sheet, Table, Tag, TextAreaField, money, useToast, type Column } from "@opencast/ui";
-import { tellMeWhenListed, type ProductionOrderExt } from "../../api/ext/spots";
 import { useApi } from "../../../api/hooks";
 import { errorText, useMakerOrders, useMarket, useOrder, useSetRotation, useRotations, useWrite } from "../../components/spots/data";
 import { dateText, localDate, parseMoney, rateText, spotLength } from "../../components/spots/format";
@@ -21,8 +20,8 @@ import "./Orders.css";
 const ORDER_READERS = [spotsApi.listMakerOrders, spotsApi.getOrder];
 const YOUR_TURN: OrderState[] = ["asked", "accepted", "changes_requested"];
 
-const label = (o: ProductionOrderExt) => ORDER_STATE_LABELS[o.state].maker;
-const asked = (o: ProductionOrderExt) => dateText(localDate(o.createdAt, STATION_TZ));
+const label = (o: ProductionOrder) => ORDER_STATE_LABELS[o.state].maker;
+const asked = (o: ProductionOrder) => dateText(localDate(o.createdAt, STATION_TZ));
 
 export default function Orders() {
   const s = useStation();
@@ -47,13 +46,13 @@ function OrderList({ base }: { base: string }) {
   if (orders.error) return <ErrorLine>{errorText(orders.error)}</ErrorLine>;
   const rows = orders.data ?? [];
   if (!rows.length) return <p className="cc-ord__empty">No orders yet. When a business asks {s.station.callSign ?? s.station.name} to make a spot, it's here.</p>;
-  const columns: Column<ProductionOrderExt>[] = [
+  const columns: Column<ProductionOrder>[] = [
     { key: "order", header: "Order", cell: (o) => <Lines title={o.title} detail={`${spotLength(o.lengthSec)}, asked ${asked(o)}`} /> },
     { key: "business", header: "Business", width: "minmax(0, 220px)", cell: (o) => o.business.name },
     { key: "price", header: "Price", width: "110px", align: "end", cell: (o) => (o.quote ? <span className="cc-sp-mono">{money(o.quote.priceMicros)}</span> : <span className="cc-sp-quiet">Not quoted</span>) },
     { key: "state", header: "State", width: "200px", cell: (o) => <Tag variant={YOUR_TURN.includes(o.state) ? "standby" : o.state === "approved" ? "solid" : "plain"}>{label(o)}</Tag> }
   ];
-  const phoneColumns: Column<ProductionOrderExt>[] = [
+  const phoneColumns: Column<ProductionOrder>[] = [
     { key: "order", header: "Order", cell: (o) => <Lines title={o.title} detail={`${o.business.name}, ${spotLength(o.lengthSec)}${o.quote ? `, ${money(o.quote.priceMicros)}` : ""}`} /> },
     { key: "state", header: "State", width: "auto", align: "end", cell: columns[3].cell }
   ];
@@ -111,14 +110,14 @@ function OrderView({ id }: { id: string }) {
   );
 }
 
-function paidLine(o: ProductionOrderExt, who: string): string {
+function paidLine(o: ProductionOrder, who: string): string {
   return o.listedRate ? `${who} listed it at ${rateText(o.listedRate)}. It's in your market now.` : `${who} hasn't set a rate yet. You'll see it in your market when they do.`;
 }
 
-function PaidAction({ o }: { o: ProductionOrderExt }) {
+function PaidAction({ o }: { o: ProductionOrder }) {
   const s = useStation();
   const toast = useToast();
-  const tell = useWrite(tellMeWhenListed, ORDER_READERS);
+  const tell = useWrite(spotsApi.tellMeWhenListed, ORDER_READERS);
   const rotations = useRotations(s.id, !!o.listedRate);
   const setRotation = useSetRotation();
   if (!s.can("spots")) return null;
@@ -145,7 +144,7 @@ function PaidAction({ o }: { o: ProductionOrderExt }) {
   );
 }
 
-function QuoteForm({ o }: { o: ProductionOrderExt }) {
+function QuoteForm({ o }: { o: ProductionOrder }) {
   const s = useStation();
   const toast = useToast();
   const quote = useWrite(spotsApi.quoteOrder, ORDER_READERS);
@@ -227,7 +226,7 @@ function QuoteForm({ o }: { o: ProductionOrderExt }) {
   );
 }
 
-function AfterQuote({ o, who }: { o: ProductionOrderExt; who: string }) {
+function AfterQuote({ o, who }: { o: ProductionOrder; who: string }) {
   const s = useStation();
   const toast = useToast();
   const deliver = useWrite(spotsApi.deliverOrder, ORDER_READERS);
@@ -285,7 +284,7 @@ function AfterQuote({ o, who }: { o: ProductionOrderExt; who: string }) {
   );
 }
 
-function Notes({ o }: { o: ProductionOrderExt }) {
+function Notes({ o }: { o: ProductionOrder }) {
   const s = useStation();
   const add = useWrite(spotsApi.addOrderNote, ORDER_READERS);
   const [text, setText] = useState("");

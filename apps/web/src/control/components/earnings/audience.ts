@@ -1,7 +1,7 @@
 // The Audience page's words for a program row.
 
 import { clock } from "@opencast/ui";
-import type { AudienceProgram } from "../../api/ext/earnings";
+import type { AudienceProgram } from "../../api/types";
 
 /** Where a program came from: "From your library", "Carried from REEL 24.1", "Live". */
 export function sourceLine(p: Pick<AudienceProgram, "source" | "carriedFrom">): string {

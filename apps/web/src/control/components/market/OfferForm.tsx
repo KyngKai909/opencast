@@ -4,10 +4,11 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { catalogApi, type CarriageTerm } from "@opencast/contracts";
+import { type CarriageTerm, catalogApi, type Offer } from "@opencast/contracts";
 import { Button, ControlTitle, duration, Field, Icon, KeyValueList, money, Notice, Segmented, useToast } from "@opencast/ui";
 import { call } from "../../../api/client";
-import { OfferX, TermsBodyX, type OfferDetailX } from "../../api/ext/market";
+import type { OfferDetailX } from "../../api/ext/market";
+import type { TermsBody } from "../../api/types";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../../pages/common";
@@ -49,7 +50,7 @@ function draftOf(o: OfferDetailX | null): Draft {
 }
 
 /** The body from the draft, or what's wrong with it. */
-export function termsFromDraft(d: Draft, breakMsPerHour = BREAKS_PER_HOUR): { body: TermsBodyX } | { errors: Partial<Record<"deals" | "barterFill" | "cashPrice" | "cpbFill" | "cpbPrice", string>> } {
+export function termsFromDraft(d: Draft, breakMsPerHour = BREAKS_PER_HOUR): { body: TermsBody } | { errors: Partial<Record<"deals" | "barterFill" | "cashPrice" | "cpbFill" | "cpbPrice", string>> } {
   const errors: Partial<Record<"deals" | "barterFill" | "cashPrice" | "cpbFill" | "cpbPrice", string>> = {};
   const fill = readDuration(d.barterFill);
   const price = readMoney(d.cashPrice);
@@ -140,7 +141,7 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
   const errors = tried && "errors" in result ? result.errors : {};
   const description = `${formatLine(program, { long: true, band: false })}. Each hour has ${duration(BREAKS_PER_HOUR)} of breaks.`;
   // What carrying stations see: the offer as the market will show it.
-  const preview: OfferX = {
+  const preview: Offer = {
     id: offer?.id ?? program.id,
     program: { id: program.id, title: program.title, description: null, category: null, live: program.live, episodeCount: program.episodeCount, rightsNote: null, format: program.format, colour: program.colour },
     maker: s.station,
@@ -151,7 +152,7 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
     previews: 0,
     ...("body" in result ? result.body : { termsOffered: ["barter"], cashPriceMicros: null, cashPriceUnit: null, barterMakerMsPerHour: null, airingsPerEpisode: 3, windowDays: 7, liveOnly: false, noticeDays: 7, approval: "i_approve", radioBandAllowed: true }),
     cashPlusBarter: "body" in result ? result.body.cashPlusBarter : null
-  } as OfferX;
+  } as Offer;
   const viewer = null;
   const dealRows = "body" in result ? result.body.termsOffered.map((t) => ({ label: t === "cash_plus_barter" ? "Cash plus barter" : t === "cash" ? "Cash" : "Barter", value: termDetail({ ...preview, maker: s.station }, t, viewer) ?? "" })) : [];
   const linked = "linked" in program && program.linked;
@@ -162,8 +163,8 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
     setBusy(true);
     setFailure(null);
     try {
-      if (offer) await call(catalogApi.updateOffer, { params: { offerId: offer.id }, body: { ...result.body, status: "offered" } }, OfferX);
-      else await call(catalogApi.offerProgram, { params: { programId: program.id }, body: result.body }, OfferX);
+      if (offer) await call(catalogApi.updateOffer, { params: { offerId: offer.id }, body: { ...result.body, status: "offered" } });
+      else await call(catalogApi.offerProgram, { params: { programId: program.id }, body: result.body });
       refresh();
       toast.show({ message: editing ? "New terms saved. They apply to new carriers." : `${program.title} is offered. Stations can find it in the market.` });
       navigate(`${s.base}/market/offered`);

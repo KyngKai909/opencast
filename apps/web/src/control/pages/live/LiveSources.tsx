@@ -5,12 +5,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { accountsApi, stationsApi, type LogEntry } from "@opencast/contracts";
+import { accountsApi, stationsApi, type LiveSource, type LogEntry } from "@opencast/contracts";
 import { Button, Checkbox, ChoiceList, ControlTitle, Field, KeyValueList, Menu, Modal, Table, clock, cx, useToast, type Column } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { listHosts, type LiveSourceExt } from "../../api/ext/live";
 import { STATION_TZ, useNow } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { useHosts, useLiveSources, useLogWindow } from "../../components/live/hooks";
@@ -104,7 +103,7 @@ export default function LiveSources() {
     { key: "signal", header: "Signal", width: "150px", cell: (e) => <Signal {...signalWords(byId(e.liveSourceId), e, now)} /> }
   ];
 
-  const reset = async (src: LiveSourceExt) => {
+  const reset = async (src: LiveSource) => {
     try {
       const out = await call(stationsApi.resetLiveSourceKey, { params: { stationId: s.id, sourceId: src.id } });
       setKeys((k) => ({ ...k, [src.id]: out.streamKey }));
@@ -114,7 +113,7 @@ export default function LiveSources() {
       toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
     }
   };
-  const remove = async (src: LiveSourceExt) => {
+  const remove = async (src: LiveSource) => {
     try {
       await call(stationsApi.removeLiveSource, { params: { stationId: s.id, sourceId: src.id } });
       void refresh();
@@ -256,7 +255,7 @@ export default function LiveSources() {
   );
 }
 
-function AddSource({ open, hasBrowser, onClose, onAdded }: { open: boolean; hasBrowser: boolean; onClose: () => void; onAdded: (src: LiveSourceExt, key: string | null) => void }) {
+function AddSource({ open, hasBrowser, onClose, onAdded }: { open: boolean; hasBrowser: boolean; onClose: () => void; onAdded: (src: LiveSource, key: string | null) => void }) {
   const s = useStation();
   const [kind, setKind] = useState<"encoder" | "browser" | null>(null);
   const [name, setName] = useState("");
@@ -315,7 +314,7 @@ function AddSource({ open, hasBrowser, onClose, onAdded }: { open: boolean; hasB
   );
 }
 
-/** Who hosts each live program (setHosts; read back with the proposed A4). */
+/** Who hosts each live program (setHosts; read back with listHosts, A4). */
 function HostsSection() {
   const s = useStation();
   const hosts = useHosts();
@@ -352,7 +351,7 @@ function HostsModal({ stationId, program, onClose }: { stationId: string; progra
   const save = async () => {
     try {
       await call(stationsApi.setHosts, { params: { stationId, programId: program.programId }, body: { userIds: chosen } });
-      await qc.invalidateQueries({ queryKey: ["GET", listHosts.path] });
+      await qc.invalidateQueries({ queryKey: ["GET", stationsApi.listHosts.path] });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");

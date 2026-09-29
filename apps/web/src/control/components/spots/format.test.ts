@@ -1,5 +1,5 @@
+import { type BreakContent } from "@opencast/contracts";
 import { describe, expect, it } from "vitest";
-import type { BreakContent } from "../../api/ext/spots";
 import { readRow } from "./SponsorshipSettings";
 import { backDetail, backTitle, pausedDetail, pausedTitle } from "./PauseNotices";
 import { breakParts, breakSummary, creditLead, dateText, firstAiring, milesText, openAcross, parseMoney, rateText, runwayParts, runsText, spotLength, sponsorScope, tonightWindow, upToText, type BreakView } from "./format";

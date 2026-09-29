@@ -4,8 +4,9 @@
 
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { CARRIAGE_REQUEST_LABELS, logApi, type CarriageTerm, type LogEntry, type Slot } from "@opencast/contracts";
+import { CARRIAGE_REQUEST_LABELS, catalogApi, logApi, type CarriageTerm, type LogEntry, type Slot } from "@opencast/contracts";
 import { Button, clock, clockRange, ControlTitle, duration, KeyValueList, Toggle, useToast } from "@opencast/ui";
+import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import type { OfferDetailX } from "../../api/ext/market";
 import { useAgreements, useOffer, useRefreshMarket } from "../../components/market/api";
@@ -109,12 +110,21 @@ export default function PlaceInLog() {
     const extra: Slot = { weekday: weekdayOf(secondDate), time: secondTime };
     const plan = { offerId: o.id, carrierStationId: s.id, term, slots: second && offerSecond ? [main, extra] : [main], repeatSlots: second && offerSecond ? [extra] : [], startsOn: slot.date, weeks: 4, replaceExisting: true, audioOnly: s.station.band === "radio" && !(o.program.format?.bands ?? []).includes("radio") };
     if (needsApproval) {
-      // Asking can't be taken back (no withdraw yet), so it goes now, without Undo.
+      // Asking goes now; Undo withdraws the request while the maker hasn't answered it (C4).
       carry(plan)
-        .then(() => {
+        .then((r) => {
           setAsked(true);
           refresh();
-          toast.show({ message: `${maker} has your request. ${o.program.title} goes in your log when they approve it.` });
+          toast.show({
+            message: `${maker} has your request. ${o.program.title} goes in your log when they approve it.`,
+            onUndo: () =>
+              void call(catalogApi.withdrawRequest, { params: { requestId: r.id } })
+                .then(() => {
+                  setAsked(false);
+                  refresh();
+                })
+                .catch((e: unknown) => toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." }))
+          });
         })
         .catch((e: unknown) => toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." }));
       return;

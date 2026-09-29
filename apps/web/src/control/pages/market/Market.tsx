@@ -5,9 +5,8 @@
 
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { logApi } from "@opencast/contracts";
+import { logApi, type Offer } from "@opencast/contracts";
 import { Button, clockRange, ControlTitle, Field, Notice, Segmented, Table, Tag, type Column } from "@opencast/ui";
-import type { OfferX } from "../../api/ext/market";
 import { useApi } from "../../../api/hooks";
 import { useBrowse, useRequests } from "../../components/market/api";
 import { browse, facetCounts, readFilters, resultWords, writeFilters, type BrowseFilters, type BrowseSort } from "../../components/market/browse";
@@ -122,9 +121,9 @@ export default function Market() {
   );
 }
 
-function OfferTable({ offers }: { offers: OfferX[] }) {
+function OfferTable({ offers }: { offers: Offer[] }) {
   const s = useStation();
-  const columns: Column<OfferX>[] = [
+  const columns: Column<Offer>[] = [
     { key: "card", width: "112px", cell: (o) => <ProgramCard offer={o} className="cc-mk__tc" /> },
     {
       key: "program",
@@ -183,7 +182,7 @@ function OfferTable({ offers }: { offers: OfferX[] }) {
 }
 
 /** Market 06.1: on the phone, what fits the gap, and one tap carries it on its default deal. */
-function PhoneMarket({ offers, gap, gapStartsAt }: { offers: OfferX[]; gap: string | null; gapStartsAt: string | null }) {
+function PhoneMarket({ offers, gap, gapStartsAt }: { offers: Offer[]; gap: string | null; gapStartsAt: string | null }) {
   const s = useStation();
   const carryIntoGap = useCarryIntoGap();
   const now = gap ? offers.filter((o) => o.approval === "any_station") : offers;

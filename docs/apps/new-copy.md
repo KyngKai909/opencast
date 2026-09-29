@@ -459,3 +459,17 @@ Words for what the API answers now (A1, A2, A3, O2, N3, N5). The API's own messa
 | Settings, Notifications | "How early": "At the start", "{N} minutes before", "An hour before", "{N} hours before"; Quiet hours: "Nothing between {10:00 pm} and {8:00 am}" from the account's window |
 | Desk, a set-up station's Claim row | "Claim"; "{Crate} hasn't been invited to claim it yet", "Claim invite sent {Sept 24}", "Claim link sent {Sept 20}"; buttons "Invite to claim" (on air, not invited yet), "Send the claim link", "Send the link again"; toasts "Claim invite sent to {name}.", "Claim link sent to {name}." |
 | Desk, a station set up before setups were kept (N5 null) | "It was set up before its recipe was kept, so its recipe, sign-on time and import aren't shown here." |
+
+### apps/web: master control on its new endpoints (contracts of 2026-09-29)
+
+Words for what the API answers now (A4, A5, B3, B6, C4, G3, G5, G7, L5 to L7, N10, P24, S15, S17). The API's own messages are shown as they come for its refusals (`not_live`, `not_on_air`, `ended`, `from_the_maker`, `speakerId`, `not_an_upload`, `claim_open`, `preparing`, `unreadable_file`, `wrong_kind`, `too_long_for_log`, `not_open`, `wrong_file_type`, `too_big`, `decided`). "Listings can't be edited here yet." is gone: the listings always load.
+
+| Where | Words |
+|---|---|
+| The claim page, a station set up under a licence (N10 `saidYesAt` null) | lede without the yes: "Opencast's team has run {works} on the {Inland Empire} dial. Everything below becomes yours when you claim it." |
+| Place in the log, a request that needs the maker's approval (C4) | the toast "{Maker} has your request. {Program} goes in your log when they approve it." now has Undo, which withdraws the request |
+| Listings, Captions (L7) | the language by name from its code ("Generated live, English" from `en`); turning captions on keeps the program's language, else English |
+| A library item, Prepared for air, Captions (L7) | "Uploaded, English" (the caption track's language, by name) |
+| Audience, By program, Stayed to the end (U1) | an airing that has ended with no one at its first minute: "–" |
+| The studio, a lower third the API refuses (S15) | toast with the API's message; the lower third stays as set on the screen |
+| Program log, Repeat this day, Once (G7) | no new words: choosing "Once" takes the day's repeat off the log from now on (another pattern replaces it) |

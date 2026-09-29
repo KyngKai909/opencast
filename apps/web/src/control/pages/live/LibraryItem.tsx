@@ -1,6 +1,6 @@
 // 04.1 a library item (/:callSign/library/items/:itemId?folder=:folderId): the file, how it was
 // prepared for air, its rights, whether it's offered for carriage, where it's scheduled and every
-// time it has aired (the proposed L5), and removing it (guarded while anything uses it).
+// time it has aired (L5), replacing its file (L6), and removing it (guarded while anything uses it).
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -9,14 +9,13 @@ import { Button, Checkbox, KeyValueList, Modal, PictureFrame, PicturePlaceholder
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { getItemHistory, LibraryExt, LibraryItemExt, replaceFile } from "../../api/ext/live";
-import { notYet } from "../../api/ext";
 import { useAuth } from "../../../auth/AuthProvider";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { FolderRail, ItemStatus, refreshLibrary, RightsPane } from "../../components/live/LibraryParts";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
+import { languageName } from "../../components/live/listings";
 import { SecTop } from "../../components/live/Studio";
 import { sendFile } from "../../components/live/upload";
 import { NotFound, Quiet } from "../common";
@@ -37,9 +36,9 @@ export default function LibraryItem() {
   const toast = useToast();
   const auth = useAuth();
   useShellOptions({ flush: true });
-  const lib = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} }, { schema: LibraryExt });
-  const itemQ = useApi(libraryApi.getItem, { params: { itemId } }, { schema: LibraryItemExt, refetchInterval: (q) => (q.state.data?.status === "preparing" ? 2000 : false) });
-  const history = useApi(getItemHistory, { params: { itemId } }, { retry: false });
+  const lib = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} });
+  const itemQ = useApi(libraryApi.getItem, { params: { itemId } }, { refetchInterval: (q) => (q.state.data?.status === "preparing" ? 2000 : false) });
+  const history = useApi(libraryApi.getItemHistory, { params: { itemId } }, { retry: false });
   const file = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
@@ -58,7 +57,7 @@ export default function LibraryItem() {
 
   const replace = async (f: File) => {
     try {
-      await sendFile(replaceFile, { itemId: item.id }, f, {}, auth.getToken, LibraryItemExt);
+      await sendFile(libraryApi.replaceFile, { itemId: item.id }, f, {}, auth.getToken);
       await refreshLibrary(qc);
       toast.show({ message: `${f.name} is being prepared for air. ${item.title} keeps its history and schedule.` });
     } catch (e) {
@@ -81,7 +80,7 @@ export default function LibraryItem() {
     : "";
   const rightsTitle = item.rights ? (item.rights.basis === "made_it" ? `Made by ${callSign}` : RIGHTS_BASIS_LABELS[item.rights.basis]) : null;
   const sound = item.status === "ready" ? `${h?.audioLayout ? `${h.audioLayout[0]!.toUpperCase()}${h.audioLayout.slice(1)}, ` : ""}levelled to broadcast loudness` : null;
-  const captions = item.captions === "none" ? "None" : `${item.captions === "generated" ? "Generated" : "Uploaded"}${h?.captionLanguage ? `, ${h.captionLanguage}` : ""}`;
+  const captions = item.captions === "none" ? "None" : `${item.captions === "generated" ? "Generated" : "Uploaded"}${h?.captionLanguage ? `, ${languageName(h.captionLanguage)}` : ""}`;
   const contentId = item.storage?.contentId;
 
   return (
@@ -144,9 +143,6 @@ export default function LibraryItem() {
               </div>
             )}
 
-            {/* Where it's scheduled and where it aired come from the proposed history (L5): without it, left out. */}
-            {!notYet(history.error) && (
-            <>
             <section className="cc-item__sec" aria-labelledby="cc-inlog-h">
               <SecTop
                 id="cc-inlog-h"
@@ -191,8 +187,6 @@ export default function LibraryItem() {
                 }))}
               />
             </section>
-            </>
-            )}
           </div>
 
           <div>

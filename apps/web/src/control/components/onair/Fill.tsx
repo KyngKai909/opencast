@@ -4,11 +4,10 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { catalogApi, libraryApi, logApi, stationsApi, type CarriageTerm, type LogEntry } from "@opencast/contracts";
+import { type CarriageTerm, catalogApi, libraryApi, logApi, type LogEntry, type Offer, stationsApi } from "@opencast/contracts";
 import { ChoiceList, clock, useToast, type Choice } from "@opencast/ui";
 import { call } from "../../../api/client";
 import { useApi, useApiMutation } from "../../../api/hooks";
-import { BrowseX, type OfferX } from "../../api/ext/market";
 import { STATION_TZ } from "../../../lib/clock";
 import { LOG_READS } from "./data";
 import { planRepeat } from "./repeat";
@@ -26,7 +25,7 @@ const TERM_WORDS: Record<CarriageTerm, string> = { barter: "barter", cash: "cash
 const DEFAULT_BREAK_MS = 2 * 60_000;
 
 /** Offers that fit this gap (the Market area's C1 `fit`), or any that fit the schedule. */
-function fitting(offers: OfferX[], gap: Gap): OfferX[] {
+function fitting(offers: Offer[], gap: Gap): Offer[] {
   const exact = offers.filter((o) => o.fit?.some((f) => f.reason === "dead_air" && f.startsAt === gap.startsAt));
   return exact.length ? exact : offers.filter((o) => o.fitsYourSchedule);
 }
@@ -38,7 +37,7 @@ export function useFill({ stationId, base, gap, phone }: { stationId: string; ba
   const qc = useQueryClient();
   const library = useApi(libraryApi.getLibrary, { params, query: {} }, { enabled: !!gap });
   const rule = useApi(stationsApi.getBreakRule, { params }, { enabled: !!gap, retry: false });
-  const market = useApi(catalogApi.browse, { query: { forStation: stationId, fitsSchedule: true, gap: gap?.startsAt } }, { schema: BrowseX, enabled: !!gap, retry: false });
+  const market = useApi(catalogApi.browse, { query: { forStation: stationId, fitsSchedule: true, gap: gap?.startsAt } }, { enabled: !!gap, retry: false });
   const fill = useApiMutation(logApi.fillGap, { invalidates: LOG_READS });
   const [chosen, setChosen] = useState<FillWith | null>(null);
 

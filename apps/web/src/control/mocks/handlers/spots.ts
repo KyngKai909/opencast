@@ -4,8 +4,7 @@
 // The Money area's Spots part owns this file.
 
 import { http } from "msw";
-import { spotsApi, stationsApi } from "@opencast/contracts";
-import { AvailsExt, MakerOrdersExt, ProductionOrderExt, StationMarketExt, StationSponsorshipsExt, tellMeWhenListed, type BreakContent } from "../../api/ext/spots";
+import { type BreakContent, SPOT_CATEGORIES, spotsApi, stationsApi } from "@opencast/contracts";
 import { getDb, membership, saveDb, stationBreaks } from "../db";
 import { breakSlot, type DbFill } from "../fixtures/evening";
 import { stationById } from "../fixtures/stations";
@@ -153,7 +152,7 @@ export const spotsHandlers = [
     const to = new Date(Date.parse(from) + hours * 3600e3).toISOString();
     const breaks = stationBreaks(String(params.stationId), from, to);
     const slots = breaks.map(breakSlot);
-    return reply(AvailsExt, {
+    return reply(spotsApi.getAvails.response, {
       totalOpenMs: slots.reduce((a, b) => a + b.openMs, 0),
       breaks: breaks.map((b, i) => ({
         breakStartsAt: b.startsAt,
@@ -184,7 +183,7 @@ export const spotsHandlers = [
       .filter((s) => within === null || (s.miles !== null && s.miles <= within))
       .filter((s) => !category || s.category === category)
       .map((s) => marketSpotOut(s, id));
-    return reply(StationMarketExt, list);
+    return reply(spotsApi.stationMarket.response, list);
   }),
 
   http.get(path(spotsApi.getRotations), ({ request, params }) => {
@@ -245,7 +244,7 @@ export const spotsHandlers = [
     const id = String(params.stationId);
     if (!isMember(id, p)) return fail(403, "forbidden", "That station isn't one of yours.");
     const list = getSpots().sponsorships.filter((s) => s.stationId === id).map((s) => sponsorshipOut(s.id));
-    return reply(StationSponsorshipsExt, { sponsorships: list, settings: settingsOut(id), members: getSpots().members[id] ?? null });
+    return reply(spotsApi.listStationSponsorships.response, { sponsorships: list, settings: settingsOut(id), members: getSpots().members[id] ?? null });
   }),
 
   http.post(path(spotsApi.decideSponsorship), async ({ request, params }) => {
@@ -307,7 +306,7 @@ export const spotsHandlers = [
       .orders.filter((o) => o.maker.id === id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map(orderOut);
-    return reply(MakerOrdersExt, list);
+    return reply(spotsApi.listMakerOrders.response, list);
   }),
 
   http.get(path(spotsApi.getOrder), ({ request, params }) => {
@@ -315,7 +314,7 @@ export const spotsHandlers = [
     if (p instanceof Response) return p;
     const o = orderById(String(params.orderId));
     if (!o || !isMember(o.maker.id, p)) return fail(404, "not_found", "That order wasn't found.");
-    return reply(ProductionOrderExt, orderOut(o));
+    return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
   http.post(path(spotsApi.quoteOrder), async ({ request, params }) => {
@@ -333,7 +332,7 @@ export const spotsHandlers = [
       o.quote = { priceMicros: body.data.priceMicros, deliverBy: body.data.deliverBy, roundsIncluded: body.data.roundsIncluded, voicedBy: body.data.voicedBy };
     }
     saveSpots();
-    return reply(ProductionOrderExt, orderOut(o));
+    return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
   http.post(path(spotsApi.deliverOrder), async ({ request, params }) => {
@@ -350,7 +349,7 @@ export const spotsHandlers = [
     o.deliveredAt = t.toISOString();
     o.autoApproveAt = new Date(t.getTime() + 7 * 86400e3).toISOString();
     saveSpots();
-    return reply(ProductionOrderExt, orderOut(o));
+    return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
   http.post(path(spotsApi.addOrderNote), async ({ request, params }) => {
@@ -362,17 +361,20 @@ export const spotsHandlers = [
     if (!body.success) return fail(400, "invalid", "Write a note first.");
     o.notes.push({ id: `${o.id.slice(0, -4)}${String(9000 + o.notes.length).padStart(4, "0")}`, timecodeMs: body.data.timecodeMs, author: p.displayName, body: body.data.body, makersMistake: false, round: o.roundsUsed, createdAt: now().toISOString() });
     saveSpots();
-    return reply(ProductionOrderExt, orderOut(o));
+    return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
-  http.post(path(tellMeWhenListed), ({ request, params }) => {
+  // S17: the one list of spot categories.
+  http.get(path(spotsApi.listSpotCategories), () => reply(spotsApi.listSpotCategories.response, [...SPOT_CATEGORIES])),
+
+  http.post(path(spotsApi.tellMeWhenListed), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const o = orderById(String(params.orderId));
     if (!o || !isMember(o.maker.id, p)) return fail(404, "not_found", "That order wasn't found.");
     o.makerToldWhenListed = true;
     saveSpots();
-    return reply(ProductionOrderExt, orderOut(o));
+    return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
   http.get(path(spotsApi.stationCustomers), ({ request, params }) => {

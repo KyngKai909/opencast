@@ -9,7 +9,8 @@ import { Button, Field, Tag, Toggle, ToggleLock, money } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { BusinessSettingsX, settingsExtApi, type ReceiptX } from "../../api/ext/settings";
+import { settingsExtApi, type ReceiptX } from "../../api/ext/settings";
+import { BusinessX } from "../../api/ext";
 import { shortAddress, useClear } from "../../auth/clear";
 import type { BusinessState } from "../../business/BusinessContext";
 import { MARKET_TZ } from "../../lib/clock";
@@ -36,7 +37,7 @@ export function topUpLine(t: Business["autoTopUp"], source: Pick<FundingSource, 
 export function MoneySection({ b }: { b: BusinessState }) {
   const access = accessFor(b.role);
   const params = { businessId: b.id };
-  const biz = useApi(spotsApi.getBusiness, { params }, { schema: BusinessSettingsX, enabled: access.funding !== "hidden" });
+  const biz = useApi(spotsApi.getBusiness, { params }, { schema: BusinessX, enabled: access.funding !== "hidden" });
   const balance = useApi(ledgerApi.getBalance, { params }, { enabled: access.funding !== "hidden" });
   const receipts = useApi(settingsExtApi.listReceipts, { params }, { retry: false });
   const clear = useClear();

@@ -1,10 +1,10 @@
 // Small pieces the Spots pages share: the spot market's tabs, a spot's thumbnail and still, and
 // the quiet error line.
 
+import { type MarketSpot } from "@opencast/contracts";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router";
 import { Tabs, TitleCard } from "@opencast/ui";
-import type { MarketSpotExt } from "../../api/ext/spots";
 import { useStation } from "../../station/StationContext";
 import { useMakerOrders } from "./data";
 import "./parts.css";
@@ -34,13 +34,13 @@ export function SpotTabs({ value }: { value: SpotTab }) {
 }
 
 /** The spot's thumbnail in a row: its still, in the business's colour until there's a picture. */
-export function SpotThumb({ spot, short }: { spot: MarketSpotExt; short?: boolean }) {
+export function SpotThumb({ spot, short }: { spot: MarketSpot; short?: boolean }) {
   const name = short ? (spot.business.shortName ?? spot.business.name) : spot.business.name;
   return <TitleCard className="cc-sp-thumb" colour={spot.spot.preview?.colour ?? "var(--line)"} title={name} decorative />;
 }
 
 /** The spot's still in the pane (C.2 .pic.adpic): the business, its line, and the code on screen. */
-export function SpotStill({ spot }: { spot: MarketSpotExt }) {
+export function SpotStill({ spot }: { spot: MarketSpot }) {
   return (
     <div className="cc-sp-still" style={{ "--cc-sp-still": spot.spot.preview?.colour ?? "var(--line)" } as CSSProperties} role="img" aria-label={`${spot.business.name}${spot.spot.preview?.line ? `. ${spot.spot.preview.line}` : ""}`}>
       <div className="cc-sp-still__card" aria-hidden="true">

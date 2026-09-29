@@ -2,39 +2,39 @@
 // by the backup rotation and reported as done ("Change" is there); and a spot that came back,
 // which never returns to the rotation by itself ("Add it back").
 
+import { type MarketSpot } from "@opencast/contracts";
 import { Button, duration, Notice } from "@opencast/ui";
-import type { MarketSpotExt } from "../../api/ext/spots";
 
 const PAUSE_REASON = { budget_spent: "Its budget is spent.", balance: "Its balance ran out." } as const;
 
-export function pausedTitle(s: MarketSpotExt): string {
+export function pausedTitle(s: MarketSpot): string {
   const why = s.pause ? ` ${PAUSE_REASON[s.pause.reason]}` : "";
   return `${s.business.name} paused ${s.spot.title}.${why}`;
 }
 
-export function pausedDetail(s: MarketSpotExt): string | null {
+export function pausedDetail(s: MarketSpot): string | null {
   if (!s.pause) return null;
   const held = `It had ${duration(s.pause.heldTonightMs)} in tonight's breaks.`;
   if (!s.pause.heldTonightMs) return s.pause.filledBy.length ? `Filled from your backup rotation: ${s.pause.filledBy.join(", ")}` : null;
   return s.pause.filledBy.length ? `${held} Filled from your backup rotation: ${s.pause.filledBy.join(", ")}` : `${held} Your station ID and bumpers fill it.`;
 }
 
-export function backTitle(s: MarketSpotExt): string {
+export function backTitle(s: MarketSpot): string {
   const who = s.business.shortName ?? s.business.name;
   const why = s.back ? (s.back.reason === "raised_budget" ? ` ${who} raised its budget.` : ` ${who} added money.`) : "";
   return `${s.spot.title} is back.${why}`;
 }
 
-export function backDetail(s: MarketSpotExt): string {
+export function backDetail(s: MarketSpot): string {
   const runway = s.runway.kind === "days" ? `About ${s.runway.days} ${s.runway.days === 1 ? "day" : "days"} of budget` : "Tops up automatically";
   return `It isn't in your rotation now. ${runway}`;
 }
 
 export interface PauseNoticesProps {
-  spots: MarketSpotExt[];
+  spots: MarketSpot[];
   /** Where "Change" goes: the rotation tab. */
   rotationHref: string;
-  onAddBack?: (s: MarketSpotExt) => void;
+  onAddBack?: (s: MarketSpot) => void;
   busy?: boolean;
 }
 

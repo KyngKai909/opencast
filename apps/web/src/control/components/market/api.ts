@@ -1,13 +1,14 @@
-// The market's reads, each through its extended schema (api/ext/market.ts), and the refresh after
+// The market's reads (the offer through api/ext/market.ts for C5's `speech`), and the refresh after
 // a change: carrying writes the log, so the log's reads refresh too.
 
 import { useQueryClient } from "@tanstack/react-query";
 import { catalogApi, libraryApi, logApi, type EndpointDef } from "@opencast/contracts";
 import { useApi } from "../../../api/hooks";
-import { AgreementsX, BrowseX, OfferDetailX, RequestsX, type BrowseQueryX } from "../../api/ext/market";
+import { OfferDetailX } from "../../api/ext/market";
+import type { BrowseQuery } from "../../api/types";
 
-export function useBrowse(query: BrowseQueryX, enabled = true) {
-  return useApi(catalogApi.browse, { query: { ...query } }, { schema: BrowseX, enabled });
+export function useBrowse(query: BrowseQuery, enabled = true) {
+  return useApi(catalogApi.browse, { query: { ...query } }, { enabled });
 }
 
 export function useOffer(offerId: string | undefined, forStation: string | null) {
@@ -15,11 +16,11 @@ export function useOffer(offerId: string | undefined, forStation: string | null)
 }
 
 export function useRequests(stationId: string, enabled = true) {
-  return useApi(catalogApi.listRequests, { params: { stationId } }, { schema: RequestsX, enabled });
+  return useApi(catalogApi.listRequests, { params: { stationId } }, { enabled });
 }
 
 export function useAgreements(stationId: string, enabled = true) {
-  return useApi(catalogApi.listAgreements, { params: { stationId } }, { schema: AgreementsX, enabled });
+  return useApi(catalogApi.listAgreements, { params: { stationId } }, { enabled });
 }
 
 export function useLibrary(stationId: string, enabled = true) {

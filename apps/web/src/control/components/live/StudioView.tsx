@@ -2,16 +2,16 @@
 // the private rehearsal (/live-sources/:sourceId/rehearse, with no block).
 //
 // A live block goes out when its block starts: stand by with a countdown, then on air (the phone's
-// tally lights), then ended. Browser ingest has no endpoint yet (contract-requests B3): the picture
-// is the local camera and "going out" is a mock state. Nothing is sent.
+// tally lights), then ended. A browser source sends the camera to its ingest over WHIP (B3) from
+// five minutes before the block until it ends; without an ingest (no Livepeer on the server) the
+// picture stays on this screen. The lower third is the API's (S15), so a second device sees it.
 
 import { useEffect, useMemo, useState } from "react";
-import { playoutApi, stationsApi, type LogEntry } from "@opencast/contracts";
+import { logApi, playoutApi, stationsApi, type LiveSource, type LogEntry, type LowerThird } from "@opencast/contracts";
 import { Button, KeyValueList, Modal, Notice, Sheet, Toggle, clock, duration, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { keyFor, useApi } from "../../../api/hooks";
-import { endEarly, getLiveBlock, getLowerThird, setLowerThird, type LiveSourceExt, type LowerThirdState } from "../../api/ext/live";
 import { STATION_TZ, useNow } from "../../../lib/clock";
 import { useShellOptions, useIsPhone } from "../../layout/shell";
 import { useMe, useStation } from "../../station/StationContext";
@@ -19,12 +19,13 @@ import { blockPhase, countdown, elapsed } from "./logic";
 import { AddSpeaker, CameraBar, CountdownBox, LowerThirdEditor, SecTop, SpeakerList, StudioPicture, type Speaker } from "./Studio";
 import { useCamera } from "./useCamera";
 import { useOnAirDevice } from "./useOnAirDevice";
+import { useWhip } from "./whip";
 import "./StudioView.css";
 
 export interface StudioViewProps {
   /** The live block, or null for a rehearsal. */
   entry: LogEntry | null;
-  source: LiveSourceExt | null;
+  source: LiveSource | null;
   /** The log around now, for "Viewers are watching …". */
   log: LogEntry[];
 }
@@ -48,17 +49,20 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
 
   const stationId = s.id;
   const entryParams = entry ? { stationId, entryId: entry.id } : null;
-  const block = useApi(getLiveBlock, { params: entryParams ?? {} }, { enabled: !!entry, retry: false, refetchInterval: 15_000 });
-  const saved = useApi(getLowerThird, { params: entryParams ?? {} }, { enabled: !!entry, retry: false });
+  const block = useApi(logApi.getLiveBlock, { params: entryParams ?? {} }, { enabled: !!entry, retry: false, refetchInterval: 15_000 });
+  const saved = useApi(stationsApi.getLowerThird, { params: entryParams ?? {} }, { enabled: !!entry, retry: false });
   const speakers = useApi(stationsApi.getSpeakers, { params: { programId: entry?.programId ?? "" } }, { enabled: !!entry?.programId, retry: false });
   const rule = useApi(stationsApi.getBreakRule, { params: { stationId } }, { enabled: !!entry, retry: false });
 
   const phase = entry ? blockPhase(entry, now, block.data?.endedEarlyAt) : "rehearsal";
   const onAir = phase === "on_air";
   const device = useOnAirDevice(onAir);
+  // B3: the camera goes to the ingest from five minutes before the block, so it's there when it starts.
+  const sending = kind === "browser" && !!entry && (onAir || (phase === "standby" && Date.parse(entry.startsAt) - now.getTime() <= 5 * 60_000));
+  const whip = useWhip(kind === "browser" ? camera.stream : null, source?.ingest, sending);
 
-  // The lower third: what the API holds (S15), or kept here when it can't say.
-  const [lt, setLt] = useState<LowerThirdState | null>(null);
+  // The lower third: what the API holds (S15), or kept here when it can't say (a rehearsal).
+  const [lt, setLt] = useState<LowerThird | null>(null);
   useEffect(() => {
     if (lt) return;
     if (saved.data) setLt(saved.data);
@@ -68,16 +72,17 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
     }
   }, [saved.data, saved.isError, speakers.data, entry, lt, me.data]);
 
-  const save = async (next: LowerThirdState) => {
+  const save = async (next: LowerThird) => {
     if (!entryParams) return;
     try {
-      const out = await call(setLowerThird, { params: entryParams, body: { hidden: next.hidden, speakerId: next.speakerId, name: next.name, title: next.title } });
-      qc.setQueryData([...keyFor(getLowerThird, { params: entryParams }), 0], out);
-    } catch {
-      // Kept on this device (S15 isn't in the API yet).
+      const out = await call(stationsApi.setLowerThird, { params: entryParams, body: { hidden: next.hidden, speakerId: next.speakerId, name: next.name, title: next.title } });
+      qc.setQueryData([...keyFor(stationsApi.getLowerThird, { params: entryParams }), 0], out);
+    } catch (e) {
+      // It stays on this screen; say why the API didn't take it.
+      toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
     }
   };
-  const change = (patch: Partial<LowerThirdState>, commit: boolean) => {
+  const change = (patch: Partial<LowerThird>, commit: boolean) => {
     setLt((cur) => {
       if (!cur) return cur;
       const next = { ...cur, ...patch };
@@ -122,8 +127,8 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
   const end = async () => {
     if (!entryParams) return;
     try {
-      await call(endEarly, { params: entryParams });
-      await block.refetch();
+      await call(logApi.endEarly, { params: entryParams });
+      await Promise.all([block.refetch(), qc.invalidateQueries({ queryKey: ["GET", logApi.getLog.path] })]);
       setEnding(false);
     } catch (e) {
       setEndError(e instanceof Error ? e.message : "Something went wrong. Try again.");
@@ -140,7 +145,8 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
   const title = entry?.title ?? "Rehearsal";
   const count = entry ? countdown(entry.startsAt, now) : "";
   const elapsedText = entry ? elapsed(entry.startsAt, now) : "";
-  const dropped = onAir && !device.online;
+  // The connection dropped: this device went offline, or the ingest lost it (it reconnects).
+  const dropped = onAir && (!device.online || whip === "dropped");
 
   const note =
     phase === "on_air"
@@ -307,7 +313,7 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
 }
 
 /** Phone, standing by: the lower third in a line, and Change for the speaker list (05.1). */
-function LowerThirdRow({ lt, speakers, onShow, onToggle, onAdd }: { lt: LowerThirdState | null; speakers: Speaker[]; onShow: (s: Speaker) => void; onToggle: (on: boolean) => void; onAdd: () => void }) {
+function LowerThirdRow({ lt, speakers, onShow, onToggle, onAdd }: { lt: LowerThird | null; speakers: Speaker[]; onShow: (s: Speaker) => void; onToggle: (on: boolean) => void; onAdd: () => void }) {
   const [open, setOpen] = useState(false);
   const words = lt && !lt.hidden && lt.name ? [lt.name, lt.title?.split(",")[0]].filter(Boolean).join(", ") : "Hidden";
   return (
