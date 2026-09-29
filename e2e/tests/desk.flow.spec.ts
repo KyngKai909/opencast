@@ -163,13 +163,8 @@ test("Add a creator: found, with nothing to ask about until their works are cata
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
 });
 
-// KNOWN BUG (reported; the fix is in apps/desk/src/auth/AuthProvider.tsx, which this phase leaves
-// to the real-API harness): signing in through the page leaves a blank page until a reload. The
-// provider's qc.clear() on the new email destroys getMe while it's in flight (a silent cancel), so
-// the gate waits forever. Marked as failing: when it's fixed this test passes, and Playwright says
-// so, so the mark comes off.
+// Signing in through the page opens the desk at once (AuthProvider resets the cache, not clears it).
 test("signing in through the page opens the desk without a reload", async ({ page }) => {
-  test.fail(true, "AuthProvider's qc.clear() cancels the first getMe: the gate stays on the quiet page until a reload");
   test.setTimeout(30_000);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to Network desk" })).toBeVisible();

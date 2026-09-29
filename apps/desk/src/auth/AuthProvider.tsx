@@ -36,7 +36,9 @@ function AuthState({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (who.current === adapter.email) return;
     who.current = adapter.email;
-    qc.clear();
+    // Reset, not clear: clear() drops the account query already in flight without an answer, and
+    // the sign-in gate would wait on it forever; reset refetches whatever is on screen.
+    void qc.resetQueries();
   }, [adapter.email, qc]);
   return <Ctx.Provider value={adapter}>{children}</Ctx.Provider>;
 }
