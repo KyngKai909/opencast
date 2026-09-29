@@ -63,5 +63,7 @@ export function hoursMinutes(ms: number): string {
 
 /** Hours, rounded: "31 hr" (the setup's "48 videos, 31 hr in total"). */
 export function roundHours(ms: number): string {
+  // Under an hour, in minutes ("27 min", not "0 hr").
+  if (ms > 0 && ms < 3_600_000 - 30_000) return `${Math.round(ms / 60_000)} min`;
   return `${Math.round(ms / 3_600_000)} hr`;
 }

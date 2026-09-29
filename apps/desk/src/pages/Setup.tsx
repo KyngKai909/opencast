@@ -65,6 +65,12 @@ export default function Setup() {
   if (!market || !creator) return <NotFound />;
   if (works.error || recipes.error) return <ErrorLine error={works.error ?? recipes.error} />;
   const base = `/markets/${market.slug}/pipeline`;
+  // Set up already, but the API doesn't read the setup back yet (N5): what the creator's record says.
+  if (!creator.setup && creator.station) {
+    const id = creator.station.id;
+    const slot = [...(tv.data?.slots ?? []), ...(radio.data?.slots ?? [])].find((sl) => sl.stations.some((st) => st.id === id));
+    return <SetUpStation creator={creator} base={base} slot={slot} />;
+  }
   const operators = team.data ?? (me.data ? [{ id: me.data.id, name: me.data.displayName ?? me.data.email ?? "You", email: me.data.email ?? "" }] : []);
   const ready = creator.setup || creator.stage === "said_yes" || creator.stage === "already_licensed";
   if (!ready) {
@@ -88,6 +94,37 @@ export default function Setup() {
     );
   }
   return <SetupView creator={creator} works={works.data ?? []} recipes={recipes.data ?? []} boards={{ tv: tv.data, radio: radio.data }} operators={operators} meId={me.data?.id ?? null} market={market} />;
+}
+
+/**
+ * A station that's set up, read from the creator's record only: the recipe, operator, sign-on time
+ * and import progress come with the setup's read-back (N5), which the API doesn't have yet.
+ */
+function SetUpStation({ creator, base, slot }: { creator: CreatorX; base: string; slot?: MarketBoardX["slots"][number] }) {
+  const s = creator.station!;
+  // The board says whether it's on air: a slot with a status ("Signs on …", "Setting up") isn't yet.
+  const onAir = creator.stage === "on_air" || (!!slot && slot.status === null);
+  return (
+    <>
+      <Crumb href={base} label="Pipeline" here={creator.displayName} />
+      <ControlTitle title={[s.callSign, s.channel].filter(Boolean).join(" ") || s.name} description={`${creator.displayName}'s station, ${s.band === "radio" ? "radio band" : "TV band"}.`} />
+      <KeyValueList
+        variant="rows"
+        className="nd-setup__done"
+        items={[
+          {
+            title: creator.stage === "claimed" ? "Claimed" : onAir ? "On air, waiting to be claimed" : "Set up, signing on",
+            detail: `${!onAir && slot?.status ? `${slot.status}. ` : ""}Its recipe, sign-on time and import can't be read back here yet.`,
+            actions: s.callSign ? (
+              <Button size="sm" href={controlHref(s.callSign)} target="_blank" rel="noopener">
+                Open in master control
+              </Button>
+            ) : undefined
+          }
+        ]}
+      />
+    </>
+  );
 }
 
 interface ViewProps {
@@ -195,7 +232,8 @@ function SetupView({ creator, works, recipes, boards, operators, meId, market }:
     ? [
         { title: `${p.pos[0]!.toUpperCase()}${p.pos.slice(1)} ${noun}`, detail: `${count} ${noun}, ${roundHours(totalMs)} in total. Each airs at most ${recipe.maxAiringsPerWorkPerWeek} times a week`, actions: <Quiet13>{hoursText(hours.creator)} a day</Quiet13> },
         ...carried.map((b) => ({ title: `Carried: ${b.carried!.programTitle} from ${b.carried!.station.callSign}`, detail: `${b.carried!.schedule}, ${b.carried!.about}`, actions: <Quiet13>{hoursText(hours.carried / Math.max(1, carried.length))}</Quiet13> })),
-        { title: "Opencast catalog", detail: recipe.catalogAbout ?? "The catalog through the day and overnight", actions: <Quiet13>{hoursText(hours.catalog)}</Quiet13> },
+        // A recipe with no catalog blocks has no catalog row.
+        ...(hours.catalog > 0 ? [{ title: "Opencast catalog", detail: recipe.catalogAbout ?? "The catalog through the day and overnight", actions: <Quiet13>{hoursText(hours.catalog)}</Quiet13> }] : []),
         { title: "Breaks", detail: breakLine(breakRuleOf(recipe)) }
       ]
     : [];
@@ -244,8 +282,9 @@ function SetupView({ creator, works, recipes, boards, operators, meId, market }:
       title: "Rights record",
       detail: !rightsOk
         ? "Nothing is covered yet: no yes on record, and no licence that allows carriage"
-        : creator.answeredAt && creator.stage !== "already_licensed"
-          ? `Permission from ${creator.personName ?? creator.displayName}, ${dayMonth(creator.answeredAt, tz)}, for the ${covered.length} listed ${noun}`
+        : creator.stage !== "already_licensed" && (creator.answeredAt || covered.some((w) => w.covered === "permission"))
+          ? // The yes's date comes with N3 (answeredAt); without it, the yes is still the record.
+            `Permission from ${creator.personName ?? creator.displayName}${creator.answeredAt ? `, ${dayMonth(creator.answeredAt, tz)}` : ""}, for the ${covered.length} listed ${noun}`
           : `${RIGHTS_BASIS_LABELS.licence_record}${licence ? `, ${licence}` : ""}, for the ${covered.length} licensed ${noun}`,
       actions: rightsOk ? (
         <span className="nd-setup__ok">

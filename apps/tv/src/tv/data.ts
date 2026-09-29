@@ -39,11 +39,15 @@ export function nextRefresh(rows: Array<{ now?: { endsAt?: string | null } | nul
   return Math.max(1_000, Math.min(60_000, (ends.length ? Math.min(...ends) : Infinity) - at + 1_000));
 }
 
-/** Every station on both bands, in channel order: what the player tunes. */
+/**
+ * Every station on both bands, in channel order: what the player tunes. Nothing until both bands
+ * have answered, so the first tune is the first TV channel whichever band's dial comes back first.
+ */
 export function useChannels(): DialRowX[] {
   const tv = useDial("tv");
   const radio = useDial("radio");
-  return useMemo(() => [...(tv.data?.rows ?? []), ...(radio.data?.rows ?? [])], [tv.data, radio.data]);
+  const waiting = tv.isPending || radio.isPending;
+  return useMemo(() => (waiting ? [] : [...(tv.data?.rows ?? []), ...(radio.data?.rows ?? [])]), [waiting, tv.data, radio.data]);
 }
 
 export interface TvPreset {

@@ -9,7 +9,8 @@ test("the market board shows the real Inland Empire", async ({ page }) => {
   await expect(page).toHaveURL(/\/markets\/inland-empire\/board$/);
   const main = page.getByRole("main");
   await expect(main).toContainText("5 stations and 1 claimable station on air.");
-  await expect(main).toContainText("Creator who said yes, not set up yet");
+  // Tía Lupe's Kitchen, until the desk's flow sets her station up (desk.flow.real.spec.ts).
+  await expect(main).toContainText(/Creators? who said yes, not set up yet/);
   await expect(main).toContainText("BEAT");
   await expect(main).toContainText("CIVC");
 });

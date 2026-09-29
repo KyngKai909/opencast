@@ -111,7 +111,11 @@ async function errorCode(res: Response): Promise<string | null> {
 export async function apiError(res: Response): Promise<ApiError> {
   const json = await res.json().catch(() => null);
   const e = ErrorResponse.safeParse(json);
-  return e.success ? new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields) : new ApiError(res.status, "error", "Something went wrong. Try again.");
+  if (e.success) return new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields);
+  // A 404 without the API's error body is a route the API doesn't mount: a proposed endpoint
+  // (api/ext*, docs/contract-requests.md) that hasn't landed. Trying again wouldn't help.
+  if (res.status === 404) return new ApiError(404, "not_available", "This isn't available yet.");
+  return new ApiError(res.status, "error", "Something went wrong. Try again.");
 }
 
 /** Calls an endpoint. `schema` overrides the response schema (an extended one). */

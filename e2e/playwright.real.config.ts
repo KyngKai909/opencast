@@ -12,7 +12,15 @@ import { appCommand, appEnv } from "./real/apps";
 import { REAL_PORTS, ROOT, WORKSPACES, type RealApp } from "./real/shared";
 
 // Start only the servers the chosen projects need, as playwright.config.ts does.
-const chosen = process.argv.flatMap((a, i, all) => (a === "--project" ? [all[i + 1]] : a.startsWith("--project=") ? [a.slice(10)] : [])).filter(Boolean) as string[];
+// `--project a b c` or `--project a --project b` or `--project=a`: every project name given.
+const PROJECTS = ["viewer", "tv", "control", "spots", "desk", "site"];
+const chosen = process.argv.flatMap((a, i, all) => {
+  if (a.startsWith("--project=")) return [a.slice(10)];
+  if (a !== "--project") return [];
+  const names: string[] = [];
+  for (let j = i + 1; j < all.length && PROJECTS.includes(all[j]!); j++) names.push(all[j]!);
+  return names;
+});
 const needs: Record<string, RealApp[]> = { viewer: ["viewer", "tv"], desk: ["desk", "viewer"] };
 const apps = new Set<RealApp>(chosen.length ? chosen.flatMap((p) => needs[p] ?? [p as RealApp]) : (Object.keys(REAL_PORTS) as RealApp[]));
 

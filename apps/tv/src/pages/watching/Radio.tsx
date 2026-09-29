@@ -12,15 +12,17 @@ export default function Radio() {
   const [params] = useSearchParams();
   const band = params.get("band") === "tv" ? "tv" : "radio";
   const navigate = useNavigate();
-  const [, engine] = usePlayer();
+  const [s, engine] = usePlayer();
   const dial = useDial(band);
+  // The player tunes only what's on its dial: wait for it to have the channels.
+  const ready = !dial.isLoading && (!dial.data?.rows.length || s.channels.length > 0);
 
   useEffect(() => {
-    if (dial.isLoading) return;
+    if (!ready) return;
     const target = dial.data ? bandTarget(dial.data.rows, band, lastOnBand(band)) : null;
     if (target) void engine.tune(target.station.id, { input: "remote" });
     navigate("/", { replace: true });
-  }, [dial.isLoading, dial.data, band, engine, navigate]);
+  }, [ready, dial.data, band, engine, navigate]);
 
   return null;
 }

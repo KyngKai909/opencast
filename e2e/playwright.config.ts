@@ -22,7 +22,15 @@ export const PORTS = { viewer: 5174, tv: 5175, control: 5179, spots: 5181, desk:
 // casting flows need TV mode too). With no --project, every app.
 const WORKSPACE = { viewer: "@opencast/viewer", tv: "@opencast/tv", control: "@opencast/control", spots: "@opencast/spots", desk: "@opencast/desk", site: "@opencast/site" } as const;
 type App = keyof typeof WORKSPACE;
-const chosen = process.argv.flatMap((a, i, all) => (a === "--project" ? [all[i + 1]] : a.startsWith("--project=") ? [a.slice(10)] : [])).filter(Boolean) as string[];
+// `--project a b c` or `--project a --project b` or `--project=a`: every project name given.
+const PROJECTS = ["viewer", "tv", "control", "spots", "desk", "site"];
+const chosen = process.argv.flatMap((a, i, all) => {
+  if (a.startsWith("--project=")) return [a.slice(10)];
+  if (a !== "--project") return [];
+  const names: string[] = [];
+  for (let j = i + 1; j < all.length && PROJECTS.includes(all[j]!); j++) names.push(all[j]!);
+  return names;
+});
 const needs: Record<string, App[]> = { viewer: ["viewer", "tv"], desk: ["desk", "viewer"] };
 const apps = new Set<App>(chosen.length ? chosen.flatMap((p) => needs[p] ?? [p as App]) : (Object.keys(WORKSPACE) as App[]));
 

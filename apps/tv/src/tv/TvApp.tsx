@@ -154,14 +154,20 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   useEffect(() => engine.setCaptions(device.settings.captions, device.settings.captionSize), [engine, device.settings.captions, device.settings.captionSize]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), mode === "cast" ? "cast" : mode === "mirror" ? "mirror" : "tv_app"), [engine, mode]);
 
-  // First tune: the last channel on this TV, or the first station on the dial.
+  // First tune: the last channel on this TV, or the first station on the dial. Unless something
+  // tuned first (a phone, or "/radio", which tunes its band's station: it's left to do that).
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !channels.length || state.currentId) return;
+    if (started.current || !channels.length) return;
+    if (state.currentId || state.pendingId) {
+      started.current = true;
+      return;
+    }
+    if (loc.pathname === "/radio") return;
     started.current = true;
     const last = getDevice().settings.startOn === "last_channel" ? channels.find((c) => c.station.id === getDevice().lastStationId) : null;
     void engine.tune((last ?? channels[0]).station.id, { input: "app" });
-  }, [channels, engine, state.currentId]);
+  }, [channels, engine, state.currentId, state.pendingId, loc.pathname]);
   useEffect(() => {
     if (state.currentId && state.currentId !== getDevice().lastStationId) setDevice({ lastStationId: state.currentId });
   }, [state.currentId]);
