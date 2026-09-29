@@ -355,3 +355,18 @@ TV screens no frame draws follow the drawn ones' pattern: About a station, choos
 | Mirroring | "Turn on Screen Mirroring and choose {TV}." (toast), "How to turn on Screen Mirroring"; "Battery: {n}%, charging." |
 | Remote | "{name} changed the channel."; "Remote" (no TV); "Not casting", "Choose a TV with the cast button on the tuned-in page.", "Choose a TV" |
 | /tv | "Done" after "The TV is signed in" |
+
+### apps/site (Phase 7)
+
+The waitlist's words the reference doesn't draw, and the tuner's number entry (the rules' "Numbers tune"; the reference's tuner has only channel up and down). The headline after joining is the API's `message`.
+
+| Where | Words |
+|---|---|
+| ZIP code | "Enter your ZIP code." (empty); "A ZIP code is five digits." (fewer) |
+| Call sign, live check | "{CS} is free." (as master control's station form says it); "{CS} is taken. Try another." (the API's 409 words, shown as it's typed too); "A call sign is three to five letters." (one or two letters) |
+| Waitlist, can't send | "We couldn’t reach Opencast. Check your connection and try again." Other API errors show the API's own message |
+| Joined, station without a call sign | "We’ll write when your market opens." (the reference's station paragraph promises a held call sign) |
+| Joined, ZIP outside every market (`market: null`) | Viewer: "Your ZIP isn’t in a market yet. We’ll write when a dial opens near you."; station with a call sign: "Your ZIP isn’t in a market yet. We’ll write when one opens near you, and your call sign is held until then."; station without: "Your ZIP isn’t in a market yet. We’ll write when one opens near you." Producer and business keep the reference's paragraphs |
+| Joined, viewer, market already open | "The {market} dial is already on. We’ll write when there’s more to watch." |
+| Joined, viewer, market not open | "We’ll write when the {market} dial opens." (the reference's static "the Inland Empire dial", with the response's market name) |
+| Tuner, a number with no station | "No station on 13" (the viewer app's words) |
