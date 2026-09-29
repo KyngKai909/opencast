@@ -87,54 +87,57 @@ export function PresetTiles({ presets, onTune, onMove, onRemove, compact, classN
     if (to !== null) move(drag.from, to, p, false);
   };
 
+  // The spoken moves sit after the list, not in it: a list holds only its six keys (axe aria-required-children).
   return (
-    <div ref={root} className={`vw-y-keys${compact ? " vw-y-keys--compact" : ""}${sortable ? " vw-y-keys--sortable" : ""}${className ? ` ${className}` : ""}`} role="list" aria-label="Presets, keys 1 to 6">
-      {[1, 2, 3, 4, 5, 6].map((k) => {
-        const p = byKey(k);
-        const cls = ["vw-y-key", !p && "vw-y-key--empty", drag?.from === k && "vw-y-key--drag", drag && drag.over === k && drag.from !== k && "vw-y-key--over"].filter(Boolean).join(" ");
-        if (!p)
+    <>
+      <div ref={root} className={`vw-y-keys${compact ? " vw-y-keys--compact" : ""}${sortable ? " vw-y-keys--sortable" : ""}${className ? ` ${className}` : ""}`} role="list" aria-label="Presets, keys 1 to 6">
+        {[1, 2, 3, 4, 5, 6].map((k) => {
+          const p = byKey(k);
+          const cls = ["vw-y-key", !p && "vw-y-key--empty", drag?.from === k && "vw-y-key--drag", drag && drag.over === k && drag.from !== k && "vw-y-key--over"].filter(Boolean).join(" ");
+          if (!p)
+            return (
+              <div key={`empty-${k}`} role="listitem" className={cls} data-key={k}>
+                <span className="vw-y-key__k">{k}</span>
+                <span className="vw-y-key__empty">Empty</span>
+              </div>
+            );
+          const items: MenuItem[] = [
+            ...(sortable && k > 1 ? [{ label: "Move left", onSelect: () => move(k, k - 1, p, true) }] : []),
+            ...(sortable && k < 6 ? [{ label: "Move right", onSelect: () => move(k, k + 1, p, true) }] : []),
+            ...(onRemove ? [{ label: "Remove", danger: true, onSelect: () => onRemove(p.station.id) }] : [])
+          ];
           return (
-            <div key={`empty-${k}`} role="listitem" className={cls} data-key={k}>
-              <span className="vw-y-key__k">{k}</span>
-              <span className="vw-y-key__empty">Empty</span>
+            // Keyed by station, so a moved station keeps its element (and the grip keeps focus).
+            <div key={p.station.id} role="listitem" className={cls} data-key={k}>
+              <button type="button" className="vw-y-key__tune" onClick={() => onTune?.(p.station.id)} aria-keyshortcuts={String(k)} aria-label={`Key ${k}, ${identText(p.station)}. Tune in`}>
+                <span className="vw-y-key__k">{k}</span>
+                <span className="vw-y-key__ch oc-ch">{p.station.channel}</span>
+                <span className="vw-y-key__cs oc-cs">{p.station.callSign ?? p.station.name}</span>
+                <small className="vw-y-key__now">{nowLine(p)}</small>
+              </button>
+              {sortable && (
+                <button
+                  type="button"
+                  className="vw-y-key__grip"
+                  data-grip={p.station.id}
+                  aria-label={`Move ${identText(p.station)}, on key ${k}. Drag, or use the arrow keys`}
+                  onKeyDown={(e) => onGripKey(e, k, p)}
+                  onPointerDown={(e) => onDown(e, k)}
+                  onPointerMove={onDrag}
+                  onPointerUp={(e) => onUp(e, p)}
+                  onPointerCancel={() => setDrag(null)}
+                >
+                  <span aria-hidden="true">::</span>
+                </button>
+              )}
+              {items.length > 0 && <Menu items={items} label={`More for ${identText(p.station)}`} className="vw-y-key__menu" />}
             </div>
           );
-        const items: MenuItem[] = [
-          ...(sortable && k > 1 ? [{ label: "Move left", onSelect: () => move(k, k - 1, p, true) }] : []),
-          ...(sortable && k < 6 ? [{ label: "Move right", onSelect: () => move(k, k + 1, p, true) }] : []),
-          ...(onRemove ? [{ label: "Remove", danger: true, onSelect: () => onRemove(p.station.id) }] : [])
-        ];
-        return (
-          // Keyed by station, so a moved station keeps its element (and the grip keeps focus).
-          <div key={p.station.id} role="listitem" className={cls} data-key={k}>
-            <button type="button" className="vw-y-key__tune" onClick={() => onTune?.(p.station.id)} aria-keyshortcuts={String(k)} aria-label={`Key ${k}, ${identText(p.station)}. Tune in`}>
-              <span className="vw-y-key__k">{k}</span>
-              <span className="vw-y-key__ch oc-ch">{p.station.channel}</span>
-              <span className="vw-y-key__cs oc-cs">{p.station.callSign ?? p.station.name}</span>
-              <small className="vw-y-key__now">{nowLine(p)}</small>
-            </button>
-            {sortable && (
-              <button
-                type="button"
-                className="vw-y-key__grip"
-                data-grip={p.station.id}
-                aria-label={`Move ${identText(p.station)}, on key ${k}. Drag, or use the arrow keys`}
-                onKeyDown={(e) => onGripKey(e, k, p)}
-                onPointerDown={(e) => onDown(e, k)}
-                onPointerMove={onDrag}
-                onPointerUp={(e) => onUp(e, p)}
-                onPointerCancel={() => setDrag(null)}
-              >
-                <span aria-hidden="true">::</span>
-              </button>
-            )}
-            {items.length > 0 && <Menu items={items} label={`More for ${identText(p.station)}`} className="vw-y-key__menu" />}
-          </div>
-        );
-      })}
+        })}
+      </div>
       <p className="oc-sr-only" aria-live="polite">
         {said}
       </p>
-    </div>
+    </>
   );
 }

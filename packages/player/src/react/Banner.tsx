@@ -35,7 +35,9 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
   // The TV app keeps its key hints beside a phone's chip, and Back still works there.
   const chip = hints.some((h) => h.kind === "chip") && !hints.some((h) => h.kind !== "chip");
   return (
-    <div className={cx("oc-banner", `oc-banner--${size}`)} role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
+    // Dark glass on both grounds: its words and the progress bar take the dark ground's ink (on the
+    // light ground they drew dark on dark, axe color-contrast on the web's radio page).
+    <div className={cx("oc-banner", `oc-banner--${size}`)} data-theme="dark" role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
       <div className="oc-banner__id">
         <span className="oc-banner__ch oc-mono">{c.station.channel}</span>
         <span className="oc-banner__cs oc-cs">{c.station.callSign ?? c.station.handle}</span>

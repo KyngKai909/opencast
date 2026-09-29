@@ -110,6 +110,12 @@ export default function MarketPicker() {
 
   const onLocation = async () => {
     setLocError(null);
+    // Without the markets' centres (S10, not in the API yet) a location can't be matched: say so,
+    // and don't ask the browser for a location that couldn't be used.
+    if (markets.data && !markets.data.some((m) => m.centre)) {
+      setLocError("Your location can't be matched to a market yet. Enter a ZIP code or pick a market instead.");
+      return;
+    }
     setBusy("location");
     try {
       const pos = await locate();

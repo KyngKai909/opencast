@@ -56,15 +56,19 @@ export function Keypad({ channels, onTune, onDone }: { channels: DialRowX[]; onT
   return (
     <div className="vw-kp">
       <div className="vw-kp__disp" role="status" aria-live="polite">
-        <div className="vw-kp__d" aria-label={typed ? `Channel ${channel ?? typed}` : "Type a channel"}>
-          {entry ? (
-            <>
-              {entry.shown.typed}
-              {entry.shown.filled && <em>{entry.shown.filled}</em>}
-            </>
-          ) : (
-            "\u00a0"
-          )}
+        {/* The digits as drawn, and what they say in words (a plain div can't carry aria-label). */}
+        <div className="vw-kp__d">
+          <span aria-hidden="true">
+            {entry ? (
+              <>
+                {entry.shown.typed}
+                {entry.shown.filled && <em>{entry.shown.filled}</em>}
+              </>
+            ) : (
+              "\u00a0"
+            )}
+          </span>
+          <span className="oc-sr-only">{typed ? `Channel ${channel ?? typed}` : "Type a channel"}</span>
         </div>
         <small>
           {line ? (
