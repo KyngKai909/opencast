@@ -14,11 +14,11 @@ export function appEnv(app: RealApp): Record<string, string> {
     VITE_PRIVY_APP_ID: "",
     VITE_CLEAR_PRIVY_PROVIDER_APP_ID: "",
     VITE_CAST_APP_ID: "",
-    VITE_VIEWER_URL: appUrl("viewer"),
-    VITE_CONTROL_URL: appUrl("control"),
+    // TV mode's links to the Opencast app (its /tv sign-in page, pledges).
+    VITE_VIEWER_URL: appUrl("web"),
     VITE_TV_URL: appUrl("tv")
   };
-  return app === "viewer" ? { ...common, VITE_MIRROR_TV: "url" } : common;
+  return app === "web" ? { ...common, VITE_MIRROR_TV: "url" } : common;
 }
 
 /** The command a Playwright webServer (or a person) runs, from the app's folder. */

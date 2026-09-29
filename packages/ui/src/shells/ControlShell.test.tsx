@@ -12,6 +12,13 @@ const LA = "America/Los_Angeles";
 afterEach(() => vi.useRealTimers());
 
 describe("ControlShell", () => {
+  it("has Back to watching in the Opencast app, and none without", () => {
+    const { rerender } = render(<ControlShell station={BEAT} active="monitor" now="2026-09-27T03:42:12Z" timeZone={LA} onAir watchHref="/" />);
+    expect(screen.getByRole("link", { name: "Back to watching" }).getAttribute("href")).toBe("/");
+    rerender(<ControlShell station={BEAT} active="monitor" now="2026-09-27T03:42:12Z" timeZone={LA} onAir />);
+    expect(screen.queryByRole("link", { name: "Back to watching" })).toBeNull();
+  });
+
   it("shows the 12-hour clock with seconds in the station's time zone", () => {
     render(<ControlShell station={BEAT} active="monitor" now="2026-09-27T03:42:12Z" timeZone={LA} onAir />);
     expect(screen.getByText("8:42:12 pm").tagName).toBe("TIME");

@@ -1,5 +1,5 @@
 // The apps against the real API (apps prompt, Phase 9): `npm run e2e:real` from the root, or
-// `npx playwright test -c playwright.real.config.ts --project control` here. docs/apps/testing.md.
+// `npx playwright test -c playwright.real.config.ts --project web` here. docs/apps/testing.md.
 //
 // The global setup starts the API (the v1 routers and services, with the fakes the API's tests use
 // for everything outside) on :8788 over a throwaway database on the Docker Postgres, migrated and
@@ -13,7 +13,7 @@ import { REAL_PORTS, ROOT, WORKSPACES, type RealApp } from "./real/shared";
 
 // Start only the servers the chosen projects need, as playwright.config.ts does.
 // `--project a b c` or `--project a --project b` or `--project=a`: every project name given.
-const PROJECTS = ["viewer", "tv", "control", "business", "desk", "site"];
+const PROJECTS = ["web", "tv", "business", "site"];
 const chosen = process.argv.flatMap((a, i, all) => {
   if (a.startsWith("--project=")) return [a.slice(10)];
   if (a !== "--project") return [];
@@ -21,7 +21,7 @@ const chosen = process.argv.flatMap((a, i, all) => {
   for (let j = i + 1; j < all.length && PROJECTS.includes(all[j]!); j++) names.push(all[j]!);
   return names;
 });
-const needs: Record<string, RealApp[]> = { viewer: ["viewer", "tv"], desk: ["desk", "viewer"] };
+const needs: Record<string, RealApp[]> = { web: ["web", "tv"] };
 const apps = new Set<RealApp>(chosen.length ? chosen.flatMap((p) => needs[p] ?? [p as RealApp]) : (Object.keys(REAL_PORTS) as RealApp[]));
 
 const spec = (product: string) => new RegExp(`(^|/)${product}\\.(.+\\.)?real\\.spec\\.ts$`);
@@ -40,11 +40,10 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "report/real" }]],
   use: { channel: "chrome", trace: "off", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
   projects: [
-    { name: "viewer", outputDir: "test-results/real/viewer", testMatch: spec("viewer"), use: { baseURL: baseURL("viewer") } },
-    { name: "control", outputDir: "test-results/real/control", testMatch: spec("control"), use: { baseURL: baseURL("control") } },
+    // The Opencast app: its specs keep their area's name (viewer.*, control.*, desk.*).
+    { name: "web", outputDir: "test-results/real/web", testMatch: spec("(viewer|control|desk)"), use: { baseURL: baseURL("web") } },
     { name: "business", outputDir: "test-results/real/business", testMatch: spec("business"), use: { baseURL: baseURL("business") } },
     { name: "tv", outputDir: "test-results/real/tv", testMatch: spec("tv"), use: { baseURL: baseURL("tv"), viewport: { width: 1920, height: 1080 } } },
-    { name: "desk", outputDir: "test-results/real/desk", testMatch: spec("desk"), use: { baseURL: baseURL("desk") } },
     { name: "site", outputDir: "test-results/real/site", testMatch: spec("site"), use: { baseURL: baseURL("site") } }
   ],
   webServer: [...apps].map((a) => ({

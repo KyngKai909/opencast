@@ -1,0 +1,7 @@
+/* The app's own layout glue, for the three areas in one document. Components and tokens come from
+   @opencast/ui. Each area's page and component styles keep their prefix: vw- (the viewer), cc-
+   (master control), nd- (Network desk), one CSS file per page or component, tokens only. */
+html, body, #root { height: 100%; }
+body { font-size: 15px; line-height: 1.45; overscroll-behavior-y: none; }
+#root { display: flex; flex-direction: column; }
+#root > * { flex: 1; min-height: 0; }

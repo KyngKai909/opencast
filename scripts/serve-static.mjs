@@ -1,6 +1,6 @@
 // Serves a built single-page app (a Vite `dist`) on $PORT: files as they are, anything else gets
 // index.html so client-side routes work. Used by the web apps on Railway.
-//   node scripts/serve-static.mjs apps/viewer/dist
+//   node scripts/serve-static.mjs apps/web/dist
 import { createReadStream, promises as fs } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
@@ -18,6 +18,8 @@ createServer(async (req, res) => {
   if (!stat || stat.isDirectory()) file = path.join(root, "index.html");
   const ext = path.extname(file);
   // Hashed assets forever; the page itself never, so a deploy shows at once.
-  res.writeHead(200, { "content-type": types[ext] ?? "application/octet-stream", "cache-control": ext === ".html" ? "no-store" : "public, max-age=31536000, immutable" });
+  // The Opencast app's Network desk (/desk) is Opencast's own tool: never indexed.
+  const noIndex = url === "/desk" || url.startsWith("/desk/") ? { "x-robots-tag": "noindex, nofollow" } : {};
+  res.writeHead(200, { "content-type": types[ext] ?? "application/octet-stream", "cache-control": ext === ".html" ? "no-store" : "public, max-age=31536000, immutable", ...noIndex });
   createReadStream(file).on("error", () => res.end()).pipe(res);
 }).listen(port, () => console.log(`Serving ${root} on :${port}`));

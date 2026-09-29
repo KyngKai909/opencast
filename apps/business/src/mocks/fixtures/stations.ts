@@ -1,5 +1,5 @@
 // The stations businesses see, with the same ids as the other apps' mocks
-// (apps/control/src/mocks/fixtures/stations.ts): the Inland Empire. Illustrations.
+// (apps/web/src/control/mocks/fixtures/stations.ts): the Inland Empire. Illustrations.
 
 import type { StationIdent } from "@opencast/contracts";
 import { uid } from "./people";

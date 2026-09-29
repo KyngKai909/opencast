@@ -5,7 +5,7 @@ import { expect, signIn, test } from "../lib/real";
 
 test("Kai's station's Monitor shows its real log", async ({ page }) => {
   await signIn(page, "kai");
-  await page.goto("/");
+  await page.goto("/control");
   await expect(page).toHaveURL(/\/beat\/monitor$/);
   await expect(page.getByRole("heading", { name: "Monitor", level: 1 })).toBeVisible();
   await expect(page.getByRole("main")).toContainText(/Late Crate|Beat Tape Live/);

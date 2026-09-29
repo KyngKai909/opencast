@@ -7,7 +7,7 @@ import { mockLiveHls } from "@opencast/player/mock";
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 /**
- * dev:mock's Cast bridge. The viewer's mock sender (apps/viewer/src/cast/mockSender.ts) is another
+ * dev:mock's Cast bridge. The viewer's mock sender (apps/web/src/viewer/cast/mockSender.ts) is another
  * origin, so it can't join the BroadcastChannel receiver.html listens on. It embeds this page in a
  * hidden iframe instead: messages posted from the viewer's origin go onto the channel, and the
  * channel's messages for phones go back to it. Served by the dev server in mock mode only; it's

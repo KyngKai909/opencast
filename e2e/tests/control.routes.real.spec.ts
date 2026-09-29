@@ -1,6 +1,6 @@
 // Master control against the real API (playwright.real.config.ts): every route opens, as Kai (BEAT's
 // owner), and shows its page, not an error. What the API doesn't answer yet (the proposed
-// endpoints in apps/control/src/api/ext) is listed on each test as `api-miss` annotations, so the
+// endpoints in apps/web/src/control/api/ext) is listed on each test as `api-miss` annotations, so the
 // run says what still runs on mocks; a page error or a blank page fails the test.
 
 import type { Page } from "@playwright/test";
@@ -14,7 +14,7 @@ interface Route {
   level?: number;
 }
 
-const beat = () => `/${seed.stations.beat.callSign.toLowerCase()}`;
+const beat = () => `/control/${seed.stations.beat.callSign.toLowerCase()}`;
 
 const ROUTES: Route[] = [
   { name: `/beat/monitor`, path: () => `${beat()}/monitor`, heading: "Monitor" },
@@ -93,7 +93,7 @@ for (const r of ROUTES) {
 
 test("someone new, with no station, is asked to start one", async ({ page }) => {
   await signIn(page, "new-owner-routes");
-  await page.goto("/");
+  await page.goto("/control");
   await expect(page.getByRole("heading", { name: "Start a station" })).toBeVisible();
   await page.getByRole("link", { name: "Start a station" }).click();
   await expect(page.getByRole("heading", { name: "Your station" })).toBeVisible();
@@ -109,7 +109,7 @@ test("the unanswered sponsorship opens", async ({ page }) => {
 
 test("the creator's claim page, signed out", async ({ page }) => {
   // The claim page (N10, GET /claim/:token) is proposed: without it, the page says it wasn't found.
-  await page.goto("/claim/not-a-real-token");
+  await page.goto("/control/claim/not-a-real-token");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
 });

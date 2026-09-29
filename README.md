@@ -13,12 +13,10 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 |---|---|---|---|
 | `apps/api` | `@opencast/api` | Express API: stations, library, uploads, playout control | platform |
 | `apps/worker` | `@opencast/worker` | Playout: airs every station from its log, from its file cache; HLS and Livepeer out | platform |
-| `apps/control` | `@opencast/control` | Master control: sign on, the Monitor, the log, live sources and going live, listings, the library, breaks, the spot market, sponsors, the syndication market, audience and earnings, rights, translators, settings; studios | apps |
-| `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA | apps |
+| `apps/web` | `@opencast/web` | The Opencast app, one sign-in for viewers and creators: the viewer at `/` (web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA), master control at `/control` (sign on, the Monitor, the log, live sources and going live, listings, the library, breaks, the spot market, sponsors, the syndication market, audience and earnings, rights, translators, settings; studios) and Network desk at `/desk` for the Opencast team (the market board, the creator pipeline, asking permission, setting up claimable stations from recipes, listed sources, held earnings). The iPhone and Android apps wrap it | apps |
 | `apps/tv` | `@opencast/tv` | TV mode: watching, the guide, the menu rail, presets, radio, sleep, pledge by QR, first launch with a sign-in code, settings; the same build is the Cast receiver (`receiver.html`) and the iPhone's second screen (`?mirror`) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
 | `apps/business` | `@opencast/business` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
-| `apps/desk` | `@opencast/desk` | Network desk, Opencast's internal tool: the market board, the creator pipeline, asking permission, setting up claimable stations from recipes, listed sources and the catalog station, held earnings. Admin sign-in only | apps |
 | `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
 | `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
@@ -46,11 +44,11 @@ npm run dev
 `npm run dev` builds `domain` and `contracts`, then runs:
 - the API on http://localhost:8787
 - the worker
-- master control on http://localhost:5173, which proxies `/api`, `/hls` and `/uploads` to the API
+- the Opencast app on http://localhost:5173 (the viewer at `/`, master control at `/control`, the desk at `/desk`), which proxies `/v1` to the API
 
 Postgres is required; there is no JSON fallback any more. The API and worker still keep their state in the old `opencast_state` table until each module moves onto the new schema (`docs/schema.md`) in platform Phase 4. `scripts/create-sample-media.sh` makes a 45 s program and a 12 s spot to upload.
 
-Each empty app runs on its own with `npm run dev -w @opencast/<name>`. Ports: viewer 5174, tv 5175, site 5176, spots 5177, desk 5178.
+Each app runs on its own with `npm run dev -w @opencast/<name>`. Ports against the API: web 5173, tv 5175, site 5176, business 5177. On mock data (`dev:mock`): web 5174, tv 5175, business 5181, site 5183.
 
 | Script | Does |
 |---|---|
@@ -59,9 +57,9 @@ Each empty app runs on its own with `npm run dev -w @opencast/<name>`. Ports: vi
 | `npm run db:up`, `db:down` | Postgres and Redis in Docker |
 | `npm run db:migrate`, `db:reset`, `db:generate` | Apply migrations; drop and re-apply (local only); write a migration after editing the schema |
 | `npm run db:migrate:legacy -- [files]` | One-time move from `opencast_state` and JSON files into the new tables |
-| `npm run build:service:{api,worker,control}` | One service and what it depends on (`turbo --filter=<pkg>...`) |
-| `npm run start:service:{api,worker,control}` | Starts one built service |
-| `npm run start:runtime` | API and worker in one process (single-service mode); the API also serves `apps/control/dist` |
+| `npm run build:service:{api,worker,web}` | One service and what it depends on (`turbo --filter=<pkg>...`) |
+| `npm run start:service:{api,worker,web}` | Starts one built service (web: the static build, `scripts/serve-static.mjs`) |
+| `npm run start:runtime` | API and worker in one process (single-service mode); the API also serves the web app's build (`WEB_DIST_DIR`, `./apps/web/dist` in `.env.example`) |
 | `npm run env:check` | Lists which variables are set |
 
 ### The gallery
@@ -88,27 +86,27 @@ npm run mock:streams -w @opencast/player
 
 That makes nine 60-second loops (CIVC, BEAT, REEL, SAZN and PREP on the TV band; NITE, HALL, CRAT and VOZE on radio) with captions, in `packages/player/.mock-streams/` (git-ignored; needs ffmpeg). The gallery serves them live at `/mock-hls/<station>/master.m3u8` (`mockLiveHls` from `@opencast/player/mock`), and its Player pages drive the real engine against them.
 
-### The viewer
+### The Opencast app
 
 ```bash
-npm run dev:mock -w @opencast/viewer
+npm run dev:mock -w @opencast/web
 ```
 
-Runs the viewer at http://localhost:5174 against mock data (Mock Service Worker), with the mock stations playing live and the clock held at Saturday 8:42 pm Pacific, as the reference frames are drawn. It signs in with any email and any six digits except 000000. The mock remembers what you change in `localStorage` (`oc-mock-db`); remove that key to start again. `npm run dev -w @opencast/viewer` runs it against the API instead: copy `apps/viewer/.env.example` to `.env.local` and set `VITE_API_BASE` and `VITE_PRIVY_APP_ID`.
+Runs the Opencast app at http://localhost:5174 against mock data (Mock Service Worker): the viewer at `/`, master control at `/control` and Network desk at `/desk`, as areas of one app with one sign-in. The mock stations play live, and the clock is held at Saturday 8:42:12 pm Pacific, as the reference frames are drawn (`?clock=<ISO time>` in the address starts it elsewhere, in mock mode only). `npm run dev -w @opencast/web` runs it on :5173 against the API instead: copy `apps/web/.env.example` to `.env.local` and set `VITE_API_BASE` and `VITE_PRIVY_APP_ID` (and `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` for master control's "Connect Clear").
 
-Every mock response is checked against the contract schemas, extended with the fields the viewer has asked for (`apps/viewer/src/api/ext*`, named by their ids in `docs/contract-requests.md`).
+One mock world for the three areas. Sign in with any six digits except 000000; the email picks who you are:
+- `kai@example.com`, Kai M.: the viewer's reference person (six presets, reminders, two pledges, TVs), who also owns BEAT 12.1 and operates HALL 90.7 in master control;
+- `marcus@example.com` operates BEAT, `jen@example.com` hosts Beat Tape Live, `sam@example.com` runs the studio Inland Sound Lab;
+- `dee@opencast.example`, Dee A., is on the Opencast team, so Network desk opens for her;
+- any other address is someone new: the viewer asks their name, master control offers to start a station, the desk says it's for the team.
 
-The iPhone and Android apps wrap the same build with Capacitor. They cast to Chromecast through the Cast SDK, mirror to AirPlay TVs with TV mode on the external display (iPhone), and show lock-screen controls. `npm run build:native -w @opencast/viewer -- ios` (or `android`) builds and syncs them. `docs/apps/native.md` has the toolchains, the env, and the demo steps.
+The avatar's menu on the web viewer shows "Master control" to people with a station role and "Network desk" to admins; master control's header has "Back to watching". Each area loads only when someone opens it, so viewers never download master control or the desk. The mock remembers what you change in `localStorage` (keys starting `oc-mock-`); remove them to start again. Mock-only panels play the other side: under the desk's pipeline, a creator's sign-on and claim; in master control, a spot's pause.
 
-### Master control
+Every mock response is checked against the contract schemas, extended with the fields each area has asked for (`apps/web/src/<area>/api/ext*`, named by their ids in `docs/contract-requests.md`). Where two areas' mocks answer the same endpoint, `apps/web/src/mocks/overlaps.ts` answers it once.
 
-```bash
-npm run dev:mock -w @opencast/control
-```
+The creator's permission page is the viewer's `/permission/:token` (public, outside the phone shell). On the mock, `/permission/desert-skate-films-2026-0926` is unanswered, `/permission/desert-skate-films-said-yes` is after the yes, and the links the desk sends open there too; a creator's answer reaches the desk's pipeline.
 
-Runs master control at http://localhost:5179 against mock data, with the clock held at Saturday 8:42:12 pm, as the reference frames are drawn (`?clock=<ISO time>` in the address starts it elsewhere, in mock mode only). Sign in with any six digits except 000000; the email picks who you are: `kai@example.com` owns BEAT 12.1 and operates HALL 90.7, `marcus@example.com` operates BEAT, `jen@example.com` hosts Beat Tape Live, `sam@example.com` runs the studio Inland Sound Lab, and any other address is someone new who can start a station. The mock remembers what you change in `localStorage` (keys starting `oc-mock-control-`); remove them to start again.
-
-`npm run dev -w @opencast/control` runs it on :5173 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`; see `apps/control/.env.example`). In production `server.mjs` serves the build and proxies `/v1` to the API.
+The iPhone and Android apps wrap the same build with Capacitor, so creators get master control on their phones too. They cast to Chromecast through the Cast SDK, mirror to AirPlay TVs with TV mode on the external display (iPhone), and show lock-screen controls. `npm run build:native -w @opencast/web -- ios` (or `android`) builds and syncs them. `docs/apps/native.md` has the toolchains, the env, and the demo steps.
 
 ### Opencast for business
 
@@ -116,19 +114,9 @@ Runs master control at http://localhost:5179 against mock data, with the clock h
 npm run dev:mock -w @opencast/business
 ```
 
-Runs the business app at http://localhost:5181 on mock data, at the same Saturday evening as master control's mock. Sign in with any six digits except 000000; the email picks who you are: `jess@orangestreet.example` owns Orange Street Coffee, `tomas@orangestreet.example` manages it, `ana@ledgerline.example` is its bookkeeper (a viewer), `devon@inlandcreative.example` manages it and Cypress Dental, and any other address is someone new who starts a business. Mock-only panels (marked "Mock") play the station's side: approving a sponsorship, quoting and delivering an order, airing a spot until its budget is spent. The mock remembers what you change in `localStorage` (keys starting `oc-mock-spots-`).
+Runs the business app at http://localhost:5181 on mock data, at the same Saturday evening as the Opencast app's mock. Sign in with any six digits except 000000; the email picks who you are: `jess@orangestreet.example` owns Orange Street Coffee, `tomas@orangestreet.example` manages it, `ana@ledgerline.example` is its bookkeeper (a viewer), `devon@inlandcreative.example` manages it and Cypress Dental, and any other address is someone new who starts a business. Mock-only panels (marked "Mock") play the station's side: approving a sponsorship, quoting and delivering an order, airing a spot until its budget is spent. The mock remembers what you change in `localStorage` (keys starting `oc-mock-spots-`).
 
 `npm run dev -w @opencast/business` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/business/.env.example`).
-
-### Network desk
-
-```bash
-npm run dev:mock -w @opencast/desk
-```
-
-Runs Network desk at http://localhost:5182 on mock data, at the same Saturday evening. It's for the Opencast team only: sign in as `dee@opencast.example` (Dee A.) with any six digits except 000000; any other address signs in and is told the desk is for the team. A mock-only panel under the pipeline plays the creator's side (their answer, the sign-on time arriving, the claim and its approval), so a creator can go found, asked, said yes, set up from a recipe, on air and claimed. The mock remembers what you change in `localStorage` (keys starting `oc-mock-desk-`). `npm run dev -w @opencast/desk` runs it on :5178 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`; see `apps/desk/.env.example`).
-
-The creator's permission page is the viewer's `/permission/:token` (public, outside the phone shell). On the viewer's mock, `/permission/desert-skate-films-2026-0926` is unanswered, `/permission/desert-skate-films-said-yes` is after the yes, and links the desk's mock sends open there too.
 
 ### TV mode
 
@@ -176,7 +164,7 @@ Files are stored once, by content ID, in object storage: R2 when its keys are se
 
 ## Environment
 
-`.env.example` at the root is read by the API and the worker. `apps/control/.env.example` holds `VITE_API_BASE`, which you only need when the API is on another origin. Per-service examples arrive with the Railway work (platform Phase 7).
+`.env.example` at the root is read by the API and the worker. `apps/web/.env.example` lists the Opencast app's own (`VITE_API_BASE`, which you only need when the API is on another origin, Privy, Clear, Cast, TV mode). Per-service examples arrive with the Railway work (platform Phase 7).
 
 ## Deploying
 
@@ -186,11 +174,11 @@ Old names, for anyone looking at that project:
 
 | Old | New |
 |---|---|
-| `@openchannel/web` | `@opencast/control` |
+| `@openchannel/web` | `@opencast/web` (by way of `@opencast/control`; master control is now its `/control`) |
 | `@openchannel/shared` | `@opencast/domain` |
 | `@openchannel/api` | `@opencast/api` |
 | `@openchannel/worker` | `@opencast/worker` |
-| `build:service:web`, `start:service:web` | `build:service:control`, `start:service:control` |
+| `build:service:web`, `start:service:web` | the same names again (for a while `build:service:control`, `start:service:control`) |
 
 ## Docs
 

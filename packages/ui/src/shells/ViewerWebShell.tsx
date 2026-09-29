@@ -5,6 +5,7 @@ import { Button } from "../primitives/Button";
 import type { ShellLink } from "./ShellRail";
 import { ShellAvatar } from "./ShellAvatar";
 import { MarketButton } from "./MarketButton";
+import { Menu, type MenuItem } from "../primitives/Menu";
 
 /** The viewer's web sections, in nav order. "you" is the avatar's page, with no nav item. */
 export type ViewerSection = "dial" | "guide" | "radio" | "presets";
@@ -38,8 +39,12 @@ export interface ViewerWebShellProps {
   market: { name: string; onClick?: () => void };
   /** Opens search: the search box, and the "/" key from anywhere outside a text field. */
   onSearch?: () => void;
-  /** The person signed in. Without it the header shows Sign in. */
-  user?: { initials: string; name: string; href?: string; onClick?: () => void };
+  /**
+   * The person signed in. Without it the header shows Sign in. With `menu` (the Opencast app's
+   * other areas: "Master control" for people with a station role, "Network desk" for admins), the
+   * avatar opens it; otherwise it's a link to their page.
+   */
+  user?: { initials: string; name: string; href?: string; onClick?: () => void; menu?: ReadonlyArray<MenuItem> };
   /** Where Sign in goes. */
   signIn?: ShellLink;
   /** The player bar (a PlayerBar), pinned under the page. */
@@ -95,8 +100,15 @@ export function ViewerWebShell({ active = null, links, linkTo, homeHref, market,
           <kbd className="oc-viewer-web__kbd">/</kbd>
         </button>
         <MarketButton name={market.name} onClick={market.onClick} />
-        {user ? (
-          <ShellAvatar {...user} current={active === "you"} />
+        {user?.menu?.length ? (
+          <Menu
+            items={user.menu}
+            label={user.name}
+            className="oc-viewer-web__me"
+            trigger={{ content: <span aria-hidden="true">{user.initials}</span>, className: cx("oc-shell-avatar", active === "you" && "oc-shell-avatar--current") }}
+          />
+        ) : user ? (
+          <ShellAvatar initials={user.initials} name={user.name} href={user.href} onClick={user.onClick} current={active === "you"} />
         ) : signIn?.href !== undefined ? (
           <Button size="sm" href={signIn.href} onClick={signIn.onClick}>
             Sign in

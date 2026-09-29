@@ -1,7 +1,7 @@
 // Station colours hold 4.5:1 against white (rules.md): the swatches both of master control's
 // colour pickers offer, and the pickers' rule, measured in the page with the WCAG formula
 // (lib/contrast.ts), not the app's own. Every fixture colour is checked in the app's unit tests
-// (apps/control/src/mocks/fixtures/colours.test.ts).
+// (apps/web/src/control/mocks/fixtures/colours.test.ts).
 
 import { expect, test, type Page } from "@playwright/test";
 import { contrast } from "../lib/contrast";
@@ -31,7 +31,7 @@ async function swatches(page: Page, name: RegExp): Promise<string[]> {
 
 test("setting up a station: the swatches pass and the rule matches the formula", async ({ page }) => {
   await signInAs(page, "new");
-  await page.goto("/new");
+  await page.goto("/control/new");
   await expect(page.getByRole("heading", { name: "Your station" })).toBeVisible();
   await settle(page);
 
@@ -52,7 +52,7 @@ test("setting up a station: the swatches pass and the rule matches the formula",
 
 test("station settings: the swatches pass and a failing colour can't be saved", async ({ page }) => {
   await signInAs(page, "kai");
-  await page.goto("/beat/settings/identity");
+  await page.goto("/control/beat/settings/identity");
   await expect(page.getByRole("radiogroup", { name: "Station colours" })).toBeVisible();
   await settle(page);
 

@@ -1,6 +1,7 @@
 // The viewer's flow (apps prompt, Phase 9): first visit, tune in, save a preset (signing in on the
-// way), set a reminder. On the mocks (dev:mock): sign-in takes any email and any six digits but
-// 000000, and the account is the reference's Kai M., whose six keys are all taken.
+// way), set a reminder. On the mocks (dev:mock): sign-in takes any six digits but 000000, and the
+// email picks the person in the app's one mock world: kai@example.com is the reference's Kai M.,
+// whose six keys are all taken (someone new would be asked their name first).
 // Copy is the frames': viewer/opencast-home.html 08.1 (first visit), opencast-you.html 01 (sign-in)
 // and 03.1 (all six keys taken), opencast-station-pages.html (Remind me).
 
@@ -51,11 +52,11 @@ for (const width of ["web", "phone"] as const) {
       const signIn = page.getByRole("dialog", { name: "Sign in to Opencast" });
       await expect(signIn).toBeVisible();
       await expect(signIn).toContainText("save PREP 31.1 as a preset");
-      await signIn.getByRole("textbox", { name: "Email" }).fill("viewer@example.com");
+      await signIn.getByRole("textbox", { name: "Email" }).fill("kai@example.com");
       await signIn.getByRole("textbox", { name: "Email" }).press("Enter");
       const code = page.getByRole("dialog", { name: "Check your email" });
       await expect(code).toBeVisible();
-      await expect(code).toContainText("viewer@example.com");
+      await expect(code).toContainText("kai@example.com");
       // 000000 is the mock's wrong code.
       await code.getByRole("textbox").first().pressSequentially("000000");
       await expect(code).toContainText("That code didn't work. Check it, or send a new one.");

@@ -5,7 +5,7 @@ import { expect, signIn, test } from "../lib/real";
 
 test("the market board shows the real Inland Empire", async ({ page }) => {
   await signIn(page, "dee");
-  await page.goto("/");
+  await page.goto("/desk");
   await expect(page).toHaveURL(/\/markets\/inland-empire\/board$/);
   const main = page.getByRole("main");
   await expect(main).toContainText("5 stations and 1 claimable station on air.");
@@ -17,7 +17,7 @@ test("the market board shows the real Inland Empire", async ({ page }) => {
 
 test("someone who isn't on the Opencast team is kept out (the API says who's an admin)", async ({ page }) => {
   await signIn(page, "sam");
-  await page.goto("/");
+  await page.goto("/desk");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("This desk is for the Opencast team.");
   await expect(page.getByRole("main")).toContainText("You're signed in as sam@example.com");
 });

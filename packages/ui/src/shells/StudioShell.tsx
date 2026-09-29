@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cx } from "../lib/cx";
-import { ShellFrame, ShellHead, ShellHeadEnd } from "./ShellFrame";
+import { ShellBackToWatching, ShellFrame, ShellHead, ShellHeadEnd } from "./ShellFrame";
 import { ShellRail, buildRail, type ShellItems, type ShellRailSpec } from "./ShellRail";
 import { StationSwitch, type ControlStudio } from "./StationSwitch";
 
@@ -47,12 +47,14 @@ export interface StudioShellProps {
   linkTo?: (page: StudioPage) => string;
   /** Main area without padding. */
   flush?: boolean;
+  /** "Back to watching": where the viewer is, in the Opencast app ("/"). Left out, the header has none. */
+  watchHref?: string;
   children?: ReactNode;
   className?: string;
 }
 
 /** Master control for a studio (a station with no channel): no clock, no tally, no Sign off. */
-export function StudioShell({ studio, onSwitchStation, active, items, linkTo, flush, children, className }: StudioShellProps) {
+export function StudioShell({ studio, onSwitchStation, active, items, linkTo, flush, watchHref, children, className }: StudioShellProps) {
   return (
     <ShellFrame
       className={cx("oc-studio-shell", className)}
@@ -61,6 +63,7 @@ export function StudioShell({ studio, onSwitchStation, active, items, linkTo, fl
         <ShellHead app="Master control">
           <StationSwitch studio={studio} onClick={onSwitchStation} />
           <ShellHeadEnd>
+            {watchHref !== undefined && <ShellBackToWatching href={watchHref} />}
             <span className="oc-shell-head__note">Studios don’t broadcast</span>
           </ShellHeadEnd>
         </ShellHead>

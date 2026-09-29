@@ -1,6 +1,6 @@
 // For people: the real API on a throwaway database, and the apps in real mode, until Ctrl-C.
 //   npm run real:up -w @opencast/e2e              the API and every app
-//   npm run real:up -w @opencast/e2e -- control   the API and master control only
+//   npm run real:up -w @opencast/e2e -- web       the API and the Opencast app only
 //   npm run real:up -w @opencast/e2e -- --no-apps the API only
 // Prints how to sign in as each seeded person. docs/apps/testing.md.
 

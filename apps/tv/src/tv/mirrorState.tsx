@@ -1,5 +1,5 @@
 // TV mode on the iPhone's second screen: what's on goes back to the phone, as the Cast receiver
-// tells its phones. The Swift plugin (apps/viewer's OpencastMirror) listens for these messages
+// tells its phones. The Swift plugin (apps/web's OpencastMirror) listens for these messages
 // in this web view and passes them to the phone's, where the remote while mirroring shows them.
 
 import { useEffect } from "react";

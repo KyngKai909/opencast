@@ -11,7 +11,7 @@ test("someone new signs on for the first time", async ({ page }) => {
   // The mock prepares an upload for air in 20 seconds, as the real one takes its time.
   test.setTimeout(180_000);
   // Signing in: a wrong code is refused, the right one lets them in.
-  await page.goto("/");
+  await page.goto("/control");
   await expect(page.getByRole("heading", { name: "Sign in to Opencast" })).toBeVisible();
   await page.getByLabel("Email").fill("dana@example.com");
   await page.getByRole("button", { name: "Email me a code" }).click();
@@ -86,7 +86,7 @@ test("someone new signs on for the first time", async ({ page }) => {
 
 test("BEAT carries a program from the syndication market", async ({ page }) => {
   await signInAs(page, "kai");
-  await page.goto("/beat/market");
+  await page.goto("/control/beat/market");
   await expect(page.getByRole("heading", { name: "Syndication market" })).toBeVisible();
   await page.getByRole("link", { name: "Nights at the observatory" }).first().click();
 
@@ -114,7 +114,7 @@ test("BEAT carries a program from the syndication market", async ({ page }) => {
   await expect(toast).toBeHidden({ timeout: 20_000 });
 
   // Carried by BEAT now lists it.
-  await page.goto("/beat/market/carried");
+  await page.goto("/control/beat/market/carried");
   const row = page.getByRole("row").filter({ hasText: "Nights at the observatory" });
   await expect(row).toContainText("From Opencast catalog");
   await expect(row).toContainText("Sundays at 8:00 pm");
@@ -123,7 +123,7 @@ test("BEAT carries a program from the syndication market", async ({ page }) => {
 
 test("BEAT fills a break from the spot market", async ({ page }) => {
   await signInAs(page, "kai");
-  await page.goto("/beat/breaks");
+  await page.goto("/control/beat/breaks");
 
   // Breaks tonight (C.1): open time across tonight's breaks.
   await expect(page.getByRole("heading", { name: "Breaks tonight" })).toBeVisible();
@@ -149,7 +149,7 @@ test("BEAT fills a break from the spot market", async ({ page }) => {
 
 test("BEAT approves a sponsorship", async ({ page }) => {
   await signInAs(page, "kai");
-  await page.goto("/beat/sponsors");
+  await page.goto("/control/beat/sponsors");
 
   // Sponsors, with a new request (sponsorships 03.1).
   await expect(page.getByRole("heading", { name: "Sponsors", exact: true })).toBeVisible();

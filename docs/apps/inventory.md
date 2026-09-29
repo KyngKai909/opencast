@@ -4,6 +4,18 @@ Phase 0 of the apps prompt. For every frame in every file in `docs/reference/`: 
 
 **How it was made.** Each reference file was rendered in Chrome, and its sections, frames (size, caption, headings, full visible text) and notes were extracted. Every frame was then checked against the Zod schemas in `packages/contracts`, with each gap verified against the schema rather than an endpoint's summary. The token values were compared across all 21 files in both grounds.
 
+## Routes since the Opencast app (handoff 4)
+
+The viewer, master control and Network desk are now one app, `apps/web`, and the routes below were
+written for three. Read them as:
+
+| In this inventory | Now |
+|---|---|
+| `apps/viewer` `/…` (the dial, `/watch/:station`, `/guide`, `/you`, `/:handle`, `/permission/:token`, `/tv`, `/remote`…) | the same paths in `apps/web` |
+| `apps/control` `/`, `/new`, `/setup/:stationId/…`, `/claim/:token` | `/control`, `/control/new`, `/control/setup/:stationId/…`, `/control/claim/:token` |
+| `apps/control` `/:callSign/…` (`/beat/monitor`, `/beat/log`, a studio's `/:handle/programs`…) | `/control/:callSign/…` (`/control/beat/monitor`…) |
+| `apps/desk` `/markets/:slug/board`, `/markets/:slug/pipeline…`, `/held-earnings`, `/settings`… | `/desk/markets/:slug/board`, `/desk/markets/:slug/pipeline…`, `/desk/held-earnings`, `/desk/settings`… |
+
 ## Counts
 
 21 files, 149 frames, 411 notes (18 marked Open). The two brand files have no frames: the site is one page of 14 sections, and the style guide has 11 chapters.

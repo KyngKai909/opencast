@@ -1,6 +1,6 @@
-// Master control: axe on every route (apps/control/src/routes.tsx and each pages/<area>/routes.tsx)
+// Master control: axe on every route (apps/web/src/control/routes.tsx and each pages/<area>/routes.tsx)
 // and the overlays the address opens (?switch=1, ?modal=sign-off, ?rights=), on both grounds, at
-// 1280 and in the phone layout (under 768). Ids are the mock's fixtures (apps/control/src/mocks).
+// 1280 and in the phone layout (under 768). Ids are the mock's fixtures (apps/web/src/control/mocks).
 
 import { expect, test, type Page } from "@playwright/test";
 import { checkA11y, useGround, type Ground } from "../lib/a11y";
@@ -15,17 +15,17 @@ interface Route {
   shows?: string | RegExp;
 }
 
-const kai = (path: string, shows?: string | RegExp): Route => ({ path: `/beat${path}`, as: "kai", shows });
-const sam = (path: string, shows?: string | RegExp): Route => ({ path: `/inland-sound-lab${path}`, as: "sam", shows });
+const kai = (path: string, shows?: string | RegExp): Route => ({ path: `/control/beat${path}`, as: "kai", shows });
+const sam = (path: string, shows?: string | RegExp): Route => ({ path: `/control/inland-sound-lab${path}`, as: "sam", shows });
 
 const ROUTES: Route[] = [
   // Outside a station.
-  { path: "/", as: null, shows: "Sign in to Opencast" },
-  { path: "/", as: "new", shows: "Start a station" },
-  { path: "/new", as: "new", shows: "Your station" },
-  { path: "/claim/crat-101-9-ready", as: null },
-  { path: "/claim/crat-101-9-ready", as: "marcus" },
-  { path: "/nowhere/at/all", as: "kai" },
+  { path: "/control", as: null, shows: "Sign in to Opencast" },
+  { path: "/control", as: "new", shows: "Start a station" },
+  { path: "/control/new", as: "new", shows: "Your station" },
+  { path: "/control/claim/crat-101-9-ready", as: null },
+  { path: "/control/claim/crat-101-9-ready", as: "marcus" },
+  { path: "/control/nowhere/at/all", as: "kai" },
   // On air.
   kai("/monitor", "Master control"),
   kai("/monitor?switch=1"),
@@ -33,14 +33,14 @@ const ROUTES: Route[] = [
   kai("/log"),
   kai("/log?view=day"),
   kai("/log?view=week"),
-  { path: "/hall/monitor", as: "kai" },
+  { path: "/control/hall/monitor", as: "kai" },
   // Live and programming.
   kai(`/live-sources`),
   kai(`/live-sources/${uid(260001)}`),
   kai(`/live-sources/${uid(260002)}/rehearse`),
   kai(`/live`),
   kai(`/live/${uid(430002)}`),
-  { path: "/beat/live", as: "jen" },
+  { path: "/control/beat/live", as: "jen" },
   kai(`/listings`),
   kai(`/listings?range=today`),
   kai(`/listings/${uid(430006)}`),
@@ -125,9 +125,9 @@ for (const size of ["web", "phone"] as const) {
         });
       }
 
-      // Signing in: the code step (the email step is `/` as nobody).
+      // Signing in: the code step (the email step is `/control` as nobody).
       test("signing in, the code", async ({ page }) => {
-        await open(page, { path: "/", as: null, shows: "Sign in to Opencast" }, ground, size);
+        await open(page, { path: "/control", as: null, shows: "Sign in to Opencast" }, ground, size);
         await page.getByLabel("Email").fill("kai@example.com");
         await page.getByRole("button", { name: "Email me a code" }).click();
         await expect(page.getByText("We sent a code to kai@example.com.")).toBeVisible();
@@ -135,15 +135,15 @@ for (const size of ["web", "phone"] as const) {
         await checkA11y(page, `sign-in code, ${size}, ${ground}`, { exclude: EXCLUDE });
       });
 
-      // Setting up a station: someone new starts one on /new, then each setup step.
+      // Setting up a station: someone new starts one on /control/new, then each setup step.
       for (const step of ["station", "library", "log", "translators", "sign-on"]) {
         test(`/setup/:id/${step} as new`, async ({ page }) => {
-          await open(page, { path: "/new", as: "new", shows: "Your station" }, ground, size);
+          await open(page, { path: "/control/new", as: "new", shows: "Your station" }, ground, size);
           await page.getByLabel("Station name").fill("Redlands Tapes");
           await page.getByLabel("Station name").blur();
           await page.waitForURL(/\/setup\/[^/]+\/station/);
           const id = page.url().match(/setup\/([^/]+)/)![1]!;
-          await page.goto(`/setup/${id}/${step}`);
+          await page.goto(`/control/setup/${id}/${step}`);
           await settle(page);
           await checkA11y(page, `/setup/:id/${step}, ${size}, ${ground}`, { exclude: EXCLUDE });
         });

@@ -49,4 +49,14 @@ describe("ViewerWebShell", () => {
     render(<ViewerWebShell market={market} signIn={{ href: "/signin" }} />);
     expect(screen.getByRole("link", { name: "Sign in" }).getAttribute("href")).toBe("/signin");
   });
+
+  it("links the avatar to You, or opens the app's other areas from it", () => {
+    const { rerender } = render(<ViewerWebShell market={market} user={kai} />);
+    expect(screen.getByRole("link", { name: "Kai M." }).getAttribute("href")).toBe("/you");
+    const go = vi.fn();
+    rerender(<ViewerWebShell market={market} user={{ ...kai, menu: [{ label: "You", onSelect: () => go("/you") }, { label: "Master control", onSelect: () => go("/control") }] }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Kai M." }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Master control" }));
+    expect(go).toHaveBeenCalledWith("/control");
+  });
 });

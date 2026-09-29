@@ -1,16 +1,16 @@
 // Network desk's flow (apps prompt, Phase 9): set up a claimable station from a recipe. Found →
 // asked → the creator says yes on the viewer's /permission/:token page → set up from a recipe →
-// on air, not claimed. On the mocks: the desk (5182) and the viewer (5174) are two origins with
-// two mocks, so the creator's yes is given on the viewer's page and then carried to the desk's
-// mock by its "creator's side" controls (mock mode only), as MockControls.tsx says.
+// on air, not claimed. On the mocks: the Opencast app's desk (/desk) and the permission page (/)
+// are one app with one mock world, so the creator's yes reaches the pipeline by itself; the rest of
+// the creator's side (signing on, claiming) is the desk's "creator's side" controls (mock mode only).
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { checkA11y, useGround } from "../lib/a11y";
 
-const IE = "/markets/inland-empire";
+const IE = "/desk/markets/inland-empire";
 
 async function signedInAsAdmin(page: Page) {
-  await page.addInitScript(() => localStorage.setItem("oc-mock-desk-signed-in", "dee@opencast.example"));
+  await page.addInitScript(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
 }
 
 /** No finite animation still running (the toast's rise, fades): axe measures what stays. */
@@ -76,11 +76,13 @@ test("set up a claimable station from a recipe", async ({ page, context }) => {
   await expect(creator.getByText(/^13 works, on /)).toBeVisible();
   await creator.close();
 
-  // Back on the desk: the yes reaches the desk's mock, and the pipeline has a new yes to set up.
+  // Back on the desk: the yes has reached it, and the pipeline has a new yes to set up.
   await page.getByRole("link", { name: "Back to the pipeline" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Creator pipeline" })).toBeVisible();
-  await expect(stage(page, "Asked")).toHaveText(/^4\s*Asked$/);
-  await creatorSide(page, "Desert Skate Films").getByRole("button", { name: "They say yes" }).click();
+  // The desk asks again (as it would the API the next time it loads): the creator answered in
+  // another tab, whose mock saved it.
+  await page.reload();
+  await expect(stage(page, "Asked")).toHaveText(/^3\s*Asked$/);
   await expect(stage(page, "Said yes")).toHaveText(/^5\s*Said yes$/);
   await expect(page.getByRole("navigation", { name: "Network desk" })).toContainText("5 yeses to set up");
   await expect(page.getByRole("row", { name: /Desert Skate Films/ })).toContainText("Said yes");
@@ -166,7 +168,7 @@ test("Add a creator: found, with nothing to ask about until their works are cata
 // Signing in through the page opens the desk at once (AuthProvider resets the cache, not clears it).
 test("signing in through the page opens the desk without a reload", async ({ page }) => {
   test.setTimeout(30_000);
-  await page.goto("/");
+  await page.goto("/desk");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in to Network desk" })).toBeVisible();
   await page.getByLabel("Email").fill("dee@opencast.example");
   await page.getByRole("button", { name: "Email me a code" }).click();
