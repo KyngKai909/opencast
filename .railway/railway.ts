@@ -49,11 +49,16 @@ export default defineRailway((ctx) => {
         S3_STORAGE_CLASSES: "false"
       };
   const origin = (name: string) => `https://\${{${name}.RAILWAY_PUBLIC_DOMAIN}}`;
+  // The web apps are on Vercel (team Deed3Labs, projects opencast-*), following the monorepo branch
+  // until the cutover. Staging's API allows them and links to the Vercel viewer; production keeps
+  // the Railway web services' addresses until its domains are decided.
+  const vercel = { viewer: "opencast-viewer", control: "opencast-control", spots: "opencast-business", desk: "opencast-desk", site: "opencast-site", tv: "opencast-tv" } as const;
+  const webOrigin = (name: keyof typeof vercel) => (production ? origin(name) : `https://${vercel[name]}.vercel.app`);
   const common = {
     NODE_ENV: "production",
     DATABASE_URL: Postgres.env.DATABASE_URL,
     REDIS_URL: Redis.env.REDIS_URL,
-    APP_ORIGIN: origin("viewer"),
+    APP_ORIGIN: webOrigin("viewer"),
     PAYMENTS_PROVIDER: production ? secret() : "fake",
     STRIPE_SECRET_KEY: secret(),
     STRIPE_WEBHOOK_SECRET: secret(),
@@ -83,7 +88,7 @@ export default defineRailway((ctx) => {
       STORAGE_ROOT: "/tmp/opencast",
       // The minute jobs run in the worker, under its leader lock.
       JOBS: "off",
-      WEB_ORIGIN: ["viewer", "control", "spots", "desk", "site", "tv"].map(origin).join(","),
+      WEB_ORIGIN: (["viewer", "control", "spots", "desk", "site", "tv"] as const).map(webOrigin).join(","),
       SERVE_WEB_APP: "false"
     }
   });
