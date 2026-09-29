@@ -42,17 +42,41 @@ export const Statement = z.object({
   periodEnd: DateOnly,
   openingMicros: Micros,
   closingMicros: Micros,
-  lines: z.array(z.object({ label: z.string(), detail: z.string().nullable(), amountMicros: Micros, notSetYet: z.boolean().default(false) })),
+  lines: z.array(
+    z.object({
+      label: z.string(),
+      detail: z.string().nullable(),
+      amountMicros: Micros,
+      notSetYet: z.boolean().default(false),
+      // ---- E3 (added 2026-09-29) ----
+      group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other"]).optional(),
+      /** How many airings the line is for (spot lines). */
+      airings: z.number().int().optional(),
+      /** The rate, when every airing on the line had the same one. Not sent yet. */
+      rate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }).optional(),
+      /** Per-thousand lines: the average tuned in across the airings. Not sent yet. */
+      averageTunedIn: z.number().int().optional()
+    })
+  ),
   issuedAt: Timestamp,
   csvUrl: z.string(),
-  pdfUrl: z.string().nullable()
+  pdfUrl: z.string().nullable(),
+  // ---- E3 (added 2026-09-29) ----
+  /** When the payout for the period was sent, and where ("Chase ending 2231"); null until it is. */
+  paidOn: DateOnly.nullable().optional(),
+  destination: z.string().nullable().optional()
 });
 
 export const StationEarnings = z.object({
   period: z.enum(["week", "month", "year"]),
   lines: z.object({
     spots: z.object({ micros: Micros, airings: z.number().int(), businesses: z.number().int() }),
-    sponsors: z.object({ micros: Micros, sponsors: z.number().int() }),
+    sponsors: z.object({
+    micros: Micros,
+    sponsors: z.number().int(),
+    /** E2 (added 2026-09-29): the approved sponsors by name, with their monthly amounts. */
+    list: z.array(z.object({ name: z.string(), monthlyMicros: Micros })).optional()
+  }),
     pledges: z.object({ micros: Micros, members: z.number().int(), newMembers: z.number().int() }),
     carriageIn: z.object({ micros: Micros, detail: z.string() }),
     carriageOut: z.object({ micros: Micros, detail: z.string() }),
@@ -67,9 +91,24 @@ export const StationEarnings = z.object({
   }),
   totalMicros: Micros,
   /** "Held for airings… Tonight 9 airings in 4 breaks". Becomes the station's when each airing runs. */
-  held: z.object({ tonightMicros: Micros, tonightAirings: z.number().int(), restOfWeekMicros: Micros, restOfWeekAirings: z.number().int() }),
+  held: z.object({
+    tonightMicros: Micros,
+    tonightAirings: z.number().int(),
+    restOfWeekMicros: Micros,
+    restOfWeekAirings: z.number().int(),
+    /** E2 (added 2026-09-29): how many breaks tonight's held airings are in ("9 airings in 4 breaks"). */
+    tonightBreaks: z.number().int().optional()
+  }),
   account: z.object({ availableMicros: Micros, paidOutThisMonthMicros: Micros }),
-  nextPayout: z.object({ on: DateOnly, schedule: z.enum(["weekly", "monthly"]), destination: z.string().nullable() }).nullable()
+  nextPayout: z
+    .object({
+      on: DateOnly,
+      schedule: z.enum(["weekly", "monthly"]),
+      destination: z.string().nullable(),
+      /** E2 (added 2026-09-29): what it would pay if it went now: the available balance. */
+      amountMicros: Micros.optional()
+    })
+    .nullable()
 });
 
 export const Pledge = z.object({

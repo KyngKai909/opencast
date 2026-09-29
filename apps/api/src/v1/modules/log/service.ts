@@ -1,9 +1,10 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Airing, LogEntry } from "@opencast/contracts";
+import type { Airing, BreakContent, BreakRow, Listing, LogEntry } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
-import { badRequest, notFound, refused } from "../../errors.js";
-import { addDays, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
+import { addDays, localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 
 /** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
 export const DEAD_AIR_NOTE = "Filled automatically: dead air";
@@ -50,7 +51,37 @@ export interface EntryInput {
   localNote?: string;
 }
 
+/** G7: a "Repeat this day" still on the log. */
+export interface RepeatView {
+  id: string;
+  day: string;
+  pattern: "once" | "daily" | "weekly";
+  until: string | null;
+  entries: number;
+}
+
+type ListingPatch = { episodeTitle?: string | null; episodeDescription?: string | null; localNote?: string | null };
+
 export interface LogService {
+  /** G1: what's in each break, in the order it airs (keyed by the break's start). */
+  breakContents(stationId: string, slots: BreakSlotView[]): Promise<Map<string, BreakContent[]>>;
+  /** G7: repeats with entries from `from` on. */
+  repeats(stationId: string, from: Date): Promise<RepeatView[]>;
+  /** G7: takes a repeat's entries off the log from now on. */
+  removeRepeat(stationId: string, repeatId: string): Promise<number>;
+  /** A live block on a station, or 404 / 409 `not_live`. */
+  liveEntry(stationId: string, entryId: string): Promise<Row>;
+  /** G3: ends a live block now and moves the log after it up. */
+  endEarly(stationId: string, entryId: string): Promise<{ entryId: string; endedAt: string; movedUp: number }>;
+  /** G5: listings per airing in a window. */
+  listings(stationId: string, from: Date, to: Date): Promise<{ listings: Listing[]; needDescription: number }>;
+  updateListing(stationId: string, entryId: string, patch: ListingPatch): Promise<Listing>;
+  /** G2: the next entry after a moment. */
+  nextEntry(stationId: string, at: Date): Promise<{ entry: LogEntry; description: string | null; producer: string | null; colour: string | null } | null>;
+  /** L5: an item's log entries on now or still to come, on every station, soonest first. */
+  itemSchedule(itemId: string, limit: number): Promise<{ total: number; shortestSlotMs: number | null; entries: Array<{ entryId: string; stationId: string; startsAt: string; endsAt: string; localNote: string | null; repeatGroupId: string | null }> }>;
+  /** L1: how often a program airs on its maker's log over the next four weeks. */
+  cadence(stationId: string, programId: string): Promise<"weekly" | "nightly" | "weeknights" | null>;
   airingsByIds(ids: string[]): Promise<Map<string, AiringRef>>;
   /** What's on now and next per station, for the dial. */
   nowNext(stationIds: string[], at: Date): Promise<Map<string, { now: Airing | null; next: Airing | null }>>;
@@ -155,8 +186,15 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       endsAt: row.endsAt.toISOString(),
       live: row.kind === "live",
       carriedFrom: agreement ? (ctx.makers.get(agreement.makerStationId) ?? null) : null,
-      programId
+      programId,
+      episodeDescription: descriptionOf(row, ctx)
     };
+  }
+
+  /** G5: the airing's own description, else its item's (a carried item's is the maker's). */
+  function descriptionOf(row: Row, ctx: Awaited<ReturnType<typeof context>>): string | null {
+    const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
+    return row.episodeDescription ?? item?.episodeDescription ?? null;
   }
 
   function toEntry(row: Row, ctx: Awaited<ReturnType<typeof context>>): LogEntry {
@@ -175,8 +213,52 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       carriedFrom: airing.carriedFrom,
       carriageAgreementId: row.carriageAgreementId,
       repeatGroupId: row.repeatGroupId,
-      localNote: row.localNote
+      localNote: row.localNote,
+      episodeDescription: airing.episodeDescription ?? null,
+      endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null
     };
+  }
+
+  async function listingViews(rows: Row[]): Promise<Listing[]> {
+    const ctx = await context(rows);
+    const programIds = [...new Set(rows.map((r) => r.programId ?? (r.assetId ? ctx.items.get(r.assetId)?.programId : null)).filter((v): v is string => Boolean(v)))];
+    const programs = new Map(
+      (await Promise.all(programIds.map((id) => services.library.program(id).catch(() => null)))).filter((p): p is NonNullable<typeof p> => Boolean(p)).map((p) => [p.id, p])
+    );
+    return rows.map((row) => {
+      const entry = toEntry(row, ctx);
+      const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
+      const program = entry.programId ? programs.get(entry.programId) : undefined;
+      const own = descriptionOf(row, ctx);
+      const carried = Boolean(entry.carriedFrom);
+      const imported = item?.source === "link";
+      const episode = row.kind !== "live" && (item?.episodeNumber != null || Boolean(row.episodeTitle));
+      const status: Listing["status"] = carried
+        ? "from_the_maker"
+        : own
+          ? "complete"
+          : imported || episode
+            ? "needs_description"
+            : program?.description
+              ? "complete"
+              : "needs_description";
+      return {
+        entryId: row.id,
+        kind: row.kind,
+        code: row.code,
+        startsAt: entry.startsAt,
+        endsAt: entry.endsAt,
+        title: entry.title,
+        episodeTitle: entry.episodeTitle,
+        episodeDescription: own,
+        localNote: row.localNote,
+        carriedFrom: entry.carriedFrom,
+        itemId: row.assetId,
+        imported,
+        status,
+        program: program ? { ...program, captions: program.captions } : null
+      };
+    });
   }
 
   function gapsIn(rows: Row[], from: Date, to: Date): Gap[] {
@@ -311,6 +393,215 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
   }
 
   const service: LogService = {
+    async breakContents(stationId, slots) {
+      const result = new Map<string, BreakContent[]>();
+      if (!slots.length) return result;
+      const stored = slots.map((s) => s.id).filter((v): v is string => Boolean(v));
+      const entryIds = [...new Set(slots.map((s) => s.logEntryId).filter((v): v is string => Boolean(v)))];
+      const [placed, rotations, credits, entries] = await Promise.all([
+        services.spots.breakAirings(stored),
+        services.spots.rotations(stationId),
+        services.spots.creditsFor(stationId),
+        entryIds.length ? db.select().from(E).where(inArray(E.id, entryIds)) : Promise.resolve([] as Row[])
+      ]);
+      const ctx = await context(entries);
+      const main = new Set(rotations.main.spots.map((s) => s.spotId));
+      const backup = new Set(rotations.backup.spots.map((s) => s.spotId));
+      for (const slot of slots) {
+        const rows: BreakContent[] = [];
+        const airings = slot.id ? (placed.get(slot.id) ?? []) : [];
+        const entry = slot.logEntryId ? entries.find((e) => e.id === slot.logEntryId) : undefined;
+        const agreement = entry?.carriageAgreementId ? ctx.agreements.get(entry.carriageAgreementId) : undefined;
+        const maker = agreement ? ctx.makers.get(agreement.makerStationId) : undefined;
+        const makerName = maker?.callSign ?? maker?.name ?? "The maker";
+        let producerPlaced = 0;
+        for (const a of airings.filter((x) => x.carriageAgreementId)) {
+          producerPlaced += a.lengthSec * 1000;
+          rows.push({ id: a.airingId, kind: "producer", title: a.title, lengthMs: a.lengthSec * 1000, spotId: a.spotId, business: a.business, shortName: a.shortName, rotation: null, note: `${makerName}'s break time, barter` });
+        }
+        if (slot.producerShareMs > producerPlaced) {
+          rows.push({ id: `${slot.startsAt}:producer`, kind: "producer", title: `${makerName}'s break time`, lengthMs: slot.producerShareMs - producerPlaced, spotId: null, business: null, shortName: null, rotation: null, note: `${makerName}'s break time, barter` });
+        }
+        for (const a of airings.filter((x) => !x.carriageAgreementId)) {
+          const rotation = main.has(a.spotId) ? "main" : backup.has(a.spotId) ? "backup" : "main";
+          rows.push({ id: a.airingId, kind: "spot", title: a.title, lengthMs: a.lengthSec * 1000, spotId: a.spotId, business: a.business, shortName: a.shortName, rotation, note: rotation === "backup" ? "Backup rotation" : null });
+        }
+        // What playout adds when it airs the break: the credit, bumpers or the slate, the station ID last.
+        let left = Math.max(0, slot.lengthMs - rows.reduce((sum, r) => sum + r.lengthMs, 0));
+        const sidMs = Math.min(left, STATION_ID_MS);
+        left -= sidMs;
+        if (credits.length && left >= CREDIT_MS) {
+          rows.push({ id: `${slot.startsAt}:credit`, kind: "underwriting", title: credits.map((c) => c.business).join(", "), lengthMs: CREDIT_MS, spotId: null, business: null, shortName: null, rotation: null, note: "Made possible by" });
+          left -= CREDIT_MS;
+        }
+        if (left > 0) {
+          rows.push({ id: `${slot.startsAt}:open`, kind: slot.id ? "bumper" : "open", title: slot.id ? "Bumpers and station ID slate" : "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: slot.id ? null : "Filled from the rotation about 20 minutes before" });
+        }
+        if (sidMs > 0) rows.push({ id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null });
+        result.set(slot.startsAt, rows);
+      }
+      return result;
+    },
+
+    async repeats(stationId, from) {
+      const rows = await db
+        .select({ group: schema.repeatGroups, n: sql<number>`count(${E.id})::int` })
+        .from(schema.repeatGroups)
+        .innerJoin(E, and(eq(E.repeatGroupId, schema.repeatGroups.id), gte(E.startsAt, from)))
+        .where(eq(schema.repeatGroups.stationId, stationId))
+        .groupBy(schema.repeatGroups.id)
+        .orderBy(asc(schema.repeatGroups.startsOn));
+      return rows.map((r) => ({ id: r.group.id, day: r.group.startsOn, pattern: r.group.pattern, until: r.group.endsOn, entries: r.n }));
+    },
+
+    async removeRepeat(stationId, repeatId) {
+      const [group] = await db.select().from(schema.repeatGroups).where(and(eq(schema.repeatGroups.id, repeatId), eq(schema.repeatGroups.stationId, stationId)));
+      if (!group) throw notFound("That repeat");
+      const removed = await db
+        .delete(E)
+        .where(and(eq(E.repeatGroupId, repeatId), gt(E.startsAt, deps.clock.now())))
+        .returning({ id: E.id });
+      return removed.length;
+    },
+
+    async liveEntry(stationId, entryId) {
+      const [row] = await db.select().from(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId)));
+      if (!row) throw notFound("That block");
+      if (row.kind !== "live") throw new HttpError(409, "not_live", "That isn't a live block.");
+      return row;
+    },
+
+    async endEarly(stationId, entryId) {
+      const row = await service.liveEntry(stationId, entryId);
+      // To the second: the as-run log's live airing ends here too.
+      const at = new Date(Math.floor(deps.clock.now().getTime() / 1000) * 1000);
+      if (row.endedEarlyAt) throw new HttpError(409, "ended", "It has already ended.");
+      if (!(row.startsAt <= at && at < row.endsAt)) throw new HttpError(409, "not_on_air", "It can end early only while it's on air.");
+      const shift = row.endsAt.getTime() - at.getTime();
+      // The programs right after it move up, in order, until a gap, a live block, a carried
+      // program (its times are the carriage agreement's) or a break with spots already held.
+      const after = await db
+        .select()
+        .from(E)
+        .where(and(eq(E.stationId, stationId), gte(E.startsAt, row.endsAt), lt(E.startsAt, new Date(row.endsAt.getTime() + 24 * HOUR))))
+        .orderBy(asc(E.startsAt));
+      const heldBreaks = after.length
+        ? await db
+            .select({ id: B.id, logEntryId: B.logEntryId })
+            .from(B)
+            .where(inArray(B.logEntryId, after.map((e) => e.id)))
+        : [];
+      const filled = await services.spots.filledMsByBreak(heldBreaks.map((b) => b.id));
+      const held = new Set(heldBreaks.filter((b) => (filled.get(b.id) ?? 0) > 0 || false).map((b) => b.logEntryId));
+      const moving: Row[] = [];
+      let cursor = row.endsAt.getTime();
+      for (const e of after) {
+        if (e.startsAt.getTime() !== cursor) break;
+        if (e.kind !== "program" || e.carriageAgreementId || held.has(e.id)) break;
+        moving.push(e);
+        cursor = e.endsAt.getTime();
+      }
+      await db.transaction(async (tx) => {
+        await tx.update(E).set({ endsAt: at, endedEarlyAt: at }).where(eq(E.id, row.id));
+        for (const e of moving) {
+          await tx
+            .update(E)
+            .set({ startsAt: new Date(e.startsAt.getTime() - shift), endsAt: new Date(e.endsAt.getTime() - shift) })
+            .where(eq(E.id, e.id));
+        }
+        // Breaks stored for the moved programs with nothing placed go; they're made again at the new times.
+        const stale = heldBreaks.filter((b) => moving.some((m) => m.id === b.logEntryId)).map((b) => b.id);
+        if (stale.length) await tx.delete(B).where(inArray(B.id, stale));
+      });
+      return { entryId, endedAt: at.toISOString(), movedUp: moving.length };
+    },
+
+    async listings(stationId, from, to) {
+      if (to.getTime() - from.getTime() > 8 * 24 * HOUR) throw badRequest("Ask for 8 days at most.");
+      const rows = (await load([stationId], from, to)).filter((r) => r.kind !== "off_air" && r.code === "PGM" && r.startsAt >= from);
+      const listings = await listingViews(rows);
+      return { listings, needDescription: listings.filter((l) => l.status === "needs_description").length };
+    },
+
+    async updateListing(stationId, entryId, patch) {
+      const [row] = await db.select().from(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId)));
+      if (!row) throw notFound("That airing");
+      if (row.carriageAgreementId && (patch.episodeTitle !== undefined || patch.episodeDescription !== undefined)) {
+        const [view] = await listingViews([row]);
+        const from = view.carriedFrom?.callSign ?? view.carriedFrom?.name ?? "its maker";
+        throw new HttpError(409, "from_the_maker", `Listings for ${view.title} come from ${from}. Add a local note instead.`);
+      }
+      const set: Partial<typeof E.$inferInsert> = {};
+      if (patch.episodeTitle !== undefined) set.episodeTitle = patch.episodeTitle || null;
+      if (patch.episodeDescription !== undefined) set.episodeDescription = patch.episodeDescription || null;
+      if (patch.localNote !== undefined) set.localNote = patch.localNote || null;
+      const [updated] = Object.keys(set).length ? await db.update(E).set(set).where(eq(E.id, entryId)).returning() : [row];
+      return (await listingViews([updated]))[0];
+    },
+
+    async nextEntry(stationId, at) {
+      const [row] = await db
+        .select()
+        .from(E)
+        .where(and(eq(E.stationId, stationId), gt(E.startsAt, at)))
+        .orderBy(asc(E.startsAt))
+        .limit(1);
+      if (!row) return null;
+      const ctx = await context([row]);
+      const entry = toEntry(row, ctx);
+      const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
+      const program = entry.programId ? ctx.programs.get(entry.programId) : undefined;
+      const agreement = row.carriageAgreementId ? ctx.agreements.get(row.carriageAgreementId) : undefined;
+      const maker = agreement ? ctx.makers.get(agreement.makerStationId) : undefined;
+      const station = (await services.stations.idents([stationId])).get(stationId);
+      return {
+        entry,
+        description: entry.episodeTitle ?? program?.description ?? item?.episodeDescription ?? null,
+        producer: maker ? (maker.callSign ?? maker.name) : null,
+        colour: maker?.colour ?? station?.colour ?? null
+      };
+    },
+
+    async itemSchedule(itemId, limit) {
+      const now = deps.clock.now();
+      // On now, or still to come.
+      const where = and(eq(E.assetId, itemId), gt(E.endsAt, now));
+      const [[count], rows] = await Promise.all([
+        db.select({ n: sql<number>`count(*)::int`, shortest: sql<number | null>`min(extract(epoch from ${E.endsAt} - ${E.startsAt}) * 1000)::bigint` }).from(E).where(where),
+        db.select().from(E).where(where).orderBy(asc(E.startsAt)).limit(limit)
+      ]);
+      return {
+        total: count.n,
+        shortestSlotMs: count.shortest === null ? null : Number(count.shortest),
+        entries: rows.map((r) => ({ entryId: r.id, stationId: r.stationId, startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), localNote: r.localNote, repeatGroupId: r.repeatGroupId }))
+      };
+    },
+
+    async cadence(stationId, programId) {
+      const now = deps.clock.now();
+      const tz = await stationTz(stationId);
+      const episodes = await services.library.episodes(programId);
+      const itemIds = episodes.map((e) => e.id);
+      const rows = await db
+        .select({ startsAt: E.startsAt })
+        .from(E)
+        .where(
+          and(
+            eq(E.stationId, stationId),
+            gte(E.startsAt, now),
+            lt(E.startsAt, new Date(now.getTime() + 28 * 24 * HOUR)),
+            or(eq(E.programId, programId), itemIds.length ? inArray(E.assetId, itemIds) : sql`false`)
+          )
+        );
+      const days = [...new Set(rows.map((r) => localDate(r.startsAt, tz)))];
+      if (days.length < 2) return null;
+      const weekdays = new Set(days.map((d) => localWeekday(localDay(d, tz).from, tz)));
+      if (weekdays.size === 1) return "weekly";
+      if (days.length >= 20 && weekdays.size === 7) return "nightly";
+      if (days.length >= 12 && weekdays.size === 5 && !weekdays.has(0) && !weekdays.has(6)) return "weeknights";
+      return null;
+    },
+
     async airingsByIds(ids) {
       if (!ids.length) return new Map();
       const rows = await db.select().from(E).where(inArray(E.id, ids));
@@ -584,12 +875,16 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       if (to.getTime() - from.getTime() > 8 * 24 * HOUR) throw badRequest("Ask for a week at most.");
       const rows = await load([stationId], from, to);
       const ctx = await context(rows);
+      const breaks = await service.breaks(stationId, from, to);
+      const [contents, repeats] = await Promise.all([service.breakContents(stationId, breaks), service.repeats(stationId, from)]);
       return {
         from: from.toISOString(),
         to: to.toISOString(),
         entries: rows.map((r) => toEntry(r, ctx)),
-        breaks: await service.breaks(stationId, from, to),
-        gaps: gapsIn(rows, from, to)
+        // G1: each break's rows, in the order they air.
+        breaks: breaks.map((b) => ({ ...b, rows: (contents.get(b.startsAt) ?? []).map(breakRow) })),
+        gaps: gapsIn(rows, from, to),
+        repeats
       };
     },
 
@@ -800,3 +1095,11 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
   return service;
 }
 
+
+/** G1: a break's content as a row on the log. */
+function breakRow(c: BreakContent): BreakRow {
+  const code: BreakRow["code"] =
+    c.kind === "station_id" ? "SID" : c.kind === "bumper" ? "BMP" : c.kind === "underwriting" || c.kind === "sponsor" ? "UND" : c.kind === "open" ? "OPEN" : "SPT";
+  const whose: BreakRow["whose"] = c.kind === "producer" ? "producer" : c.rotation === "backup" ? "backup" : "station";
+  return { code, title: c.business && c.kind === "spot" ? `${c.shortName ?? c.business}: ${c.title}` : c.title, lengthMs: c.lengthMs, whose, note: c.note };
+}

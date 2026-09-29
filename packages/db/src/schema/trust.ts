@@ -1,7 +1,7 @@
 import { boolean, index, integer, text, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, millis } from "./columns.js";
 import { trust, rightsBasis } from "./namespaces.js";
-import { assets, stations } from "./broadcast.js";
+import { assets, contents, stations } from "./broadcast.js";
 import { users } from "./accounts.js";
 
 export const claimStatus = trust.enum("claim_status", [
@@ -86,5 +86,23 @@ export const policy = trust.table("policy", {
   upheldPerYearToPauseOffers: integer("upheld_per_year_to_pause_offers").notNull().default(3),
   answerDays: integer("answer_days").notNull().default(14),
   claimantReplyBusinessDays: integer("claimant_reply_business_days").notNull().default(10),
+  createdAt: createdAt()
+});
+
+/** B6 (added 2026-09-29): a file that backs an answer (the permission, the licence), stored by content ID. */
+export const claimAttachments = trust.table("claim_attachments", {
+  id: id(),
+  claimId: uuid("claim_id")
+    .notNull()
+    .references(() => claims.id),
+  contentId: text("content_id")
+    .notNull()
+    .references(() => contents.cid),
+  fileName: text("file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  bytes: integer("bytes").notNull(),
+  uploadedBy: uuid("uploaded_by")
+    .notNull()
+    .references(() => users.id),
   createdAt: createdAt()
 });

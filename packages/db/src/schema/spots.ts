@@ -43,6 +43,8 @@ export const advertisers = spots.table("advertisers", {
   receiptsEmail: text("receipts_email"),
   /** The house maker is a studio station; this marks Clear sponsoring as itself. */
   isHouse: boolean("is_house").notNull().default(false),
+  /** P25 (added 2026-09-29): the name in tight places ("Orange Street"). Null: the name. */
+  shortName: text("short_name"),
   closedAt: at("closed_at"),
   createdAt: createdAt()
 });
@@ -97,6 +99,11 @@ export const spotsTable = spots.table(
     /** Why it's paused: the daily cap resumes by itself at midnight; the others need the business. */
     pauseReason: text("pause_reason", { enum: ["daily_cap", "budget_spent", "balance"] }),
     pausedAt: at("paused_at"),
+    /** P6 (added 2026-09-29): the last pause and the resume after it, kept once it's back (the pause story). */
+    lastPauseReason: text("last_pause_reason", { enum: ["daily_cap", "budget_spent", "balance"] }),
+    lastPausedAt: at("last_paused_at"),
+    resumedAt: at("resumed_at"),
+    resumeReason: text("resume_reason", { enum: ["raised_budget", "added_money", "by_hand", "midnight"] }),
     rateKind: text("rate_kind", { enum: ["per_thousand", "per_airing"] }).notNull(),
     rateMicros: micros("rate_micros").notNull(),
     /** Per-thousand spots: the most one airing can cost, which caps its hold. */
@@ -362,6 +369,8 @@ export const productionOrders = spots.table("production_orders", {
   approvedAt: at("approved_at"),
   spotId: uuid("spot_id").references(() => spotsTable.id),
   tellMakerWhenListed: boolean("tell_maker_when_listed").notNull().default(false),
+  /** P24 (added 2026-09-29): the maker asked to be told when the spot is listed. */
+  makerAskedListedAt: at("maker_asked_listed_at"),
   createdAt: createdAt()
 });
 

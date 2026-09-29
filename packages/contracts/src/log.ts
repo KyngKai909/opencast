@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { Captions, Program } from "./library.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -17,9 +18,30 @@ export const LogEntry = z.object({
   carriedFrom: StationIdent.nullable(),
   carriageAgreementId: Id.nullable(),
   repeatGroupId: Id.nullable(),
-  localNote: z.string().nullable()
+  localNote: z.string().nullable(),
+  /** G5 (added 2026-09-29): this airing's own description, else its item's (up to 160 characters). */
+  episodeDescription: z.string().nullable().optional(),
+  /** G3 (added 2026-09-29): a live block ended early at this moment (`endsAt` is then the same). */
+  endedEarlyAt: Timestamp.nullable().optional()
 });
 export type LogEntry = z.infer<typeof LogEntry>;
+
+/**
+ * G1 (added 2026-09-29): one thing in a break, in the order it airs. Spots placed in the break
+ * (held, so they air), the maker's barter time, the station's credit and bumpers, and the station
+ * ID, which is always last. Before spots are placed (up to 20 minutes ahead) a break holds only
+ * the maker's time and the station's fill.
+ */
+export const BreakRow = z.object({
+  code: LogCode,
+  title: z.string(),
+  lengthMs: Millis,
+  /** Whose time: the station's, the maker's under barter, or the backup rotation's. */
+  whose: z.enum(["station", "producer", "backup"]),
+  /** "REEL's break time, barter". */
+  note: z.string().nullable()
+});
+export type BreakRow = z.infer<typeof BreakRow>;
 
 export const BreakSlot = z.object({
   id: Id.nullable(),
@@ -31,7 +53,9 @@ export const BreakSlot = z.object({
   /** Break time the producer fills under barter; the station can't sell it. */
   producerShareMs: Millis,
   filledMs: Millis,
-  openMs: Millis
+  openMs: Millis,
+  /** G1 (added 2026-09-29): what's in it, in order. */
+  rows: z.array(BreakRow).optional()
 });
 
 export const Gap = z.object({ startsAt: Timestamp, endsAt: Timestamp });
@@ -42,7 +66,15 @@ export const ProgramLog = z.object({
   entries: z.array(LogEntry),
   breaks: z.array(BreakSlot),
   /** Dead air: time with nothing on the log. */
-  gaps: z.array(Gap)
+  gaps: z.array(Gap),
+  /**
+   * G7 (added 2026-09-29): what "Repeat this day" set up and still has entries from the start of
+   * the window on: the day copied, how, until when, and how many entries are still to come.
+   * `removeRepeat` takes them off.
+   */
+  repeats: z
+    .array(z.object({ id: Id, day: DateOnly, pattern: z.enum(["once", "daily", "weekly"]), until: DateOnly.nullable(), entries: z.number().int() }))
+    .optional()
 });
 
 export const DeadAirStatus = z.object({
@@ -55,6 +87,36 @@ export const DeadAirStatus = z.object({
 });
 
 const StationParams = z.object({ stationId: Id });
+const EntryParams = z.object({ stationId: Id, entryId: Id });
+
+/** G5: how an airing's listing stands. */
+export const ListingStatus = z.enum(["complete", "needs_description", "from_the_maker"]);
+export type ListingStatus = z.infer<typeof ListingStatus>;
+
+/**
+ * G5 (added 2026-09-29): an airing with its listing, as the viewer's frames draw it: the episode
+ * title and description (the airing's own, else its item's), the local note, and its status.
+ * A carried program's listing comes from the maker (`from_the_maker`): only the local note is the
+ * carrier's.
+ */
+export const Listing = z.object({
+  entryId: Id,
+  kind: z.enum(["program", "live", "off_air"]),
+  code: LogCode,
+  startsAt: Timestamp,
+  endsAt: Timestamp,
+  title: z.string(),
+  episodeTitle: z.string().nullable(),
+  episodeDescription: z.string().nullable(),
+  localNote: z.string().nullable(),
+  carriedFrom: StationIdent.nullable(),
+  itemId: Id.nullable(),
+  /** Imported from a link. */
+  imported: z.boolean(),
+  status: ListingStatus,
+  program: Program.extend({ captions: Captions.nullable().optional() }).nullable()
+});
+export type Listing = z.infer<typeof Listing>;
 
 const EntryInput = z.object({
   kind: z.enum(["program", "live", "off_air"]),
@@ -141,6 +203,66 @@ export const logApi = {
     summary: "Gaps in the next 24 hours and warnings sent",
     params: StationParams,
     response: DeadAirStatus
+  }),
+
+  // ---- Added 2026-09-29: G3, G5, G7 ----
+
+  /** G7: undo "Repeat this day". */
+  removeRepeat: endpoint({
+    method: "DELETE",
+    path: "/stations/:stationId/log/repeats/:repeatId",
+    auth: "user",
+    summary: "G7: take a repeat's entries off the log from now on (owner, operator). What already aired stays in the as-run log.",
+    params: z.object({ stationId: Id, repeatId: Id }),
+    response: z.object({ removed: z.number().int() })
+  }),
+  /** G3: end a live block now. */
+  endEarly: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/:entryId/end-early",
+    auth: "user",
+    summary:
+      "G3: end a live block now (owner, operator, or its host). The block ends here, the programs after it move up, and playout hands back to the log at once; the as-run log records the live airing to this moment. Only while it's on air: 409 `not_on_air`, `ended`; 409 `not_live` for anything else.",
+    params: EntryParams,
+    response: z.object({ entryId: Id, endedAt: Timestamp, movedUp: z.number().int() })
+  }),
+  /** G3: a live block's state. */
+  getLiveBlock: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/log/:entryId/live",
+    auth: "user",
+    summary: "G3: a live block's state: ended early or not, and whether its signal is in (owner, operator, its host)",
+    params: EntryParams,
+    response: z.object({
+      entryId: Id,
+      endedEarlyAt: Timestamp.nullable(),
+      startsAt: Timestamp.optional(),
+      endsAt: Timestamp.optional(),
+      /** While it's on air: `receiving`, or `standby` (the stand-by slate, waiting for the signal). Null otherwise. */
+      signal: z.enum(["receiving", "standby"]).nullable().optional()
+    })
+  }),
+  /** G5: listings per airing. */
+  listListings: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/listings",
+    auth: "user",
+    summary: "G5: every program and live airing in a window (at most 8 days) with its listing and status (owner, operator)",
+    params: StationParams,
+    query: z.object({ from: Timestamp, to: Timestamp }),
+    response: z.object({ listings: z.array(Listing), needDescription: z.number().int() })
+  }),
+  updateListing: endpoint({
+    method: "PATCH",
+    path: "/stations/:stationId/listings/:entryId",
+    auth: "user",
+    summary:
+      "G5: an airing's episode title and description, or a carried program's local note (owner, operator). A carried program's title and description are the maker's: 409 `from_the_maker`.",
+    params: EntryParams,
+    body: z
+      .object({ episodeTitle: z.string().max(200).nullable(), episodeDescription: z.string().max(160).nullable(), localNote: z.string().max(160).nullable() })
+      .partial(),
+    response: Listing
   })
 };
 
@@ -150,15 +272,41 @@ export const SignOnCheck = z.object({
   passed: z.boolean(),
   /** Blockers stop sign-on; warnings don't. */
   blocking: z.boolean(),
-  detail: z.string().nullable()
+  detail: z.string().nullable(),
+  /** G6 (added 2026-09-29): where to watch what this check is about (the output's playback, once there is one). */
+  watchUrl: z.string().nullable().optional()
 });
 
 export const PlayoutStatus = z.object({
   onAir: z.boolean(),
   now: z.object({ title: z.string(), code: LogCode, startedAt: Timestamp, itemId: Id.nullable() }).nullable(),
   lastError: z.string().nullable(),
-  output: z.object({ livepeerEnabled: z.boolean(), playbackUrl: z.string().nullable() }),
-  nextBreakAt: Timestamp.nullable()
+  output: z.object({
+    livepeerEnabled: z.boolean(),
+    playbackUrl: z.string().nullable(),
+    /** G2 (added 2026-09-29): not measured yet, always null. */
+    bitrateKbps: z.number().int().nullable().optional()
+  }),
+  nextBreakAt: Timestamp.nullable(),
+  /** G2 (added 2026-09-29): when it last signed on ("On air since 6:00 pm"); null off air. */
+  onAirSince: Timestamp.nullable().optional(),
+  /** G2 (added 2026-09-29): the next thing on the log, for the preview monitor. */
+  next: z
+    .object({
+      title: z.string(),
+      /** The line under the title: the episode title, else the program's description. */
+      detail: z.string().nullable(),
+      code: LogCode,
+      startsAt: Timestamp,
+      /** A carried program's maker ("next up from REEL"). */
+      producer: z.string().nullable(),
+      /** The card's colour: the maker's (carried) or the station's. */
+      colour: z.string().nullable(),
+      /** No stored stills yet: always null. */
+      pictureUrl: z.string().nullable()
+    })
+    .nullable()
+    .optional()
 });
 
 export const AsRunRow = z.object({

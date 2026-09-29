@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, Platform, Timestamp } from "./common.js";
+import { Id, Platform, StationIdent, Timestamp } from "./common.js";
 
 export const Heartbeat = z.object({
   stationId: Id,
@@ -29,7 +29,35 @@ export const AudienceReport = z.object({
   }),
   stayedToTheEnd: z.array(z.object({ programId: Id, title: z.string(), percent: z.number() })),
   /** Viewers on YouTube and Twitch relays: shown apart, never billed. */
-  translators: z.array(z.object({ translatorId: Id, name: z.string(), viewers: z.number().int() }))
+  translators: z.array(z.object({ translatorId: Id, name: z.string(), viewers: z.number().int() })),
+  // ---- Added 2026-09-29 ----
+  /**
+   * U1: by program, one row per airing in the window that has started, newest first: when it
+   * aired (its start on the log), where it came from, the average and peak tuned in over it (to
+   * now, while it's on), and the percent still there at its last minute against its first (null
+   * while it's on, or with no one at its first minute).
+   */
+  byProgram: z
+    .array(
+      z.object({
+        key: z.string(),
+        programId: Id.nullable(),
+        title: z.string(),
+        airedAt: Timestamp.nullable(),
+        airings: z.number().int(),
+        source: z.enum(["library", "carried", "live"]),
+        carriedFrom: StationIdent.nullable(),
+        averageTunedIn: z.number().int(),
+        peakTunedIn: z.number().int(),
+        stayedToTheEnd: z.number().nullable(),
+        onNow: z.boolean()
+      })
+    )
+    .optional(),
+  /** U3: the same window a week earlier, minute by minute, past now too. */
+  comparison: z.array(z.object({ minute: Timestamp, tunedIn: z.number().int() })).optional(),
+  /** U3: every break in the window, for the shaded bands. */
+  breaks: z.array(z.object({ startsAt: Timestamp, endsAt: Timestamp })).optional()
 });
 
 export const audienceApi = {

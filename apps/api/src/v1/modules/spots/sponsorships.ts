@@ -6,18 +6,21 @@ import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { checkCreditText } from "@opencast/domain";
 import type { Sponsorship, SponsorshipSetting } from "@opencast/contracts";
+import { miles } from "../network/service.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 
 export interface SponsorshipsPart {
   offerSponsorship(businessId: string, input: { stationId: string; programId: string | null; monthlyMicros: number; creditText: string; startsOn: string }): Promise<Sponsorship>;
   businessSponsorships(businessId: string): Promise<Sponsorship[]>;
-  stationSponsorships(stationId: string): Promise<{ sponsorships: Sponsorship[]; settings: SponsorshipSetting[] }>;
+  stationSponsorships(stationId: string): Promise<{ sponsorships: Sponsorship[]; settings: SponsorshipSetting[]; members: { creditName: string; members: number; named: number } | null }>;
   stationOfSponsorship(sponsorshipId: string): Promise<{ stationId: string; businessId: string }>;
   decideSponsorship(sponsorshipId: string, userId: string, decision: { decision: "approve" } | { decision: "decline"; reason: "not_right_fit" | "full" | "amount" }): Promise<Sponsorship>;
   endSponsorship(sponsorshipId: string): Promise<Sponsorship>;
   setSponsorshipSettings(stationId: string, settings: Array<{ programId: string | null; minMonthlyMicros: number; maxSponsors: number; closed: boolean }>): Promise<SponsorshipSetting[]>;
   activeSponsorCount(stationId: string): Promise<number>;
+  /** E2: the approved sponsors by name, with their monthly amounts. */
+  activeSponsors(stationId: string): Promise<Array<{ name: string; monthlyMicros: number }>>;
   /** Credits for the current month, for the underwriting slate. */
   creditsFor(stationId: string): Promise<Array<{ business: string; creditText: string; programId: string | null }>>;
   /** Holds each approved sponsorship's month at its start, pays last month to the station, lapses the unfunded. */
@@ -101,6 +104,45 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
     }
   }
 
+  /** P22: each sponsor as the station sees it: category, city, miles from the studio, what else it sponsors. */
+  async function sponsorProfiles(stationId: string, rows: Array<typeof SS.$inferSelect>) {
+    const result = new Map<string, { category: string; city: string | null; miles: number | null; elsewhere: string[] }>();
+    if (!rows.length) return result;
+    const businessIds = [...new Set(rows.map((r) => r.advertiserId))];
+    const [businesses, locations, others, profile] = await Promise.all([
+      db.select().from(schema.advertisers).where(inArray(schema.advertisers.id, businessIds)),
+      db.select().from(schema.advertiserLocations).where(inArray(schema.advertiserLocations.advertiserId, businessIds)).orderBy(asc(schema.advertiserLocations.createdAt)),
+      db.select().from(SS).where(and(inArray(SS.advertiserId, businessIds), eq(SS.status, "approved"))),
+      services.stations.profiles([stationId]).then((m) => m.get(stationId))
+    ]);
+    const elsewhereRows = others.filter((o) => o.stationId !== stationId);
+    const [idents, titles] = await Promise.all([
+      services.stations.idents(elsewhereRows.map((o) => o.stationId)),
+      services.library.titles({ itemIds: [], programIds: elsewhereRows.map((o) => o.programId).filter((v): v is string => Boolean(v)) })
+    ]);
+    for (const r of rows) {
+      const business = businesses.find((b) => b.id === r.advertiserId);
+      if (!business) continue;
+      const places = locations.filter((l) => l.advertiserId === business.id);
+      const online = business.customersWhere === "online";
+      const distances = profile?.location && !online ? places.map((l) => miles(profile.location!, { lat: l.latitude, lng: l.longitude })) : [];
+      result.set(r.id, {
+        category: business.category,
+        city: online ? null : (places[0]?.city ?? null),
+        miles: distances.length ? Math.round(Math.min(...distances) * 10) / 10 : null,
+        elsewhere: elsewhereRows
+          .filter((o) => o.advertiserId === business.id)
+          .flatMap((o) => {
+            const where = idents.get(o.stationId);
+            if (!where) return [];
+            const name = where.callSign ?? where.name;
+            return [o.programId ? `${titles.programs.get(o.programId) ?? "A program"} on ${name}` : name];
+          })
+      });
+    }
+    return result;
+  }
+
   const part: SponsorshipsPart = {
     async offerSponsorship(businessId, input) {
       const check = checkCreditText(input.creditText);
@@ -156,14 +198,23 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
       const counts = new Map<string, number>();
       for (const r of rows) if (r.status === "approved") counts.set(r.programId ?? "station", (counts.get(r.programId ?? "station") ?? 0) + 1);
       const station = settings.find((s) => s.programId === null);
+      // L1: each program's format in words ("Weekly, live").
+      const formats = new Map(await Promise.all(programs.map(async (p) => [p.id, formatWords(await services.library.format(p.id), p.live)] as const)));
       const settingViews: SponsorshipSetting[] = [
-        { programId: null, title: "The whole station", minMonthlyMicros: station?.minMonthlyMicros ?? 0, maxSponsors: station?.maxSponsors ?? 0, closed: station?.closed ?? false, sponsors: counts.get("station") ?? 0, sponsoredThrough: null },
+        { programId: null, title: "The whole station", minMonthlyMicros: station?.minMonthlyMicros ?? 0, maxSponsors: station?.maxSponsors ?? 0, closed: station?.closed ?? false, sponsors: counts.get("station") ?? 0, sponsoredThrough: null, format: null },
         ...programs.map((p) => {
           const s = settings.find((x) => x.programId === p.id);
-          return { programId: p.id, title: p.title, minMonthlyMicros: s?.minMonthlyMicros ?? 0, maxSponsors: s?.maxSponsors ?? 0, closed: s?.closed ?? false, sponsors: counts.get(p.id) ?? 0, sponsoredThrough: null };
+          return { programId: p.id, title: p.title, minMonthlyMicros: s?.minMonthlyMicros ?? 0, maxSponsors: s?.maxSponsors ?? 0, closed: s?.closed ?? false, sponsors: counts.get(p.id) ?? 0, sponsoredThrough: null, format: formats.get(p.id) ?? null };
         })
       ];
-      return { sponsorships: await views(rows), settings: settingViews };
+      const [list, credits, profiles] = await Promise.all([views(rows), services.ledger.memberCredits(stationId), sponsorProfiles(stationId, rows)]);
+      const ident = (await services.stations.idents([stationId])).get(stationId);
+      return {
+        sponsorships: list.map((v) => ({ ...v, ...(profiles.has(v.id) ? { profile: profiles.get(v.id) } : {}) })),
+        settings: settingViews,
+        // P17: the name read in the members' credit, how many members, how many asked to be named.
+        members: ident ? { creditName: `members of ${ident.name}`, members: credits.members, named: credits.named.length } : null
+      };
     },
 
     async stationOfSponsorship(sponsorshipId) {
@@ -209,6 +260,12 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
         if (settings.length) await tx.insert(SET).values(settings.map((s) => ({ stationId, ...s })));
       });
       return (await part.stationSponsorships(stationId)).settings;
+    },
+
+    async activeSponsors(stationId) {
+      const rows = await db.select().from(SS).where(and(eq(SS.stationId, stationId), eq(SS.status, "approved"))).orderBy(asc(SS.createdAt));
+      const names = await services.spots.businessNames(rows.map((r) => r.advertiserId));
+      return rows.map((r) => ({ name: names.get(r.advertiserId) ?? "", monthlyMicros: r.monthlyMicros }));
     },
 
     async activeSponsorCount(stationId) {
@@ -266,4 +323,12 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
     }
   };
   return part;
+}
+
+/** L1: a program's format in words: "Weekly, live", "Nightly", "Series", "One-off". */
+function formatWords(format: { kind: "series" | "one_off"; cadence: "weekly" | "nightly" | "weeknights" | null }, live: boolean): string {
+  const parts = [format.cadence ? { weekly: "Weekly", nightly: "Nightly", weeknights: "Weeknights" }[format.cadence] : null, live ? "live" : null].filter((v): v is string => Boolean(v));
+  if (!parts.length) return format.kind === "series" ? "Series" : "One-off";
+  const words = parts.join(", ");
+  return words[0].toUpperCase() + words.slice(1);
 }

@@ -1,4 +1,4 @@
-import { spotsApi as api } from "@opencast/contracts";
+import { SPOT_CATEGORIES, spotsApi as api } from "@opencast/contracts";
 import { checkCreditText } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
@@ -104,9 +104,20 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await accounts.requireStation(user, params.stationId, [...staff]);
     const now = deps.clock.now();
     const breaks = await services.log.breaks(params.stationId, now, new Date(now.getTime() + query.hours * 3_600_000));
+    // G1: what's in each break.
+    const contents = await services.log.breakContents(params.stationId, breaks);
     return {
       totalOpenMs: breaks.reduce((s, b) => s + b.openMs, 0),
-      breaks: breaks.map((b) => ({ breakStartsAt: b.startsAt, context: b.context, lengthMs: b.lengthMs, openMs: b.openMs, producerShareMs: b.producerShareMs }))
+      breaks: breaks.map((b) => ({
+        breakStartsAt: b.startsAt,
+        context: b.context,
+        lengthMs: b.lengthMs,
+        openMs: b.openMs,
+        producerShareMs: b.producerShareMs,
+        breakId: b.id,
+        origin: b.origin,
+        contents: contents.get(b.startsAt) ?? []
+      }))
     };
   });
 
@@ -149,6 +160,15 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await accounts.requireBusiness(user, params.businessId, [...everyone]);
     return spots.businessOrders(params.businessId);
   });
+  // P24: the maker asks to be told when the spot it made is listed.
+  r.handle(api.tellMeWhenListed, async ({ user, params }) => {
+    const { makerStationId } = await spots.partiesOfOrder(params.orderId);
+    await accounts.requireStation(user, makerStationId, [...staff]);
+    return spots.tellMeWhenListed(params.orderId);
+  });
+  // S17: the spot categories, in one list.
+  r.handle(api.listSpotCategories, () => SPOT_CATEGORIES.map((c) => ({ ...c })));
+
   r.handle(api.listMakerOrders, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return spots.makerOrders(params.stationId);

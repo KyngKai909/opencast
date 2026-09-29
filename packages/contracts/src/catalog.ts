@@ -21,6 +21,38 @@ export const Terms = z.object({
   radioBandAllowed: z.boolean()
 });
 
+/**
+ * C3 (added 2026-09-29): cash plus barter's own fee and split, which the single cash price can't
+ * hold. Null: cash plus barter uses the cash price and the barter split above.
+ */
+export const CashPlusBarter = z.object({
+  priceMicros: Micros.positive(),
+  unit: z.enum(["per_airing", "per_hour"]),
+  makerMsPerHour: Millis
+});
+export type CashPlusBarter = z.infer<typeof CashPlusBarter>;
+
+/**
+ * C1 (added 2026-09-29): where an offer fits the browsing station's next 24 hours: a dead-air gap
+ * ("11:40 pm gap", exact when an episode fills it within five minutes), or a slot the station
+ * fills with library repeats (filled automatically, or a "Repeat this day").
+ */
+export const FitSlot = z.object({
+  reason: z.enum(["dead_air", "library_repeats", "weak_slot"]),
+  label: z.string(),
+  title: z.string(),
+  startsAt: Timestamp.nullable(),
+  endsAt: Timestamp.nullable(),
+  exact: z.boolean()
+});
+export type FitSlot = z.infer<typeof FitSlot>;
+
+/** Terms as offerProgram and updateOffer take them (C3 fields added 2026-09-29). */
+const TermsBody = Terms.extend({
+  cashPlusBarter: CashPlusBarter.nullable().optional(),
+  barterFill: z.enum(["spots", "credit_only"]).optional()
+});
+
 export const Offer = Terms.extend({
   id: Id,
   program: z.object({
@@ -30,7 +62,20 @@ export const Offer = Terms.extend({
     category: z.string().nullable(),
     live: z.boolean(),
     episodeCount: z.number().int(),
-    rightsNote: z.string().nullable()
+    rightsNote: z.string().nullable(),
+    /** L1 (added 2026-09-29): see `Program.format`. */
+    format: z
+      .object({
+        kind: z.enum(["series", "one_off"]),
+        cadence: z.enum(["weekly", "nightly", "weeknights"]).nullable(),
+        episodeLengthMs: Millis.nullable(),
+        bands: z.array(Band)
+      })
+      .optional(),
+    /** L1 (added 2026-09-29): the title card's colour (the maker's). */
+    colour: z.string().nullable().optional(),
+    /** L1 (added 2026-09-29). */
+    advisory: z.enum(["none", "language", "mature"]).optional()
   }),
   maker: StationIdent,
   makerKind: z.enum(["station", "studio", "catalog"]),
@@ -38,7 +83,20 @@ export const Offer = Terms.extend({
   carriers: z.number().int(),
   /** For the browsing station: how the program fits its open schedule. */
   fitsYourSchedule: z.boolean().nullable(),
-  previews: z.number().int()
+  previews: z.number().int(),
+  // ---- Added 2026-09-29 ----
+  /** C1: with `forStation`, where it fits that station's next 24 hours. */
+  fit: z.array(FitSlot).optional(),
+  /** C3: break time in each hour of the program, from the maker's break rule. */
+  breakMsPerHour: Millis.optional(),
+  cashPlusBarter: CashPlusBarter.nullable().optional(),
+  barterFill: z.enum(["spots", "credit_only"]).optional(),
+  /** C8: the deal a one-tap carry uses: the first one offered. */
+  defaultTerm: CarriageTerm.optional(),
+  /** C9: who underwrites it (an approved sponsor of the program), for catalog programs. */
+  underwriter: z.string().nullable().optional(),
+  /** C2: when it was first offered, for "Newest". */
+  offeredAt: Timestamp.optional()
 });
 export type Offer = z.infer<typeof Offer>;
 
@@ -64,7 +122,16 @@ export const CarriageRequest = z.object({
   /** The carrier's spot cap per hour, shown to the maker. */
   carrierSpotMsPerHour: Millis,
   createdAt: Timestamp,
-  decidedAt: Timestamp.nullable()
+  decidedAt: Timestamp.nullable(),
+  /** C4 (added 2026-09-29): the agreement, once approved (at once when the offer needs no approval). */
+  agreementId: Id.nullable().optional(),
+  /**
+   * C7 (added 2026-09-29): the asking station as the maker sees it: its description, members
+   * (active pledges), how many programs it carries now, and what it blocks.
+   */
+  carrierProfile: z
+    .object({ description: z.string().nullable(), members: z.number().int().nullable(), carriesPrograms: z.number().int(), blockedCategories: z.array(z.string()) })
+    .optional()
 });
 
 export const Agreement = z.object({
@@ -80,7 +147,11 @@ export const Agreement = z.object({
   endNoticeGivenAt: Timestamp.nullable(),
   endsAt: Timestamp.nullable(),
   airingsThisMonth: z.number().int(),
-  paidThisMonthMicros: Micros
+  paidThisMonthMicros: Micros,
+  /** C6 (added 2026-09-29): when the carrier airs it (the request's slots). */
+  slots: z.array(Slot).optional(),
+  /** C6 (added 2026-09-29): the offer it came from. */
+  offerId: Id.optional()
 });
 
 const StationParams = z.object({ stationId: Id });
@@ -97,7 +168,13 @@ export const catalogApi = {
       band: Band.optional(),
       term: CarriageTerm.optional(),
       fitsSchedule: z.coerce.boolean().optional(),
-      q: z.string().optional()
+      q: z.string().optional(),
+      // ---- C2 (added 2026-09-29) ----
+      /** One maker's offers (a station or studio), withdrawn ones too. */
+      maker: Id.optional(),
+      makerKind: z.enum(["station", "studio", "catalog"]).optional(),
+      /** Only offers with an episode that fits the dead-air gap starting then (needs `forStation`). */
+      gap: Timestamp.optional()
     }),
     response: z.array(Offer)
   }),
@@ -115,10 +192,23 @@ export const catalogApi = {
           durationMs: Millis.nullable(),
           breakPointsMs: z.array(Millis),
           /** A low-bitrate HLS preview, once rendered (added in 2026-09). */
-          previewUrl: z.string().nullable().optional()
+          previewUrl: z.string().nullable().optional(),
+          // ---- C5 (added 2026-09-29) ----
+          episodeNumber: z.number().int().nullable().optional(),
+          /** From the as-run log, anywhere. */
+          firstAiredAt: Timestamp.nullable().optional(),
+          firstAiredOn: StationIdent.nullable().optional(),
+          captions: z.enum(["none", "generated", "uploaded"]).optional()
         })
       ),
-      carriedBy: z.array(z.object({ station: StationIdent, since: Timestamp }))
+      carriedBy: z.array(
+        z.object({
+          station: StationIdent,
+          since: Timestamp,
+          /** C6 (added 2026-09-29): when this carrier airs it. */
+          slots: z.array(Slot).optional()
+        })
+      )
     })
   }),
   countPreview: endpoint({
@@ -135,7 +225,7 @@ export const catalogApi = {
     auth: "user",
     summary: "Offer a program for carriage. Refused if any episode was imported from a link.",
     params: z.object({ programId: Id }),
-    body: Terms,
+    body: TermsBody,
     response: Offer,
     status: 201
   }),
@@ -145,7 +235,7 @@ export const catalogApi = {
     auth: "user",
     summary: "Change terms (new carriers only) or withdraw",
     params: z.object({ offerId: Id }),
-    body: Terms.partial().extend({ status: z.enum(["offered", "withdrawn"]).optional() }),
+    body: TermsBody.partial().extend({ status: z.enum(["offered", "withdrawn"]).optional() }),
     response: Offer
   }),
   requestCarriage: endpoint({
@@ -208,6 +298,17 @@ export const catalogApi = {
     params: z.object({ agreementId: Id }),
     body: z.object({ from: DateOnly, weeks: z.number().int().min(1).max(12).default(4), replaceExisting: z.boolean().default(false) }),
     response: z.object({ placed: z.number().int(), replaced: z.number().int(), blockedByLimit: z.number().int() })
+  }),
+
+  // ---- Added 2026-09-29: C4 ----
+
+  withdrawRequest: endpoint({
+    method: "POST",
+    path: "/carriage/requests/:requestId/withdraw",
+    auth: "user",
+    summary: "C4: withdraw a request the maker hasn't answered (the carrier's owner or operator). 409 `decided` once it's approved or declined.",
+    params: z.object({ requestId: Id }),
+    response: CarriageRequest
   })
 };
 

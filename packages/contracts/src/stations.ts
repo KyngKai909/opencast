@@ -27,7 +27,9 @@ export const Airing = z.object({
   live: z.boolean(),
   /** "Carried from REEL 24.1". */
   carriedFrom: StationIdent.nullable(),
-  programId: Id.nullable()
+  programId: Id.nullable(),
+  /** G5 (added 2026-09-29): the airing's own description, else its episode's ("Tonight: a steamboat, a haunted barn…"). */
+  episodeDescription: z.string().nullable().optional()
 });
 export type Airing = z.infer<typeof Airing>;
 
@@ -150,7 +152,22 @@ export const LiveSource = z.object({
   server: z.string().nullable(),
   streamKeyPreview: z.string().nullable(),
   signal: z.enum(["not_connected", "receiving"]),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  /** S14 (added 2026-09-29): signal quality ("1080p, 4.5 Mbps"). Not measured yet: null. */
+  quality: z.string().nullable().optional(),
+  /**
+   * S14 (added 2026-09-29): a private preview of what the source is sending (the rehearsal only
+   * the team sees): the source's own playback, for sources that send through Livepeer. Null for
+   * sources without one.
+   */
+  previewUrl: z.string().nullable().optional(),
+  /**
+   * B3 (added 2026-09-29): where a browser source publishes (WHIP, WebRTC): POST the SDP offer to
+   * `whipUrl` (the token is in it; send it as the bearer too). Browser sources added while the
+   * server sends live sources through Livepeer have one; null otherwise. Hosts get it too: they go
+   * live from the browser.
+   */
+  ingest: z.object({ whipUrl: z.string(), token: z.string() }).nullable().optional()
 });
 
 export const AvailableChannels = z.object({
@@ -171,6 +188,33 @@ export const MarketLookup = z.object({
 export type MarketLookup = z.infer<typeof MarketLookup>;
 
 const StationParams = z.object({ stationId: Id });
+
+/** A4 (added 2026-09-29): every live program and who hosts it. */
+export const HostsByProgram = z.object({
+  programs: z.array(
+    z.object({
+      programId: Id,
+      title: z.string(),
+      hosts: z.array(z.object({ userId: Id, displayName: z.string().nullable() }))
+    })
+  )
+});
+export type HostsByProgram = z.infer<typeof HostsByProgram>;
+
+/**
+ * S15 (added 2026-09-29): the lower third on a live block: a speaker from the program's list, free
+ * text (`speakerId` null), or hidden. Readable by a second device.
+ */
+export const LowerThird = z.object({
+  entryId: Id,
+  hidden: z.boolean(),
+  speakerId: Id.nullable(),
+  name: z.string().max(80),
+  title: z.string().max(120).nullable(),
+  /** When it was last set; null for the default (the first speaker) before anyone has. */
+  updatedAt: Timestamp.nullable().optional()
+});
+export type LowerThird = z.infer<typeof LowerThird>;
 
 export const stationsApi = {
   listMarkets: endpoint({ method: "GET", path: "/markets", auth: "public", summary: "Every market", response: z.array(Market) }),
@@ -444,6 +488,34 @@ export const stationsApi = {
     params: z.object({ programId: Id }),
     body: z.array(z.object({ name: z.string().min(1).max(80), title: z.string().max(120).nullable() })),
     response: z.array(z.object({ id: Id, name: z.string(), title: z.string().nullable(), position: z.number().int() }))
+  }),
+
+  // ---- Added 2026-09-29: A4, S15 ----
+
+  listHosts: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/hosts",
+    auth: "user",
+    summary: "A4: every live program and who hosts it (owner, operator; a host gets only their own programs)",
+    params: StationParams,
+    response: HostsByProgram
+  }),
+  getLowerThird: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/log/:entryId/lower-third",
+    auth: "user",
+    summary: "S15: the lower third on a live block (owner, operator, its host). Before anyone sets it: the first speaker, showing.",
+    params: z.object({ stationId: Id, entryId: Id }),
+    response: LowerThird
+  }),
+  setLowerThird: endpoint({
+    method: "PUT",
+    path: "/stations/:stationId/log/:entryId/lower-third",
+    auth: "user",
+    summary: "S15: show a speaker (their name and title are taken from the list), free text, or hide it (owner, operator, its host). 409 `not_live`.",
+    params: z.object({ stationId: Id, entryId: Id }),
+    body: z.object({ hidden: z.boolean(), speakerId: Id.nullable(), name: z.string().max(80), title: z.string().max(120).nullable() }),
+    response: LowerThird
   })
 };
 

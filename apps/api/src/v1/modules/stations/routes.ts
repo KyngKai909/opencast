@@ -1,7 +1,7 @@
 import { stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
-import { badRequest, notFound } from "../../errors.js";
+import { badRequest, HttpError, notFound } from "../../errors.js";
 import { clientIp, isPrivateAddress } from "../../geo.js";
 import type { StationProfile } from "./service.js";
 
@@ -272,6 +272,28 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     if ((await services.library.stationOfProgram(params.programId)) !== params.stationId) throw notFound("That program");
     return { userIds: await stations.setHosts(params.stationId, params.programId, body.userIds) };
   });
+  // A4: who hosts each live program. Hosts see their own.
+  r.handle(api.listHosts, async ({ user, params }) => {
+    const role = await accounts.requireStation(user, params.stationId, ["owner", "operator", "host"]);
+    return { programs: await stations.hosts(params.stationId, role === "host" ? user.id : undefined) };
+  });
+
+  // S15: the lower third on a live block, for owners, operators and the block's hosts.
+  async function liveBlockFor(user: Parameters<typeof accounts.requireStation>[0], stationId: string, entryId: string) {
+    const role = await accounts.requireStation(user, stationId, ["owner", "operator", "host"]);
+    const entry = await log.liveEntry(stationId, entryId);
+    if (role === "host" && !(await stations.isHost(user.id, stationId, entry.programId))) throw new HttpError(403, "not_your_block", "Hosts run their own live blocks.");
+    return entry;
+  }
+  r.handle(api.getLowerThird, async ({ user, params }) => {
+    const entry = await liveBlockFor(user, params.stationId, params.entryId);
+    return stations.lowerThird(params.stationId, entry.id, entry.programId);
+  });
+  r.handle(api.setLowerThird, async ({ user, params, body }) => {
+    const entry = await liveBlockFor(user, params.stationId, params.entryId);
+    return stations.setLowerThird(params.stationId, entry.id, entry.programId, user.id, body);
+  });
+
   r.handle(api.getSpeakers, async ({ user, params }) => {
     const stationId = await services.library.stationOfProgram(params.programId);
     const role = await accounts.requireStation(user, stationId, ["owner", "operator", "host"]);

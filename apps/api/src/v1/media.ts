@@ -11,6 +11,8 @@ export interface Probe {
   mediaKind: "video" | "audio";
   width: number | null;
   height: number | null;
+  /** Channels in the first audio stream (1 mono, 2 stereo); null without audio. */
+  audioChannels?: number | null;
 }
 
 export interface Prepared {
@@ -44,11 +46,18 @@ function run(command: string, args: string[]): Promise<{ code: number; stdout: s
 export function ffmpegPipeline(storageRoot: string): MediaPipeline {
   return {
     async probe(file) {
-      const [durationSec, mediaKind, size] = await Promise.all([
+      const [durationSec, mediaKind, size, audio] = await Promise.all([
         probeDurationSec(file),
         probeMediaKind(file),
-        run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", file])
+        run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "json", file]),
+        run("ffprobe", ["-v", "error", "-select_streams", "a:0", "-show_entries", "stream=channels", "-of", "json", file])
       ]);
+      let audioChannels: number | null = null;
+      try {
+        audioChannels = JSON.parse(audio.stdout).streams?.[0]?.channels ?? null;
+      } catch {
+        // No audio stream.
+      }
       let width: number | null = null;
       let height: number | null = null;
       try {
@@ -58,7 +67,7 @@ export function ffmpegPipeline(storageRoot: string): MediaPipeline {
       } catch {
         // No video stream.
       }
-      return { durationMs: durationSec != null ? Math.round(durationSec * 1000) : null, mediaKind, width, height };
+      return { durationMs: durationSec != null ? Math.round(durationSec * 1000) : null, mediaKind, width, height, audioChannels };
     },
 
     async loudness(file) {

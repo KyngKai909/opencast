@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
@@ -16,14 +16,17 @@ export interface SignOnCheck {
   passed: boolean;
   blocking: boolean;
   detail: string | null;
+  watchUrl?: string | null;
 }
 
 export interface PlayoutStatusView {
   onAir: boolean;
   now: { title: string; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startedAt: string; itemId: string | null } | null;
   lastError: string | null;
-  output: { livepeerEnabled: boolean; playbackUrl: string | null };
+  output: { livepeerEnabled: boolean; playbackUrl: string | null; bitrateKbps?: number | null };
   nextBreakAt: string | null;
+  onAirSince?: string | null;
+  next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null } | null;
 }
 
 export interface AsRunView {
@@ -60,6 +63,14 @@ export interface PlayoutService {
   nextSignOn(stationIds: string[]): Promise<Map<string, Date>>;
   /** Cancels a station's scheduled sign-ons (a creator stopped it before it signed on). */
   cancelSignOns(stationId: string): Promise<void>;
+  /** L5: where an item aired, newest first, from the as-run log (any station). */
+  airedItem(itemId: string, limit: number): Promise<Array<{ stationId: string; startedAt: Date; reason: AsRunView["reason"]; carriageAgreementId: string | null }>>;
+  /** C5: when each item first aired anywhere, and where. */
+  firstAired(itemIds: string[]): Promise<Map<string, { stationId: string; startedAt: Date }>>;
+  /** G3: a live block ended early: playout hands back to the log now. */
+  endLive(stationId: string, userId: string): Promise<void>;
+  /** G2: when each station last signed on (while on air). */
+  onAirSince(stationIds: string[]): Promise<Map<string, Date>>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
@@ -182,7 +193,9 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           label: "Output ready",
           passed: Boolean(out?.ingestUrl) || !hasLivepeerApiKey(),
           blocking: false,
-          detail: out?.lastError ?? (hasLivepeerApiKey() ? "Set up on sign-on" : "Local output only")
+          detail: out?.lastError ?? (hasLivepeerApiKey() ? "Set up on sign-on" : "Local output only"),
+          // G6: the output's playback, once there is one (Livepeer's is made at the first sign-on).
+          watchUrl: out?.playbackUrl ?? null
         }
       ];
       return { ready: checks.every((c) => c.passed || !c.blocking), checks };
@@ -201,7 +214,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           .insert(P)
           .values({ stationId, onAir: true, updatedAt: deps.clock.now() })
           .onConflictDoUpdate({ target: P.stationId, set: { onAir: true, lastError: null, updatedAt: deps.clock.now() } });
-        await tx.insert(schema.commands).values({ stationId, action: "sign_on" });
+        await tx.insert(schema.commands).values({ stationId, action: "sign_on", createdAt: deps.clock.now() });
         return result;
       });
       deps.bus.emit("station.signed_on", { stationId, first });
@@ -243,14 +256,29 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const titles = current ? (await services.log.airingsByIds([current.id])).get(current.id) : undefined;
       const [nextBreak] = (await services.log.breaks(stationId, now, new Date(now.getTime() + 6 * HOUR))).filter((b) => Date.parse(b.startsAt) > now.getTime());
       const output = out.get(stationId);
+      const onAir = state?.onAir ?? false;
+      // G2: since when, and what's next for the preview monitor.
+      const [since, next] = await Promise.all([onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()), services.log.nextEntry(stationId, now)]);
       return {
-        onAir: state?.onAir ?? false,
+        onAirSince: since.get(stationId)?.toISOString() ?? null,
+        next: next
+          ? {
+              title: next.entry.title,
+              detail: next.description,
+              code: next.entry.code,
+              startsAt: next.entry.startsAt,
+              producer: next.producer,
+              colour: next.colour,
+              pictureUrl: null
+            }
+          : null,
+        onAir,
         now:
           state?.onAir && current
             ? { title: titles?.title ?? "On air", code: current.code, startedAt: current.startsAt.toISOString(), itemId: current.assetId }
             : null,
         lastError: state?.lastError ?? output?.lastError ?? null,
-        output: { livepeerEnabled: output?.enabled ?? false, playbackUrl: output?.playbackUrl ?? null },
+        output: { livepeerEnabled: output?.enabled ?? false, playbackUrl: output?.playbackUrl ?? null, bitrateKbps: null },
         nextBreakAt: nextBreak?.startsAt ?? null
       };
     },
@@ -330,6 +358,40 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .update(schema.schedules)
         .set({ enabled: false })
         .where(and(eq(schema.schedules.stationId, stationId), eq(schema.schedules.enabled, true), gte(schema.schedules.startAt, deps.clock.now())));
+    },
+
+    async airedItem(itemId, limit) {
+      const rows = await db
+        .select({ stationId: schema.asRun.stationId, startedAt: schema.asRun.startedAt, reason: schema.asRun.reason, carriageAgreementId: schema.asRun.carriageAgreementId })
+        .from(schema.asRun)
+        .where(and(eq(schema.asRun.assetId, itemId), eq(schema.asRun.code, "PGM")))
+        .orderBy(desc(schema.asRun.startedAt))
+        .limit(limit);
+      return rows;
+    },
+
+    async firstAired(itemIds) {
+      if (!itemIds.length) return new Map();
+      const rows = await db
+        .selectDistinctOn([schema.asRun.assetId], { itemId: schema.asRun.assetId, stationId: schema.asRun.stationId, startedAt: schema.asRun.startedAt })
+        .from(schema.asRun)
+        .where(inArray(schema.asRun.assetId, itemIds))
+        .orderBy(schema.asRun.assetId, asc(schema.asRun.startedAt));
+      return new Map(rows.map((r) => [r.itemId!, { stationId: r.stationId, startedAt: r.startedAt }]));
+    },
+
+    async endLive(stationId, userId) {
+      await db.insert(schema.commands).values({ stationId, action: "end_live", issuedBy: userId });
+    },
+
+    async onAirSince(stationIds) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: schema.commands.stationId, at: sql<Date>`max(${schema.commands.createdAt})` })
+        .from(schema.commands)
+        .where(and(inArray(schema.commands.stationId, stationIds), eq(schema.commands.action, "sign_on")))
+        .groupBy(schema.commands.stationId);
+      return new Map(rows.map((r) => [r.stationId, new Date(r.at)]));
     },
 
     async carriedAirings(agreementIds, from, to) {

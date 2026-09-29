@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { formatChannelNumber, parseChannelNumber, type Band } from "@opencast/domain";
-import { RecipeBreakRule, type Creator, type CreatorWork, type HeldEarnings, type ListedSource, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
+import { RecipeBreakRule, type ClaimPage, type Creator, type CreatorWork, type HeldEarnings, type ListedSource, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, notFound, refused } from "../../errors.js";
@@ -98,6 +98,8 @@ export interface DeskPart {
   claimantOf(stationId: string): Promise<{ userId: string; kind: "claim" | "stop" } | null>;
   /** The escrow contract said something about a claim: approved and waiting, cancelled, or paid. */
   onEscrowEvent(stationId: string, event: import("../../chain/index.js").EscrowEvent): Promise<void>;
+  /** N10: the creator's claim page, by their permission link's token. */
+  claimPage(token: string): Promise<ClaimPage>;
   listedSources(marketId?: string): Promise<ListedSource[]>;
   addListedSource(input: { marketId: string; band: Band; channel: string; callSign: string; name: string; description?: string; streamUrl: string; embedTerms: "allowed" | "unclear"; calendarUrl?: string }): Promise<ListedSource>;
   syncListedSource(sourceId: string): Promise<ListedSource>;
@@ -974,6 +976,56 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         });
         if (event.reason === "stop") await services.playout.signOff(stationId, true);
       }
+    },
+
+    async claimPage(token) {
+      const [request] = await db.select().from(PQ).where(eq(PQ.linkToken, token));
+      const missing = () => notFound("That claim link");
+      if (!request) throw missing();
+      const creator = await creatorRow(request.creatorId);
+      if (!creator.stationId) throw missing();
+      const stationId = creator.stationId;
+      const [profiles, yes, works, presets, balances, handovers] = await Promise.all([
+        services.stations.profiles([stationId]),
+        latestYes(creator.id),
+        db.select().from(W).where(eq(W.creatorId, creator.id)).orderBy(asc(W.createdAt)),
+        services.accounts.presetCounts([stationId]),
+        services.ledger.escrowBalances([stationId]),
+        db
+          .select()
+          .from(HO)
+          .where(and(eq(HO.creatorId, creator.id), isNull(HO.cancelledAt)))
+          .orderBy(desc(HO.createdAt))
+          .limit(1)
+      ]);
+      const profile = profiles.get(stationId);
+      if (!profile) throw missing();
+      // The works the yes covers (else every work not left out), in the creator's words.
+      const covered = yes ? new Set((await db.select().from(PW).where(eq(PW.permissionRecordId, yes.record.id))).map((w) => w.creatorWorkId)) : null;
+      const mine = works.filter((w) => (covered ? covered.has(w.id) : !w.leftOutReason));
+      const plural = (noun: string) => (/s$/.test(noun) ? noun : `${noun}s`);
+      const words = [
+        ...new Set(mine.map((w) => (w.groupLabel ? w.groupLabel.toLowerCase() : w.noun ? plural(w.noun.toLowerCase()) : null)).filter((v): v is string => Boolean(v)))
+      ];
+      const phrase = words.length ? (words.length === 1 ? words[0] : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`) : "work";
+      const balance = balances.get(stationId) ?? { owed: 0, held: 0 };
+      const handover = handovers[0];
+      return {
+        station: profile.ident,
+        personName: creator.personName ?? creator.displayName,
+        saidYesAt: yes?.record.answeredAt.toISOString() ?? null,
+        works: `a ${profile.ident.band === "radio" ? "radio station" : "station"} of your ${phrase}`,
+        worksShort: `your ${words[0] ?? "work"}`,
+        sourcePlatform: creator.sourcePlatform,
+        onAirSince: profile.firstSignedOnAt?.toISOString() ?? null,
+        presetCount: presets.get(stationId) ?? 0,
+        heldMicros: balance.held + balance.owed,
+        escrowContract: deps.config.escrowContractAddress,
+        escrowStationId: profile.escrowId,
+        handover: handover
+          ? { handoverId: handover.id, kind: handover.kind, status: handoverStatus(handover), payableAfter: handover.payableAfter?.toISOString() ?? null }
+          : null
+      };
     },
 
     async listedSources(marketId) {

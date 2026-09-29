@@ -12,6 +12,14 @@ import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 import { miles } from "../network/service.js";
 import { localDate, localDay } from "../../lib/time.js";
+
+/** P23: a business's colour for its still while there's no picture: one of these, by its id. All hold 4.5:1 on white. */
+const STILL_COLOURS = ["#9A5412", "#33507A", "#2F6B3F", "#7A3366", "#5B4A99", "#8A3B2E", "#1F6570", "#6B5A1E"];
+function colourFor(id: string): string {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return STILL_COLOURS[hash % STILL_COLOURS.length];
+}
 import { createSponsorships, type SponsorshipsPart } from "./sponsorships.js";
 import { createOrders, type OrdersPart } from "./orders.js";
 import { createCodes, type CodesPart } from "./codes.js";
@@ -26,7 +34,7 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
   /** Pauses spots the balance no longer covers for a day; a top-up (`toppedUp`) also brings paused ones back. */
   reviewBalance(businessId: string, toppedUp?: boolean): Promise<void>;
   typicalAiringCost(businessId: string): Promise<number | null>;
-  heldAirings(stationId: string, from: Date, to: Date): Promise<Array<{ airingId: string; holdId: string; scheduledAt: Date }>>;
+  heldAirings(stationId: string, from: Date, to: Date): Promise<Array<{ airingId: string; holdId: string; scheduledAt: Date; breakId: string }>>;
   businessesAiredOn(stationId: string, from: Date, to: Date): Promise<number>;
   businessOfSpot(spotId: string): Promise<string>;
   /** What the ledger needs to warn a business: its thresholds, auto top-up, and when it started. */
@@ -102,6 +110,7 @@ export type BusinessPatch = {
   receiptsEmail: string | null;
   legalName: string | null;
   ein: string | null;
+  shortName: string | null;
 };
 
 export interface LocationInput {
@@ -130,6 +139,9 @@ export interface BreakAiring {
   airingId: string;
   spotId: string;
   title: string;
+  /** The business, and its short name (P25). */
+  business: string;
+  shortName: string;
   lengthSec: number;
   /** The spot's file by content ID (the worker cache has it), or a legacy path. */
   contentId: string | null;
@@ -194,7 +206,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       receiptsEmail: row.receiptsEmail,
       legalName: row.legalName,
       einLast4: row.einLast4,
-      createdAt: row.createdAt.toISOString()
+      createdAt: row.createdAt.toISOString(),
+      shortName: row.shortName ?? row.name
     };
   }
 
@@ -395,20 +408,61 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
   async function pauseFor(row: typeof SP.$inferSelect, reason: "daily_cap" | "budget_spent" | "balance") {
     if (row.status !== "listed") return;
-    await setStatus(row.id, { status: "paused", pauseReason: reason, pausedAt: deps.clock.now() });
+    const now = deps.clock.now();
+    // P6: the story is kept past the resume.
+    await setStatus(row.id, { status: "paused", pauseReason: reason, pausedAt: now, lastPauseReason: reason, lastPausedAt: now, resumedAt: null, resumeReason: null });
     const stationIds = [...((await rotationMembership([row.id])).get(row.id) ?? [])];
     deps.bus.emit("spot.paused", { spotId: row.id, businessId: row.advertiserId, reason, stationIds });
   }
 
-  async function resumeRow(row: typeof SP.$inferSelect) {
-    await setStatus(row.id, { status: "listed", pauseReason: null, pausedAt: null });
+  async function resumeRow(row: typeof SP.$inferSelect, reason: "raised_budget" | "added_money" | "by_hand") {
+    const now = deps.clock.now();
+    await setStatus(row.id, { status: "listed", pauseReason: null, pausedAt: null, resumedAt: now, resumeReason: reason });
     const stationIds = [...((await rotationMembership([row.id])).get(row.id) ?? [])];
     // Stations are told it's back; it's never put back in a rotation by itself.
     await db
       .update(schema.rotationSpots)
-      .set({ removedAt: deps.clock.now() })
+      .set({ removedAt: now })
       .where(and(eq(schema.rotationSpots.spotId, row.id), isNull(schema.rotationSpots.removedAt)));
     deps.bus.emit("spot.resumed", { spotId: row.id, businessId: row.advertiserId, stationIds });
+  }
+
+  /**
+   * P6: why each paused spot paused, as this station sees it, and why a resumed one is back (when
+   * the station had it in its rotation before). Daily-cap pauses tell no one.
+   */
+  async function pauseStories(stationId: string, rows: Array<typeof SP.$inferSelect>) {
+    const stories = new Map<string, { pause: MarketSpot["pause"]; back: MarketSpot["back"] }>();
+    const now = deps.clock.now();
+    const tz = await services.stations.timezoneOf(stationId);
+    for (const row of rows) {
+      if (row.status === "paused" && row.pausedAt && (row.pauseReason === "budget_spent" || row.pauseReason === "balance")) {
+        const endOfDay = localDay(localDate(row.pausedAt, tz), tz).to;
+        const [held] = await db
+          .select({ ms: sql<number>`coalesce(sum(${SP.lengthSec}), 0)::int * 1000` })
+          .from(AI)
+          .innerJoin(SP, eq(SP.id, AI.spotId))
+          .where(and(eq(AI.spotId, row.id), eq(AI.stationId, stationId), gte(AI.scheduledAt, row.pausedAt), lt(AI.scheduledAt, endOfDay)));
+        // What the backup rotation aired here since.
+        const backups = (await services.playout.asRun(stationId, row.pausedAt, now)).filter((r) => r.reason === "backup_rotation" && r.airingId);
+        const spotIds = backups.length
+          ? (await db.select({ spotId: AI.spotId }).from(AI).where(inArray(AI.id, backups.map((b) => b.airingId!)))).map((a) => a.spotId)
+          : [];
+        const owners = spotIds.length ? await db.select({ advertiserId: SP.advertiserId }).from(SP).where(inArray(SP.id, [...new Set(spotIds)])) : [];
+        const names = await service.businessNames(owners.map((o) => o.advertiserId));
+        stories.set(row.id, { pause: { reason: row.pauseReason, pausedAt: row.pausedAt.toISOString(), heldTonightMs: held?.ms ?? 0, filledBy: [...new Set(names.values())] }, back: null });
+      } else if (row.status === "listed" && row.resumedAt && (row.resumeReason === "raised_budget" || row.resumeReason === "added_money")) {
+        // Back, and this station had it in its rotation when it came back.
+        const [had] = await db
+          .select({ id: schema.rotationSpots.id })
+          .from(schema.rotationSpots)
+          .innerJoin(schema.rotations, eq(schema.rotations.id, schema.rotationSpots.rotationId))
+          .where(and(eq(schema.rotationSpots.spotId, row.id), eq(schema.rotations.stationId, stationId), eq(schema.rotationSpots.removedAt, row.resumedAt)))
+          .limit(1);
+        if (had) stories.set(row.id, { pause: null, back: { reason: row.resumeReason, backAt: row.resumedAt.toISOString() } });
+      }
+    }
+    return stories;
   }
 
   const parts = {
@@ -476,7 +530,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         const needed = oneDayOfBudgetMicros({ totalBudgetMicros: row.totalBudgetMicros, dailyCapMicros: row.dailyCapMicros, startsOn: row.startsOn, endsOn: row.endsOn });
         if (row.status === "listed" && availableMicros < needed) await pauseFor(row, "balance");
         // Only a top-up brings a spot back: money returning from a hold isn't one, and would flap it.
-        else if (toppedUp && row.status === "paused" && row.pauseReason === "balance" && availableMicros >= needed) await resumeRow(row);
+        else if (toppedUp && row.status === "paused" && row.pauseReason === "balance" && availableMicros >= needed) await resumeRow(row, "added_money");
       }
     },
 
@@ -491,7 +545,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
     async heldAirings(stationId, from, to) {
       const rows = await db
-        .select({ airingId: AI.id, holdId: AI.holdId, scheduledAt: AI.scheduledAt })
+        .select({ airingId: AI.id, holdId: AI.holdId, scheduledAt: AI.scheduledAt, breakId: AI.breakId })
         .from(AI)
         .where(and(eq(AI.stationId, stationId), gte(AI.scheduledAt, from), lt(AI.scheduledAt, to)));
       const open = await services.ledger.openAmount(rows.map((r) => r.holdId));
@@ -555,7 +609,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       await businessRow(businessId);
       await db.transaction(async (tx) => {
         const patch: Partial<typeof AD.$inferInsert> = {};
-        for (const key of ["name", "category", "about", "website", "logoUrl", "customersWhere", "warnDays", "receiptsEmail", "legalName"] as const) {
+        for (const key of ["name", "category", "about", "website", "logoUrl", "customersWhere", "warnDays", "receiptsEmail", "legalName", "shortName"] as const) {
           if (input[key] !== undefined) (patch as Record<string, unknown>)[key] = input[key];
         }
         if (input.autoTopUp) {
@@ -648,7 +702,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const updated = await spotRow(spotId);
       if (updated.status === "paused" && updated.pauseReason === "budget_spent") {
         const spent = (await services.ledger.spotSpend([spotId], new Date(0))).get(spotId)?.used ?? 0;
-        if (spent < updated.totalBudgetMicros) await resumeRow(updated);
+        if (spent < updated.totalBudgetMicros) await resumeRow(updated, "raised_budget");
       }
       return service.spot(spotId);
     },
@@ -738,7 +792,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (availableMicros < needed) throw refused("insufficient_balance", "Add money first: your balance has to cover a day of its budget.");
       const spent = (await services.ledger.spotSpend([spotId], new Date(0))).get(spotId)?.used ?? 0;
       if (spent >= row.totalBudgetMicros) throw refused("budget_spent", "Its budget is spent. Raise the budget to put it back.");
-      await resumeRow(row);
+      await resumeRow(row, row.pauseReason === "balance" ? "added_money" : "by_hand");
       return service.spot(spotId);
     },
 
@@ -783,6 +837,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const result: MarketSpot[] = [];
       const month = deps.clock.now().toISOString().slice(0, 7);
       const customers = await service.customersByStation(stationId, month);
+      const stories = await pauseStories(stationId, listed);
       for (const row of listed) {
         const matched = (await match(row, (await spotViews([row]))[0].targeting)).find((m) => m.stationId === stationId);
         if (!matched?.included) continue;
@@ -793,9 +848,29 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         const [location] = await db.select().from(schema.advertiserLocations).where(eq(schema.advertiserLocations.advertiserId, row.advertiserId)).limit(1);
         const code = (await db.select().from(schema.codes).where(eq(schema.codes.spotId, row.id)))[0];
         const runway = business.autoTopUp ? null : (await services.ledger.runwayDays([business.id])).get(business.id);
+        const [file] = await db.select({ contentId: schema.spotFiles.contentId, location: schema.spotFiles.location }).from(schema.spotFiles).where(and(eq(schema.spotFiles.spotId, row.id), eq(schema.spotFiles.current, true)));
+        const story = stories.get(row.id);
+        const back = story?.back && !inMain.has(row.id) ? story.back : null;
         result.push({
-          spot: { id: row.id, title: row.title, lengthSec: row.lengthSec, category: row.category, onScreen: code ? `A code for ${code.offer}` : null },
-          business: { id: business.id, name: business.name, category: business.category, city: business.customersWhere === "online" ? null : (location?.city ?? null), online: business.customersWhere === "online" },
+          spot: {
+            id: row.id,
+            title: row.title,
+            lengthSec: row.lengthSec,
+            category: row.category,
+            onScreen: code ? `A code for ${code.offer}` : null,
+            // P23: the file itself, and the still's colour and line.
+            preview: { url: file?.contentId ? await services.library.content.url(file.contentId) : (file?.location ?? null), colour: colourFor(business.id), line: code ? code.offer : row.title }
+          },
+          business: {
+            id: business.id,
+            name: business.name,
+            category: business.category,
+            city: business.customersWhere === "online" ? null : (location?.city ?? null),
+            online: business.customersWhere === "online",
+            shortName: business.shortName ?? business.name
+          },
+          pause: story?.pause ?? null,
+          back,
           miles: matched.miles,
           rate: { kind: row.rateKind, micros: row.rateMicros },
           upToPerDay: row.dailyCapMicros && row.rateKind === "per_airing" ? Math.floor(row.dailyCapMicros / row.rateMicros) : null,
@@ -804,7 +879,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           runway: business.autoTopUp ? { kind: "tops_up" } : { kind: "days", days: runway ?? 30 },
           inRotation: inMain.has(row.id) ? "main" : inBackup.has(row.id) ? "backup" : null,
           customersFromThisStation: customers.get(row.id) ?? 0,
-          state: row.status === "paused" ? "paused" : inMain.has(row.id) ? "in_rotation" : "in_the_market"
+          state: row.status === "paused" ? "paused" : inMain.has(row.id) ? "in_rotation" : back ? "its_back" : "in_the_market"
         });
       }
       return result;
@@ -923,9 +998,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const result = new Map<string, BreakAiring[]>();
       if (!breakIds.length) return result;
       const rows = await db
-        .select({ airing: AI, spot: SP, file: schema.spotFiles, code: schema.codes })
+        .select({ airing: AI, spot: SP, file: schema.spotFiles, code: schema.codes, business: { name: schema.advertisers.name, shortName: schema.advertisers.shortName } })
         .from(AI)
         .innerJoin(SP, eq(SP.id, AI.spotId))
+        .innerJoin(schema.advertisers, eq(schema.advertisers.id, SP.advertiserId))
         .leftJoin(schema.spotFiles, and(eq(schema.spotFiles.spotId, AI.spotId), eq(schema.spotFiles.current, true)))
         .leftJoin(schema.codes, eq(schema.codes.spotId, AI.spotId))
         .where(inArray(AI.breakId, breakIds))
@@ -936,6 +1012,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           airingId: r.airing.id,
           spotId: r.spot.id,
           title: r.spot.title,
+          business: r.business.name,
+          shortName: r.business.shortName ?? r.business.name,
           lengthSec: r.spot.lengthSec,
           contentId: r.file?.contentId ?? null,
           location: r.file?.location ?? null,
@@ -1045,7 +1123,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const rows = await db.select().from(SP).where(and(eq(SP.status, "paused"), eq(SP.pauseReason, "daily_cap")));
       for (const row of rows) {
         // Resumes by itself at midnight; no one is told.
-        await setStatus(row.id, { status: "listed", pauseReason: null, pausedAt: null });
+        await setStatus(row.id, { status: "listed", pauseReason: null, pausedAt: null, resumedAt: deps.clock.now(), resumeReason: "midnight" });
       }
       return rows.length;
     }

@@ -90,6 +90,8 @@ export class StationRunner {
   private feedTimer?: NodeJS.Timeout;
   /** Segments that air in full, once aired (so a quick exit never replays them). */
   private aired = new Set<string>();
+  /** The current segment was stopped on purpose (a cued break, a live block ended early), not lost. */
+  private interrupted = false;
 
   constructor(
     private ctx: ModuleContext,
@@ -130,7 +132,10 @@ export class StationRunner {
   replan(interruptCurrent = false) {
     this.planVersion++;
     this.planUntil = 0;
-    if (interruptCurrent) this.producer?.process.kill("SIGTERM");
+    if (interruptCurrent && this.producer) {
+      this.interrupted = true;
+      this.producer.process.kill("SIGTERM");
+    }
   }
 
   private current?: Segment;
@@ -431,6 +436,7 @@ export class StationRunner {
           this.options.onSignalLost?.();
         }
       }
+      this.interrupted = false;
       await this.setNow(seg, startedAt, null, standingBy);
       const slateTargets = this.slateMuxers.map((m) => m.stdin);
       const targets = [this.muxer?.stdin, ...(seg.inBreak ? [] : slateTargets)];
@@ -460,7 +466,7 @@ export class StationRunner {
       clearInterval(watch);
       const endedAt = this.ctx.deps.clock.now();
       const airedMs = endedAt.getTime() - startedAt.getTime();
-      if (input.live && airedMs < durationMs - 2_000 && !this.stopped) {
+      if (input.live && airedMs < durationMs - 2_000 && !this.stopped && !this.interrupted) {
         // The live source dropped before the block ended.
         signalLostFor = seg.key;
         this.log("live signal lost: standing by");

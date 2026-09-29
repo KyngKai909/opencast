@@ -40,6 +40,12 @@ export const offers = catalog.table(
     ...termsColumns(),
     approval: text("approval", { enum: ["any_station", "i_approve"] }).notNull().default("i_approve"),
     radioBandAllowed: boolean("radio_band_allowed").notNull().default(true),
+    /** C3 (added 2026-09-29): cash plus barter's own price and split; null: the cash columns above. */
+    cpbPriceMicros: micros("cpb_price_micros"),
+    cpbPriceUnit: text("cpb_price_unit", { enum: ["per_airing", "per_hour"] }),
+    cpbMakerMsPerHour: millis("cpb_maker_ms_per_hour"),
+    /** C3: what the maker's barter time carries: its spots, or only its underwriting credit. */
+    barterFill: text("barter_fill", { enum: ["spots", "credit_only"] }).notNull().default("spots"),
     status: text("status", { enum: ["offered", "withdrawn"] }).notNull().default("offered"),
     createdAt: createdAt(),
     updatedAt: at("updated_at").notNull().defaultNow()

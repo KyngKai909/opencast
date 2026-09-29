@@ -148,6 +148,8 @@ export const invites = accounts.table(
     expiresAt: at("expires_at").notNull(),
     acceptedAt: at("accepted_at"),
     acceptedBy: uuid("accepted_by").references(() => users.id),
+    /** A4 (added 2026-09-29): the live programs a host invite hosts, assigned when it's accepted. */
+    programIds: jsonb("program_ids").$type<string[]>(),
     createdAt: createdAt()
   },
   (t) => [

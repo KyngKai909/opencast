@@ -11,6 +11,11 @@ export function catalogRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return catalog.browse(query);
   });
   r.handle(api.getOffer, ({ params }) => catalog.offer(params.offerId));
+  // C4: the carrier withdraws a request that hasn't been answered.
+  r.handle(api.withdrawRequest, async ({ user, params }) => {
+    await accounts.requireStation(user, await catalog.carrierOfRequest(params.requestId), [...staff]);
+    return catalog.withdraw(params.requestId);
+  });
   r.handle(api.countPreview, async ({ params }) => ({ previews: await catalog.countPreview(params.offerId) }));
   r.handle(api.offerProgram, async ({ user, params, body }) => {
     await accounts.requireStation(user, await library.stationOfProgram(params.programId), [...staff]);
