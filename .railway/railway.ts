@@ -59,6 +59,10 @@ export default defineRailway((ctx) => {
     NODE_ENV: "production",
     DATABASE_URL: Postgres.env.DATABASE_URL,
     REDIS_URL: Redis.env.REDIS_URL,
+    // Full public addresses for files, receipts and webhooks (the API) and the HLS fallback (the
+    // worker serves it), so apps on another host (Vercel) can use them.
+    API_PUBLIC_URL: origin("api"),
+    HLS_PUBLIC_URL: origin("worker"),
     APP_ORIGIN: production ? secret() : webOrigin("web"),
     PAYMENTS_PROVIDER: production ? secret() : "fake",
     STRIPE_SECRET_KEY: secret(),
