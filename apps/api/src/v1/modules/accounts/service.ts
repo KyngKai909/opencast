@@ -366,6 +366,13 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         db.select().from(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.userId, userId)),
         service.clearLink(userId)
       ]);
+      // Opencast admins run every station Opencast runs (network, claimable, listed) as its owner
+      // (stationRole), so master control lists those too, after their own.
+      if (user.isAdmin) {
+        const own = new Set(stationRows.map((r) => r.stationId));
+        const run = await services.stations.idsOfKinds([...OPENCAST_RUN_KINDS] as Array<"claimable" | "catalog" | "listed">);
+        for (const id of run) if (!own.has(id)) stationRows.push({ stationId: id, role: "owner" } as (typeof stationRows)[number]);
+      }
       const [idents, businesses, markets] = await Promise.all([
         stationIdents(stationRows.map((r) => r.stationId)),
         services.spots.businessNames(businessRows.map((r) => r.advertiserId)),

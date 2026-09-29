@@ -165,3 +165,18 @@ describe("Opencast admins by email (OPENCAST_ADMIN_EMAILS)", () => {
     }
   });
 });
+
+describe("the stations an Opencast admin runs", () => {
+  it("lists Opencast's own stations as the admin's, as owner, after their own; nobody else gets them", async () => {
+    const m = await market(h, "admin-run");
+    const net = await stationFixture(h, { callSign: "NETW", kind: "catalog", marketId: m.id, tenths: 612 });
+    const admin = await h.signIn("Dee", { admin: true });
+    const viewer = await h.signIn("Val");
+    const theirs = (await admin.get("/v1/me").expect(200)).body.memberships.filter((x: { kind: string }) => x.kind === "station");
+    expect(theirs).toContainEqual(expect.objectContaining({ role: "owner", station: expect.objectContaining({ id: net.id }) }));
+    await admin.get(`/v1/stations/${net.id}/off-air-hours`).expect(200);
+    const others = (await viewer.get("/v1/me").expect(200)).body.memberships;
+    expect(others.some((x: { station?: { id: string } }) => x.station?.id === net.id)).toBe(false);
+    await viewer.get(`/v1/stations/${net.id}/off-air-hours`).expect(404);
+  });
+});

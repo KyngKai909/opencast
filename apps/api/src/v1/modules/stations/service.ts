@@ -75,6 +75,8 @@ export interface StationProfile {
 export interface StationsService {
   idents(ids: string[]): Promise<Map<string, StationIdent>>;
   kindOf(stationId: string): Promise<StationKind | null>;
+  /** Every station of these kinds (for Opencast admins: the stations Opencast runs). */
+  idsOfKinds(kinds: StationKind[]): Promise<string[]>;
   removeHost(stationId: string, userId: string): Promise<void>;
   /** Signed on at least once and not signed off for good. Nothing is public before that. */
   isPublic(stationId: string): Promise<boolean>;
@@ -368,6 +370,11 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async kindOf(stationId) {
       const [row] = await db.select({ kind: S.kind }).from(S).where(eq(S.id, stationId));
       return row?.kind ?? null;
+    },
+
+    async idsOfKinds(kinds) {
+      if (!kinds.length) return [];
+      return (await db.select({ id: S.id }).from(S).where(inArray(S.kind, kinds))).map((r) => r.id);
     },
 
     async removeHost(stationId, userId) {

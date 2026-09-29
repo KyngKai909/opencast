@@ -70,12 +70,18 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
   const [channel, setChannel] = useState<string | null>(st?.channel ?? null);
   const [colourText, setColourText] = useState(st?.colour ?? SWATCHES[1]);
   const [changingMarket, setChangingMarket] = useState(false);
+  // The market picked here, before the station has one saved.
+  const [pickedMarketId, setPickedMarketId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const markets = useApi(stationsApi.listMarkets, {});
   const me = useApi(accountsApi.getMe, {});
-  const market = markets.data?.find((m) => m.slug === (st?.marketSlug ?? me.data?.market?.slug)) ?? markets.data?.[0] ?? null;
+  const market =
+    (pickedMarketId ? markets.data?.find((m) => m.id === pickedMarketId) : undefined) ??
+    markets.data?.find((m) => m.slug === (st?.marketSlug ?? me.data?.market?.slug)) ??
+    markets.data?.[0] ??
+    null;
   const channels = useApi(stationsApi.availableChannels, { params: { marketSlug: market?.slug ?? "" }, query: { band } }, { enabled: !!market });
   const typedSign = useDebounced(callSign, 250);
   const check = useApi(waitlistApi.checkCallSign, { params: { callSign: typedSign } }, { enabled: /^[A-Z]{3,5}$/.test(typedSign) && typedSign !== st?.callSign });
@@ -223,7 +229,18 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
               <div className="cc-sf__help">{band === "tv" ? "Video, with or without sound." : "Sound only."}</div>
             </div>
             {changingMarket ? (
-              <SelectField label="Market" value={market?.id ?? ""} onChange={() => setChangingMarket(false)} onBlur={() => setChangingMarket(false)}>
+              <SelectField
+                label="Market"
+                value={market?.id ?? ""}
+                autoFocus
+                onChange={(e) => {
+                  // Another market has its own channels: the one chosen here no longer applies.
+                  if (e.target.value !== market?.id) setChannel(null);
+                  setPickedMarketId(e.target.value);
+                  setChangingMarket(false);
+                }}
+                onBlur={() => setChangingMarket(false)}
+              >
                 {(markets.data ?? []).map((m) => (
                   <option key={m.id} value={m.id} disabled={!m.open}>
                     {m.name}
