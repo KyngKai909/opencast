@@ -144,3 +144,24 @@ describe("admins", () => {
     expect(row.isAdmin).toBe(true);
   });
 });
+
+describe("Opencast admins by email (OPENCAST_ADMIN_EMAILS)", () => {
+  it("makes whoever signs in with a listed email an admin, by email, Google or Apple, and nobody else", async () => {
+    const before = process.env.OPENCAST_ADMIN_EMAILS;
+    process.env.OPENCAST_ADMIN_EMAILS = " Boss@Example.test , other@example.test";
+    try {
+      const byEmail = await h.signIn(undefined, { linked: [{ kind: "email", value: "boss@example.test" }] });
+      const byGoogle = await h.signIn(undefined, { linked: [{ kind: "google", value: "Other@Example.test" }] });
+      const someone = await h.signIn(undefined, { linked: [{ kind: "email", value: "someone@example.test" }] });
+      const admin = async (id: string) => (await h.db.select({ isAdmin: schema.users.isAdmin }).from(schema.users).where(eq(schema.users.id, id)))[0]!.isAdmin;
+      expect(await admin(byEmail.id)).toBe(true);
+      expect(await admin(byGoogle.id)).toBe(true);
+      expect(await admin(someone.id)).toBe(false);
+      await byEmail.get("/v1/admin/team").expect(200);
+      await someone.get("/v1/admin/team").expect(403);
+    } finally {
+      process.env.OPENCAST_ADMIN_EMAILS = before;
+      if (before === undefined) delete process.env.OPENCAST_ADMIN_EMAILS;
+    }
+  });
+});

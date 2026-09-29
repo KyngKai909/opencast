@@ -166,6 +166,21 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
   const { db } = deps;
   const u = schema.users;
 
+  // Opencast admins by email (OPENCAST_ADMIN_EMAILS, comma-separated): whoever signs in through Privy
+  // with one of them (email, Google or Apple) is made an admin. It only ever adds admins; taking one
+  // away is still `is_admin = false` by hand. Each user is looked at once per process.
+  const lookedAtForAdmin = new Set<string>();
+  async function promoteByEmail<T extends { id: string; isAdmin: boolean }>(user: T): Promise<T> {
+    const emails = new Set((process.env.OPENCAST_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+    if (user.isAdmin || !emails.size || lookedAtForAdmin.has(user.id)) return user;
+    lookedAtForAdmin.add(user.id);
+    const I = schema.identities;
+    const rows = await db.select({ value: I.value }).from(I).where(and(eq(I.userId, user.id), inArray(I.kind, ["email", "google", "apple"])));
+    if (!rows.some((r) => emails.has(r.value.toLowerCase()))) return user;
+    await db.update(u).set({ isAdmin: true }).where(eq(u.id, user.id));
+    return { ...user, isAdmin: true };
+  }
+
   async function findOrCreateUser(privyDid: string, issuedAt: Date | null, sid: string | null) {
     const [existing] = await db.select().from(u).where(eq(u.privyDid, privyDid));
     if (existing?.deletedAt) {
@@ -316,7 +331,7 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
   const service: AccountsService = {
     async userForToken(token) {
       const verified = await deps.auth.verify(token);
-      const user = await findOrCreateUser(verified.privyDid, verified.issuedAt, verified.sessionId);
+      const user = await promoteByEmail(await findOrCreateUser(verified.privyDid, verified.issuedAt, verified.sessionId));
       // A1: signed out everywhere. Tokens from before it are refused by their iat; a session seen
       // before it stays ended even after Privy refreshes its token.
       if (user.signedOutAt && (!verified.issuedAt || second(verified.issuedAt) < second(user.signedOutAt))) throw signedOut();

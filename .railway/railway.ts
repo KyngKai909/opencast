@@ -95,6 +95,10 @@ export default defineRailway((ctx) => {
       STORAGE_ROOT: "/tmp/opencast",
       // The minute jobs run in the worker, under its leader lock.
       JOBS: "off",
+      // Opencast admins by email, comma-separated (set in Railway, never in the repo).
+      OPENCAST_ADMIN_EMAILS: secret(),
+      // Radio encoders push to the worker's RTMP ingest, through its TCP proxy.
+      WORKER_INGEST_SERVER: "rtmp://${{worker.RAILWAY_TCP_PROXY_DOMAIN}}:${{worker.RAILWAY_TCP_PROXY_PORT}}/live",
       WEB_ORIGIN: production ? secret() : (["web", "business", "site", "tv"] as const).map(webOrigin).join(","),
       SERVE_WEB_APP: "false"
     }
@@ -105,9 +109,12 @@ export default defineRailway((ctx) => {
     build: build("@opencast/worker", ["apps/worker/**", "apps/api/**"]),
     deploy: { startCommand: "npm run start -w @opencast/worker", healthcheckPath: "/health", healthcheckTimeout: 300, numReplicas: 1, ...restart },
     volumeMounts: { "/data": workerCache },
+    // Radio live: the leading worker takes encoders' RTMP pushes on 1935 (one replica, so the proxy reaches it).
+    tcp: [1935],
     env: {
       ...common,
       PORT: "8080",
+      WORKER_INGEST_PORT: "1935",
       STORAGE_ROOT: "/data/storage",
       WORKER_SCRATCH_DIR: "/data/scratch",
       // Items prepared at once; each FFmpeg pass wants about 2 vCPU.

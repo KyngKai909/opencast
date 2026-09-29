@@ -47,6 +47,7 @@ HLS: items are prepared once into segments in object storage, and each station's
 | `PREPARE_CONCURRENCY` | | ✓ | items prepared at once (1; each FFmpeg pass wants about 2 vCPU). `PREPARE_PRESET` is optional |
 | `LEGACY_PLAYOUT` | | `off` | `on` runs the old continuous encode instead of prepare once, then assemble |
 | `JOBS` | `off` | | the minute jobs run in the worker |
+| `OPENCAST_ADMIN_EMAILS` | ✓ | | added 2026-09-29: comma-separated emails; whoever signs in through Privy with one (email, Google or Apple) becomes an Opencast admin (the Network desk, and owner of every network station). It only adds admins. Set in Railway, never in the repo |
 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | ✓ | ✓ | staging: the Railway bucket `media` (virtual-host URLs; `S3_STORAGE_CLASSES=false`; it doesn't verify upload checksums, so only reads catch a bad copy). Production: Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_PUBLIC_BASE` too) |
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET` | ✓ | ✓ | sign-in, with Opencast's own Privy app (never Clear's: the API refuses to start with Clear's app ID); without them signed-in endpoints answer 401. The API also needs the secret to read a linked Clear wallet |
 | `CLEAR_PRIVY_PROVIDER_APP_ID` | ✓ | | Clear's Privy app ID, as the global-wallet provider (docs/clear-integration.md). Unset: "Connect Clear" answers 409 |

@@ -148,7 +148,7 @@ describe("an uploaded caption track", () => {
 
   it("the radio band has no subtitle rendition", async () => {
     const m = await market(h, "desert", "Desert");
-    const nite = await stationFixture(h, { callSign: "NITE", ownerId: kai.id, marketId: m.id, tenths: 883, band: "radio", signedOn: true });
+    const nite = await stationFixture(h, { callSign: "NITE", ownerId: kai.id, marketId: m.id, tenths: 884, band: "radio", signedOn: true });
     await h.db.insert(schema.channelItems).values({ stationId: nite.id, run: 1, seq: 0, disc: 0, startsAt: new Date(Date.parse("2026-10-02T03:00:00Z")), endsAt: new Date(Date.parse("2026-10-02T03:00:04Z")), kind: "prepared", preparedKey: tapeCid, segments: 1, segmentMs: [4000], code: "PGM", label: "x", reason: "planned" });
     expect((await h.services.playout.playlist(nite.id, "master.m3u8"))!.body).not.toContain("SUBTITLES");
     expect(await h.services.playout.playlist(nite.id, "subs.m3u8")).toBeNull();
