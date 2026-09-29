@@ -244,15 +244,20 @@ export function testClip(seconds: number, kind: "video" | "audio" = "video"): Pr
         const { promises: fs } = await import("node:fs");
         const dir = path.join(os.tmpdir(), "opencast-test-clips");
         await fs.mkdir(dir, { recursive: true });
-        const file = path.join(dir, `clip-${key}.${kind === "video" ? "mp4" : "m4a"}`);
+        const ext = kind === "video" ? "mp4" : "m4a";
+        const file = path.join(dir, `clip-${key}.${ext}`);
+        // Test files run in parallel workers, each making its own clips: write to a name of this
+        // worker's own, then rename into place, so no worker reads a clip another is still writing.
+        const partial = path.join(dir, `clip-${key}.${process.pid}-${Math.random().toString(36).slice(2)}.${ext}`);
         const args =
           kind === "video"
-            ? ["-y", "-f", "lavfi", "-i", `testsrc=duration=${seconds}:size=640x360:rate=24`, "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", file]
-            : ["-y", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:a", "aac", file];
+            ? ["-y", "-f", "lavfi", "-i", `testsrc=duration=${seconds}:size=640x360:rate=24`, "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", partial]
+            : ["-y", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-c:a", "aac", partial];
         await new Promise<void>((resolve, reject) => {
           const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", ...args]);
           child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}`))));
         });
+        await fs.rename(partial, file);
         return file;
       })()
     );
