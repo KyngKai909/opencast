@@ -30,11 +30,17 @@ describe("the watching screen's mock dial", () => {
     expect(r.now?.title).toBe("Town Hall");
   });
 
-  it("gives an off-air row its off-air block, ending at its next airing or 6:00 am, whichever is sooner", () => {
-    const later = row("CIVC", { onAir: false, now: null, playback: null, next: { ...row("X").next!, startsAt: "2026-09-30T02:00:00Z" } });
-    expect(patchRow(later, t, none).now).toMatchObject({ kind: "off_air", title: "Off air", endsAt: "2026-09-27T13:00:00.000Z" });
-    const sooner = row("CIVC", { onAir: false, now: null, playback: null });
-    expect(patchRow(sooner, t, none).now?.endsAt).toBe("2026-09-27T04:30:00Z");
+  it("signs a station off with the switch as planned off air (G9): until its next airing or 6:00 am, whichever is sooner", () => {
+    const later = row("CIVC", { next: { ...row("X").next!, startsAt: "2026-09-30T02:00:00Z" } });
+    const off = patchRow(later, t, { offAir: ["CIVC"], standby: [] });
+    expect(off).toMatchObject({ onAir: false, backAt: "2026-09-27T13:00:00.000Z", now: { kind: "off_air", code: "OPEN", title: "Off air", endsAt: "2026-09-27T13:00:00.000Z", backAt: "2026-09-27T13:00:00.000Z" } });
+    expect(patchRow(row("CIVC"), t, { offAir: ["CIVC"], standby: [] }).backAt).toBe("2026-09-27T04:30:00Z");
+  });
+
+  it("leaves a gap between airings as the API does: nothing on, no back time", () => {
+    const gap = patchRow(row("CIVC", { onAir: false, now: null, playback: null }), t, none);
+    expect(gap.now).toBeNull();
+    expect("backAt" in gap).toBe(false);
   });
 
   it("takes a station off the air, or puts it on stand by, from the address's switches", () => {

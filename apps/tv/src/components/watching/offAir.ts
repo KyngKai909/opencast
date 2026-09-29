@@ -5,7 +5,7 @@
 import type { DialRowX } from "../../api/ext";
 
 /** S13's `signal` is on the contract's dial row now. */
-export type Row = Pick<DialRowX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowX["signal"] };
+export type Row = Pick<DialRowX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowX["signal"]; backAt?: string };
 
 /** "REEL 24.1", kept on one line (a no-break space). */
 export function identText(s: Pick<Row["station"], "callSign" | "channel" | "name">): string {
@@ -32,10 +32,23 @@ export function suggestion<R extends Row>(rows: R[], currentId: string | null): 
   return rows.find((r) => r.station.band !== cur.station.band && canSuggest(r)) ?? null;
 }
 
-/** When an off-air station signs on again: the end of its off-air block, or its next airing. */
+/**
+ * When an off-air station signs on again: its planned off air's back time (G9: the row's
+ * `backAt`, or its off air airing's), else its next airing.
+ */
 export function signOnAt(r: Row): string | null {
-  if (r.now?.kind === "off_air") return r.now.endsAt;
+  if (r.backAt) return r.backAt;
+  if (r.now?.kind === "off_air") return r.now.backAt ?? r.now.endsAt;
   return r.next?.startsAt ?? null;
+}
+
+/**
+ * When the station on screen is back: the player's word first (a stream that signed off says, in
+ * its sign-off tag), then the dial's (signOnAt).
+ */
+export function backTime(r: Row, playerOffAir: { stationId: string; backAt: string | null } | null | undefined): string | null {
+  const fromStream = playerOffAir?.stationId === r.station.id ? playerOffAir.backAt : null;
+  return fromStream ?? signOnAt(r);
 }
 
 /** Which screen shows over the picture on "/": off air, stand by, or none. */

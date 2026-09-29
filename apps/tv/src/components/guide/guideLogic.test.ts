@@ -99,6 +99,18 @@ describe("the guide's rows and cells", () => {
     expect(model.rows[rowOf("BEAT")]!.cells[0]!.key).toMatch(/^log-/);
   });
 
+  it("draws planned off air (G9) as one off air cell back at its backAt, joining the gap before it", () => {
+    const off = airing("23:00", "30:00", "Off air", { kind: "off_air", code: "OPEN", programId: null, backAt: iso("30:00") });
+    const cells = rowCells(row(station("PREP", "31.1"), [airing("22:00", "22:30", "Friday scoreboard"), off, airing("30:00", "31:00", "Morning")]), FROM, at("31:00"));
+    expect(cells.map((c) => [c.airing?.title ?? "off", c.start, c.signOnAt])).toEqual([
+      ["off", FROM, at("22:00")],
+      ["Friday scoreboard", at("22:00"), null],
+      ["off", at("22:30"), at("30:00")],
+      ["Morning", at("30:00"), null]
+    ]);
+    expect(offAirLine(cells[2]!, station("PREP", "31.1"), TZ)).toBe("PREP 31.1 signs on again at 6:00 am.");
+  });
+
   it("skips an airing that overlaps one already placed", () => {
     const cells = rowCells(row(station("X", "40.1"), [airing("20:30", "21:30", "A"), airing("21:00", "21:15", "B"), airing("21:30", "22:00", "C")]), FROM, at("22:00"));
     expect(cells.map((c) => c.airing?.title)).toEqual(["A", "C"]);

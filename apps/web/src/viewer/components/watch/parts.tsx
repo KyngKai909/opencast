@@ -20,13 +20,16 @@ export function NowTitle({ w, size = "web" }: { w: WatchData; size?: "web" | "ph
   const now = w.now;
   if (!row) return null;
   if (!now) {
-    const next = row.next ?? w.page.data?.upNext[0] ?? null;
+    // When it's back: the stream's sign-off or the dial's off air (G9), else its next airing.
+    const back = w.backAt ?? (row.next ?? w.page.data?.upNext.find((x) => x.kind !== "off_air") ?? null)?.startsAt ?? null;
     return (
       <>
         <h2 className={cx("vw-w-title", size === "phone" && "vw-w-title--phone")}>Off air</h2>
-        {next && (
+        {back && (
           <div className="vw-w-meta">
-            {identText(row.station)} signs on again at <span className="oc-mono">{clock(next.startsAt, { timeZone: MARKET_TZ })}</span>.
+            <span>
+              {identText(row.station)} signs on again at <span className="oc-mono">{clock(back, { timeZone: MARKET_TZ })}</span>.
+            </span>
           </div>
         )}
       </>

@@ -3,6 +3,11 @@
 // reference frames draw them, inside the style guide's safe areas (brand Ch. 11): the bug bottom
 // right at 3.5% and 7% (tv: 5% and 6%), at 78% unless the tag says otherwise; the lower third at
 // 5% and 8%; the code bottom left at 6% and 7% (business/opencast-biz-spots.html, "What will air").
+//
+// Decided (docs/apps/open-questions.md): the banner covers the bug and the lower third, but not a
+// spot's code (paid, and only for its last 10 seconds): the code stays, lifted clear of the banner.
+// A code takes the lower third's place while it shows. In the TV guide's window only the bug is
+// drawn, small, as tv 03.1 draws it.
 
 import { useMemo } from "react";
 import { encode } from "uqr";
@@ -18,10 +23,13 @@ export interface GraphicsInput {
   banner: boolean;
 }
 
-/** Which graphics to draw: the rules for how they share the picture. */
-export function visibleGraphics({ onScreen: os, showing, banner }: GraphicsInput): Pick<OnScreen, "bug" | "lowerThird" | "code"> {
-  if (!os || !showing || banner) return { bug: null, lowerThird: null, code: null };
+/** Which graphics to draw: the rules for how they share the picture. `only: "bug"` is the TV guide's window. */
+export function visibleGraphics({ onScreen: os, showing, banner }: GraphicsInput, only?: "bug"): Pick<OnScreen, "bug" | "lowerThird" | "code"> {
+  if (!os || !showing) return { bug: null, lowerThird: null, code: null };
+  if (only === "bug") return { bug: os.bug, lowerThird: null, code: null };
   const code = os.code;
+  // The banner carries the bug's ident and covers the lower third; the code stays, above it.
+  if (banner) return { bug: null, lowerThird: null, code };
   // The code sits where the lower third does (bottom left); for its few seconds, it wins.
   const lowerThird = code ? null : os.lowerThird;
   // The bug never covers a lower third (style guide): a bottom-left bug steps aside for one.
@@ -47,16 +55,20 @@ function Qr({ value, label }: { value: string; label: string }) {
 export interface OverlaysProps extends GraphicsInput {
   channel: Channel | undefined;
   size: "web" | "tv";
+  /** "bug": the bug alone, sized for the TV guide's window (tv 03.1). */
+  only?: "bug";
+  /** While the banner is up: how far the banner reaches up from the bottom (px), for the code to sit above. */
+  codeLift?: number | null;
 }
 
-export function Overlays({ channel, size, ...input }: OverlaysProps) {
-  const { bug, lowerThird, code } = visibleGraphics(input);
+export function Overlays({ channel, size, only, codeLift, ...input }: OverlaysProps) {
+  const { bug, lowerThird, code } = visibleGraphics(input, only);
   if (!bug && !lowerThird && !code) return null;
   const callSign = bug?.callSign ?? channel?.station.callSign ?? null;
   const ch = bug?.channel ?? channel?.station.channel ?? null;
   return (
     // On the picture, the dark ground's values whatever the page's ground (the QR's dark modules).
-    <div className={cx("oc-ovl", `oc-ovl--${size}`)} data-theme="dark" data-testid="player-graphics">
+    <div className={cx("oc-ovl", `oc-ovl--${size}`, only === "bug" && "oc-ovl--window")} data-theme="dark" data-testid="player-graphics">
       {lowerThird && <LowerThird className="oc-ovl__l3" name={lowerThird.name} title={lowerThird.title ?? undefined} />}
       {bug && (
         <div className="oc-ovl__bug" data-position={bug.position} data-mode={bug.mode} style={{ ["--bug-opacity" as string]: String(bug.opacity / 100) }}>
@@ -68,7 +80,7 @@ export function Overlays({ channel, size, ...input }: OverlaysProps) {
         </div>
       )}
       {code && (
-        <div className="oc-ovl__code">
+        <div className="oc-ovl__code" style={input.banner && codeLift ? { bottom: `calc(${codeLift}px + 2%)` } : undefined}>
           <Qr value={code.qrUrl} label={`QR code for ${code.code}`} />
           <div>
             <b className="oc-ovl__code-c">{code.code}</b>

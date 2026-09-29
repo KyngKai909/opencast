@@ -4,12 +4,14 @@ import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
 import { GuideX } from "../../api/ext";
 import { inWindow } from "../fixtures/schedule";
+import { syncStreamSignOff } from "../fixtures/signoff";
 import { inMarket } from "../fixtures/stations";
 import { fail, path, reply } from "../respond";
 import { airingX, identX, marketOf } from "../view";
 
 export const guideHandlers = [
-  http.get(path(stationsApi.getGuide), ({ params, request }) => {
+  http.get(path(stationsApi.getGuide), async ({ params, request }) => {
+    await syncStreamSignOff();
     const slug = String(params.marketSlug);
     const market = marketOf(slug);
     if (!market) return fail(404, "not_found", "That market wasn't found.");

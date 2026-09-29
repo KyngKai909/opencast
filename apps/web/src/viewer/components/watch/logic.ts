@@ -175,3 +175,21 @@ export function listingText(note: string | null | undefined, description: string
   const rest = sentences.filter((s) => s.replace(/\.$/, "").toLowerCase() !== n.toLowerCase());
   return [n ? `${n}.` : "", ...rest].filter(Boolean).join(" ");
 }
+
+/**
+ * Planned off air (G9): an `off_air` airing ("Off air", code OPEN), from sign-off to `backAt`.
+ * It's not a program: nothing to tune to, remind or describe.
+ */
+export function isOffAir(a: Pick<AiringX, "kind"> | null | undefined): boolean {
+  return a?.kind === "off_air";
+}
+
+/**
+ * When an off air station is back: the player's own word (the stream's sign-off tag), then the
+ * dial's `backAt`, then the off air airing's, then its next airing; null when nothing says.
+ */
+export function backAtOf(row: Pick<DialRowX, "now" | "next"> & { backAt?: string } | null | undefined, player?: { stationId: string; backAt: string | null } | null, stationId?: string): string | null {
+  const fromPlayer = player && stationId && player.stationId === stationId ? player.backAt : null;
+  const now = row?.now;
+  return fromPlayer ?? row?.backAt ?? (isOffAir(now) ? (now!.backAt ?? now!.endsAt) : null) ?? row?.next?.startsAt ?? null;
+}

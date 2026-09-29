@@ -5,13 +5,17 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { Button, ChipRow, Dial, DialRow, Segmented, type DialNow } from "@opencast/ui";
 import type { DialRowX } from "../../api/ext";
+import { backAtOf, isOffAir } from "../watch/logic";
 import { CHIP_ALL, chipOptions, filterRows, stationsText } from "./logic";
 import { useAppLink, useOpenStation, useTuneAndWatch } from "./nav";
 import "./MarketDial.css";
 
-/** What a dial row says is on: the airing, or Off air until it signs on again. */
+/**
+ * What a dial row says is on: the airing, or Off air until it signs on again: its planned off
+ * air's back time (G9: `backAt` on the row or its `off_air` airing), else its next airing.
+ */
 export function dialNow(r: DialRowX, detail?: ReactNode): DialNow {
-  if (!r.onAir || !r.now) return { title: "", offAir: true, until: r.next?.startsAt, detail };
+  if (!r.onAir || !r.now || isOffAir(r.now)) return { title: "", offAir: true, until: backAtOf(r) ?? undefined, detail };
   return {
     title: r.now.title,
     until: r.now.endsAt,

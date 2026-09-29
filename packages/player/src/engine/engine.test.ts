@@ -245,6 +245,34 @@ describe("the heartbeat", () => {
     await flush(60_000);
     expect(send).toHaveBeenCalledTimes(3);
   });
+
+  it("stops during a station's planned off air (offAirUntil), even across tuning away and back, until nextInMs has passed", async () => {
+    const offFor = 10 * 60_000;
+    const send = vi.fn(async (b: { stationId: string }) => (b.stationId === BEAT.station.id ? { nextInMs: offFor, offAirUntil: "2026-09-27T13:00:00Z" } : { nextInMs: 30_000 }));
+    const stop = startHeartbeat(engine, send, "tv_app", "11111111-1111-4111-8111-111111111111");
+    const t = engine.tune(BEAT.station.id);
+    await flush(10);
+    await t;
+    await flush(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    await flush(5 * 60_000);
+    expect(send).toHaveBeenCalledTimes(1);
+    // Away and back: CIVC beats; BEAT stays quiet until its time.
+    const a = engine.tune(CIVC.station.id);
+    await flush(10);
+    await a;
+    await flush(0);
+    expect(send.mock.calls.at(-1)![0].stationId).toBe(CIVC.station.id);
+    const b = engine.tune(BEAT.station.id);
+    await flush(10);
+    await b;
+    await flush(0);
+    const beatsToBeat = () => send.mock.calls.filter((c) => c[0].stationId === BEAT.station.id).length;
+    expect(beatsToBeat()).toBe(1);
+    await flush(5 * 60_000);
+    expect(beatsToBeat()).toBe(2);
+    stop();
+  });
 });
 
 void byId;

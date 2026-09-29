@@ -1,7 +1,9 @@
 // Mock endpoints for Watching and menus. The dial as the TV's watching screen needs it:
-// - an off-air station's `now` is its off-air block (kind "off_air", ending when it signs on
-//   again: the next 6:00 am in the market, or its next airing if that's sooner), as the contract
-//   allows, so "CIVC 7.1 signs on again at 6:00 am" has a time to say;
+// - a station signed off by the switch below gets planned off air as the contract has it (G9):
+//   `now` is an "Off air" airing (kind "off_air", code OPEN) running until it's back (the next
+//   6:00 am in the market, or its next airing if that's sooner), with `backAt` on the airing and
+//   the row, so "CIVC 7.1 signs on again at 6:00 am" has a time to say. Planned off air in the
+//   schedule (PREP's nights) comes from the shared dial handler already;
 // - `signal` (S13): "standby" for a live block waiting for its signal, "ok" otherwise on air,
 //   absent when the station isn't on air.
 // Mock-only switches in the TV's address, read once at start:
@@ -45,14 +47,14 @@ const switches = readSwitches();
 export function patchRow(r: DialRowX, t: Date, sw: Switches): DialRowX {
   const cs = (r.station.callSign ?? "").toUpperCase();
   let row: DialRowX = { ...r, signal: "ok" };
-  if (sw.offAir.includes(cs)) row = { ...row, onAir: false, playback: null, now: null };
-  // The contract leaves `signal` out when the station isn't on air.
-  if (!row.onAir) delete row.signal;
-  if (!row.onAir && (!row.now || row.now.kind !== "off_air")) {
+  if (sw.offAir.includes(cs)) {
     const six = nextSixAm(t);
     const back = row.next && row.next.startsAt < six ? row.next.startsAt : six;
-    row.now = { logEntryId: null, title: "Off air", episodeTitle: null, code: "PGM", kind: "off_air", startsAt: t.toISOString(), endsAt: back, live: false, carriedFrom: null, programId: null };
+    const now = { logEntryId: null, title: "Off air", episodeTitle: null, code: "OPEN" as const, kind: "off_air" as const, startsAt: t.toISOString(), endsAt: back, live: false, carriedFrom: null, programId: null, backAt: back };
+    row = { ...row, onAir: false, playback: null, now, backAt: back };
   }
+  // The contract leaves `signal` out when the station isn't on air.
+  if (!row.onAir) delete row.signal;
   if (row.onAir && sw.standby.includes(cs)) row = { ...row, signal: "standby" };
   return row;
 }

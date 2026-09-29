@@ -17,6 +17,7 @@ import { useChannels } from "../../tv/data";
 import { focusKey, FocusContext, useTvFocusable } from "../../tv/focus";
 import { TvButton } from "../../components/guide/TvButton";
 import { cellLine, identText, type Cell } from "../../components/guide/guideLogic";
+import { signOnAt } from "../../components/watching/offAir";
 import "./About.css";
 
 /** Stations that take pledges: not a city's listed stream, a studio or the catalog. */
@@ -55,7 +56,9 @@ export default function About() {
   const row = station ? channels.find((c) => c.station.id === station.id) : undefined;
   const onNow = row ? row.now : (page.data?.now ?? null);
   const next = row ? row.next : (page.data?.upNext[0] ?? null);
-  const onAir = row ? row.onAir : !!page.data?.onAir;
+  const onAir = row ? row.onAir && row.now?.kind !== "off_air" : !!page.data?.onAir;
+  // Off air: when it's back (G9's back time), else its next airing.
+  const signOn = row ? signOnAt(row) : page.data?.now?.kind === "off_air" ? (page.data.now.backAt ?? page.data.now.endsAt) : (next?.startsAt ?? null);
 
   let body;
   if (page.error) body = <p className="tvg-about__msg" role="alert">{(page.error as ApiError).message}</p>;
@@ -98,7 +101,7 @@ export default function About() {
             ) : (
               <>
                 <b>Off air</b>
-                {next && <span>Signs on at {clock(next.startsAt, { timeZone: MARKET_TZ })}</span>}
+                {signOn && <span>Signs on at {clock(signOn, { timeZone: MARKET_TZ })}</span>}
               </>
             )}
           </div>

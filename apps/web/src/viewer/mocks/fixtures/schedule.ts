@@ -21,6 +21,8 @@ export interface MockAiring {
   listed?: boolean;
   carriedFrom?: string;
   programId: string | null;
+  /** Planned off air (G9): its off air hours, or a sign-off on its log. `end` is when it's back. */
+  offAir?: boolean;
 }
 
 // The base day, in the market's zone (Pacific time, UTC-7 in September).
@@ -68,7 +70,7 @@ export const PROGRAMS: Record<string, { id: string; title: string; maker: string
   "desert-rock": { id: P("desert-rock"), title: "Desert country, all night", maker: "DUST", description: "All night.", category: "Music" }
 };
 
-function a(callSign: string, start: string, end: string, title: string, program: keyof typeof PROGRAMS | null, o: Partial<Pick<MockAiring, "episodeTitle" | "episodeDescription" | "note" | "live" | "listed" | "carriedFrom">> = {}): MockAiring {
+function a(callSign: string, start: string, end: string, title: string, program: keyof typeof PROGRAMS | null, o: Partial<Pick<MockAiring, "episodeTitle" | "episodeDescription" | "note" | "live" | "listed" | "carriedFrom" | "offAir">> = {}): MockAiring {
   const s = stationByRef(callSign)!;
   return { id: uid(800000 + ++n), stationId: s.ident.id, title, start: at(start), end: at(end), programId: program ? PROGRAMS[program].id : null, ...o };
 }
@@ -109,6 +111,8 @@ export const AIRINGS: MockAiring[] = [
   a("PREP", "19:30", "22:00", "Football: Redlands East Valley at Citrus Valley", "football"),
   a("PREP", "22:00", "22:30", "Friday scoreboard", "scoreboard"),
   a("PREP", "22:30", "23:00", "Highlights", "scoreboard"),
+  // Its off air hours (G9): every night, 11:00 pm to 6:00 am. One airing, sign-off to sign-on.
+  a("PREP", "23:00", "30:00", "Off air", null, { offAir: true }),
   // Radio
   a("NITE", "20:00", "30:00", "Radio dramas from the 1940s", "radio-dramas", { episodeTitle: "The Hollow Door, part 2" }),
   a("HALL", "20:00", "26:00", "Slow beats for late work", "slow-beats"),
@@ -127,6 +131,8 @@ function identOf(callSign: string): StationIdent | null {
 
 /** An airing as the contract's Airing. */
 export function toAiring(x: MockAiring): Airing {
+  // Planned off air: one "Off air" airing (code OPEN) from sign-off to when it's back (G9).
+  if (x.offAir) return { logEntryId: x.id, title: "Off air", episodeTitle: null, code: "OPEN", kind: "off_air", startsAt: x.start, endsAt: x.end, live: false, carriedFrom: null, programId: null, backAt: x.end };
   return {
     logEntryId: x.listed ? null : x.id,
     title: x.title,

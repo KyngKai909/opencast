@@ -6,7 +6,8 @@ import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi, Tv,
 import { now } from "../../lib/clock";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
-import { AIRINGS, airingById } from "../fixtures/schedule";
+import { AIRINGS, airingById, nowNext } from "../fixtures/schedule";
+import { syncStreamSignOff } from "../fixtures/signoff";
 import { STATIONS, stationById, stationByRef, uid } from "../fixtures/stations";
 import { channelsFor, nextChargeFor, receiptsFor } from "../fixtures/you";
 import { fail, needsUser, path, reply } from "../respond";
@@ -320,5 +321,13 @@ export const meHandlers = [
   }),
 
   // ---------- Tuned in ----------
-  http.post(path(audienceApi.heartbeat), () => reply(audienceApi.heartbeat.response, { ok: true, nextInMs: 30_000 }))
+  // During the station's planned off air (G9) the beat isn't counted, and says when it's back.
+  http.post(path(audienceApi.heartbeat), async ({ request }) => {
+    const body = (await request.json().catch(() => null)) as { stationId?: string } | null;
+    await syncStreamSignOff();
+    const t = now();
+    const off = body?.stationId ? nowNext(body.stationId, t).now : null;
+    if (off?.offAir) return reply(audienceApi.heartbeat.response, { ok: true, nextInMs: Math.max(1000, Date.parse(off.end) - t.getTime()), offAirUntil: off.end });
+    return reply(audienceApi.heartbeat.response, { ok: true, nextInMs: 30_000 });
+  })
 ];

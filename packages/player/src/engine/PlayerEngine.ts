@@ -621,12 +621,34 @@ export class PlayerEngine {
     if (d) d.setCueLine(this.cueLine(d));
   }
 
+  private graphicsLift: number | null = null;
+
+  /**
+   * Lift the captions clear of the station's graphics at the bottom of the picture (a lower third,
+   * or a spot's code) while they show: the bottom `percent` they cover, or null. The surface
+   * measures it; the higher of this and setCaptionLift's wins.
+   */
+  setGraphicsLift(percent: number | null) {
+    const p = percent === null ? null : Math.round(percent);
+    if (p === this.graphicsLift) return;
+    this.graphicsLift = p;
+    const d = this.active();
+    if (d) d.setCueLine(this.cueLine(d));
+  }
+
+  /** What the captions clear now: the higher of the surface's lift and the graphics', or null. */
+  captionLiftNow(): number | null {
+    if (this.captionLift === null && this.graphicsLift === null) return null;
+    return Math.max(this.captionLift ?? 0, this.graphicsLift ?? 0);
+  }
+
   /** The caption line (from the bottom) that clears the lift, at the caption size in use. */
   private cueLine(d: Deck): number | null {
-    if (this.captionLift === null) return null;
+    const lift = this.captionLiftNow();
+    if (lift === null) return null;
     const v = d.video;
     const aspect = v.clientWidth && v.clientHeight ? v.clientWidth / v.clientHeight : 16 / 9;
-    return captionLineFor(this.captionLift, CAPTION_SCALE[this.state.captionSize], aspect);
+    return captionLineFor(lift, CAPTION_SCALE[this.state.captionSize], aspect);
   }
 
   private applyCaptions(d: Deck) {

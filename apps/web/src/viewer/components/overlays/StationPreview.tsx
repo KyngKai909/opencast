@@ -15,14 +15,16 @@ import { useTune } from "../../player/PlayerRoot";
 import { Dialog, useApiAs, useOverlayParams } from "../watch/overlay";
 import { PresetButton } from "../watch/usePresetButton";
 import { withLive } from "../watch/lines";
-import { callSignOf, stationSlug } from "../watch/logic";
+import { callSignOf, isOffAir, stationSlug } from "../watch/logic";
 import "./StationPreview.css";
 
 /** Now, next and one later: the later one is the next airing of a program (not filler between them). */
-export function previewListings(page: Pick<StationPageFull, "now" | "upNext">): { now: AiringX | null; next: AiringX | null; later: AiringX | null } {
+export function previewListings(page: Pick<StationPageFull, "now" | "upNext">): { now: AiringX | null; next: AiringX | null; later: AiringX | null; backAt: string | null } {
   const [next = null, ...rest] = page.upNext;
   const later = rest.find((a) => a.programId !== null) ?? rest[0] ?? null;
-  return { now: page.now, next, later };
+  // Planned off air (G9) on now reads as off air, back at its sign-on.
+  const off = isOffAir(page.now);
+  return { now: off ? null : page.now, next, later, backAt: off ? (page.now!.backAt ?? page.now!.endsAt) : null };
 }
 
 /** Programs this station makes that other stations carry, with how many: `madeHere` (S7), or the dial's carried-widely list (S2) until it lands. */
@@ -79,7 +81,8 @@ export default function StationPreview() {
   const st = p?.station;
   const market = markets.data?.find((m) => m.slug === st?.marketSlug)?.name;
   const place = [st?.homeCity, phone ? null : market].filter(Boolean).join(", ");
-  const { now, next, later } = p ? previewListings(p) : { now: null, next: null, later: null };
+  const { now, next, later, backAt } = p ? previewListings(p) : { now: null, next: null, later: null, backAt: null };
+  const signOn = backAt ?? next?.startsAt ?? null;
   const carried = st ? carriedByOthers(st.id, p?.madeHere, [tv.data, radio.data]) : [];
   const describe = (a: AiringX) => a.note ?? p?.programs.find((x) => x.id === a.programId)?.description ?? null;
   const laterCarried = later ? carried.find((c) => c.programId === later.programId) : undefined;
@@ -128,7 +131,7 @@ export default function StationPreview() {
           {now ? (
             <ListingRow variant="line" label="On now" title={now.title} detail={nowDetail(now)} timeZone={MARKET_TZ} />
           ) : (
-            <ListingRow variant="line" label="On now" title="Off air" detail={next ? <>Signs on at <span className="oc-mono">{clock(next.startsAt, { timeZone: MARKET_TZ })}</span></> : undefined} />
+            <ListingRow variant="line" label="On now" title="Off air" detail={signOn ? <>Signs on at <span className="oc-mono">{clock(signOn, { timeZone: MARKET_TZ })}</span></> : undefined} />
           )}
           {next && <ListingRow variant="line" label="Next" at={next.startsAt} title={next.title} detail={describe(next) ?? undefined} timeZone={MARKET_TZ} />}
           {later && (

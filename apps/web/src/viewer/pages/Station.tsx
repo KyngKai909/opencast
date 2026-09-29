@@ -29,12 +29,16 @@ import { useBack, useLink, useOpenOverlay, useTuneIn } from "../components/stati
 import { SecTop, StationSide } from "../components/station/StationSide";
 import { StationListing } from "../components/station/StationListing";
 import { broadcastDayKey, clockAfter, onDay, weekTabs } from "../components/station/when";
+import { isOffAir } from "../components/watch/logic";
+import { BackAt } from "../components/watch/lines";
 import "../components/station/Station.css";
 
 const DAY = 86400e3;
 
 /** The line under a schedule row: "Carried from REEL 24.1", "Live from the Redlands studio", "Beat showcase". */
 function rowSubtitle(a: AiringX) {
+  // Planned off air (G9): "Off air", back at its sign-on.
+  if (isOffAir(a)) return <BackAt at={a.backAt ?? a.endsAt} />;
   if (a.carriedFrom) return `Carried from ${[a.carriedFrom.callSign, a.carriedFrom.channel].filter(Boolean).join(" ")}`;
   const note = a.note ?? a.episodeTitle;
   if (a.live && note?.startsWith("Live ")) return <><LiveText /> {note.slice(5)}</>;
@@ -63,8 +67,10 @@ function PresetAction({ page, phone }: { page: Page; phone: boolean }) {
 
 function OnNow({ page, t }: { page: Page; t: Date }) {
   const link = useLink();
-  const a = page.now;
-  const next = page.upNext[0];
+  // Planned off air (G9) on now: off air, and when it's back.
+  const off = isOffAir(page.now);
+  const a = off ? null : page.now;
+  const next = page.upNext.find((x) => !isOffAir(x));
   const nextLine = next && (
     <p className="vw-now__next">
       Next at <span className="oc-mono">{clockAfter(next.startsAt, a?.endsAt ?? t, MARKET_TZ)}</span>: <b>{next.title}</b>
@@ -76,6 +82,11 @@ function OnNow({ page, t }: { page: Page; t: Date }) {
       <div className="vw-now vw-now--off">
         <div>
           <Tag variant="off">Off air</Tag>
+          {off && page.now && (
+            <p className="vw-now__next">
+              <BackAt at={page.now.backAt ?? page.now.endsAt} />
+            </p>
+          )}
           {nextLine}
         </div>
       </div>
@@ -203,11 +214,12 @@ export default function StationPage() {
 
   const items: ScheduleItem[] = rows.map((a) => ({ id: a.logEntryId ?? a.listedAiringId ?? a.startsAt, start: a.startsAt, end: a.endsAt, title: a.title, subtitle: rowSubtitle(a) }));
   const status = scheduleStatus(items, t);
-  const openable = items.map((it, i) => (status[i] === "next" && (rows[i]!.logEntryId || rows[i]!.listedAiringId) ? { ...it, title: <button type="button" className="vw-sch-open" onClick={() => setListing(rows[i]!)}>{it.title}</button> } : it));
+  const openable = items.map((it, i) => (status[i] === "next" && !isOffAir(rows[i]) && (rows[i]!.logEntryId || rows[i]!.listedAiringId) ? { ...it, title: <button type="button" className="vw-sch-open" onClick={() => setListing(rows[i]!)}>{it.title}</button> } : it));
   const byId = new Map(items.map((it, i) => [it.id, rows[i]!]));
   const remindRow = (it: ScheduleItem) => {
     const a = byId.get(it.id);
-    if (a) remind({ airing: a, station: s });
+    // Off air isn't something to be reminded of.
+    if (a && !isOffAir(a)) remind({ airing: a, station: s });
   };
 
   const bandName = `${s.name}. ${page.description ?? ""}`.trim();

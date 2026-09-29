@@ -5,18 +5,17 @@ import { stationsApi } from "@opencast/contracts";
 import { DialX, MarketsX, type DialRowX } from "../../api/ext";
 import { now } from "../../lib/clock";
 import { AIRINGS, PROGRAMS } from "../fixtures/schedule";
-import { MARKETS, STATIONS, ZIPS, inMarket, playbackFor, stationByRef, type MockStation } from "../fixtures/stations";
+import { MARKETS, STATIONS, ZIPS, inMarket, stationByRef, type MockStation } from "../fixtures/stations";
 import { carriedPick, homeAirings, homeNowNext } from "../fixtures/home";
 import { path, reply, fail } from "../respond";
-import { airingX, identX, marketOf, milesBetween } from "../view";
+import { syncStreamSignOff } from "../fixtures/signoff";
+import { airingX, identX, marketOf, milesBetween, rowOf } from "../view";
 
 const THIN = 3; // Fewer stations than this and the dial shows the nearest market too.
 
 /** A dial row from home's schedule (the shared one, plus the radio rows' lines and late airings). */
 function dialRow(s: MockStation, t: Date): DialRowX {
-  const nn = homeNowNext(s.ident.id, t);
-  const onAir = !!nn.now;
-  return { station: identX(s), onAir, now: nn.now ? airingX(nn.now) : null, next: nn.next ? airingX(nn.next) : null, playback: onAir ? playbackFor(s) : null };
+  return rowOf(s, homeNowNext(s.ident.id, t));
 }
 
 export const dialHandlers = [
@@ -29,7 +28,8 @@ export const dialHandlers = [
     return reply(stationsApi.marketForZip.response, { market, nearby });
   }),
 
-  http.get(path(stationsApi.getDial), ({ params, request }) => {
+  http.get(path(stationsApi.getDial), async ({ params, request }) => {
+    await syncStreamSignOff();
     const slug = String(params.marketSlug);
     const market = marketOf(slug);
     if (!market) return fail(404, "not_found", "That market wasn't found.");

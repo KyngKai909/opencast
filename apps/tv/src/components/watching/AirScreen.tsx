@@ -4,10 +4,11 @@
 // bars, shown only when the dial says the station is waiting for its signal (S13).
 
 import { useEffect } from "react";
+import { usePlayer } from "@opencast/player";
 import { Slate, clock } from "@opencast/ui";
 import { MARKET_TZ } from "../../lib/clock";
 import { FocusContext, focusKey, useTvFocusable } from "../../tv/focus";
-import { identText, signOnAt, signOnDay, type Row } from "./offAir";
+import { backTime, identText, signOnDay, type Row } from "./offAir";
 import { TvButton } from "./TvButton";
 import "./AirScreen.css";
 
@@ -27,7 +28,9 @@ export function AirScreen({ kind, row, suggest, now, onTune, onGuide }: AirScree
   useEffect(() => focusKey(first), [first, row.station.id, kind]);
 
   const here = identText(row.station);
-  const back = kind === "off_air" ? signOnAt(row) : null;
+  // The player's word first: a stream that signed off says when it's back (its sign-off tag), then the dial's.
+  const [ps] = usePlayer();
+  const back = kind === "off_air" ? backTime(row, ps.offAir) : null;
   const day = back ? signOnDay(back, now, MARKET_TZ) : null;
   const other = suggest ? ` ${identText(suggest.station)} is on now.` : "";
   const line =
