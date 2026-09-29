@@ -1,0 +1,267 @@
+# Every test that runs on the team Macs, on GitHub instead: typecheck, the web apps' builds, the
+# unit tests, the API suite (Postgres, Redis, stripe-mock, ffmpeg, anvil), and Playwright on the
+# mocks and against the real API. docs/apps/testing.md, "On GitHub Actions".
+#
+# The Foundry tests (contracts/) run in contracts.yml, only when contracts/ changes.
+
+name: CI
+
+on:
+  push:
+    branches: [monorepo, apps]
+    paths-ignore: ["docs/**", "**/*.md"]
+  pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_dispatch:
+
+# One run per branch: a newer push (or the pull request's run for the same branch) cancels the older.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The team Macs' zone: the mock clocks and the seeded schedule are the Inland Empire's.
+  TZ: America/Los_Angeles
+  TURBO_TELEMETRY_DISABLED: "1"
+  # Turbo 2's strict env mode would drop TZ and the services' URLs from the tasks it runs.
+  TURBO_ENV_MODE: loose
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: "false"
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-typecheck-${{ github.sha }}
+          restore-keys: turbo-typecheck-
+      - run: npm run typecheck -- --output-logs=errors-only
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: "false"
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-build-${{ github.sha }}
+          restore-keys: turbo-build-
+      - name: Build the four web apps
+        run: npx turbo run build --filter=@opencast/web --filter=@opencast/business --filter=@opencast/tv --filter=@opencast/site --output-logs=errors-only
+      - name: No mock code in the production bundles
+        run: .github/scripts/check-no-mocks.sh web business tv site
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          build-packages: "false"
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-unit-${{ github.sha }}
+          restore-keys: turbo-unit-
+      # Vitest in every workspace but the API and the database (they need Postgres: the api job)
+      # and e2e (Playwright: the e2e jobs).
+      - name: Vitest
+        run: npx turbo run test --filter='!@opencast/api' --filter='!@opencast/db' --filter='!@opencast/e2e' --output-logs=errors-only
+
+  api:
+    name: api (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # `npm test -w @opencast/api` is the suite, then test:realtime; here they run side by side.
+        suite: [suite, realtime]
+    # The same host ports as docker-compose.yml, so the tests' defaults find them.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: opencast
+          POSTGRES_PASSWORD: opencast
+          POSTGRES_DB: opencast
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -h localhost -U opencast"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+      redis:
+        image: redis:7
+        ports: ["63799:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+      stripe-mock:
+        image: stripe/stripe-mock:latest
+        ports: ["12111:12111"]
+    env:
+      DATABASE_URL: postgres://opencast:opencast@localhost:54329/opencast
+      TEST_REDIS_URL: redis://127.0.0.1:63799
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The escrow, Clear and sample-week tests deploy the contracts to anvil.
+          submodules: ${{ matrix.suite == 'suite' && 'recursive' || 'false' }}
+      - uses: ./.github/actions/setup
+        with:
+          ffmpeg: "true"
+      # Every test file migrates its own database in one transaction; several at once can run out
+      # of Postgres's lock table ("out of shared memory") at the default 64 locks per transaction.
+      - name: Postgres, room for parallel migrations
+        run: |
+          pg=${{ job.services.postgres.id }}
+          docker exec "$pg" psql -U opencast -qc "ALTER SYSTEM SET max_locks_per_transaction = 512"
+          docker restart "$pg" >/dev/null
+          until docker exec "$pg" pg_isready -h localhost -U opencast -q; do sleep 1; done
+          docker exec "$pg" psql -U opencast -Atc "SHOW max_locks_per_transaction"
+      - name: Foundry
+        if: matrix.suite == 'suite'
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - name: Cache the contracts' build
+        if: matrix.suite == 'suite'
+        uses: actions/cache@v4
+        with:
+          path: |
+            contracts/out
+            contracts/cache
+          key: forge-${{ hashFiles('contracts/src/**', 'contracts/test/**', 'contracts/script/**', 'contracts/foundry.toml', 'contracts/foundry.lock') }}
+      # Built once here: the chain tests would otherwise race each other to `forge build`.
+      - name: forge build
+        if: matrix.suite == 'suite'
+        working-directory: contracts
+        run: forge build
+      - name: The database's tests
+        if: matrix.suite == 'suite'
+        run: npm test -w @opencast/db
+      # Two --exclude flags: the package script's `--exclude 'test/playout-{run,live}.test.ts'` is
+      # misparsed by Vitest's CLI and selects only playout-live.test.ts.
+      - name: The API's suite
+        if: matrix.suite == 'suite'
+        working-directory: apps/api
+        run: npx vitest run --exclude test/playout-run.test.ts --exclude test/playout-live.test.ts
+      - name: The real-time playout tests
+        if: matrix.suite == 'realtime'
+        run: npm run test:realtime -w @opencast/api
+
+  e2e-mock:
+    name: e2e-mock (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      E2E_SKIP_A11Y: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      # TV mode and the viewer play the mock stations (npm run mock:streams -w @opencast/player).
+      - name: Cache the mock HLS streams
+        id: streams
+        uses: actions/cache@v4
+        with:
+          path: packages/player/.mock-streams
+          key: mock-streams-${{ hashFiles('packages/player/mock/generate-streams.mjs') }}
+      - name: ffmpeg
+        if: steps.streams.outputs.cache-hit != 'true'
+        run: command -v ffmpeg || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null; }
+      - name: Make the mock HLS streams
+        if: steps.streams.outputs.cache-hit != 'true'
+        run: npm run mock:streams -w @opencast/player
+      - name: Google Chrome
+        # The runner image has it (Playwright runs channel "chrome"); install it only if it's gone.
+        run: |
+          if [ ! -x /opt/google/chrome/chrome ]; then npx playwright install chrome --with-deps; fi
+          /opt/google/chrome/chrome --version
+      - name: Playwright
+        working-directory: e2e
+        run: npx playwright test --shard=${{ matrix.shard }}/2 --workers 2
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-mock-${{ matrix.shard }}
+          path: |
+            e2e/report
+            e2e/test-results
+          retention-days: 7
+
+  e2e-real:
+    name: e2e-real (${{ matrix.shard }}/4)
+    # The longest job (four runners): on pull requests and by hand, not on every push.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each shard is its own runner: its own Postgres and Redis, its own throwaway database and seed.
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: opencast
+          POSTGRES_PASSWORD: opencast
+          POSTGRES_DB: opencast
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -h localhost -U opencast"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+      redis:
+        image: redis:7
+        ports: ["63799:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+        with:
+          # The API checks uploads with ffmpeg; the business flow makes its spot with it.
+          ffmpeg: "true"
+      - name: Google Chrome
+        # The runner image has it (Playwright runs channel "chrome"); install it only if it's gone.
+        run: |
+          if [ ! -x /opt/google/chrome/chrome ]; then npx playwright install chrome --with-deps; fi
+          /opt/google/chrome/chrome --version
+      - name: Playwright
+        working-directory: e2e
+        run: npx playwright test -c playwright.real.config.ts --shard=${{ matrix.shard }}/4 --workers 1
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-real-${{ matrix.shard }}
+          path: |
+            e2e/report/real
+            e2e/test-results/real
+            e2e/.real/api.log
+          include-hidden-files: true
+          retention-days: 7

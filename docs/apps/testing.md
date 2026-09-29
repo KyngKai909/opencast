@@ -175,3 +175,36 @@ another is going uses the first one's API, which goes away when the first run en
 ## Quick run
 
 `npm run e2e:quick` runs every mock flow without the axe accessibility specs, on two workers (a couple of minutes). The axe specs come back before launch, once the design is final.
+
+## On GitHub Actions
+
+Every suite above also runs on GitHub, so nothing heavy has to run on a laptop:
+`.github/workflows/ci.yml` on every push to `monorepo` and `apps`, on pull requests, and by hand
+(Actions → CI → Run workflow). Changes only to `docs/` or Markdown don't start it. A newer push to
+the same branch cancels the run before it.
+
+| Job | Runs | Needs |
+| --- | --- | --- |
+| `typecheck` | `npm run typecheck` | |
+| `build` | the four web apps' production builds, then `.github/scripts/check-no-mocks.sh` (no Mock Service Worker, mock or test-token sign-in, mock streams or Cast bridge in `dist/assets`) | |
+| `unit` | Vitest in every workspace but the API, the database and e2e | |
+| `api (suite)` | `npm test -w @opencast/db`, then the API's Vitest suite without the playout files | Postgres 17, Redis 7, stripe-mock, ffmpeg, Foundry (anvil) |
+| `api (realtime)` | `npm run test:realtime -w @opencast/api` | Postgres, Redis, ffmpeg |
+| `e2e-mock (1/2, 2/2)` | the mock flows, `E2E_SKIP_A11Y=1`, `--shard=n/2 --workers 2` | Google Chrome (on the runner), the mock HLS streams (made with ffmpeg, cached) |
+| `e2e-real (1/4…4/4)` | the real-API specs, `--shard=n/4 --workers 1`; on pull requests and by hand only | Postgres, Redis, ffmpeg, Chrome |
+
+`.github/workflows/contracts.yml` runs `npm run contracts:test` (Foundry) when `contracts/` changes.
+
+The services are GitHub service containers on the same host ports as `docker-compose.yml`
+(:54329, :63799, stripe-mock on :12111), so the tests' defaults find them. Each e2e-real shard is its
+own runner with its own Postgres and Redis, and its global setup makes its own database and seed.
+The runners use the team Macs' zone (`TZ=America/Los_Angeles`). No secrets are used: `.env` is
+git-ignored, the setup refuses to run if one is in the checkout, and the harnesses blank every
+provider key anyway. On a failure the job keeps the Playwright report and test results (and the
+e2e API's log) as an artifact for 7 days: the run's Summary page, Artifacts.
+
+`CI` is set on GitHub, and it changes one thing in the Playwright configs: `forbidOnly`, so a
+`test.only` left in fails the run. Locally nothing changes.
+
+To see why a job failed: the run's page lists each job; a Playwright job's artifact has the HTML
+report (`npx playwright show-report <folder>` after downloading).
