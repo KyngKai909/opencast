@@ -1,0 +1,16 @@
+{
+  "name": "@opencast/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:real": "playwright test -c playwright.real.config.ts",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.63.0",
+    "jose": "^6.0.0"
+  }
+}
