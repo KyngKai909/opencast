@@ -232,6 +232,19 @@ export async function stationFixture(
   return station;
 }
 
+/**
+ * A radio channel number (tenths) the database takes: the band's numbering is moving from odd
+ * tenths (88.1 to 107.9) to even ones (88.2 to 107.8), so this reads the rule rather than
+ * assuming it. `n` picks the nth channel from the bottom of the band.
+ */
+export async function radioTenths(h: Harness, n = 0): Promise<number> {
+  const { sql } = await import("drizzle-orm");
+  const result = (await h.db.execute(sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'channel_number_in_band'`)) as unknown as { rows?: Array<{ def: string }> } | Array<{ def: string }>;
+  const rows = Array.isArray(result) ? result : (result.rows ?? []);
+  const even = /%\s*2\)?\s*=\s*0/.test(rows[0]?.def ?? "");
+  return (even ? 882 : 881) + 2 * n;
+}
+
 /** A short test clip made with ffmpeg (a test pattern and a tone), cached per run. */
 const clips = new Map<string, Promise<string>>();
 export function testClip(seconds: number, kind: "video" | "audio" = "video"): Promise<string> {

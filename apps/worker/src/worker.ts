@@ -1,9 +1,10 @@
 // The playout worker: prepare once, then assemble. The leader (Redis lease) runs the playout
 // engine, which prepares items for air (FFmpeg, once per content ID, into object storage),
-// assembles every station on air into its playlists (pointing at prepared segments, and at
-// Livepeer's during live blocks), runs translators that are on, and the minute tick (reminders,
-// dead-air warnings, deadlines). Followers wait. The worker needs only scratch space
-// (WORKER_SCRATCH_DIR) for preparation and translators.
+// assembles every station on air into its playlists (pointing at prepared segments, at Livepeer's
+// during a TV station's live blocks, and at its own during a radio station's: the leader takes
+// radio encoders' RTMP pushes on WORKER_INGEST_PORT, 1935 by default), runs translators that are
+// on, and the minute tick (reminders, dead-air warnings, deadlines). Followers wait. The worker
+// needs only scratch space (WORKER_SCRATCH_DIR) for preparation, radio live and translators.
 //
 // GET /health reports leadership, stations on air, preparation (items prepared, waiting, and the
 // time preparing takes) and readiness; GET /hls/<station>/master.m3u8 (and <rendition>.m3u8) serves
@@ -23,7 +24,9 @@ const JOBS_EVERY_MS = 60_000;
 
 const deps = createDeps(process.env, STORAGE_ROOT);
 const { services } = createV1(deps);
-const engine = createEngine({ deps, services }, { log: (line) => console.log(line) });
+// Radio live: encoders push to the leader's RTMP ingest (WORKER_INGEST_SERVER is the address they're given).
+const ingestPort = process.env.WORKER_INGEST_PORT === "off" ? null : Number(process.env.WORKER_INGEST_PORT ?? 1935);
+const engine = createEngine({ deps, services }, { log: (line) => console.log(line), ingest: ingestPort === null ? null : { port: ingestPort } });
 const jobs = createJobs(deps, services);
 const legacy = process.env.LEGACY_PLAYOUT === "on" ? startLegacyPlayout() : null;
 
@@ -73,9 +76,9 @@ const health = http.createServer((req, res) => {
   if (url === "/health") {
     engine
       .stats()
-      .then(({ stationsOnAir, preparation, readiness, translators }) => {
+      .then(({ stationsOnAir, preparation, readiness, live, translators }) => {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, preparation, readiness, translators, at: new Date().toISOString() }));
+        res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, preparation, readiness, live, translators, at: new Date().toISOString() }));
       })
       .catch((error) => res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: (error as Error).message })));
     return;

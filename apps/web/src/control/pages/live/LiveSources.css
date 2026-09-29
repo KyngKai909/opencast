@@ -17,6 +17,8 @@
 .cc-src h4 .cc-sig { font-family: var(--font-text); }
 .cc-src__menu { margin-left: auto; }
 .cc-src > small { font-size: 13px; color: var(--ink-70); }
+/* A radio station's encoder: Opencast takes the sound itself. */
+.cc-src > small.cc-src__route { display: block; margin-top: 2px; }
 .cc-keyrows { margin-top: 10px; border-top: 1px solid var(--hair); }
 .cc-keyrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 52px; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
 .cc-keyrow > span:first-child { color: var(--ink-70); }

@@ -10,9 +10,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "lint": "echo \"No lint configured for api\"",
     "test": "npm run test:suite && npm run test:realtime",
-    "test:suite": "vitest run --exclude test/playout-translator.test.ts",
+    "test:suite": "vitest run --exclude test/playout-translator.test.ts --exclude test/playout-radio-live.test.ts --exclude test/playout-relay-background.test.ts --exclude test/playout-live-audio.test.ts",
     "storage:move-off-pinata": "tsx --conditions=source scripts/move-off-pinata.ts",
-    "test:realtime": "vitest run test/playout-translator.test.ts --no-file-parallelism"
+    "test:realtime": "vitest run test/playout-translator.test.ts test/playout-radio-live.test.ts test/playout-relay-background.test.ts test/playout-live-audio.test.ts --no-file-parallelism"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1085.0",

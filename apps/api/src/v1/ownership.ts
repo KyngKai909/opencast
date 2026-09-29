@@ -10,6 +10,7 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.blocked_categories",
     "broadcast.translators",
     "broadcast.live_sources",
+    "broadcast.relay_backgrounds",
     "broadcast.host_assignments",
     "broadcast.speakers",
     "broadcast.lower_thirds"

@@ -524,3 +524,18 @@ The channel's playlists now carry captions (a WebVTT subtitle rendition on the T
 | The subtitle rendition's name, as a device's own caption menu shows it (Safari and iOS, Apple TV, a Chromecast's) | The language's name in itself: "English", "Español" (from the station's programs' captions language; "English" when none is set). No other words |
 | Upload with a caption file, and Upload captions (L7): when the file is neither WebVTT nor SRT | "That isn't WebVTT or SRT captions." (the API's words, shown as they come; unchanged from L7) |
 | Master control, a translator (no screen yet; proposed): the choice | "Draw captions into the picture"; help "Off: {YouTube} gets the picture without captions. On: captions are part of the picture there, for everyone watching." Off by default |
+
+### Radio live and the relay background (contracts of 2026-09-29)
+
+Radio stations go live through Opencast's own ingest (sound only), and choose the picture their translators relay under their sound. No frame draws either; the words follow the Translators page and Live sources. A140 and A141 in open-questions.md.
+
+| Where | Words |
+|---|---|
+| Live sources, a radio station's encoder, under "For OBS, vMix or a hardware encoder. Paste these into its stream settings." | "Sound only: {WAVE} takes the audio and packages it at 128 and 64 kbps. Any picture is left out." (the Server row shows Opencast's own ingest; Streaming key and Reset key as before) |
+| Translators page and Settings, Translators (radio stations only), the section below the relays | title "Relay background"; "What YouTube, Twitch and other services show under {WAVE}'s sound. Listeners on Opencast never see it." |
+| Relay background, the line beside the preview | none: "None yet. Relays show {WAVE}'s colour with its call sign and channel."; a picture: "{wave.png}, held still."; a GIF or video: "{spin.gif}, looping every {2.4} seconds."; while it's prepared: "{waves.mp4} is being prepared. Relays keep showing what they show now until it's ready."; if it couldn't be: the API's words, "That file couldn't be made into a loop. Try another." |
+| Relay background, help and buttons | "An image, a GIF, or a video up to 30 seconds. Its sound is left out. Spots' codes show over it for their last 10 seconds, as they do on TV."; "Upload" (none yet) or "Replace"; "Remove" |
+| Relay background, toasts | after an upload: "{waves.mp4} is being prepared. Relays show it once it's ready."; after Remove: "Background removed. Relays show {WAVE}'s colour again." |
+| Relay background, the preview's label (screen readers) | "The relay background, {wave.png}, with the bug"; without one: "What relays show: {WAVE 88.4} in {WAVE}'s colour" |
+| Relay background, the API's refusals (shown as they come) | "Use a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video." (`wrong_file_type`); "Use a file of 100 MB or less." (`too_big`); "Use a video of 30 seconds or less. It loops." (`too_long`); "That file couldn't be read as a picture or a video." (`unreadable_file`); "Backgrounds are for radio stations' relays. A TV station relays its own picture." (`not_radio`, not shown: TV stations don't see the section) |
+| An encoder with the wrong key (no screen: the encoder's own error) | RTMP `NetStream.Publish.BadName`, "That stream key isn't a live source here." |

@@ -58,6 +58,13 @@ function visit(buf: Buffer, onPts: (at: number, value: number) => void, onPcr: (
   }
 }
 
+/** A TS segment's first timestamp (90 kHz, the earliest PTS or DTS in it), or null when it has none. */
+export function firstPts(buf: Buffer): number | null {
+  let first = Number.POSITIVE_INFINITY;
+  visit(buf, (_, v) => (first = Math.min(first, v)), () => undefined);
+  return Number.isFinite(first) ? first : null;
+}
+
 /** Where the joined stream carries its program table, picture and sound. */
 export const OUT_PID = { pmt: 0x1000, video: 0x100, audio: 0x101 } as const;
 const VIDEO_TYPES = new Set([0x01, 0x02, 0x10, 0x1b, 0x24]);
@@ -111,11 +118,13 @@ function psiPacket(pid: number, body: number[]): Buffer {
   return out;
 }
 
-function patPacket(): Buffer {
+/** The joined stream's program table (PAT), continuity counter 0. */
+export function patPacket(): Buffer {
   return psiPacket(0, [0x00, 0xb0, 0, 0x00, 0x01, 0xc1, 0x00, 0x00, 0x00, 0x01, 0xe0 | (OUT_PID.pmt >> 8), OUT_PID.pmt & 0xff]);
 }
 
-function pmtPacket(pcrPid: number, videoType: number | null, audioType: number | null): Buffer {
+/** The joined stream's PMT: picture on 0x100, sound on 0x101 (continuity counter 0). */
+export function pmtPacket(pcrPid: number, videoType: number | null, audioType: number | null): Buffer {
   const body = [0x02, 0xb0, 0, 0x00, 0x01, 0xc1, 0x00, 0x00, 0xe0 | (pcrPid >> 8), pcrPid & 0xff, 0xf0, 0x00];
   if (videoType !== null) body.push(videoType, 0xe0 | (OUT_PID.video >> 8), OUT_PID.video & 0xff, 0xf0, 0x00);
   if (audioType !== null) body.push(audioType, 0xe0 | (OUT_PID.audio >> 8), OUT_PID.audio & 0xff, 0xf0, 0x00);

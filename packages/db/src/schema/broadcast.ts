@@ -276,7 +276,7 @@ export const contentRefs = broadcast.table(
     cid: text("cid")
       .notNull()
       .references(() => contents.cid),
-    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo", "caption_track"] }).notNull(),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo", "caption_track", "relay_background"] }).notNull(),
     ownerId: uuid("owner_id").notNull(),
     createdAt: createdAt()
   },
@@ -686,6 +686,33 @@ export const translators = broadcast.table("translators", {
   /** Added 2026-09-29 (migration 0021): captions drawn into the relayed picture. Off unless the station chooses it. */
   burnCaptions: boolean("burn_captions").notNull().default(false),
   createdAt: createdAt()
+});
+
+/**
+ * Added 2026-09-29 (migration 0023): a radio station's background for its translators, which want
+ * a picture: an image, a GIF or a short video (up to 30 s), prepared once at upload into a loop at
+ * the relay's size (`relay-backgrounds/<content ID>-<W>x<H>/loop.mp4` and `still.jpg`). Relays
+ * only; the apps never show it. One per station: a new upload replaces it.
+ */
+export const relayBackgrounds = broadcast.table("relay_backgrounds", {
+  stationId: uuid("station_id")
+    .primaryKey()
+    .references(() => stations.id),
+  kind: text("kind", { enum: ["image", "gif", "video"] }).notNull(),
+  /** The upload, by content ID (a `relay_background` reference keeps it). */
+  contentId: text("content_id").notNull(),
+  fileName: text("file_name"),
+  status: text("status", { enum: ["preparing", "ready", "failed"] }).notNull().default("preparing"),
+  error: text("error"),
+  /** Where the prepared loop and its still are (a prefix in object storage), once ready. */
+  loopKey: text("loop_key"),
+  width: integer("width"),
+  height: integer("height"),
+  durationMs: integer("duration_ms"),
+  /** Frames in the loop (30 a second). */
+  frames: integer("frames"),
+  createdAt: createdAt(),
+  updatedAt: at("updated_at").notNull().defaultNow()
 });
 
 export const livepeerConfig = broadcast.table("livepeer_config", {

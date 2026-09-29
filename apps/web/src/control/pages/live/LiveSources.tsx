@@ -186,6 +186,7 @@ export default function LiveSources() {
             {src.kind === "encoder" ? (
               <>
                 <small>For OBS, vMix or a hardware encoder. Paste these into its stream settings.</small>
+                {src.route === "opencast" && <small className="cc-src__route">Sound only: {callSign} takes the audio and packages it at 128 and 64 kbps. Any picture is left out.</small>}
                 <div className="cc-keyrows">
                   <div className="cc-keyrow">
                     <span>Server</span>

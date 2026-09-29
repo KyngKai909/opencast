@@ -9,18 +9,26 @@
 //   - applies commands (sign on and off, skip, cue a break, end a live block early, replan);
 //   - fills breaks ahead of time (holding the money) and fills dead air nobody filled;
 //   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
+//   - takes radio stations' live pushes on its own RTMP ingest (rtmp.ts, radiolive.ts) while it's
+//     the leader: the radio band never goes through Livepeer;
 //   - runs the translators that are on (translator.ts).
 //
 // The old worker cache and continuous encode are gone: the worker needs only scratch space.
 
+import { createHash } from "node:crypto";
+import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { asc, eq, isNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
+import { publicUrl } from "../../../lib/url.js";
 import { ChannelAssembler, pruneChannelItems, type ChannelLook } from "./assemble.js";
 import { createFiller } from "./fill.js";
-import { LADDER, scaledLadder, type Band, type Ladder } from "./ladder.js";
+import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type Ladder } from "./ladder.js";
+import { audioOnlySegment, LiveHlsSource, type AudioOnlyMaker, type LiveSource } from "./live.js";
+import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
+import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
 import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
 import { TranslatorRelay } from "./translator.js";
@@ -62,6 +70,11 @@ export interface EngineOptions {
   translators?: boolean;
   /** How far ahead the channel's rows are written. */
   leadMs?: number;
+  /**
+   * The worker's RTMP ingest for radio live blocks (WORKER_INGEST_PORT in the worker; port 0 picks
+   * a free one). None by default: radio live sources then air the stand-by slate.
+   */
+  ingest?: { port: number; host?: string } | null;
 }
 
 export interface ReadinessSummary {
@@ -107,6 +120,22 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let rightsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
   let captionsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
   let readiness: ReadinessSummary = { checkedAt: null, items: 0, ready: 0, waiting: 0, firstNotReady: null };
+  /** Radio live: what packaging the stations' sound has cost since the worker started. */
+  const liveCpu = { sessions: 0, ms: 0, cpuSeconds: 0 };
+  const ingest = options.ingest
+    ? new RtmpIngest({
+        port: options.ingest.port,
+        host: options.ingest.host,
+        log,
+        // Radio stations' encoders only: a TV station's goes to Livepeer.
+        authorize: async (key) => {
+          const found = await services.stations.liveSourceByKey(key);
+          return found && found.band === "radio" ? found.id : null;
+        }
+      })
+    : null;
+  let ingestListening: Promise<unknown> | null = null;
+  let ingestTriedAt = 0;
 
   // A program that just became ready airs from its next segment boundary: plan again.
   preparer.onReady((key) => {
@@ -233,6 +262,55 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     return source?.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${source.livepeerPlaybackId}/index.m3u8` : null;
   }
 
+  /** Stores a live segment the worker made; its URL for the playlists. */
+  async function storeLiveSegment(key: string, file: string): Promise<string> {
+    const sha256 = createHash("sha256").update(await fs.readFile(file)).digest();
+    await deps.storage.objects.put(key, file, { contentType: "video/mp2t", storageClass: "standard", sha256 });
+    return publicUrl(deps, deps.storage.objects.publicUrl?.(key) ?? `/hls/${key}`);
+  }
+
+  /** TV live blocks: the audio-only rendition's segment, the sound of Livepeer's smallest. */
+  function audioOnlyMaker(liveSourceId: string): AudioOnlyMaker {
+    return async ({ uri, seq, session, rendition }) => {
+      const response = await fetch(uri, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+      if (!response?.ok) return null;
+      const sound = await audioOnlySegment(Buffer.from(await response.arrayBuffer()));
+      if (!sound) return null;
+      await fs.mkdir(scratchDir, { recursive: true });
+      const file = path.join(scratchDir, `ao-${liveSourceId.slice(0, 8)}-${session}-${seq}.ts`);
+      await fs.writeFile(file, sound);
+      try {
+        return await storeLiveSegment(liveSegmentKey(liveSourceId, session, rendition, seq), file);
+      } finally {
+        await fs.rm(file, { force: true });
+      }
+    };
+  }
+
+  /** A live block's source: radio from the worker's own ingest, TV from Livepeer. */
+  async function liveSource(liveSourceId: string, band: Band, now: () => number): Promise<LiveSource | null> {
+    if (band === "radio") {
+      if (!ingest) return null;
+      return new WorkerLiveSource({
+        sourceId: liveSourceId,
+        ingest,
+        ladder,
+        renditions: BAND_RENDITIONS.radio,
+        scratchDir,
+        store: storeLiveSegment,
+        now,
+        log,
+        onSession: ({ ms, cpuSeconds }) => {
+          liveCpu.sessions++;
+          liveCpu.ms += ms;
+          liveCpu.cpuSeconds += cpuSeconds;
+        }
+      });
+    }
+    const url = await liveUrl(liveSourceId);
+    return url ? new LiveHlsSource(url, BAND_RENDITIONS.tv, ladder, now, audioOnlyMaker(liveSourceId)) : null;
+  }
+
   async function startAssembler(stationId: string) {
     const found = await services.stations.look(stationId);
     if (!found) return;
@@ -244,7 +322,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       plan: (from, to) => planner.plan(stationId, from, to),
       preparer,
       slates: planner.slates,
-      liveUrl,
+      liveSource: (id) => liveSource(id, look.band, () => deps.clock.now().getTime()),
       appOrigin: deps.config.appOrigin,
       scratchDir,
       leadMs: options.leadMs,
@@ -339,13 +417,20 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     planner,
     filler,
     preparer,
+    /** The radio ingest, when the worker runs one. */
+    ingest,
+    /** A running relay (tests read what it drew). */
+    relay(stationId: string, translatorId: string): TranslatorRelay | null {
+      return translators.get(stationId)?.get(translatorId)?.relay ?? null;
+    },
 
     /** For the worker's health endpoint. */
-    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; translators: Array<{ stationId: string; translatorId: string; bytesThisSession: number }> }> {
+    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; live: LiveCpu; translators: Array<{ stationId: string; translatorId: string; bytesThisSession: number }> }> {
       return {
         stationsOnAir: assemblers.size,
         preparation: await preparer.stats(),
         readiness,
+        live: { sessions: liveCpu.sessions, liveSeconds: Math.round(liveCpu.ms / 1000), cpuSeconds: Math.round(liveCpu.cpuSeconds * 10) / 10, cpuSecondsPerLiveHour: liveCpu.ms ? Math.round((liveCpu.cpuSeconds * 3_600_000) / liveCpu.ms) : null },
         translators: [...translators].flatMap(([stationId, running]) => [...running].map(([translatorId, t]) => ({ stationId, translatorId, bytesThisSession: t.relay.bytesSent })))
       };
     },
@@ -358,6 +443,15 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       if (!initialized) {
         await preparer.init();
         initialized = true;
+      }
+      // Encoders are taken by the leader only (the one assembling): it listens once it leads.
+      if (ingest && !ingestListening && Date.now() - ingestTriedAt >= 30_000) {
+        ingestTriedAt = Date.now();
+        ingestListening = ingest.listen().catch((error) => {
+          log(`[ingest] couldn't listen on :${options.ingest?.port}: ${(error as Error).message}`);
+          ingestListening = null;
+        });
+        await ingestListening;
       }
       const now = deps.clock.now().getTime();
       if (now - lastRights >= RIGHTS_EVERY_MS) {
@@ -426,6 +520,11 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       for (const stationId of [...translators.keys()]) await stopTranslators(stationId);
       for (const assembler of assemblers.values()) await assembler.stop({ signOff: false });
       assemblers.clear();
+      if (ingest && ingestListening) {
+        ingestListening = null;
+        ingestTriedAt = 0;
+        await ingest.close();
+      }
       // Preparations under way are left: the next leader queues them again.
     }
   };

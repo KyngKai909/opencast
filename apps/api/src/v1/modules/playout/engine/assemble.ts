@@ -9,8 +9,10 @@
 //     live, lower third, sign-off).
 //   - Open time and holds air the station ID slate, prepared at the length needed (whole seconds,
 //     at most a minute a row). Items not prepared air the same fill, and the station is told.
-//   - A live block points at the live source's segments (Livepeer's, the same ladder), appended as
-//     they appear; a source that isn't connected airs the prepared stand-by slate.
+//   - A live block points at the live source's segments (TV: Livepeer's, the same ladder, with the
+//     audio-only rendition's sound taken from Livepeer's smallest; radio: the worker's own, from
+//     the station's RTMP push), appended as they appear; a source that isn't connected airs the
+//     prepared stand-by slate. A source that reconnects starts a new row (a discontinuity).
 //   - A planned sign-off: the sign-off slate, then the playlist ends (an `end` row: #EXT-X-ENDLIST).
 //     At the back time a new run starts (a new playlist), from the station ID.
 //   - When an item's last segment is published, its as-run entry is written with the program
@@ -25,7 +27,7 @@ import { dateRangeTag, HLS_CLASS, HlsLogCode } from "@opencast/contracts";
 import type { ModuleContext } from "../../../context.js";
 import { publicUrl } from "../../../lib/url.js";
 import { BAND_RENDITIONS, REFERENCE, SEGMENT_MS, type Band } from "./ladder.js";
-import { LiveHlsSource } from "./live.js";
+import type { LiveSource } from "./live.js";
 import type { Segment } from "./plan.js";
 import { refKey, type Preparer } from "./prepare.js";
 import { proofFrame } from "./proof.js";
@@ -58,8 +60,8 @@ export interface AssemblerOptions {
   plan(from: Date, to: Date): Promise<Segment[]>;
   preparer: Preparer;
   slates: Slates;
-  /** Where a live source's HLS is read from (Livepeer's playback), or null when it has none. */
-  liveUrl(liveSourceId: string): Promise<string | null>;
+  /** A live block's source (TV: Livepeer's playback; radio: the worker's ingest), or null when it has none. */
+  liveSource(liveSourceId: string): Promise<LiveSource | null>;
   appOrigin: string;
   scratchDir: string;
   onMissing?(missing: { itemId: string; title: string; airsAt: Date }): void;
@@ -109,8 +111,8 @@ export class ChannelAssembler {
   private written = new Set<string>();
   /** Plan segments with nothing left to air. */
   private passed = new Set<string>();
-  private sources = new Map<string, LiveHlsSource | null>();
-  private liveRow: { row: Row; segKey: string; sourceId: string; lastSeq: number } | null = null;
+  private sources = new Map<string, LiveSource | null>();
+  private liveRow: { row: Row; segKey: string; sourceId: string; lastSeq: number; session?: string } | null = null;
   private standBy: { id: string; segKey: string; sourceId: string } | null = null;
   private signalLost = new Set<string>();
   private pending: "now" | "future" | null = null;
@@ -178,6 +180,8 @@ export class ChannelAssembler {
   async stop(options: { signOff: boolean }) {
     this.stopped = true;
     if (this.liveRow) await this.closeLive();
+    for (const source of this.sources.values()) await source?.close?.().catch(() => undefined);
+    this.sources.clear();
     if (options.signOff && this.cursor && !this.cursor.ended) {
       await this.truncate(this.now());
       await this.insertEnd(Math.max(this.now(), this.cursor!.at));
@@ -352,7 +356,8 @@ export class ChannelAssembler {
       const position = ["top_left", "top_right", "bottom_left", "bottom_right"].includes(look.bug.position) ? look.bug.position : "bottom_right";
       out.push(dateRangeTag({ id: `${rowId}-bug`, class: HLS_CLASS.bug, start, durationSeconds: seconds, attributes: { mode, callSign: look.callSign, channel: look.channel, logoUrl: logo, position, opacity: look.bug.opacity } }));
     }
-    if (tv && seg.code10 && seg.spotId && end - start > 0) {
+    // The code on both bands: the radio band's players draw no picture, but its translators do.
+    if (seg.code10 && seg.spotId && end - start > 0) {
       const from = Math.max(start, end - CODE_MS);
       const qrUrl = `${this.options.appOrigin}/c/${encodeURIComponent(seg.code10.code)}?s=${this.stationId}`;
       out.push(dateRangeTag({ id: `${rowId}-code`, class: HLS_CLASS.code, start: from, durationSeconds: (end - from) / 1000, attributes: { spotId: seg.spotId, code: seg.code10.code, offer: seg.code10.offer, qrUrl } }));
@@ -494,11 +499,8 @@ export class ChannelAssembler {
 
   // --- Live -------------------------------------------------------------------------------
 
-  private async source(liveSourceId: string): Promise<LiveHlsSource | null> {
-    if (!this.sources.has(liveSourceId)) {
-      const url = await this.options.liveUrl(liveSourceId);
-      this.sources.set(liveSourceId, url ? new LiveHlsSource(url, BAND_RENDITIONS[this.options.look.band], this.options.preparer.ladder, () => this.now()) : null);
-    }
+  private async source(liveSourceId: string): Promise<LiveSource | null> {
+    if (!this.sources.has(liveSourceId)) this.sources.set(liveSourceId, await this.options.liveSource(liveSourceId).catch(() => null));
     return this.sources.get(liveSourceId) ?? null;
   }
 
@@ -508,7 +510,11 @@ export class ChannelAssembler {
     for (const seg of this.plan) {
       if (seg.source.kind === "live" && seg.startsAt.getTime() - LIVE_PREROLL_MS <= now && seg.endsAt.getTime() > now) wanted.add(seg.source.liveSourceId);
     }
-    for (const id of this.sources.keys()) if (!wanted.has(id) && this.liveRow?.sourceId !== id) this.sources.delete(id);
+    for (const [id, source] of this.sources) {
+      if (wanted.has(id) || this.liveRow?.sourceId === id) continue;
+      this.sources.delete(id);
+      await source?.close?.().catch(() => undefined);
+    }
     for (const id of wanted) await (await this.source(id))?.poll();
   }
 
@@ -540,8 +546,13 @@ export class ChannelAssembler {
         let row = live.row;
         const uris = { ...(row.liveUris ?? {}) };
         const lengths = [...row.segmentMs];
+        // The source reconnected (a new session, its timestamps from the start): a new row.
+        if (fresh[0].session !== live.session) {
+          await this.closeLive();
+          return true;
+        }
         for (const s of fresh) {
-          if (row.startsAt.getTime() + sum(lengths) >= blockEnd) break;
+          if (row.startsAt.getTime() + sum(lengths) >= blockEnd || s.session !== live.session) break;
           lengths.push(s.durationMs);
           for (const r of BAND_RENDITIONS[band]) uris[r] = [...(uris[r] ?? []), s.uris[r]!];
           // The source's captions, when it has them ("" where a segment has none).
@@ -572,7 +583,7 @@ export class ChannelAssembler {
       if (edge.some((s) => s.uris.subs)) uris.subs = edge.map((s) => s.uris.subs ?? "");
       const tags = await this.tagsFor(id, seg, c.at, c.at + sum(lengths), null, "live");
       const row = await this.insertRow({ id, ...this.asRunFields(seg), reason: "live", kind: "live", liveUris: uris, segments: lengths.length, segmentMs: lengths, startsAt: new Date(c.at), endsAt: new Date(c.at + sum(lengths)), tags, open: true });
-      this.liveRow = { row, segKey: seg.key, sourceId: liveSourceId, lastSeq: edge[edge.length - 1].seq };
+      this.liveRow = { row, segKey: seg.key, sourceId: liveSourceId, lastSeq: edge[edge.length - 1].seq, session: edge[edge.length - 1].session };
       this.signalLost.delete(seg.key);
       this.log("live source connected: on air from it");
       return true;
@@ -609,9 +620,11 @@ export class ChannelAssembler {
       .from(CI)
       .where(and(eq(CI.stationId, this.stationId), or(gt(CI.endsAt, new Date(at)), and(eq(CI.kind, "end"), gte(CI.startsAt, new Date(at))))))
       .orderBy(asc(CI.seq), asc(CI.startsAt));
+    let standByGone = false;
     for (const row of rows) {
       if (row.startsAt.getTime() >= at) {
         await this.db.delete(CI).where(eq(CI.id, row.id));
+        if (this.standBy?.id === row.id) standByGone = true;
         if (row.planKey) this.written.delete(row.planKey);
         if (this.liveRow?.row.id === row.id) this.liveRow = null;
         continue;
@@ -632,7 +645,10 @@ export class ChannelAssembler {
     if (!last) this.cursor = { run: c.run, seq: c.seq, disc: c.disc, at: Math.max(at, this.now()), ended: false, fresh: true };
     else if (last.kind === "end") this.cursor = { run: last.run, seq: last.seq, disc: last.disc, at: Math.max(at, last.startsAt.getTime()), ended: true, fresh: false };
     else this.cursor = { run: last.run, seq: last.seq + last.segments, disc: last.disc, at: last.endsAt.getTime(), ended: false, fresh: false };
-    this.standBy = null;
+    // A stand-by slate that's still there (a replan cut after it, or through it) is still one: the
+    // source connecting cuts it. Before, a replan while standing by (dead air filled after the
+    // block, a log edit) left the slate to run out before the source could air.
+    if (standByGone) this.standBy = null;
   }
 
   // --- Published: the as-run log ------------------------------------------------------------
@@ -745,7 +761,27 @@ export class ChannelAssembler {
   }
 }
 
-/** Channel rows older than two days go (the as-run log is the record). */
+/**
+ * Channel rows older than two days go (the as-run log is the record), and with them the live
+ * segments the worker stored for their live blocks (`prepared/live-…`).
+ */
 export async function pruneChannelItems({ deps }: ModuleContext) {
-  await deps.db.delete(CI).where(and(lte(CI.endsAt, new Date(deps.clock.now().getTime() - 2 * 86_400_000)), sql`${CI.asRunId} is not null or ${CI.kind} = 'end'`));
+  const old = and(lte(CI.endsAt, new Date(deps.clock.now().getTime() - 2 * 86_400_000)), sql`${CI.asRunId} is not null or ${CI.kind} = 'end'`);
+  const live = await deps.db.select({ liveUris: CI.liveUris }).from(CI).where(and(old, eq(CI.kind, "live")));
+  for (const prefix of liveObjectPrefixes(live.map((r) => r.liveUris))) await deps.storage.objects.deletePrefix(prefix).catch(() => undefined);
+  await deps.db.delete(CI).where(old);
+}
+
+/** The stored live sessions (`prepared/live-…`) a live row's segments are in. */
+export function liveObjectPrefixes(uris: Array<Record<string, string[]> | null>): string[] {
+  const out = new Set<string>();
+  for (const byRendition of uris) {
+    for (const list of Object.values(byRendition ?? {})) {
+      for (const uri of list) {
+        const m = /(prepared\/live-[\w-]+)\//.exec(uri);
+        if (m) out.add(m[1]);
+      }
+    }
+  }
+  return [...out];
 }

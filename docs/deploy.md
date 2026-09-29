@@ -52,6 +52,8 @@ HLS: items are prepared once into segments in object storage, and each station's
 | `CLEAR_PRIVY_PROVIDER_APP_ID` | ✓ | | Clear's Privy app ID, as the global-wallet provider (docs/clear-integration.md). Unset: "Connect Clear" answers 409 |
 | `CLEAR_WALLET_ACCESS` | ✓ | | `read_only` (default) or `full`: what Clear has granted Opencast in Clear's Privy dashboard. The API can't detect it |
 | `LIVEPEER_API_KEY` | ✓ | ✓ | live sources and the Livepeer output |
+| `WORKER_INGEST_PORT` | | ✓ | added 2026-09-29: the port the leading worker takes radio stations' RTMP pushes on (1935 by default; `off` turns it off). Radio live blocks never go through Livepeer. Encoders need a TCP route to it (on Railway, a TCP proxy on the worker) |
+| `WORKER_INGEST_SERVER` | ✓ | | added 2026-09-29: the address radio stations' encoders are given, e.g. `rtmp://<the worker's TCP proxy>/live` (default `rtmp://localhost:<WORKER_INGEST_PORT>/live`) |
 | `PAYMENTS_PROVIDER` | ✓ | ✓ | `fake` on staging; `clear` or `stripe_only` in production (docs/clear-integration.md) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓ | ✓ | test keys on staging, live only in production. Webhook: `https://<api>/v1/webhooks/stripe` |
 | `CHAIN_RPC_URL`, `CHAIN_ID`, `ESCROW_CONTRACT_ADDRESS`, `CREATOR_FUND_ADDRESS`, `USDC_ADDRESS` | ✓ | ✓ | from `contracts/`'s deploy (Base Sepolia on staging). The API only reads and encodes |

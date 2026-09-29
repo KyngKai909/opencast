@@ -2,6 +2,23 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: radio live blocks through the worker, relay backgrounds, codes on relays
+
+From the Phase 5 demo's gaps (docs/phase-5-demo.md): a radio station couldn't go live (Livepeer returns only video), a TV live block's audio-only rendition carried Livepeer's smallest picture, and relays didn't draw spots' codes. Additive: one optional field, one new schema and three endpoints. Migration 0023 adds one table (`relay_backgrounds`); `content_refs.owner` gains `relay_background` (a text column, no migration).
+
+Changed (additive):
+
+- `LiveSource.route` (response, optional): where an encoder's push goes. `opencast` for every radio station's source: `server` is Opencast's own RTMP ingest (the worker's, `WORKER_INGEST_SERVER`, e.g. `rtmp://ingest.<domain>/live`), and the key is Opencast's own (shown once, reset as before). `livepeer` for a TV station's source with a Livepeer stream; null for a TV source without one. Radio stations never create Livepeer streams (`addLiveSource`), so a radio source's `previewUrl` is null, and a radio browser source's `ingest` (WHIP through Livepeer) is null: A140.
+- New: `RelayBackground` `{ kind: image | gif | video, fileName, status: preparing | ready | failed, error, loopUrl, stillUrl, width, height, durationMs, updatedAt }`, and `getRelayBackground` (`GET /stations/:stationId/relay-background`, `{ background: RelayBackground | null }`), `setRelayBackground` (`PUT`, multipart `file`: a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video up to 30 s, up to 100 MB; 409 `not_radio`; 422 `wrong_file_type`, `too_big`, `too_long`, `unreadable_file`) and `removeRelayBackground` (`DELETE`, `Ok`). Owners and operators. A radio station's picture for its translators only; the apps never show it. It's prepared once at upload (`status` `preparing` for a few seconds, then `ready`): `loopUrl` is the loop (MP4, H.264 at the relay's size, 30 fps, no sound; a still image is a two-second loop, a short GIF is repeated to at least two seconds), `stillUrl` its first frame. Relays that are on pick up a new or removed background within ten seconds.
+
+What the playlists carry:
+
+- A radio station's live block points at segments the worker packages from the station's own RTMP push: AAC 128k (`a128.m3u8`) and 64k (`a64.m3u8`), 4-second segments, stored like prepared ones (`prepared/live-<source>-<session>/<rendition>/seg_NNNNN.ts`) and served from the same places. As for TV: `#EXT-X-DISCONTINUITY` in and out, the `live` DATERANGE (also over the stand-by slate while the encoder isn't connected), and a new discontinuity if the encoder reconnects. Cued breaks during it air prepared spots and back, held and settled from the as-run as for recorded blocks.
+- A TV station's live block: `a128.m3u8` points at audio-only segments of its own (the sound of Livepeer's smallest rendition, stream-copied, its timestamps kept), no longer at Livepeer's 360p picture. The picture renditions still point at Livepeer.
+- The `code` DATERANGE (a spot's code for its last 10 s) is now on the radio band's playlists too (before: TV only). Players draw nothing on radio; radio relays draw it.
+
+Worker: radio encoders push to the leader's RTMP ingest (`WORKER_INGEST_PORT`, 1935 by default; `off` turns it off); the key is checked against radio stations' live sources, and a wrong key is refused. `GET /health` gains `live`: `{ sessions, liveSeconds, cpuSeconds, cpuSecondsPerLiveHour }` for packaging radio live sound since the worker started. Relays: a radio station's relay airs its sound over the background (or its colour with its call sign and channel) with the bug, and a spot's code, offer and QR for its last 10 s in the player's style, all prepared once, so nothing is encoded while it relays (`translator_sessions.mode` is `copy`). A TV station's relay draws the code into the segments it shows in. Live segments the worker stored go with their channel rows after two days.
+
 ## 2026-09-29: captions, prepared once and carried by the channel (X2)
 
 The platform prompt's Phase 5 ("captions are generated here, once"), for uploaded and embedded tracks. Additive: two optional body fields, one optional response field and two optional body fields on translators, and new playlist files. Migration 0021 adds one table (`prepared_captions`) and two columns (`caption_tracks.content_id`, nullable; `translators.burn_captions`, default false). Captions from speech are not built (they need a provider): see X2 in docs/contract-requests.md.

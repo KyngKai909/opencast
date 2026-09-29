@@ -251,6 +251,21 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     return { ok: true as const };
   });
 
+  // A radio station's relay background (added 2026-09-29).
+  r.handle(api.getRelayBackground, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return { background: await stations.getRelayBackground(params.stationId) };
+  });
+  r.handle(api.setRelayBackground, async ({ user, params, file }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return stations.setRelayBackground(params.stationId, file);
+  });
+  r.handle(api.removeRelayBackground, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    await stations.removeRelayBackground(params.stationId);
+    return { ok: true as const };
+  });
+
   r.handle(api.listLiveSources, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, ["owner", "operator", "host"]);
     return stations.liveSources(params.stationId);

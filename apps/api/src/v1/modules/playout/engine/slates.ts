@@ -153,20 +153,40 @@ export class Slates {
     );
   }
 
-  /** A spot's code and QR, bottom left inside title safe, shown for its last :10. */
-  async code(code: string, offer: string, url: string): Promise<string> {
-    const qr = await QRCode.toString(url, { type: "svg", margin: 1, width: 150, color: { dark: "#000000", light: "#FFFFFF" } });
-    const inner = qr.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
-    const viewBox = /viewBox="([^"]+)"/.exec(qr)?.[1] ?? "0 0 150 150";
-    return this.cached("code", { code, offer, url }, (file) =>
+  /**
+   * A spot's code, offer and QR for its last :10, where the picture leaves Opencast's players
+   * (translators): the player's code overlay (packages/player's Overlays, `oc-ovl__code` at TV
+   * size), bottom left at 6% and 7%, the screen colour at 85% behind white type, the QR's dark
+   * modules on white. A transparent frame of `size` to lay over the picture.
+   */
+  async code(code: string, offer: string, url: string, size: { width: number; height: number } = FRAME): Promise<string> {
+    const u = size.width / 1920;
+    const qr = await QRCode.toString(url, { type: "svg", margin: 2, errorCorrectionLevel: "M", color: { dark: "#0F1830", light: "#FFFFFF" } });
+    const inner = qr.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+    const viewBox = /viewBox="([^"]+)"/.exec(qr)?.[1] ?? "0 0 33 33";
+    const pad = { x: 40 * u, y: 27 * u };
+    const q = 142 * u;
+    const gap = 34 * u;
+    const codeSize = 54 * u;
+    const offerSize = 37 * u;
+    // The text's width, as the typefaces set it (mono: 0.6 em; Public Sans: about 0.52 em).
+    const textW = Math.max(code.length * codeSize * 0.6, offer.length * offerSize * 0.52);
+    const w = pad.x * 2 + q + gap + textW;
+    const h = pad.y * 2 + q;
+    const x = size.width * 0.06;
+    const y = size.height * (1 - 0.07) - h;
+    const tx = x + pad.x + q + gap;
+    const mid = y + h / 2;
+    return this.cached("code", { code, offer, url, size, v: 2 }, (file) =>
       this.svgToPng(
-        `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
-          <rect x="${SAFE.x}" y="${SAFE.y + SAFE.h - 170}" width="440" height="170" rx="6" fill="#000000" fill-opacity="0.72"/>
-          <svg x="${SAFE.x + 10}" y="${SAFE.y + SAFE.h - 160}" width="150" height="150" viewBox="${viewBox}">${inner}</svg>
-          <text x="${SAFE.x + 180}" y="${SAFE.y + SAFE.h - 100}" font-family="${MONO}" font-size="40" font-weight="600" fill="#FFFFFF">${esc(code)}</text>
-          <text x="${SAFE.x + 180}" y="${SAFE.y + SAFE.h - 55}" font-family="${TEXT}" font-size="28" fill="#FFFFFF">${esc(offer)}</text>
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${size.width}" height="${size.height}">
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${20 * u}" fill="rgb(10,17,36)" fill-opacity="0.85"/>
+          <svg x="${x + pad.x}" y="${y + pad.y}" width="${q}" height="${q}" viewBox="${viewBox}" shape-rendering="crispEdges">${inner}</svg>
+          <text x="${tx}" y="${mid - 4 * u}" font-family="${MONO}" font-size="${codeSize}" font-weight="500" fill="#FFFFFF">${esc(code)}</text>
+          <text x="${tx}" y="${mid + offerSize + 4 * u}" font-family="${TEXT}" font-size="${offerSize}" fill="#FFFFFF" fill-opacity="0.8">${esc(offer)}</text>
         </svg>`,
-        file
+        file,
+        size
       )
     );
   }

@@ -18,7 +18,7 @@ const REF = schema.contentRefs;
 const PV = schema.contentPreviews;
 const NEED = schema.contentPreviewNeeds;
 
-export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track";
+export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background";
 export type PreviewReason = "offer" | "review" | "order";
 
 export interface ContentInfo {

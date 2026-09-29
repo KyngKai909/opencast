@@ -1,14 +1,24 @@
-// A live source, as the channel's playlist reads it: Livepeer transcodes the block's source to the
-// same ladder, and its HLS output is polled here. Each new segment (in every rendition we map to)
-// is handed to the assembler, which points the channel's playlists at it. No bytes pass through
-// the worker. A source with no new segment for a few seconds counts as not connected, and the
+// A live source, as the channel's playlist reads it. Two kinds:
+//
+//   - TV: Livepeer transcodes the block's source to the same ladder, and its HLS output is polled
+//     here (`LiveHlsSource`). Each new segment (in every rendition we map to) is handed to the
+//     assembler, which points the channel's playlists at it. The picture's bytes don't pass
+//     through the worker. Livepeer makes no audio-only rendition, so the channel's audio-only one
+//     is made here: the sound of Livepeer's smallest rendition, stream-copied into a segment of
+//     its own (no re-encode, its timestamps kept) and stored with the platform's objects.
+//   - Radio: the worker takes the station's own RTMP push and packages its sound itself
+//     (radiolive.ts). Radio never goes through Livepeer.
+//
+// Either way, a source with no new segment for a few seconds counts as not connected, and the
 // assembler airs the stand-by slate until it's back.
 //
 // Livepeer's live renditions are mapped to the ladder by height (nearest), and the audio-only
-// renditions to an audio-only variant if the source has one, else its smallest. If the source's
-// master names a subtitle rendition, its WebVTT segments are passed through too (by media
-// sequence, as `uris.subs`); Livepeer gives none today, so a live block's captions are empty.
+// renditions to an audio-only variant if the source has one, else its smallest (whose sound is
+// taken, as above). If the source's master names a subtitle rendition, its WebVTT segments are
+// passed through too (by media sequence, as `uris.subs`); Livepeer gives none today, so a live
+// block's captions are empty.
 
+import { spawn } from "node:child_process";
 import type { Ladder, RenditionName } from "./ladder.js";
 
 /**
@@ -25,7 +35,44 @@ export interface LiveSegment {
   durationMs: number;
   /** Each rendition's segment, and `subs`, the source's caption segment when it has one. */
   uris: Partial<Record<RenditionName | "subs", string>>;
+  /**
+   * Which connection of the source it came from. Segments of one session run on (their
+   * timestamps continue); a new session starts again, so the channel puts a discontinuity there.
+   */
+  session?: string;
 }
+
+/** What the assembler reads a live block from. */
+export interface LiveSource {
+  /** Reads what's new (called about once a second while the block is on or near). */
+  poll(): Promise<void>;
+  /** A new segment within the last few seconds. */
+  connected(): boolean;
+  /** Segments after `seq`, in order; with no `seq`, the newest one (the live edge). */
+  after(seq: number | null): LiveSegment[];
+  /** The block no longer needs it. */
+  close?(): Promise<void>;
+}
+
+/**
+ * The sound of a TS segment, stream-copied into a segment of its own (no re-encode; its
+ * timestamps kept, so it lines up with the pictures it came with). Null when FFmpeg can't.
+ */
+export function audioOnlySegment(segment: Buffer): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-copyts", "-f", "mpegts", "-i", "pipe:0", "-map", "0:a:0", "-c", "copy", "-muxdelay", "0", "-muxpreload", "0", "-f", "mpegts", "pipe:1"], { stdio: ["pipe", "pipe", "pipe"] });
+    const out: Buffer[] = [];
+    child.stdout.on("data", (d: Buffer) => out.push(d));
+    child.stderr.on("data", () => undefined);
+    child.stdin.on("error", () => undefined);
+    child.on("error", () => resolve(null));
+    child.on("close", (code) => resolve(code === 0 && out.length ? Buffer.concat(out) : null));
+    child.stdin.end(segment);
+  });
+}
+
+/** Makes the channel's audio-only segment from a picture rendition's (TV live blocks): its URL, or null. */
+export type AudioOnlyMaker = (input: { uri: string; seq: number; session: string; rendition: RenditionName }) => Promise<string | null>;
 
 /** The source's subtitle rendition (its first), if its master names one. */
 export function parseSubtitles(text: string, base: string): string | null {
@@ -97,8 +144,13 @@ export function mapVariants(variants: Variant[], renditions: RenditionName[], la
   return map;
 }
 
-export class LiveHlsSource {
+export class LiveHlsSource implements LiveSource {
   private map: Map<RenditionName, string> | null = null;
+  /** Audio-only renditions read from a picture variant: their sound is taken (`audioOnly`). */
+  private derived = new Set<RenditionName>();
+  /** Counts the source's sessions (a new one each time its master is read afresh). */
+  private sessions = 0;
+  private session = "";
   /** The source's subtitle playlist, when its master names one. */
   private subsUrl: string | null = null;
   /** Every video rendition has a variant of its own size (else the master is read again). */
@@ -116,7 +168,9 @@ export class LiveHlsSource {
     readonly url: string,
     private renditions: RenditionName[],
     private ladder: Ladder,
-    private now: () => number
+    private now: () => number,
+    /** Makes audio-only segments where the source has no audio-only variant (TV: Livepeer has none). */
+    private audioOnly?: AudioOnlyMaker
   ) {}
 
   /** A playlist's text, and the address it came from after redirects (its URIs are relative to that). */
@@ -154,7 +208,10 @@ export class LiveHlsSource {
         this.subsUrl = variants ? parseSubtitles(master.text, master.url) : null;
         if (!map.size && !this.map) return;
         if (map.size) {
+          if (!this.map) this.session = `${Date.now().toString(36)}${(++this.sessions).toString(36)}`;
           this.map = map;
+          const audioVariants = new Set((variants ?? []).filter((v) => v.audioOnly).map((v) => v.url));
+          this.derived = new Set([...map].filter(([name, url]) => this.ladder[name].kind === "audio" && Boolean(variants) && !audioVariants.has(url)).map(([name]) => name));
           this.mapAt = this.now();
           this.complete = !variants || this.renditions.every((name) => this.ladder[name].kind !== "video" || variants.some((v) => !v.audioOnly && v.height === this.ladder[name].height));
         }
@@ -182,9 +239,16 @@ export class LiveHlsSource {
       }
       // Only segments every rendition has (renditions line up by media sequence).
       if (Object.keys(uris).length !== map.size) continue;
+      // The audio-only renditions' own segments, from the picture's sound (else the picture's, as before).
+      if (this.audioOnly) {
+        for (const name of this.derived) {
+          const made = await this.audioOnly({ uri: uris[name]!, seq: seg.seq, session: this.session, rendition: name }).catch(() => null);
+          if (made) uris[name] = made;
+        }
+      }
       const caption = subs.find((s) => s.seq === seg.seq);
       if (caption) uris.subs = caption.uri;
-      this.segments.set(seg.seq, { seq: seg.seq, durationMs: seg.durationMs, uris });
+      this.segments.set(seg.seq, { seq: seg.seq, durationMs: seg.durationMs, uris, session: this.session });
       this.segmentMs = seg.durationMs;
       this.newest = seg.seq;
       grew = true;

@@ -13,6 +13,7 @@ import { InviteModal } from "../../components/station/settings/InviteModal";
 import { NotificationsSection } from "../../components/station/settings/NotificationsSection";
 import { OwnershipSection } from "../../components/station/settings/OwnershipSection";
 import { TeamLede, TeamSection } from "../../components/station/settings/TeamSection";
+import { RelayBackground } from "../../components/station/RelayBackground";
 import { TranslatorList, TRANSLATOR_NOTE } from "../../components/station/TranslatorList";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation, type StationState } from "../../station/StationContext";
@@ -73,6 +74,7 @@ function Body({ id, s, phone }: { id: string; s: StationState; phone: boolean })
         <div className="cc-settings__translators">
           <TranslatorList stationId={s.id} callSign={s.station.callSign ?? s.station.name} canEdit={s.can("programming")} removable phone={phone} />
           <p className="cc-settings__note">{TRANSLATOR_NOTE}</p>
+          {s.station.band === "radio" && <RelayBackground stationId={s.id} callSign={s.station.callSign ?? s.station.name} channel={s.station.channel} colour={s.station.colour} canEdit={s.can("programming")} />}
         </div>
       );
     case "team":

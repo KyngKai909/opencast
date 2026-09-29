@@ -7,6 +7,7 @@ import type { Executor, ModuleContext } from "../../context.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
+import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackground.js";
 
 export type StationKind = "station" | "studio" | "claimable" | "listed" | "catalog";
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
@@ -91,6 +92,8 @@ export interface StationsService {
   liveSourceBelongs(stationId: string, sourceId: string): Promise<boolean>;
   /** For playout: where a live source's signal comes from. */
   liveSourceSignal(sourceId: string): Promise<{ streamKey: string | null; livepeerPlaybackId: string | null } | null>;
+  /** For the worker's radio ingest: the live source a stream key belongs to, and its station's band. */
+  liveSourceByKey(streamKey: string): Promise<{ id: string; stationId: string; band: Band | null } | null>;
   isHost(userId: string, stationId: string, programId: string | null): Promise<boolean>;
   /** For sign-on checks. */
   identityReady(stationId: string): Promise<{ callSign: boolean; channel: boolean }>;
@@ -114,8 +117,15 @@ export interface StationsService {
   } | null>;
   /** Stations that take orders, and studios. */
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
-  /** For playout: every enabled relay, with its key. */
-  relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate"; burnCaptions: boolean }>>;
+  /** For playout: every enabled relay, with its key (and a radio station's background, once prepared). */
+  relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate"; burnCaptions: boolean; background: { loopKey: string; frames: number } | null }>>;
+  /** A radio station's relay background (added 2026-09-29). */
+  getRelayBackground(stationId: string): Promise<RelayBackgroundView | null>;
+  setRelayBackground(stationId: string, file: import("../../http.js").UploadedFile | null): Promise<RelayBackgroundView>;
+  removeRelayBackground(stationId: string): Promise<void>;
+  /** For playout: the prepared background loop, when ready. */
+  relayBackground(stationId: string): Promise<{ loopKey: string; frames: number } | null>;
+  settleRelayBackgrounds(): Promise<void>;
   /** Used by Network desk to set up claimable, listed and catalog stations. */
   createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string }): Promise<string>;
 
@@ -201,6 +211,7 @@ export interface LiveSourceView {
   quality?: string | null;
   previewUrl?: string | null;
   ingest?: { whipUrl: string; token: string } | null;
+  route?: "livepeer" | "opencast" | null;
 }
 
 export interface LowerThirdView {
@@ -224,6 +235,8 @@ const C = schema.channels;
 const DEFAULT_TZ = "America/Los_Angeles";
 const PUBLIC_STATUSES = new Set(["on_air", "off_air"]);
 const INGEST_SERVER = process.env.LIVE_INGEST_SERVER ?? (hasLivepeerApiKey() ? "rtmp://rtmp.livepeer.com/live" : "rtmp://localhost:1935/live");
+/** Radio: the worker's own RTMP ingest (radio never goes through Livepeer), as encoders reach it. */
+const WORKER_INGEST_SERVER = (process.env.WORKER_INGEST_SERVER ?? `rtmp://localhost:${process.env.WORKER_INGEST_PORT ?? 1935}/live`).replace(/\/+$/, "");
 /** B3: Livepeer's WebRTC ingest (WHIP), by stream key. */
 const WHIP_BASE = (process.env.LIVEPEER_WHIP_BASE ?? "https://livepeer.studio/webrtc").replace(/\/+$/, "");
 /** S14: a source's own playback on Livepeer, the team's private preview of what it's sending. */
@@ -314,26 +327,40 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
   }
 
   const preview = (key: string | null) => (key ? `${key.slice(0, 8)}…` : null);
-  function liveSourceView(row: typeof schema.liveSources.$inferSelect): LiveSourceView {
+  /** The station's band (its primary channel's), for how its live sources are reached. */
+  async function bandOfStation(stationId: string): Promise<Band | null> {
+    const [row] = await db
+      .select({ band: C.band })
+      .from(C)
+      .where(and(eq(C.stationId, stationId), eq(C.isPrimary, true), isNull(C.releasedAt)));
+    return row?.band ?? null;
+  }
+
+  function liveSourceView(row: typeof schema.liveSources.$inferSelect, band: Band | null = null): LiveSourceView {
+    // Radio: the worker's own ingest takes the sound. TV: Livepeer, when it's set up.
+    const radio = band === "radio";
     return {
       id: row.id,
       kind: row.kind,
       name: row.name,
-      server: row.kind === "encoder" ? INGEST_SERVER : null,
+      server: row.kind === "encoder" ? (radio ? WORKER_INGEST_SERVER : INGEST_SERVER) : null,
+      route: radio ? "opencast" : row.livepeerStreamId ? "livepeer" : null,
       streamKeyPreview: preview(row.streamKey),
       signal: "not_connected",
       createdAt: row.createdAt.toISOString(),
       // S14: signal quality isn't measured yet.
       quality: null,
-      previewUrl: row.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${row.livepeerPlaybackId}/index.m3u8` : null,
-      // B3: a browser source sent through Livepeer publishes over WHIP with its stream key.
-      ingest: row.kind === "browser" && row.livepeerStreamId && row.streamKey ? { whipUrl: `${WHIP_BASE}/${row.streamKey}`, token: row.streamKey } : null
+      previewUrl: !radio && row.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${row.livepeerPlaybackId}/index.m3u8` : null,
+      // B3: a browser source sent through Livepeer publishes over WHIP with its stream key (TV only).
+      ingest: !radio && row.kind === "browser" && row.livepeerStreamId && row.streamKey ? { whipUrl: `${WHIP_BASE}/${row.streamKey}`, token: row.streamKey } : null
     };
   }
 
   const newKey = (prefix: string) => `${prefix.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 20)}-${randomBytes(12).toString("hex")}`;
 
   const service: StationsService = {
+    ...createRelayBackgrounds({ deps, services }),
+
     async idents(ids) {
       return new Map((await build(await rows(ids))).map((p) => [p.id, p.ident]));
     },
@@ -477,6 +504,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       return row ?? null;
     },
 
+    async liveSourceByKey(streamKey) {
+      if (!streamKey) return null;
+      const [row] = await db
+        .select({ id: schema.liveSources.id, stationId: schema.liveSources.stationId })
+        .from(schema.liveSources)
+        .where(and(eq(schema.liveSources.streamKey, streamKey), eq(schema.liveSources.kind, "encoder")));
+      return row ? { ...row, band: await bandOfStation(row.stationId) } : null;
+    },
+
     async isHost(userId, stationId, programId) {
       if (!programId) return false;
       const [row] = await db
@@ -555,7 +591,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .select()
         .from(schema.translators)
         .where(and(eq(schema.translators.stationId, stationId), eq(schema.translators.enabled, true)));
-      return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions }));
+      const background = rows.length && (await bandOfStation(stationId)) === "radio" ? await service.relayBackground(stationId) : null;
+      return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions, background }));
     },
 
     async createManaged(tx, input) {
@@ -758,14 +795,17 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
 
     async liveSources(stationId) {
       const list = await db.select().from(schema.liveSources).where(eq(schema.liveSources.stationId, stationId)).orderBy(asc(schema.liveSources.createdAt));
-      return list.map(liveSourceView);
+      const band = await bandOfStation(stationId);
+      return list.map((row) => liveSourceView(row, band));
     },
 
     async addLiveSource(stationId, input) {
       const [station] = await db.select({ callSign: S.callSign, name: S.name }).from(S).where(eq(S.id, stationId));
       let streamKey = input.kind === "encoder" ? newKey(`${station?.callSign ?? station?.name ?? "live"}-${input.name}`) : null;
       let livepeer: { streamId: string; playbackId: string } | null = null;
-      if (hasLivepeerApiKey()) {
+      const band = await bandOfStation(stationId);
+      // Radio never goes through Livepeer: the worker takes the sound itself, with Opencast's own key.
+      if (hasLivepeerApiKey() && band !== "radio") {
         // Encoders (RTMP) and browsers (WHIP, B3) send to Livepeer; playout reads the source back from Livepeer's playback.
         const stream = await createLivepeerStream(`${station?.callSign ?? station?.name} live: ${input.name}`);
         streamKey = stream.streamKey;
@@ -775,7 +815,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .insert(schema.liveSources)
         .values({ stationId, kind: input.kind, name: input.name, streamKey, livepeerStreamId: livepeer?.streamId ?? null, livepeerPlaybackId: livepeer?.playbackId ?? null })
         .returning();
-      return { source: liveSourceView(row), streamKey };
+      return { source: liveSourceView(row, band), streamKey };
     },
 
     async resetLiveSourceKey(stationId, sourceId) {
@@ -787,7 +827,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       if (current.kind !== "encoder") throw refused("not_an_encoder", "Only encoders have a key.");
       const streamKey = newKey(current.name);
       const [row] = await db.update(schema.liveSources).set({ streamKey }).where(eq(schema.liveSources.id, sourceId)).returning();
-      return { source: liveSourceView(row), streamKey };
+      return { source: liveSourceView(row, await bandOfStation(stationId)), streamKey };
     },
 
     async removeLiveSource(stationId, sourceId) {

@@ -180,7 +180,38 @@ export const LiveSource = z.object({
    * server sends live sources through Livepeer have one; null otherwise. Hosts get it too: they go
    * live from the browser.
    */
-  ingest: z.object({ whipUrl: z.string(), token: z.string() }).nullable().optional()
+  ingest: z.object({ whipUrl: z.string(), token: z.string() }).nullable().optional(),
+  /**
+   * Added 2026-09-29: where an encoder's push goes. `livepeer` (TV: Livepeer transcodes it to the
+   * channel's ladder), `opencast` (radio: Opencast's own ingest, `server` and the key, takes the
+   * sound and packages it at AAC 128 and 64 kbps; any picture is ignored), or null when the server
+   * has no live path for it (TV without Livepeer set up).
+   */
+  route: z.enum(["livepeer", "opencast"]).nullable().optional()
+});
+
+/**
+ * Added 2026-09-29: a radio station's background for its translators (relays to YouTube, Twitch
+ * or any RTMP address, which want a picture): a still image, a GIF or a short looping video (up to
+ * 30 s), prepared once at upload into a loop at the relay's size. The relay airs the station's
+ * sound over it, with the bug, and a spot's code in its last 10 s. Relays only: Opencast's own apps
+ * never show it (they draw the radio screen themselves). With none, relays use a picture in the
+ * station's colour with its call sign and channel.
+ */
+export const RelayBackground = z.object({
+  kind: z.enum(["image", "gif", "video"]),
+  fileName: z.string().nullable(),
+  /** Prepared once at upload: `preparing` for a few seconds, then `ready` (or `failed`, with `error`). */
+  status: z.enum(["preparing", "ready", "failed"]),
+  error: z.string().nullable(),
+  /** The prepared loop (MP4, H.264, no sound) at the relay's size, and a still from it; null until ready. */
+  loopUrl: z.string().nullable(),
+  stillUrl: z.string().nullable(),
+  width: z.number().int().nullable(),
+  height: z.number().int().nullable(),
+  /** The loop's length. A still image is a two-second loop. */
+  durationMs: Millis.nullable(),
+  updatedAt: Timestamp
 });
 
 export const AvailableChannels = z.object({
@@ -445,6 +476,36 @@ export const stationsApi = {
     response: Ok
   }),
 
+  // ---- Added 2026-09-29: a radio station's relay background ----
+
+  getRelayBackground: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/relay-background",
+    auth: "user",
+    summary: "The picture a radio station's translators air under its sound (owner, operator). Null: the generated picture in the station's colour",
+    params: StationParams,
+    response: z.object({ background: RelayBackground.nullable() })
+  }),
+  setRelayBackground: endpoint({
+    method: "PUT",
+    path: "/stations/:stationId/relay-background",
+    auth: "user",
+    summary:
+      "Upload or replace a radio station's relay background (owner, operator): a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video up to 30 seconds (its sound is dropped), up to 100 MB. Prepared once into a loop at the relay's size (`status` `preparing`, then `ready`); relays that are on pick it up once it's ready. 409 `not_radio` (a TV station relays its own picture); 422 `wrong_file_type`, `too_big`, `too_long`, `unreadable_file`.",
+    params: StationParams,
+    multipart: true,
+    body: z.object({}),
+    response: RelayBackground
+  }),
+  removeRelayBackground: endpoint({
+    method: "DELETE",
+    path: "/stations/:stationId/relay-background",
+    auth: "user",
+    summary: "Remove the relay background (owner, operator); relays go back to the picture in the station's colour",
+    params: StationParams,
+    response: Ok
+  }),
+
   listLiveSources: endpoint({
     method: "GET",
     path: "/stations/:stationId/live-sources",
@@ -545,4 +606,5 @@ export type StationSetup = z.infer<typeof StationSetup>;
 export type BreakRule = z.infer<typeof BreakRule>;
 export type Translator = z.infer<typeof Translator>;
 export type LiveSource = z.infer<typeof LiveSource>;
+export type RelayBackground = z.infer<typeof RelayBackground>;
 export type AvailableChannels = z.infer<typeof AvailableChannels>;
