@@ -39,7 +39,8 @@ export interface AsRunView {
 
 export interface PlayoutService {
   /** Whether each station is on air, and where to play it. */
-  statusFor(stationIds: string[]): Promise<Map<string, { onAir: boolean; playbackUrl: string | null }>>;
+  /** `standingBy`: a live block is on the stand-by slate, waiting for its signal (S13). */
+  statusFor(stationIds: string[]): Promise<Map<string, { onAir: boolean; playbackUrl: string | null; standingBy: boolean }>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
   signOn(stationId: string): Promise<PlayoutStatusView>;
   signOff(stationId: string, permanently: boolean): Promise<PlayoutStatusView>;
@@ -101,7 +102,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         stationIds.map((id) => {
           const out = outputs.get(id);
           const onAir = byId.get(id)?.onAir ?? false;
-          return [id, { onAir, playbackUrl: onAir ? (out?.enabled && out.playbackUrl ? out.playbackUrl : `/hls/${id}/index.m3u8`) : null }];
+          const standingBy = onAir && (byId.get(id)?.standingBy ?? false);
+          return [id, { onAir, playbackUrl: onAir ? (out?.enabled && out.playbackUrl ? out.playbackUrl : `/hls/${id}/index.m3u8`) : null, standingBy }];
         })
       );
     },

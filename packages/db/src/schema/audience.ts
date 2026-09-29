@@ -3,7 +3,8 @@ import { at, id } from "./columns.js";
 import { audience } from "./namespaces.js";
 import { stations, translators } from "./broadcast.js";
 
-export const platform = audience.enum("platform", ["phone", "cast", "web", "tv_app"]);
+/** `mirror`: the iPhone's second screen (TV mode mirrored to a TV). */
+export const platform = audience.enum("platform", ["phone", "cast", "web", "tv_app", "mirror"]);
 
 /** A viewer's player session. Heartbeats every 30 s; sessions that act like bots never count. */
 export const sessions = audience.table(
@@ -36,7 +37,8 @@ export const minuteSamples = audience.table(
     phone: integer("phone").notNull().default(0),
     cast: integer("cast").notNull().default(0),
     web: integer("web").notNull().default(0),
-    tvApp: integer("tv_app").notNull().default(0)
+    tvApp: integer("tv_app").notNull().default(0),
+    mirror: integer("mirror").notNull().default(0)
   },
   (t) => [primaryKey({ columns: [t.stationId, t.minute] })]
 );

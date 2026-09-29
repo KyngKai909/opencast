@@ -48,5 +48,6 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "network.listed_sources",
     "network.listed_airings",
     "network.handovers"
-  ]
+  ],
+  tv: ["tv.*"]
 };

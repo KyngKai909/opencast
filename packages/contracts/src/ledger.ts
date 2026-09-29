@@ -258,7 +258,7 @@ export const ledgerApi = {
     response: z.object({ pledge: Pledge, checkoutUrl: z.string().nullable() }),
     status: 201
   }),
-  listMyPledges: endpoint({ method: "GET", path: "/me/pledges", auth: "user", summary: "My pledges", response: z.array(Pledge) }),
+  listMyPledges: endpoint({ method: "GET", path: "/me/pledges", auth: "user", tvSession: true, summary: "My pledges", response: z.array(Pledge) }),
   updatePledge: endpoint({
     method: "PATCH",
     path: "/me/pledges/:pledgeId",

@@ -10,6 +10,8 @@ import { ffmpegPipeline } from "./media.js";
 import { paymentsFromEnv } from "./payments/index.js";
 import { storageFromEnv } from "./storage.js";
 import { chainFromEnv } from "./chain/index.js";
+import { geoFromEnv } from "./geo.js";
+import { relayFromEnv } from "./relay.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -45,6 +47,8 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       privyAppSecret: env.PRIVY_APP_SECRET || undefined
     }),
     clear: clearLookupFromEnv(env),
+    geo: geoFromEnv(env),
+    relay: relayFromEnv(env),
     config: {
       storageRoot,
       appOrigin,

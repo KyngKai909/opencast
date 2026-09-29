@@ -10,7 +10,7 @@ if (!["localhost", "127.0.0.1"].includes(host)) {
 const client = new pg.Client({ connectionString: url });
 await client.connect();
 await client.query(
-  `DROP SCHEMA IF EXISTS accounts, broadcast, catalog, spots, ledger, trust, network, audience, drizzle CASCADE`
+  `DROP SCHEMA IF EXISTS accounts, broadcast, catalog, spots, ledger, trust, network, audience, notify, tv, drizzle CASCADE`
 );
 await client.end();
 console.log("Dropped the new schemas. Run db:migrate next.");

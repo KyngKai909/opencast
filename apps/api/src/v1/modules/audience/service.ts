@@ -9,7 +9,7 @@ import type { AudienceReport } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest } from "../../errors.js";
 
-type Platform = "phone" | "cast" | "web" | "tv_app";
+type Platform = "phone" | "cast" | "web" | "tv_app" | "mirror";
 
 export const HEARTBEAT_MS = 30_000;
 /** Closer beats than this aren't a real player. */
@@ -75,7 +75,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
       // Count each session once per minute it's watching.
       // The first heartbeat never counts, so the second always does; after that, once a minute.
       if (counts && (existing.beats === 1 || minuteOf(existing.lastBeatAt).getTime() !== minuteOf(now).getTime())) {
-        const key = ({ phone: "phone", cast: "cast", web: "web", tv_app: "tvApp" } as const)[input.platform];
+        const key = ({ phone: "phone", cast: "cast", web: "web", tv_app: "tvApp", mirror: "mirror" } as const)[input.platform];
         const count = async (minute: Date) => {
           await db
             .insert(M)
@@ -166,7 +166,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
       const inBreak = (minute: Date) =>
         breaks.some((b) => Date.parse(b.startsAt) < minute.getTime() + MINUTE && Date.parse(b.startsAt) + b.lengthMs > minute.getTime());
       const peak = samples.reduce<(typeof samples)[number] | null>((best, s) => (!best || s.tunedIn > best.tunedIn ? s : best), null);
-      const byPlatform = { phone: 0, cast: 0, web: 0, tv_app: 0 };
+      const byPlatform = { phone: 0, cast: 0, web: 0, tv_app: 0, mirror: 0 };
       for (const row of live) byPlatform[row.platform] = row.n;
 
       // Stayed to the end: tuned in over a program's last minute against its first.

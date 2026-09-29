@@ -19,6 +19,9 @@ import type { TrustService } from "./modules/trust/service.js";
 import type { NotificationsService } from "./modules/notifications/service.js";
 import type { WaitlistService } from "./modules/waitlist/service.js";
 import type { NetworkService } from "./modules/network/service.js";
+import type { TvService } from "./modules/tv/service.js";
+import type { GeoLookup } from "./geo.js";
+import type { RelayBus } from "./relay.js";
 import type { RouteRegistrar } from "./http.js";
 
 /** A database handle, or a transaction on it. Service functions take either. */
@@ -48,6 +51,10 @@ export interface Deps {
   chain: EscrowChain | null;
   notifier: Notifier;
   payments: Payments;
+  /** Where a request comes from (GEOIP_URL), for the market from the connection. Addresses are never stored. */
+  geo: GeoLookup;
+  /** The TV remote's message bus: in-process, or Redis pub/sub when REDIS_URL is set. */
+  relay: RelayBus;
   config: {
     /** Where uploads and working files go. */
     storageRoot: string;
@@ -58,6 +65,8 @@ export interface Deps {
     /** USDC on the configured chain (CHAIN_ID, USDC_ADDRESS): what a transfer from a linked Clear wallet sends. Null until set. */
     usdc: { chainId: number; address: string } | null;
     production: boolean;
+    /** Event streams' heartbeat (25 s). Tests shorten it. */
+    sseHeartbeatMs?: number;
   };
 }
 
@@ -76,6 +85,7 @@ export interface Services {
   notifications: NotificationsService;
   waitlist: WaitlistService;
   network: NetworkService;
+  tv: TvService;
 }
 
 export interface ModuleContext {

@@ -2,6 +2,7 @@ import { stationsApi as api, type Airing, type StationIdent } from "@opencast/co
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest, notFound } from "../../errors.js";
+import { clientIp, isPrivateAddress } from "../../geo.js";
 import type { StationProfile } from "./service.js";
 
 /** A thin dial shows nearby markets' stations after its own. */
@@ -49,12 +50,15 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
       }
       const s = status.get(p.id);
       const current = nowNext.get(p.id);
+      const onAir = Boolean(s?.onAir && current?.now && current.now.kind !== "off_air");
       return {
         station: p.ident,
-        onAir: Boolean(s?.onAir && current?.now && current.now.kind !== "off_air"),
+        onAir,
         now: current?.now ?? null,
         next: current?.next ?? null,
-        playback: s?.playbackUrl ? { kind: "hls" as const, url: s.playbackUrl } : null
+        playback: s?.playbackUrl ? { kind: "hls" as const, url: s.playbackUrl } : null,
+        // S13: a live block on the stand-by slate, waiting for its signal.
+        ...(onAir ? { signal: s?.standingBy && current?.now?.kind === "live" ? ("standby" as const) : ("ok" as const) } : {})
       };
     });
   }
@@ -64,6 +68,19 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     const market = await network.marketForZip(params.zip);
     return { market, nearby: market ? await network.nearbyMarkets(market.id) : [] };
   });
+
+  // S10: the market from where someone is. Neither the address nor the point is stored or logged.
+  r.handle(api.marketForConnection, async ({ req }) => {
+    const ip = clientIp(req);
+    const found = ip && !isPrivateAddress(ip) && deps.geo.configured ? await deps.geo.lookup(ip) : null;
+    if (found?.zip) {
+      const market = await network.marketForZip(found.zip);
+      if (market) return { market, nearby: await network.nearbyMarkets(market.id) };
+    }
+    if (found?.point) return network.marketNear(found.point);
+    return { market: null, nearby: (await network.openMarkets()).map((market) => ({ market, miles: null })) };
+  });
+  r.handle(api.marketForLocation, ({ query }) => network.marketNear({ lat: query.lat, lng: query.lng }));
 
   r.handle(api.getDial, async ({ params, query }) => {
     const market = await network.marketBySlug(params.marketSlug);

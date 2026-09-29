@@ -310,13 +310,13 @@ export class StationRunner {
     return row;
   }
 
-  private async setNow(seg: Segment | null, startedAt: Date | null, error: string | null = null) {
+  private async setNow(seg: Segment | null, startedAt: Date | null, error: string | null = null, standingBy = false) {
     await this.ctx.deps.db
       .insert(schema.playoutState)
-      .values({ stationId: this.stationId, onAir: true, currentAssetId: seg?.itemId ?? null, currentLogEntryId: seg?.logEntryId ?? null, currentStartedAt: startedAt, lastError: error, updatedAt: this.ctx.deps.clock.now() })
+      .values({ stationId: this.stationId, onAir: true, currentAssetId: seg?.itemId ?? null, currentLogEntryId: seg?.logEntryId ?? null, currentStartedAt: startedAt, lastError: error, standingBy, updatedAt: this.ctx.deps.clock.now() })
       .onConflictDoUpdate({
         target: schema.playoutState.stationId,
-        set: { currentAssetId: seg?.itemId ?? null, currentLogEntryId: seg?.logEntryId ?? null, currentStartedAt: startedAt, lastError: error, updatedAt: this.ctx.deps.clock.now() }
+        set: { currentAssetId: seg?.itemId ?? null, currentLogEntryId: seg?.logEntryId ?? null, currentStartedAt: startedAt, lastError: error, standingBy, updatedAt: this.ctx.deps.clock.now() }
       });
   }
 
@@ -418,10 +418,12 @@ export class StationRunner {
       } catch {
         input = null;
       }
+      let standingBy = false;
       if (!input) {
         // A live block with no signal: the stand-by slate, until the signal comes.
         seg = { ...seg, label: "Stand by", source: { kind: "image", path: await this.options.slates.standBy(this.options.look) } };
         reason = "slate";
+        standingBy = true;
         input = await this.inputArgs(seg, offsetMs);
         if (signalLostFor !== seg.key) {
           signalLostFor = seg.key;
@@ -429,7 +431,7 @@ export class StationRunner {
           this.options.onSignalLost?.();
         }
       }
-      await this.setNow(seg, startedAt);
+      await this.setNow(seg, startedAt, null, standingBy);
       const slateTargets = this.slateMuxers.map((m) => m.stdin);
       const targets = [this.muxer?.stdin, ...(seg.inBreak ? [] : slateTargets)];
       this.producer = this.produce(input.args, input.filter, durationMs, targets, input.feed);

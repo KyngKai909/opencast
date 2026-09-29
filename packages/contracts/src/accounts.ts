@@ -17,6 +17,23 @@ export const Membership = z.discriminatedUnion("kind", [
   })
 ]);
 
+/** The TV app's settings (A7, added 2026-09-28). Captions stay in `watching`; who on the Wi-Fi can change the channel in `tvs`. */
+export const TvSettings = z
+  .object({
+    /** Which way channel up goes. */
+    channelUp: z.enum(["up_the_dial", "down_the_dial"]),
+    /** How long the channel banner stays. */
+    bannerSeconds: z.union([z.literal(3), z.literal(5), z.literal(8)]),
+    /** How long to wait after a number is typed before tuning. */
+    numberWaitSeconds: z.union([z.literal(1), z.literal(1.5), z.literal(2), z.literal(3)]),
+    includeRadioBand: z.boolean(),
+    quality: z.enum(["auto", "data_saver", "best"]),
+    /** Evening out the audio (loud ads and quiet programs). */
+    eveningOut: z.boolean()
+  })
+  .partial();
+export type TvSettings = z.infer<typeof TvSettings>;
+
 /** The eight settings sections. Unknown keys are kept, so the apps can add settings. */
 export const ViewerSettings = z
   .object({
@@ -34,7 +51,9 @@ export const ViewerSettings = z
     market: z.object({ showNearby: z.boolean() }).partial().optional(),
     appearance: z.object({ ground: z.enum(["system", "dark", "light"]), reducedMotion: z.boolean() }).partial().optional(),
     privacy: z.object({ keepWatchHistory: z.boolean() }).partial().optional(),
-    tvs: z.object({ lockScreenRemote: z.boolean(), othersOnWifiCanChange: z.boolean() }).partial().optional()
+    tvs: z.object({ lockScreenRemote: z.boolean(), othersOnWifiCanChange: z.boolean() }).partial().optional(),
+    /** A7 (added 2026-09-28): the TV app's own rows. */
+    tv: TvSettings.optional()
   })
   .loose();
 
@@ -115,7 +134,7 @@ export const accountsApi = {
   getMe: endpoint({
     method: "GET",
     path: "/me",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "The signed-in person, their identities, stations and businesses",
     response: Me
   }),
@@ -136,7 +155,7 @@ export const accountsApi = {
   updateMe: endpoint({
     method: "PATCH",
     path: "/me",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Change display name, market or settings",
     body: z.object({
       displayName: z.string().min(1).max(80).nullable().optional(),
@@ -149,7 +168,7 @@ export const accountsApi = {
   mergeDevice: endpoint({
     method: "POST",
     path: "/me/merge-device",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Keep presets and reminders saved on this device before signing in",
     body: z.object({
       presets: z.array(z.object({ stationId: Id, key: z.number().int().min(1).max(6).nullable() })),
@@ -158,11 +177,11 @@ export const accountsApi = {
     response: z.object({ presets: z.array(Preset), reminders: z.array(Reminder) })
   }),
 
-  listPresets: endpoint({ method: "GET", path: "/me/presets", auth: "user", summary: "Presets in order", response: z.array(Preset) }),
+  listPresets: endpoint({ method: "GET", path: "/me/presets", auth: "user", tvSession: true, summary: "Presets in order", response: z.array(Preset) }),
   savePreset: endpoint({
     method: "POST",
     path: "/me/presets",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary:
       "Save a station. With a key that's taken, the old station moves to More presets (never deleted). With no key, it goes to More presets.",
     body: z.object({ stationId: Id, key: z.number().int().min(1).max(6).nullable() }),
@@ -171,7 +190,7 @@ export const accountsApi = {
   reorderPresets: endpoint({
     method: "PUT",
     path: "/me/presets",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Set the whole order and keys at once (drag to reorder)",
     body: z.array(z.object({ stationId: Id, key: z.number().int().min(1).max(6).nullable() })),
     response: z.array(Preset)
@@ -179,7 +198,7 @@ export const accountsApi = {
   removePreset: endpoint({
     method: "DELETE",
     path: "/me/presets/:stationId",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Remove a preset",
     params: StationParams,
     response: z.array(Preset)
@@ -187,24 +206,24 @@ export const accountsApi = {
   suggestPresetKey: endpoint({
     method: "GET",
     path: "/me/presets/suggested-key",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "The key to suggest replacing when all six are full: the one used least in the last month",
     response: z.object({ key: z.number().int().min(1).max(6).nullable() })
   }),
   usePresetKey: endpoint({
     method: "POST",
     path: "/me/presets/keys/:key/use",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Count a press of a preset key",
     params: z.object({ key: z.coerce.number().int().min(1).max(6) }),
     response: Ok
   }),
 
-  listReminders: endpoint({ method: "GET", path: "/me/reminders", auth: "user", summary: "Upcoming reminders", response: z.array(Reminder) }),
+  listReminders: endpoint({ method: "GET", path: "/me/reminders", auth: "user", tvSession: true, summary: "Upcoming reminders", response: z.array(Reminder) }),
   addReminder: endpoint({
     method: "POST",
     path: "/me/reminders",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Remind me of an airing. Switch me over is off unless asked for.",
     body: z
       .object({ logEntryId: Id.optional(), listedAiringId: Id.optional(), switchMeOver: z.boolean().default(false) })
@@ -214,7 +233,7 @@ export const accountsApi = {
   updateReminder: endpoint({
     method: "PATCH",
     path: "/me/reminders/:reminderId",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Turn switch me over on or off",
     params: z.object({ reminderId: Id }),
     body: z.object({ switchMeOver: z.boolean() }),
@@ -223,7 +242,7 @@ export const accountsApi = {
   removeReminder: endpoint({
     method: "DELETE",
     path: "/me/reminders/:reminderId",
-    auth: "user",
+    auth: "user", tvSession: true,
     summary: "Remove a reminder",
     params: z.object({ reminderId: Id }),
     response: Ok

@@ -17,6 +17,8 @@ const OPENCAST_RUN_KINDS = new Set(["claimable", "catalog", "listed"]);
 
 export interface AccountsService {
   userForToken(token: string): Promise<CurrentUser>;
+  /** A person by id, as a caller (a TV session acts as them). Null if there's no such person. */
+  currentUser(userId: string): Promise<CurrentUser | null>;
   me(userId: string): Promise<Me>;
   updateMe(userId: string, input: { displayName?: string | null; marketId?: string | null; settings?: Record<string, unknown> }): Promise<Me>;
   displayNames(userIds: string[]): Promise<Map<string, string | null>>;
@@ -270,6 +272,11 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       const verified = await deps.auth.verify(token);
       const user = await findOrCreateUser(verified.privyDid);
       return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin };
+    },
+
+    async currentUser(userId) {
+      const [user] = await db.select({ id: u.id, privyDid: u.privyDid, isAdmin: u.isAdmin }).from(u).where(eq(u.id, userId));
+      return user ?? null;
     },
 
     async me(userId) {

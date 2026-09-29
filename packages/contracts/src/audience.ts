@@ -19,7 +19,14 @@ export const AudienceReport = z.object({
   presetCount: z.number().int(),
   /** Per minute; breaks shaded; with a comparison line (same window last week). */
   series: z.array(z.object({ minute: Timestamp, tunedIn: z.number().int(), lastWeek: z.number().int().nullable(), inBreak: z.boolean() })),
-  byPlatform: z.object({ phone: z.number().int(), cast: z.number().int(), web: z.number().int(), tv_app: z.number().int() }),
+  byPlatform: z.object({
+    phone: z.number().int(),
+    cast: z.number().int(),
+    web: z.number().int(),
+    tv_app: z.number().int(),
+    /** The iPhone's second screen (added 2026-09-28; always sent now). */
+    mirror: z.number().int().optional()
+  }),
   stayedToTheEnd: z.array(z.object({ programId: Id, title: z.string(), percent: z.number() })),
   /** Viewers on YouTube and Twitch relays: shown apart, never billed. */
   translators: z.array(z.object({ translatorId: Id, name: z.string(), viewers: z.number().int() }))

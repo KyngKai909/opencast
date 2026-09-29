@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { api, API_PREFIX } from "../src/index.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const who = { public: "anyone", optional: "anyone (personal if signed in)", user: "signed in", admin: "Opencast admin" } as const;
+const who = { public: "anyone", optional: "anyone (personal if signed in)", user: "signed in", admin: "Opencast admin", device: "a TV app (device token or TV session)" } as const;
 const lines = [
   "# API",
   "",
@@ -17,7 +17,7 @@ for (const [module, endpoints] of Object.entries(api)) {
   const list = Object.entries(endpoints);
   total += list.length;
   lines.push(`## ${module} (${list.length})`, "", "| | Method | Path | Who | What |", "|---|---|---|---|---|");
-  for (const [name, e] of list) lines.push(`| \`${name}\` | ${e.method} | \`${e.path}\` | ${who[e.auth]} | ${e.summary.replace(/\|/g, "\\|")} |`);
+  for (const [name, e] of list) lines.push(`| \`${name}\` | ${e.method} | \`${e.path}\` | ${who[e.auth]}${"tvSession" in e && e.tvSession ? ", or a TV signed in" : ""}${"events" in e && e.events ? " (event stream)" : ""} | ${e.summary.replace(/\|/g, "\\|")} |`);
   lines.push("");
 }
 lines.splice(4, 0, `${total} endpoints in ${Object.keys(api).length} modules.`, "");

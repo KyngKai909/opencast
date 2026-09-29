@@ -2,27 +2,27 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-192 endpoints in 13 modules.
+211 endpoints in 14 modules.
 
 ## accounts (26)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
-| `getMe` | GET | `/me` | signed in | The signed-in person, their identities, stations and businesses |
+| `getMe` | GET | `/me` | signed in, or a TV signed in | The signed-in person, their identities, stations and businesses |
 | `linkClear` | POST | `/me/clear` | signed in | After the app links Clear with Privy's cross-app linking, record it: the API reads the person's Clear cross-app account from Privy and stores its address and access. 409 if Privy has no Clear account linked. |
 | `unlinkClear` | DELETE | `/me/clear` | signed in | Forget the linked Clear account (the app also unlinks it in Privy). Funding sources and payout destinations that used it stop working. |
-| `updateMe` | PATCH | `/me` | signed in | Change display name, market or settings |
-| `mergeDevice` | POST | `/me/merge-device` | signed in | Keep presets and reminders saved on this device before signing in |
-| `listPresets` | GET | `/me/presets` | signed in | Presets in order |
-| `savePreset` | POST | `/me/presets` | signed in | Save a station. With a key that's taken, the old station moves to More presets (never deleted). With no key, it goes to More presets. |
-| `reorderPresets` | PUT | `/me/presets` | signed in | Set the whole order and keys at once (drag to reorder) |
-| `removePreset` | DELETE | `/me/presets/:stationId` | signed in | Remove a preset |
-| `suggestPresetKey` | GET | `/me/presets/suggested-key` | signed in | The key to suggest replacing when all six are full: the one used least in the last month |
-| `usePresetKey` | POST | `/me/presets/keys/:key/use` | signed in | Count a press of a preset key |
-| `listReminders` | GET | `/me/reminders` | signed in | Upcoming reminders |
-| `addReminder` | POST | `/me/reminders` | signed in | Remind me of an airing. Switch me over is off unless asked for. |
-| `updateReminder` | PATCH | `/me/reminders/:reminderId` | signed in | Turn switch me over on or off |
-| `removeReminder` | DELETE | `/me/reminders/:reminderId` | signed in | Remove a reminder |
+| `updateMe` | PATCH | `/me` | signed in, or a TV signed in | Change display name, market or settings |
+| `mergeDevice` | POST | `/me/merge-device` | signed in, or a TV signed in | Keep presets and reminders saved on this device before signing in |
+| `listPresets` | GET | `/me/presets` | signed in, or a TV signed in | Presets in order |
+| `savePreset` | POST | `/me/presets` | signed in, or a TV signed in | Save a station. With a key that's taken, the old station moves to More presets (never deleted). With no key, it goes to More presets. |
+| `reorderPresets` | PUT | `/me/presets` | signed in, or a TV signed in | Set the whole order and keys at once (drag to reorder) |
+| `removePreset` | DELETE | `/me/presets/:stationId` | signed in, or a TV signed in | Remove a preset |
+| `suggestPresetKey` | GET | `/me/presets/suggested-key` | signed in, or a TV signed in | The key to suggest replacing when all six are full: the one used least in the last month |
+| `usePresetKey` | POST | `/me/presets/keys/:key/use` | signed in, or a TV signed in | Count a press of a preset key |
+| `listReminders` | GET | `/me/reminders` | signed in, or a TV signed in | Upcoming reminders |
+| `addReminder` | POST | `/me/reminders` | signed in, or a TV signed in | Remind me of an airing. Switch me over is off unless asked for. |
+| `updateReminder` | PATCH | `/me/reminders/:reminderId` | signed in, or a TV signed in | Turn switch me over on or off |
+| `removeReminder` | DELETE | `/me/reminders/:reminderId` | signed in, or a TV signed in | Remove a reminder |
 | `getStationTeam` | GET | `/stations/:stationId/team` | signed in | Members and invites (owner and operator) |
 | `inviteToStation` | POST | `/stations/:stationId/team/invites` | signed in | Invite by email or phone as operator or host (owner only). Expires after a week. |
 | `updateStationMember` | PATCH | `/stations/:stationId/team/:userId` | signed in | Change a member's role or note (owner only). Ownership moves with transferOwnership. |
@@ -35,12 +35,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `resendInvite` | POST | `/invites/:inviteId/resend` | signed in | Send an invite again and extend it a week |
 | `acceptInvite` | POST | `/invites/:inviteId/accept` | signed in | Join the team the invite is for |
 
-## stations (24)
+## stations (26)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `listMarkets` | GET | `/markets` | anyone | Every market |
 | `marketForZip` | GET | `/markets/by-zip/:zip` | anyone | Your ZIP decides your market. Location isn't stored. |
+| `marketForConnection` | GET | `/markets/by-connection` | anyone | The market for the request's internet address, which isn't stored or logged. With no lookup configured, or a private address, `market` is null and `nearby` is the open markets (miles null). |
+| `marketForLocation` | GET | `/markets/by-location` | anyone | The market for a point (the device's location), which isn't stored: the nearest market within 50 miles of its centre, and others within 60 miles, nearest first. Nothing that close: `market` null and the open markets by distance. |
 | `getDial` | GET | `/markets/:marketSlug/dial` | anyone | The dial for a market in channel order, with now and next per station |
 | `getGuide` | GET | `/markets/:marketSlug/guide` | anyone | The guide for a market and time window (at most 24 hours) |
 | `getStation` | GET | `/stations/:stationRef` | anyone | A station page, by id or call sign |
@@ -197,7 +199,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `setPayoutDestination` | PUT | `/stations/:stationId/payout-account` | signed in | Pay the station out to the owner's linked Clear wallet (read-only access is enough), or back to its Clear account (owner only) |
 | `moveToBank` | POST | `/stations/:stationId/payouts` | signed in | Move earnings to the bank now (owner only) |
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |
-| `listMyPledges` | GET | `/me/pledges` | signed in | My pledges |
+| `listMyPledges` | GET | `/me/pledges` | signed in, or a TV signed in | My pledges |
 | `updatePledge` | PATCH | `/me/pledges/:pledgeId` | signed in | Change the amount or on-air credit, or stop (it ends after the current month) |
 
 ## audience (2)
@@ -260,3 +262,25 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listListedSources` | GET | `/admin/listed-sources` | Opencast admin | City and county streams |
 | `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a city stream on the dial. Viewers get the source's own player. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |
+
+## tv (17)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `registerTv` | POST | `/tv/devices` | anyone | A TV app registers itself on first launch. Keep the deviceToken; it's shown once. |
+| `createTvCode` | POST | `/tv/codes` | a TV app (device token or TV session) | A sign-in code for this TV (10 minutes). A new code replaces the TV's earlier ones. |
+| `pollTvCode` | GET | `/tv/codes/:pollToken` | anyone | Has a phone approved this TV's code? Approved carries the TV session token, once. Unknown poll token: 404. |
+| `approveTvCode` | POST | `/tv/codes/:code/approve` | signed in | Sign in the TV showing this code (spaces and lower case are fine). Wrong or run-out: 404 `code_not_found`; already used: 409 `code_used`; 10 wrong in 15 minutes: 429 `too_many_tries`. |
+| `signOutThisTv` | DELETE | `/tv/session` | a TV app (device token or TV session) | The TV signs itself out (its session ends on the server). Phones on the account are told `ended`. |
+| `listTvs` | GET | `/me/tvs` | signed in | TVs signed in to the account (the TV app), and remembered cast targets |
+| `signOutTv` | DELETE | `/me/tvs/:tvId` | signed in | Sign a TV out remotely (or forget a cast target). Returns the list. |
+| `recordCastTarget` | POST | `/me/tvs/cast-targets` | signed in | Remember a Chromecast or AirPlay TV by name for Your TVs (again: it's marked used now) |
+| `tvRemoteEvents` | GET | `/tv/remote/events` | a TV app (device token or TV session) (event stream) | The TV's stream (SSE): `command` from phones, with who sent it, and `phones` when the list changes. Open while the app runs; it makes the TV `online`. |
+| `postRemoteState` | POST | `/tv/remote/state` | a TV app (device token or TV session) | What the TV shows now, for every phone driving it (sent after each change) |
+| `endRemote` | POST | `/tv/remote/end` | a TV app (device token or TV session) | The TV ended the session (the sleep timer ran out): every phone is told `ended`. Pairings stay. |
+| `createPairCode` | POST | `/tv/remote/pair-code` | a TV app (device token or TV session) | A 4-digit code for a guest's phone to pair with this TV (5 minutes; a new one replaces the last) |
+| `listRemotePhones` | GET | `/tv/remote/phones` | a TV app (device token or TV session) | Phones that can drive this TV: guests paired by code, and account phones that have connected |
+| `removeRemotePhone` | DELETE | `/tv/remote/phones/:phoneId` | a TV app (device token or TV session) | Unpair a guest's phone (its token stops working), or drop an account phone from the list until it connects again. It's told `ended`. |
+| `pairPhone` | POST | `/tv/remote/pair` | anyone (personal if signed in) | Pair this phone with the TV showing the code. Wrong or run-out: 404 `code_not_found`; 10 wrong in 10 minutes: 429 `too_many_tries`. |
+| `phoneRemoteEvents` | GET | `/tv/remote/:tvId/events` | anyone (personal if signed in) (event stream) | A phone's stream for one TV (SSE): `state` and `ended`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |
+| `sendRemoteCommand` | POST | `/tv/remote/:tvId/commands` | anyone (personal if signed in) | Send a command to the TV, with the phone's name ("Kai's phone"). The TV isn't connected: 409 `tv_not_connected`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |

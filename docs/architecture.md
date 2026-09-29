@@ -7,8 +7,8 @@
 | `apps/api` | Express. `/v1` is the new API on the new schema; `/api` is the old one, kept for the old master control until the apps prompt replaces it | Postgres |
 | `apps/worker` | Playout: the engine (below) airs every station from its program log; the minute tick. Also runs the old queue loop for stations still on the old model (`LEGACY_PLAYOUT`) | Postgres, Redis lock |
 | `apps/control`, `viewer`, `tv`, `site`, `spots`, `desk` | The apps (the apps prompt) | none; they call `/v1` |
-| Postgres | One database, nine schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`), plus the old `public.opencast_state` | |
-| Redis | The worker's leader lock | |
+| Postgres | One database, ten schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`, `tv`), plus the old `public.opencast_state` | |
+| Redis | The worker's leader lock; the API's pub/sub for the TV remote's relay | |
 
 ## The v1 API
 
@@ -17,6 +17,8 @@ apps/api/src/v1/
   index.ts        builds every module's service, mounts every route under /v1
   http.ts         mounts contract endpoints: validates params, query and body, and the response
   auth.ts         Privy access tokens (ES256 JWT) checked against the app's key or JWKS
+  geo.ts          the market from a connection: the client's address and the pluggable lookup (GEOIP_URL)
+  relay.ts        the TV remote's message bus: in-process, or Redis pub/sub
   context.ts      Deps (db, clock, bus, auth, media, payments, notifier) and Services
   events.ts       in-process events, handled after the request (mostly notifications)
   jobs.ts         the minute tick: reminders, dead air, deadlines, daily caps, sponsorship months
@@ -45,8 +47,17 @@ apps/api/src/v1/
 | notifications | `notify.*` | Notices, pushes, emails |
 | waitlist | signups, call-sign reservations, channel holds | The waitlist |
 | network | markets, creators, permission and licence records, recipes, listed sources, handovers | Network desk |
+| tv | `tv.*` | TV devices, sign-in by code, TV sessions, TVs on the account, the phone remote's relay |
 
 **Roles** are checked in each route through `accounts.requireStation` / `requireBusiness`: station owner, operator, host (their own live blocks only); business owner, manager (never withdraws or changes funding), viewer (results, airings, statements); Opencast admin (the desk, and owner of the stations Opencast runs). A station you're not on answers 404, not 403, so its existence isn't revealed.
+
+## TVs and the phone remote
+
+A TV app registers on first launch (`POST /tv/devices`) and keeps an opaque device token. "Sign in on your phone": the TV shows a 6-character code (10 minutes) and polls; the person approves it on their phone; the next poll hands the TV a session token, once. Every token is stored as its SHA-256.
+
+**Auth.** `http.ts` routes tokens by prefix: `tvd_` (device), `tvs_` (TV session), `tvp_` (a paired guest phone); anything else is a Privy token. Endpoints with `auth: "device"` take the device token or the TV session. A TV session is accepted as `user` only by endpoints marked `tvSession: true` in the contracts (getMe, updateMe, mergeDevice, presets, reminders, listMyPledges), acting as the person who approved it, never as an admin; everywhere else it's 403 `tv_not_allowed`.
+
+**The relay.** Android TV and Fire TV have no Cast, so phones reach the TV app through the API with the Cast receiver's messages. The TV holds an event stream (`GET /tv/remote/events`, Server-Sent Events) and receives `command`s with who sent them; it posts its state, which goes to every phone's stream (`GET /tv/remote/:tvId/events`). A phone on the TV's account drives it without pairing; a guest's phone pairs with a 4-digit code the TV shows (5 minutes) and gets a phone token. The TV enforces its own "who can change the channel" setting. Messages go through `deps.relay` (Redis pub/sub when `REDIS_URL` is set, so a TV and its phones can be on different replicas). Presence is in the database: open streams write `online_until` and renew it at each 25-second heartbeat; a TV stays online 10 seconds after its stream closes.
 
 ## Playout
 

@@ -6,8 +6,14 @@ import { z } from "zod";
  * - `optional`: anyone; a signed-in caller gets personalised results.
  * - `user`: a signed-in Privy user. Roles on a station or business are checked per request.
  * - `admin`: an Opencast admin (Network desk).
+ * - `device`: a TV app (added 2026-09-28): its `deviceToken` from `tv.registerTv`, or its TV
+ *   session token once it's signed in, as `Authorization: Bearer`.
+ *
+ * A TV session token (from `tv.pollTvCode`) is accepted as `user` only by endpoints marked
+ * `tvSession: true`, acting as the person who approved the TV; every other `user` or `admin`
+ * endpoint answers it 403 `tv_not_allowed`.
  */
-export type Auth = "public" | "optional" | "user" | "admin";
+export type Auth = "public" | "optional" | "user" | "admin" | "device";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -25,6 +31,19 @@ export interface EndpointDef {
   response: z.ZodType;
   /** Status for a successful response. Defaults to 200 (201 for POST that creates). */
   status?: number;
+  /**
+   * Also accepts a TV session token as `user` (added 2026-09-28): the TV acts as the person who
+   * signed it in. Only the account endpoints a TV uses carry this.
+   */
+  tvSession?: boolean;
+  /**
+   * Server-Sent Events (added 2026-09-28): the response is a `text/event-stream`, not JSON. Each
+   * event's name is a key here and its `data` is JSON matching the schema. The server sends a
+   * comment (`: ping`) every 25 seconds. `response` describes the events as `{ event, data }`, for
+   * documentation and mocks. Browsers' EventSource can't send `Authorization`, so read these with
+   * `fetch` and a stream reader (or an EventSource that takes headers).
+   */
+  events?: Record<string, z.ZodType>;
 }
 
 /** Declares an endpoint. The API validates requests against it; the apps build clients and mocks from it. */

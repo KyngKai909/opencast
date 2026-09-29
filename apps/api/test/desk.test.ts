@@ -171,24 +171,32 @@ describe("tuned in", () => {
   it("counts a session from its second heartbeat, and never one that behaves like a bot", async () => {
     const owner = await h.signIn();
     const civc = await stationFixture(h, { callSign: "CIVC", ownerId: owner.id, marketId, tenths: 71, signedOn: true });
-    const beat = (viewer: string, media: number) => anon(h).post("/v1/heartbeat").send({ stationId: civc.id, sessionId: viewer, platform: "web", mediaTimeMs: media, playing: true });
+    const beat = (viewer: string, media: number, platform = "web") => anon(h).post("/v1/heartbeat").send({ stationId: civc.id, sessionId: viewer, platform, mediaTimeMs: media, playing: true });
     const real = "11111111-1111-4111-8111-111111111111";
     const bot = "22222222-2222-4222-8222-222222222222";
+    // TV mode on an iPhone's second screen.
+    const mirror = "33333333-3333-4333-8333-333333333333";
     h.clock.set("2026-09-22T19:00:10.000Z");
     await beat(real, 0).expect(200);
     await beat(bot, 0).expect(200);
+    await beat(mirror, 0, "mirror").expect(200);
     h.clock.set("2026-09-22T19:00:40.000Z");
     await beat(real, 30_000).expect(200);
     await beat(bot, 5_000_000).expect(200); // Media time racing ahead of the clock.
+    await beat(mirror, 30_000, "mirror").expect(200);
     h.clock.set("2026-09-22T19:01:10.000Z");
     await beat(real, 60_000).expect(200);
     await beat(bot, 5_030_000).expect(200);
+    await beat(mirror, 60_000, "mirror").expect(200);
     const samples = await h.db.select().from(schema.minuteSamples).where(eq(schema.minuteSamples.stationId, civc.id));
-    expect(samples.map((s) => s.tunedIn)).toEqual([1, 1]);
+    expect(samples.map((s) => [s.tunedIn, s.web, s.mirror])).toEqual([
+      [2, 1, 1],
+      [2, 1, 1]
+    ]);
     const [flagged] = await h.db.select().from(schema.sessions).where(eq(schema.sessions.id, bot));
     expect(flagged).toMatchObject({ flaggedBot: true, flagReason: "media time moving faster than the clock" });
     const report = await owner.get(`/v1/stations/${civc.id}/audience?from=2026-09-22T18:00:00.000Z&to=2026-09-22T20:00:00.000Z`).expect(200);
-    expect(report.body).toMatchObject({ tunedInNow: 1, byPlatform: { web: 1 }, peak: { tunedIn: 1 } });
+    expect(report.body).toMatchObject({ tunedInNow: 2, byPlatform: { web: 1, mirror: 1, phone: 0, cast: 0, tv_app: 0 }, peak: { tunedIn: 2 } });
   });
 });
 
