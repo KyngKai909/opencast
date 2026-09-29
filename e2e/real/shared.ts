@@ -16,9 +16,10 @@ export const API_PORT = 8788;
 export const API_BASE = `http://localhost:${API_PORT}`;
 
 /** Each app in real mode, on its own port (the mock servers keep 5174–5183). */
-export const REAL_PORTS = { viewer: 5274, tv: 5275, control: 5279, business: 5281, desk: 5282, site: 5283 } as const;
+/** The Opencast app (apps/web: the viewer, /control, /desk) on 5274, the others beside it. */
+export const REAL_PORTS = { web: 5274, tv: 5275, business: 5281, site: 5283 } as const;
 export type RealApp = keyof typeof REAL_PORTS;
-export const WORKSPACES: Record<RealApp, string> = { viewer: "apps/viewer", tv: "apps/tv", control: "apps/control", business: "apps/business", desk: "apps/desk", site: "apps/site" };
+export const WORKSPACES: Record<RealApp, string> = { web: "apps/web", tv: "apps/tv", business: "apps/business", site: "apps/site" };
 export const appUrl = (app: RealApp) => `http://localhost:${REAL_PORTS[app]}`;
 
 /** The Privy app id the API checks tokens against. Never a real Privy app. */

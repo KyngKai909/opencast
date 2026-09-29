@@ -53,7 +53,7 @@ These change what the API accepts, or add something no fixture can stand in for.
 | S9 | **Station counts per market** on `listMarkets` | home 08.1 | Yes | 3 |
 | S10 | **Done 2026-09-28** (monorepo): `GET /markets/by-connection` and `GET /markets/by-location?lat=&lng=`, both `MarketLookup` (`nearby[].miles` is nullable). **Market from where you are**: from coordinates ("Use my location") and from the request's IP (TV first launch), neither stored | home 08.1; tv 05.3 | Fixture market | 3 |
 
-S10 interim (Phase 3): the viewer computes "Use my location" on the device from a market centre (`lat`, `lng` on `listMarkets`, proposed in `apps/viewer/src/api/ext/home.ts`): the nearest open market within 150 miles. The coordinates are never sent. A server-side lookup by IP is still needed for the TV's first launch.
+S10 interim (Phase 3): the viewer computes "Use my location" on the device from a market centre (`lat`, `lng` on `listMarkets`, proposed in `apps/web/src/viewer/api/ext/home.ts`): the nearest open market within 150 miles. The coordinates are never sent. A server-side lookup by IP is still needed for the TV's first launch.
 
 | S11 | **Open channels for signed-out viewers**: a thin market's "Any channel from 2 to 69 is open except 5" (`availableChannels` is `user`) | home 08.2 | Yes | 3 |
 | S12 | **One airing by id, public**: for share links that tune in or offer a reminder | home 07.1 | Yes | 3 |
@@ -180,7 +180,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
 | N12 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.pronoun`, accepted by `addCreator` and `updateCreator`. **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
 
-Phase 7 built against these as optional extensions in `apps/desk/src/api/ext.ts` and `apps/viewer/src/components/permission/api.ts`, filled by the mocks:
+Phase 7 built against these as optional extensions in `apps/web/src/desk/api/ext.ts` and `apps/web/src/viewer/components/permission/api.ts`, filled by the mocks:
 - N1 `Creator.proposedOptions: { band, channels[] }` (empty channels: band only).
 - N2 `POST /admin/creators/:creatorId/reminders` (admin) → `Creator` with `remindedAt`; a second reminder is refused; after it the desk offers "No answer" (`updateCreator { stage: "no_answer" }`).
 - N3 `Creator.askedAt`, `remindedAt`, `answeredAt`, `claimInviteSentAt`, `claimLinkSentAt`, `claimedAt`; `HeldEarnings.stations[].invitedAt`, `claimLinkSentAt`, `signOnAt`.
@@ -217,7 +217,7 @@ Phase 7 built against these as optional extensions in `apps/desk/src/api/ext.ts`
 
 ## How the viewer carries them (Phase 3)
 
-Every proposed field is an optional extension of a contract schema in `apps/viewer/src/api/ext.ts` or `apps/viewer/src/api/ext/<area>.ts`, named by its request id here. The mock responses are validated against those extended schemas. Against the real API the fields are absent until each request lands, and the screens hide what depends on them. The shapes the viewer proposes:
+Every proposed field is an optional extension of a contract schema in `apps/web/src/viewer/api/ext.ts` or `apps/web/src/viewer/api/ext/<area>.ts`, named by its request id here. The mock responses are validated against those extended schemas. Against the real API the fields are absent until each request lands, and the screens hide what depends on them. The shapes the viewer proposes:
 
 - **S5**: `from`/`to` on `getStation`; the station's schedule over that range.
 - **S7**: `carries[] {from, program, slot}` and `madeHere[] {program, carriers}` on the station page.
@@ -229,7 +229,7 @@ Every proposed field is an optional extension of a contract schema in `apps/view
 
 ## How master control carries them (Phase 4)
 
-As in the viewer: every proposed field is an optional extension of a contract schema in `apps/control/src/api/ext/<area>.ts` (onair, live, market, spots, earnings, station), named by its request id, and the mocks return them. The new ones are G7, T4, P25 and U3 above. The shapes master control proposes for requests already listed:
+As in the viewer: every proposed field is an optional extension of a contract schema in `apps/web/src/control/api/ext/<area>.ts` (onair, live, market, spots, earnings, station), named by its request id, and the mocks return them. The new ones are G7, T4, P25 and U3 above. The shapes master control proposes for requests already listed:
 
 - **G1** break contents: `rows` (code, title, length, whose, note) on `getLog` breaks and `contents[]` on `Avail`. **G2** `onAirSince`, `next`, `output.bitrateKbps` on `PlayoutStatus`. **G3** end a live block early, and its state. **G5** listings per airing, and editing one. **G6** `watchUrl` on sign-on checks.
 - **A4** `GET /stations/:id/hosts`, and `programIds` on host invites. **A5** `GET /me/stations/status` (`stationId`, `onAir`, `deadAirAt`) for the switcher; it could live on `Me.memberships[]`.

@@ -6,7 +6,7 @@
 |---|---|---|
 | `apps/api` | Express. `/v1` is the new API on the new schema; `/api` is the old one, kept for the old master control until the apps prompt replaces it | Postgres |
 | `apps/worker` | Playout: the engine (below) airs every station from its program log; the minute tick. Also runs the old queue loop for stations still on the old model (`LEGACY_PLAYOUT`) | Postgres, Redis lock |
-| `apps/control`, `viewer`, `tv`, `site`, `spots`, `desk` | The apps (the apps prompt) | none; they call `/v1` |
+| `apps/web` (the viewer, master control at `/control`, Network desk at `/desk`), `business`, `tv`, `site` | The apps (the apps prompt) | none; they call `/v1` |
 | Postgres | One database, ten schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`, `tv`), plus the old `public.opencast_state` | |
 | Redis | The worker's leader lock; the API's pub/sub for the TV remote's relay | |
 

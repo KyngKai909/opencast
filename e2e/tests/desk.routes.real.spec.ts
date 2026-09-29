@@ -3,12 +3,12 @@
 // no error, throws nothing, and every answer matches its contract (the client says so in the
 // console when one doesn't). The only calls the API refuses are the proposed endpoints it doesn't
 // mount (api/ext.ts, by request id), recorded on the test; the page leaves out what needs them.
-// Routes from apps/desk/src/routes.tsx.
+// Routes from apps/web/src/desk/routes.tsx (the Opencast app's /desk).
 
 import type { Page } from "@playwright/test";
 import { expect, seed, signIn, signOut, test } from "../lib/real";
 
-const IE = "/markets/inland-empire";
+const IE = "/desk/markets/inland-empire";
 
 /** Proposed endpoints the API doesn't mount yet (docs/contract-requests.md), by request id. */
 const PROPOSED: Array<[id: string, method: string, path: RegExp]> = [
@@ -39,14 +39,14 @@ const VISITS: Visit[] = [
   { name: "listed sources", path: `${IE}/listed`, h1: "Listed sources" },
   { name: "listed sources, list a source", path: `${IE}/listed?add=1`, h1: "Listed sources", says: (p) => p.getByRole("dialog", { name: "List a source" }) },
   { name: "catalog", path: `${IE}/catalog`, h1: "Catalog", says: (p) => p.getByText("This page isn't designed yet.") },
-  { name: "held earnings", path: "/held-earnings", h1: "Held earnings", says: (p) => p.getByRole("main").getByText("CRAT").first() },
-  { name: "reserved call signs", path: "/reserved-call-signs", h1: "Reserved call signs" },
-  { name: "rights claims", path: "/rights-claims", h1: "Rights claims", says: (p) => p.getByText("This page isn't designed yet.") },
-  { name: "catalog sponsors", path: "/catalog-sponsors", h1: "Catalog sponsors", says: (p) => p.getByText("This page isn't designed yet.") },
-  { name: "settings", path: "/settings", h1: "Settings", says: (p) => p.getByRole("heading", { name: "Appearance" }) },
-  { name: "a page that isn't there", path: "/no-such-page", h1: "There's nothing here." },
-  { name: "signed out: the sign-in page", path: "/", as: null, h1: "Sign in to Network desk" },
-  { name: "signed in off the team", path: "/", as: "sam", h1: "This desk is for the Opencast team.", says: (p) => p.getByText("You're signed in as sam@example.com", { exact: false }) }
+  { name: "held earnings", path: "/desk/held-earnings", h1: "Held earnings", says: (p) => p.getByRole("main").getByText("CRAT").first() },
+  { name: "reserved call signs", path: "/desk/reserved-call-signs", h1: "Reserved call signs" },
+  { name: "rights claims", path: "/desk/rights-claims", h1: "Rights claims", says: (p) => p.getByText("This page isn't designed yet.") },
+  { name: "catalog sponsors", path: "/desk/catalog-sponsors", h1: "Catalog sponsors", says: (p) => p.getByText("This page isn't designed yet.") },
+  { name: "settings", path: "/desk/settings", h1: "Settings", says: (p) => p.getByRole("heading", { name: "Appearance" }) },
+  { name: "a page that isn't there", path: "/desk/no-such-page", h1: "There's nothing here." },
+  { name: "signed out: the sign-in page", path: "/desk", as: null, h1: "Sign in to Network desk" },
+  { name: "signed in off the team", path: "/desk", as: "sam", h1: "This desk is for the Opencast team.", says: (p) => p.getByText("You're signed in as sam@example.com", { exact: false }) }
 ];
 
 for (const v of VISITS) {

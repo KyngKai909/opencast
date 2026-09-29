@@ -49,16 +49,17 @@ export default defineRailway((ctx) => {
         S3_STORAGE_CLASSES: "false"
       };
   const origin = (name: string) => `https://\${{${name}.RAILWAY_PUBLIC_DOMAIN}}`;
-  // The web apps are on Vercel (team Deed3Labs, projects opencast-*), following the monorepo branch
-  // until the cutover. Staging's API allows them and links to the Vercel viewer; production keeps
-  // the Railway web services' addresses until its domains are decided.
-  const vercel = { viewer: "opencast-viewer", control: "opencast-control", spots: "opencast-business", desk: "opencast-desk", site: "opencast-site", tv: "opencast-tv" } as const;
-  const webOrigin = (name: keyof typeof vercel) => (production ? origin(name) : `https://${vercel[name]}.vercel.app`);
+  // The web apps are on Vercel (team Deed3Labs: opencast-web, opencast-business, opencast-site,
+  // opencast-tv), on their free vercel.app addresses until a domain is bought. Railway runs only
+  // the API, the worker, Postgres and Redis. Staging's API allows the Vercel apps and links to
+  // opencast-web; production's addresses are set at the cutover, when its domains are decided.
+  const vercel = { web: "opencast-web", business: "opencast-business", site: "opencast-site", tv: "opencast-tv" } as const;
+  const webOrigin = (name: keyof typeof vercel) => `https://${vercel[name]}.vercel.app`;
   const common = {
     NODE_ENV: "production",
     DATABASE_URL: Postgres.env.DATABASE_URL,
     REDIS_URL: Redis.env.REDIS_URL,
-    APP_ORIGIN: webOrigin("viewer"),
+    APP_ORIGIN: production ? secret() : webOrigin("web"),
     PAYMENTS_PROVIDER: production ? secret() : "fake",
     STRIPE_SECRET_KEY: secret(),
     STRIPE_WEBHOOK_SECRET: secret(),
@@ -88,7 +89,7 @@ export default defineRailway((ctx) => {
       STORAGE_ROOT: "/tmp/opencast",
       // The minute jobs run in the worker, under its leader lock.
       JOBS: "off",
-      WEB_ORIGIN: (["viewer", "control", "spots", "desk", "site", "tv"] as const).map(webOrigin).join(","),
+      WEB_ORIGIN: production ? secret() : (["web", "business", "site", "tv"] as const).map(webOrigin).join(","),
       SERVE_WEB_APP: "false"
     }
   });
@@ -112,25 +113,8 @@ export default defineRailway((ctx) => {
     }
   });
 
-  const control = service("control", {
-    source,
-    build: build("@opencast/control", ["apps/control/**"]),
-    deploy: { startCommand: "npm run start -w @opencast/control", healthcheckPath: "/health", healthcheckTimeout: 300, ...restart },
-    env: { API_PROXY_BASE_URL: "http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8080", VITE_PRIVY_APP_ID: secret(), VITE_CLEAR_PRIVY_PROVIDER_APP_ID: secret() }
-  });
-
-  // The apps prompt's web apps: static, served from dist.
-  const web = (name: string) =>
-    service(name, {
-      source,
-      build: build(`@opencast/${name}`, [`apps/${name}/**`, "scripts/serve-static.mjs"]),
-      deploy: { startCommand: `node scripts/serve-static.mjs apps/${name}/dist`, healthcheckPath: "/health", healthcheckTimeout: 120, ...restart },
-      // Opencast's own Privy app (build time), and Clear's provider app for "Connect Clear".
-      env: { VITE_API_BASE: origin("api"), VITE_PRIVY_APP_ID: secret(), VITE_CLEAR_PRIVY_PROVIDER_APP_ID: secret() }
-    });
-
   return project("opencast", {
     environments: ["production", "staging"],
-    resources: [Postgres, Redis, redisVolume, postgresVolume, workerCache, ...(media ? [media] : []), api, worker, control, web("viewer"), web("spots"), web("desk"), web("site"), web("tv")]
+    resources: [Postgres, Redis, redisVolume, postgresVolume, workerCache, ...(media ? [media] : []), api, worker]
   });
 });

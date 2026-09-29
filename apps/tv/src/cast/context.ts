@@ -5,7 +5,7 @@
 
 import { CAST_NAMESPACE, type CastContextLike } from "@opencast/player";
 
-/** The mock's channel name; the viewer's mock sender uses the same (apps/viewer/src/cast/mockCast.ts). */
+/** The mock's channel name; the viewer's mock sender uses the same (apps/web/src/viewer/cast/mockCast.ts). */
 export const MOCK_CAST_CHANNEL = "opencast-cast-mock";
 
 /** A message on the mock channel. */

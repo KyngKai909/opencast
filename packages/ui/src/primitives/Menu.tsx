@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cx } from "../lib/cx";
 import { Icon } from "../icons/Icon";
 import type { IconName } from "../icons/glyphs";
@@ -24,6 +24,8 @@ export interface MenuProps {
   align?: "start" | "end";
   /** Show the list now (the gallery's still states). */
   defaultOpen?: boolean;
+  /** What the button shows in place of "···" (the header avatar's initials), with its own class. */
+  trigger?: { content: ReactNode; className: string };
   className?: string;
 }
 
@@ -31,7 +33,7 @@ export interface MenuProps {
  * The "···" row menu: a small button that opens a list of actions. Arrow keys, Home and End move
  * through it, Enter chooses, Escape and Tab close it; focus goes back to the button.
  */
-export function Menu({ items, label = "More", align = "end", defaultOpen = false, className }: MenuProps) {
+export function Menu({ items, label = "More", align = "end", defaultOpen = false, trigger, className }: MenuProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [active, setActive] = useState(-1);
   const button = useRef<HTMLButtonElement>(null);
@@ -74,7 +76,7 @@ export function Menu({ items, label = "More", align = "end", defaultOpen = false
       <button
         ref={button}
         type="button"
-        className="oc-menu__btn"
+        className={trigger ? trigger.className : "oc-menu__btn"}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -93,7 +95,7 @@ export function Menu({ items, label = "More", align = "end", defaultOpen = false
           }
         }}
       >
-        <span aria-hidden="true">&middot;&middot;&middot;</span>
+        {trigger ? trigger.content : <span aria-hidden="true">&middot;&middot;&middot;</span>}
       </button>
       {open && (
         <div

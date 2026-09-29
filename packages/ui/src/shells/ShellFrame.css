@@ -25,3 +25,6 @@
 /* A quiet line in the header ("New station, step 1 of 5", "Opencast team", "Studios don't broadcast"). */
 .oc-shell-head__note { color: var(--ink-50); font-size: 14px; }
 .oc-shell-head__end .oc-shell-head__note { font-size: 13px; }
+/* "Back to watching" (master control, the Opencast app): a quiet link before the header's end parts. */
+.oc-shell-head__back { color: var(--ink-70); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.oc-shell-head__back:hover { color: var(--ink); text-decoration: underline; }

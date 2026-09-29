@@ -10,7 +10,7 @@ const beatId = () => seed.stations.beat.id;
 
 test("BEAT carries Saturday Reel from the syndication market", async ({ page }) => {
   await signIn(page, "kai");
-  await page.goto(`/beat/market/offers/${seed.offers.saturdayReel}`);
+  await page.goto(`/control/beat/market/offers/${seed.offers.saturdayReel}`);
   await expect(page.getByRole("heading", { name: "Saturday Reel", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Choose terms" }).click();
   const terms = page.getByRole("dialog");
@@ -27,15 +27,15 @@ test("BEAT carries Saturday Reel from the syndication market", async ({ page }) 
   await expect
     .poll(async () => (await api<{ carrying: { program: { id: string } }[] }>(`/stations/${beatId()}/carriage/agreements`, { as: "kai" })).carrying.some((a) => a.program.id === seed.programs.saturdayReel))
     .toBe(true);
-  await page.goto("/beat/market/carried");
+  await page.goto("/control/beat/market/carried");
   await expect(page.getByRole("row").filter({ hasText: "Saturday Reel" })).toContainText(/REEL/);
 });
 
 test("BEAT fills its breaks from the spot market", async ({ page }) => {
   await signIn(page, "kai");
-  await page.goto("/beat/breaks");
+  await page.goto("/control/beat/breaks");
   await expect(page.getByRole("heading", { name: "Breaks tonight" })).toBeVisible();
-  await page.goto("/beat/spot-market");
+  await page.goto("/control/beat/spot-market");
   await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
   const add = page.getByRole("button", { name: "Add Orange Street Coffee to your rotation" }).first();
   await add.click();
@@ -48,7 +48,7 @@ test("BEAT fills its breaks from the spot market", async ({ page }) => {
       return r.main.spots.some((s) => s.spotId === seed.spots.fallMenu || s.spotId === seed.spots.nightOwl);
     })
     .toBe(true);
-  await page.goto("/beat/breaks");
+  await page.goto("/control/beat/breaks");
   await expect(page.getByText(/Rotation: 1 spot\./)).toBeVisible();
 });
 
@@ -60,11 +60,11 @@ test("BEAT approves a sponsorship of Beat Tape Live", async ({ page }) => {
   });
 
   await signIn(page, "kai");
-  await page.goto("/beat/sponsors");
+  await page.goto("/control/beat/sponsors");
   await expect(page.getByRole("heading", { name: "Sponsors", exact: true })).toBeVisible();
   const request = page.getByText("Orange Street Coffee wants to sponsor Beat Tape Live");
   await expect(request).toBeVisible();
-  await page.goto(`/beat/sponsors/${offered.id}`);
+  await page.goto(`/control/beat/sponsors/${offered.id}`);
   await expect(request).toBeVisible();
   await page.getByRole("button", { name: "Approve" }).click();
   const toast = page.getByText("Orange Street Coffee approved.");
@@ -80,7 +80,7 @@ test("BEAT approves a sponsorship of Beat Tape Live", async ({ page }) => {
 
 test("someone new starts a station", async ({ page }) => {
   await signIn(page, "first-station-owner");
-  await page.goto("/");
+  await page.goto("/control");
   await expect(page.getByRole("heading", { name: "Start a station" })).toBeVisible();
   await page.getByRole("link", { name: "Start a station" }).click();
 
@@ -103,7 +103,7 @@ test("someone new starts a station", async ({ page }) => {
   expect(setup.station).toMatchObject({ name: "Redlands Tapes", callSign: "TAPE", channel: `${picked}.1` });
 
   // The sign-on checks read the real API: an empty log can't sign on yet.
-  await page.goto(`/setup/${stationId}/sign-on`);
+  await page.goto(`/control/setup/${stationId}/sign-on`);
   await expect(page.getByRole("heading", { name: "Ready to sign on" })).toBeVisible();
   await expect(page.getByText("The log covers the next 24 hours")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign on", exact: true })).toBeDisabled();

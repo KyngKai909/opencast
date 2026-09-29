@@ -105,7 +105,7 @@ Styles with no frame (no new words): a field's error line (standby amber, with t
 
 ### apps/viewer (Phase 3)
 
-Settings' undrawn panes (Account, Market, TVs and casting, Appearance, Privacy, Your data) are written in full in `apps/viewer/src/components/settings/panes.tsx`; review them there. Everything else is below.
+Settings' undrawn panes (Account, Market, TVs and casting, Appearance, Privacy, Your data) are written in full in `apps/web/src/viewer/components/settings/panes.tsx`; review them there. Everything else is below.
 
 **Home, first visit, the radio band**
 
@@ -373,7 +373,7 @@ The waitlist's words the reference doesn't draw, and the tuner's number entry (t
 
 ### apps/desk and the creator's permission page (Phase 7)
 
-The frames' words are used as drawn. Below is what they don't have. Mock-only panels (the creator's side under the pipeline) and mock error messages aren't listed. The permission page's words, drawn and new, are all in `apps/viewer/src/components/permission/copy.ts`, versioned for the lawyer (open question 15).
+The frames' words are used as drawn. Below is what they don't have. Mock-only panels (the creator's side under the pipeline) and mock error messages aren't listed. The permission page's words, drawn and new, are all in `apps/web/src/viewer/components/permission/copy.ts`, versioned for the lawyer (open question 15).
 
 **Desk: signing in and the frame**
 
@@ -437,3 +437,11 @@ The frames' words are used as drawn. Below is what they don't have. Mock-only pa
 | /tv | "Enter the code the TV shows: six letters and numbers, or four numbers.", "Four numbers from the TV's Remote and phones make this phone its remote.", "This phone is paired with {TV}, but the remote didn't open. Try Watch on." |
 | Your TVs | ", on now" |
 | TV, Remote and phones | "Pair a phone" / "For a guest's phone. Phones signed in to your account don't need a code" / "Show a code", "Hide the code"; "On the phone, go to {host}/tv and enter:", "Changes in N minutes", "Changes in 1 minute", "Changes in under a minute"; "Phones that can change the channel"; "Signed in to your account", "Paired with a code", ", connected now", "Remove"; "No phones yet", "Phones signed in to your account appear here once they connect", "Pair a phone to use it as a remote" |
+
+### apps/web: one app, three areas (handoff 4)
+
+"Master control", "Network desk" (the avatar's menu) and "Back to watching" (master control's header) are the apps prompt's own words. What the frames don't have:
+
+- The avatar's menu on the web viewer, for people with a station role or on the Opencast team: **You** (their page, where the avatar went before), then **Master control** and **Network desk** as they apply. Everyone else's avatar still goes straight to You, with no menu.
+- The browser tab's title while master control is open: **Master control · Opencast** (master control's own title before), and **Network desk** on the desk.
+

@@ -9,22 +9,28 @@ downloaded.
 
 ## Unit tests
 
-In each app: `npx tsc -p tsconfig.json --noEmit` and `npx vitest run`. The API: `npm test -w @opencast/api`.
+In each app: `npx tsc -p tsconfig.json --noEmit` and `npx vitest run` (in `apps/web`, the three
+areas' suites together, and `src/mocks/handlers.test.ts`, which checks the one mock world answers
+each endpoint once). The API: `npm test -w @opencast/api`.
 
 ## The mock flows
 
-`npm run e2e` from the root (or `cd e2e && npx playwright test --project <product>`) runs the specs
+`npm run e2e` from the root (or `cd e2e && npx playwright test --project <project>`) runs the specs
 in `e2e/tests/<product>.<name>.spec.ts` against each app's `dev:mock` server, where Mock Service
 Worker answers every API call from the reference files' fixtures:
 
-| Project | App | Mock port |
-| --- | --- | --- |
-| `viewer` | apps/viewer (needs TV mode too, for casting) | 5174 |
-| `tv` | apps/tv | 5175 |
-| `control` | apps/control | 5179 |
-| `spots` | apps/business | 5181 |
-| `desk` | apps/desk (needs the viewer too, for the permission page) | 5182 |
-| `site` | apps/site | 5183 |
+| Project | App | Specs | Mock port |
+| --- | --- | --- | --- |
+| `web` | apps/web, the Opencast app (needs TV mode too, for casting) | `viewer.*` (paths from `/`), `control.*` (`/control/…`), `desk.*` (`/desk/…`) | 5174 |
+| `tv` | apps/tv | `tv.*` | 5175 |
+| `business` | apps/business | `business.*` | 5181 |
+| `site` | apps/site | `site.*` | 5183 |
+
+The Opencast app's three areas share one mock world and one sign-in: the specs sign someone in by
+setting `oc-mock-signed-in` to their email before the page loads (`control.support.ts`'s `signInAs`,
+`dee@opencast.example` for the desk, `kai@example.com` for the viewer). One spec file at a time,
+with one worker, keeps a laptop cool: `npx playwright test tests/desk.flow.spec.ts --project web
+--workers 1 --trace off`.
 
 A server that's already running on its port is reused; otherwise Playwright starts the ones the
 chosen `--project`s need. `e2e/lib/a11y.ts` has `useGround` and `checkA11y` (axe, WCAG 2.2 A and
@@ -61,9 +67,9 @@ What happens:
    Clear's provider app and Cast blanked (so nothing outside loads in the browser either); only the
    servers the chosen `--project`s need, as the mock config does:
 
-   | viewer | tv | control | spots | desk | site |
-   | --- | --- | --- | --- | --- | --- |
-   | 5274 | 5275 | 5279 | 5281 | 5282 | 5283 |
+   | web (viewer, control, desk specs) | tv | business | site |
+   | --- | --- | --- | --- |
+   | 5274 | 5275 | 5281 | 5283 |
 
 3. **The teardown** stops the API, which drops its database and temp storage. (If a run is killed,
    the API notices the runner is gone and does the same; `npm run real:down -w @opencast/e2e`
@@ -71,8 +77,8 @@ What happens:
 
 ### Signing in: test tokens
 
-The viewer, master control, business and the desk have a third way to sign in beside Privy and the
-mock: the **test sign-in** (`apps/<app>/src/auth/devTokenAuth.ts`). It's chosen only when
+The Opencast app and business have a third way to sign in beside Privy and the mock: the **test
+sign-in** (`apps/web/src/auth/devTokenAuth.ts`, `apps/business/src/auth/devTokenAuth.ts`). It's chosen only when
 `import.meta.env.DEV && VITE_DEV_TOKEN_AUTH === "true"`, so a production build never contains it.
 It reads a token and an email from `localStorage` (`oc-dev-token`, `oc-dev-email`) and hands the
 token to the API as Privy's would be; every step of the sign-in page picks it up.
@@ -154,7 +160,7 @@ The ids are in `seed` (the `Seed` type in `e2e/real/shared.ts`).
 
 ```sh
 npm run real:up -w @opencast/e2e              # the API and every app, until Ctrl-C
-npm run real:up -w @opencast/e2e -- control   # the API and master control
+npm run real:up -w @opencast/e2e -- web       # the API and the Opencast app
 npm run real:up -w @opencast/e2e -- --no-apps # the API only
 ```
 

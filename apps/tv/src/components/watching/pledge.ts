@@ -1,5 +1,5 @@
 // Pledge by QR (tv 05.4): the QR opens the viewer's own pledge page for the station
-// (apps/viewer /:handle/pledge, $10.00 a month selected: the sheet's own default), and money
+// (apps/web /:handle/pledge, $10.00 a month selected: the sheet's own default), and money
 // happens on the phone. The station's handle, or its call sign when it has none.
 
 import type { StationIdent } from "@opencast/contracts";

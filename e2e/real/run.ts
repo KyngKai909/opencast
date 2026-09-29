@@ -56,7 +56,7 @@ export async function startRun(o: { parentPid?: number } = {}): Promise<RunState
       E2E_SIGNING_JWK: JSON.stringify(privateJwk),
       REDIS_URL: redisUrl,
       WEB_ORIGIN: origins.join(","),
-      APP_ORIGIN: `http://localhost:${REAL_PORTS.viewer}`,
+      APP_ORIGIN: `http://localhost:${REAL_PORTS.web}`,
       STORAGE_ROOT: path.join(os.tmpdir(), `opencast-e2e-${run}`),
       E2E_SEED_FILE: seedFile,
       E2E_STATE_FILE: STATE_FILE,

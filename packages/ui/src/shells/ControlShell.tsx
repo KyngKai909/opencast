@@ -3,7 +3,7 @@ import { cx } from "../lib/cx";
 import { clock, type TimeInput } from "../lib/format";
 import { Tally } from "../primitives/Tally";
 import { Button } from "../primitives/Button";
-import { ShellFrame, ShellHead } from "./ShellFrame";
+import { ShellBackToWatching, ShellFrame, ShellHead } from "./ShellFrame";
 import { ShellRail, buildRail, type ShellItems, type ShellRailSpec } from "./ShellRail";
 import { StationSwitch, type ControlStation } from "./StationSwitch";
 import { useNow } from "./useNow";
@@ -86,12 +86,14 @@ export interface ControlShellProps {
   onSignOff?: () => void;
   /** Main area without padding (settings, full-bleed pages). */
   flush?: boolean;
+  /** "Back to watching": where the viewer is, in the Opencast app ("/"). Left out, the header has none. */
+  watchHref?: string;
   children?: ReactNode;
   className?: string;
 }
 
 /** Master control: header with station switcher, 12-hour clock with seconds, tally and Sign off; the fixed rail; main. */
-export function ControlShell({ station, onSwitchStation, active, items, linkTo, now, timeZone, onAir, flicker, onSignOff, flush, children, className }: ControlShellProps) {
+export function ControlShell({ station, onSwitchStation, active, items, linkTo, now, timeZone, onAir, flicker, onSignOff, flush, watchHref, children, className }: ControlShellProps) {
   const time = useNow(now);
   const at = time instanceof Date ? time : new Date(time);
   return (
@@ -105,6 +107,7 @@ export function ControlShell({ station, onSwitchStation, active, items, linkTo, 
             {clock(at, { seconds: true, timeZone })}
           </time>
           <div className="oc-control-shell__end">
+            {watchHref !== undefined && <ShellBackToWatching href={watchHref} />}
             <Tally state={onAir ? "lit" : "unlit"} flicker={flicker} />
             {onAir && onSignOff && (
               <Button size="sm" onClick={onSignOff}>

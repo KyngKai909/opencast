@@ -1,4 +1,4 @@
-// Master control's helpers for its specs: who's signed in to the mock, and waiting for a page to
+// Master control's helpers for its specs (the Opencast app's /control): who's signed in to the mock, and waiting for a page to
 // settle (its data loaded, its animations done) before axe or an assertion reads it.
 
 import { expect, type Page } from "@playwright/test";
@@ -19,7 +19,7 @@ export async function signInAs(page: Page, who: Who) {
   if (!who) return;
   await page.addInitScript((email) => {
     try {
-      localStorage.setItem("oc-mock-control-signed-in", email);
+      localStorage.setItem("oc-mock-signed-in", email);
     } catch {
       /* about:blank */
     }

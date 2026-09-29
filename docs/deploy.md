@@ -21,8 +21,7 @@ All build with Nixpacks from the repo root (`nixpacks.toml`: Node 22, ffmpeg, yt
 |---|---|---|---|---|
 | **api** | `npx turbo run build --filter=@opencast/api...` | `npm run start -w @opencast/api` (pre-deploy: `npm run migrate -w @opencast/db`) | `/health` | Postgres, Redis, object storage, Privy, Livepeer, payments, chain (read-only) |
 | **worker** | `npx turbo run build --filter=@opencast/worker...` | `npm run start -w @opencast/worker` | `/health` (leader, stations on air, cache hit rate, bytes, misses) | Postgres, Redis (leader lock), object storage, the cache volume at `/data`, Livepeer, chain (it sends the weekly escrow batch) |
-| **control** | `npx turbo run build --filter=@opencast/control...` | `npm run start -w @opencast/control` | `/health` | the API over private networking |
-| **viewer**, **spots**, **desk**, **site**, **tv** | `npx turbo run build --filter=@opencast/<app>...` | `node scripts/serve-static.mjs apps/<app>/dist` | `/health` | `VITE_API_BASE` at build |
+| **web** (the Opencast app: the viewer, `/control`, `/desk`), **business**, **site**, **tv** | `npx turbo run build --filter=@opencast/<app>...` | `node scripts/serve-static.mjs apps/<app>/dist` | `/health` | `VITE_API_BASE` at build |
 | Postgres, Redis | Railway databases | | | 5 GB volumes |
 
 Keep **worker at one replica** for now: the Redis leader lock makes extra replicas wait, not share stations.
@@ -53,9 +52,8 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓ | ✓ | test keys on staging, live only in production. Webhook: `https://<api>/v1/webhooks/stripe` |
 | `CHAIN_RPC_URL`, `CHAIN_ID`, `ESCROW_CONTRACT_ADDRESS`, `CREATOR_FUND_ADDRESS`, `USDC_ADDRESS` | ✓ | ✓ | from `contracts/`'s deploy (Base Sepolia on staging). The API only reads and encodes |
 | `SETTLEMENT_PRIVATE_KEY` | | ✓ | the wallet that sends the weekly escrow batch and the pool's fund share. Worker only |
-| `API_PROXY_BASE_URL` | | | control: `http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8080` |
 | `VITE_API_BASE` | | | the web apps, at build: the API's public URL |
-| `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` | | | control and spots, at build: Clear's Privy app ID for "Connect Clear" (`linkCrossAppAccount`). The same value as the API's `CLEAR_PRIVY_PROVIDER_APP_ID` |
+| `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` | | | web and business, at build: Clear's Privy app ID for "Connect Clear" (`linkCrossAppAccount`). The same value as the API's `CLEAR_PRIVY_PROVIDER_APP_ID` |
 
 Per-service examples: `apps/<service>/.env.example`.
 
@@ -71,6 +69,8 @@ Per-service examples: `apps/<service>/.env.example`.
 | desk | https://desk-staging-ceae.up.railway.app |
 | site | https://site-staging-77bf.up.railway.app |
 | tv | https://tv-staging.up.railway.app |
+
+These predate the Opencast app (handoff 4): the viewer, control and desk services become one `web` service (`apps/web`, with master control at `/control` and the desk at `/desk`), and spots is `business`, once `.railway/railway.ts` is applied again.
 
 Staging's database is fresh. For markets on the dial, seed it once from inside the api service (`railway ssh -s api -- npm run seed -w @opencast/db`); the seed is safe to rerun.
 

@@ -65,6 +65,18 @@ export function ShellHead({ app, variant = "control", homeHref, children, classN
   );
 }
 
+/**
+ * "Back to watching": master control's way back to the viewer, in the same session (the Opencast
+ * app, apps/web). A quiet link in the header's end.
+ */
+export function ShellBackToWatching({ href }: { href: string }) {
+  return (
+    <a className="oc-shell-head__back" href={href}>
+      Back to watching
+    </a>
+  );
+}
+
 /** The part of a header pushed to the right (shared-mid .mc-end, .biz-head .end, .nd-head .end). */
 export function ShellHeadEnd({ children, className }: { children?: ReactNode; className?: string }) {
   return <div className={cx("oc-shell-head__end", className)}>{children}</div>;

@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 import { api, expect, seed, signIn, test } from "../lib/real";
 
-const IE = "/markets/inland-empire";
+const IE = "/desk/markets/inland-empire";
 
 type Creator = { id: string; displayName: string; stage: string; station: { callSign: string | null; channel: string | null } | null; nextActionDue: string | null };
 type Slot = { major: number; state: string; stations: Array<{ callSign: string | null }> };
@@ -143,7 +143,7 @@ test("a reminder that's due: Remind says it isn't available yet (N2), and nothin
 test("held earnings: CRAT's, waiting to be claimed", async ({ page }) => {
   const w = watch(page);
   await signIn(page, "dee");
-  await page.goto("/held-earnings");
+  await page.goto("/desk/held-earnings");
   await expect(page.getByRole("heading", { level: 1, name: "Held earnings" })).toBeVisible();
   const held = await api<{ stations: Array<{ station: { callSign: string | null }; creator: string }> }>("/admin/held-earnings", { as: "dee" });
   const crat = held.stations.find((s) => s.station.callSign === "CRAT");

@@ -1,6 +1,0 @@
-/* Master control's own layout glue. Components and tokens come from @opencast/ui. Page styles
-   use the prefix cc- (control), one CSS file per page or component, tokens only. */
-html, body, #root { height: 100%; }
-body { font-size: 15px; line-height: 1.45; }
-#root { display: flex; flex-direction: column; }
-#root > * { flex: 1; min-height: 0; }

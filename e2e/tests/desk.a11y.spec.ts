@@ -7,14 +7,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { checkA11y, useGround, type Ground } from "../lib/a11y";
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const IE = "/markets/inland-empire";
+const IE = "/desk/markets/inland-empire";
 const SKATE = U(202); // Desert Skate Films: Found, works catalogued
 const LUPE = U(201); // Tía Lupe's Kitchen: set up, signs on later
 const MARIACHI = U(217); // Moreno Valley Mariachi: said yes, not set up
 
 /** Signed in as the admin, as the mock's sign-in leaves it. */
 async function signedInAsAdmin(page: Page) {
-  await page.addInitScript(() => localStorage.setItem("oc-mock-desk-signed-in", "dee@opencast.example"));
+  await page.addInitScript(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
 }
 
 /** No finite animation still running (fades, the modal's rise): axe measures what stays on screen. */
@@ -47,19 +47,19 @@ const ROUTES: Route[] = [
   { path: `${IE}/listed`, ready: async (p) => { await h1("Listed sources")(p); await expect(p.getByRole("heading", { name: "Opencast catalog station" })).toBeVisible(); } },
   { path: `${IE}/listed?add=1`, ready: async (p) => { await expect(p.getByRole("dialog", { name: "List a source" })).toBeVisible(); } },
   { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
-  { path: "/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
-  { path: "/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
-  { path: "/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
-  { path: "/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
-  { path: "/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
-  { path: "/no-such-page", ready: h1("There's nothing here.") }
+  { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
+  { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
+  { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
+  { path: "/desk/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
+  { path: "/desk/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
+  { path: "/desk/no-such-page", ready: h1("There's nothing here.") }
 ];
 
 for (const ground of ["dark", "light"] as Ground[]) {
   test.describe(`${ground} ground`, () => {
     test("sign-in page, and a wrong code", async ({ page }) => {
       await useGround(page, ground);
-      await page.goto("/");
+      await page.goto("/desk");
       await h1("Sign in to Network desk")(page);
       await settled(page);
       await checkA11y(page, `desk sign-in, ${ground}`);
@@ -75,9 +75,9 @@ for (const ground of ["dark", "light"] as Ground[]) {
     test("not on the team", async ({ page }) => {
       // Signed in as the mock leaves it (signing in through the page has a known bug: see
       // desk.flow.spec.ts, the last test).
-      await page.addInitScript(() => localStorage.setItem("oc-mock-desk-signed-in", "sam@example.com"));
+      await page.addInitScript(() => localStorage.setItem("oc-mock-signed-in", "sam@example.com"));
       await useGround(page, ground);
-      await page.goto("/");
+      await page.goto("/desk");
       await h1("This desk is for the Opencast team.")(page);
       await expect(page.getByText("You're signed in as sam@example.com, but that account isn't on the team.")).toBeVisible();
       await settled(page);

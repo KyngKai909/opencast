@@ -4,7 +4,7 @@
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { checkA11y, useGround, type A11yOptions, type Ground } from "../lib/a11y";
-// TV mode's dev:mock server (playwright.config.ts PORTS.tv), started with the viewer project.
+// TV mode's dev:mock server (playwright.config.ts PORTS.tv), started with the web project.
 
 const WIDTHS = { web: { width: 1280, height: 800 }, phone: { width: 390, height: 844 } } as const;
 type Width = keyof typeof WIDTHS;

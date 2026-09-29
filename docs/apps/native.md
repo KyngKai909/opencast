@@ -2,9 +2,17 @@
 
 Three builds wrap the web apps with Capacitor 8:
 
-- the viewer on iPhone;
-- the viewer on Android;
+- the Opencast app on iPhone;
+- the Opencast app on Android;
 - TV mode on Android TV and Fire TV.
+
+The Opencast app is `apps/web`: the viewer at `/`, master control at `/control` and Network desk at
+`/desk`, with one sign-in. The phone apps wrap all of it, so creators get master control on their
+phones too (going live from the phone included); viewers never download master control or the desk,
+which load only when opened. The app id stays the viewer's, `org.useopencast.viewer`: the native
+projects' packages (`org.useopencast.viewer`) and any store records keep it. Changing it to
+`org.useopencast.app` means renaming the Android package folders and the Xcode bundle id together,
+before anything is submitted.
 
 Nothing has been submitted to any store. Each section below covers:
 
@@ -14,11 +22,11 @@ Nothing has been submitted to any store. Each section below covers:
 
 **Toolchains everywhere:** Node 22 or later. Capacitor 8 needs Xcode 26.0 or later and Android Studio 2025.2.1 or later. Android Studio brings its own JDK 21.
 
-**Never build `apps/viewer/android` and `apps/tv/android` at the same time.** Both compile the shared `node_modules/@capacitor/android` and `@capacitor/app`, and those modules keep their build folders inside `node_modules`. Two Gradle runs at once overwrite each other's output. The failures look like "cannot access Bridge" or a missing `R-def.txt`. Build one project, then the other.
+**Never build `apps/web/android` and `apps/tv/android` at the same time.** Both compile the shared `node_modules/@capacitor/android` and `@capacitor/app`, and those modules keep their build folders inside `node_modules`. Two Gradle runs at once overwrite each other's output. The failures look like "cannot access Bridge" or a missing `R-def.txt`. Build one project, then the other.
 
-## The viewer on iPhone and Android
+## The Opencast app on iPhone and Android
 
-The viewer's web build (`apps/viewer`) runs in a Capacitor WebView, from the files bundled into the app, with three plugins of its own:
+The Opencast app's web build (`apps/web`) runs in a Capacitor WebView, from the files bundled into the app, with three plugins of its own:
 
 - **Casting to Chromecast** (both platforms), so an iPhone can cast too. Safari can't.
 - **Mirroring to an AirPlay TV** (iPhone only): TV mode appears on the external display.
@@ -28,14 +36,14 @@ The viewer's web build (`apps/viewer`) runs in a Capacitor WebView, from the fil
 
 | File | What it does |
 |---|---|
-| `apps/viewer/capacitor.config.ts` | App id `org.useopencast.viewer`, name "Opencast", `webDir: "dist"`, the dark ground behind the WebView. `CAP_SERVER_URL` switches on live reload (below). |
-| `scripts/build-native.mjs` (`npm run build:native`) | Checks the env, builds the viewer, builds TV mode into `dist/tv/` for the iPhone, writes the Cast receiver id for Xcode and Gradle, then runs `cap sync`. |
+| `apps/web/capacitor.config.ts` | App id `org.useopencast.viewer`, name "Opencast", `webDir: "dist"`, the dark ground behind the WebView. `CAP_SERVER_URL` switches on live reload (below). |
+| `scripts/build-native.mjs` (`npm run build:native`) | Checks the env, builds the Opencast app, builds TV mode into `dist/tv/` for the iPhone, writes the Cast receiver id for Xcode and Gradle, then runs `cap sync`. |
 | `scripts/native-art.mjs` (`npm run native:art`) | Draws the app icons and launch screens from the PWA's mark (`public/icons/icon.svg`), in the PWA icon's colours. The PWA's icons stop at 512 px and the App Store needs 1024 px. |
-| `src/native/platform.ts` | `isNative()` and `hasPlugin(name)`. Every native path asks these, so the web build behaves as before. |
-| `src/native/plugins.ts` | The three plugins' TypeScript interfaces (`registerPlugin`). |
-| `src/native/nativeCastSender.ts` | The Cast sender for both apps, over the `OpencastCast` plugin. `senderFor` chooses it when the app has the plugin (`src/cast/sender.ts`). It uses the same messages and namespace as the web sender. Unlike the web sender, it lists TVs by name. |
-| `src/cast/mirroring.ts` | The mirroring seam. `nativeMirroring()` turns the `OpencastMirror` plugin's events into the status that CastSync and the remote already read (guide, remote while mirroring, "Mirroring stopped", battery line). Keep-awake comes from `@capacitor-community/keep-awake`. |
-| `src/native/lockScreen.ts` | Turns lock-screen presses into player commands: next and previous are channel up and down, and pause, play and toggle map to themselves. `PlayerRoot` uses it in place of the web's Media Session when the app has the plugin, and keeps the lock screen showing the station and what's on. |
+| `src/viewer/native/platform.ts` | `isNative()` and `hasPlugin(name)`. Every native path asks these, so the web build behaves as before. |
+| `src/viewer/native/plugins.ts` | The three plugins' TypeScript interfaces (`registerPlugin`). |
+| `src/viewer/native/nativeCastSender.ts` | The Cast sender for both apps, over the `OpencastCast` plugin. `senderFor` chooses it when the app has the plugin (`src/viewer/cast/sender.ts`). It uses the same messages and namespace as the web sender. Unlike the web sender, it lists TVs by name. |
+| `src/viewer/cast/mirroring.ts` | The mirroring seam. `nativeMirroring()` turns the `OpencastMirror` plugin's events into the status that CastSync and the remote already read (guide, remote while mirroring, "Mirroring stopped", battery line). Keep-awake comes from `@capacitor-community/keep-awake`. |
+| `src/viewer/native/lockScreen.ts` | Turns lock-screen presses into player commands: next and previous are channel up and down, and pause, play and toggle map to themselves. `PlayerRoot` uses it in place of the web's Media Session when the app has the plugin, and keeps the lock screen showing the station and what's on. |
 | `ios/App/App/OpencastBridgeViewController.swift` | Capacitor's view controller, which registers the three plugins. They live in the app target, not in npm packages, so `cap sync` doesn't find them. |
 | `ios/App/App/OpencastCastPlugin.swift` | `OpencastCast` for iOS: the Google Cast iOS SDK. |
 | `ios/App/App/OpencastMirrorPlugin.swift`, `ExternalDisplaySceneDelegate.swift` | `OpencastMirror`: the external display's scene and a second WKWebView showing TV mode. |
@@ -68,15 +76,15 @@ It costs about 1.8 MB in the iPhone app. The Android viewer doesn't mirror, so `
 **Live reload** (development only; `build:native` refuses to run while it's set):
 
 ```sh
-npm run dev -w @opencast/viewer                                    # the Vite dev server, port 5174
-CAP_SERVER_URL=http://192.168.1.20:5174 npx cap sync ios           # this Mac's LAN address; the Simulator can use http://localhost:5174
+npm run dev -w @opencast/web                                       # the Vite dev server, port 5173
+CAP_SERVER_URL=http://192.168.1.20:5173 npx cap sync ios           # this Mac's LAN address; the Simulator can use http://localhost:5173
 # then Run from Xcode. For the external display, also run TV mode (npm run dev -w @opencast/tv)
-# and start the viewer with VITE_MIRROR_TV=url VITE_TV_URL=http://192.168.1.20:5175
+# and start the Opencast app with VITE_MIRROR_TV=url VITE_TV_URL=http://192.168.1.20:5175
 ```
 
 Run `npx cap sync` again without `CAP_SERVER_URL` before any real build.
 
-### The viewer on iPhone (iOS)
+### The Opencast app on iPhone (iOS)
 
 **Toolchain:**
 
@@ -119,7 +127,7 @@ Run `npx cap sync` again without `CAP_SERVER_URL` before any real build.
 **Build and run:**
 
 ```sh
-cd apps/viewer
+cd apps/web
 npm run build:native -- ios                    # or: npm run build:native -- ios --mode staging
 npx cap open ios                               # Xcode: pick a Simulator or a phone, then Run
 # or without opening Xcode:
@@ -127,7 +135,7 @@ npx cap run ios --target "<simulator UDID>"    # xcrun simctl list devices
 # an archive for App Store Connect (in Xcode: Product → Archive → Distribute App)
 ```
 
-### The viewer on Android
+### The Opencast app on Android
 
 **Toolchain:**
 
@@ -168,7 +176,7 @@ npx cap run ios --target "<simulator UDID>"    # xcrun simctl list devices
 **Build and run:**
 
 ```sh
-cd apps/viewer
+cd apps/web
 npm run build:native -- android
 cd android
 ./gradlew assembleDebug                       # app/build/outputs/apk/debug/app-debug.apk
@@ -305,7 +313,7 @@ How it works on Android:
 | `ios/App/App/*.swift` (the 5 new files, and the edits to `AppDelegate.swift` and `SceneDelegate.swift`) | **Never built.** Parsed, then type-checked with `swiftc` against Mac Catalyst's UIKit, WebKit, AVFoundation and MediaPlayer (the only iOS-flavoured SDK without Xcode). Capacitor and GoogleCast were replaced by hand-written stubs of their APIs. | **(1)** In Xcode, that `GoogleCastDynamic` resolves and `import GoogleCast` finds it. **(2)** The Cast listener methods: they carry explicit Objective-C selectors (`sessionManager:didStartSession:`…), so check they're called. **(3)** That the external display gets its own scene with `UIApplicationSupportsMultipleScenes` false; if it doesn't, set it to true. **(4)** That sharing Capacitor's scheme handler with the second WKWebView serves `/tv/…`. **(5)** Whether WebKit's own Now Playing (the `<video>` element) fights the plugin's; if it does, drop `OpencastNowPlaying` on iOS and let `lockScreenInput()` fall back to the web's Media Session. |
 | `ios/App/App.xcodeproj/project.pbxproj`, `Info.plist`, `opencast.xcconfig`, `Main.storyboard` | Edited by hand. `plutil -lint` passes, and a script checked that every object reference resolves. | That Xcode opens it without "damaged project", and that Release picks up `opencast.xcconfig`. |
 | `android/…/*.kt`, `MainActivity.java`, the manifest and Gradle files | **Compiled** (`assembleDebug`) and lint-clean. Never run. | On a device with Google Play services: discovery lists the TV, `selectRoute` starts a Cast session, and messages arrive. The notification's buttons on Android 12 and earlier. |
-| `src/native/*.ts`, `src/cast/mirroring.ts`, `sender.ts` | Type-checked, tested with Vitest (`nativeCastSender.test.ts`, `mirroring.native.test.ts`, `lockScreen.test.ts`, `sender.test.ts`), built. The web build carries no native code beyond `@capacitor/core`'s `isNativePlatform`: the Cast sender and plugin interfaces are their own chunks, loaded only in the apps. | |
+| `src/viewer/native/*.ts`, `src/viewer/cast/mirroring.ts`, `sender.ts` | Type-checked, tested with Vitest (`nativeCastSender.test.ts`, `mirroring.native.test.ts`, `lockScreen.test.ts`, `sender.test.ts`), built. The web build carries no native code beyond `@capacitor/core`'s `isNativePlatform`: the Cast sender and plugin interfaces are their own chunks, loaded only in the apps. | |
 
 ### The STOP demo
 
@@ -321,7 +329,7 @@ How it works on Android:
   3. The phone switches to the remote. CH ▲ changes the channel on the TV, and the TV's chip says "Playing from Kai's phone".
 - **With no Chromecast:** the Cast SDK has no pretend TV, and dev:mock's mock receiver can't be reached from the Simulator. It talks over a BroadcastChannel inside one browser, and the app's WebView can't run dev:mock at all, because it has no service worker. What the Simulator can show without hardware:
   - the same phone remote driving TV mode through the relay (the "Opencast app" row). Use TV mode on the Android TV emulator (demo 3) or in a desktop browser, on the same API.
-  - the native sender itself, shown by its tests over a mocked plugin (`npx vitest run src/native`).
+  - the native sender itself, shown by its tests over a mocked plugin (`npx vitest run src/viewer/native`).
 
   See open question 2.
 
