@@ -6,7 +6,7 @@ import type { DayTemplate } from "@opencast/contracts";
 import { monitorOffAirText, nextOffAirText, offAirSource, ruleIndexOf, ruleLines, wallClock } from "./offAir";
 import { buildRundown } from "./rundown";
 import { signOnSummary } from "./signOn";
-import { copyDetail, copyName, datesText, generationLines, oldCopies, originOf, repeatOptions, templateDetail, templateName } from "./templates";
+import { copyDetail, copyName, datesText, dayOriginOf, generationLines, oldCopies, originOf, repeatOptions, templateDetail, templateName } from "./templates";
 
 const TZ = "America/Los_Angeles";
 const T = (hhmm: string) => `2026-09-27T${hhmm}:00.000Z`;
@@ -89,6 +89,19 @@ describe("day template words", () => {
     expect(originOf([t], "2026-10-03")).toEqual({ template: t, edited: false });
     expect(originOf([t], "2026-10-10")).toEqual({ template: t, edited: true });
     expect(originOf([t], "2026-09-26")).toBeNull();
+  });
+
+  it("reads which template made a day from the log's days first, today and past days too (G11)", () => {
+    const t = template({ id: "sat", dates: [{ date: "2026-10-03", edited: false, entries: 8, skipped: 2 }] });
+    const days = [
+      { date: "2026-09-19", templateId: "old", templateName: "After work", label: "Weekdays", edited: true },
+      { date: "2026-09-26", templateId: null, templateName: null, label: null, edited: false }
+    ];
+    expect(dayOriginOf(days, [t], "2026-09-19")).toEqual({ templateId: "old", name: "After work", edited: true });
+    expect(dayOriginOf(days, [t], "2026-09-26")).toBeNull();
+    // A day the log didn't list: the templates' dates.
+    expect(dayOriginOf(days, [t], "2026-10-03")).toEqual({ templateId: "sat", name: "Every Saturday", edited: false });
+    expect(dayOriginOf(undefined, [t], "2026-10-03")).toEqual({ templateId: "sat", name: "Every Saturday", edited: false });
   });
 
   it("keeps G7's one-time copies apart from templates", () => {

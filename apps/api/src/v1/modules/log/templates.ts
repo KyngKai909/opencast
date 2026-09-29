@@ -5,15 +5,33 @@
 // date's log by hand makes it an exception, never generated again; editing the template makes
 // every future date that isn't an exception again. Dates already started are never touched.
 //
+// A template's day is a broadcast day (G10), as the log, the guide and master control draw it: from
+// 6:00 am local to 6:00 am the next day (25 hours the night clocks fall back, 23 the night they
+// spring forward). "Repeat this day" on Saturday takes Saturday 6:00 am to Sunday 6:00 am, the
+// programs after midnight included and Friday night's last hours left out. Every date here
+// (`fromDay`, `onto`, `until`, `day_template_dates.date`, `log_entries.template_date`, today and
+// tomorrow) is a broadcast date, and weekdays are the broadcast day's: "Every Saturday" is the
+// Saturday broadcast day, Weekdays are the Monday to Friday broadcast days.
+//
+// `day_template_entries.start_minute` stays the local wall-clock minute (0 to 1439, as the
+// contract's `startTime`), and a minute before 6:00 am falls on the calendar day after the date:
+// 8:00 pm stays 8:00 pm across daylight saving, and "00:30" on Saturday is Sunday 12:30 am. Rows
+// written before the broadcast day (2026-09-29) keep their meaning: a wall-clock minute is still
+// one, and dates already generated aren't generated again until their template changes.
+//
+// Stopping a template (`remove`) takes its entries off the dates still ahead that weren't edited,
+// and those dates can be made by another template; an edited date keeps its entries as they are,
+// and stays an exception (A132).
+//
 // G7's "Repeat this day" (`repeatDay`) makes a template too. G7 copies made before templates
 // (`repeat_groups.template` false) stay as they were: `removeRepeat` still takes them off.
 
-import { and, asc, eq, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { DayTemplate, DayTemplateEntry, TemplateGeneration } from "@opencast/contracts";
+import type { DayTemplate, DayTemplateEntry, LogDay, TemplateGeneration } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
-import { addDays, localDate, localDay, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
+import { addDays, localDate, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
 
 const G = schema.repeatGroups;
 const TE = schema.dayTemplateEntries;
@@ -63,8 +81,13 @@ export interface TemplateOps {
   generate(stationId: string, options?: { through?: string; force?: string }): Promise<TemplateGeneration>;
   /** Every station with templates, for the job. */
   generateAll(): Promise<{ stations: number; dates: number }>;
-  /** Hand edits: these local dates become exceptions (if a template made them). */
-  markEdited(stationId: string, dates: string[]): Promise<void>;
+  /**
+   * Hand edits: these broadcast dates become exceptions (if a template made them). An instant
+   * stands for the broadcast day it falls in.
+   */
+  markEdited(stationId: string, dates: Array<string | Date>): Promise<void>;
+  /** G11: every broadcast day `[from, to)` touches, with the template that made it. */
+  days(stationId: string, from: Date, to: Date): Promise<LogDay[]>;
 }
 
 const RANK: Record<Pattern, number> = { once: 3, weekly: 2, weekdays: 1, daily: 0 };
@@ -107,6 +130,29 @@ function localMinute(at: Date, tz: string): number {
   return ((minutes % 1440) + 1440) % 1440;
 }
 
+/** The broadcast day starts at 6:00 am local (G10), as the log and the guide draw it. */
+export const DAY_STARTS_MINUTE = 6 * 60;
+
+/** The broadcast day an instant falls in, by the wall clock: 2:00 am Sunday is still Saturday. */
+export function broadcastDate(at: Date, tz: string): string {
+  const date = localDate(at, tz);
+  return localMinute(at, tz) < DAY_STARTS_MINUTE ? addDays(date, -1) : date;
+}
+
+/** Start and end (exclusive) of a broadcast day: 6:00 am to 6:00 am the next calendar day. */
+export function broadcastDay(date: string, tz: string): { from: Date; to: Date } {
+  return { from: zonedTime(date, minuteText(DAY_STARTS_MINUTE), tz), to: zonedTime(addDays(date, 1), minuteText(DAY_STARTS_MINUTE), tz) };
+}
+
+/** A template's wall-clock minute on a broadcast date: before 6:00 am is the calendar day after. */
+export function templateInstant(date: string, startMinute: number, tz: string): Date {
+  return zonedTime(startMinute < DAY_STARTS_MINUTE ? addDays(date, 1) : date, minuteText(startMinute), tz);
+}
+
+/** A wall-clock minute's place in the broadcast day (6:00 am is 0 ... 5:59 am is 1439). */
+const dayOrder = (startMinute: number) => (startMinute - DAY_STARTS_MINUTE + 1440) % 1440;
+const byDayOrder = <T extends { startMinute: number }>(a: T, b: T) => dayOrder(a.startMinute) - dayOrder(b.startMinute);
+
 export function createTemplateOps({ deps, services }: ModuleContext): TemplateOps {
   const { db } = deps;
 
@@ -116,9 +162,9 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     return row;
   }
 
-  /** A day's log as template entries. */
+  /** A broadcast day's log as template entries (at their wall-clock minutes). */
   async function snapshot(stationId: string, day: string, tz: string) {
-    const { from, to } = localDay(day, tz);
+    const { from, to } = broadcastDay(day, tz);
     const rows = await db
       .select()
       .from(E)
@@ -180,9 +226,10 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         episodeDescription: x.episodeDescription ?? null
       });
     }
-    out.sort((a, b) => a.startMinute - b.startMinute);
+    // In the broadcast day's order: "23:00" comes before "01:00".
+    out.sort(byDayOrder);
     for (let i = 1; i < out.length; i++) {
-      if (out[i - 1].startMinute * MIN + out[i - 1].lengthMs > out[i].startMinute * MIN) throw badRequest("Two entries overlap.", { entries: "Overlap" });
+      if (dayOrder(out[i - 1].startMinute) * MIN + out[i - 1].lengthMs > dayOrder(out[i].startMinute) * MIN) throw badRequest("Two entries overlap.", { entries: "Overlap" });
     }
     return out;
   }
@@ -215,7 +262,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
   async function views(stationId: string, groups: Group[]): Promise<DayTemplate[]> {
     if (!groups.length) return [];
     const tz = await services.stations.timezoneOf(stationId);
-    const tomorrow = addDays(localDate(deps.clock.now(), tz), 1);
+    const tomorrow = addDays(broadcastDate(deps.clock.now(), tz), 1);
     const ids = groups.map((g) => g.id);
     const [entries, dates] = await Promise.all([
       db.select().from(TE).where(inArray(TE.templateId, ids)).orderBy(asc(TE.startMinute)),
@@ -243,6 +290,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       timezone: tz,
       entries: entries
         .filter((e) => e.templateId === g.id)
+        .sort(byDayOrder)
         .map(
           (e): DayTemplateEntry => ({
             id: e.id,
@@ -295,7 +343,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     async create(stationId, input) {
       const tz = await services.stations.timezoneOf(stationId);
       const now = deps.clock.now();
-      const today = localDate(now, tz);
+      const today = broadcastDate(now, tz);
       checkPattern({ ...input, fromDay: input.fromDay }, today);
       const entries = await snapshot(stationId, input.fromDay, tz);
       const [row] = await db.transaction(async (tx) => {
@@ -325,7 +373,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       if (!current.template || current.removedAt) throw notFound("That template");
       const tz = await services.stations.timezoneOf(stationId);
       const now = deps.clock.now();
-      const today = localDate(now, tz);
+      const today = broadcastDate(now, tz);
       const pattern = input.pattern ?? current.pattern;
       const onto = pattern === "once" ? (input.onto ?? (current.pattern === "once" ? current.endsOn : null)) : null;
       const until = pattern === "once" ? onto : input.until !== undefined ? input.until : current.pattern === "once" ? null : current.endsOn;
@@ -356,15 +404,23 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const row = await group(stationId, groupId);
       const now = deps.clock.now();
       if (row.template) await db.update(G).set({ removedAt: now }).where(eq(G.id, groupId));
+      // A132: a date edited by hand keeps its entries as they are ("Future dates that weren't
+      // edited will be cleared"), and stays an exception, so no other template makes it again.
+      const edited = row.template
+        ? (await db.select({ date: TD.date }).from(TD).where(and(eq(TD.stationId, stationId), eq(TD.templateId, groupId), isNotNull(TD.editedAt)))).map((d) => d.date)
+        : [];
       const upcoming = await db
         .select()
         .from(E)
         .where(and(eq(E.repeatGroupId, groupId), gt(E.startsAt, now)));
-      const removed = await removeRows(db, upcoming);
+      const removed = await removeRows(
+        db,
+        upcoming.filter((e) => !(e.templateDate && edited.includes(e.templateDate)))
+      );
       if (row.template) {
         const tz = await services.stations.timezoneOf(stationId);
-        await db.delete(TD).where(and(eq(TD.templateId, groupId), gt(TD.date, localDate(now, tz))));
-        // Another template may cover those dates now ("Every day" on the Saturdays "Every Saturday" had).
+        await db.delete(TD).where(and(eq(TD.templateId, groupId), gt(TD.date, broadcastDate(now, tz)), isNull(TD.editedAt)));
+        // Another template may cover the dates it cleared now ("Every day" on the Saturdays "Every Saturday" had).
         await ops.generate(stationId);
       }
       return removed;
@@ -374,7 +430,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const totals: TemplateGeneration = { dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 };
       const tz = await services.stations.timezoneOf(stationId);
       const now = deps.clock.now();
-      const today = localDate(now, tz);
+      // Today's broadcast day has started: generation starts tomorrow's.
+      const today = broadcastDate(now, tz);
       const first = addDays(today, 1);
       const cap = addDays(today, MAX_AHEAD_DAYS);
       let last = addDays(today, TEMPLATE_HORIZON_DAYS);
@@ -419,7 +476,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         const rows: Array<typeof E.$inferInsert & { startsAt: Date; endsAt: Date }> = [];
         let skipped = 0;
         for (const e of templateEntries.filter((x) => x.templateId === t.id)) {
-          const startsAt = zonedTime(date, minuteText(e.startMinute), tz);
+          const startsAt = templateInstant(date, e.startMinute, tz);
           const endsAt = new Date(startsAt.getTime() + e.lengthMs);
           if (startsAt <= now) continue;
           if (e.kind === "program") {
@@ -540,12 +597,35 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     },
 
     async markEdited(stationId, dates) {
-      const unique = [...new Set(dates)];
-      if (!unique.length) return;
+      if (!dates.length) return;
+      const tz = dates.some((d) => d instanceof Date) ? await services.stations.timezoneOf(stationId) : "UTC";
+      const unique = [...new Set(dates.map((d) => (d instanceof Date ? broadcastDate(d, tz) : d)))];
       await db
         .update(TD)
         .set({ editedAt: deps.clock.now() })
         .where(and(eq(TD.stationId, stationId), inArray(TD.date, unique), isNull(TD.editedAt)));
+    },
+
+    async days(stationId, from, to) {
+      const tz = await services.stations.timezoneOf(stationId);
+      const first = broadcastDate(from, tz);
+      const last = broadcastDate(new Date(Math.max(from.getTime(), to.getTime() - 1)), tz);
+      const records = await db
+        .select({ date: TD.date, editedAt: TD.editedAt, group: G })
+        .from(TD)
+        .innerJoin(G, eq(G.id, TD.templateId))
+        .where(and(eq(TD.stationId, stationId), gte(TD.date, first), lte(TD.date, last)));
+      const byDate = new Map(records.map((r) => [r.date, r]));
+      const out: LogDay[] = [];
+      for (let d = first; d <= last; d = addDays(d, 1)) {
+        const r = byDate.get(d);
+        out.push(
+          r
+            ? { date: d, templateId: r.group.id, templateName: r.group.name, label: templateLabel(r.group), edited: Boolean(r.editedAt) }
+            : { date: d, templateId: null, templateName: null, label: null, edited: false }
+        );
+      }
+      return out;
     }
   };
   return ops;

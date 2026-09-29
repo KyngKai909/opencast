@@ -2,7 +2,7 @@
 // frame draws them (Every Saturday, Weekdays, Every day, Once), which template made a date and
 // whether that date was edited, a template's line in the list, and what a write made.
 
-import type { DayTemplate, ProgramLog, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
+import type { DayTemplate, LogDay, ProgramLog, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
 import { DAY_WORDS } from "./time";
 
 export type { RepeatPattern };
@@ -34,6 +34,19 @@ export function originOf(templates: DayTemplate[], date: string): { template: Da
     if (d) return { template: t, edited: d.edited };
   }
   return null;
+}
+
+/**
+ * The template a broadcast day was made from, by name, and whether it was edited since: from the
+ * log's `days` (G11: today and past days too), else from the templates' dates (tomorrow on).
+ */
+export function dayOriginOf(days: LogDay[] | undefined, templates: DayTemplate[], date: string): { templateId: string; name: string; edited: boolean } | null {
+  if (days) {
+    const d = days.find((x) => x.date === date);
+    if (d) return d.templateId ? { templateId: d.templateId, name: templateName({ name: d.templateName, label: d.label ?? "a template" }), edited: d.edited } : null;
+  }
+  const origin = originOf(templates, date);
+  return origin ? { templateId: origin.template.id, name: templateName(origin.template), edited: origin.edited } : null;
 }
 
 /** "3 dates ahead, 1 edited". */

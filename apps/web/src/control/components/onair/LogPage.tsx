@@ -298,7 +298,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
               {minutesText(Date.parse(first.endsAt) - Date.parse(first.startsAt))} with nothing scheduled.
             </Notice>
           )}
-          {view !== "week" && <DayOrigin stationId={stationId} day={day} />}
+          {view !== "week" && <DayOrigin stationId={stationId} day={day} days={log.data?.days} />}
           {timeline}
         </div>
         {view !== "week" && (

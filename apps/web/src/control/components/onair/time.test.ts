@@ -10,6 +10,14 @@ describe("the log's days and windows", () => {
     expect(isoDate(broadcastDay("2026-09-27T13:30:00.000Z", TZ))).toBe("2026-09-27");
   });
 
+  it("keeps the night clocks change in its own day, by the wall clock", () => {
+    // Sunday November 1, 5:30 am PST, is still Saturday night (the night is 25 hours).
+    expect(isoDate(broadcastDay("2026-11-01T13:30:00.000Z", TZ))).toBe("2026-10-31");
+    expect(isoDate(broadcastDay("2026-11-01T14:00:00.000Z", TZ))).toBe("2026-11-01");
+    // Sunday March 8, 2026, 6:30 am PDT, is Sunday.
+    expect(isoDate(broadcastDay("2026-03-08T13:30:00.000Z", TZ))).toBe("2026-03-08");
+  });
+
   it("draws the evening from 6 pm to 2 am, and the day from 6 am to 6 am", () => {
     expect(viewWindow("evening", SAT, TZ)).toEqual({ from: "2026-09-27T01:00:00.000Z", to: "2026-09-27T09:00:00.000Z" });
     expect(viewWindow("day", SAT, TZ)).toEqual({ from: "2026-09-26T13:00:00.000Z", to: "2026-09-27T13:00:00.000Z" });

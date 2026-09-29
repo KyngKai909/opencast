@@ -113,7 +113,10 @@ export type OffAirHours = z.infer<typeof OffAirHours>;
 /** One thing in a day template, at its local time. */
 export const DayTemplateEntry = z.object({
   id: Id,
-  /** Local wall-clock start, "20:00". */
+  /**
+   * Local wall-clock start, "20:00". A template's day is a broadcast day (6:00 am to 6:00 am): a
+   * time before 06:00 is after midnight, on the calendar day after the date (G10).
+   */
   startTime: WallClock,
   lengthMs: Millis,
   kind: z.enum(["program", "live", "off_air"]),
@@ -144,11 +147,14 @@ export const DayTemplateEntryInput = z.object({
 });
 
 /**
- * Day templates (added 2026-09-29): a day built once and repeated. Each future date the pattern
- * covers (from the day after `fromDay`, through `until`) gets its log generated from `entries`,
- * three weeks ahead. Editing one date's log makes it an exception (`edited`); editing the template
- * makes every future date that isn't one again. Where two templates cover a date the more specific
- * wins: once, then a weekday, then weekdays, then every day (the newest among equals).
+ * Day templates (added 2026-09-29): a day built once and repeated. Its days (`fromDay`, `onDate`,
+ * `until`, `dates`, `weekday`) are broadcast days, 6:00 am to 6:00 am local, as the log draws them
+ * (G10): Saturday is Saturday 6:00 am to Sunday 6:00 am, after-midnight programs included. Each
+ * future date the pattern covers (from the day after `fromDay`, through `until`) gets its log
+ * generated from `entries`, three weeks ahead. Editing one date's log makes it an exception
+ * (`edited`); editing the template makes every future date that isn't one again. Where two
+ * templates cover a date the more specific wins: once, then a weekday, then weekdays, then every
+ * day (the newest among equals).
  */
 export const DayTemplate = z.object({
   id: Id,
@@ -184,6 +190,20 @@ export const TemplateGeneration = z.object({
 });
 export type TemplateGeneration = z.infer<typeof TemplateGeneration>;
 
+/** G11: a broadcast day on the log and the day template that made it. */
+export const LogDay = z.object({
+  /** The broadcast day: "2026-10-31" runs from 6:00 am that day to 6:00 am the next. */
+  date: DateOnly,
+  templateId: Id.nullable(),
+  /** The template's name ("After work"), null when it has none. */
+  templateName: z.string().nullable(),
+  /** The template's label ("Every Saturday", "Weekdays"); null with no template. */
+  label: z.string().nullable(),
+  /** Changed by hand since the template made it (an exception); false with no template. */
+  edited: z.boolean()
+});
+export type LogDay = z.infer<typeof LogDay>;
+
 export const ProgramLog = z.object({
   from: Timestamp,
   to: Timestamp,
@@ -216,7 +236,13 @@ export const ProgramLog = z.object({
    * Added 2026-09-29: planned off air time overlapping the window (off air hours, and sign-off
    * entries), drawn differently from dead air and never warned about. `gaps` leaves it out.
    */
-  offAir: z.array(OffAirSpan).optional()
+  offAir: z.array(OffAirSpan).optional(),
+  /**
+   * G11 (added 2026-09-29): every broadcast day (6:00 am to 6:00 am local) the window touches, in
+   * order, with the day template that made it (null for a day no template made) and whether it
+   * was edited by hand since. Today and past days too.
+   */
+  days: z.array(LogDay).optional()
 });
 
 export const DeadAirStatus = z.object({
@@ -281,7 +307,7 @@ export const logApi = {
     method: "GET",
     path: "/stations/:stationId/log",
     auth: "user",
-    summary: "The program log for a window (day, evening or week), with generated breaks and dead air",
+    summary: "The program log for a window (day, evening or week), with generated breaks and dead air, and (G11) the day template that made each broadcast day in it",
     params: StationParams,
     query: z.object({ from: Timestamp, to: Timestamp }),
     response: ProgramLog
@@ -381,7 +407,7 @@ export const logApi = {
     path: "/stations/:stationId/log/templates",
     auth: "user",
     summary:
-      "Repeat this day: make a day template from `fromDay`'s log and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there.",
+      "Repeat this day: make a day template from `fromDay`'s log, its broadcast day from 6:00 am to 6:00 am, and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there.",
     params: StationParams,
     body: z.object({
       fromDay: DateOnly,
@@ -418,7 +444,8 @@ export const logApi = {
     method: "DELETE",
     path: "/stations/:stationId/log/templates/:templateId",
     auth: "user",
-    summary: "Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the log from now on.",
+    summary:
+      "Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the dates ahead that weren't edited, which another template may take; edited dates stay as they are.",
     params: z.object({ stationId: Id, templateId: Id }),
     response: z.object({ removed: z.number().int() })
   }),

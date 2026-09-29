@@ -15,7 +15,7 @@ import { dbStation, getDb, membership, saveDb, stationBreaks, stationLog, type D
 import { breakSlot, type DbBreak, type DbFill, type DbLogEntry } from "../fixtures/evening";
 import { DEFAULT_BREAK_MS, MOCK_STREAMS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState } from "../fixtures/onair";
 import { fail, needsUser, path, reply } from "../respond";
-import { createTemplate, generateWindow, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
+import { createTemplate, generateWindow, logDays, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
 const HOUR = 3_600_000;
 const uuid = () => crypto.randomUUID();
@@ -266,7 +266,9 @@ export const logHandlers = [
       breaks: stationBreaks(id, from, to).map(slotWithRows),
       gaps: gapsIn(id, from, to),
       repeats: [...copies, ...templates],
-      offAir: offAirFor(id, from, to)
+      offAir: offAirFor(id, from, to),
+      // G11: which template made each broadcast day in the window, today and past days too.
+      days: logDays(id, from, to)
     });
   }),
 

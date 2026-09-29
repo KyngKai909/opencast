@@ -45,6 +45,11 @@ export interface DbTemplate {
   dates: DbTemplateDate[];
   createdAt: string;
   updatedAt: string | null;
+  /**
+   * Stopped (`removeTemplate`): it no longer repeats or lists, but keeps its edited dates, which
+   * stay as they were (A132), and its past dates, which the log still says it made (G11).
+   */
+  stoppedAt?: string | null;
 }
 
 /** How far ahead dates are made, and the furthest "Once" can go. */

@@ -5,16 +5,16 @@
 // already on the log. Under it, the station's templates with their names, dates and edited dates,
 // each changed (renamed, repeated differently) or stopped, and G7's one-time copies from before
 // templates, which can still be taken off. On the log, `DayOrigin` says which template made a date
-// and whether it was edited since.
+// and whether it was edited since (from the log's `days`, G11, so today and past days too).
 
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { logApi, type DayTemplate, type TemplateGeneration } from "@opencast/contracts";
+import { logApi, type DayTemplate, type LogDay, type TemplateGeneration } from "@opencast/contracts";
 import { Button, Field, KeyValueList, Modal, Notice, Segmented, Sheet, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { LOG_READS, useTemplates } from "./data";
-import { copyDetail, copyName, generationLines, oldCopies, originOf, repeatOptions, shortDate, templateDetail, templateName, type LogRepeat, type RepeatPattern } from "./templates";
+import { copyDetail, copyName, dayOriginOf, generationLines, oldCopies, repeatOptions, shortDate, templateDetail, templateName, type LogRepeat, type RepeatPattern } from "./templates";
 import { DAY_WORDS, addDays, broadcastDay, isoDate, localTime, monthDay, weekdayOf, type Ymd } from "./time";
 import { now } from "../../../lib/clock";
 
@@ -290,18 +290,22 @@ function fromIso(date: string): Ymd {
   return { year, month, day: d };
 }
 
-/** On the log: the template a date was made from, and whether it was edited since, or the one built from it. */
-export function DayOrigin({ stationId, day }: { stationId: string; day: Ymd }) {
+/**
+ * On the log: the template a date was made from (the log's `days`, G11), and whether it was edited
+ * since, or the one built from it. Today and past dates have started: changing the template
+ * changes only the dates ahead.
+ */
+export function DayOrigin({ stationId, day, days }: { stationId: string; day: Ymd; days?: LogDay[] }) {
   const templates = useTemplates(stationId);
   const list = templates.data?.templates ?? [];
   const date = isoDate(day);
-  const origin = originOf(list, date);
+  const origin = dayOriginOf(days, list, date);
   if (origin) {
-    const name = templateName(origin.template);
+    const ahead = date > isoDate(broadcastDay(now()));
     return origin.edited ? (
-      <Notice tone="plain" icon={null} title={`Made from ${name}, then edited.`} detail="Changes to the template leave this date as it is." className="cc-log__origin" />
+      <Notice tone="plain" icon={null} title={`Made from ${origin.name}, then edited.`} detail="Changes to the template leave this date as it is." className="cc-log__origin" />
     ) : (
-      <Notice tone="plain" icon={null} title={`Made from ${name}.`} detail="Changing the template changes this date too." className="cc-log__origin" />
+      <Notice tone="plain" icon={null} title={`Made from ${origin.name}.`} detail={ahead ? "Changing the template changes this date too." : undefined} className="cc-log__origin" />
     );
   }
   const built = list.filter((t) => t.fromDay === date);

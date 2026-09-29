@@ -8,7 +8,7 @@ import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN_PREFIX } from "../../../auth/mockToken";
 import { handlers } from "./index";
 import { now } from "../../../lib/clock";
-import { addDays, broadcastDay, isoDate } from "../../components/onair/time";
+import { addDays, broadcastDay, isoDate, viewWindow, weekdayOf } from "../../components/onair/time";
 
 const server = setupServer(...handlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -69,6 +69,7 @@ describe("day templates (G8)", () => {
 
   it("renames one, changes when it repeats, leaves edited dates alone, and stops it", async () => {
     const [weekdays] = (await api(`/stations/${beat()}/log/templates`)).body.templates;
+    const edited = new Set<string>(weekdays.dates.filter((d: { edited: boolean }) => d.edited).map((d: { date: string }) => d.date));
     const renamed = await api(`/stations/${beat()}/log/templates/${weekdays.id}`, { method: "PATCH", body: { name: "Weeknights" } });
     expect(renamed.body.template.name).toBe("Weeknights");
     const daily = await api(`/stations/${beat()}/log/templates/${weekdays.id}`, { method: "PATCH", body: { pattern: "daily" } });
@@ -79,7 +80,29 @@ describe("day templates (G8)", () => {
     expect(stop.status).toBe(200);
     expect(stop.body.removed).toBeGreaterThan(0);
     expect((await api(`/stations/${beat()}/log/templates/${weekdays.id}`)).status).toBe(404);
-    expect(getDb().log.some((e) => e.repeatGroupId === weekdays.id && e.startsAt > now().toISOString())).toBe(false);
+    // A132: the dates ahead that weren't edited are cleared; the edited Wednesday stays as it is.
+    const left = getDb().log.filter((e) => e.repeatGroupId === weekdays.id && e.startsAt > now().toISOString());
+    expect(left.length).toBeGreaterThan(0);
+    expect(left.every((e) => edited.has(isoDate(broadcastDay(e.startsAt))))).toBe(true);
+  });
+
+  it("says which template made each broadcast day on the log, past days and edited ones too (G11)", async () => {
+    const [weekdays] = (await api(`/stations/${beat()}/log/templates`)).body.templates;
+    const today = broadcastDay(now());
+    const week = viewWindow("week", today);
+    const log = (await api(`/stations/${beat()}/log?from=${encodeURIComponent(week.from)}&to=${encodeURIComponent(week.to)}`)).body;
+    expect(log.days).toHaveLength(7);
+    // This week's weekdays before today were made from "After work".
+    for (const d of log.days) {
+      const made = d.date > weekdays.fromDay && d.date < isoDate(today) && weekdayOf(broadcastDay(`${d.date}T19:00:00.000Z`)) % 6 !== 0;
+      if (made) expect(d).toEqual({ date: d.date, templateId: weekdays.id, templateName: "After work", label: "Weekdays", edited: false });
+      if (d.date === weekdays.fromDay) expect(d.templateId).toBeNull();
+    }
+    const editedDate = weekdays.dates.find((d: { edited: boolean }) => d.edited).date as string;
+    const [y, m, dd] = editedDate.split("-").map(Number);
+    const day = viewWindow("day", { year: y, month: m, day: dd });
+    const one = (await api(`/stations/${beat()}/log?from=${encodeURIComponent(day.from)}&to=${encodeURIComponent(day.to)}`)).body;
+    expect(one.days).toEqual([{ date: editedDate, templateId: weekdays.id, templateName: "After work", label: "Weekdays", edited: true }]);
   });
 
   it("makes a date an exception when it's edited by hand", async () => {

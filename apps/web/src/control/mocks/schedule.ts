@@ -3,7 +3,7 @@
 // here (so gaps leave it out and nothing warns about it) and call `generate` for the dates a log
 // window covers; the template handlers (handlers/templates.ts) write through it.
 
-import type { DayTemplate, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
+import type { DayTemplate, LogDay, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
 import { now, STATION_TZ } from "../../lib/clock";
 import { addDays, broadcastDay, isoDate, localTime, weekdayOf } from "../components/onair/time";
 import { getDb, stationLog } from "./db";
@@ -61,7 +61,13 @@ export function removeWithBreaks(entryId: string) {
 const today = () => broadcastDay(now());
 const dayOf = (t: string) => isoDate(broadcastDay(t));
 
+/** The templates still repeating. */
 export function templatesOf(stationId: string): DbTemplate[] {
+  return getDb().templates.filter((t) => t.stationId === stationId && !t.stoppedAt);
+}
+
+/** With the stopped ones, which keep their edited and past dates. */
+function allTemplatesOf(stationId: string): DbTemplate[] {
   return getDb().templates.filter((t) => t.stationId === stationId);
 }
 
@@ -145,7 +151,7 @@ function makeSeeded(stationId: string, dates?: Set<string>) {
 }
 
 function recordOf(stationId: string, date: string): { t: DbTemplate; rec: DbTemplateDate } | null {
-  for (const t of templatesOf(stationId)) {
+  for (const t of allTemplatesOf(stationId)) {
     const rec = t.dates.find((d) => d.date === date);
     if (rec) return { t, rec };
   }
@@ -212,6 +218,22 @@ export function generateWindow(stationId: string, from: string, to: string) {
   const dates: string[] = [];
   for (let d = broadcastDay(from); isoDate(d) <= dayOf(iso(Date.parse(to) - 1)); d = addDays(d, 1)) dates.push(isoDate(d));
   generate(stationId, { dates });
+}
+
+/**
+ * G11: each broadcast day `[from, to)` touches and the template that made it, today and past days
+ * too. The seed's past weekdays have no record: their entries say which template made them.
+ */
+export function logDays(stationId: string, from: string, to: string): LogDay[] {
+  const out: LogDay[] = [];
+  const last = dayOf(iso(Math.max(Date.parse(from), Date.parse(to) - 1)));
+  for (let d = broadcastDay(from); isoDate(d) <= last; d = addDays(d, 1)) {
+    const date = isoDate(d);
+    const had = recordOf(stationId, date);
+    const t = had?.t ?? allTemplatesOf(stationId).find((x) => getDb().log.some((e) => e.stationId === stationId && e.repeatGroupId === x.id && dayOf(e.startsAt) === date));
+    out.push(t ? { date, templateId: t.id, templateName: t.name, label: templateLabel(t), edited: had?.rec.edited ?? false } : { date, templateId: null, templateName: null, label: null, edited: false });
+  }
+  return out;
 }
 
 /** A date changed by hand is an exception: a template never makes it again. */
@@ -302,12 +324,21 @@ export function updateTemplate(t: DbTemplate, input: TemplatePatch): TemplateGen
   return generate(t.stationId, { force: t.id, through: pattern === "once" ? (onto ?? undefined) : undefined });
 }
 
-/** Stops a template: its entries come off the log from now on, and another may take its dates. */
+/**
+ * Stops a template: its entries come off the dates ahead that weren't edited, and another may take
+ * those dates. An edited date keeps its entries as they are and stays an exception (A132: "Future
+ * dates that weren't edited will be cleared").
+ */
 export function removeTemplate(t: DbTemplate): number {
   const t0 = now().toISOString();
-  const gone = getDb().log.filter((e) => e.repeatGroupId === t.id && e.startsAt > t0);
+  const tomorrow = isoDate(addDays(today(), 1));
+  const edited = new Set(t.dates.filter((d) => d.edited).map((d) => d.date));
+  // A seeded edited date not on the log yet is made first, so it stays as it was.
+  makeSeeded(t.stationId, edited);
+  const gone = getDb().log.filter((e) => e.repeatGroupId === t.id && e.startsAt > t0 && !edited.has(dayOf(e.startsAt)));
   for (const e of gone) removeWithBreaks(e.id);
-  getDb().templates = getDb().templates.filter((x) => x !== t);
+  t.stoppedAt = t0;
+  t.dates = t.dates.filter((d) => d.date < tomorrow || d.edited);
   generate(t.stationId);
   return gone.length;
 }
