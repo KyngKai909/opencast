@@ -1,0 +1,7 @@
+/* Network desk's own layout glue. Components and tokens come from @opencast/ui. Page and component
+   styles use the prefix nd- (network desk), one CSS file per page or component, tokens only, pixel
+   sizes from the reference CSS (network-desk). */
+html, body, #root { height: 100%; }
+body { font-size: 15px; line-height: 1.45; }
+#root { display: flex; flex-direction: column; }
+#root > * { flex: 1; min-height: 0; }

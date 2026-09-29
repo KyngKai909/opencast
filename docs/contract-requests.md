@@ -178,6 +178,20 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | N9 | **Held earnings**: unclaimed period and date, licence name, pending handovers (so `approveHandover` is reachable), chain | desk 07.1 | Config | 7 |
 | N10 | **The creator's claim page**: said-yes date, days on air, presets, held amount, source platform to connect, and a GET for the handover's status after starting | rights 05.1 | Yes | 4 |
 | N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
+| N12 | **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
+
+Phase 7 built against these as optional extensions in `apps/desk/src/api/ext.ts` and `apps/viewer/src/components/permission/api.ts`, filled by the mocks:
+- N1 `Creator.proposedOptions: { band, channels[] }` (empty channels: band only).
+- N2 `POST /admin/creators/:creatorId/reminders` (admin) → `Creator` with `remindedAt`; a second reminder is refused; after it the desk offers "No answer" (`updateCreator { stage: "no_answer" }`).
+- N3 `Creator.askedAt`, `remindedAt`, `answeredAt`, `claimInviteSentAt`, `claimLinkSentAt`, `claimedAt`; `HeldEarnings.stations[].invitedAt`, `claimLinkSentAt`, `signOnAt`.
+- N4 `PermissionPage.creator.sourcePlatform`, `works[].groupLabel` and `noun`, `summary: { included, leftOut }` ("6 skate films and 7 park session edits", "the shoe sponsor edit"), `marketName`; `CreatorWork.noun`; `answerPermission` body `wordingVersion` (sent now, ignored until it lands).
+- N5 `Creator.setup: { recipeId, band, channel, callSign, name, colour, operator, signOnAt, importDone, importTotal, escrowStationId }`. The draft before the yes is kept on the device (`oc-desk-draft-<creatorId>`) until the API keeps drafts.
+- N6 `Recipe.blocks[].label`, `listing`, `colour`, `carried: { station, programTitle, schedule, about }`; `Recipe.when`, `catalogAbout`; `breakRule` read as `{ everyMinutes, lengthMs, fillFrom, blockedCategories }`.
+- N7 `MarketBoard.stats.market: { localShareOfTonightPercent, claimableOnAir, deadAirComing }`; `slots[].signOnAt`, `creatorId`.
+- N9 `HeldEarnings.unclaimedPeriodDays`, `chain: { name, explorerUrl }`, `stations[].licenceName`.
+- A6 `GET /admin/team` (admin) → `[{ id, name, email }]`.
+- B7 `askPermission` body `workIds` (the ticked works). Still blocking: the real API covers every work without a left-out reason.
+- B8 `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user) → `PermissionPage` with `stoppedAt` and `claim: { handoverId, status, startedAt }`. Still blocking.
 
 ## notifications
 

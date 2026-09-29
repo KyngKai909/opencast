@@ -1,0 +1,5 @@
+/* network-desk .ok-t */
+.nd-ok { font-size: 13px; color: var(--ink-70); display: inline-flex; gap: 6px; align-items: center; }
+.nd-ok .oc-i { flex: none; }
+.nd-ok--warn { color: var(--standby); }
+.nd-ok__quiet { color: var(--ink-50); }

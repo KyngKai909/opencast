@@ -1,0 +1,5 @@
+/* network-desk 02.1 .pp rows: 14px, the Next line 13px ink-70, due in standby 600. */
+.nd-pp .oc-table__row { font-size: 14px; }
+.nd-pp__next { font-size: 13px; color: var(--ink-70); }
+.nd-pp__next--due { color: var(--standby); font-weight: 600; }
+.nd-pp__empty { margin: 0; padding: 12px 0; border-bottom: 1px solid var(--hair); color: var(--ink-70); font-size: 14px; }

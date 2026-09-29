@@ -370,3 +370,59 @@ The waitlist's words the reference doesn't draw, and the tuner's number entry (t
 | Joined, viewer, market already open | "The {market} dial is already on. We’ll write when there’s more to watch." |
 | Joined, viewer, market not open | "We’ll write when the {market} dial opens." (the reference's static "the Inland Empire dial", with the response's market name) |
 | Tuner, a number with no station | "No station on 13" (the viewer app's words) |
+
+### apps/desk and the creator's permission page (Phase 7)
+
+The frames' words are used as drawn. Below is what they don't have. Mock-only panels (the creator's side under the pipeline) and mock error messages aren't listed. The permission page's words, drawn and new, are all in `apps/viewer/src/components/permission/copy.ts`, versioned for the lawyer (open question 15).
+
+**Desk: signing in and the frame**
+
+| Where | Words |
+|---|---|
+| Sign in | "Sign in to Network desk"; foot "Opencast's own tool for building a market. For the Opencast team only." |
+| Not on the team | "This desk is for the Opencast team."; "You're signed in as {email}, but that account isn't on the team. If you run a station, master control is where you run it."; "Sign out"; the API's 403 "Network desk is for the Opencast team." |
+| Couldn't check | "Network desk didn't open."; "We couldn't check who you are just now. Try again in a minute." |
+| Rail (screen readers) | "{4} yeses to set up", "{1} not listed yet", "{$227.00} held", "{26} reserved"; the avatar "{Dee A.}: settings" |
+| Not built yet | "This page isn't designed yet. It comes after the pages the desk needs first."; Catalog "Opencast's own programs: the public-domain catalog every station can carry."; Rights claims "Claims against programs on any station, and the answers."; Catalog sponsors "Businesses that sponsor the catalog station's programs." |
+| Not found | "There's nothing here.", "Back to the market board" |
+| Settings | "Your own settings for Network desk, on this device."; "Appearance", "Ground", "Dark is the default. The system setting decides unless you choose here.", "System", "Dark", "Light"; "You", "Signed in as {email}. On the Opencast team.", "Sign out" |
+| Reserved call signs | "{26} call signs reserved from the waitlist in the {Inland Empire}, {4} with a channel held."; columns "Call sign", "Channel held", "Held until", "Asked", "From"; "None yet"; "Nobody in the {market} has reserved a call sign yet." |
+
+**Desk: the board**
+
+| Where | Words |
+|---|---|
+| Stats | nothing airing "Off air" / "Nothing airs here tonight yet"; one "Claimable station on air, waiting to be claimed", "Creator who said yes, not set up yet"; none "Stations with dead air coming"; a market with nothing "No stations yet." |
+| Selected slot | "Claimable. {Mojave Field Recordings}'s work is published under {CC BY 4.0}. Recipe set, signs on …"; "Claimable. {name}'s station is being set up"; "Claimable, on air. {name}'s station, waiting to be claimed"; "Independent station. {Inland Beat}, {Redlands}"; "Opencast catalog. {Opencast Classics}"; "Listed city streams: 9.1 RDLS, 9.2 COLT, 9.3 SBCO" (and a row each); "Listed city stream. {name}"; "Held for the waitlist. {TACO} asked for this number, so nothing else goes on it"; "Open. No station, and nobody on the waitlist has asked for it"; buttons "Listed sources", "Reserved call signs"; nothing chosen "Choose a channel" / "See what's on it, who it's for, and where to go next" |
+
+**Desk: the pipeline and asking**
+
+| Where | Words |
+|---|---|
+| Tags | "Setting up" (standby), "No answer" (dashed), from states.ts |
+| Next | "Waiting for an answer"; "Reminder due {Oct 1}"; "Reminder overdue since {Sept 24}"; "Reminded {Sept 26}. No more after this"; "No answer after the reminder"; "Don't ask again" (found, do not ask); "On air with credit"; "Set up with credit, then invite them to claim"; "Set it up from a recipe"; "Setting up"; "Claim invite sent {date}"; "On air. Waiting to be claimed"; "Claimed. Running it themselves"; "Said no. Don’t ask again"; "No answer after the reminder. Don’t ask again"; the platform "Their own site" |
+| Buttons and toasts | "No answer"; "Reminded {name}. That's their one reminder."; "{name}: No answer. Nobody will ask again." (Undo) |
+| Empties | "Nobody at this stage."; "No creators in the {market} yet. Add the first one you find." |
+| Add a creator | "Add a creator", "Someone making things in the {market}. Nothing is asked or copied yet."; "Name" / "As they call themselves: a channel, a crew, a person."; "The person behind it"; "What they make" / "One line: “Skate films, Joshua Tree”."; "Their work lives on", "Link"; "Email" / "Asking goes to them on their platform, and here too if there's an address."; "Optional"; "Cancel", "Add them"; errors "Say what they're called.", "Paste the link to their channel or page.", "That doesn't look like an email address.", "Keep it under 200 characters."; toast "{name} is on the pipeline, as Found." |
+| Ask | "A radio band station" (band only); a single work's length, "Length not known"; "Nothing found on their {Vimeo} yet. Their works are catalogued from the source, by title and length, before asking."; the preview's empty note "Your note goes here."; "Tick at least one work to ask about."; sent "Sent to {name}." / "If they don't answer in a week, the pipeline says a reminder is due." / "Back to the pipeline"; asked "Asked {September 19}." / "They get one reminder after a week, then it stops."; "No answer after the reminder." / "Nobody asks again."; "Already licensed, under {CC BY 4.0}." / "No need to ask: their station can go on air with credit while they're invited to claim it." / "Set up"; "They said yes {September 25}." / "Set up"; a work unticked when asking "Left out when asking" |
+
+**Desk: setting up, listed sources, held earnings**
+
+| Where | Words |
+|---|---|
+| Setup | before a yes "A station comes after a yes." / "Ask first. Their station can be set up once they say yes, or straight away if their work is already published under a licence that allows it."; "Already licensed under {CC BY 4.0}. Covers …"; "Their {recordings}" (no pronoun); "No recipe for this band yet"; channel "From the board", "The waitlist holds {95.5} for {GOSP}. Pick another", "{12.1} is {BEAT}'s. Pick another", "The waitlist holds {95.5}, so this is the nearest open one", "None open"; call sign "Choose a call sign.", "Three to five capital letters.", "No K or W at the start: those are US broadcast prefixes.", "{LUPE} is taken. Try another."; rights "Published under a licence, {CC BY 4.0}, for the {15} licensed {recordings}", "Nothing is covered yet: no yes on record, and no licence that allows carriage", "Missing"; import "{48} to import"; held "Given at setup"; run by "Nobody yet"; "Not scheduled", "On air since"; after setup "Sign-on scheduled" / "{Monday, 6:00 am}. {31} of {48} prepared for air so far", "On air, waiting to be claimed" / "Since {date}", "Set up"; toast "{LUPE 33.1} is set up. It signs on {Monday} at {6:00 am}."; the values' labels "Change the channel", "Change the call sign", "Change who runs it", "Change when it signs on" |
+| Listed sources | "No calendar yet"; "Not listed"; one wording for a synced calendar, "Synced from the agenda calendar"; "No public streams listed in the {market} yet."; "No catalog station in the {market} yet." |
+| List a source | "List a source", "A public stream on the {market} dial. Viewers get the source's own player."; "Whose stream" / "“City of Redlands”, “San Bernardino County”."; "What it shows"; "Band", "TV band", "Radio band"; "Channel"; "Call sign"; "Stream"; "Agenda calendar" / "Where they publish meetings. They become listings with their real titles and times."; "Their terms", "Allow embedding", "Unclear" / "It's saved but not listed. Someone asks them first."; "Cancel", "List it"; errors "Say whose stream it is.", "A channel like 9.4.", "A frequency like 89.1.", "Paste the link to their stream.", "That doesn't look like a link.", "Keep it under 160 characters."; toasts "{City of Rialto} is listed on {9.4}.", "{name} is saved. It goes on the dial once their terms allow embedding." |
+| Held earnings | statuses "On air, not invited", "Claim being checked", "Claimed", "Stopped"; "Not scheduled to sign on yet"; "Claim invitation out" (one); the unclaimed period unknown "Not set yet"; "Nothing held yet. A claimable station's earnings show here from its first week on air."; no contract yet "Not deployed yet. Earnings are recorded, and move into it when it is" |
+
+**The creator's permission page (viewer `/permission/:token`)**
+
+| Where | Words |
+|---|---|
+| Page | the tab's title "Your station on Opencast"; radio "A radio station, run for you"; "Your {videos} through the day, …" when their work airs by day |
+| After yes, set up | "Your station is {33.1 LUPE}. The call sign is yours to keep." |
+| No thanks | "Understood. We won't ask again."; "Nothing of yours goes on the air. If you change your mind, write to us." |
+| Stop | toast "Stopping it." (Undo); "Stopped."; "It comes off the dial within a day. What it earned is yours: once you sign in and we've checked it's you, it's paid to you." |
+| Claim now | sign-in "To claim your station", "Claim it and go back"; "Your claim has started"; "We check it's you, then the station is yours to run from master control"; "Open master control" |
+| Bad link | "This link doesn't work."; "It may be mistyped, or replaced by a newer one. Write to us and we'll send it again." |
+| Errors | "That didn't go through. Try again."; the API's "This has been answered. Write to us to change it." |

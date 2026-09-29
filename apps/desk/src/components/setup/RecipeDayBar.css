@@ -1,0 +1,5 @@
+/* network-desk .day24, .hours */
+.nd-day__bar { display: flex; height: 46px; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); margin: 10px 0 6px; }
+.nd-day__bar i { display: flex; align-items: center; justify-content: center; min-width: 0; font: 600 11px var(--font-text); font-style: normal; color: var(--on-station); white-space: nowrap; overflow: hidden; background: var(--nd-block); }
+.nd-day__bar i.nd-day__plain { background: var(--raised); color: var(--ink-70); }
+.nd-day__hours { display: flex; justify-content: space-between; font: 500 11px var(--font-mono); color: var(--ink-50); }

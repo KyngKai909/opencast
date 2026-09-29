@@ -1,0 +1,55 @@
+// The board's figures (network-desk 01.1): the two bands' answers put together as the frame shows them.
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { callAndChannel, coverage, marketLine, slotNumber, slotLabel, statCaptions } from "./board";
+
+const NOW = new Date("2026-09-27T03:42:12Z");
+let db: typeof import("../../mocks/db");
+
+beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now: NOW });
+  db = await import("../../mocks/db");
+});
+beforeEach(() => {
+  localStorage.clear();
+  db.resetDb();
+});
+
+const boards = (slug = "inland-empire") => {
+  const m = db.marketBySlug(slug)!;
+  return [db.boardView(m, "tv"), db.boardView(m, "radio")] as const;
+};
+
+describe("coverage", () => {
+  it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.7", () => {
+    const c = coverage(...boards());
+    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 3, catalog: 1, claimable: 3 });
+    expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.7"]);
+    expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.7");
+    expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 3 listed city streams and the catalog station. 26 people on the waitlist here.");
+  });
+
+  it("adds the bands' counts when the API sends no market-wide stats, and takes the TV band's share", () => {
+    const [tv, radio] = boards();
+    const strip = (b: typeof tv) => ({ ...b, stats: { ...b.stats, market: undefined } });
+    const c = coverage(strip(tv), strip(radio));
+    expect(c.localSharePercent).toBe(74);
+    expect(c.claimableOnAir).toBe(2);
+    expect(c.deadAirComing.map((s) => s.callSign)).toEqual(["HALL"]);
+  });
+
+  it("says so when a market has nothing yet", () => {
+    const c = coverage(...boards("los-angeles"));
+    expect(c.localSharePercent).toBeNull();
+    expect(marketLine(c)).toBe("No stations yet.");
+  });
+});
+
+describe("slots", () => {
+  it("write their numbers as the board does", () => {
+    const [tv, radio] = boards();
+    expect(slotNumber(tv.slots.find((s) => s.major === 9)!, "tv")).toBe("9.1–3");
+    expect(slotNumber(tv.slots.find((s) => s.major === 33)!, "tv")).toBe("33");
+    expect(slotNumber(radio.slots.find((s) => s.major === 883)!, "radio")).toBe("88.3");
+    expect(slotLabel(tv.slots.find((s) => s.major === 41)!, "tv")).toBe("Channel 41, TACO, Held for the waitlist");
+  });
+});

@@ -1,0 +1,22 @@
+/* network-desk .dialmap, .radiomap, .slot and its kinds. */
+.nd-map { display: grid; grid-template-columns: repeat(var(--nd-map-cols, 17), minmax(0, 1fr)); gap: 4px; margin-top: 10px; }
+.nd-slot {
+  height: 52px; min-width: 0; border-radius: 4px; border: 1px solid var(--hair); background: transparent;
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+  padding: 4px 5px; font: 500 11px var(--font-mono); color: var(--ink-50); overflow: hidden; text-align: left; cursor: pointer;
+}
+.nd-slot:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.nd-slot__n { white-space: nowrap; line-height: 1.3; }
+.nd-slot__cs { font: 800 11px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: 0; color: var(--on-station); line-height: 1.3; }
+/* An independent station: its own colour, the number in white at 80%. */
+.nd-slot--st { background: var(--nd-slot-colour, var(--ink-70)); border: 0; color: color-mix(in srgb, var(--on-station) 80%, transparent); }
+.nd-slot--cl { border: 2px dashed var(--signal); color: var(--ink); }
+.nd-slot--cl .nd-slot__cs { color: var(--ink); }
+.nd-slot--li { border: 1px dashed var(--line); color: var(--ink-70); }
+.nd-slot--li .nd-slot__cs { color: var(--ink-70); }
+.nd-slot--rs { background: repeating-linear-gradient(135deg, var(--hair) 0 4px, transparent 4px 8px); color: var(--ink-70); }
+.nd-slot--rs .nd-slot__cs { color: var(--ink-70); }
+.nd-slot--ho { background: var(--ink); border: 0; color: var(--ground); }
+.nd-slot--ho .nd-slot__cs { color: var(--ground); }
+.nd-slot--open:hover { border-color: var(--line); }
+.nd-slot--sel { box-shadow: 0 0 0 2px var(--standby); }

@@ -1,0 +1,16 @@
+/* Shared desk page parts (network-desk .sec-top, .quiet crumb, errors). */
+.nd-quiet { min-height: 60vh; }
+.nd-empty { display: grid; gap: var(--s3); justify-items: start; }
+.nd-error { margin: 8px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.nd-crumb { margin: 0; font-size: 13px; color: var(--ink-50); }
+.nd-crumb a { color: inherit; text-decoration: none; }
+.nd-crumb a:hover { color: var(--ink); text-decoration: underline; }
+.nd-crumb + .oc-control-title { margin-top: 0; }
+.nd-sectop { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 22px; }
+.nd-sectop--first { margin-top: 0; }
+.nd-sectop__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.nd-sectop__sub { font-size: 13px; color: var(--ink-50); }
+.nd-sectop__end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.nd-unbuilt { margin: 0; padding: 12px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); color: var(--ink-70); font-size: 14px; max-width: 62ch; }
+.nd-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd-quiet-text { color: var(--ink-50); }
