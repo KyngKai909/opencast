@@ -61,6 +61,8 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
       neighbours: { sameBand: !settings.includeRadioBand },
       bannerMs: settings.bannerSeconds * 1000,
       numberWaitMs: settings.numberWaitSeconds * 1000,
+      quality: settings.quality,
+      eveningOut: settings.eveningOut,
       now: () => now().getTime(),
       onCommand: (c: Command, s?: CommandSource) => {
         if (ui.current && engineRef.current) onPictureCommand(c, ui.current, engineRef.current, s);
@@ -130,8 +132,11 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   );
 
   // Settings take effect at once.
-  const { bannerSeconds, numberWaitSeconds, includeRadioBand } = device.settings;
-  useEffect(() => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand } }), [engine, bannerSeconds, numberWaitSeconds, includeRadioBand]);
+  const { bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut } = device.settings;
+  useEffect(
+    () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand }, quality, eveningOut }),
+    [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut]
+  );
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);
   useEffect(() => engine.setPresets(Object.fromEntries(presets.map((p) => [p.key, p.stationId]))), [engine, presets]);

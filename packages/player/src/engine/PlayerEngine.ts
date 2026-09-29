@@ -7,6 +7,7 @@
 // - Pause holds your place for up to 30 minutes, then offers Back to live.
 // - Number entry: 1, 2 tunes 12.1 after a short wait, or at once on OK.
 // - Captions, with the size setting; a sleep timer that fades the sound over its last minute.
+// - Picture quality (auto, data saver, best) and evening out the sound, settings on TV.
 //
 // Surfaces read its state (subscribe/getState) and send it commands (handle).
 
@@ -14,7 +15,7 @@ import type { Channel, Command, CommandSource } from "../types";
 import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../dial";
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, type WarmMode } from "./Deck";
-import { defaultDriver, type MediaDriver } from "./driver";
+import { defaultDriver, type MediaDriver, type Quality } from "./driver";
 import { AudioLevels } from "./meter";
 
 export type CaptionMode = "off" | "on" | "muted_only";
@@ -66,6 +67,10 @@ export interface EngineOptions {
   /** How long a pause holds its place. */
   pauseHoldMs?: number;
   presets?: Record<number, string>;
+  /** Picture quality, for the picture on screen and the warm neighbours (auto by default). */
+  quality?: Quality;
+  /** Even out the sound, so one station isn't much louder than the next (off by default). */
+  eveningOut?: boolean;
   now?: () => number;
   /** Commands the player doesn't act on itself (guide, menu, presets, focus…), for the surface. */
   onCommand?: (command: Command, source?: CommandSource) => void;
@@ -109,10 +114,13 @@ export class PlayerEngine {
       bannerMs: options.bannerMs ?? 5000,
       numberWaitMs: options.numberWaitMs ?? 2000,
       pauseHoldMs: options.pauseHoldMs ?? THIRTY_MINUTES,
+      quality: options.quality ?? "auto",
+      eveningOut: options.eveningOut ?? false,
       now: options.now ?? (() => Date.now()),
       onCommand: options.onCommand
     };
     this.presets = options.presets ?? {};
+    this.audio.setEvenOut(this.o.eveningOut);
     this.state = {
       channels: [],
       currentId: null,
@@ -179,8 +187,12 @@ export class PlayerEngine {
     this.presets = presets;
   }
 
-  setOptions(p: Partial<Pick<EngineOptions, "bannerMs" | "numberWaitMs" | "warm" | "neighbours">>) {
+  setOptions(p: Partial<Pick<EngineOptions, "bannerMs" | "numberWaitMs" | "warm" | "neighbours" | "quality" | "eveningOut">>) {
+    const quality = p.quality !== undefined && p.quality !== this.o.quality;
     Object.assign(this.o, Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)));
+    // The picture on screen and the warm neighbours at once.
+    if (quality) for (const d of this.decks.values()) d.setQuality(this.o.quality);
+    this.audio.setEvenOut(this.o.eveningOut);
     if (this.state.currentId) this.rewarm(this.state.currentId);
   }
 
@@ -192,7 +204,7 @@ export class PlayerEngine {
     if (!this.host || c.playback?.kind !== "hls") return null;
     let d = this.decks.get(c.station.id);
     if (!d) {
-      d = new Deck({ stationId: c.station.id, url: c.playback.url, host: this.host, driver: this.driver, onChange: () => this.refreshWarm() });
+      d = new Deck({ stationId: c.station.id, url: c.playback.url, host: this.host, driver: this.driver, quality: this.o.quality, onChange: () => this.refreshWarm() });
       this.decks.set(c.station.id, d);
     }
     return d;
@@ -252,7 +264,7 @@ export class PlayerEngine {
     if (seq !== this.tuneSeq) return; // A newer tune took over.
     for (const d of this.decks.values()) if (d !== deck && d.role === "active") d.warm(this.o.warm === "play" ? "play" : "buffer");
     deck.show(this.state.muted || this.state.mutedByBrowser);
-    this.audio.measure(deck.video);
+    this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
     this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
     this.settle(stationId, previous, "playing");
@@ -549,6 +561,11 @@ export class PlayerEngine {
   /** Real sound levels for the meter (0 to 1 each), or null where they can't be measured. */
   audioLevels(bars: number): number[] | null {
     return this.state.status === "playing" ? this.audio.levels(bars) : null;
+  }
+
+  /** Whether the sound on screen runs through Web Audio (measured, and evened out when that's on). */
+  soundRouted(): boolean {
+    return this.audio.routed();
   }
 
   /** The <video> on screen, for the heartbeat's media time. */

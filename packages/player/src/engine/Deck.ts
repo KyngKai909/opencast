@@ -3,7 +3,7 @@
 // second. A warm deck is hidden and silent; "buffer" keeps a few seconds near the live edge,
 // "play" keeps it decoding.
 
-import type { MediaDriver, MediaHandle } from "./driver";
+import type { MediaDriver, MediaHandle, Quality } from "./driver";
 
 export type WarmMode = "buffer" | "play";
 export type DeckState = "loading" | "ready" | "playing" | "error";
@@ -17,6 +17,8 @@ export interface DeckOptions {
   warmBuffer?: number;
   /** Seconds to keep buffered while on screen. */
   activeBuffer?: number;
+  /** Picture quality (auto by default). */
+  quality?: Quality;
   onChange: () => void;
   now?: () => number;
 }
@@ -36,7 +38,7 @@ export class Deck {
   private handle: MediaHandle;
   private keeper: ReturnType<typeof setInterval> | null = null;
   private frameWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
-  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now">> & Pick<DeckOptions, "onChange">;
+  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now" | "quality">> & Pick<DeckOptions, "onChange">;
   private now: () => number;
 
   constructor(o: DeckOptions) {
@@ -68,6 +70,7 @@ export class Deck {
       this.set("error");
     });
     this.handle.setBufferAhead(this.opts.warmBuffer);
+    this.handle.setQuality(o.quality ?? "auto");
   }
 
   private set(s: DeckState) {
@@ -160,6 +163,11 @@ export class Deck {
 
   setCaptions(on: boolean) {
     this.handle.setCaptions(on);
+  }
+
+  /** Picture quality, on screen or warm alike. */
+  setQuality(quality: Quality) {
+    this.handle.setQuality(quality);
   }
 
   private cueLine: number | null = null;

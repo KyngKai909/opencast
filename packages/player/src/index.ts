@@ -6,7 +6,7 @@ export { inChannelOrder, neighbour, neighbours, findByChannel, type NeighbourOpt
 export { readEntry, typeKey, noStationText, type NumberEntry } from "./numberEntry";
 export { PlayerEngine, CAPTION_SCALE, captionLineFor, type PlayerState, type EngineOptions, type CaptionMode, type CaptionSize, type Status, type TuneRecord } from "./engine/PlayerEngine";
 export { Deck, type WarmMode, type DeckState } from "./engine/Deck";
-export { defaultDriver, hlsDriver, nativeDriver, type MediaDriver, type MediaHandle } from "./engine/driver";
+export { defaultDriver, hlsDriver, nativeDriver, type MediaDriver, type MediaHandle, type Quality } from "./engine/driver";
 export { startHeartbeat, httpHeartbeat, sessionId, type SendHeartbeat, type HeartbeatBody } from "./heartbeat";
 export * from "./input";
 export * from "./react";

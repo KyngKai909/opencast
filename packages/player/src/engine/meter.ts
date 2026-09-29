@@ -7,14 +7,67 @@
 //   allow after a gesture: the engine unlocks it on the first command someone gives.
 // - Where the browser gives no samples (native HLS on iPhone), levels() returns null and the
 //   meter falls back to its rhythm.
+//
+// The same graph evens out the sound when that setting is on: a gentle compressor and a make-up
+// gain between the element and the meter, so a quiet station comes up and a loud one comes
+// down. Off, the sound takes a straight path past them; switching crossfades the two paths.
+// An element Web Audio would only get silence from (the browser's own HLS, or cross-origin
+// without CORS) is never routed: once routed, an element plays only through the graph, so its
+// sound would be lost. Such an element keeps its sound as it is, not evened out and not measured.
 
 type Ctx = AudioContext;
 
+/** The leveller: gentle enough for speech and music alike. */
+export const LEVELLER = {
+  thresholdDb: -24,
+  ratio: 4,
+  kneeDb: 12,
+  attack: 0.01,
+  release: 0.25,
+  /**
+   * The compressor already applies its own make-up gain (part of Web Audio's compressor
+   * processing: about +8 dB on quiet sound at these settings), so the make-up gain after it only
+   * trims 1 dB for headroom. Measured in Chrome with pink noise (RMS, dBFS, in → out): -40 → -33,
+   * -30 → -23, -18 → -16.6, -14 → -15.3, -10 → -13.9, -6 → -12.8, with peaks staying under 0.
+   */
+  makeUpDb: -1
+} as const;
+
+/** Time constant of the crossfade between the straight and levelled paths (about 0.15 s in all). */
+const CROSSFADE_SECONDS = 0.03;
+
+interface Chain {
+  analyser: AnalyserNode;
+  data: Uint8Array<ArrayBuffer>;
+  /** The straight path (evening out off) and the levelled one (on): one is at 1, the other 0. */
+  dry: GainNode;
+  wet: GainNode;
+}
+
+/**
+ * Whether Web Audio gets this element's samples. Media Source (hls.js) and same-origin sources
+ * do; a cross-origin one only when it was loaded with CORS (crossorigin set, or it wouldn't load).
+ */
+export function samplesReachWebAudio(el: HTMLMediaElement): boolean {
+  if (el.srcObject) return true;
+  const src = el.currentSrc || el.src;
+  if (!src || src.startsWith("blob:") || src.startsWith("data:")) return true;
+  try {
+    if (new URL(src, location.href).origin === location.origin) return true;
+  } catch {
+    return false;
+  }
+  return el.crossOrigin !== null;
+}
+
 export class AudioLevels {
   private ctx: Ctx | null = null;
-  private sources = new WeakMap<HTMLMediaElement, { analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> }>();
+  private sources = new WeakMap<HTMLMediaElement, Chain>();
+  /** Elements Web Audio would get silence from: left alone. */
+  private unroutable = new WeakSet<HTMLMediaElement>();
   private current: HTMLMediaElement | null = null;
   private silentSince: number | null = null;
+  private evenOut = false;
 
   private context(): Ctx | null {
     if (this.ctx) return this.ctx;
@@ -36,25 +89,83 @@ export class AudioLevels {
     void run.then(() => this.current && this.connect(this.current)).catch(() => {});
   }
 
-  /** Measures this element from now on (the one on screen). Only once the context runs. */
-  measure(el: HTMLMediaElement) {
+  /**
+   * Measures this element from now on (the one on screen), and evens it out if that's on. Only
+   * once the context runs. `routable` false: Web Audio gets only silence from how it plays.
+   */
+  measure(el: HTMLMediaElement, routable = true) {
     this.current = el;
     this.silentSince = null;
-    if (this.ctx?.state === "running") this.connect(el);
+    if (!routable) this.unroutable.add(el);
+    const chain = this.sources.get(el);
+    // It was on screen before: its paths may be as an earlier setting left them. (It was silent
+    // until now, so no ramp is needed.)
+    if (chain) this.setPaths(chain, false);
+    else if (this.ctx?.state === "running") this.connect(el);
+  }
+
+  /** Evening out the sound, on or off: crossfades the element on screen at once, without a click. */
+  setEvenOut(on: boolean) {
+    if (on === this.evenOut) return;
+    this.evenOut = on;
+    const chain = this.current && this.sources.get(this.current);
+    if (chain) this.setPaths(chain, true);
+  }
+
+  /** Whether the element on screen is running through the graph (and evened out, if that's on). */
+  routed(): boolean {
+    return !!this.current && this.sources.has(this.current);
+  }
+
+  private setPaths(chain: Chain, ramp: boolean) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    for (const [gain, value] of [
+      [chain.dry, this.evenOut ? 0 : 1],
+      [chain.wet, this.evenOut ? 1 : 0]
+    ] as const) {
+      gain.gain.cancelScheduledValues(t);
+      if (ramp) gain.gain.setTargetAtTime(value, t, CROSSFADE_SECONDS);
+      else gain.gain.setValueAtTime(value, t);
+    }
   }
 
   private connect(el: HTMLMediaElement) {
-    if (!this.ctx || this.sources.has(el)) return;
+    const ctx = this.ctx;
+    if (!ctx || this.sources.has(el)) return;
+    // Routing an element Web Audio gets silence from would silence it: leave it alone.
+    if (this.unroutable.has(el) || !samplesReachWebAudio(el)) return;
     try {
-      const source = this.ctx.createMediaElementSource(el);
-      const analyser = this.ctx.createAnalyser();
+      const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.7;
-      source.connect(analyser);
-      analyser.connect(this.ctx.destination);
-      this.sources.set(el, { analyser, data: new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) });
+      // source → dry ─────────────────────────────→ analyser → speakers
+      // source → compressor → make-up gain → wet ──↗
+      const dry = ctx.createGain();
+      const wet = ctx.createGain();
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = LEVELLER.thresholdDb;
+      compressor.ratio.value = LEVELLER.ratio;
+      compressor.knee.value = LEVELLER.kneeDb;
+      compressor.attack.value = LEVELLER.attack;
+      compressor.release.value = LEVELLER.release;
+      const makeUp = ctx.createGain();
+      makeUp.gain.value = Math.pow(10, LEVELLER.makeUpDb / 20);
+      // Last: from here the element plays only through the graph.
+      const source = ctx.createMediaElementSource(el);
+      source.connect(dry);
+      dry.connect(analyser);
+      source.connect(compressor);
+      compressor.connect(makeUp);
+      makeUp.connect(wet);
+      wet.connect(analyser);
+      analyser.connect(ctx.destination);
+      const chain: Chain = { analyser, data: new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)), dry, wet };
+      this.setPaths(chain, false);
+      this.sources.set(el, chain);
     } catch {
-      // Already routed, or the browser refuses (cross-origin without CORS): no real levels.
+      // Already routed, or the browser refuses: no real levels, and the sound as it was.
     }
   }
 
