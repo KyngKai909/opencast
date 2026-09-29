@@ -4,6 +4,8 @@
 //  - the phone's own sound is off while a TV plays;
 //  - mirroring: when the external display connects the phone switches to the remote by itself,
 //    and after a lock it shows "Mirroring stopped" (tv-update 02); the screen is kept awake;
+//  - the iPhone app: the mirroring plugin knows the phone's name, market and station before a
+//    display connects, so TV mode opens there on the phone's station;
 //  - dev:mock mirroring: the phone's player stands in for TV mode on the external display;
 //  - a Chromecast cast to or an AirPlay TV mirrored to is remembered for Your TVs (signed in).
 
@@ -15,8 +17,10 @@ import { tvApi } from "@opencast/contracts";
 import { call } from "../api/client";
 import { keyFor } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
+import { useMarketSlug, useMe } from "../data/viewer";
 import { rememberCastTarget } from "./remember";
-import { getMirroring } from "./mirroring";
+import { getMirroring, mirroringOffered } from "./mirroring";
+import { mirrorConfig } from "./useCast";
 import { applyMirrorStatus, getCastSession, sendToTv, setMirrorReceiver, useCastSession, type CastSession } from "./session";
 import type { RemoteCommand } from "./types";
 
@@ -94,8 +98,18 @@ export function CastSync() {
     };
   }, [engine, navigate]);
 
-  // A cast that started or mirroring that connected: Your TVs remembers the TV (signed in only).
+  // The iPhone app: what the next external display loads TV mode with.
   const auth = useAuth();
+  const me = useMe();
+  const marketSlug = useMarketSlug();
+  const displayName = me.data?.displayName ?? null;
+  useEffect(() => {
+    if (!mirroringOffered()) return;
+    const o = mirrorConfig({ signedIn: auth.signedIn, displayName, marketSlug, stationId: phoneId });
+    void getMirroring().then((m) => m?.configure?.(o));
+  }, [auth.signedIn, displayName, marketSlug, phoneId]);
+
+  // A cast that started or mirroring that connected: Your TVs remembers the TV (signed in only).
   const qc = useQueryClient();
   const before = useRef<CastSession>(session);
   useEffect(() => {

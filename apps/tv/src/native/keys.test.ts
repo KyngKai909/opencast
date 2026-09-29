@@ -138,3 +138,24 @@ describe("native keys, through TV mode's keyboard adapter", () => {
     r.stop();
   });
 });
+
+describe("Android's long press", () => {
+  it("counts a Back let go right after Android's long-press repeat as a hold", async () => {
+    vi.useFakeTimers();
+    const got: Command[] = [];
+    const stop = keyboardInput({ profile: "tv", context: () => "picture" }).start((c) => got.push(c));
+    let t = 1_000;
+    const now = () => t;
+    deliverKey({ type: "down", code: 4, repeat: false, canceled: false }, document, now);
+    t += 400;
+    vi.advanceTimersByTime(400);
+    deliverKey({ type: "down", code: 4, repeat: true, canceled: false }, document, now);
+    t += 5;
+    vi.advanceTimersByTime(5);
+    deliverKey({ type: "up", code: 4, repeat: false, canceled: false }, document, now);
+    vi.advanceTimersByTime(200);
+    expect(got).toEqual([{ type: "menu" }]);
+    stop();
+    vi.useRealTimers();
+  });
+});

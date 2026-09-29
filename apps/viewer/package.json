@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:mock": "vite --mode mock",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:native": "node scripts/build-native.mjs",
+    "native:art": "node scripts/native-art.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

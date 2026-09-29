@@ -1,9 +1,10 @@
-// Which senders this build has. Cast: dev:mock's stand-in (reaching TV mode's receiver.html), Google's
-// Cast Web Sender in Chrome when a receiver application is configured, or none (casting isn't
-// offered on the web elsewhere; the Phase 8 apps cast natively). The relay, for the Opencast TV
-// app: over the API, or in dev:mock over TV mode's bridge page.
+// Which senders this build has. Cast: dev:mock's stand-in (reaching TV mode's receiver.html), the
+// Cast SDK through the app's plugin in the iPhone and Android apps, Google's Cast Web Sender in
+// Chrome, each when a receiver application is configured; or none (casting isn't offered in other
+// browsers). The relay, for the Opencast TV app: over the API, or in dev:mock over TV mode's bridge page.
 
 import { config } from "../config";
+import { hasPlugin } from "../native/platform";
 import { browserCanCast, createGoogleSender } from "./googleSender";
 import { createRelaySender } from "./relay";
 import { apiRelayLink } from "./relayApi";
@@ -16,7 +17,8 @@ let relay: Promise<CastSender> | null = null;
 export function castOffered(): boolean {
   // Written out in full so a production build drops the mock branch (and its chunk) entirely.
   if (import.meta.env.VITE_MOCK === "true") return true;
-  return !!config.castAppId && browserCanCast();
+  if (!config.castAppId) return false;
+  return hasPlugin("OpencastCast") || browserCanCast();
 }
 
 export function getSender(): Promise<CastSender | null> {
@@ -25,7 +27,13 @@ export function getSender(): Promise<CastSender | null> {
       const m = await import("./mockSender");
       return m.createMockSender(() => m.iframeTransport(config.tvUrl));
     }
-    if (config.castAppId && browserCanCast()) return createGoogleSender(config.castAppId);
+    if (!config.castAppId) return null;
+    // The apps: the Cast SDK, in its own chunk (the web build never loads it).
+    if (hasPlugin("OpencastCast")) {
+      const [{ createNativeCastSender }, { OpencastCast }] = await Promise.all([import("../native/nativeCastSender"), import("../native/plugins")]);
+      return createNativeCastSender(OpencastCast, config.castAppId);
+    }
+    if (browserCanCast()) return createGoogleSender(config.castAppId);
     return null;
   })();
   return sender;
@@ -43,7 +51,13 @@ export function getRelaySender(): Promise<CastSender> {
   return relay;
 }
 
-/** The sender that reaches this TV: the relay for the TV app, Cast otherwise. */
+/** The sender that reaches this TV: the relay for the TV app, Cast otherwise (natively in the apps). AirPlay TVs aren't cast to: they mirror (mirroring.ts). */
 export function senderFor(target: CastTarget): Promise<CastSender | null> {
   return target.kind === "tv_app" ? getRelaySender() : getSender();
+}
+
+/** Tests only: forget the senders chosen so far. */
+export function resetSendersForTests() {
+  sender = null;
+  relay = null;
 }

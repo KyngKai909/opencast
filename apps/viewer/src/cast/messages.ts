@@ -29,6 +29,15 @@ export function phoneName(displayName: string | null | undefined): string {
   return `${first.slice(0, 40)}'s phone`;
 }
 
+/**
+ * The iPhone's name for the mirrored TV's chip ("Mirrored from Kai's iPhone"), from the account as
+ * phoneName is; null signed out, and TV mode says "Mirrored from an iPhone".
+ */
+export function mirrorDeviceName(displayName: string | null | undefined): string | null {
+  const name = phoneName(displayName);
+  return name === SIGNED_OUT_NAME ? null : name.replace(/'s phone$/, "'s iPhone");
+}
+
 export function sessionMessage(intro: SessionIntro) {
   return { type: "session" as const, from: intro.from, marketSlug: intro.marketSlug, othersCanChange: intro.othersCanChange };
 }

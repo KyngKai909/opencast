@@ -98,6 +98,8 @@ Runs the viewer at http://localhost:5174 against mock data (Mock Service Worker)
 
 Every mock response is checked against the contract schemas, extended with the fields the viewer has asked for (`apps/viewer/src/api/ext*`, named by their ids in `docs/contract-requests.md`).
 
+The iPhone and Android apps wrap the same build with Capacitor. They cast to Chromecast through the Cast SDK, mirror to AirPlay TVs with TV mode on the external display (iPhone), and show lock-screen controls. `npm run build:native -w @opencast/viewer -- ios` (or `android`) builds and syncs them. `docs/apps/native.md` has the toolchains, the env, and the demo steps.
+
 ### Master control
 
 ```bash

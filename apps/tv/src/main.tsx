@@ -10,6 +10,7 @@
 // external display): the phone remote's commands arrive over the bridge, and nothing is stored.
 //   ?mirror&device=Kai's iPhone&market=inland-empire&station=<station id>
 
+import { MirrorStateToPhone } from "./tv/mirrorState";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@opencast/ui/styles.css";
@@ -74,6 +75,7 @@ async function boot() {
     <StrictMode>
       <TvApp mode={mirror ? "mirror" : "tv"} inputs={inputs} routes={tvRoutes}>
         {relay && <RelayStateToPhones relay={relay} />}
+        {mirror && <MirrorStateToPhone />}
         {androidApp && <AndroidTv />}
       </TvApp>
     </StrictMode>

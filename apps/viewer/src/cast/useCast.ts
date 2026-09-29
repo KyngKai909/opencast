@@ -8,7 +8,9 @@ import { useApi } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
 import { useMarketSlug, useMe } from "../data/viewer";
 import { useSavedSettings } from "../layout/SettingsSync";
-import { SIGNED_OUT_NAME, phoneName } from "./messages";
+import { config } from "../config";
+import type { MirrorConfig } from "../native/plugins";
+import { SIGNED_OUT_NAME, mirrorDeviceName, phoneName } from "./messages";
 import { getMirroring } from "./mirroring";
 import { loadPairings } from "./pairings";
 import { getSender } from "./sender";
@@ -34,6 +36,19 @@ export function useCastIntro(): SessionIntro {
     marketSlug: slug,
     // "Anyone on the same network with the app can pick up the remote" (tv 06 note): on unless the account says otherwise.
     othersCanChange: settings?.tvs?.othersOnWifiCanChange ?? true
+  };
+}
+
+/**
+ * What the iPhone's external display loads TV mode with: "Kai's iPhone" for its chip, the market,
+ * the station on the phone now, and where TV mode comes from (the app's own copy, or VITE_TV_URL).
+ */
+export function mirrorConfig(o: { signedIn: boolean; displayName: string | null | undefined; marketSlug: string | null; stationId: string | null }): MirrorConfig {
+  return {
+    device: o.signedIn ? mirrorDeviceName(o.displayName) : null,
+    marketSlug: o.marketSlug,
+    stationId: o.stationId,
+    tvUrl: config.mirrorTv === "url" ? `${config.tvUrl}/` : null
   };
 }
 

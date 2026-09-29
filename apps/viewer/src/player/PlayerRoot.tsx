@@ -3,14 +3,17 @@
 
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { audienceApi } from "@opencast/contracts";
-import { PlayerProvider, mediaSessionInput, startHeartbeat, usePlayer, type EngineOptions, type InputAdapter } from "@opencast/player";
+import { PlayerProvider, startHeartbeat, usePlayer, type EngineOptions, type InputAdapter } from "@opencast/player";
 import { call } from "../api/client";
 import { setDevice } from "../device/store";
 import { useChannels, usePresets } from "../data/viewer";
 import { useSavedSettings } from "../layout/SettingsSync";
+import { lockScreenInput, nowPlayingInfo } from "../native/lockScreen";
+import { hasPlugin } from "../native/platform";
 
 const OPTIONS: EngineOptions = { warm: "buffer", neighbours: { sameBand: true }, bannerMs: 5000, numberWaitMs: 2000 };
-const INPUTS: InputAdapter[] = [mediaSessionInput()];
+// The lock screen and headset buttons: the web's Media Session, or the apps' own plugin.
+const INPUTS: InputAdapter[] = [lockScreenInput()];
 
 function isPhone() {
   return typeof window !== "undefined" && (window.matchMedia?.("(max-width: 767px)").matches || /iPhone|Android.+Mobile/.test(navigator.userAgent));
@@ -34,10 +37,24 @@ function PlayerSync() {
   return null;
 }
 
+/** The apps: the lock screen shows the station and what's on, with channel up, down and pause. */
+function NowPlayingSync() {
+  const np = useNowPlaying();
+  const info = nowPlayingInfo(np.row, np.status === "playing");
+  const key = info ? `${info.title}|${info.subtitle ?? ""}|${info.playing}` : "";
+  useEffect(() => {
+    void import("../native/plugins").then(({ OpencastNowPlaying }) => (info ? OpencastNowPlaying.update(info) : OpencastNowPlaying.clear())).catch(() => {});
+  }, [key]); // `key` stands for `info`'s contents
+  return null;
+}
+
+const NATIVE_NOW_PLAYING = hasPlugin("OpencastNowPlaying");
+
 export function PlayerRoot({ children }: { children: ReactNode }) {
   return (
     <PlayerProvider options={OPTIONS} inputs={INPUTS}>
       <PlayerSync />
+      {NATIVE_NOW_PLAYING && <NowPlayingSync />}
       {children}
     </PlayerProvider>
   );

@@ -6,6 +6,8 @@
 //
 // The D-pad's arrows aren't here: the WebView delivers them as ArrowUp and the rest by itself.
 
+import { HOLD_MS } from "@opencast/player";
+
 /** One key from MainActivity (OpencastTvPlugin.sendKey). */
 export interface NativeKey {
   type: "down" | "up";
@@ -67,6 +69,9 @@ export const ANDROID_KEYS: Record<string, Key> = {
   KEYCODE_MINUS: { code: 69, key: ".", keyCode: 189 }
 };
 
+/** Keys down now: when each went down, and whether Android has reported it as a long press. */
+const presses = new Map<number, { at: number; longPress: boolean }>();
+
 const byCode = new Map(Object.values(ANDROID_KEYS).map((k) => [k.code, k]));
 
 /** The page's key for an Android key code, or null for a key MainActivity doesn't forward. */
@@ -80,10 +85,27 @@ export function domKeyFor(code: number): { key: string; keyCode: number } | null
  * window, where the keyboard adapter listens). A canceled release lets go without acting, as
  * focus leaving the page does. Returns false for a key it doesn't know.
  */
-export function deliverKey(k: NativeKey, doc: Document = document): boolean {
+export function deliverKey(k: NativeKey, doc: Document = document, now: () => number = () => Date.now()): boolean {
   const dom = domKeyFor(k.code);
   const win = doc.defaultView;
   if (!dom || !win) return false;
+  // Android's long press: its first repeat comes at the system's long-press time (400 ms on
+  // Android TV), and a remote let go soon after can release before the page's HOLD_MS. A release
+  // after that repeat waits until HOLD_MS has passed, so the hold still counts as a hold.
+  if (k.type === "down" && !k.repeat) presses.set(k.code, { at: now(), longPress: false });
+  if (k.type === "down" && k.repeat) {
+    const p = presses.get(k.code);
+    if (p) p.longPress = true;
+  }
+  if (k.type === "up") {
+    const p = presses.get(k.code);
+    presses.delete(k.code);
+    const wait = p?.longPress && !k.canceled ? HOLD_MS + 20 - (now() - p.at) : 0;
+    if (wait > 0) {
+      win.setTimeout(() => deliverKey({ ...k }, doc, now), wait);
+      return true;
+    }
+  }
   if (k.type === "up" && k.canceled) {
     win.dispatchEvent(new win.Event("blur"));
     return true;

@@ -2,12 +2,15 @@
    window reaches the screen's edges. Sizes are the reference's; the hint keys are 21px, not 20px. */
 .tvg { position: absolute; inset: 0; display: flex; flex-direction: column; }
 
-/* The dim (the reference's rgb(8 14 32 / .96) is the screen colour at 96%), with a hole where the
-   picture shows: a shadow from the window's box, so the picture itself never moves layers. */
+/* The dim (the reference's rgb(8 14 32 / .96), the screen colour at 96%), with a hole where the
+   picture shows: a shadow from the window's box, so the picture itself never moves layers.
+   A plain colour, not color-mix(): Chromium 113 (Android TV 14's WebView) resolves color-mix()
+   with a variable inside a box-shadow to currentColor, which painted the guide in the ink colour. */
 .tvg__window {
+  --tvg-dim: rgb(8 14 32 / .96);
   position: absolute; top: 0; right: 0; width: 640px; height: 360px;
   border-radius: var(--r-screen);
-  box-shadow: 0 0 0 4000px color-mix(in srgb, var(--screen) 96%, transparent);
+  box-shadow: 0 0 0 4000px var(--tvg-dim);
   pointer-events: none;
 }
 /* The picture, scaled to the window (640 by 360 at 1184, 54). It keeps playing, with its sound. */

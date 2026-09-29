@@ -1,9 +1,12 @@
-// The mirroring seam (tv-update 02): on an iPhone, Phase 8's Swift plugin notices Screen Mirroring,
-// draws TV mode on the external display (apps/tv with ?mirror, the bridge input) and passes the
-// phone remote's commands to it. The app can't start mirroring itself, can't list AirPlay TVs
-// (only ones remembered from earlier sessions, raise 6) and stops drawing when the phone locks.
+// The mirroring seam (tv-update 02): in the iPhone app, the OpencastMirror plugin
+// (ios/App/App/OpencastMirrorPlugin.swift) notices Screen Mirroring, draws TV mode on the external
+// display (apps/tv with ?mirror, the bridge input) and passes the phone remote's commands to it.
+// The app can't start mirroring itself, can't list AirPlay TVs (only ones remembered from earlier
+// sessions, raise 6) and stops drawing when the phone locks.
 // dev:mock stands in with mockMirroring.ts; on the web without the plugin there's no mirroring.
 
+import { hasPlugin } from "../native/platform";
+import type { MirrorConfig, MirrorEvent, OpencastMirrorPlugin } from "../native/plugins";
 import { parseState } from "./messages";
 import type { ReceiverState, RemoteCommand } from "./types";
 
@@ -34,6 +37,8 @@ export interface MirroringSeam {
   subscribe(listener: () => void): () => void;
   /** The guide is showing for this TV. The plugin watches anyway; dev:mock's stand-in connects a little later. */
   expect(tvName: string): void;
+  /** What the next external display loads TV mode with (the plugin only: the phone's name, market and station). */
+  configure?(o: MirrorConfig): void;
   /** The phone remote's command, to TV mode on the external display. */
   send(command: RemoteCommand): void;
   /** dev:mock only: there's no external display, so the phone's own player stands in for it and takes the commands. */
@@ -46,44 +51,61 @@ export interface MirroringSeam {
   stop(): void;
 }
 
-/** The plugin's events and calls, as Phase 8 will register them (Capacitor). */
-interface NativePlugin {
-  addListener(event: "displayConnected" | "displayDisconnected" | "battery" | "state", cb: (data: Record<string, unknown>) => void): unknown;
-  knownTvs(): Promise<{ names: string[] }>;
-  send(o: { command: RemoteCommand }): Promise<void>;
-  keepAwake(o: { on: boolean }): Promise<void>;
-  stop(): Promise<void>;
-}
-declare global {
-  interface Window {
-    Capacitor?: { Plugins?: { OpencastMirroring?: NativePlugin } };
-  }
+/** The plugin's calls and events (native/plugins.ts, ios/App/App/OpencastMirrorPlugin.swift). */
+export type NativeMirrorPlugin = Pick<OpencastMirrorPlugin, "addListener" | "configure" | "knownTvs" | "send" | "stop">;
+
+export interface NativeMirrorDeps {
+  /** Keeps the screen from dimming (the keep-awake plugin). */
+  keepAwake(on: boolean): void;
+  now?: () => number;
 }
 
-function nativeMirroring(plugin: NativePlugin): MirroringSeam {
+/** The seam over the iPhone app's plugin: its events become the status the remote and CastSync read. */
+export function nativeMirroring(plugin: NativeMirrorPlugin, deps: NativeMirrorDeps): MirroringSeam {
+  const now = deps.now ?? Date.now;
   let status: MirrorStatus = { connected: false, tvName: null, lockedAt: null };
   let known: string[] = [];
   let readings: BatteryReading[] = [];
+  /** The TV the guide is showing for: the name when the plugin can't read the AirPlay route's (the Simulator's external display). */
+  let expected: string | null = null;
+  let awake = false;
   const listeners = new Set<() => void>();
   const emit = () => listeners.forEach((l) => l());
-  void plugin.knownTvs().then((r) => ((known = r.names), emit()), () => {});
-  plugin.addListener("displayConnected", (d) => {
+  const remember = (name: string | null) => {
+    if (name && !known.includes(name)) known = [...known, name];
+  };
+  const on = (event: MirrorEvent, cb: (d: Record<string, unknown>) => void) => void plugin.addListener(event, cb).catch(() => {});
+  void plugin.knownTvs().then(
+    (r) => {
+      known = [...new Set([...(r.names ?? []), ...known])];
+      emit();
+    },
+    () => {}
+  );
+  on("displayConnected", (d) => {
     readings = [];
-    status = { connected: true, tvName: typeof d.tvName === "string" ? d.tvName : status.tvName, lockedAt: null };
-    if (status.tvName && !known.includes(status.tvName)) known = [...known, status.tvName];
+    const tvName = typeof d.tvName === "string" && d.tvName ? d.tvName : expected ?? status.tvName;
+    status = { connected: true, tvName, lockedAt: null };
+    remember(tvName);
     emit();
   });
-  plugin.addListener("displayDisconnected", (d) => {
-    status = { connected: false, tvName: status.tvName, lockedAt: d.reason === "locked" ? Number(d.at) || Date.now() : null };
+  // "locked": the phone locked and Screen Mirroring stopped ("Mirroring stopped" says when); "ended":
+  // Screen Mirroring was turned off with Opencast in front, and the phone just goes back to itself.
+  on("displayDisconnected", (d) => {
+    const at = Number(d.at);
+    status = { connected: false, tvName: status.tvName, lockedAt: d.reason === "locked" ? (Number.isFinite(at) && at > 0 ? at : now()) : null };
     emit();
   });
   // TV mode's {type:"state"} from the external display's web view, passed back by the plugin.
-  plugin.addListener("state", (d) => {
+  on("state", (d) => {
+    if (!status.connected) return;
     status = { ...status, receiver: parseState(d) };
     emit();
   });
-  plugin.addListener("battery", (d) => {
-    readings = [...readings, { level: Number(d.level), charging: d.charging === true, at: Date.now() }].slice(-120);
+  on("battery", (d) => {
+    const level = Number(d.level);
+    if (!Number.isFinite(level) || level < 0 || level > 1) return;
+    readings = [...readings, { level, charging: d.charging === true, at: now() }].slice(-120);
     emit();
   });
   return {
@@ -94,16 +116,29 @@ function nativeMirroring(plugin: NativePlugin): MirroringSeam {
       listeners.add(l);
       return () => listeners.delete(l);
     },
-    expect: () => {},
-    send: (command) => void plugin.send({ command }),
+    expect(tvName) {
+      expected = tvName;
+    },
+    configure: (o) => void plugin.configure(o).catch(() => {}),
+    send: (command) => void plugin.send({ command }).catch(() => {}),
     battery: () => readings,
-    keepAwake: (on) => void plugin.keepAwake({ on }),
+    keepAwake(on) {
+      if (on === awake) return;
+      awake = on;
+      deps.keepAwake(on);
+    },
     stop() {
-      void plugin.stop();
+      void plugin.stop().catch(() => {});
       status = { connected: false, tvName: status.tvName, lockedAt: null };
       emit();
     }
   };
+}
+
+function nativeKeepAwake(on: boolean) {
+  void import("@capacitor-community/keep-awake")
+    .then(({ KeepAwake }) => (on ? KeepAwake.keepAwake() : KeepAwake.allowSleep()))
+    .catch(() => {});
 }
 
 let seam: Promise<MirroringSeam | null> | null = null;
@@ -113,8 +148,9 @@ export function getMirroring(): Promise<MirroringSeam | null> {
   seam ??= (async () => {
     // Written out in full so a production build drops the mock (and its chunk).
     if (import.meta.env.VITE_MOCK === "true") return (await import("./mockMirroring")).mockMirroring();
-    const plugin = typeof window !== "undefined" ? window.Capacitor?.Plugins?.OpencastMirroring : undefined;
-    return plugin ? nativeMirroring(plugin) : null;
+    if (!hasPlugin("OpencastMirror")) return null;
+    const { OpencastMirror } = await import("../native/plugins");
+    return nativeMirroring(OpencastMirror, { keepAwake: nativeKeepAwake });
   })();
   return seam;
 }
@@ -122,7 +158,12 @@ export function getMirroring(): Promise<MirroringSeam | null> {
 /** Whether this build can mirror, without loading anything. */
 export function mirroringOffered(): boolean {
   if (import.meta.env.VITE_MOCK === "true") return true;
-  return typeof window !== "undefined" && !!window.Capacitor?.Plugins?.OpencastMirroring;
+  return hasPlugin("OpencastMirror");
+}
+
+/** Tests only. */
+export function resetMirroringForTests() {
+  seam = null;
 }
 
 // ---------- The battery line (02.2) ----------
