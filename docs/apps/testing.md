@@ -179,7 +179,7 @@ another is going uses the first one's API, which goes away when the first run en
 ## On GitHub Actions
 
 Every suite above also runs on GitHub, so nothing heavy has to run on a laptop:
-`.github/workflows/ci.yml` on every push to `monorepo` and `apps`, on pull requests, and by hand
+`.github/workflows/ci.yml` on every push to `staging` and `dev`, on pull requests, and by hand
 (Actions → CI → Run workflow). Changes only to `docs/` or Markdown don't start it. A newer push to
 the same branch cancels the run before it.
 

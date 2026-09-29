@@ -1,6 +1,6 @@
 # Deploying Opencast
 
-Railway project **opencast** (`dc1fb63d-c475-42a0-8dce-7581260858f2`), environments `staging` and `production`. The old `@openchannel/*` services keep running in the `glistening-truth` project until the cutover below.
+Railway project **opencast** (`dc1fb63d-c475-42a0-8dce-7581260858f2`), environments `staging` and `production`. The old `@openchannel/*` services were in the `glistening-truth` project, which is being retired (the user decided on 2026-09-29 that it can be deleted).
 
 Everything Railway runs is defined in [.railway/railway.ts](../.railway/railway.ts): the databases, services, volume, bucket, builds, starts, health checks, watch paths and variables (by reference where they come from another service). Secrets are marked `preserve()`: they're set once in Railway and never written in the repo.
 
@@ -11,22 +11,22 @@ npx @railway/cli@latest config apply    # change it
 npx @railway/cli@latest variables --set "NAME=value" -s <service>   # a secret
 ```
 
-Railway retired per-service `railway.json` (Config as Code) in favour of this file. The root `railway.json` is only for the legacy services on `main`.
+Railway retired per-service `railway.json` (Config as Code) in favour of this file. The root `railway.json` is only for the legacy services in the old `glistening-truth` project; delete it with that project.
 
 ## Services
 
-All build with Nixpacks from the repo root (`nixpacks.toml`: Node 22, ffmpeg, yt-dlp; `npm ci --include=dev`). Staging builds the `monorepo` branch; production builds `main`. Each service rebuilds only when its own paths or the shared packages change.
+All build with Nixpacks from the repo root (`nixpacks.toml`: Node 22, ffmpeg, yt-dlp; `npm ci --include=dev`). Staging builds the `staging` branch; production builds `main`. Day-to-day work happens on `dev` and moves to `staging` by fast-forward or pull request. Each service rebuilds only when its own paths or the shared packages change.
 
 | Service | Build | Start | Health | Needs |
 |---|---|---|---|---|
 | **api** | `npx turbo run build --filter=@opencast/api...` | `npm run start -w @opencast/api` (pre-deploy: `npm run migrate -w @opencast/db`) | `/health` | Postgres, Redis, object storage, Privy, Livepeer, payments, chain (read-only) |
-| **worker** | `npx turbo run build --filter=@opencast/worker...` | `npm run start -w @opencast/worker` | `/health` (leader, stations on air, cache hit rate, bytes, misses) | Postgres, Redis (leader lock), object storage, the cache volume at `/data`, Livepeer, chain (it sends the weekly escrow batch) |
-| **web** (the Opencast app: the viewer, `/control`, `/desk`), **business**, **site**, **tv** | `npx turbo run build --filter=@opencast/<app>...` | `node scripts/serve-static.mjs apps/<app>/dist` | `/health` | `VITE_API_BASE` at build |
+| **worker** | `npx turbo run build --filter=@opencast/worker...` | `npm run start -w @opencast/worker` | `/health` (leader, stations on air, preparation, readiness, translators) | Postgres, Redis (leader lock), object storage, scratch space on the volume at `/data`, Livepeer (live blocks), chain (it sends the weekly escrow batch) |
+| **web** (the Opencast app: the viewer, `/control`, `/desk`), **business**, **site**, **tv** | on Vercel (team Deed3Labs: `opencast-web`, `opencast-business`, `opencast-site`, `opencast-tv`), from each app's `vercel.json` | static | | `VITE_API_BASE` at build |
 | Postgres, Redis | Railway databases | | | 5 GB volumes |
 
 Keep **worker at one replica** for now: the Redis leader lock makes extra replicas wait, not share stations.
 
-HLS: the worker writes each station's HLS to its own disk and serves it at `https://<worker>/hls/<stationId>/index.m3u8`, with the break cues. Viewers watch Livepeer's output; this is for checking and for players that want cues.
+HLS: items are prepared once into segments in object storage, and each station's playlists are assembled from them and served at `https://<worker>/hls/<stationId>/master.m3u8` (`index.m3u8` answers too), with the DATERANGE tags and break cues. Segments come from the bucket's public domain (`R2_PUBLIC_BASE`); without one, the worker passes them through, billed as Railway egress.
 
 ## Variables
 
@@ -43,8 +43,9 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 | `HLS_PUBLIC_URL` | ✓ | | optional (A117): the worker's public origin, for a station's own HLS (`/hls/<stationId>/index.m3u8`) when it has no Livepeer output. Unset: the API's origin |
 | `TRUST_PROXY_HOPS` | ✓ | | how many proxies add `X-Forwarded-For` entries before the API (default 1, Railway's edge): the client's address is that many entries from the end |
 | `STORAGE_ROOT` | `/tmp/opencast` | `/data/storage` | the API only keeps temporary files; the worker's HLS and proof frames live on its volume |
-| `WORKER_CACHE_DIR`, `WORKER_CACHE_GB` | | ✓ | `/data/cache`; 4.5 on staging, 99.5 in production |
-| `LEGACY_PLAYOUT` | | `off` | no station is on the old queue model |
+| `WORKER_SCRATCH_DIR` | | ✓ | `/data/scratch`: preparation and translators (the volume is 5 GB on staging, 20 GB in production) |
+| `PREPARE_CONCURRENCY` | | ✓ | items prepared at once (1; each FFmpeg pass wants about 2 vCPU). `PREPARE_PRESET` is optional |
+| `LEGACY_PLAYOUT` | | `off` | `on` runs the old continuous encode instead of prepare once, then assemble |
 | `JOBS` | `off` | | the minute jobs run in the worker |
 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | ✓ | ✓ | staging: the Railway bucket `media` (virtual-host URLs; `S3_STORAGE_CLASSES=false`; it doesn't verify upload checksums, so only reads catch a bad copy). Production: Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_PUBLIC_BASE` too) |
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET` | ✓ | ✓ | sign-in, with Opencast's own Privy app (never Clear's: the API refuses to start with Clear's app ID); without them signed-in endpoints answer 401. The API also needs the secret to read a linked Clear wallet |
@@ -82,7 +83,7 @@ Staging's database is fresh. For markets on the dial, seed it once from inside t
 Production is empty until this runs. Nothing here touches `glistening-truth` until the last step.
 
 1. **Plan.** Upgrade the Railway plan so the worker's 100 GB volume fits (Hobby stops at 5 GB).
-2. **Code.** Merge `monorepo` into `main` (a PR; never force-push `main`). Production builds `main`.
+2. **Code.** Merge `staging` into `main` (a PR; never force-push `main`). Production builds `main`.
 3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs.
 4. **Keys.** Make fresh ones for production. Don't reuse the old project's Livepeer or Pinata keys, which are to be rotated:
    - Privy: Opencast's own production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed, and embedded wallets created only for people who sign in;
@@ -95,7 +96,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 7. **Check it.** Every service's `/health`; the API's pre-deploy log says "Migrations applied"; seed the markets; the worker's `/health` shows the leader and the cache. Sign in on the viewer, and put one test station on air end to end.
 8. **Move off Pinata.** With production's storage variables and `PINATA_JWT`, run `npm run storage:move-off-pinata -w @opencast/api`, which reports. Then `--copy`, which copies each pin in and verifies it by hash. Check Pinata's dashboard total matches (the old key sees only v3 files), mark any catalog pins, and only then `--unpin --yes-unpin`. Unpinning can't be undone.
 9. **Domains.** Add the custom domains to the production services and update DNS. Update `WEB_ORIGIN`, `APP_ORIGIN`, Privy's allowed origins and Stripe's webhook URL if they were the Railway ones.
-10. **Retire the old project.** Stop pointing anything at `glistening-truth`. Leave its Postgres alone: it holds the only copy of the old `opencast_state`, which production doesn't import (a fresh start).
+10. **Retire the old project.** Stop pointing anything at `glistening-truth`, then delete it from the Railway dashboard, along with the root `railway.json`. Its Postgres holds the only copy of the old `opencast_state`, which production doesn't import (a fresh start); take a `pg_dump` first if it might ever be wanted.
 11. **Rotate and tidy.** Rotate the old Livepeer and Pinata keys, and anything else reused on staging. Delete the Livepeer test streams the early tests made. In the Railway dashboard, delete the stray project bucket `media-probe` (empty, no instance).
 
 ## Plan limits (Hobby)

@@ -1,194 +1,346 @@
 # Opencast
 
-A dial of 24/7 local stations. Viewers tune in on the web, a phone, a TV app or by casting; stations are run from master control. Opencast is a working name; the package scope is `@opencast/*`.
+Monorepo for **Opencast** — a dial of 24/7 local stations. Anyone can run a channel: a TV channel
+or a radio-band one, with a schedule, breaks, sponsors and a number on the dial. Viewers tune in on
+the web, a phone, a TV app or by casting, the way they'd flip channels.
 
-The build is driven by two prompts in `docs/prompts/`, working from the reference designs in `docs/reference/`:
+Four web apps, two native wrappers, an API, a playout worker, and the escrow contracts that hold a
+claimable station's earnings until its creator claims them.
 
-- `1-platform.md` (branch `monorepo`): the repo, backend, contracts, money, escrow and Railway.
-- `2-apps.md` (branch `apps`, from `monorepo`): every app from the reference files.
+[System](#what-the-system-is) · [Layout](#repository-layout) · [Branches](#branches-and-deploys) ·
+[Quickstart](#quickstart) · [Playout](#playout) · [Money](#money) · [Apps](#the-apps) ·
+[API](#the-api-appsapi) · [Contracts](#the-escrow-contracts-contracts) · [Tests](#tests-and-ci) ·
+[Docs](#documentation)
 
-## Layout
+> ⚠️ **Status: pre-launch, staging only.** Everything runs on staging; nothing serves real viewers
+> yet. The escrow contracts are **unaudited** and deployed only to a local chain. Interfaces still
+> move: contract changes are additive and logged in
+> [`docs/contracts-changelog.md`](./docs/contracts-changelog.md).
 
-| Path | Package | What it is | Owner |
-|---|---|---|---|
-| `apps/api` | `@opencast/api` | Express API: stations, library, uploads, playout control | platform |
-| `apps/worker` | `@opencast/worker` | Playout: airs every station from its log, from its file cache; HLS and Livepeer out | platform |
-| `apps/web` | `@opencast/web` | The Opencast app, one sign-in for viewers and creators: the viewer at `/` (web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA), master control at `/control` (sign on, the Monitor, the log, live sources and going live, listings, the library, breaks, the spot market, sponsors, the syndication market, audience and earnings, rights, translators, settings; studios) and Network desk at `/desk` for the Opencast team (the market board, the creator pipeline, asking permission, setting up claimable stations from recipes, listed sources, held earnings). The iPhone and Android apps wrap it | apps |
-| `apps/tv` | `@opencast/tv` | TV mode: watching, the guide, the menu rail, presets, radio, sleep, pledge by QR, first launch with a sign-in code, settings; the same build is the Cast receiver (`receiver.html`) and the iPhone's second screen (`?mirror`) | apps |
-| `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
-| `apps/business` | `@opencast/business` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
-| `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
-| `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
-| `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
-| `packages/contracts` | `@opencast/contracts` | Zod request and response schemas | platform; the apps prompt reads it and never edits it |
-| `packages/ui` | `@opencast/ui` | Design system: tokens, primitives, broadcast and data components, shells | apps |
-| `packages/player` | `@opencast/player` | The one player for the viewer app, TV mode and the Cast receiver: live HLS, channel changes with warm neighbours, the banner, number entry, inputs | apps |
-| `contracts` | | `CreatorEscrow` and `CreatorFund` (Foundry): claimable stations' earnings until claimed, and the fund that backs new stations | platform |
-| `docs/reference` | | HTML design references, one folder per app | |
+---
 
-`domain` and `contracts` build to `dist/` because the API and worker import their JavaScript at runtime. `ui` and `player` are source-only, since Vite compiles them into each app.
+## What the system is
 
-## Run locally
+A **station** has a call sign, a channel number in its market (`BEAT 12.1`, `LOFI 99.1`), a library
+and a **program log**: the timed schedule of what airs. The worker turns every log into a live
+channel, around the clock. Viewers never pick a video; they tune to a number and get whatever is
+on.
 
-You need Node 22 (or 20.19+), npm 10+, Docker, and `ffmpeg` and `ffprobe` on `PATH`. `yt-dlp` is only needed for link imports.
+```mermaid
+flowchart LR
+  MC["Master control<br/><i>the log, library, breaks</i>"] --> API["API<br/><code>apps/api</code>"]
+  API --> DB[("Postgres<br/>Redis")]
+  W["Worker<br/><code>apps/worker</code>"] --> DB
+  W -->|"prepare once"| R2[("Object storage<br/><i>segments by content ID</i>")]
+  W -->|"assemble"| PL["Channel playlists<br/><i>HLS, per rendition</i>"]
+  PL --> V["Viewer · TV · Cast"]
+  R2 --> V
+  LP["Livepeer<br/><i>live blocks only</i>"] --> PL
+```
+
+Three ideas to know before reading the code.
+
+**Prepare once, then assemble.** Prerecorded material is never encoded live. Each file is
+transcoded once, into 4-second segments at a fixed ladder, and stored by content ID. A channel is a
+rolling HLS playlist that points at those segments in the order the log says. Writing playlists
+takes almost no CPU, so a channel costs a few dollars a month, not hundreds. Live blocks are the
+only live encode (through Livepeer, for their hours only).
+
+**The player draws the graphics.** The station's bug, lower thirds and a spot's code and QR aren't
+burned into the picture. The worker writes `#EXT-X-DATERANGE` tags into the playlist
+([`packages/contracts/src/hls.ts`](./packages/contracts/src/hls.ts)), and the player draws them.
+The same tags carry SCTE-35 cues for every break.
+
+**Off air is a choice; dead air is a mistake.** A station can schedule off air hours or sign off
+from its log: the playlist ends after a sign-off slate, the dial says when it's back, and nothing
+warns. Any other gap in the next 24 hours raises warnings, and the worker fills it from the
+library if nobody acts.
+
+---
+
+## Repository layout
+
+npm workspaces + Turborepo. Each app under `apps/` builds on its own.
+
+```
+apps/
+  web/        the Opencast app       @opencast/web       Vite + React; viewer, /control, /desk
+  tv/         TV mode + Cast         @opencast/tv        Vite + React; also receiver.html
+  business/   Opencast for business  @opencast/business  Vite + React
+  site/       marketing site         @opencast/site      Vite + React
+  gallery/    component gallery      @opencast/gallery   every ui component, beside its frame
+  api/        the API                @opencast/api       Express, Postgres, Redis
+  worker/     playout                @opencast/worker    prepares, assembles, relays
+packages/
+  contracts/  Zod request/response schemas and the HLS tag spec — the API's public surface
+  db/         Drizzle schema, SQL migrations, the seed
+  domain/     types and pure rules shared by the API and worker
+  ui/         design system: tokens, primitives, broadcast components, shells
+  player/     the one player: live HLS, channel changes, overlays, the banner, inputs
+contracts/    CreatorEscrow and CreatorFund (Foundry) — not a workspace
+e2e/          Playwright, on the mocks and against a real API
+docs/         architecture, schema, API reference, deploy, the build prompts and reference designs
+```
+
+**`packages/contracts` is the seam.** The API is built from it, the apps read it, and the apps
+never edit it. Every change is additive and goes in the changelog; what an app needs that isn't
+there goes in [`docs/contract-requests.md`](./docs/contract-requests.md).
+
+```mermaid
+flowchart TD
+  WEB["apps/web"] --> C(["packages/contracts"])
+  TV["apps/tv"] --> C
+  BIZ["apps/business"] --> C
+  API["apps/api"] --> C
+  WRK["apps/worker"] --> API
+  WEB -.-> UI(["packages/ui"])
+  TV -.-> UI
+  BIZ -.-> UI
+  WEB -.-> PLY(["packages/player"])
+  TV -.-> PLY
+  API --> DB(["packages/db"])
+```
+
+`domain` and `contracts` build to `dist/`, because the API and worker import their JavaScript at
+runtime. `ui` and `player` are source-only; Vite compiles them into each app.
+
+---
+
+## Branches and deploys
+
+| Branch | What it is | Deploys to |
+|---|---|---|
+| `dev` | day-to-day work | CI only |
+| `staging` | what's on staging | Railway `staging` and the Vercel apps |
+| `main` | production | Railway `production` (not live yet) |
+
+Work lands on `dev`, moves to `staging` by fast-forward or pull request, and reaches `main` only by
+pull request. Never force-push `staging` or `main`.
+
+| Target | Root | Host |
+|---|---|---|
+| The Opencast app | `apps/web` | Vercel — [opencast-web.vercel.app](https://opencast-web.vercel.app) |
+| Opencast for business | `apps/business` | Vercel — [opencast-business.vercel.app](https://opencast-business.vercel.app) |
+| TV mode | `apps/tv` | Vercel — [opencast-tv.vercel.app](https://opencast-tv.vercel.app) |
+| Site | `apps/site` | Vercel — [opencast-site.vercel.app](https://opencast-site.vercel.app) |
+| API, worker, Postgres, Redis | `apps/api`, `apps/worker` | Railway project `opencast` |
+| iPhone, Android, Android TV / Fire TV | `apps/web/ios`, `apps/web/android`, `apps/tv/android` | Capacitor 8; nothing submitted yet |
+
+Everything Railway runs is defined in [`.railway/railway.ts`](./.railway/railway.ts) and applied
+with `railway config plan`, then `railway config apply`. Secrets are set in Railway and never
+written in the repo. Variables, the cutover checklist and the costs are in
+[`docs/deploy.md`](./docs/deploy.md).
+
+---
+
+## Quickstart
+
+Requires **Node 22** (Vite 7 won't start on older), npm 10+, Docker, and `ffmpeg` / `ffprobe` on
+`PATH`.
 
 ```bash
 npm install
 cp .env.example .env
-npm run db:up
+npm run db:up        # Postgres on :54329, Redis on :63799
 npm run db:migrate
-npm run db:seed
+npm run db:seed      # markets (the Inland Empire's ZIP codes) and Opencast's network stations
 npm run dev
 ```
 
-`npm run dev` builds `domain` and `contracts`, then runs:
-- the API on http://localhost:8787
-- the worker
-- the Opencast app on http://localhost:5173 (the viewer at `/`, master control at `/control`, the desk at `/desk`), which proxies `/v1` to the API
+`npm run dev` runs the API on http://localhost:8787, the worker, and the Opencast app on
+http://localhost:5173: the viewer at `/`, master control at `/control`, Network desk at `/desk`.
 
-Postgres is required; there is no JSON fallback any more. The API and worker still keep their state in the old `opencast_state` table until each module moves onto the new schema (`docs/schema.md`) in platform Phase 4. `scripts/create-sample-media.sh` makes a 45 s program and a 12 s spot to upload.
+Every app also runs on **mock data** with no backend, answered by Mock Service Worker and checked
+against the contracts:
 
-Each app runs on its own with `npm run dev -w @opencast/<name>`. Ports against the API: web 5173, tv 5175, site 5176, business 5177. On mock data (`dev:mock`): web 5174, tv 5175, business 5181, site 5183.
+```bash
+npm run dev:mock -w @opencast/web        # http://localhost:5174
+npm run dev:mock -w @opencast/tv         # http://localhost:5175
+npm run dev:mock -w @opencast/business   # http://localhost:5181
+npm run dev:mock -w @opencast/site       # http://localhost:5183
+npm run mock:streams -w @opencast/player # the mock stations' HLS, once
+```
 
 | Script | Does |
 |---|---|
-| `npm run build` | Builds everything with Turborepo, dependencies first |
-| `npm run typecheck`, `npm run lint`, `npm test` | Every workspace. The db tests need `npm run db:up` |
+| `npm run build`, `typecheck`, `lint`, `test` | every workspace, through Turborepo |
 | `npm run db:up`, `db:down` | Postgres and Redis in Docker |
-| `npm run db:migrate`, `db:reset`, `db:generate` | Apply migrations; drop and re-apply (local only); write a migration after editing the schema |
-| `npm run db:migrate:legacy -- [files]` | One-time move from `opencast_state` and JSON files into the new tables |
-| `npm run build:service:{api,worker,web}` | One service and what it depends on (`turbo --filter=<pkg>...`) |
-| `npm run start:service:{api,worker,web}` | Starts one built service (web: the static build, `scripts/serve-static.mjs`) |
-| `npm run start:runtime` | API and worker in one process (single-service mode); the API also serves the web app's build (`WEB_DIST_DIR`, `./apps/web/dist` in `.env.example`) |
-| `npm run env:check` | Lists which variables are set |
+| `npm run db:migrate`, `db:reset`, `db:generate` | apply migrations; drop and re-apply (local only); write one after a schema edit |
+| `npm run docs:api` | regenerate [`docs/api.md`](./docs/api.md) from the contracts |
+| `npm run e2e:quick` | the mock Playwright flows, without the accessibility specs |
+| `npm run e2e:real` | Playwright against a real API and a throwaway database |
+| `npm run contracts:test` | the Foundry suite |
+| `npm run env:check` | which variables are set, and which are missing |
 
-### The gallery
-
-```bash
-npm run dev -w @opencast/gallery
-```
-
-http://localhost:5180 shows every component in `@opencast/ui` on the dark and light grounds side by side, each linked to the reference frame it comes from (served from `docs/reference` at `/reference/`). "Compare with the reference" puts a component next to its reference section.
-
-`npm run compare -w @opencast/gallery` checks the build against the references: it opens each pair of elements listed in `apps/gallery/scripts/pairs/*.json` in Chrome, on both grounds, and prints every computed style that differs. Add `-- <id or group>` for some, and `-- --shots` for side-by-side screenshots in `apps/gallery/compare-out/`. It uses the installed Chrome; nothing is downloaded.
-
-Apps import the design system's styles once, `import "@opencast/ui/styles.css"`, and take every colour, font, space and radius from its tokens (`packages/ui/src/tokens.css`). The rules every screen follows are in `docs/apps/rules.md`.
-
-### The player
-
-`@opencast/player` is one engine (`PlayerEngine`) with a React surface (`PlayerProvider`, `PlayerSurface`). Inputs (`keyboardInput`, `castInput`, `bridgeInput`, `mediaSessionInput`) all produce the same commands, so the TV's remote, the phone remote over Cast and the iPhone bridge drive it identically.
-
-For development it plays mock stations served as live HLS:
-
-```bash
-npm run mock:streams -w @opencast/player
-```
-
-That makes nine 60-second loops (CIVC, BEAT, REEL, SAZN and PREP on the TV band; NITE, HALL, CRAT and VOZE on radio) with captions, in `packages/player/.mock-streams/` (git-ignored; needs ffmpeg). The gallery serves them live at `/mock-hls/<station>/master.m3u8` (`mockLiveHls` from `@opencast/player/mock`), and its Player pages drive the real engine against them.
-
-### The Opencast app
-
-```bash
-npm run dev:mock -w @opencast/web
-```
-
-Runs the Opencast app at http://localhost:5174 against mock data (Mock Service Worker): the viewer at `/`, master control at `/control` and Network desk at `/desk`, as areas of one app with one sign-in. The mock stations play live, and the clock is held at Saturday 8:42:12 pm Pacific, as the reference frames are drawn (`?clock=<ISO time>` in the address starts it elsewhere, in mock mode only). `npm run dev -w @opencast/web` runs it on :5173 against the API instead: copy `apps/web/.env.example` to `.env.local` and set `VITE_API_BASE` and `VITE_PRIVY_APP_ID` (and `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` for master control's "Connect Clear").
-
-One mock world for the three areas. Sign in with any six digits except 000000; the email picks who you are:
-- `kai@example.com`, Kai M.: the viewer's reference person (six presets, reminders, two pledges, TVs), who also owns BEAT 12.1 and operates HALL 90.7 in master control;
-- `marcus@example.com` operates BEAT, `jen@example.com` hosts Beat Tape Live, `sam@example.com` runs the studio Inland Sound Lab;
-- `dee@opencast.example`, Dee A., is on the Opencast team, so Network desk opens for her;
-- any other address is someone new: the viewer asks their name, master control offers to start a station, the desk says it's for the team.
-
-The avatar's menu on the web viewer shows "Master control" to people with a station role and "Network desk" to admins; master control's header has "Back to watching". Each area loads only when someone opens it, so viewers never download master control or the desk. The mock remembers what you change in `localStorage` (keys starting `oc-mock-`); remove them to start again. Mock-only panels play the other side: under the desk's pipeline, a creator's sign-on and claim; in master control, a spot's pause.
-
-Every mock response is checked against the contract schemas, extended with the fields each area has asked for (`apps/web/src/<area>/api/ext*`, named by their ids in `docs/contract-requests.md`). Where two areas' mocks answer the same endpoint, `apps/web/src/mocks/overlaps.ts` answers it once.
-
-The creator's permission page is the viewer's `/permission/:token` (public, outside the phone shell). On the mock, `/permission/desert-skate-films-2026-0926` is unanswered, `/permission/desert-skate-films-said-yes` is after the yes, and the links the desk sends open there too; a creator's answer reaches the desk's pipeline.
-
-The iPhone and Android apps wrap the same build with Capacitor, so creators get master control on their phones too. They cast to Chromecast through the Cast SDK, mirror to AirPlay TVs with TV mode on the external display (iPhone), and show lock-screen controls. `npm run build:native -w @opencast/web -- ios` (or `android`) builds and syncs them. `docs/apps/native.md` has the toolchains, the env, and the demo steps.
-
-### Opencast for business
-
-```bash
-npm run dev:mock -w @opencast/business
-```
-
-Runs the business app at http://localhost:5181 on mock data, at the same Saturday evening as the Opencast app's mock. Sign in with any six digits except 000000; the email picks who you are: `jess@orangestreet.example` owns Orange Street Coffee, `tomas@orangestreet.example` manages it, `ana@ledgerline.example` is its bookkeeper (a viewer), `devon@inlandcreative.example` manages it and Cypress Dental, and any other address is someone new who starts a business. Mock-only panels (marked "Mock") play the station's side: approving a sponsorship, quoting and delivering an order, airing a spot until its budget is spent. The mock remembers what you change in `localStorage` (keys starting `oc-mock-spots-`).
-
-`npm run dev -w @opencast/business` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/business/.env.example`).
-
-### TV mode
-
-```bash
-npm run dev:mock -w @opencast/tv
-```
-
-Runs TV mode at http://localhost:5175 on mock data, at 1920×1080 like the frames, with the clock at Saturday 8:42 pm (`?clock=<ISO time>` starts it elsewhere, in mock mode only). The keyboard stands in for the remote: arrows, Enter for OK, Escape or Backspace for Back, PageUp and PageDown for CH, digits and the dot, ContextMenu for Menu (or hold Back), and hold Enter on a preset to replace it. The first launch shows the sign-in code; add `?approveCode=5` to have the mock approve it after five seconds (or call `__ocApproveTvCode()`), or choose "Watch without signing in". The TV remembers itself in `localStorage` (`oc-tv-device`: its `tvId` and device token from `registerTv`, its TV session once signed in, settings and presets). `__ocSignOutTvRemotely()` plays the account signing this TV out. Mock switches: `?offAir=CIVC`, `?standby=CIVC`, `?guideState=loading|error|empty`, `?codeTtl=<s>`, `?noMarket`.
-
-One build, three inputs, as the reference draws it:
-- **The TV app** (Android TV and Fire TV in Phase 8, TV browsers now): the remote's keys, through the player's `keyboardInput` "tv" profile.
-- **The Cast receiver**, `/receiver.html`: Google's Cast Application Framework on a Chromecast, with Opencast's namespace `urn:x-cast:org.useopencast.tv`. In mock mode a stand-in carries the same messages over a BroadcastChannel, and the viewer's phone remote reaches it through `/mock-cast-bridge.html` (served by the dev server in mock mode only). Open http://localhost:5174, tune in at phone width, choose the cast button and "Cast to Living room TV", and the remote drives the receiver in the other tab.
-- **Phones through the relay** (the TV app, where there's no Cast: Fire TV, Android TV): the API's `/tv/remote` Server-Sent Events carry the same commands and state. Phones signed in to the TV's account drive it directly; a guest's phone pairs with the 4-digit code in Settings, Remote and phones. In mock mode the relay rides the same bridge and channel as the Cast stand-in (the mock TV is "Den TV"; its first pair code is 4821).
-- **The iPhone's second screen**, `/?mirror&device=Kai's iPhone&market=inland-empire`: the Phase 8 Swift plugin loads this on the external display and passes the phone remote's commands over the bridge (`window.postMessage({ opencast: "command", command })`).
-
-`npm run dev -w @opencast/tv` runs it against the API (`VITE_API_BASE`, `VITE_VIEWER_URL` for the sign-in and pledge QR codes, `VITE_CAST_APP_ID`; see `apps/tv/.env.example`). The viewer needs `VITE_CAST_APP_ID` for its Cast sender (Chrome only on the web) and `VITE_TV_URL` for the mock bridge.
-
-### Why Turborepo
-
-Before, every app's `build` script rebuilt `shared` first, and the root repeated the same order by hand in `build`, each `build:service:*` and three `pre*` hooks. With nine apps and four packages that doubles. Turborepo's `dependsOn: ["^build"]` replaces all of it. npm workspaces still install everything.
-
-## The API
-
-`/v1` is the new API, built from `packages/contracts`: 183 endpoints in 13 modules, listed in `docs/api.md` (regenerate with `npm run docs:api`). How it's put together is in `docs/architecture.md`. The old `/api` routes stay for the old master control until the apps prompt replaces it.
-
-Sign-in is Privy, with Opencast's own Privy app (never Clear's): set `PRIVY_APP_ID` (and `PRIVY_VERIFICATION_KEY` if you have it). Without it, signed-in endpoints answer 401; public ones (the dial, guide, station pages, heartbeats) still work. To make someone an Opencast admin: `update accounts.users set is_admin = true where email = '…'`.
+---
 
 ## Playout
 
-The worker airs every station that's on air from its program log: `npm run dev` runs it. To see an evening end to end in about four and a half minutes (on the dev database, with the dev stack running):
+The worker (`apps/api/src/v1/modules/playout/engine/`, run by `apps/worker`) does three jobs, under
+a Redis leader lock so only one replica airs stations.
+
+```mermaid
+flowchart LR
+  subgraph Prepare["Prepare — once per file"]
+    F["Upload, rights confirmed"] --> T["FFmpeg: 4 s segments,<br/>levelled, faded edges"]
+    T --> S[("prepared/&lt;content ID&gt;/&lt;rendition&gt;/")]
+  end
+  subgraph Assemble["Assemble — continuously"]
+    LOG["Program log"] --> RS["Run sheet<br/><i>breaks, holds, fill</i>"]
+    RS --> PLS["Playlists<br/><i>discontinuities, date-times,<br/>DATERANGE tags</i>"]
+    PLS --> AR["As-run log<br/><i>what billing reads</i>"]
+  end
+  S --> PLS
+```
+
+- **The ladder.** TV: 1080p, 720p, 480p and 360p, plus audio-only. Radio band: AAC at 128 and
+  64 kbps. Spots, bumpers, station IDs and generated underwriting credits are prepared the same way.
+- **Breaks** come from the station's break rule and always contain a station ID. Each spot placed
+  makes a hold on the advertiser's balance; one without a hold is skipped for the next in rotation.
+- **Live blocks** point the playlist at Livepeer's segments for their hours, and back.
+- **Translators** relay a channel to YouTube, Twitch or any RTMP address. They're the one continuous
+  encode, only while on, and their egress is recorded.
+- **Readiness.** Every hour the worker checks the next 48 hours: an item not prepared an hour before
+  it airs warns the station and the desk, and airs the usual fill if it's still missing.
+- **Day templates and off air hours.** A station builds a day once and repeats it (every day,
+  weekdays, a given weekday, once). Days run 6:00 am to 6:00 am, and times snap to segment
+  boundaries.
+
+To see an evening end to end on the dev database:
 
 ```bash
 npm run demo:evening -w @opencast/worker
+npm run as-run -w @opencast/worker -- <stationId>
 ```
 
-It prints the station, when it starts, and an RTMP URL to push an encoder to for the live block. Afterwards, `npm run as-run -w @opencast/worker -- <stationId>` prints what aired.
+`curl localhost:8788/health` shows the worker's leader, stations on air, what's prepared or
+waiting, readiness and translators.
 
-In development the API and worker run the workspace packages from source (the `source` export condition, `tsx --conditions=source`), so an edit to `packages/db` or the API reloads the worker too. Built services (`npm start`, Railway) use `dist`.
+---
 
-The worker airs files from its cache (`storage/cache` locally, a volume on Railway), which it fills ahead of time from object storage. `curl localhost:8788/health` shows the cache's hit rate, bytes and misses.
+## Money
 
-## Storage
+Every cent goes through a double-entry ledger in the API (`apps/api/src/v1/modules/ledger`), in
+micro-dollars. Billing reads the as-run log, never the planned one.
 
-Files are stored once, by content ID, in object storage: R2 when its keys are set, `storage/objects` otherwise (served at `/objects` in development). IPFS is only for the Opencast catalog and a station's own "Export to IPFS". See [docs/architecture.md](docs/architecture.md#storage).
+```mermaid
+flowchart LR
+  B["Business balance"] -->|"hold, per airing"| H["Held"]
+  H -->|"aired (as-run)"| ST["Station earnings"]
+  H -->|"didn't air"| B
+  ST --> P["Payout"]
+  ST -->|"claimable station"| E["CreatorEscrow<br/><i>USDC, on-chain</i>"]
+  E -->|"claimed"| CR["Creator"]
+  E -->|"never claimed"| FUND["CreatorFund"]
+```
 
-## Environment
+- **Spots** are bought from a business's balance: a hold per placed airing, settled when it airs,
+  released when it doesn't. An airing that already has a hold always airs.
+- **Sponsorships** and **underwriting** are monthly; the credits are generated slates, never
+  uploads.
+- **Claimable stations** are ones Opencast sets up for a creator who hasn't joined. What they earn
+  goes to the escrow weekly and is paid out when the creator claims the station.
+- **Payments** run through a provider switch (`PAYMENTS_PROVIDER`): a fake on staging, Clear or
+  Stripe in production. A live Stripe key outside production is refused.
 
-`.env.example` at the root is read by the API and the worker. `apps/web/.env.example` lists the Opencast app's own (`VITE_API_BASE`, which you only need when the API is on another origin, Privy, Clear, Cast, TV mode). Per-service examples arrive with the Railway work (platform Phase 7).
+A worked week of every entry is in [`docs/phase-6-sample-week.md`](./docs/phase-6-sample-week.md),
+generated by a test.
 
-## Deploying
+---
 
-The services go into a **new** Railway project, with staging first, in platform Phase 7. The old project (`glistening-truth`) stays as it is and isn't used.
+## The apps
 
-Old names, for anyone looking at that project:
+| App | Who it's for | What's in it |
+|---|---|---|
+| **The Opencast app** (`apps/web`) | viewers and creators, one sign-in | The viewer at `/`: the dial, tuned in, the guide, station and program pages, search, the radio band, presets, pledges, You. Master control at `/control`: sign on, the Monitor, the log, live sources, the library, breaks, the spot and syndication markets, sponsors, audience, earnings, translators. Network desk at `/desk` for the Opencast team. A PWA; the phone apps wrap it |
+| **TV mode** (`apps/tv`) | the living room | Watching with the banner, number entry, the guide, presets, radio, first launch with a sign-in code, settings. The same build is the Cast receiver and the iPhone's second screen |
+| **Opencast for business** (`apps/business`) | advertisers and sponsors | The balance, spots and where they aired, codes at the counter, sponsorships, spots made to order |
+| **Site** (`apps/site`) | everyone else | The marketing site, the tuner and the waitlist |
 
-| Old | New |
+Screens are built from the reference designs in [`docs/reference/`](./docs/reference/), one folder
+per app. Copy is final; new words wait in [`docs/apps/new-copy.md`](./docs/apps/new-copy.md) and
+open questions in [`docs/apps/open-questions.md`](./docs/apps/open-questions.md).
+
+Sign-in is **Privy**, with Opencast's own Privy app (the API refuses to start with Clear's).
+
+---
+
+## The API (`apps/api`)
+
+Express, Postgres (Drizzle; rules enforced by triggers) and Redis. `/v1` is built from
+`packages/contracts`: 264 endpoints in 14 modules, listed in [`docs/api.md`](./docs/api.md). How
+it's put together — modules, roles, events, how money moves — is in
+[`docs/architecture.md`](./docs/architecture.md), and the schema in
+[`docs/schema.md`](./docs/schema.md).
+
+```text
+GET /health
+```
+
+Public reads (the dial, guide, station pages, heartbeats) need no sign-in. Everything else needs a
+Privy token and a role on the station, business or desk it touches.
+
+---
+
+## The escrow contracts (`contracts/`)
+
+`CreatorEscrow` holds a claimable station's earnings in USDC until its creator claims it.
+`CreatorFund` backs new stations and programs with what's never claimed. Both are UUPS proxies on
+OpenZeppelin 5, administered through a 7-day timelock that any verifier or steward can cancel.
+
+```bash
+npm run contracts:test
+```
+
+Deployment, roles and the upgrade path are in [`contracts/README.md`](./contracts/README.md).
+
+---
+
+## Tests and CI
+
+| Suite | Run |
 |---|---|
-| `@openchannel/web` | `@opencast/web` (by way of `@opencast/control`; master control is now its `/control`) |
-| `@openchannel/shared` | `@opencast/domain` |
-| `@openchannel/api` | `@opencast/api` |
-| `@openchannel/worker` | `@opencast/worker` |
-| `build:service:web`, `start:service:web` | the same names again (for a while `build:service:control`, `start:service:control`) |
+| Unit (every app and package) | `npm test`, or `npm test -w @opencast/<name>` |
+| API | `npm run test:suite -w @opencast/api` (needs `npm run db:up`); real-time relays: `test:realtime` |
+| Playwright on the mocks | `npm run e2e:quick` |
+| Playwright against a real API | `npm run e2e:real` |
+| Contracts | `npm run contracts:test` |
 
-## Docs
+GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) runs typecheck, builds, unit
+tests, the API suite and the mock Playwright flows on every push to `dev` and `staging`, and the
+real-API Playwright specs on pull requests. Production builds are checked for mock code. More in
+[`docs/apps/testing.md`](./docs/apps/testing.md).
 
-- `docs/api.md`: every endpoint, generated from the contracts
-- `docs/architecture.md`: services, modules, roles, and how money moves
-- `docs/audit.md`: what the repo did before the restructure
-- `docs/schema.md`: the schema, its constraints, and the migration from the old model
-- `docs/open-decisions.md`: what isn't decided yet, and its default
-- `docs/migration-report.md`: the last legacy migration run
-- `docs/technical-implementation-guide.md`: the MVP's design and cost notes (predates the reference designs)
-- `docs/contracts-changelog.md`: changes to published contracts
-- `docs/apps/`: the apps prompt's inventory of the reference designs, the rules for every screen, open questions, and copy waiting for review
-- `docs/contract-requests.md`: fields and endpoints the apps need from the contracts
+---
+
+## Documentation
+
+| | |
+|---|---|
+| Architecture | [`docs/architecture.md`](./docs/architecture.md) |
+| Schema | [`docs/schema.md`](./docs/schema.md) |
+| API reference | [`docs/api.md`](./docs/api.md) (generated) |
+| Contracts changelog · requests | [`docs/contracts-changelog.md`](./docs/contracts-changelog.md) · [`docs/contract-requests.md`](./docs/contract-requests.md) |
+| Deploying | [`docs/deploy.md`](./docs/deploy.md) |
+| Clear integration | [`docs/clear-integration.md`](./docs/clear-integration.md) |
+| The apps: inventory, rules, testing, native | [`docs/apps/`](./docs/apps/) |
+| Build prompts | [`docs/prompts/`](./docs/prompts/) — the platform prompt and the apps prompt |
+| Reference designs | [`docs/reference/`](./docs/reference/) |
+| Open decisions | [`docs/open-decisions.md`](./docs/open-decisions.md) |
+
+---
+
+## Security
+
+- Secrets live in Railway, Vercel and the ignored `.env`; never in the repo. Rotate anything that
+  has been pasted anywhere else
+- Signed-in endpoints check the Privy token and the caller's role on every request
+- Money only moves through the ledger, and billing reads only the as-run log
+- The escrow contracts are **unaudited**; don't deploy them to a real network before a review
+
+---
+
+## Contributing
+
+Focused pull requests against `dev`. Run the suites that cover what you touched, keep contract
+changes additive (and in the changelog), and update the docs when an interface or workflow moves.

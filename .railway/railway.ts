@@ -11,8 +11,8 @@ const REPO = "KyngKai909/untitled-project";
 
 export default defineRailway((ctx) => {
   const production = ctx.isEnvironment("production");
-  // Staging builds the monorepo branch until it merges; production builds main.
-  const source = github(REPO, { branch: production ? "main" : "monorepo" });
+  // Work happens on dev, staging builds the staging branch, and production builds main.
+  const source = github(REPO, { branch: production ? "main" : "staging" });
   const shared = ["packages/**", "package.json", "package-lock.json", "turbo.json", "tsconfig.base.json", "nixpacks.toml"];
   const build = (filter: string, watch: string[]) => ({ builder: "NIXPACKS" as const, buildCommand: `npx turbo run build --filter=${filter}...`, watchPatterns: [...watch, ...shared] });
   const restart = { restartPolicyType: "ON_FAILURE" as const, restartPolicyMaxRetries: 10 };
