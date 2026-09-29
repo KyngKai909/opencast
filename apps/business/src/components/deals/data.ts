@@ -50,10 +50,19 @@ const TOUCHES: EndpointDef[] = [
 /** A write, then a refresh of what it touches. */
 export function useWrite<E extends EndpointDef>(endpoint: E) {
   const qc = useQueryClient();
-  return useMutation({
+  const m = useMutation({
     mutationFn: (args: CallArgs) => call(endpoint, args),
     onSettled: () => Promise.all(TOUCHES.map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })))
   });
+  // A call's own onSuccess still runs when its component has gone: the refetch above can re-render
+  // the order into a state that unmounts the button, and React Query would drop the call's callbacks.
+  const mutate = (args: CallArgs, opts?: { onSuccess?: (out: unknown) => void; onError?: (e: Error) => void }) => {
+    m.mutateAsync(args).then(
+      (out) => opts?.onSuccess?.(out),
+      (e: Error) => opts?.onError?.(e)
+    );
+  };
+  return { ...m, mutate };
 }
 
 /** Refresh everything the area reads (after a write made outside useWrite). */
