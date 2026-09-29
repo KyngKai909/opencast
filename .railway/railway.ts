@@ -28,10 +28,11 @@ export default defineRailway((ctx) => {
   const alerts = { usage: { "80": {}, "95": {}, "100": {} } };
   const redisVolume = volume("redis-volume", { alerts, allowOnlineResize: true, region: "us-west2", sizeMB: 5_000 });
   const postgresVolume = volume("postgres-volume", { alerts, allowOnlineResize: true, region: "us-west2", sizeMB: 5_000 });
-  // The worker's file cache: the next 48 hours of every station's log. Production wants 100 GB
-  // (a Railway plan above Hobby, whose volumes stop at 5 GB); staging's library is small.
-  const cacheGB = production ? 100 : 5;
-  const workerCache = volume("worker-cache", { alerts, allowOnlineResize: true, region: "us-west2", sizeMB: cacheGB * 1_000 });
+  // The worker's scratch space: one preparation at a time (a 2-hour 1080p source and its
+  // renditions) and the translators. Prepared segments live in the bucket, not here. The volume
+  // keeps its old name (it was the file cache) so it's resized, not replaced.
+  const scratchGB = production ? 20 : 5;
+  const workerCache = volume("worker-cache", { alerts, allowOnlineResize: true, region: "us-west2", sizeMB: scratchGB * 1_000 });
   // Object storage by content ID. Production uses Cloudflare R2 (its keys preserved below);
   // staging uses a Railway bucket, S3-compatible, so it runs without a Cloudflare account.
   const media = production ? null : bucket("media", { region: "sjc" });
@@ -108,10 +109,10 @@ export default defineRailway((ctx) => {
       ...common,
       PORT: "8080",
       STORAGE_ROOT: "/data/storage",
-      WORKER_CACHE_DIR: "/data/cache",
-      // Most of the volume (the cache fills 90% of what it's given; HLS and proof frames use the rest).
-      WORKER_CACHE_GB: String(cacheGB - 0.5),
-      // Fresh data: no station is on the old queue model.
+      WORKER_SCRATCH_DIR: "/data/scratch",
+      // Items prepared at once; each FFmpeg pass wants about 2 vCPU.
+      PREPARE_CONCURRENCY: "1",
+      // Prepare once, then assemble (the old continuous encode only runs when this is "on").
       LEGACY_PLAYOUT: "off",
       // Only the worker sends transactions (the weekly escrow batch, the pool's fund share).
       SETTLEMENT_PRIVATE_KEY: secret()
