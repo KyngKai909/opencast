@@ -102,7 +102,9 @@ Add `apps/gallery`: every component in both grounds and every state, with the re
 
 One player used by the viewer app, TV mode and the Cast receiver:
 - HLS playback with hls.js (native on Safari). Tuning in joins live, mid-program. No scrub bar, except in the syndication market's station preview.
-- Channel changes keep the previous picture until the new one is ready. Pre-warm the neighbouring channels so up and down are fast.
+- Channel changes keep the previous picture until the new one is ready. Pre-warm the neighbouring channels (their playlists and first segment) so up and down are fast.
+- **The player draws the station's bug, lower thirds and on-screen codes and QR** as overlays, timed from `#EXT-X-DATERANGE` tags in the channel's playlist. They aren't in the picture: channels are assembled from segments prepared once, as the platform prompt describes. Place them inside the style guide's safe areas, exactly as the reference frames show them.
+- Handle `#EXT-X-DISCONTINUITY` between items and the switch into and out of live blocks without a visible glitch.
 - The banner on every change: ident, what's on, progress, what's next, clock and tally, for 5 seconds (a setting on TV).
 - Captions (with the size setting), background audio on phones, pause that holds for 30 minutes then offers Back to live.
 - A tuned-in heartbeat every 30 seconds with station and session, as the platform prompt specifies.
@@ -121,7 +123,7 @@ One player used by the viewer app, TV mode and the Cast receiver:
 
 ## Phase 3: `apps/web`, the viewer area (web and phone)
 
-From `viewer/`: the home and dial, tuned in, the guide, station preview, carried from, pledge, share, reminders, first visit and thin markets, sign-in, You, presets (with the replace dialog), managing a pledge, settings (eight sections), the station page, the program page, search (with "Tune to" for numbers) and the radio band.
+From `viewer/`: off air stations on the dial and in the guide with the time they're back, the home and dial, tuned in, the guide, station preview, carried from, pledge, share, reminders, first visit and thin markets, sign-in, You, presets (with the replace dialog), managing a pledge, settings (eight sections), the station page, the program page, search (with "Tune to" for numbers) and the radio band.
 
 - Number keys 1 to 6 tune presets from anywhere on the web; arrow keys change channel on the tuned-in page; `/` opens search.
 - Sign-in appears only when someone saves, reminds or pledges, and completes the action afterwards.
@@ -134,7 +136,7 @@ From `viewer/`: the home and dial, tuned in, the guide, station preview, carried
 
 From `control/`, plus the station halves of `business/opencast-sponsorships.html` and `business/opencast-production-orders.html`:
 - **Sign-on flow A1 to A5** and the Monitor, with the "From the market" suggestions.
-- **Program log** as a timeline with breaks and dead air.
+- **Program log** as a timeline with breaks, dead air, and scheduled off air hours (drawn differently from dead air, and never warned about), with "Repeat this day" (every Saturday, weekdays, every day, once) and the off air hours setting.
 - **Library:** item page and folders.
 - **Live sources** and going live from a browser and a phone, with stand by, countdown, lower thirds and the speaker list.
 - **Listings** with previews.

@@ -89,7 +89,7 @@ docs/
 Replace the single `opencast_state` JSON blob with a normalised Postgres schema. Use Drizzle ORM with SQL migrations checked in; if you have a strong reason to prefer Kysely plus `node-pg-migrate`, say so at the STOP. Use one database with these schemas:
 
 - `accounts`: users, sign-in identities, station memberships and roles (owner, operator), advertiser memberships, viewer presets (keys 1 to 6 and beyond), reminders, markets
-- `broadcast`: stations, channels, assets and folders, rights confirmations, program log entries, break rules, schedules, playout state, commands, translators, Livepeer config, live sources, as-run log
+- `broadcast`: stations, channels, assets and folders, rights confirmations, program log entries, day templates and their repeat rules (every day, weekdays, a given weekday, once), scheduled off air hours, break rules, schedules, playout state, commands, translators, Livepeer config, live sources, as-run log
 - `catalog`: carriage offers (per program: terms offered, rates, airings per episode, window, notice period), carriage agreements, approvals
 - `spots`: advertisers, spots, sponsorships (underwriting of a whole station or one program: flat monthly, approved by the station, with credit text), rate cards, targeting (distance, categories), budgets (total and optional daily cap), spot status (draft, listed, paused, ended), rotations and backup rotations, airings, on-screen codes and redemptions, production orders (a station or the house studio making a spot for a business)
 - `ledger`: accounts (including each advertiser's funded balance and a holds account), an append-only double-entry journal, holds against scheduled airings, payouts, statements
@@ -116,7 +116,7 @@ Write a one-time migration script that reads the existing `opencast_state` blob 
 
 **Storage.** IPFS through Pinata stops being the working store. It costs more per gigabyte than object storage, it charges for reads the worker makes every day, its files are public by default, and a takedown can't guarantee removal. Replace it with this:
 - **Object storage** on Cloudflare R2 (S3-compatible, no charge for reads), behind a `storage` interface so another S3-compatible provider can be swapped in. Every object is keyed by its content ID, computed in the IPFS CID format (CIDv1, raw, sha-256), so identical files are stored once however many stations air them, and any file can move to IPFS later without renaming.
-- **Classes:** the prepared file the worker airs in Standard; the original upload in Infrequent Access; preview renditions (low-bitrate HLS for the syndication market preview, the business review screen and the spot review queue) only for items offered in the market, in review, or in a production order. Delete preview renditions when they're no longer needed.
+- **Classes:** the prepared HLS segments every channel airs from (all renditions, see Phase 5) in Standard; the original upload in Infrequent Access. Previews in the syndication market, the business review screen and the spot review queue play the prepared segments directly, so no separate preview renditions are needed.
 - **Assets** point at content IDs, never at files. Deleting an asset removes the object only when no other asset, carriage agreement or claim still references that content ID.
 - **Takedowns** remove the content ID from every station's log, from the worker cache, and from storage once the claim resolves against it; until then the object is locked, not deleted, so it can come back.
 - **IPFS stays for two things only:** the Opencast catalog (public domain, published and pinned on purpose), and "Export to IPFS", a per-item action a station owner takes on its own original, with a warning that IPFS files are public and can't be taken back. Keep Pinata for those, behind the same `storage` interface.
@@ -158,26 +158,40 @@ Endpoints the designs need, at minimum:
 
 ## Phase 5: Playout
 
-Change the worker from a queue loop to a timeline:
+**Prepare once, then assemble.** Prerecorded material is never encoded live. Change the worker from a queue loop that encodes a continuous stream into two jobs:
+
+1. **Prepare, once per file.** When an item's rights are confirmed, transcode it into HLS segments at a fixed ladder (for TV: 1080p, 720p, 480p and 360p, with an audio-only rendition; for the radio band: AAC at 128 and 64 kbps), with aligned keyframes and a fixed segment length (4 seconds unless testing shows a reason to change), and store the segments in R2 under the item's content ID. Use Livepeer's transcode API or FFmpeg on the worker, whichever is cheaper per hour at the audit's volumes; report both at the STOP. Loudness is levelled and captions are generated here, once. Spots, bumpers, station IDs and generated underwriting credits are prepared the same way. Carried programs and catalog items are prepared once for every station that airs them.
+2. **Assemble, continuously.** Each channel's stream is a rolling HLS playlist per rendition, written by the worker, that points at prepared segments in the order the log says, with `#EXT-X-DISCONTINUITY` between items and `#EXT-X-PROGRAM-DATE-TIME` on every item. Writing playlists takes almost no CPU, so a channel costs a few dollars a month, not hundreds. Serve segments from R2 through its custom domain (check Cloudflare's terms for video at scale before launch) and playlists from the API with a short cache.
+
+The channel is on air 24 hours a day either way; only how the picture is made changes. The log is timed to the second but the stream changes item at segment boundaries, so programs, breaks and live blocks are scheduled on segment boundaries, and the log editor snaps to them.
+
+**Live blocks** are the only live encoding. A live source is ingested and transcoded by Livepeer for the block's hours only, to the same rendition ladder. During the block the channel's playlist points at Livepeer's live segments, then returns to prepared segments when the block ends. Verify at the STOP that the renditions line up so players switch cleanly.
+
+**The bug, lower thirds and on-screen codes** are drawn by the player as overlays, timed from `#EXT-X-DATERANGE` tags in the playlist, not burned into the picture. Anywhere the picture leaves Opencast's players (translators, proof frames), the worker composites them in.
+
+The timeline rules:
 - Read the program log as timed entries. Programs start at their times; breaks are generated from the station's break rule (after every program, every N minutes, or none) and always contain a station ID.
 - Fill each break from the station's rotation, within each spot's daily limit and any barter split: break time inside a carried program is divided between the airing station and the producer as the carriage agreement says.
 - Placing a spot in a break creates a hold on the advertiser's balance for that airing (Phase 6). If the hold can't be made, skip that spot, try the next in the rotation, then the station's backup rotation, then station ID and bumpers.
 - An airing that already has a hold always airs, even if the spot is paused afterwards. It's already paid for.
 - Open time with nothing in it airs the station ID and bumpers, never nothing.
 - Underwriting credits are generated, not uploaded. The worker renders each credit as a short slate (10 to 15 seconds) in the station's colour: "Inland Beat is made possible by", then each active sponsor's name and one line of their approved text, set in the style guide's typefaces. Once a month it also renders a members credit from every viewer who opted in to on-air credit when pledging. Credits regenerate automatically when sponsors or members change, and the break's underwriting slot plays the current one. Sponsor text is limited to who they are and where: no prices, offers or calls to action, which is the difference between underwriting and a spot.
-- Mark every break in the HLS output with SCTE-35 style cues (`#EXT-X-DATERANGE` with `SCTE35-OUT` and `SCTE35-IN`, or `EXT-X-CUE-OUT` and `EXT-X-CUE-IN`, whichever Livepeer passes through; test it). Translators set to "Station ID slate" swap the break for a slate on that destination only.
-- Live blocks switch to a live source (Livepeer RTMP ingest) at their start time and back at their end. A live source that isn't connected airs a slate.
-- Keep a rolling 24-hour dead-air check. Emit warnings at 30 and 12 minutes before a gap. If nobody acts, fill the gap by repeating from the library and record that it happened.
-- Write an as-run entry for every item that actually airs, with real start and end times. Billing reads the as-run log, never the planned log.
-- Pre-warm the neighbouring stations' streams where the architecture allows, so channel changes in the viewer apps are fast. If this belongs in the player instead, say so.
+- Mark every break in the playlists with SCTE-35 style cues (`#EXT-X-DATERANGE` with `SCTE35-OUT` and `SCTE35-IN`). They're written by the worker, so nothing has to pass them through.
+- **Translators** (relays to YouTube, Twitch or any RTMP destination) are the one place a continuous encode is needed. Only while a translator is on, the worker reads the channel's own playlist, composites the bug, swaps breaks for the station ID slate where the station chose that, and pushes the result over RTMP. Stream-copy wherever no compositing is needed. Report each translator's egress in gigabytes, because relaying a full channel around the clock is the largest per-station cost.
+- Live blocks switch the playlist to the live source at their start time and back at their end. A live source that isn't connected airs a prepared slate.
+- **Off air is a choice; dead air is a mistake.** A station can schedule off air hours (a standing rule like "every night 2:00 to 6:00 am", or a one-off sign-off entry in the log). During them the channel's playlist ends with `#EXT-X-ENDLIST` after a sign-off slate, the guide and dial show the station as off air with the time it's back, heartbeats stop, and no warning or auto-fill applies. At sign-on the playlist starts again from the station ID.
+- **Day templates.** A station builds a day once and repeats it: every day, weekdays, a given weekday, or once. The log for each future date is generated from its template; editing one date changes only that date, and editing the template changes every future date that hasn't been edited.
+- Keep a rolling 24-hour dead-air check for everything else: any unplanned gap outside off air hours. Emit warnings at 30 and 12 minutes before a gap. If nobody acts, fill the gap by repeating from the library and record that it happened.
+- Write an as-run entry for every item as its segments are published to the playlist, with the program date-times it aired at. Billing reads the as-run log, never the planned log. Proof frames are extracted from the segment that was published during each spot, with the station's bug composited on.
+- Neighbouring channels are cheap to pre-warm, since they're just playlists: the player fetches the next and previous channels' playlists and first segment so channel changes are fast.
 
 Tuned-in counting: viewers' players send a heartbeat every 30 seconds with station and session. Store per-station per-minute concurrency in `audience`. Drop sessions that behave like bots (no media progress, impossible rates) before they count. Billing per thousand tuned in reads these numbers.
 
 Keep the Redis leader lock for worker replicas.
 
-**Worker cache.** The worker keeps a local cache on a Railway volume. Every hour it reads the next 48 hours of every station's log and fetches any content ID it doesn't already have, earliest airtime first, evicting what airs furthest in the future (or never) when space runs short. An item that isn't cached by an hour before it airs raises a warning to the station and Network desk. Nothing at air time ever waits on a download; if a file is somehow missing, the log's usual fill airs instead and the gap is reported. Expose cache hit rate, bytes cached and misses in the health endpoint.
+**Readiness check.** Every hour, check the next 48 hours of every station's log: every item must have its prepared segments in storage, in every rendition. An item that isn't ready an hour before it airs raises a warning to the station and Network desk, and the log's usual fill airs in its place if it's still missing at air time. Expose items prepared, items waiting and preparation time in the health endpoint. The worker only needs a small volume, for preparation scratch space and for translators.
 
-**STOP.** Show a station's evening running end to end locally: programs, a carried program with a barter break, a live block, a dead-air auto-fill, and the as-run log it produced.
+**STOP.** Show a station's evening running end to end locally: programs, a carried program with a barter break, a live block through Livepeer switching in and out cleanly, a dead-air auto-fill, one translator relaying, and the as-run log it produced. Report the cost per channel per month for a TV channel and a radio-band channel, split into preparation, assembly, storage, live hours and translators.
 
 ## Phase 6: Money
 
@@ -245,7 +259,7 @@ Services, each its own Railway service:
 - `api`, `worker`
 - `web` (the Opencast app: viewer, master control and Network desk; the desk's admin-only access is enforced by the API's role checks, not by a separate deploy), `business` (Opencast for business), `site` (marketing, static), `tv` (the TV build and the Chromecast receiver, static)
 - Postgres and Redis as Railway plugins
-- a Railway volume for the worker's cache, sized from the audit (start at 100 GB), and R2 credentials as variables on `api` and `worker` only
+- a small Railway volume for the worker (preparation scratch space and translators, start at 20 GB), and R2 credentials as variables on `api` and `worker` only
 
 For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: the root for `site`, `app.` for `web`, `business.`, `tv.` (the Cast receiver's registered URL) and `api.`, on whatever domain is chosen.
 

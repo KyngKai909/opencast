@@ -765,8 +765,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 
   <div class="step-h"><span class="mono">A3</span><h3>Program log</h3></div>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app mc" data-setup="3">
+    <div class="fit" data-w="1280" data-h="960"><div class="scaler">
+      <div class="app mc" data-setup="3" style="height:960px">
         <div class="mc-title"><div><h2>Program log</h2><p>What airs, in order. Build one day and repeat it, then adjust.</p></div><div class="end"><div class="seg"><button aria-pressed="false">Day</button><button aria-pressed="true">Evening</button><button aria-pressed="false">Week</button></div></div></div>
         <div class="days"><button>Mon</button><button>Tue</button><button>Wed</button><button>Thu</button><button>Fri</button><button class="on">Sat</button><button>Sun</button></div>
         <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
@@ -789,7 +789,13 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
               <div><span>Open time goes to</span><span>The spot market</span></div>
             </div>
             <h4 style="margin-top:22px">Repeat this day</h4>
-            <div class="seg"><button aria-pressed="true">Every Saturday</button><button aria-pressed="false">Every day</button><button aria-pressed="false">Once</button></div>
+            <div class="seg"><button aria-pressed="true">Every Saturday</button><button aria-pressed="false">Weekdays</button><button aria-pressed="false">Every day</button><button aria-pressed="false">Once</button></div>
+            <h4 style="margin-top:22px">Off air hours</h4>
+            <div class="kv" style="margin-top:0">
+              <div><span>Sign off</span><span>Every night, 2:00 am</span></div>
+              <div><span>Sign back on</span><span>6:00 am</span></div>
+            </div>
+            <p class="m-note" style="margin-top:6px">Planned off air hours aren't dead air: no warnings, nothing fills them, and viewers see when you're back.</p>
           </div>
         </div>
         <div class="mc-foot"><span class="quiet" style="font-size:13.5px">Programs are placed in whole minutes; breaks are placed for you.</span><div class="end"><button class="btn btn-ghost">Back</button><button class="btn btn-primary">Continue to translators</button></div></div>
@@ -799,6 +805,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       <div class="note"><h3>A timeline, not a playlist</h3><p>The repo's queue becomes the day it will actually be. Each program has a start time, breaks are drawn where they'll fall, and a gap is drawn as dead air.</p></div>
       <div class="note"><h3>Breaks come from a rule</h3><p>The repo's three break modes, in plain words. The station sets the rule once; the log places each break and puts a station ID in it.</p></div>
       <div class="note"><h3>Three ways to fill a gap</h3><p>Repeat your own programs, carry someone else's, or sign off. All three are fine; dead air is the only wrong answer.</p></div>
+      <div class="note"><h3>Off air is a choice, dead air is a mistake</h3><p>A station can sign off on a schedule, like every night from 2:00 to 6:00 am. Those hours are off air: the guide shows them, viewers see when the station is back, and nothing warns or fills. Dead air is only an unplanned gap.</p></div>
+      <div class="note"><h3>Build a day once</h3><p>"Repeat this day" makes the day a template: every Saturday, weekdays or every day. Changing one date changes only that date; changing the template changes every future repeat.</p></div>
       <div class="note"><h3>Live shows are blocks too</h3><p>Beat Tape Live at 9:00 is a block with an ingest source instead of a file. Master control switches to it at 9:00 and back when it ends.</p></div>
     </div>
   </div>
