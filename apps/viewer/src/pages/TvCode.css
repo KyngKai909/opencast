@@ -1,0 +1,5 @@
+/* /tv: approve a TV's code (the same words as You's "Add a TV"). */
+.vw-tvc { display: grid; gap: 16px; justify-items: start; max-width: 440px; padding: 8px 0 24px; }
+.vw-tvc > .oc-field, .vw-tvc > .oc-btn--block { width: 100%; }
+.vw-tvc__h { margin: 0; font: 800 30px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.vw-tvc__lede { margin: 0; font-size: 15px; color: var(--ink-70); }

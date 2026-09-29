@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { accountsApi, stationsApi } from "@opencast/contracts";
 import { DialX, type DialRowX } from "../api/ext";
 import { useApi } from "../api/hooks";
+import { now } from "../lib/clock";
 import { useDevice } from "./device";
 
 /** Until the TV knows its market (S10: from the connection), the Inland Empire in mock mode. */
@@ -26,7 +27,16 @@ export function useMarketSlug(): string {
 
 export function useDial(band: "tv" | "radio") {
   const slug = useMarketSlug();
-  return useApi(stationsApi.getDial, { params: { marketSlug: slug }, query: { band } }, { schema: DialX, refetchInterval: 60_000 });
+  return useApi(stationsApi.getDial, { params: { marketSlug: slug }, query: { band } }, { schema: DialX, refetchInterval: (q) => nextRefresh(q.state.data?.rows ?? [], now().getTime()) });
+}
+
+/**
+ * When to read the dial again: a second after the first program on it ends (so the banner never
+ * shows a program that's over), and at least every minute.
+ */
+export function nextRefresh(rows: Array<{ now?: { endsAt?: string | null } | null }>, at: number): number {
+  const ends = rows.map((r) => Date.parse(r.now?.endsAt ?? "")).filter((t) => t > at);
+  return Math.max(1_000, Math.min(60_000, (ends.length ? Math.min(...ends) : Infinity) - at + 1_000));
 }
 
 /** Every station on both bands, in channel order: what the player tunes. */

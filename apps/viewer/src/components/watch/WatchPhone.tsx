@@ -14,8 +14,14 @@ import { Picture } from "./Picture";
 import { Actions, NowTitle, SharedAiring, Tonight } from "./parts";
 import { callSignOf, bandHint, neighbourOf } from "./logic";
 import { useOverlayParams } from "./overlay";
+import { WatchOnSheet } from "../remote/WatchOnSheet";
+import { useCastSession } from "../../cast/session";
+import { watchOnOffered } from "../../cast/useCast";
 
-/** The full player's own top bar: minimise, the hint, share. Reads the player itself (the shell renders it). */
+/**
+ * The full player's own top bar: minimise, the hint, the cast button (tv 06.2: "Watch on", lit while
+ * a TV plays) where this build can cast or mirror, share. Reads the player itself (the shell renders it).
+ */
 export function WatchTop() {
   const [s] = usePlayer();
   const channels = useChannels();
@@ -23,10 +29,15 @@ export function WatchTop() {
   const { open } = useOverlayParams();
   const row = channels.find((c) => c.station.id === (s.pendingId ?? s.currentId));
   const radio = row?.station.band === "radio";
+  const cast = useCastSession();
+  const onTv = cast.status === "casting" || cast.status === "mirroring";
   return (
     <header className="oc-viewer-phone__top vw-wph__top">
       <IconButton icon="down" label="Minimise player" bare onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/"))} />
       <span className="vw-wph__topline">{radio ? "Radio band" : "Swipe the picture to change channel"}</span>
+      {watchOnOffered() && (
+        <IconButton icon="cast" label={onTv ? `Watching on ${cast.target.name}` : "Cast"} bare aria-pressed={onTv} className={onTv ? "vw-wph__cast vw-wph__cast--on" : "vw-wph__cast"} onClick={() => open({ sheet: "watch-on" })} />
+      )}
       <IconButton
         icon="share"
         label="Share"
@@ -34,6 +45,7 @@ export function WatchTop() {
         disabled={!row}
         onClick={() => row && open({ modal: "share", station: callSignOf(row.station), ...(row.now?.logEntryId ? { airing: row.now.logEntryId } : {}) }, ["airing"])}
       />
+      <WatchOnSheet />
     </header>
   );
 }

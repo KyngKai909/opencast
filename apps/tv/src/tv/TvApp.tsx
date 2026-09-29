@@ -149,6 +149,14 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   useEffect(() => {
     if (state.currentId && state.currentId !== getDevice().lastStationId) setDevice({ lastStationId: state.currentId });
   }, [state.currentId]);
+  // The dial changed under the picture (another market): what's on isn't on this dial, so tune
+  // its first station, or stop when the new market has none.
+  useEffect(() => {
+    if (!started.current || !state.currentId || !channels.length) return;
+    if (channels.some((c) => c.station.id === state.currentId)) return;
+    const first = channels.find((c) => c.station.band === "tv") ?? channels[0];
+    void engine.tune(first.station.id, { input: "app" });
+  }, [channels, engine, state.currentId]);
 
   // First launch on the TV app: sign in on your phone, or watch without signing in.
   useEffect(() => {

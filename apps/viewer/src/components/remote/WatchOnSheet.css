@@ -1,0 +1,21 @@
+/* Watch on (tv 06.2: .dev-list .opt, .opt .ic, .m-note). The rows are ChoiceList's; the device's
+   icon leads and the radio sits at the end, as drawn. */
+.vw-wo .oc-modal__head { padding-top: 6px; }
+.vw-wo__list.oc-choices--option { border-top: 0; }
+.vw-wo__list .oc-choice__end { order: -1; margin-left: 0; }
+.vw-wo__list .oc-choice__rad { order: 3; margin-left: auto; }
+.vw-wo__ic { width: 36px; height: 36px; border-radius: var(--r-control); background: var(--raised); display: grid; place-items: center; flex: none; color: var(--ink); }
+.vw-wo__ic .oc-i { width: 20px; height: 16px; }
+.vw-wo__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.vw-wo__none { font-size: 14px; color: var(--ink-70); margin: 0 0 4px; padding-bottom: 12px; border-bottom: 1px solid var(--hair); }
+.vw-wo__error { font-size: 13px; color: var(--standby); margin: 12px 0 0; }
+.vw-wo__how { margin-top: 8px; padding-left: 0; }
+
+/* Looking for TVs: quiet rows the height of a device row. */
+.vw-wo__quiet { display: grid; }
+.vw-wo__quiet i { height: 61px; border-bottom: 1px solid var(--hair); background: linear-gradient(90deg, var(--raised) 0 36px, transparent 36px 48px, var(--raised) 48px 55%, transparent 55%); background-size: 100% 16px; background-repeat: no-repeat; background-position: 0 50%; opacity: .6; }
+
+/* The cast button in the full player's top bar: signal while a TV plays. */
+.vw-wph__cast--on { color: var(--signal); }
+/* With the cast button beside share, the hint keeps to one line at 390. */
+.vw-wph__top:has(.vw-wph__cast) { gap: 4px; }
