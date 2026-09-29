@@ -8,7 +8,8 @@ import { now } from "../../../lib/clock";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, profileOf, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { meHandler, meView } from "../../../mocks/me";
-import { AIRINGS, airingById } from "../fixtures/schedule";
+import { AIRINGS, airingById, nowNext } from "../fixtures/schedule";
+import { syncStreamSignOff } from "../fixtures/signoff";
 import { STATIONS, stationById, uid } from "../fixtures/stations";
 import { channelsFor, nextChargeFor, receiptsFor } from "../fixtures/you";
 import { fail, needsUser, path, personOf, reply } from "../respond";
@@ -345,7 +346,12 @@ export const meHandlers = [
   http.post(path(audienceApi.heartbeat), async ({ request }) => {
     const p = personOf(request);
     const body = (await request.json().catch(() => null)) as { stationId?: string; playing?: boolean } | null;
-    if (p && body?.stationId && body.playing && profileOf(p).settings.privacy?.keepWatchHistory !== false) recordWatching(body.stationId, now());
+    // During the station's planned off air (G9) the beat isn't counted or kept, and says when it's back.
+    await syncStreamSignOff();
+    const t = now();
+    const off = body?.stationId ? nowNext(body.stationId, t).now : null;
+    if (off?.offAir) return reply(audienceApi.heartbeat.response, { ok: true, nextInMs: Math.max(1000, Date.parse(off.end) - t.getTime()), offAirUntil: off.end });
+    if (p && body?.stationId && body.playing && profileOf(p).settings.privacy?.keepWatchHistory !== false) recordWatching(body.stationId, t);
     return reply(audienceApi.heartbeat.response, { ok: true, nextInMs: 30_000 });
   })
 ];

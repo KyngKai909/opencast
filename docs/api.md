@@ -107,7 +107,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
-| `getLog` | GET | `/stations/:stationId/log` | signed in | The program log for a window (day, evening or week), with generated breaks and dead air |
+| `getLog` | GET | `/stations/:stationId/log` | signed in | The program log for a window (day, evening or week), with generated breaks and dead air, and (G11) the day template that made each broadcast day in it |
 | `addEntry` | POST | `/stations/:stationId/log` | signed in | Put something on the log. Items need confirmed rights; another station's program needs a carriage agreement. |
 | `updateEntry` | PATCH | `/stations/:stationId/log/:entryId` | signed in | Move or change an entry |
 | `removeEntry` | DELETE | `/stations/:stationId/log/:entryId` | signed in | Take an entry off the log |
@@ -116,9 +116,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getDeadAir` | GET | `/stations/:stationId/dead-air` | signed in | Gaps in the next 24 hours and warnings sent |
 | `listTemplates` | GET | `/stations/:stationId/log/templates` | signed in | Day templates still repeating (owner, operator) |
 | `getTemplate` | GET | `/stations/:stationId/log/templates/:templateId` | signed in | One day template, with the dates generated from it (owner, operator) |
-| `createTemplate` | POST | `/stations/:stationId/log/templates` | signed in | Repeat this day: make a day template from `fromDay`'s log and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there. |
+| `createTemplate` | POST | `/stations/:stationId/log/templates` | signed in | Repeat this day: make a day template from `fromDay`'s log, its broadcast day from 6:00 am to 6:00 am, and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there. |
 | `updateTemplate` | PATCH | `/stations/:stationId/log/templates/:templateId` | signed in | Change a day template (owner, operator): its entries (`entries` replaces them; `fromDay` takes them from that day's log again), when it repeats, or its name. Every future date made from it that nobody edited is made again; edited dates stay as they are. |
-| `removeTemplate` | DELETE | `/stations/:stationId/log/templates/:templateId` | signed in | Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the log from now on. |
+| `removeTemplate` | DELETE | `/stations/:stationId/log/templates/:templateId` | signed in | Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the dates ahead that weren't edited, which another template may take; edited dates stay as they are. |
 | `getOffAirHours` | GET | `/stations/:stationId/off-air-hours` | signed in | The station's off air hours, in its market's time zone (owner, operator) |
 | `setOffAirHours` | PUT | `/stations/:stationId/off-air-hours` | signed in | Set the off air hours (owner, operator): replaces every rule; an empty list means none. A program or live block on the log inside them still airs (the hours cover what's otherwise empty). 400 when a rule signs off and back at the same time. |
 | `removeRepeat` | DELETE | `/stations/:stationId/log/repeats/:repeatId` | signed in | G7: take a repeat's entries off the log from now on (owner, operator). What already aired stays in the as-run log. |

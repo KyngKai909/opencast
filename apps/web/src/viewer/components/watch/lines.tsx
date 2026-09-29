@@ -2,9 +2,19 @@
 // 24.1", "Beat showcase", "Live, from the Redlands studio" (Live in red text, never the tally).
 
 import type { ReactNode } from "react";
-import { LiveText } from "@opencast/ui";
+import { LiveText, clock } from "@opencast/ui";
 import type { AiringX } from "../../api/ext";
-import { identText, liveRest } from "./logic";
+import { MARKET_TZ } from "../../../lib/clock";
+import { identText, isOffAir, liveRest } from "./logic";
+
+/** Planned off air's line (G9): "Signs on at 6:00 am", the time in mono. */
+export function BackAt({ at, timeZone = MARKET_TZ }: { at: string; timeZone?: string }) {
+  return (
+    <>
+      Signs on at <span className="oc-mono">{clock(at, { timeZone })}</span>
+    </>
+  );
+}
 
 /** "Carried from REEL 24.1", or null for the station's own program. */
 export function carriedText(a: Pick<AiringX, "carriedFrom">): string | null {
@@ -13,6 +23,7 @@ export function carriedText(a: Pick<AiringX, "carriedFrom">): string | null {
 
 /** A schedule row's line: where it's carried from, or its note, with Live set in red. */
 export function scheduleLine(a: AiringX): ReactNode {
+  if (isOffAir(a)) return <BackAt at={a.backAt ?? a.endsAt} />;
   const carried = carriedText(a);
   if (carried) return carried;
   const { live, rest } = liveRest(a.note);

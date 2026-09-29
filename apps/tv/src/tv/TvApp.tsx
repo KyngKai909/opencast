@@ -202,8 +202,8 @@ export function TvLayout() {
   // After a week on this TV the key hints hide; the casting and mirroring chips never do.
   const hidden = mode === "tv" && keyHintsHidden(readFirstUse(), now().getTime());
   const hints = loc.pathname === "/" ? visibleHints(adapters.flatMap((a) => a.hints?.() ?? []), hidden) : [];
-  // The guide shows the picture small in its window: no station graphics there.
-  const graphics = !loc.pathname.startsWith("/guide");
+  // The guide shows the picture small in its window: the bug alone there, small, as tv 03.1 draws it.
+  const graphics = loc.pathname.startsWith("/guide") ? "bug" : true;
   return (
     <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} overlays={graphics} />}>
       <Outlet />

@@ -1,6 +1,7 @@
 // A.6 Ready to sign on, setup step 5: the checks, each with its fix beside it, and the unlit
 // tally above the ink Sign on button, so signing on is the tally lighting in the same place.
 // The first sign-on fixes the call sign and channel, then master control opens the Monitor.
+// Planned off air in the next 24 hours shows as a line of its own (`off_air_hours`), never a warning.
 
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -10,7 +11,7 @@ import { Button, Checks, ControlTitle, Modal, Notice, Tally, clock, type Check }
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { LOG_READS, useLog, useSignOnChecks } from "../../components/onair/data";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
-import { signOnSummary } from "../../components/onair/signOn";
+import { isInformational, signOnSummary } from "../../components/onair/signOn";
 import { STATION_TZ, now } from "../../../lib/clock";
 import { Quiet } from "../common";
 import "./SetupSignOn.css";
@@ -65,7 +66,12 @@ export default function SetupSignOn() {
         return null;
     }
   };
-  const items: Check[] = list.map((c) => ({ state: c.passed ? "fine" : "attention", title: c.label, detail: c.detail ?? undefined, action: c.passed && c.key !== "output" ? undefined : fix(c.key, c.watchUrl) }));
+  // Off air hours planned (G9) only informs: it's fine as it is, with nothing to fix.
+  const items: Check[] = list.map((c) =>
+    isInformational(c)
+      ? { state: "fine", title: c.label, detail: c.detail ?? undefined }
+      : { state: c.passed ? "fine" : "attention", title: c.label, detail: c.detail ?? undefined, action: c.passed && c.key !== "output" ? undefined : fix(c.key, c.watchUrl) }
+  );
 
   // What goes out first: the program on at sign-on, or the next one.
   const t = now().getTime();

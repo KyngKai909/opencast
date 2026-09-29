@@ -11,11 +11,13 @@ import { onairHandlers } from "./onair";
 import { spotsHandlers } from "./spots";
 import { stationHandlers } from "./station";
 import { stationsHandlers } from "./stations";
+import { templateHandlers } from "./templates";
 
 export const handlers = [
   ...accountsHandlers,
   ...stationsHandlers,
   ...onairHandlers,
+  ...templateHandlers,
   ...logHandlers,
   ...liveHandlers,
   ...libraryHandlers,

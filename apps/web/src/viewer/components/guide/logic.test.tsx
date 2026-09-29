@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { render } from "@testing-library/react";
 import type { GuideX } from "../../api/ext";
 import { GUIDE_PHONE_SPAN_MS, findListing, gridRows, guideDate, guideHeading, guideWindow, listingActions, stepWindow } from "./logic";
 
@@ -91,6 +92,15 @@ describe("the grid's rows", () => {
     const rows = gridRows(guide);
     expect(rows[0]!.programs[0]).toMatchObject({ id: "e1", carriedFrom: "REEL", listed: false });
     expect(rows[1]!.programs[0]).toMatchObject({ id: "l1", listed: true });
+  });
+  it("draws planned off air (G9) as Off air, signing on at its back time, in mono", () => {
+    const off = { ...guide, rows: [{ ...guide.rows[0]!, airings: [{ ...guide.rows[0]!.airings[0]!, logEntryId: "o1", title: "Off air", code: "OPEN", kind: "off_air", carriedFrom: null, startsAt: pt(23).toISOString(), endsAt: pt(6, 0, 1).toISOString(), backAt: pt(6, 0, 1).toISOString() }] }] } as unknown as GuideX;
+    const cell = gridRows(off, null, TZ)[0]!.programs[0]!;
+    expect(cell).toMatchObject({ id: "o1", title: "Off air" });
+    expect(cell.live).toBeUndefined();
+    const { container } = render(<>{cell.detail}</>);
+    expect(container.textContent).toBe("Signs on at 6:00 am");
+    expect(container.querySelector(".oc-mono")?.textContent).toBe("6:00 am");
   });
   it("keeps only presets when asked", () => {
     expect(gridRows(guide, new Set(["d"])).map((r) => r.callSign)).toEqual(["RDLS"]);

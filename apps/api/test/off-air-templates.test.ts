@@ -116,11 +116,16 @@ describe("day templates", () => {
     const list = await kai.get(`/v1/stations/${beat}/log/templates`).expect(200);
     expect(list.body.templates.map((t: { label: string }) => t.label)).toEqual(["Every Saturday", "Weekdays", "Every day"]);
 
-    // Stop the Saturday template: its entries come off from now on, and every day takes Saturdays.
+    // Stop the Saturday template: its entries come off the dates ahead that weren't edited, and
+    // every day takes those Saturdays. November 7 was edited: it stays as it is (A132).
     const removed = await kai.delete(`/v1/stations/${beat}/log/templates/${saturday}`).expect(200);
-    expect(removed.body).toEqual({ removed: 4 });
-    const nov7 = await logOf(beat, "2026-11-07T08:00:00.000Z", "2026-11-08T08:00:00.000Z");
-    expect(nov7.entries.map((e: { startsAt: string; repeatGroupId: string }) => [e.startsAt, e.repeatGroupId])).toEqual([["2026-11-07T15:00:00.000Z", daily.body.template.id]]);
+    expect(removed.body).toEqual({ removed: 2 });
+    const pairs = (log: { entries: Array<{ startsAt: string; repeatGroupId: string }> }) => log.entries.map((e) => [e.startsAt, e.repeatGroupId]);
+    expect(pairs(await logOf(beat, "2026-11-07T08:00:00.000Z", "2026-11-08T08:00:00.000Z"))).toEqual([
+      ["2026-11-07T17:00:00.000Z", saturday],
+      ["2026-11-08T05:00:00.000Z", saturday]
+    ]);
+    expect(pairs(await logOf(beat, "2026-11-14T08:00:00.000Z", "2026-11-15T08:00:00.000Z"))).toEqual([["2026-11-14T15:00:00.000Z", daily.body.template.id]]);
     await kai.get(`/v1/stations/${beat}/log/templates/${saturday}`).expect(404);
   });
 
@@ -295,5 +300,148 @@ describe("off air hours", () => {
     expect(set.body.next).toMatchObject({ source: "sign_off", startsAt: "2026-10-28T08:30:00.000Z", backAt: "2026-10-28T09:00:00.000Z" });
     const none = await kai.put(`/v1/stations/${reel}/off-air-hours`, { rules: [] }).expect(200);
     expect(none.body).toMatchObject({ rules: [], next: expect.objectContaining({ source: "sign_off" }) });
+  });
+});
+
+describe("day templates on the broadcast day (G10, G11, A132)", () => {
+  // Tuesday, October 13, 2026, noon in Los Angeles (PDT). Clocks fall back on Sunday, November 1.
+  const TUESDAY_NOON = "2026-10-13T19:00:00.000Z";
+  let wave: string;
+  let tide: string;
+  let crate: { id: string };
+  let after: { id: string };
+  let dawn: { id: string };
+  let friday: { id: string };
+  let news: { id: string };
+  let owl: { id: string };
+  let saturday: string;
+  let weekdays: string;
+  let daily: string;
+
+  const add = (stationId: string, startsAt: string, itemId: string) => kai.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt, itemId }).expect(201);
+  const rowsOf = async (groupId: string) =>
+    (await h.db.select().from(schema.logEntries).where(eq(schema.logEntries.repeatGroupId, groupId)).orderBy(asc(schema.logEntries.startsAt))).map((r) => [r.startsAt.toISOString(), r.templateDate]);
+
+  beforeAll(async () => {
+    h.clock.set(TUESDAY_NOON);
+    const [m] = await h.db.select().from(schema.markets).where(eq(schema.markets.slug, "inland-empire"));
+    wave = (await stationFixture(h, { callSign: "WAVE", name: "Wave", ownerId: kai.id, marketId: m.id, tenths: 311, signedOn: true })).id;
+    tide = (await stationFixture(h, { callSign: "TIDE", name: "Tide", ownerId: kai.id, marketId: m.id, tenths: 312, signedOn: true })).id;
+    crate = await itemFixture(h, wave, { title: "Crate Night" });
+    after = await itemFixture(h, wave, { title: "After Hours" });
+    dawn = await itemFixture(h, wave, { title: "Dawn Set" });
+    friday = await itemFixture(h, wave, { title: "Friday Late" });
+    news = await itemFixture(h, tide, { title: "Late News" });
+    owl = await itemFixture(h, tide, { title: "Owl Hour" });
+  });
+
+  it("Repeat this day on a Saturday copies Saturday 6:00 am to Sunday 6:00 am, after midnight included, and not Friday night", async () => {
+    await add(wave, "2026-10-17T08:00:00.000Z", friday.id); // Saturday 1:00 am: Friday night
+    await add(wave, "2026-10-18T03:00:00.000Z", crate.id); // Saturday 8:00 pm
+    await add(wave, "2026-10-18T07:30:00.000Z", after.id); // Sunday 12:30 am
+    await add(wave, "2026-10-18T12:30:00.000Z", dawn.id); // Sunday 5:30 am
+    const made = await kai.post(`/v1/stations/${wave}/log/templates`, { fromDay: "2026-10-17", pattern: "weekly" }).expect(201);
+    saturday = made.body.template.id;
+    expect(made.body.template).toMatchObject({ weekday: 6, label: "Every Saturday", fromDay: "2026-10-17" });
+    expect(made.body.template.entries.map((e: { startTime: string; title: string }) => `${e.startTime} ${e.title}`)).toEqual(["20:00 Crate Night", "00:30 After Hours", "05:30 Dawn Set"]);
+    expect(made.body.template.dates.map((d: { date: string }) => d.date)).toEqual(["2026-10-24", "2026-10-31"]);
+    expect(made.body.generated).toEqual({ dates: 2, created: 6, removed: 0, skippedForConflicts: 0, exceptions: 0 });
+    // Each Saturday's after-midnight programs are on the Sunday morning after it; nothing on the
+    // Saturday morning before (Friday night's).
+    expect(await rowsOf(saturday)).toEqual([
+      ["2026-10-25T03:00:00.000Z", "2026-10-24"],
+      ["2026-10-25T07:30:00.000Z", "2026-10-24"],
+      ["2026-10-25T12:30:00.000Z", "2026-10-24"],
+      ["2026-11-01T03:00:00.000Z", "2026-10-31"],
+      ["2026-11-01T07:30:00.000Z", "2026-10-31"],
+      ["2026-11-01T13:30:00.000Z", "2026-10-31"]
+    ]);
+  });
+
+  it("the night clocks fall back is 25 hours, and 8:00 pm stays 8:00 pm", async () => {
+    // Saturday October 31, 6:00 am PDT, to Sunday November 1, 6:00 am PST.
+    const log = await logOf(wave, "2026-10-31T13:00:00.000Z", "2026-11-01T14:00:00.000Z");
+    expect(starts(log.entries)).toEqual(["2026-11-01T03:00:00.000Z", "2026-11-01T07:30:00.000Z", "2026-11-01T13:30:00.000Z"]);
+    expect(log.days).toEqual([{ date: "2026-10-31", templateId: saturday, templateName: null, label: "Every Saturday", edited: false }]);
+    // That 25-hour day, once onto Saturday November 7 (standard time): 5:30 am PST is still in it.
+    const once = await kai.post(`/v1/stations/${wave}/log/templates`, { fromDay: "2026-10-31", pattern: "once", onto: "2026-11-07" }).expect(201);
+    expect(once.body.template.entries.map((e: { startTime: string }) => e.startTime)).toEqual(["20:00", "00:30", "05:30"]);
+    expect(await rowsOf(once.body.template.id)).toEqual([
+      ["2026-11-08T04:00:00.000Z", "2026-11-07"],
+      ["2026-11-08T08:30:00.000Z", "2026-11-07"],
+      ["2026-11-08T13:30:00.000Z", "2026-11-07"]
+    ]);
+  });
+
+  it("Weekdays are the Monday to Friday broadcast days, over the weekend and the change to standard time", async () => {
+    await add(tide, "2026-10-14T06:00:00.000Z", news.id); // Tuesday 11:00 pm
+    await add(tide, "2026-10-14T08:00:00.000Z", owl.id); // Wednesday 1:00 am, Tuesday night
+    const made = await kai.post(`/v1/stations/${tide}/log/templates`, { fromDay: "2026-10-13", pattern: "weekdays" }).expect(201);
+    weekdays = made.body.template.id;
+    expect(made.body.template.entries.map((e: { startTime: string }) => e.startTime)).toEqual(["23:00", "01:00"]);
+    expect(made.body.template.dates.map((d: { date: string }) => d.date)).toEqual([
+      "2026-10-14", "2026-10-15", "2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23",
+      "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-11-02", "2026-11-03"
+    ]);
+    const rows = await rowsOf(weekdays);
+    expect(rows).toHaveLength(30);
+    // Friday night runs into Saturday morning; Sunday night (Monday 1:00 am) has nothing.
+    expect(rows).toEqual(expect.arrayContaining([
+      ["2026-10-17T06:00:00.000Z", "2026-10-16"],
+      ["2026-10-17T08:00:00.000Z", "2026-10-16"],
+      ["2026-10-20T06:00:00.000Z", "2026-10-19"],
+      ["2026-10-20T08:00:00.000Z", "2026-10-19"],
+      // Friday October 30 in daylight time, Monday November 2 in standard time.
+      ["2026-10-31T06:00:00.000Z", "2026-10-30"],
+      ["2026-10-31T08:00:00.000Z", "2026-10-30"],
+      ["2026-11-03T07:00:00.000Z", "2026-11-02"],
+      ["2026-11-03T09:00:00.000Z", "2026-11-02"]
+    ]));
+    expect(rows.some(([startsAt]) => startsAt === "2026-10-19T08:00:00.000Z")).toBe(false);
+    expect(rows.some(([, date]) => ["2026-10-17", "2026-10-18", "2026-10-24", "2026-10-25"].includes(date!))).toBe(false);
+  });
+
+  it("stopping a template leaves an edited date as it is; the dates it cleared go to another template (A132)", async () => {
+    // Saturday October 24 only: Crate Night moves to 9:00 pm.
+    const oct24 = await logOf(wave, "2026-10-24T13:00:00.000Z", "2026-10-25T13:00:00.000Z");
+    const eight = oct24.entries.find((e: { startsAt: string }) => e.startsAt === "2026-10-25T03:00:00.000Z");
+    await kai.patch(`/v1/stations/${wave}/log/${eight.id}`, { startsAt: "2026-10-25T04:00:00.000Z" }).expect(200);
+    const edited = await h.db.select().from(schema.logEntries).where(and(eq(schema.logEntries.stationId, wave), eq(schema.logEntries.templateDate, "2026-10-24"))).orderBy(asc(schema.logEntries.startsAt));
+    expect(edited.map((r) => r.startsAt.toISOString())).toEqual(["2026-10-25T04:00:00.000Z", "2026-10-25T07:30:00.000Z", "2026-10-25T12:30:00.000Z"]);
+
+    // Every day ("Evenings"), from today's 7:00 pm: Saturdays are the Saturday template's.
+    await add(wave, "2026-10-14T02:00:00.000Z", crate.id);
+    daily = (await kai.post(`/v1/stations/${wave}/log/templates`, { fromDay: "2026-10-13", pattern: "daily", name: "Evenings" }).expect(201)).body.template.id;
+
+    // Stop it: October 31's three come off; October 24's stay exactly as they are.
+    expect((await kai.delete(`/v1/stations/${wave}/log/templates/${saturday}`).expect(200)).body).toEqual({ removed: 3 });
+    const kept = await h.db.select().from(schema.logEntries).where(and(eq(schema.logEntries.stationId, wave), eq(schema.logEntries.templateDate, "2026-10-24"))).orderBy(asc(schema.logEntries.startsAt));
+    expect(kept).toEqual(edited);
+    const [rec24] = await h.db.select().from(schema.dayTemplateDates).where(and(eq(schema.dayTemplateDates.stationId, wave), eq(schema.dayTemplateDates.date, "2026-10-24")));
+    expect(rec24).toMatchObject({ templateId: saturday, editedAt: expect.any(Date) });
+    // October 31 is cleared, and Every day makes it.
+    const oct31 = await logOf(wave, "2026-10-31T13:00:00.000Z", "2026-11-01T14:00:00.000Z");
+    expect(oct31.entries.map((e: { startsAt: string; repeatGroupId: string }) => [e.startsAt, e.repeatGroupId])).toEqual([["2026-11-01T02:00:00.000Z", daily]]);
+    expect(oct31.days).toEqual([{ date: "2026-10-31", templateId: daily, templateName: "Evenings", label: "Every day", edited: false }]);
+    // October 24 stays an exception: Every day doesn't take it.
+    expect((await h.services.log.templates.generate(wave)).exceptions).toBe(1);
+  });
+
+  it("getLog says which template made each broadcast day, today and past days included (G11)", async () => {
+    h.clock.set("2026-10-25T17:00:00.000Z"); // Sunday October 25, 10:00 am
+    const log = await logOf(wave, "2026-10-23T13:00:00.000Z", "2026-10-26T13:00:00.000Z");
+    expect(log.days).toEqual([
+      { date: "2026-10-23", templateId: daily, templateName: "Evenings", label: "Every day", edited: false },
+      { date: "2026-10-24", templateId: saturday, templateName: null, label: "Every Saturday", edited: true },
+      { date: "2026-10-25", templateId: daily, templateName: "Evenings", label: "Every day", edited: false }
+    ]);
+    // The evening (6:00 pm to 2:00 am) is one broadcast day.
+    expect((await logOf(wave, "2026-10-25T01:00:00.000Z", "2026-10-25T09:00:00.000Z")).days.map((d: { date: string }) => d.date)).toEqual(["2026-10-24"]);
+    // Days no template made.
+    expect((await logOf(tide, "2026-10-16T13:00:00.000Z", "2026-10-19T13:00:00.000Z")).days).toEqual([
+      { date: "2026-10-16", templateId: weekdays, templateName: null, label: "Weekdays", edited: false },
+      { date: "2026-10-17", templateId: null, templateName: null, label: null, edited: false },
+      { date: "2026-10-18", templateId: null, templateName: null, label: null, edited: false }
+    ]);
   });
 });

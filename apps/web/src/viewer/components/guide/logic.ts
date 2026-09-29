@@ -2,9 +2,11 @@
 // now, the most the API gives in one call), the heading for the day on screen, the grid's rows,
 // and which button a listing leads with.
 
+import { createElement } from "react";
 import type { GuideProgram, GuideStation } from "@opencast/ui";
 import type { AiringX, GuideX } from "../../api/ext";
-import { zoned } from "../watch/logic";
+import { BackAt } from "../watch/lines";
+import { isOffAir, zoned } from "../watch/logic";
 
 const HOUR = 3600e3;
 /** Earlier and Later move by this much; the web shows this much at once. */
@@ -66,24 +68,19 @@ export function airingKey(a: Pick<AiringX, "logEntryId" | "listedAiringId" | "st
 }
 
 /** The guide's rows as the grid draws them, optionally only the given stations (the Presets filter). */
-export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> | null): GuideStation[] {
+export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> | null, timeZone?: string): GuideStation[] {
   return (guide?.rows ?? [])
     .filter((r) => !only || only.has(r.station.id))
     .map((r) => ({
       id: r.station.id,
       channel: r.station.channel ?? "",
       callSign: r.station.callSign ?? r.station.handle ?? "",
-      programs: r.airings.map(
-        (a): GuideProgram => ({
-          id: airingKey(a, r.station.id),
-          title: a.title,
-          start: a.startsAt,
-          end: a.endsAt,
-          live: a.live,
-          listed: a.kind === "listed",
-          carriedFrom: a.carriedFrom?.callSign ?? undefined
-        })
-      )
+      programs: r.airings.map((a): GuideProgram => {
+        const id = airingKey(a, r.station.id);
+        // Planned off air (G9): one block from sign-off to sign-on, "Off air, Signs on at 6:00 am".
+        if (isOffAir(a)) return { id, title: a.title, start: a.startsAt, end: a.endsAt, detail: createElement(BackAt, { at: a.backAt ?? a.endsAt, timeZone }) };
+        return { id, title: a.title, start: a.startsAt, end: a.endsAt, live: a.live, listed: a.kind === "listed", carriedFrom: a.carriedFrom?.callSign ?? undefined };
+      })
     }));
 }
 

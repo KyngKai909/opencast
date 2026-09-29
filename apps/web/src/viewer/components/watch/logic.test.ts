@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, DialRowX } from "../../api/ext";
-import { bandHint, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel } from "./logic";
+import { backAtOf, bandHint, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 2026 at 8:42 pm in Redlands (UTC−7).
@@ -144,5 +144,21 @@ describe("words around Live", () => {
       "Live from the Redlands studio. Producers play unreleased tapes and talk through how they were made."
     );
     expect(listingText(null, "One producer, one crate.")).toBe("One producer, one crate.");
+  });
+});
+
+describe("planned off air (G9)", () => {
+  const off = { logEntryId: "o", title: "Off air", episodeTitle: null, code: "OPEN", kind: "off_air", startsAt: pt("23:00"), endsAt: pt("06:00", 1), live: false, carriedFrom: null, programId: null, backAt: pt("06:30", 1) } as AiringX;
+  const later = { ...off, title: "Morning", code: "PGM", kind: "program", startsAt: pt("07:00", 1), endsAt: pt("08:00", 1), backAt: undefined } as AiringX;
+  it("says when the station is back: the player's word, then the dial's backAt, the off air airing's, then its next airing", () => {
+    const r = { ...row("p", "PREP", "31.1", "tv"), onAir: false, now: off, next: later };
+    expect(isOffAir(off)).toBe(true);
+    expect(isOffAir(later)).toBe(false);
+    expect(backAtOf(r)).toBe(pt("06:30", 1));
+    expect(backAtOf({ ...r, backAt: pt("06:15", 1) })).toBe(pt("06:15", 1));
+    expect(backAtOf(r, { stationId: "p", backAt: pt("05:00", 1) }, "p")).toBe(pt("05:00", 1));
+    expect(backAtOf(r, { stationId: "q", backAt: pt("05:00", 1) }, "p")).toBe(pt("06:30", 1));
+    expect(backAtOf({ ...r, now: null })).toBe(pt("07:00", 1));
+    expect(backAtOf({ ...r, now: null, next: null })).toBeNull();
   });
 });

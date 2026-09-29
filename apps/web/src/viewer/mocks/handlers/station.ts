@@ -7,6 +7,7 @@ import { now } from "../../../lib/clock";
 import { type MockAiring } from "../fixtures/schedule";
 import { PROGRAM_EXTRA, STATION_EXTRA, atDay, outsideIdent, programById, programByKey, registerReminded, weekAirings } from "../fixtures/station";
 import { STATIONS, inMarket, playbackFor, stationById, stationByRef } from "../fixtures/stations";
+import { syncStreamSignOff } from "../fixtures/signoff";
 import { fail, path, reply } from "../respond";
 import { airingX, identX } from "../view";
 
@@ -34,13 +35,14 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   return {
     station: identX(s),
     description: x.line ?? s.description,
-    onAir: !!nn.now,
+    // Planned off air (G9) is its `off_air` airing on now: not on air.
+    onAir: !!nn.now && !nn.now.offAir,
     now: nn.now ? airingX(nn.now) : null,
     upNext: mine.filter((a) => a.start > iso).slice(0, 3).map(airingX),
     programs,
     claimable: s.ident.kind === "claimable" ? { runFor: "Marcus Reyes", claimed: false, escrowContract: "0x5ee2000000000000000000000000000000a41d", escrowStationId: 101 } : null,
     pledgesTaxDeductible: s.ident.callSign === "CIVC" ? true : null,
-    playback: nn.now ? playbackFor(s) : null,
+    playback: nn.now && !nn.now.offAir ? playbackFor(s) : null,
     about: x.about ?? s.about ?? null,
     members,
     onDialSince: x.onDialSince ?? s.onDialSince ?? null,
@@ -142,7 +144,8 @@ export function programPage(programId: string, market: string | null) {
 }
 
 export const stationHandlers = [
-  http.get(path(stationsApi.getStation), ({ params, request }) => {
+  http.get(path(stationsApi.getStation), async ({ params, request }) => {
+    await syncStreamSignOff();
     const q = new URL(request.url).searchParams;
     const page = stationPage(String(params.stationRef), q.get("from"), q.get("to"));
     return page ? reply(StationPageFull, page) : fail(404, "not_found", "That station wasn't found.");

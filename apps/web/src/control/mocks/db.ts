@@ -9,8 +9,10 @@
 import type { ClearLink, Folder, LibraryItem, LiveSource, Program, StationIdent, StationSetup } from "@opencast/contracts";
 import { seedEvening, seedLiveSources, type DbBreak, type DbLogEntry } from "./fixtures/evening";
 import { seedLibrary } from "./fixtures/library";
+import { seedOffAirRules, type DbOffAirRule } from "./fixtures/offair";
 import { JEN, KAI, MARCUS, SAM } from "./fixtures/people";
 import { BEAT, CRAT, HALL, LAB, STATIONS } from "./fixtures/stations";
+import { seedTemplates, type DbTemplate } from "./fixtures/templates";
 import { at } from "./fixtures/time";
 
 export interface DbMember {
@@ -43,9 +45,13 @@ export interface Db {
   liveSources: LiveSource[];
   /** Linked Clear accounts, by person id (Connect Clear). */
   clearLinks: Record<string, ClearLink>;
+  /** Day templates (G8): "Repeat this day", with the dates made from each. */
+  templates: DbTemplate[];
+  /** Off air hours (G9), per station. */
+  offAirRules: DbOffAirRule[];
 }
 
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 const KEY = "oc-mock-control-db";
 
 function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStation["setup"] {
@@ -70,7 +76,10 @@ function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStat
 
 export function seed(): Db {
   const library = seedLibrary();
-  const { log, breaks } = seedEvening(library.items);
+  const evening = seedEvening(library.items);
+  const { templates, log: weekdays } = seedTemplates(evening.log, library.items);
+  const log = [...weekdays, ...evening.log];
+  const breaks = evening.breaks;
   const ours = [BEAT, HALL, CRAT, LAB];
   const stations: DbStation[] = STATIONS.filter((s) => ours.includes(s)).map((ident) => ({
     ident,
@@ -98,7 +107,9 @@ export function seed(): Db {
     breaks,
     library,
     liveSources: seedLiveSources(),
-    clearLinks: {}
+    clearLinks: {},
+    templates,
+    offAirRules: seedOffAirRules()
   };
 }
 

@@ -10,7 +10,7 @@ import { StationPageX, type DialRowX } from "../../api/ext";
 import { useChannels, useDial, useMarketSlug } from "../../data/viewer";
 import { useNowPlaying, useTune } from "../../player/PlayerRoot";
 import { useApiAs } from "./overlay";
-import { resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, withOutsideStation } from "./logic";
+import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, withOutsideStation } from "./logic";
 
 export function useWatch(stationRef: string | undefined) {
   const [s, engine] = usePlayer();
@@ -93,7 +93,13 @@ export function useWatch(stationRef: string | undefined) {
 
   // The page shows the station the URL names; the URL follows the channel.
   const shown = target ?? inDial ?? outside;
-  const now = shown?.now ?? page.data?.now ?? null;
+  // Off air, planned (the dial's `off_air` airing) or by the stream (its sign-off), shows as off air
+  // with when it's back, not as the dial's program.
+  const listed = shown?.now ?? page.data?.now ?? null;
+  const offByPlayer = !!shown && s.currentId === shown.station.id && s.status === "off_air";
+  const offAir = offByPlayer || isOffAir(listed) || (!!shown && !shown.onAir && !listed);
+  const now = offAir ? null : listed;
+  const backAt = offAir ? backAtOf(shown, s.offAir, shown?.station.id) : null;
   const programId = now?.programId ?? null;
   const program = useApiAs("watch", libraryApi.getProgram, { params: { programId: programId ?? "" } }, libraryApi.getProgram.response, !!programId);
 
@@ -107,11 +113,13 @@ export function useWatch(stationRef: string | undefined) {
       notOnDial: dialReady && !inDial && page.isError,
       row: shown ?? null,
       now,
+      /** Off air: when the station is back (the stream's sign-off, the dial's back time, or its next airing). */
+      backAt,
       page,
       program,
       playing: np.playing
     }),
-    [s, engine, engineChannels, dialReady, inDial, shown, now, page, program, np.playing]
+    [s, engine, engineChannels, dialReady, inDial, shown, now, backAt, page, program, np.playing]
   );
 }
 

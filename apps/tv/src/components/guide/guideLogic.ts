@@ -66,12 +66,14 @@ export function airingKey(stationId: string, a: AiringX): string {
   return a.logEntryId ?? a.listedAiringId ?? `${stationId}~${ms(a.startsAt)}`;
 }
 
-/** A row's cells across [from, to): its airings in time order, and off air wherever there's a gap. */
+/**
+ * A row's cells across [from, to): its airings in time order, and off air wherever there's a gap.
+ * Planned off air (G9: an `off_air` airing) is an off air cell too, back at its `backAt`; a gap
+ * that runs into it joins it.
+ */
 export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
   const id = row.station.id;
-  const airings = row.airings
-    .filter((a) => ms(a.endsAt) > from && ms(a.startsAt) < to && a.kind !== "off_air")
-    .sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
+  const airings = row.airings.filter((a) => ms(a.endsAt) > from && ms(a.startsAt) < to).sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
   const cells: Cell[] = [];
   let cursor = from;
   const offAir = (start: number, end: number, signOnAt: number | null) =>
@@ -80,6 +82,12 @@ export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
     const s = ms(a.startsAt);
     const e = ms(a.endsAt);
     if (e <= cursor) continue; // overlaps what's already placed
+    if (a.kind === "off_air") {
+      // From the gap it closes (or its own start, before the window's first cell) to its end.
+      offAir(cursor === from ? Math.min(s, from) : cursor, e, ms(a.backAt ?? a.endsAt));
+      cursor = e;
+      continue;
+    }
     if (s > cursor) offAir(cursor, s, s);
     cells.push({ key: airingKey(id, a), stationId: id, start: s, end: e, airing: a, signOnAt: null });
     cursor = e;

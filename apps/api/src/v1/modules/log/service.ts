@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Airing, BreakContent, BreakRow, Listing, LogEntry } from "@opencast/contracts";
+import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
@@ -144,7 +144,7 @@ export interface LogService {
   /** Puts carried slots on the carrier's log. */
   placeCarried(input: { agreementId: string; carrierStationId: string; programId: string; starts: Date[]; replaceExisting: boolean }): Promise<{ placed: number; replaced: number; blockedByLimit: number }>;
 
-  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[]; offAir: OffAirSpanView[] }>;
+  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[]; offAir: OffAirSpanView[]; days: LogDay[] }>;
   add(stationId: string, userId: string, input: EntryInput): Promise<LogEntry>;
   update(stationId: string, entryId: string, input: Partial<EntryInput>): Promise<LogEntry>;
   remove(stationId: string, entryId: string): Promise<void>;
@@ -1038,7 +1038,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       const ctx = await context(rows);
       const breaks = await service.breaks(stationId, from, to);
-      const [contents, repeats] = await Promise.all([service.breakContents(stationId, breaks), service.repeats(stationId, from)]);
+      const [contents, repeats, days] = await Promise.all([service.breakContents(stationId, breaks), service.repeats(stationId, from), templates.days(stationId, from, to)]);
       return {
         from: from.toISOString(),
         to: to.toISOString(),
@@ -1047,7 +1047,9 @@ export function createLogService(ctx: ModuleContext): LogService {
         breaks: breaks.map((b) => ({ ...b, rows: (contents.get(b.startsAt) ?? []).map(breakRow) })),
         gaps: gapsIn(rows, from, to, offAir),
         repeats,
-        offAir
+        offAir,
+        // G11: each broadcast day in the window and the day template that made it.
+        days
       };
     },
 
@@ -1072,7 +1074,7 @@ export function createLogService(ctx: ModuleContext): LogService {
         })
         .returning();
       // Adding to a date a day template made makes that date an exception.
-      await templates.markEdited(stationId, [localDate(row.startsAt, await stationTz(stationId))]);
+      await templates.markEdited(stationId, [row.startsAt]);
       return toEntry(row, await context([row]));
     },
 
@@ -1109,8 +1111,7 @@ export function createLogService(ctx: ModuleContext): LogService {
         })
         .where(eq(E.id, entryId))
         .returning();
-      const tz = await stationTz(stationId);
-      await templates.markEdited(stationId, [current.templateDate ?? localDate(current.startsAt, tz), localDate(row.startsAt, tz)]);
+      await templates.markEdited(stationId, [current.templateDate ?? current.startsAt, row.startsAt]);
       return toEntry(row, await context([row]));
     },
 
@@ -1120,7 +1121,7 @@ export function createLogService(ctx: ModuleContext): LogService {
         .where(and(eq(E.id, entryId), eq(E.stationId, stationId)))
         .returning({ startsAt: E.startsAt, templateDate: E.templateDate });
       if (!removed.length) throw notFound("That log entry");
-      await templates.markEdited(stationId, [removed[0].templateDate ?? localDate(removed[0].startsAt, await stationTz(stationId))]);
+      await templates.markEdited(stationId, [removed[0].templateDate ?? removed[0].startsAt]);
     },
 
     async repeatDay(stationId, input) {

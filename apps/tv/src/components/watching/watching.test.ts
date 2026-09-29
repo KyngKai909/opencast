@@ -3,7 +3,7 @@ import type { DialRowX } from "../../api/ext";
 import { bandTarget, lastOnBand, otherBand, rememberOnBand } from "./bands";
 import { keyHintsHidden, readFirstUse, recordFirstUse, visibleHints, WEEK_MS } from "./hintRow";
 import { canPledge, menuItems, savedText, stationsText, toggledCaptions } from "./menu";
-import { airState, canSuggest, identText, signOnAt, signOnDay, suggestion, type Row } from "./offAir";
+import { airState, backTime, canSuggest, identText, signOnAt, signOnDay, suggestion, type Row } from "./offAir";
 import { byRef, pledgePath, pledgeRoute, pledgeUrl, shownUrl } from "./pledge";
 import { firstKey, nowLine, okAction, saveOnDevice, sixSlots, stripCommand } from "./presetStrip";
 import { cardText, reminderCard, switchDue } from "./reminders";
@@ -58,6 +58,17 @@ describe("off air: the station to offer instead", () => {
     const next = { ...row("CIVC", "7.1").now!, startsAt: "2026-09-27T04:30:00Z" };
     expect(signOnAt({ ...off(dial[0]!), now: null, next })).toBe("2026-09-27T04:30:00Z");
     expect(signOnAt({ ...off(dial[0]!), now: null, next: null })).toBeNull();
+  });
+
+  it("planned off air (G9): the row's backAt, then the off air airing's; the player's own word comes first", () => {
+    const block = { ...row("CIVC", "7.1").now!, kind: "off_air" as const, code: "OPEN" as const, endsAt: "2026-09-27T13:00:00Z", backAt: "2026-09-27T13:30:00Z" };
+    expect(signOnAt({ ...off(dial[0]!), now: block })).toBe("2026-09-27T13:30:00Z");
+    const planned = { ...off(dial[0]!), now: block, backAt: "2026-09-27T14:00:00Z" };
+    expect(signOnAt(planned)).toBe("2026-09-27T14:00:00Z");
+    // A stream that signed off says when it's back, in its sign-off tag.
+    expect(backTime(planned, { stationId: planned.station.id, backAt: "2026-09-27T12:00:00Z" })).toBe("2026-09-27T12:00:00Z");
+    expect(backTime(planned, { stationId: "someone-else", backAt: "2026-09-27T12:00:00Z" })).toBe("2026-09-27T14:00:00Z");
+    expect(backTime(planned, { stationId: planned.station.id, backAt: null })).toBe("2026-09-27T14:00:00Z");
   });
 
   it("names the day only when the sign-on isn't in the day ahead", () => {

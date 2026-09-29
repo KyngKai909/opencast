@@ -44,6 +44,11 @@ export function homeAirings(): MockAiring[] {
   return list;
 }
 
+/** The schedule changed (a sign-off matched to the mock stream, fixtures/signoff.ts): build again. */
+export function resetHomeAirings() {
+  built = null;
+}
+
 /** What's on at `t` and what's next, from home's schedule. Off air between airings. */
 export function homeNowNext(stationId: string, t: Date): { now: MockAiring | null; next: MockAiring | null } {
   const iso = t.toISOString();

@@ -80,10 +80,14 @@ export function isoDate(d: Ymd): string {
   return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
 }
 
-/** The broadcast day a moment belongs to: 2:00 am Sunday is still Saturday night. */
+/**
+ * The broadcast day a moment belongs to: 2:00 am Sunday is still Saturday night. By the wall
+ * clock, as the API reads it (G10), so the hour clocks change doesn't slip into the wrong day.
+ */
 export function broadcastDay(t: TimeInput, tz = STATION_TZ): Ymd {
-  const p = localParts(ms(t) - DAY_STARTS * HOUR, tz);
-  return { year: p.year, month: p.month, day: p.day };
+  const p = localParts(t, tz);
+  const d = { year: p.year, month: p.month, day: p.day };
+  return p.hour < DAY_STARTS ? addDays(d, -1) : d;
 }
 
 /** Monday to Sunday of the week a day is in. */

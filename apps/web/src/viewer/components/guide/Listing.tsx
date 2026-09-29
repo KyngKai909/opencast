@@ -17,8 +17,8 @@ import { MARKET_TZ, useNow } from "../../../lib/clock";
 import { useTune } from "../../player/PlayerRoot";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApiAs } from "../watch/overlay";
-import { withLive } from "../watch/lines";
-import { callSignOf, identText, listingText, stationSlug } from "../watch/logic";
+import { BackAt, withLive } from "../watch/lines";
+import { callSignOf, identText, isOffAir, listingText, stationSlug } from "../watch/logic";
 import { listingActions } from "./logic";
 
 const POP_WIDTH = 360;
@@ -91,6 +91,20 @@ function useListingContent({ airing: a, station, onDone }: { airing: AiringX; st
       Tune in to {cs}
     </Button>
   );
+
+  // Planned off air (G9): when it's back; nothing to remind of or tune to.
+  if (isOffAir(a))
+    return {
+      eyebrow: (
+        <>
+          <span className="oc-mono">{clockRange(a.startsAt, a.endsAt, { separator: "–", timeZone: MARKET_TZ })}</span>, {identText(station)}
+        </>
+      ),
+      title: a.title,
+      subtitle: <BackAt at={a.backAt ?? a.endsAt} />,
+      body: null,
+      footer: []
+    };
 
   return {
     eyebrow: (

@@ -2,13 +2,15 @@
 // next break, Cue a break now, and programs from the market that fit this station's open time.
 // P.1 on the phone (the same route under 768px), and a claimable station's Monitor (rights 05.2,
 // "Run by Opencast"). Everything ticks from the station clock and reads the shared log, so a break
-// filled from the spot market shows here as soon as it's saved.
+// filled from the spot market shows here as soon as it's saved. Planned off air (G9) reads "Off
+// air, back at 6:00 am" while it's on, and "Signs off at 2:00 am" when it's coming within 24 hours.
 
 import { useMemo, type ReactNode } from "react";
 import { audienceApi, catalogApi, type Offer, playoutApi, stationsApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Notice, PictureFrame, Rundown, Tally, clock, duration, useToast, type HealthRow, type RundownItem } from "@opencast/ui";
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "../../components/onair/data";
+import { monitorOffAirText } from "../../components/onair/offAir";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
 import { breakLine, buildRundown, currentIndex, nextBreak, rundownFrom, type RundownRow } from "../../components/onair/rundown";
 import { broadcastDay, dayClock, monthDay } from "../../components/onair/time";
@@ -58,7 +60,7 @@ export default function Monitor() {
   const cue = useApiMutation(playoutApi.cueBreak, { invalidates: LOG_READS });
   const signOn = useApiMutation(playoutApi.signOn, { invalidates: LOG_READS });
 
-  const rows = useMemo(() => (log.data ? buildRundown(log.data.entries, log.data.breaks) : []), [log.data]);
+  const rows = useMemo(() => (log.data ? buildRundown(log.data.entries, log.data.breaks, undefined, log.data.offAir) : []), [log.data]);
   const current = rows[currentIndex(rows, t)] ?? null;
   const liveEntry = log.data?.entries.find((e) => e.kind === "live" && Date.parse(e.startsAt) <= t && t < Date.parse(e.endsAt)) ?? null;
   const inBreak = current?.kind === "break";
@@ -99,6 +101,9 @@ export default function Monitor() {
     );
   }
 
+  // G9: planned off air, on now or within 24 hours. Not dead air: never a warning.
+  const offAirText = monitorOffAirText(status?.offAir ?? null, t);
+  const plannedOffNow = !!status?.offAir && (status.offAir.now || Date.parse(status.offAir.startsAt) <= t);
   const since = status?.onAirSince ?? null;
   const sinceText = since ? (sameDay(since, t) ? clock(since, { timeZone: STATION_TZ }) : monthDay(since)) : null;
   const breakIn = status?.nextBreakAt ? Date.parse(status.nextBreakAt) - t : null;
@@ -111,6 +116,8 @@ export default function Monitor() {
         </>
       )}
     </>
+  ) : plannedOffNow && offAirText ? (
+    `${offAirText}.`
   ) : (
     "Off air."
   );
@@ -122,7 +129,7 @@ export default function Monitor() {
     <>
       {runBy}
       {onAir && (liveEntry || !runBy) && cueButton("Cue a break now", "sm")}
-      {!onAir && s.can("manage") && (
+      {!onAir && !plannedOffNow && s.can("manage") && (
         <Button variant="ink" size="sm" onClick={doSignOn} disabled={signOn.isPending}>
           Sign on
         </Button>
@@ -141,6 +148,7 @@ export default function Monitor() {
   const runsUntil = deadAir.data?.logRunsUntil ?? null;
   const shortLog = !!deadAir.data?.nextGapAt;
   if (deadAir.data) health.push({ label: "Log runs until", value: runsUntil ? dayClock(runsUntil) : "Nothing on the log", attention: shortLog, textValue: !runsUntil });
+  if (offAirText) health.push({ label: "Off air hours", value: offAirText, textValue: true });
 
   // From the market: programs that fit this station's open time.
   const gapAt = deadAir.data?.nextGapAt ?? null;
@@ -210,7 +218,7 @@ export default function Monitor() {
         {!onAir && (
           <div className="cc-pm__sec">
             <ControlTitle title="Monitor" description={description} as="h1" />
-            {s.can("manage") && (
+            {s.can("manage") && !plannedOffNow && (
               <Button variant="ink" onClick={doSignOn} disabled={signOn.isPending}>
                 Sign on
               </Button>
@@ -223,7 +231,7 @@ export default function Monitor() {
         </div>
         {health.length > 0 && (
           <div className="cc-pm__sec cc-pm__sec--last">
-            <KeyValueList variant="health" items={health.filter((h) => h.label === "Tuned in" || h.label === "Log runs until")} />
+            <KeyValueList variant="health" items={health.filter((h) => h.label === "Tuned in" || h.label === "Log runs until" || h.label === "Off air hours")} />
           </div>
         )}
       </div>

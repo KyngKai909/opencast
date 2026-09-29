@@ -3,13 +3,16 @@
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { setupServer } from "msw/node";
-import { AccountExport, ledgerApi, WatchHistory } from "@opencast/contracts";
+import { AccountExport, audienceApi, ledgerApi, WatchHistory } from "@opencast/contracts";
 import { ApiError } from "../../../api/client";
 import { mockTokenFor } from "../../../auth/mockToken";
 import { deleteRefusal, leadLine, quietLine } from "../../components/settings/panes";
 import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN } from "../respond";
 import { stationByRef } from "../fixtures/stations";
+import { AIRINGS } from "../fixtures/schedule";
+import { applySignOff } from "../fixtures/signoff";
+import { now } from "../../../lib/clock";
 import { meHandlers } from "./me";
 
 const server = setupServer(...meHandlers);
@@ -108,5 +111,21 @@ describe("notification timing's words (O2)", () => {
     expect(leadLine(60)).toBe("An hour before");
     expect(quietLine({})).toBe("Nothing between 10:00 pm and 8:00 am");
     expect(quietLine({ quietFrom: "23:30", quietTo: "07:00" })).toBe("Nothing between 11:30 pm and 7:00 am");
+  });
+});
+
+describe("the heartbeat during planned off air (G9)", () => {
+  it("isn't counted or kept, and says when the station is back", async () => {
+    const prep = stationByRef("PREP")!.ident.id;
+    const t = now().getTime();
+    const back = new Date(t + 10 * 60_000).toISOString();
+    applySignOff(AIRINGS, prep, new Date(t - 60_000).toISOString(), back);
+    const r = audienceApi.heartbeat.response.parse(await (await req("POST", "/heartbeat", { ...beatHeartbeat, stationId: prep })).json());
+    expect(r.offAirUntil).toBe(back);
+    expect(r.nextInMs).toBeGreaterThan(9 * 60_000);
+    expect(r.nextInMs).toBeLessThanOrEqual(10 * 60_000);
+    expect(WatchHistory.parse(await (await req("GET", "/me/watch-history")).json()).items).toEqual([]);
+    // Another station beats as usual.
+    expect(audienceApi.heartbeat.response.parse(await (await req("POST", "/heartbeat", beatHeartbeat)).json())).toEqual({ ok: true, nextInMs: 30_000 });
   });
 });

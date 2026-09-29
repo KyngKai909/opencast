@@ -93,7 +93,8 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
     },
 
     async events(fromBlock) {
-      const toBlock = await pub.getBlockNumber();
+      // Uncached: a sync right after a transaction must see its block.
+      const toBlock = await pub.getBlockNumber({ cacheTime: 0 });
       if (fromBlock > toBlock) return { toBlock: fromBlock - 1n, events: [] };
       const get = <T extends string>(signature: T) => pub.getLogs({ address: config.escrow, event: parseAbiItem(signature as never), fromBlock, toBlock });
       const [deposited, proposed, ready, cancelled, paid] = await Promise.all([

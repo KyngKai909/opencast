@@ -16,14 +16,23 @@ export function airingX(x: MockAiring): AiringX {
 }
 
 export function dialRow(s: MockStation, t = now()): DialRowX {
-  const nn = nowNext(s.ident.id, t);
-  const onAir = !!nn.now;
+  return rowOf(s, nowNext(s.ident.id, t));
+}
+
+/**
+ * A dial row from what's on and next. Planned off air (G9) is its `off_air` airing as `now`, with
+ * `onAir` false, no playback, and `backAt`; a gap between airings is off air with nothing said.
+ */
+export function rowOf(s: MockStation, nn: { now: MockAiring | null; next: MockAiring | null }): DialRowX {
+  const planned = !!nn.now?.offAir;
+  const onAir = !!nn.now && !planned;
   return {
     station: identX(s),
     onAir,
     now: nn.now ? airingX(nn.now) : null,
     next: nn.next ? airingX(nn.next) : null,
-    playback: onAir ? playbackFor(s) : null
+    playback: onAir ? playbackFor(s) : null,
+    ...(planned ? { backAt: nn.now!.end } : {})
   };
 }
 

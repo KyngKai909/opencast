@@ -20,6 +20,7 @@ import {
 } from "../fixtures/live";
 import { PEOPLE, type MockPerson } from "../fixtures/people";
 import { fail, needsUser, path, reply } from "../respond";
+import { markEdited } from "../schedule";
 
 // Every handler here reads the week this area adds to the log; add it as soon as the mocks load.
 try {
@@ -342,6 +343,9 @@ export const liveHandlers: HttpHandler[] = [
     if (b.episodeTitle !== undefined) e.episodeTitle = b.episodeTitle || null;
     if (b.localNote !== undefined) e.localNote = b.localNote || null;
     if (b.episodeDescription !== undefined) liveState().descriptions[e.id] = b.episodeDescription || null;
+    // Editing an airing's listing is editing its date (G8: an exception to its day template).
+    markEdited(id, [e.startsAt]);
+    saveDb();
     saveLive();
     return reply(logApi.updateListing.response, listingOf(e));
   }),

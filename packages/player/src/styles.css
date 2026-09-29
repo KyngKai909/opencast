@@ -56,6 +56,11 @@
 .oc-ovl--tv .oc-ovl__logo { right: 5%; bottom: 6%; height: calc(66 * var(--u)); }
 .oc-ovl--tv .oc-ovl__bug[data-position^="top"] .oc-ovl__logo { top: 6%; }
 .oc-ovl--tv .oc-ovl__bug[data-position$="left"] .oc-ovl__logo { left: 5%; }
+/* The TV guide's window (tv 03.1): the bug alone, 22/13px on the 640-wide window, which is the
+   picture at a third of its size, so three times that in the picture's own units. */
+.oc-ovl--tv.oc-ovl--window .oc-bug__cs { font-size: calc(66 * var(--u)); }
+.oc-ovl--tv.oc-ovl--window .oc-bug__ch { font-size: calc(39 * var(--u)); }
+.oc-ovl--tv.oc-ovl--window .oc-ovl__logo { height: calc(109 * var(--u)); }
 /* The lower third (ui's LowerThird: left 5%, bottom 8%). */
 .oc-ovl--tv .oc-l3__nm { font-size: calc(44 * var(--u)); }
 .oc-ovl--tv .oc-l3__tt { font-size: calc(28 * var(--u)); }

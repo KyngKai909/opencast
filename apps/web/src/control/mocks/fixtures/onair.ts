@@ -6,8 +6,6 @@
 import type { LibraryItem, LogEntry } from "@opencast/contracts";
 import type { BreakRow } from "@opencast/contracts";
 import type { DbBreak, DbFill, DbLogEntry } from "./evening";
-import { BEAT } from "./stations";
-import { at } from "./time";
 
 // ---- Channels (A.1) ----
 
@@ -148,19 +146,22 @@ export function deadAirWarnings(gapStartsAt: string, now: number) {
 
 export interface OnAirState {
   version: number;
-  /** How each station's days repeat (G7): the day copied, how, and until when. Copies carry its id as their repeatGroupId. */
+  /**
+   * One-time copies from before day templates (G7): the day copied, how, and until when. Copies
+   * carry its id as their repeatGroupId. "Repeat this day" makes a day template now (db.templates).
+   */
   repeats: Array<{ id: string; stationId: string; day: string; pattern: "once" | "daily" | "weekly"; until: string | null }>;
   /** Breaks the log placed with a fill, so taking the program off takes its break too. */
   placedBreaks: Array<{ breakId: string; entryId: string }>;
 }
 
 const KEY = "oc-mock-control-onair";
-const VERSION = 2;
+const VERSION = 3;
 let state: OnAirState | null = null;
 
 function seedState(): OnAirState {
-  // BEAT's Saturday repeats every Saturday (A.4: "Every Saturday").
-  return { version: VERSION, repeats: [{ id: "6c1f0d7e-2b4a-4e9b-9d51-0a7c3e5b8f21", stationId: BEAT.id, day: at("12:00").slice(0, 10), pattern: "weekly", until: null }], placedBreaks: [] };
+  // BEAT's Saturday repeats every Saturday as a day template now (db.templates, fixtures/templates.ts).
+  return { version: VERSION, repeats: [], placedBreaks: [] };
 }
 
 export function onAirState(): OnAirState {
