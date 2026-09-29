@@ -2,6 +2,10 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: the channel playlist's tags (`hls.ts`)
+
+For prepare once, then assemble (platform prompt, Phase 5): the `#EXT-X-DATERANGE` classes the worker writes into each channel's playlist and the player reads (`HLS_CLASS`: item, break with SCTE-35 cues, live, bug, lower third, code, sign-off), their `X-OC-…` attributes as Zod schemas (`HlsItem`, `HlsBreak`, `HlsLive`, `HlsBug`, `HlsLowerThird`, `HlsCode`, `HlsSignOff`), `parseDateRanges()` for the reader and `dateRangeTag()` for the writer. `#EXT-X-DISCONTINUITY` and `#EXT-X-PROGRAM-DATE-TIME` mark every item; a planned sign-off ends the playlist with `#EXT-X-ENDLIST`. New, nothing existing changed.
+
 ## 2026-09-29: the business app's requests (B5, P1, P4 to P21, P26, E3 to E7, S1) and fixes A115 to A117, A124
 
 Additive: new endpoints, new optional fields, new optional request fields, and two enums widened in responses only (statement lines' `group`, a new `kind`). Nothing existing changed shape. Migration 0018 adds tables and nullable (or defaulted) columns only. The shapes follow the business app's proposals (`apps/business/src/api/ext*`); where they differ it's noted.
