@@ -37,7 +37,7 @@ export default defineConfig({
   workers: 2,
   retries: 0,
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
-  use: { channel: "chrome", trace: "retain-on-failure", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
+  use: { channel: "chrome", trace: "off", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
   projects: [
     { name: "viewer", outputDir: "test-results/viewer", testMatch: /viewer\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.viewer}` } },
     { name: "control", outputDir: "test-results/control", testMatch: /control\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.control}` } },

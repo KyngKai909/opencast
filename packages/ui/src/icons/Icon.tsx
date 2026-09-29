@@ -51,7 +51,7 @@ export function Mark({ variant = "outline", size = 30, label, className }: { var
 /** The lockup: the mark and "opencast", as in every app header. */
 export function Lockup({ size = "app", className }: { size?: "app" | "phone" | "site" | "hero"; className?: string }) {
   return (
-    <span className={cx("oc-lockup", `oc-lockup--${size}`, className)} aria-label="Opencast">
+    <span className={cx("oc-lockup", `oc-lockup--${size}`, className)} role="img" aria-label="Opencast">
       <Mark variant="outline" />
       <span aria-hidden="true">opencast</span>
     </span>

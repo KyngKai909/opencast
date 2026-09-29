@@ -30,7 +30,7 @@ export default defineConfig({
   globalSetup: "./real/global-setup.ts",
   globalTeardown: "./real/global-teardown.ts",
   reporter: [["list"], ["html", { open: "never", outputFolder: "report/real" }]],
-  use: { channel: "chrome", trace: "retain-on-failure", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
+  use: { channel: "chrome", trace: "off", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
   projects: [
     { name: "viewer", outputDir: "test-results/real/viewer", testMatch: spec("viewer"), use: { baseURL: baseURL("viewer") } },
     { name: "control", outputDir: "test-results/real/control", testMatch: spec("control"), use: { baseURL: baseURL("control") } },

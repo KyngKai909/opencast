@@ -23,7 +23,11 @@ export function ShellFrame({ head, rail, flush, children, className }: ShellFram
       {head}
       <div className="oc-shell__body">
         {rail}
-        <main className={cx("oc-shell__main", flush && "oc-shell__main--flush")}>{children}</main>
+        {/* Focusable: main scrolls on its own, and a page with nothing to tab to inside it (a long
+            table) must still scroll from the keyboard (axe scrollable-region-focusable). */}
+        <main className={cx("oc-shell__main", flush && "oc-shell__main--flush")} tabIndex={0}>
+          {children}
+        </main>
       </div>
     </div>
   );
