@@ -171,3 +171,7 @@ starting its own, and leaves it running.
 
 One real-API run at a time: they share :8788 and the e2e ports. A second test run started while
 another is going uses the first one's API, which goes away when the first run ends.
+
+## Quick run
+
+`npm run e2e:quick` runs every mock flow without the axe accessibility specs, on two workers (a couple of minutes). The axe specs come back before launch, once the design is final.

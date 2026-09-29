@@ -103,7 +103,8 @@ test("Orange Street Coffee: the station answers a sponsorship; order a spot and 
   await page.goto(`/${orange}/sponsorships`);
   const row = page.getByRole("row", { name: /Late Crate/ });
   await expect(row).toContainText("Waiting for BEAT");
-  const [late] = await api<Array<{ id: string }>>(`/businesses/${orange}/sponsorships`, { as: "maya" });
+  // By its program, not its place in the list: other specs add Orange Street sponsorships too.
+  const late = (await api<Array<{ id: string; program: { id: string } | null }>>(`/businesses/${orange}/sponsorships`, { as: "maya" })).find((x) => x.program?.id === seed.programs.lateCrate);
   await api(`/sponsorships/${late!.id}/decision`, { as: "kai", method: "POST", body: { decision: "approve" } });
   await page.reload();
   // It starts today, so it reads as on the air rather than approved.

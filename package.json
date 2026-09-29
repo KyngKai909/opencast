@@ -39,7 +39,8 @@
     "docs:api": "npm run docs:api -w @opencast/contracts",
     "db:seed": "npm run seed -w @opencast/db",
     "e2e": "npm test -w @opencast/e2e",
-    "e2e:real": "npm run test:real -w @opencast/e2e"
+    "e2e:real": "npm run test:real -w @opencast/e2e",
+    "e2e:quick": "npm run test:quick -w @opencast/e2e"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

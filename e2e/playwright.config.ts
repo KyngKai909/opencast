@@ -38,7 +38,8 @@ const apps = new Set<App>(chosen.length ? chosen.flatMap((p) => needs[p] ?? [p a
 export default defineConfig({
   testDir: "tests",
   // The real-API specs run with playwright.real.config.ts.
-  testIgnore: /\.real\.spec\.ts$/,
+  // E2E_SKIP_A11Y=1 (npm run e2e:quick) leaves out the axe specs until the design is final.
+  testIgnore: process.env.E2E_SKIP_A11Y ? [/\.real\.spec\.ts$/, /\.a11y\.spec\.ts$/] : /\.real\.spec\.ts$/,
   outputDir: "test-results",
   timeout: 90_000,
   expect: { timeout: 15_000 },

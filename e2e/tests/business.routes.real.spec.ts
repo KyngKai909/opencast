@@ -26,8 +26,9 @@ const ROUTES: Record<string, Route> = {
   "/:b/sponsorships": { path: (b) => `/${b}/sponsorships`, heading: "Sponsorships" },
   "/:b/sponsorships?modal=sponsorship": {
     path: async (b) => {
-      const list = await api<Array<{ id: string }>>(`/businesses/${b}/sponsorships`, { as: "maya" });
-      return `/${b}/sponsorships?modal=sponsorship&id=${list[0]!.id}`;
+      // Late Crate by its program: other specs add Orange Street sponsorships too.
+      const list = await api<Array<{ id: string; program: { id: string } | null }>>(`/businesses/${b}/sponsorships`, { as: "maya" });
+      return `/${b}/sponsorships?modal=sponsorship&id=${list.find((x) => x.program?.id === seed.programs.lateCrate)!.id}`;
     },
     heading: "Sponsorships",
     dialog: /Late Crate/
