@@ -86,7 +86,8 @@ export default defineRailway((ctx) => {
   const api = service("api", {
     source,
     build: build("@opencast/api", ["apps/api/**"]),
-    deploy: { startCommand: "npm run start -w @opencast/api", preDeployCommand: ["npm run migrate -w @opencast/db"], healthcheckPath: "/health", healthcheckTimeout: 300, ...restart },
+    deploy: { startCommand: "npm run start -w @opencast/api", // Staging also runs the seed (markets, ZIPs, Opencast's network stations); safe to repeat.
+    preDeployCommand: production ? ["npm run migrate -w @opencast/db"] : ["npm run migrate -w @opencast/db && npm run seed -w @opencast/db"], healthcheckPath: "/health", healthcheckTimeout: 300, ...restart },
     env: {
       ...common,
       PORT: "8080",
