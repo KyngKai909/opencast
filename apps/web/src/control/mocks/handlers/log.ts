@@ -1,27 +1,34 @@
 // log and playout: tonight's log with its breaks and dead air, the status the tally reads,
 // sign-on and its checks, sign off, cue a break. The On air area owns this file. Everything
 // here reads and writes the shared db (fixtures/evening.ts): a break the spot market fills shows
-// in the log, on the Monitor's rundown and on the rail's badge at once.
+// in the log, on the Monitor's rundown and on the rail's badge at once. Off air hours and day
+// templates (G8, G9) are kept in ../schedule.ts; their own endpoints are in templates.ts.
+// Planned off air isn't dead air: gaps leave it out, so nothing warns about it or fills it.
 
 import { http } from "msw";
 import { logApi, playoutApi, type BreakSlot, type LogEntry } from "@opencast/contracts";
-import { stationColourPasses } from "@opencast/ui";
+import { clock, stationColourPasses } from "@opencast/ui";
 import { buildRundown, currentIndex, type RundownRow } from "../../components/onair/rundown";
-import { addDays, broadcastDay, isoDate, localTime, timeOn } from "../../components/onair/time";
-import { now } from "../../../lib/clock";
+import { addDays, broadcastDay, isoDate, timeOn } from "../../components/onair/time";
+import { now, STATION_TZ } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationBreaks, stationLog, type DbStation } from "../db";
 import { breakSlot, type DbBreak, type DbFill, type DbLogEntry } from "../fixtures/evening";
 import { DEFAULT_BREAK_MS, MOCK_STREAMS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState } from "../fixtures/onair";
 import { fail, needsUser, path, reply } from "../respond";
+import { createTemplate, generateWindow, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
 const HOUR = 3_600_000;
 const uuid = () => crypto.randomUUID();
 
-/** Time with nothing on the log, between `from` and `to`. Shorter than five minutes between programs is a break. */
+/**
+ * Time with nothing on the log, between `from` and `to`, outside planned off air (off air hours
+ * and sign-offs aren't dead air). Shorter than five minutes between programs is a break.
+ */
 export function gapsIn(stationId: string, from: string, to: string) {
   const gaps: { startsAt: string; endsAt: string }[] = [];
   let cursor = from;
-  for (const e of stationLog(stationId, from, to)) {
+  const blocks = [...stationLog(stationId, from, to), ...offAirFor(stationId, from, to)].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  for (const e of blocks) {
     if (e.startsAt > cursor) gaps.push({ startsAt: cursor, endsAt: e.startsAt });
     if (e.endsAt > cursor) cursor = e.endsAt;
   }
@@ -35,9 +42,16 @@ function slotWithRows(b: DbBreak): BreakSlot {
   return { ...breakSlot(b), rows: rowsOfBreak(b) };
 }
 
-/** The station's rundown between two times, to the second. */
+/** The station's rundown between two times, to the second, with its planned off air. */
 export function rundownOf(stationId: string, from: string, to: string): RundownRow[] {
-  return buildRundown(stationLog(stationId, from, to), stationBreaks(stationId, new Date(Date.parse(from) - 3 * HOUR).toISOString(), to).map(slotWithRows));
+  return buildRundown(stationLog(stationId, from, to), stationBreaks(stationId, new Date(Date.parse(from) - 3 * HOUR).toISOString(), to).map(slotWithRows), undefined, offAirFor(stationId, from, to));
+}
+
+/** How far the log runs from `from` without dead air: planned off air counts as covered. */
+function runsUntil(stationId: string, from: string) {
+  const log = stationLog(stationId);
+  const off = offAirFor(stationId, from, new Date(Date.parse(from) + 8 * 24 * HOUR).toISOString());
+  return coverageUntil([...log, ...off], from);
 }
 
 function slug(st: DbStation) {
@@ -48,9 +62,11 @@ function outputUrl(st: DbStation) {
   return MOCK_STREAMS.includes(slug(st)) ? `/mock-hls/${slug(st)}/master.m3u8` : null;
 }
 
+/** Signed on, and not in planned off air (a sign-off, or the off air hours). */
 function isOnAirNow(st: DbStation, t: string) {
   const entry = stationLog(st.ident.id).find((e) => e.startsAt <= t && t < e.endsAt);
-  return st.onAir && entry?.kind !== "off_air";
+  const planned = offAirFor(st.ident.id, t, new Date(Date.parse(t) + 1000).toISOString()).length > 0;
+  return st.onAir && entry?.kind !== "off_air" && !planned;
 }
 
 function status(st: DbStation) {
@@ -71,6 +87,8 @@ function status(st: DbStation) {
   }
   const card = next ? PREVIEW_CARDS[next.title] : undefined;
   const nextEntry = next?.entryId ? stationLog(st.ident.id).find((e) => e.id === next.entryId) : undefined;
+  // Planned off air on now, or the next within 24 hours ("Signs off at 2:00 am"); while signed on.
+  const off = st.onAir ? offAirNext(st.ident.id, 24 * HOUR) : null;
   return {
     onAir,
     now: onAir && cur && cur.kind !== "gap" ? { title: cur.title, code: cur.code, startedAt: cur.at, itemId: cur.entryId ? (stationLog(st.ident.id).find((e) => e.id === cur.entryId)?.itemId ?? null) : null } : null,
@@ -89,12 +107,13 @@ function status(st: DbStation) {
             colour: card?.colour ?? nextEntry?.carriedFrom?.colour ?? st.ident.colour,
             pictureUrl: null
           }
-        : null
+        : null,
+    offAir: off ? { ...off, now: Date.parse(off.startsAt) <= t.getTime() } : null
   };
 }
 
 /** The person's role on a station, or the response to return. */
-function roleOn(request: Request, stationId: string, allowed: Array<"owner" | "operator" | "host">) {
+export function roleOn(request: Request, stationId: string, allowed: Array<"owner" | "operator" | "host">) {
   const p = needsUser(request);
   if (p instanceof Response) return p;
   const st = dbStation(stationId);
@@ -128,16 +147,6 @@ function entry(stationId: string, o: Partial<LogEntry> & Pick<LogEntry, "startsA
   return { id: uuid(), stationId, kind: "program", code: "PGM", episodeTitle: null, itemId: null, programId: null, liveSourceId: null, carriedFrom: null, carriageAgreementId: null, repeatGroupId: null, localNote: null, ...o };
 }
 
-/** Takes an entry off the log, with any break the log placed after it. */
-function removeWithBreaks(entryId: string) {
-  const db = getDb();
-  const s = onAirState();
-  const breakIds = new Set(s.placedBreaks.filter((p) => p.entryId === entryId).map((p) => p.breakId));
-  db.log = db.log.filter((e) => e.id !== entryId);
-  db.breaks = db.breaks.filter((b) => !breakIds.has(b.id));
-  s.placedBreaks = s.placedBreaks.filter((p) => p.entryId !== entryId);
-}
-
 // ---- Sign-on checks (A.6) ----
 
 export function signOnChecks(st: DbStation) {
@@ -148,14 +157,14 @@ export function signOnChecks(st: DbStation) {
   const entries = stationLog(id, from, to);
   const breaks = stationBreaks(id, from, to);
   const lib = getDb().library.items.filter((i) => i.stationId === id);
-  const checks: Array<{ key: "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output"; label: string; passed: boolean; blocking: boolean; detail: string | null; watchUrl?: string | null }> = [];
+  const checks: Array<{ key: "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours"; label: string; passed: boolean; blocking: boolean; detail: string | null; watchUrl?: string | null }> = [];
 
   if (!st.ident.callSign) checks.push({ key: "call_sign_chosen", label: "Choose a call sign", passed: false, blocking: true, detail: "Three to five capital letters, on the Your station step" });
   if (!st.ident.channel) checks.push({ key: "channel_chosen", label: "Choose a channel", passed: false, blocking: true, detail: "On the Your station step" });
 
   // The log covers the next 24 hours: nothing but breaks shorter than five minutes.
   const gaps = gapsIn(id, from, to).filter((g) => Date.parse(g.endsAt) - Date.parse(g.startsAt) >= 5 * MIN);
-  const until = coverageUntil(stationLog(id), from);
+  const until = runsUntil(id, from);
   checks.push(
     gaps.length
       ? { key: "log_covers_24h", label: "The log covers the next 24 hours", passed: false, blocking: true, detail: `Dead air from ${timeOn(gaps[0].startsAt, from)} to ${timeOn(gaps[0].endsAt, gaps[0].startsAt)}` }
@@ -166,10 +175,12 @@ export function signOnChecks(st: DbStation) {
   const ids = breaks.reduce((a, b) => a + b.fills.filter((f) => f.kind === "station_id").length, 0);
   const everyBreak = breaks.length > 0 && breaks.every((b) => b.fills.some((f) => f.kind === "station_id"));
   let hourly = everyBreak;
+  const plannedOff = offAirFor(id, from, to);
   for (let h = t.getTime(); hourly && h < t.getTime() + 24 * HOUR - HOUR; h += HOUR) {
     const a = new Date(h).toISOString();
     const z = new Date(h + HOUR).toISOString();
-    const offAir = stationLog(id, a, z).every((e) => e.kind === "off_air");
+    // Time off air doesn't need a station ID.
+    const offAir = stationLog(id, a, z).every((e) => e.kind === "off_air") || plannedOff.some((o) => o.startsAt <= a && o.endsAt >= z);
     if (!offAir && !breaks.some((b) => b.startsAt >= a && b.startsAt < z)) hourly = false;
   }
   const hasSid = lib.some((i) => i.code === "SID" && i.status === "ready" && i.rights);
@@ -202,6 +213,12 @@ export function signOnChecks(st: DbStation) {
   const programs = getDb().library.programs.filter((p) => p.station.id === id && p.listingStatus === "needs_description" && entries.some((e) => e.programId === p.id));
   for (const p of programs) checks.push({ key: "listings_complete", label: `${p.title} needs a description`, passed: false, blocking: false, detail: "Viewers see the series description until it has one" });
 
+  // Planned off air isn't a gap: say so, so nobody wonders (informational, never blocking).
+  const firstOff = plannedOff[0];
+  if (firstOff) {
+    checks.push({ key: "off_air_hours", label: "Off air hours planned", passed: true, blocking: false, detail: `Off air from ${clock(firstOff.startsAt, { timeZone: STATION_TZ })}, back at ${clock(firstOff.backAt, { timeZone: STATION_TZ })}. Not dead air: no warnings, nothing fills it` });
+  }
+
   return { ready: checks.every((c) => c.passed || !c.blocking), checks };
 }
 
@@ -228,18 +245,28 @@ export const logHandlers = [
     const last = broadcastDay(new Date(Date.parse(to) - 1).toISOString());
     const days = new Set<string>();
     for (let d = first; isoDate(d) <= isoDate(last); d = addDays(d, 1)) days.add(isoDate(d));
-    // G7: what "Repeat this day" set up, with its entries still to come (a day in the window counts too).
-    const repeats = onAirState()
+    // G8: the dates in the window that templates cover are made first, as the API does.
+    generateWindow(id, from, to);
+    saveDb();
+    const toCome = (groupId: string) => getDb().log.filter((e) => e.stationId === id && e.repeatGroupId === groupId && e.startsAt >= from).length;
+    // G7: one-time copies, with their entries still to come (a day in the window counts too);
+    // then the day templates still repeating, except weekdays ones (listTemplates only).
+    const copies = onAirState()
       .repeats.filter((r) => r.stationId === id)
-      .map((r) => ({ id: r.id, day: r.day, pattern: r.pattern, until: r.until, entries: getDb().log.filter((e) => e.stationId === id && e.repeatGroupId === r.id && e.startsAt >= from).length }))
+      .map((r) => ({ id: r.id, day: r.day, pattern: r.pattern, until: r.until, entries: toCome(r.id), template: false }))
       .filter((r) => r.entries > 0 || days.has(r.day));
+    const templates = templatesOf(id)
+      .map(templateView)
+      .filter((t): t is typeof t & { pattern: "once" | "daily" | "weekly" } => t.pattern !== "weekdays")
+      .map((t) => ({ id: t.id, day: t.fromDay, pattern: t.pattern, until: t.until, entries: toCome(t.id), template: true, weekday: t.weekday, label: t.label }));
     return reply(logApi.getLog.response, {
       from,
       to,
       entries: stationLog(id, from, to),
       breaks: stationBreaks(id, from, to).map(slotWithRows),
       gaps: gapsIn(id, from, to),
-      repeats
+      repeats: [...copies, ...templates],
+      offAir: offAirFor(id, from, to)
     });
   }),
 
@@ -278,6 +305,7 @@ export const logHandlers = [
     if (clash) return fail(409, "conflict", `That time already has ${clash.title} on the log.`);
     const e = entry(id, { startsAt: b.startsAt, endsAt, title, episodeTitle: b.episodeTitle ?? o.episodeTitle ?? null, localNote: b.localNote ?? null, ...o, kind: o.kind ?? b.kind });
     getDb().log.push(e);
+    markEdited(id, [e.startsAt]);
     saveDb();
     return reply(logApi.addEntry.response, e, 201);
   }),
@@ -295,6 +323,7 @@ export const logHandlers = [
     if (endsAt <= startsAt) return fail(400, "bad_request", "It has to end after it starts.");
     const clash = overlaps(e.stationId, startsAt, endsAt, e.id);
     if (clash) return fail(409, "conflict", `That time already has ${clash.title} on the log.`);
+    markEdited(e.stationId, [e.startsAt, startsAt]);
     Object.assign(e, { startsAt, endsAt }, b.episodeTitle !== undefined ? { episodeTitle: b.episodeTitle } : {}, b.localNote !== undefined ? { localNote: b.localNote } : {});
     saveDb();
     return reply(logApi.updateEntry.response, e);
@@ -305,69 +334,43 @@ export const logHandlers = [
     if (r instanceof Response) return r;
     const e = getDb().log.find((x) => x.id === String(params.entryId) && x.stationId === r.station.ident.id);
     if (!e) return fail(404, "not_found", "That entry isn't on the log.");
+    markEdited(e.stationId, [e.startsAt]);
     removeWithBreaks(e.id);
     saveDb();
     saveOnAirState();
     return reply(logApi.removeEntry.response, { ok: true });
   }),
 
+  // Since G8 "Repeat this day" makes a day template running until `until` (see ../schedule.ts).
   http.post(path(logApi.repeatDay), async ({ request, params }) => {
     const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
     if (r instanceof Response) return r;
     const body = logApi.repeatDay.body!.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "Say which day and how it repeats.");
     const { day, pattern, until, onto } = body.data;
-    const id = r.station.ident.id;
-    const [y, m, d] = day.split("-").map(Number);
-    const src = { year: y, month: m, day: d };
-    const from = localTime(src, 6);
-    const to = localTime(src, 30);
-    const targets: number[] = [];
-    if (pattern === "once") {
-      if (onto) {
-        const [oy, om, od] = onto.split("-").map(Number);
-        targets.push(Math.round((Date.UTC(oy, om - 1, od) - Date.UTC(y, m - 1, d)) / 86_400_000));
-      }
-    } else {
-      const step = pattern === "weekly" ? 7 : 1;
-      for (let n = step; isoDate(addDays(src, n)) <= until; n += step) targets.push(n);
+    try {
+      const made = createTemplate(r.station.ident.id, { fromDay: day, pattern, until: pattern === "once" ? null : until, onto });
+      saveDb();
+      saveOnAirState();
+      return reply(logApi.repeatDay.response, { created: made.generated.created, skippedForConflicts: made.generated.skippedForConflicts, templateId: made.template.id });
+    } catch (e) {
+      if (e instanceof TemplateInputError) return fail(400, "bad_request", e.message, e.fields);
+      throw e;
     }
-    const groupId = uuid();
-    const dayEntries = stationLog(id, from, to).filter((e) => e.startsAt >= from);
-    const dayBreaks = stationBreaks(id, from, to);
-    let created = 0;
-    let skipped = 0;
-    for (const n of targets) {
-      const shift = (s: string) => new Date(Date.parse(localTime(addDays(src, n), 0)) + (Date.parse(s) - Date.parse(localTime(src, 0)))).toISOString();
-      for (const e of dayEntries) {
-        const s = shift(e.startsAt);
-        const f = shift(e.endsAt);
-        if (overlaps(id, s, f)) {
-          skipped++;
-          continue;
-        }
-        getDb().log.push({ ...e, id: uuid(), startsAt: s, endsAt: f, repeatGroupId: groupId });
-        created++;
-      }
-      for (const b of dayBreaks) {
-        const s = shift(b.startsAt);
-        if (getDb().breaks.some((x) => x.stationId === id && x.startsAt === s)) continue;
-        // The station's own fills repeat; spots come from the rotation each night.
-        getDb().breaks.push({ ...b, id: uuid(), startsAt: s, fills: b.fills.filter((f) => f.kind !== "spot").map((f) => ({ ...f, id: uuid() })) });
-      }
-    }
-    const st = onAirState();
-    st.repeats = [...st.repeats, { id: groupId, stationId: id, day, pattern, until: pattern === "once" ? (onto ?? null) : until }];
-    saveDb();
-    saveOnAirState();
-    return reply(logApi.repeatDay.response, { created, skippedForConflicts: skipped });
   }),
 
-  // G7: take a repeat's entries off the log from now on.
+  // G7: take a repeat's entries off the log from now on; a day template stops repeating.
   http.delete(path(logApi.removeRepeat), ({ request, params }) => {
     const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
     if (r instanceof Response) return r;
     const id = r.station.ident.id;
+    const template = templateById(id, String(params.repeatId));
+    if (template) {
+      const removed = removeTemplate(template);
+      saveDb();
+      saveOnAirState();
+      return reply(logApi.removeRepeat.response, { removed });
+    }
     const st = onAirState();
     const rep = st.repeats.find((x) => x.stationId === id && x.id === String(params.repeatId));
     if (!rep) return fail(404, "not_found", "That repeat wasn't found.");
@@ -415,6 +418,7 @@ export const logHandlers = [
       saveOnAirState();
     }
     getDb().log.push(...made);
+    markEdited(id, [b.startsAt]);
     saveDb();
     return reply(logApi.fillGap.response, made);
   }),
@@ -428,9 +432,9 @@ export const logHandlers = [
     const to = new Date(t.getTime() + 24 * HOUR).toISOString();
     const gaps = gapsIn(id, from, to);
     const next = gaps[0] ?? null;
-    // Warnings go out 30 and 12 minutes before a gap (P.2).
+    // Warnings go out 30 and 12 minutes before a gap (P.2); never for planned off air.
     const warnings = next ? deadAirWarnings(next.startsAt, t.getTime()) : [];
-    return reply(logApi.getDeadAir.response, { gaps, nextGapAt: next?.startsAt ?? null, logRunsUntil: coverageUntil(stationLog(id), from), warnings });
+    return reply(logApi.getDeadAir.response, { gaps, nextGapAt: next?.startsAt ?? null, logRunsUntil: runsUntil(id, from), warnings, offAir: offAirFor(id, from, to) });
   }),
 
   // ---- playout ----
@@ -495,7 +499,8 @@ export const logHandlers = [
     const from = q.get("from") ?? new Date(now().getTime() - 6 * HOUR).toISOString();
     const to = q.get("to") ?? now().toISOString();
     const t = now().getTime();
-    const rows = rundownOf(r.station.ident.id, from, to).filter((x) => Date.parse(x.at) < t && x.kind !== "gap");
+    // Nothing is recorded for the dark time off air.
+    const rows = rundownOf(r.station.ident.id, from, to).filter((x) => Date.parse(x.at) < t && x.kind !== "gap" && x.kind !== "off_air");
     return reply(
       playoutApi.getAsRun.response,
       rows.map((x) => ({

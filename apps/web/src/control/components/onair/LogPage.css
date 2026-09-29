@@ -13,6 +13,28 @@
 .cc-log__quiet { margin: 0; font-size: 13.5px; color: var(--ink-50); }
 .cc-log__standby { color: var(--standby); }
 .cc-log--setup .oc-control-foot { margin-top: 18px; }
+.cc-log__main > .cc-log__origin { margin-bottom: 14px; }
+.cc-log__hrow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.cc-log__note { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }
+.cc-log__link { color: var(--signal); font-weight: 600; text-decoration: none; }
+.cc-log__link:hover { text-decoration: underline; }
+.cc-log__templates { margin-top: 12px; }
+
+/* Planned off air (G9): a calm band, not dead air. No hatching, no standby amber, no warning sign:
+   the quiet ground with "Off air" and when the station is back. */
+.oc-blk:has(.cc-log__off) {
+  background: color-mix(in srgb, var(--hair) 55%, var(--ground)); box-shadow: inset 3px 0 0 var(--line);
+  color: var(--ink-70); align-items: center;
+}
+.oc-blk:has(.cc-log__off) .oc-code { display: none; }
+.oc-blk:has(.cc-log__off) b { font-weight: 600; color: var(--ink-70); }
+
+/* Repeat this day and Off air hours, in their dialogs. */
+.cc-rep { display: grid; gap: 14px; }
+.cc-rep__seg { justify-self: start; }
+.cc-offair { display: grid; gap: 14px; }
+.cc-offair__rule { margin: 0; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--hair); display: grid; gap: 10px; justify-items: start; }
+.cc-offair__times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
 
 /* The week: seven days side by side, the hours once at the left. */
 .cc-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
@@ -28,6 +50,7 @@
 }
 @media (max-width: 767px) {
   .cc-log { padding: 14px 16px; }
+  .cc-offair__times { grid-template-columns: minmax(0, 1fr); }
   .cc-log .oc-control-title { flex-wrap: wrap; }
   .cc-log__days { overflow-x: auto; }
   .cc-log__split { grid-template-columns: minmax(0, 1fr); }

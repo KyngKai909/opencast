@@ -9,6 +9,7 @@ import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { PEOPLE, type MockPerson } from "../fixtures/people";
 import { ALWAYS_ON, DEAD_AIR_AT, defaultBreakRule, defaultPrefs, newId, saveStationState, stationState, type StationInvite } from "../fixtures/station";
 import { fail, needsUser, path, personOf, reply } from "../respond";
+import { offAirFor } from "../schedule";
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -186,8 +187,8 @@ export function nextDeadAir(stationId: string, at: Date = now()): string | null 
   const to = new Date(at.getTime() + DEAD_AIR_LOOKAHEAD).toISOString();
   const fixed = DEAD_AIR_AT[stationId];
   if (fixed) return fixed > from && fixed < to ? fixed : null;
-  // Only a station whose log the mock keeps can say where its gaps are.
-  const log = stationLog(stationId, from, to);
+  // Only a station whose log the mock keeps can say where its gaps are. Planned off air isn't dead air.
+  const log = [...stationLog(stationId, from, to), ...offAirFor(stationId, from, to)];
   if (!stationLog(stationId).length) return null;
   return firstGap(log, from, to);
 }
@@ -215,7 +216,8 @@ const statusHandlers = [
         const studio = st?.ident.kind === "studio";
         const deadAirAt = studio || !st?.onAir ? null : nextDeadAir(m.stationId);
         // How long it lasts: until the next thing on the log, when the mock keeps one.
-        const deadAirEndsAt = deadAirAt ? (stationLog(m.stationId).find((e) => e.startsAt > deadAirAt)?.startsAt ?? null) : null;
+        const ahead = deadAirAt ? [...stationLog(m.stationId), ...offAirFor(m.stationId, deadAirAt, new Date(Date.parse(deadAirAt) + DAY).toISOString())].sort((a, b) => a.startsAt.localeCompare(b.startsAt)) : [];
+        const deadAirEndsAt = deadAirAt ? (ahead.find((e) => e.startsAt > deadAirAt)?.startsAt ?? null) : null;
         return { stationId: m.stationId, onAir: !!st?.onAir && !studio, deadAirAt, deadAirEndsAt };
       });
     return reply(accountsApi.myStationStatus.response, rows);

@@ -1,7 +1,8 @@
 // Tonight on BEAT (master-control T, RD and BK; live-listings): Crate Session 02 from 6:00,
 // Late Crate ep. 14 at 8:00, Saturday Reel carried from REEL at 8:30 (on air at 8:42:12), Beat
 // Tape Live at 9:01 from the studio, Late Crate ep. 15 at 10:00, Slow Hours carried from HALL
-// at 10:30:30, then dead air from 11:40 pm to 2:00 am (P.2: "the log runs short").
+// at 10:30:30, then dead air from 11:40 pm to 2:00 am (P.2: "the log runs short"), overnight
+// repeats, and the off air hours. Tomorrow night a sign-off at 11:00 pm.
 // Breaks are as "Breaks tonight" (C.1) draws them, before the spot market fills them.
 
 import type { LibraryItem, LiveSource, LogEntry } from "@opencast/contracts";
@@ -83,9 +84,12 @@ export function seedEvening(items: LibraryItem[]): { log: DbLogEntry[]; breaks: 
     fromItem("Late Crate, ep. 15", at("22:00"), at("22:28:30"), { localNote: "Beat showcase" }),
     entry({ title: "Slow Hours", startsAt: at("22:30:30"), endsAt: at("23:40"), programId: PROGRAM_IDS.slowHours, carriedFrom: HALL, carriageAgreementId: uid(270002) }),
     // 11:40 pm to 2:00 am: nothing. Dead air.
-    // Overnight repeats; the log runs until 6:00 am.
+    // Overnight repeats until 4:00 am, inside the off air hours (2:00 to 6:00 am, fixtures/offair.ts):
+    // what's on the log still airs, and the hours cover the rest, so BEAT is off air 4:00 to 6:00 am.
     ...[12, 13, 14, 15].map((ep, i) => fromItem(`Late Crate, ep. ${ep}`, at(`${26 + Math.floor(i / 2)}:${i % 2 ? "30" : "00"}`), at(`${26 + Math.floor((i + 1) / 2)}:${(i + 1) % 2 ? "30" : "00"}`), { localNote: "Overnight repeat" })),
-    fromItem("Crate Session 01", at("28:00"), at("30:00"), { localNote: "Overnight repeat" })
+    // Tomorrow night BEAT signs off early, at 11:00 pm: the sign-off runs into the off air hours,
+    // so it's back at 6:00 am (A.4's "Sign off at 11:40 pm", "Back at 6:00 am").
+    entry({ kind: "off_air", code: "OPEN", title: "Off air", startsAt: at("+1 23:00"), endsAt: at("+1 26:00") })
   ];
 
   const f = (kind: DbFill["kind"], title: string, lengthSec: number, o: Partial<DbFill> = {}): DbFill => ({ id: fillId(), kind, title, lengthMs: lengthSec * SEC, ...o });

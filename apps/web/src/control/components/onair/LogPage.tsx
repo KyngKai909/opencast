@@ -1,12 +1,14 @@
 // The program log (A.4): the day as it will actually be, as a timeline: programs at their start
-// times, breaks where they fall, dead air drawn as dead air, and a pane to fill a gap, set the
-// break rule and repeat the day. The same page is setup step 3 and the station's Program log;
-// on the phone the fill choices open as a sheet (P.2, `?fill=<gapStart>`).
+// times, breaks where they fall, dead air drawn as dead air, planned off air (G9: the off air hours
+// and sign-offs) as a calm band with when the station is back, never warned about, and a pane to
+// fill a gap, set the break rule, repeat the day (G8: day templates) and set the off air hours.
+// The same page is setup step 3 and the station's Program log; on the phone the fill choices open
+// as a sheet (P.2, `?fill=<gapStart>`). `?day=` is a weekday of this week ("sat") or a date
+// ("2026-10-03", from a template's dates).
 
-import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { logApi, stationsApi, type ProgramLog, type StationIdent } from "@opencast/contracts";
+import { stationsApi, type ProgramLog, type StationIdent } from "@opencast/contracts";
 import {
   Button,
   ControlFoot,
@@ -23,15 +25,17 @@ import {
   useToast,
   type TimelineBlock
 } from "@opencast/ui";
-import { call } from "../../../api/client";
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { useIsPhone } from "../../layout/shell";
 import { now, STATION_TZ, useNow } from "../../../lib/clock";
 import { Quiet } from "../../pages/common";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "./data";
 import { FillOptions, useFill, type Gap } from "./Fill";
+import { offAirSource } from "./offAir";
+import { OffAirHoursSection } from "./OffAirHours";
+import { DayOrigin, RepeatDaySection } from "./RepeatDay";
 import { entrySource } from "./rundown";
-import { DAY_KEYS, DAY_SHORT, DAY_WORDS, addDays, broadcastDay, isoDate, localTime, monthDay, spanText, viewWindow, weekOf, weekdayOf, type LogView, type Ymd } from "./time";
+import { DAY_KEYS, DAY_SHORT, broadcastDay, isoDate, spanText, viewWindow, weekOf, weekdayOf, type LogView, type Ymd } from "./time";
 import "./LogPage.css";
 
 const MIN = 60_000;
@@ -45,16 +49,33 @@ export interface LogPageProps {
   setup?: { back: string; next: string };
 }
 
-/** Blocks for the timeline, from the log's entries, breaks and gaps inside a window. */
-export function timelineBlocks(log: Pick<ProgramLog, "entries" | "breaks" | "gaps">, from: string, to: string, now = Date.now()): TimelineBlock[] {
+/** The marker on an off air block's title: the log's CSS draws the block as the calm off air band. */
+export const OFF_AIR_MARK = "cc-log__off";
+
+/**
+ * Blocks for the timeline, from the log's entries, breaks, gaps and planned off air inside a
+ * window. Off air (the hours, and a sign-off entry) is its own band, "Off air" with when the
+ * station is back; it's never dead air.
+ */
+export function timelineBlocks(log: Pick<ProgramLog, "entries" | "breaks" | "gaps" | "offAir">, from: string, to: string, now = Date.now()): TimelineBlock[] {
   const a = Date.parse(from);
   const z = Date.parse(to);
   const clip = (s: string, e: string) => ({ start: new Date(Math.max(a, Date.parse(s))).toISOString(), end: new Date(Math.min(z, Date.parse(e))).toISOString() });
   const inside = (s: string, e: string) => Date.parse(e) > a && Date.parse(s) < z;
+  const offAir = log.offAir ?? [];
+  const offTitle = <span className={OFF_AIR_MARK}>Off air</span>;
   return [
     ...log.entries
-      .filter((e) => inside(e.startsAt, e.endsAt))
-      .map<TimelineBlock>((e) => ({ id: e.id, kind: e.carriedFrom ? "car" : "pgm", ...clip(e.startsAt, e.endsAt), title: e.kind === "off_air" ? "Off air" : e.title, source: entrySource(e), code: e.code })),
+      // A sign-off entry is drawn from its off air span, with when the station is back.
+      .filter((e) => inside(e.startsAt, e.endsAt) && !(e.kind === "off_air" && offAir.some((o) => o.logEntryId === e.id)))
+      .map<TimelineBlock>((e) =>
+        e.kind === "off_air"
+          ? { id: e.id, kind: "pgm", ...clip(e.startsAt, e.endsAt), title: offTitle, source: "Viewers see \"Off air\" and when you're back", code: "OPEN" }
+          : { id: e.id, kind: e.carriedFrom ? "car" : "pgm", ...clip(e.startsAt, e.endsAt), title: e.title, source: entrySource(e), code: e.code }
+      ),
+    ...offAir
+      .filter((o) => inside(o.startsAt, o.endsAt))
+      .map<TimelineBlock>((o) => ({ id: o.logEntryId ?? `off:${o.startsAt}`, kind: "pgm", ...clip(o.startsAt, o.endsAt), title: offTitle, source: offAirSource(o), code: "OPEN" })),
     // Breaks between programs; one inside a program (a carried program's, a live block's cue) is part of its block.
     ...log.breaks
       .map((b) => ({ b, end: new Date(Date.parse(b.startsAt) + b.lengthMs).toISOString() }))
@@ -88,10 +109,12 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const [params, setParams] = useSearchParams();
   const t = useNow(30_000).getTime();
   const today = broadcastDay(now());
-  const week = weekOf(today);
+  const thisWeek = weekOf(today);
   const view = (["day", "evening", "week"].includes(params.get("view") ?? "") ? params.get("view") : "evening") as LogView;
-  const dayKey = params.get("day") ?? DAY_KEYS[weekdayOf(today)];
-  const day: Ymd = week.find((d) => DAY_KEYS[weekdayOf(d)] === dayKey) ?? today;
+  const dayParam = params.get("day") ?? DAY_KEYS[weekdayOf(today)];
+  const dated = /^\d{4}-\d{2}-\d{2}$/.exec(dayParam) ? ymdOf(dayParam) : null;
+  const week = dated ? weekOf(dated) : thisWeek;
+  const day: Ymd = dated ?? thisWeek.find((d) => DAY_KEYS[weekdayOf(d)] === dayParam) ?? today;
   const win = viewWindow(view, day);
 
   const log = useLog(stationId, win.from, win.to, { refetchInterval: 30_000 });
@@ -99,8 +122,6 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const playout = usePlayout(stationId);
   const rule = useApi(stationsApi.getBreakRule, { params: { stationId } }, { retry: false });
   const setRule = useApiMutation(stationsApi.setBreakRule, { invalidates: [stationsApi.getBreakRule, ...LOG_READS] });
-  const qc = useQueryClient();
-  const [repeating, setRepeating] = useState(false);
 
   const set = (k: string, v: string | null) =>
     setParams(
@@ -123,28 +144,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   if (log.isError) return <ControlTitle title="Program log" description={log.error.message} />;
 
   const first = gaps[0];
-  const dayWord = DAY_WORDS[weekdayOf(day)];
-  // G7: this day's repeats. Choosing another pattern takes the old one off first; "Once" only does that.
-  const dayRepeats = (log.data?.repeats ?? []).filter((r) => r.day === isoDate(day) && r.pattern !== "once");
-  const repeatValue = dayRepeats[dayRepeats.length - 1]?.pattern ?? "once";
-  const until = addDays(day, 56);
-
-  const onRepeat = async (pattern: "once" | "daily" | "weekly") => {
-    if (repeating || pattern === repeatValue) return;
-    setRepeating(true);
-    try {
-      for (const r of dayRepeats) await call(logApi.removeRepeat, { params: { stationId, repeatId: r.id } });
-      if (pattern !== "once") {
-        await call(logApi.repeatDay, { params: { stationId }, body: { day: isoDate(day), pattern, until: isoDate(until) } });
-        toast.show({ message: `${pattern === "weekly" ? `Repeats every ${dayWord}` : "Repeats every day"} through ${monthDay(localTime(until, 12))}.` });
-      }
-    } catch (e) {
-      toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
-    } finally {
-      await Promise.all(LOG_READS.map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })));
-      setRepeating(false);
-    }
-  };
+  // A day of this week by its key; another week's by its date.
+  const dayValue = (d: Ymd) => (thisWeek.some((x) => isoDate(x) === isoDate(d)) ? DAY_KEYS[weekdayOf(d)] : isoDate(d));
 
   const onRule = (mode: "after_every_program" | "every_n_minutes" | "none") => {
     if (!rule.data) return;
@@ -225,20 +226,21 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   );
 
   const repeatSection = view !== "week" && (
-    <section className="cc-log__sec">
-      <h2 className="cc-log__h">Repeat this day</h2>
-      <Segmented
-        label="Repeat this day"
-        value={repeatValue}
-        onChange={(v) => void onRepeat(v)}
-        options={[
-          { value: "weekly", label: `Every ${dayWord}` },
-          { value: "daily", label: "Every day" },
-          { value: "once", label: "Once" }
-        ]}
-      />
-    </section>
+    <RepeatDaySection
+      stationId={stationId}
+      day={day}
+      repeats={log.data?.repeats}
+      phone={phone}
+      dateHref={(date) => {
+        const p = new URLSearchParams(params);
+        p.set("day", date);
+        p.delete("fill");
+        return `?${p}`;
+      }}
+    />
   );
+
+  const offAirSection = view !== "week" && <OffAirHoursSection stationId={stationId} callSign={station.callSign ?? station.name} phone={phone} />;
 
   // Fill it: the gap's pane (from the week, on the evening of the gap's day).
   const fillFrom = (g: Gap & { key: string }) =>
@@ -246,7 +248,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
       (p) => {
         if (view === "week") {
           p.set("view", "evening");
-          p.set("day", DAY_KEYS[weekdayOf(broadcastDay(g.startsAt))]);
+          p.set("day", dayValue(broadcastDay(g.startsAt)));
         }
         p.set("fill", g.key);
         return p;
@@ -279,9 +281,9 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
         <Tabs
           variant="days"
           label="Day"
-          value={DAY_KEYS[weekdayOf(day)]}
+          value={dayValue(day)}
           onChange={(v) => set("day", v)}
-          items={week.map((d) => ({ value: DAY_KEYS[weekdayOf(d)], label: DAY_SHORT[weekdayOf(d)] }))}
+          items={week.map((d) => ({ value: dayValue(d), label: DAY_SHORT[weekdayOf(d)] }))}
           className="cc-log__days"
         />
       )}
@@ -296,13 +298,15 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
               {minutesText(Date.parse(first.endsAt) - Date.parse(first.startsAt))} with nothing scheduled.
             </Notice>
           )}
+          {view !== "week" && <DayOrigin stationId={stationId} day={day} />}
           {timeline}
         </div>
         {view !== "week" && (
-          <aside className="cc-log__pane" aria-label="Filling, breaks and repeats">
+          <aside className="cc-log__pane" aria-label="Filling, breaks, repeats and off air hours">
             {fillSection}
             {breaksSection}
             {repeatSection}
+            {offAirSection}
           </aside>
         )}
       </div>
@@ -333,4 +337,9 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
       )}
     </div>
   );
+}
+
+function ymdOf(date: string): Ymd {
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
 }

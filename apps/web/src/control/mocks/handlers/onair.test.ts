@@ -104,8 +104,12 @@ describe("the log", () => {
     expect(await starts()).toContain(gap.startsAt);
   });
 
-  it("repeats a day, lists the repeat, and takes it off again (G7)", async () => {
+  it("repeats a day, lists the repeat, and takes it off again (G7, a day template since G8)", async () => {
     const beat = getDb().stations.find((x) => x.ident.callSign === "BEAT")!.ident.id;
+    // BEAT's own templates stopped first: a more specific one (weekdays, every Saturday) would win the dates.
+    for (const t of (await api(`/stations/${beat}/log/templates`, { as: "kai@example.com" })).body.templates) {
+      expect((await api(`/stations/${beat}/log/templates/${t.id}`, { method: "DELETE", as: "kai@example.com" })).status).toBe(200);
+    }
     // The day of BEAT's next program, copied onto the next three days.
     const next = getDb().log.filter((e) => e.stationId === beat && e.startsAt > now().toISOString()).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0]!;
     const day = isoDate(broadcastDay(next.startsAt));
@@ -115,7 +119,7 @@ describe("the log", () => {
     const window = `from=${encodeURIComponent(now().toISOString())}&to=${encodeURIComponent(new Date(now().getTime() + 4 * 86_400_000).toISOString())}`;
     const log = await api(`/stations/${beat}/log?${window}`, { as: "kai@example.com" });
     const rep = log.body.repeats.find((r: { day: string; pattern: string }) => r.day === day && r.pattern === "daily");
-    expect(rep).toMatchObject({ until, entries: expect.any(Number) });
+    expect(rep).toMatchObject({ until, entries: expect.any(Number), template: true, label: "Every day", id: made.body.templateId });
     expect(rep.entries).toBeGreaterThan(0);
     const out = await api(`/stations/${beat}/log/repeats/${rep.id}`, { method: "DELETE", as: "kai@example.com" });
     expect(out.body.removed).toBe(rep.entries);

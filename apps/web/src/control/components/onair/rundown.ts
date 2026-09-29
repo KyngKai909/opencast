@@ -1,8 +1,11 @@
 // The Monitor's rundown, to the second (master-control A.7 RD, P.1): programs split around the
-// breaks inside them ("Saturday Reel, part 1"), each break's rows in the order they air, and
-// time with nothing on the log. Shared with the mock, which answers "what's on now" from it.
+// breaks inside them ("Saturday Reel, part 1"), each break's rows in the order they air, planned
+// off air (G9: off air hours and sign-offs, with when the station is back), and time with nothing
+// on the log. Shared with the mock, which answers "what's on now" from it.
 
-import type { BreakRow, BreakSlot, LogCode, LogEntry } from "@opencast/contracts";
+import type { BreakRow, BreakSlot, LogCode, LogEntry, OffAirSpan } from "@opencast/contracts";
+import { clock } from "@opencast/ui";
+import { STATION_TZ } from "../../../lib/clock";
 
 export interface RundownRow {
   id: string;
@@ -13,7 +16,8 @@ export interface RundownRow {
   /** The line under the title: "Carried from REEL 24.1", "REEL's break time, barter". */
   source: string | null;
   lengthMs: number;
-  kind: "program" | "break" | "gap";
+  /** `off_air`: the off air hours (a sign-off is its own entry, a program row). */
+  kind: "program" | "break" | "gap" | "off_air";
   /** The break a row belongs to. */
   breakId?: string;
   /** The log entry a program row belongs to. */
@@ -60,18 +64,25 @@ export function breakRows(b: BreakSlot): RundownRow[] {
   return out;
 }
 
-/** Everything on the log in time order, to the second. */
-export function buildRundown(entries: LogEntry[], breaks: BreakSlot[], gapMinMs = GAP_MIN_MS): RundownRow[] {
+/** "Back at 6:00 am". */
+export function backAtText(backAt: string, tz = STATION_TZ): string {
+  return `Back at ${clock(backAt, { timeZone: tz })}`;
+}
+
+/** Everything on the log in time order, to the second, with the planned off air (`getLog.offAir`). */
+export function buildRundown(entries: LogEntry[], breaks: BreakSlot[], gapMinMs = GAP_MIN_MS, offAir: OffAirSpan[] = []): RundownRow[] {
   const sortedBreaks = [...breaks].sort((a, b) => t(a.startsAt) - t(b.startsAt));
   const rows: RundownRow[] = [];
   const used = new Set<BreakSlot>();
+  const signOffBack = (id: string) => offAir.find((o) => o.logEntryId === id)?.backAt;
 
   for (const e of [...entries].sort((a, b) => t(a.startsAt) - t(b.startsAt))) {
     const s = t(e.startsAt);
     const end = t(e.endsAt);
     const inside = sortedBreaks.filter((b) => t(b.startsAt) > s && t(b.startsAt) < end);
     const title = e.kind === "off_air" ? "Off air" : e.title;
-    const source = e.kind === "off_air" ? "Viewers see \"Off air\" and when you're back" : entrySource(e);
+    const back = e.kind === "off_air" ? signOffBack(e.id) : undefined;
+    const source = e.kind === "off_air" ? (back ? backAtText(back) : "Viewers see \"Off air\" and when you're back") : entrySource(e);
     if (!inside.length) {
       rows.push({ id: e.id, at: e.startsAt, code: e.code, title, source, lengthMs: end - s, kind: "program", entryId: e.id });
       continue;
@@ -86,6 +97,11 @@ export function buildRundown(entries: LogEntry[], breaks: BreakSlot[], gapMinMs 
     if (end > cursor) rows.push({ id: `${e.id}:p${inside.length + 1}`, at: iso(cursor), code: e.code, title: `${title}, part ${inside.length + 1}`, source, lengthMs: end - cursor, kind: "program", entryId: e.id });
   }
   for (const b of sortedBreaks) if (!used.has(b)) rows.push(...breakRows(b));
+  // The off air hours: what the log leaves empty inside them.
+  for (const o of offAir) {
+    if (o.source !== "hours") continue;
+    rows.push({ id: `off:${o.startsAt}`, at: o.startsAt, code: "OPEN", title: "Off air", source: backAtText(o.backAt), lengthMs: t(o.endsAt) - t(o.startsAt), kind: "off_air" });
+  }
   rows.sort((a, b) => t(a.at) - t(b.at));
 
   // Time with nothing in it.
