@@ -34,8 +34,7 @@ export function zonedTime(date: string, time: string, tz: string): Date {
 /** Start and end (exclusive) of a local day. */
 export function localDay(date: string, tz: string): { from: Date; to: Date } {
   const from = zonedTime(date, "00:00", tz);
-  const next = new Date(Date.UTC(...(date.split("-").map(Number) as [number, number, number])) + 86_400_000);
-  const to = zonedTime(next.toISOString().slice(0, 10), "00:00", tz);
+  const to = zonedTime(addDays(date, 1), "00:00", tz);
   return { from, to };
 }
 

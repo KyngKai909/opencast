@@ -134,6 +134,13 @@
       "when": 1790668343226,
       "tag": "0018_business_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790675704232,
+      "tag": "0019_off_air_hours_and_day_templates",
+      "breakpoints": true
     }
   ]
 }

@@ -163,6 +163,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       }
       // G3: a live block ended early. The log already moved up: hand back to it now.
       if (command.action === "end_live") runner?.replan(true);
+      // The off air hours changed: read the log again (a station off air notices at once).
+      if (command.action === "replan") runner?.replan();
       // sign_on and sign_off change who's on air; the runners follow below.
       await db.update(schema.commands).set({ consumedAt: deps.clock.now() }).where(eq(schema.commands.id, command.id));
     }

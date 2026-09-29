@@ -29,7 +29,13 @@ export const Airing = z.object({
   carriedFrom: StationIdent.nullable(),
   programId: Id.nullable(),
   /** G5 (added 2026-09-29): the airing's own description, else its episode's ("Tonight: a steamboat, a haunted barn…"). */
-  episodeDescription: z.string().nullable().optional()
+  episodeDescription: z.string().nullable().optional(),
+  /**
+   * Added 2026-09-29, on `off_air` airings only: when the station is back ("Off air, back at
+   * 6:00 am"). Planned off air (the station's off air hours, or a sign-off on its log) is one
+   * airing from sign-off to sign-on, with `logEntryId` the sign-off entry's when there is one.
+   */
+  backAt: Timestamp.nullable().optional()
 });
 export type Airing = z.infer<typeof Airing>;
 
@@ -45,7 +51,12 @@ export const DialRow = z.object({
    * S13 (added 2026-09-28): `standby` while a live block is on the stand-by slate waiting for its
    * signal; `ok` otherwise. Absent when the station isn't on air (and from listed city streams).
    */
-  signal: z.enum(["ok", "standby"]).optional()
+  signal: z.enum(["ok", "standby"]).optional(),
+  /**
+   * Added 2026-09-29: while the station is off air on a schedule (its off air hours or a sign-off
+   * on its log), when it's back. `now` is then the `off_air` airing and `onAir` is false. Absent otherwise.
+   */
+  backAt: Timestamp.optional()
 });
 
 export const Dial = z.object({

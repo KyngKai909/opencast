@@ -450,6 +450,11 @@ export const logEntries = broadcast.table(
     episodeDescription: text("episode_description"),
     /** G3 (added 2026-09-29): a live block ended early. `ends_at` is moved to this moment; the log after it moved up. */
     endedEarlyAt: at("ended_early_at"),
+    /**
+     * Day templates (added 2026-09-29): the date (the station's local day) a template generated this
+     * entry for, with `repeat_group_id` the template. Null for entries made by hand and for G7 copies.
+     */
+    templateDate: date("template_date"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -462,19 +467,110 @@ export const logEntries = broadcast.table(
   ]
 );
 
-/** "Build one day and repeat it": Every Saturday / Every day / Once. */
+/**
+ * "Build one day and repeat it": Every Saturday / Weekdays / Every day / Once.
+ *
+ * G7 copies (`template` false) copied a day's entries once, up to `ends_on`. Day templates
+ * (`template` true, added 2026-09-29) keep the day in `day_template_entries` and generate each
+ * future date's log from it, a few weeks ahead (`day_template_dates` records each date made).
+ * `starts_on` is the day it was built from; `ends_on` is the last date it repeats on (the date
+ * for "once"; null repeats until it's taken off). `weekday` (0 = Sunday) for "weekly".
+ */
 export const repeatGroups = broadcast.table("repeat_groups", {
   id: id(),
   stationId: uuid("station_id")
     .notNull()
     .references(() => stations.id),
-  pattern: text("pattern", { enum: ["once", "daily", "weekly"] }).notNull(),
+  /** `weekdays` (Monday to Friday) added 2026-09-29; a text column, so no migration for it. */
+  pattern: text("pattern", { enum: ["once", "daily", "weekly", "weekdays"] }).notNull(),
   weekday: smallint("weekday"),
   startTime: time("start_time").notNull(),
   startsOn: date("starts_on").notNull(),
   endsOn: date("ends_on"),
+  /** Added 2026-09-29: a day template (generates dates) rather than a one-time copy. */
+  template: boolean("template").notNull().default(false),
+  name: text("name"),
+  /** When the template last changed: dates generated before this are made again (unless edited). */
+  updatedAt: at("updated_at"),
+  /** Taken off the log (`removeRepeat`): nothing more is generated. */
+  removedAt: at("removed_at"),
   createdAt: createdAt()
 });
+
+/** Day templates (added 2026-09-29): the day a template repeats, as local wall-clock times. */
+export const dayTemplateEntries = broadcast.table(
+  "day_template_entries",
+  {
+    id: id(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => repeatGroups.id),
+    /** Minutes after the station's local midnight (0 to 1439): 8:00 pm stays 8:00 pm across DST. */
+    startMinute: integer("start_minute").notNull(),
+    lengthMs: millis("length_ms").notNull(),
+    kind: text("kind", { enum: ["program", "live", "off_air"] }).notNull(),
+    code: logCode("code").notNull(),
+    assetId: uuid("asset_id").references(() => rightsConfirmations.assetId),
+    programId: uuid("program_id").references(() => programs.id),
+    carriageAgreementId: uuid("carriage_agreement_id").references(() => agreements.id),
+    liveSourceId: uuid("live_source_id").references(() => liveSources.id),
+    localNote: text("local_note"),
+    episodeTitle: text("episode_title"),
+    episodeDescription: text("episode_description"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    check("template_entry_start_minute", sql`${t.startMinute} >= 0 and ${t.startMinute} < 1440`),
+    check("template_entry_length", sql`${t.lengthMs} > 0`),
+    index("day_template_entries_template").on(t.templateId)
+  ]
+);
+
+/**
+ * Day templates (added 2026-09-29): each date a template generated, one per station and date.
+ * Generation is idempotent: a date made from the template since its last change is left alone,
+ * and an edited date (`edited_at`) is never generated again.
+ */
+export const dayTemplateDates = broadcast.table(
+  "day_template_dates",
+  {
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** The station's local day. */
+    date: date("date").notNull(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => repeatGroups.id),
+    generatedAt: at("generated_at").notNull(),
+    /** Someone changed this date's log by hand: it's an exception now. */
+    editedAt: at("edited_at"),
+    entries: integer("entries").notNull().default(0),
+    /** Template entries that overlapped something already there, or can't air (rights, carriage). */
+    skipped: integer("skipped").notNull().default(0)
+  },
+  (t) => [primaryKey({ columns: [t.stationId, t.date] }), index("day_template_dates_template").on(t.templateId)]
+);
+
+/**
+ * Scheduled off air hours (added 2026-09-29): "every night 2:00 to 6:00 am", in the market's time
+ * zone. `days` are the weekdays (0 = Sunday) the sign-off falls on; when `back_at` is at or before
+ * `sign_off_at` the station is back the next day. Off air isn't dead air: no warnings, no fill.
+ */
+export const offAirHours = broadcast.table(
+  "off_air_hours",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    days: smallint("days").array().notNull(),
+    signOffAt: time("sign_off_at").notNull(),
+    backAt: time("back_at").notNull(),
+    createdAt: createdAt()
+  },
+  (t) => [index("off_air_hours_station").on(t.stationId)]
+);
 
 /** A break slot, generated from the break rule or cued live. Filled from rotations at playout. */
 export const breaks = broadcast.table(
@@ -561,8 +657,11 @@ export const commands = broadcast.table("commands", {
   stationId: uuid("station_id")
     .notNull()
     .references(() => stations.id),
-  /** `end_live` (added 2026-09-29): a live block ended early; playout hands back to the log. */
-  action: text("action", { enum: ["sign_on", "sign_off", "skip", "previous", "cue_break", "end_live"] }).notNull(),
+  /**
+   * `end_live` (added 2026-09-29): a live block ended early; playout hands back to the log.
+   * `replan` (added 2026-09-29): the off air hours changed; playout reads the log again. A text column: no migration.
+   */
+  action: text("action", { enum: ["sign_on", "sign_off", "skip", "previous", "cue_break", "end_live", "replan"] }).notNull(),
   issuedBy: uuid("issued_by").references(() => users.id),
   createdAt: createdAt(),
   consumedAt: at("consumed_at")

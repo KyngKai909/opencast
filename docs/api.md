@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-257 endpoints in 14 modules.
+264 endpoints in 14 modules.
 
 ## accounts (34)
 
@@ -103,7 +103,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `putCaptionTrack` | PUT | `/library/:itemId/captions` | signed in | L7: upload or edit the caption track (owner, operator): WebVTT, or SRT (turned into WebVTT), up to 1 MB. The item's captions become `uploaded`. 422 `not_captions` when it isn't either. |
 | `removeCaptionTrack` | DELETE | `/library/:itemId/captions` | signed in | L7: remove the caption track (owner, operator); the item's captions go back to none |
 
-## log (12)
+## log (19)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -111,9 +111,16 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `addEntry` | POST | `/stations/:stationId/log` | signed in | Put something on the log. Items need confirmed rights; another station's program needs a carriage agreement. |
 | `updateEntry` | PATCH | `/stations/:stationId/log/:entryId` | signed in | Move or change an entry |
 | `removeEntry` | DELETE | `/stations/:stationId/log/:entryId` | signed in | Take an entry off the log |
-| `repeatDay` | POST | `/stations/:stationId/log/repeat` | signed in | Build one day and repeat it: every day, every week on that day, or once |
+| `repeatDay` | POST | `/stations/:stationId/log/repeat` | signed in | Build one day and repeat it: every day, every week on that day, or once. Since 2026-09-29 this makes a day template (see `createTemplate`, which also does weekdays) running until `until`: dates are generated three weeks ahead, the rest as they come. |
 | `fillGap` | POST | `/stations/:stationId/log/fill` | signed in | Fill a gap: repeat from the library (in order, with the break rule), or sign off until a time |
 | `getDeadAir` | GET | `/stations/:stationId/dead-air` | signed in | Gaps in the next 24 hours and warnings sent |
+| `listTemplates` | GET | `/stations/:stationId/log/templates` | signed in | Day templates still repeating (owner, operator) |
+| `getTemplate` | GET | `/stations/:stationId/log/templates/:templateId` | signed in | One day template, with the dates generated from it (owner, operator) |
+| `createTemplate` | POST | `/stations/:stationId/log/templates` | signed in | Repeat this day: make a day template from `fromDay`'s log and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there. |
+| `updateTemplate` | PATCH | `/stations/:stationId/log/templates/:templateId` | signed in | Change a day template (owner, operator): its entries (`entries` replaces them; `fromDay` takes them from that day's log again), when it repeats, or its name. Every future date made from it that nobody edited is made again; edited dates stay as they are. |
+| `removeTemplate` | DELETE | `/stations/:stationId/log/templates/:templateId` | signed in | Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the log from now on. |
+| `getOffAirHours` | GET | `/stations/:stationId/off-air-hours` | signed in | The station's off air hours, in its market's time zone (owner, operator) |
+| `setOffAirHours` | PUT | `/stations/:stationId/off-air-hours` | signed in | Set the off air hours (owner, operator): replaces every rule; an empty list means none. A program or live block on the log inside them still airs (the hours cover what's otherwise empty). 400 when a rule signs off and back at the same time. |
 | `removeRepeat` | DELETE | `/stations/:stationId/log/repeats/:repeatId` | signed in | G7: take a repeat's entries off the log from now on (owner, operator). What already aired stays in the as-run log. |
 | `endEarly` | POST | `/stations/:stationId/log/:entryId/end-early` | signed in | G3: end a live block now (owner, operator, or its host). The block ends here, the programs after it move up, and playout hands back to the log at once; the as-run log records the live airing to this moment. Only while it's on air: 409 `not_on_air`, `ended`; 409 `not_live` for anything else. |
 | `getLiveBlock` | GET | `/stations/:stationId/log/:entryId/live` | signed in | G3: a live block's state: ended early or not, and whether its signal is in (owner, operator, its host) |

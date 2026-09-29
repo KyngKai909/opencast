@@ -74,7 +74,11 @@ export const audienceApi = {
     tvSession: true,
     summary: "Players send this every 30 seconds while tuned in",
     body: Heartbeat,
-    response: z.object({ ok: z.literal(true), nextInMs: z.number().int() })
+    /**
+     * Added 2026-09-29: during the station's planned off air time the beat isn't counted (nor kept
+     * in watch history), `offAirUntil` says when it's back, and `nextInMs` runs until then.
+     */
+    response: z.object({ ok: z.literal(true), nextInMs: z.number().int(), offAirUntil: Timestamp.optional() })
   }),
   getAudience: endpoint({
     method: "GET",

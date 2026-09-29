@@ -8,8 +8,11 @@ import path from "node:path";
 import { breakCue, decoratePlaylist } from "./engine/scte35.js";
 import { publicUrl } from "../../lib/url.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
+import { dateRangeTag, HLS_CLASS } from "@opencast/contracts";
+import type { OffAirSpanView } from "../log/service.js";
+import { clockTime } from "../../lib/time.js";
 
-type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output";
+type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours";
 
 export interface SignOnCheck {
   key: CheckKey;
@@ -28,6 +31,8 @@ export interface PlayoutStatusView {
   nextBreakAt: string | null;
   onAirSince?: string | null;
   next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null } | null;
+  /** Planned off air time on now, or the next within 24 hours. */
+  offAir?: (OffAirSpanView & { now: boolean }) | null;
 }
 
 export interface AsRunView {
@@ -78,6 +83,8 @@ export interface PlayoutService {
   endLive(stationId: string, userId: string): Promise<void>;
   /** G2: when each station last signed on (while on air). */
   onAirSince(stationIds: string[]): Promise<Map<string, Date>>;
+  /** The log or off air hours changed: playout reads them again now. */
+  replan(stationId: string): Promise<void>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
@@ -131,27 +138,32 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     async checks(stationId) {
       const now = deps.clock.now();
       const day = new Date(now.getTime() + 24 * HOUR);
-      const [identity, gaps, breaks, readiness, entries, output] = await Promise.all([
+      const [identity, gaps, breaks, readiness, entries, output, offAir, tz] = await Promise.all([
         services.stations.identityReady(stationId),
         services.log.gaps(stationId, now, day),
         services.log.breaks(stationId, now, day),
         services.library.readiness(stationId),
         services.log.entries(stationId, now, day),
-        livepeer([stationId])
+        livepeer([stationId]),
+        services.log.offAirSpans(stationId, now, day),
+        services.stations.timezoneOf(stationId)
       ]);
       const rule = await services.stations.breakRule(stationId);
 
       // A station ID at least once an hour: every break ends with one, so breaks must come hourly.
+      // Planned off air time doesn't count against it: the station signs off and back on with its ID.
       const breakTimes = breaks.map((b) => Date.parse(b.startsAt)).sort((a, b) => a - b);
       const sidEntries = entries.filter((e) => e.code === "SID").map((e) => e.startsAt.getTime());
-      const marks = [...breakTimes, ...sidEntries].sort((a, b) => a - b);
+      const offAirMarks = offAir.flatMap((o) => [Math.max(now.getTime(), Date.parse(o.startsAt)), Math.min(day.getTime(), Date.parse(o.endsAt))]);
+      const marks = [...breakTimes, ...sidEntries, ...offAirMarks].sort((a, b) => a - b);
       let longest = 0;
       let cursor = now.getTime();
+      const inOffAir = (a: number, b: number) => offAir.some((o) => Date.parse(o.startsAt) <= a && Date.parse(o.endsAt) >= b);
       for (const mark of marks) {
-        longest = Math.max(longest, mark - cursor);
+        if (!inOffAir(cursor, mark)) longest = Math.max(longest, mark - cursor);
         cursor = mark;
       }
-      longest = Math.max(longest, day.getTime() - cursor);
+      if (!inOffAir(cursor, day.getTime())) longest = Math.max(longest, day.getTime() - cursor);
       const idsPerDay = marks.length;
       const hourly = rule.mode !== "none" || sidEntries.length > 0 ? longest <= HOUR : false;
 
@@ -205,6 +217,18 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           watchUrl: out?.playbackUrl ?? null
         }
       ];
+      // Planned off air time isn't a gap; say so, so nobody wonders.
+      const stretches = [...new Map(offAir.map((o) => [o.backAt, o])).values()];
+      if (stretches.length) {
+        const first = offAir.find((o) => o.backAt === stretches[0].backAt)!;
+        checks.push({
+          key: "off_air_hours",
+          label: "Off air hours planned",
+          passed: true,
+          blocking: false,
+          detail: `Off air from ${clockTime(new Date(first.startsAt), tz)}, back at ${clockTime(new Date(first.backAt), tz)}. Not dead air: no warnings, nothing fills it`
+        });
+      }
       return { ready: checks.every((c) => c.passed || !c.blocking), checks };
     },
 
@@ -265,8 +289,14 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const output = out.get(stationId);
       const onAir = state?.onAir ?? false;
       // G2: since when, and what's next for the preview monitor.
-      const [since, next] = await Promise.all([onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()), services.log.nextEntry(stationId, now)]);
+      const [since, next, offAir] = await Promise.all([
+        onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()),
+        services.log.nextEntry(stationId, now),
+        services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR))
+      ]);
+      const plannedOff = offAir[0] ? { ...offAir[0], now: Date.parse(offAir[0].startsAt) <= now.getTime() } : null;
       return {
+        offAir: plannedOff,
         onAirSince: since.get(stationId)?.toISOString() ?? null,
         next: next
           ? {
@@ -325,10 +355,19 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const now = deps.clock.now();
       // Every break in the window, stored or only generated from the rule, carries its cue.
       const breaks = await services.log.breaks(stationId, new Date(now.getTime() - 5 * 60_000), new Date(now.getTime() + 2 * 60_000));
-      return decoratePlaylist(
+      const decorated = decoratePlaylist(
         playlist,
         breaks.map((b) => breakCue(stationId, b))
       );
+      // Planned off air: the sign-off slate carries when the station is back (the worker ends the
+      // playlist with #EXT-X-ENDLIST after it).
+      const off = await services.log.offAirAt(stationId, now);
+      if (!off) return decorated;
+      const tag = dateRangeTag({ id: `sign-off-${stationId}-${Date.parse(off.startsAt)}`, class: HLS_CLASS.signOff, start: Date.parse(off.startsAt), attributes: { backAt: off.backAt } });
+      const lines = decorated.split("\n");
+      const first = lines.findIndex((l) => l.startsWith("#EXTINF") || l.startsWith("#EXT-X-PROGRAM-DATE-TIME"));
+      lines.splice(first < 0 ? lines.length : first, 0, tag);
+      return lines.join("\n");
     },
 
     async stationsThatAired(from, to) {
@@ -420,6 +459,11 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
 
     async endLive(stationId, userId) {
       await db.insert(schema.commands).values({ stationId, action: "end_live", issuedBy: userId });
+    },
+
+    async replan(stationId) {
+      const [state] = await db.select({ onAir: P.onAir }).from(P).where(eq(P.stationId, stationId));
+      if (state?.onAir) await db.insert(schema.commands).values({ stationId, action: "replan" });
     },
 
     async onAirSince(stationIds) {

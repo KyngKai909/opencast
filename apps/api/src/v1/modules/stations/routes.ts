@@ -58,7 +58,9 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
         next: current?.next ?? null,
         playback: s?.playbackUrl ? { kind: "hls" as const, url: s.playbackUrl } : null,
         // S13: a live block on the stand-by slate, waiting for its signal.
-        ...(onAir ? { signal: s?.standingBy && current?.now?.kind === "live" ? ("standby" as const) : ("ok" as const) } : {})
+        ...(onAir ? { signal: s?.standingBy && current?.now?.kind === "live" ? ("standby" as const) : ("ok" as const) } : {}),
+        // Planned off air: when it's back.
+        ...(current?.now?.kind === "off_air" && current.now.backAt ? { backAt: current.now.backAt } : {})
       };
     });
   }
@@ -146,7 +148,7 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
       description: profile.description,
       onAir: row.onAir,
       now: row.now,
-      upNext: (upcoming.get(profile.id) ?? []).filter((a) => a.logEntryId !== row.now?.logEntryId).slice(0, 8),
+      upNext: (upcoming.get(profile.id) ?? []).filter((a) => !(a.logEntryId === (row.now?.logEntryId ?? null) && a.startsAt === row.now?.startsAt)).slice(0, 8),
       programs: programs.map((p) => ({ id: p.id, title: p.title, description: p.description, live: p.live })),
       claimable: claimable
         ? {

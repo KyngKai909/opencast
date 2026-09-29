@@ -60,6 +60,130 @@ export const BreakSlot = z.object({
 
 export const Gap = z.object({ startsAt: Timestamp, endsAt: Timestamp });
 
+/** "Every Saturday" (weekly), "Weekdays" (Monday to Friday, added 2026-09-29), "Every day", "Once". */
+export const RepeatPattern = z.enum(["once", "daily", "weekly", "weekdays"]);
+export type RepeatPattern = z.infer<typeof RepeatPattern>;
+
+/** "HH:MM", 24-hour, in the station's market time zone. */
+export const WallClock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
+
+/**
+ * Off air hours (added 2026-09-29): planned time off air, from the standing rule (`hours`) or a
+ * one-off sign-off entry on the log (`sign_off`, with its entry). Planned off air isn't dead air:
+ * no warnings, nothing fills it, and viewers see `backAt`, the end of the off air time it's part of
+ * (a sign-off at 11:40 pm running into 2:00 to 6:00 am hours is back at 6:00 am).
+ */
+export const OffAirSpan = z.object({
+  startsAt: Timestamp,
+  endsAt: Timestamp,
+  backAt: Timestamp,
+  source: z.enum(["hours", "sign_off"]),
+  logEntryId: Id.nullable()
+});
+export type OffAirSpan = z.infer<typeof OffAirSpan>;
+
+/** One standing off air rule: "Every night, 2:00 am to 6:00 am". */
+export const OffAirRule = z.object({
+  id: Id,
+  /** The weekdays the sign-off falls on, 0 = Sunday. All seven reads "Every night". */
+  days: z.array(z.number().int().min(0).max(6)).min(1),
+  signOffAt: WallClock,
+  /** At or before `signOffAt`: back the next day. */
+  backAt: WallClock,
+  /** "Every night, 2:00 am to 6:00 am", "Weeknights, 11:00 pm to 6:00 am". */
+  label: z.string()
+});
+export type OffAirRule = z.infer<typeof OffAirRule>;
+
+export const OffAirRuleInput = z.object({
+  days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+  signOffAt: WallClock,
+  backAt: WallClock
+});
+
+export const OffAirHours = z.object({
+  /** The market's time zone the rules are in. */
+  timezone: z.string(),
+  rules: z.array(OffAirRule),
+  /** The off air time on now, or the next one within 8 days. */
+  next: OffAirSpan.nullable()
+});
+export type OffAirHours = z.infer<typeof OffAirHours>;
+
+/** One thing in a day template, at its local time. */
+export const DayTemplateEntry = z.object({
+  id: Id,
+  /** Local wall-clock start, "20:00". */
+  startTime: WallClock,
+  lengthMs: Millis,
+  kind: z.enum(["program", "live", "off_air"]),
+  code: LogCode,
+  title: z.string(),
+  itemId: Id.nullable(),
+  programId: Id.nullable(),
+  liveSourceId: Id.nullable(),
+  carriageAgreementId: Id.nullable(),
+  episodeTitle: z.string().nullable(),
+  episodeDescription: z.string().nullable(),
+  localNote: z.string().nullable()
+});
+export type DayTemplateEntry = z.infer<typeof DayTemplateEntry>;
+
+export const DayTemplateEntryInput = z.object({
+  startTime: WallClock,
+  /** Programs default to the item's length, rounded up to whole minutes. */
+  lengthMs: Millis.optional(),
+  kind: z.enum(["program", "live", "off_air"]),
+  itemId: Id.optional(),
+  programId: Id.optional(),
+  liveSourceId: Id.optional(),
+  carriageAgreementId: Id.optional(),
+  episodeTitle: z.string().max(200).optional(),
+  episodeDescription: z.string().max(160).optional(),
+  localNote: z.string().max(160).optional()
+});
+
+/**
+ * Day templates (added 2026-09-29): a day built once and repeated. Each future date the pattern
+ * covers (from the day after `fromDay`, through `until`) gets its log generated from `entries`,
+ * three weeks ahead. Editing one date's log makes it an exception (`edited`); editing the template
+ * makes every future date that isn't one again. Where two templates cover a date the more specific
+ * wins: once, then a weekday, then weekdays, then every day (the newest among equals).
+ */
+export const DayTemplate = z.object({
+  id: Id,
+  name: z.string().nullable(),
+  pattern: RepeatPattern,
+  /** For `weekly`: 0 = Sunday. */
+  weekday: z.number().int().min(0).max(6).nullable(),
+  /** "Every Saturday", "Weekdays", "Every day", "Once, Sat Oct 10". */
+  label: z.string(),
+  /** The day it was built from (its own log is the station's, not generated). */
+  fromDay: DateOnly,
+  /** For `once`: the date it's for. */
+  onDate: DateOnly.nullable(),
+  /** The last date it repeats on; null until it's taken off. */
+  until: DateOnly.nullable(),
+  timezone: z.string(),
+  entries: z.array(DayTemplateEntry),
+  /** Dates from tomorrow on that were generated from it, and whether each was edited since. */
+  dates: z.array(z.object({ date: DateOnly, edited: z.boolean(), entries: z.number().int(), skipped: z.number().int() })),
+  createdAt: Timestamp,
+  updatedAt: Timestamp.nullable()
+});
+export type DayTemplate = z.infer<typeof DayTemplate>;
+
+/** What a template write generated: dates made (or made again), entries placed, removed and skipped. */
+export const TemplateGeneration = z.object({
+  dates: z.number().int(),
+  created: z.number().int(),
+  removed: z.number().int(),
+  skippedForConflicts: z.number().int(),
+  /** Dates left alone because they were edited by hand. */
+  exceptions: z.number().int()
+});
+export type TemplateGeneration = z.infer<typeof TemplateGeneration>;
+
 export const ProgramLog = z.object({
   from: Timestamp,
   to: Timestamp,
@@ -73,8 +197,26 @@ export const ProgramLog = z.object({
    * `removeRepeat` takes them off.
    */
   repeats: z
-    .array(z.object({ id: Id, day: DateOnly, pattern: z.enum(["once", "daily", "weekly"]), until: DateOnly.nullable(), entries: z.number().int() }))
-    .optional()
+    .array(
+      z.object({
+        id: Id,
+        day: DateOnly,
+        /** G7's three. A `weekdays` template is listed by `listTemplates` only. */
+        pattern: z.enum(["once", "daily", "weekly"]),
+        until: DateOnly.nullable(),
+        entries: z.number().int(),
+        /** Added 2026-09-29: a day template (see `listTemplates`), rather than a one-time copy. */
+        template: z.boolean().optional(),
+        weekday: z.number().int().min(0).max(6).nullable().optional(),
+        label: z.string().optional()
+      })
+    )
+    .optional(),
+  /**
+   * Added 2026-09-29: planned off air time overlapping the window (off air hours, and sign-off
+   * entries), drawn differently from dead air and never warned about. `gaps` leaves it out.
+   */
+  offAir: z.array(OffAirSpan).optional()
 });
 
 export const DeadAirStatus = z.object({
@@ -83,7 +225,9 @@ export const DeadAirStatus = z.object({
   nextGapAt: Timestamp.nullable(),
   /** "Log runs until Sun 8:42 pm". */
   logRunsUntil: Timestamp.nullable(),
-  warnings: z.array(z.object({ gapStartsAt: Timestamp, warnedAt: Timestamp, minutesBefore: z.union([z.literal(30), z.literal(12)]) }))
+  warnings: z.array(z.object({ gapStartsAt: Timestamp, warnedAt: Timestamp, minutesBefore: z.union([z.literal(30), z.literal(12)]) })),
+  /** Added 2026-09-29: planned off air time in the next 24 hours (not gaps: never warned or filled). */
+  offAir: z.array(OffAirSpan).optional()
 });
 
 const StationParams = z.object({ stationId: Id });
@@ -173,16 +317,23 @@ export const logApi = {
     method: "POST",
     path: "/stations/:stationId/log/repeat",
     auth: "user",
-    summary: "Build one day and repeat it: every day, every week on that day, or once",
+    summary:
+      "Build one day and repeat it: every day, every week on that day, or once. Since 2026-09-29 this makes a day template (see `createTemplate`, which also does weekdays) running until `until`: dates are generated three weeks ahead, the rest as they come.",
     params: StationParams,
     body: z.object({
       day: z.iso.date(),
+      /** For weekdays, use `createTemplate`. */
       pattern: z.enum(["once", "daily", "weekly"]),
       until: z.iso.date(),
       /** For "once": the day to copy to. */
       onto: z.iso.date().optional()
     }),
-    response: z.object({ created: z.number().int(), skippedForConflicts: z.number().int() })
+    response: z.object({
+      created: z.number().int(),
+      skippedForConflicts: z.number().int(),
+      /** Added 2026-09-29: the day template it made. */
+      templateId: Id.optional()
+    })
   }),
   fillGap: endpoint({
     method: "POST",
@@ -206,6 +357,89 @@ export const logApi = {
   }),
 
   // ---- Added 2026-09-29: G3, G5, G7 ----
+
+  // ---- Added 2026-09-29: day templates and off air hours ----
+
+  listTemplates: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/log/templates",
+    auth: "user",
+    summary: "Day templates still repeating (owner, operator)",
+    params: StationParams,
+    response: z.object({ templates: z.array(DayTemplate) })
+  }),
+  getTemplate: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/log/templates/:templateId",
+    auth: "user",
+    summary: "One day template, with the dates generated from it (owner, operator)",
+    params: z.object({ stationId: Id, templateId: Id }),
+    response: DayTemplate
+  }),
+  createTemplate: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/templates",
+    auth: "user",
+    summary:
+      "Repeat this day: make a day template from `fromDay`'s log and generate the dates it covers (owner, operator). `weekly` repeats on `fromDay`'s weekday unless `weekday` says otherwise; `once` needs `onto`. Entries that overlap something already on a date are skipped there.",
+    params: StationParams,
+    body: z.object({
+      fromDay: DateOnly,
+      pattern: RepeatPattern,
+      weekday: z.number().int().min(0).max(6).optional(),
+      onto: DateOnly.optional(),
+      until: DateOnly.nullable().optional(),
+      name: z.string().max(60).optional()
+    }),
+    response: z.object({ template: DayTemplate, generated: TemplateGeneration }),
+    status: 201
+  }),
+  updateTemplate: endpoint({
+    method: "PATCH",
+    path: "/stations/:stationId/log/templates/:templateId",
+    auth: "user",
+    summary:
+      "Change a day template (owner, operator): its entries (`entries` replaces them; `fromDay` takes them from that day's log again), when it repeats, or its name. Every future date made from it that nobody edited is made again; edited dates stay as they are.",
+    params: z.object({ stationId: Id, templateId: Id }),
+    body: z
+      .object({
+        name: z.string().max(60).nullable(),
+        pattern: RepeatPattern,
+        weekday: z.number().int().min(0).max(6),
+        onto: DateOnly,
+        until: DateOnly.nullable(),
+        fromDay: DateOnly,
+        entries: z.array(DayTemplateEntryInput).max(200)
+      })
+      .partial(),
+    response: z.object({ template: DayTemplate, generated: TemplateGeneration })
+  }),
+  removeTemplate: endpoint({
+    method: "DELETE",
+    path: "/stations/:stationId/log/templates/:templateId",
+    auth: "user",
+    summary: "Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the log from now on.",
+    params: z.object({ stationId: Id, templateId: Id }),
+    response: z.object({ removed: z.number().int() })
+  }),
+  getOffAirHours: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/off-air-hours",
+    auth: "user",
+    summary: "The station's off air hours, in its market's time zone (owner, operator)",
+    params: StationParams,
+    response: OffAirHours
+  }),
+  setOffAirHours: endpoint({
+    method: "PUT",
+    path: "/stations/:stationId/off-air-hours",
+    auth: "user",
+    summary:
+      "Set the off air hours (owner, operator): replaces every rule; an empty list means none. A program or live block on the log inside them still airs (the hours cover what's otherwise empty). 400 when a rule signs off and back at the same time.",
+    params: StationParams,
+    body: z.object({ rules: z.array(OffAirRuleInput).max(7) }),
+    response: OffAirHours
+  }),
 
   /** G7: undo "Repeat this day". */
   removeRepeat: endpoint({
@@ -267,7 +501,8 @@ export const logApi = {
 };
 
 export const SignOnCheck = z.object({
-  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output"]),
+  /** `off_air_hours` (added 2026-09-29): informational, never blocking; there when off air time is planned in the next 24 hours. */
+  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours"]),
   label: z.string(),
   passed: z.boolean(),
   /** Blockers stop sign-on; warnings don't. */
@@ -306,7 +541,12 @@ export const PlayoutStatus = z.object({
       pictureUrl: z.string().nullable()
     })
     .nullable()
-    .optional()
+    .optional(),
+  /**
+   * Added 2026-09-29: planned off air time on now (`now` true: the channel shows the sign-off slate,
+   * then ends until `backAt`), else the next within 24 hours ("Signs off at 2:00 am"); null for none.
+   */
+  offAir: OffAirSpan.extend({ now: z.boolean() }).nullable().optional()
 });
 
 export const AsRunRow = z.object({

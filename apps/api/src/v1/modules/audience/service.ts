@@ -19,7 +19,8 @@ const MAX_RATE = 1.5;
 const MINUTE = 60_000;
 
 export interface AudienceService {
-  heartbeat(input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean }): Promise<void>;
+  /** Not counted during the station's planned off air time: then it says when the station is back. */
+  heartbeat(input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean }): Promise<{ offAirUntil: string | null }>;
   /** Tuned in, averaged over a window (e.g. one airing of a spot). */
   averageTunedIn(stationId: string, from: Date, to: Date): Promise<number>;
   /** People tuned in, added up minute by minute, per station (the pool's watch-time share). */
@@ -39,6 +40,9 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
   const service: AudienceService = {
     async heartbeat(input) {
       const now = deps.clock.now();
+      // Planned off air (off air hours, a sign-off on the log): nothing's on, so nobody's tuned in.
+      const off = await services.log.offAirAt(input.stationId, now);
+      if (off) return { offAirUntil: off.backAt };
       const [existing] = await db.select().from(S).where(eq(S.id, input.sessionId));
       if (!existing) {
         await db.insert(S).values({
@@ -50,7 +54,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           beats: 1,
           lastMediaTimeMs: input.mediaTimeMs
         });
-        return;
+        return { offAirUntil: null };
       }
       if (existing.stationId !== input.stationId) {
         throw badRequest("A session is for one station; start a new one when you change channel.");
@@ -89,6 +93,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           await count(previous);
         }
       }
+      return { offAirUntil: null };
     },
 
     async watchMinutes(from, to) {

@@ -5,6 +5,10 @@
 // we're late, with timestamps carried on from the last one, so the outputs never
 // reconnect between items. When a segment ends, what actually aired goes in the
 // as-run log, and a spot's airing is settled from it.
+//
+// Planned off air time (added 2026-09-29): after the sign-off slate the outputs close, the
+// playlist ends with #EXT-X-ENDLIST, and nothing is encoded until the back time, when a new
+// playlist starts from the station ID. (Prepare once, then assemble replaces this runner.)
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -165,6 +169,52 @@ export class StationRunner {
       });
   }
 
+  /** Signs off: the outputs close and the playlist ends. */
+  private async closeOutputs() {
+    const muxers = [this.muxer, ...this.slateMuxers].filter((m): m is ChildProcess => Boolean(m));
+    this.muxer = undefined;
+    this.slateMuxers = [];
+    await Promise.all(
+      muxers.map(
+        (m) =>
+          new Promise<void>((resolve) => {
+            if (m.exitCode !== null || m.signalCode !== null) return resolve();
+            const kill = setTimeout(() => m.kill("SIGKILL"), 5_000);
+            m.once("close", () => {
+              clearTimeout(kill);
+              resolve();
+            });
+            m.stdin?.end();
+          })
+      )
+    );
+    const file = path.join(this.options.hlsDir, "index.m3u8");
+    const playlist = await fs.readFile(file, "utf8").catch(() => null);
+    if (playlist !== null && !playlist.includes("#EXT-X-ENDLIST")) await fs.writeFile(file, `${playlist.trimEnd()}\n#EXT-X-ENDLIST\n`);
+  }
+
+  /** Planned off air: nothing airs until the back time (or the log changes), then a new playlist starts. */
+  private async offAirUntil(seg: Segment) {
+    this.log(`signed off until ${seg.endsAt.toISOString()} (planned off air)`);
+    await this.closeOutputs();
+    await this.setNow(null, null);
+    let version = this.planVersion;
+    while (!this.stopped && this.ctx.deps.clock.now() < seg.endsAt) {
+      if (version !== this.planVersion) {
+        // The log or the off air hours changed: still off air?
+        version = this.planVersion;
+        const current = await this.segmentAt(this.ctx.deps.clock.now());
+        if (current?.source.kind !== "off") break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (this.stopped) return;
+    await fs.rm(this.options.hlsDir, { recursive: true, force: true });
+    this.mediaClockS = 0;
+    await this.startMuxers();
+    this.log("signed back on");
+  }
+
   private async segmentAt(now: Date): Promise<Segment | null> {
     while (now.getTime() >= this.planUntil - 60_000) {
       const version = this.planVersion;
@@ -204,6 +254,8 @@ export class StationRunner {
     } else if (src.kind === "file") {
       video = add(["-re", ...seek(src.seekMs + offsetMs), "-i", src.location]);
       audio = (await hasAudio(src.location)) ? video : silence();
+    } else if (src.kind === "off") {
+      throw new Error("off air: nothing to encode");
     } else {
       feed = this.feeds.get(src.liveSourceId);
       if (!feed?.connected) throw new Error("no live signal");
@@ -379,6 +431,10 @@ export class StationRunner {
       while (seg && ((isWhole(seg) && this.aired.has(seg.key)) || (!isWhole(seg) && seg.endsAt.getTime() - now.getTime() < MIN_JOIN_MS))) seg = this.after(seg);
       if (!seg) {
         await new Promise((r) => setTimeout(r, 250));
+        continue;
+      }
+      if (seg.source.kind === "off") {
+        await this.offAirUntil(seg);
         continue;
       }
       const whole = isWhole(seg);

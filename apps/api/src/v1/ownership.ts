@@ -28,7 +28,16 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.content_preview_needs",
     "broadcast.caption_tracks"
   ],
-  log: ["broadcast.log_entries", "broadcast.repeat_groups", "broadcast.breaks", "broadcast.dead_air_events"],
+  log: [
+    "broadcast.log_entries",
+    "broadcast.repeat_groups",
+    "broadcast.breaks",
+    "broadcast.dead_air_events",
+    // Added 2026-09-29: day templates and off air hours.
+    "broadcast.day_template_entries",
+    "broadcast.day_template_dates",
+    "broadcast.off_air_hours"
+  ],
   playout: ["broadcast.playout_state", "broadcast.commands", "broadcast.livepeer_config", "broadcast.schedules", "broadcast.as_run"],
   catalog: ["catalog.*"],
   spots: ["spots.*"],

@@ -138,9 +138,12 @@ describe("breaks and repeats on the log (G1, G7)", () => {
     const ep = await itemFixture(h, stationId, { title: "Overnight", programId: showProgramId });
     await kai.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-06T03:00:00.000Z", itemId: ep.id }).expect(201);
     const repeated = await kai.post(`/v1/stations/${stationId}/log/repeat`, { day: "2026-10-05", pattern: "daily", until: "2026-10-08" }).expect(200);
-    expect(repeated.body).toEqual({ created: 3, skippedForConflicts: 0 });
+    // Since 2026-09-29 it makes a day template (`templateId`, and `template` on the repeat).
+    expect(repeated.body).toEqual({ created: 3, skippedForConflicts: 0, templateId: expect.any(String) });
     const log = await kai.get(`/v1/stations/${stationId}/log?from=2026-10-05T07:00:00.000Z&to=2026-10-09T07:00:00.000Z`).expect(200);
-    expect(log.body.repeats).toEqual([{ id: expect.any(String), day: "2026-10-05", pattern: "daily", until: "2026-10-08", entries: 3 }]);
+    expect(log.body.repeats).toEqual([
+      { id: repeated.body.templateId, day: "2026-10-05", pattern: "daily", until: "2026-10-08", entries: 3, template: true, weekday: null, label: "Every day" }
+    ]);
     const removed = await kai.delete(`/v1/stations/${stationId}/log/repeats/${log.body.repeats[0].id}`).expect(200);
     expect(removed.body).toEqual({ removed: 3 });
     const after = await kai.get(`/v1/stations/${stationId}/log?from=2026-10-05T07:00:00.000Z&to=2026-10-09T07:00:00.000Z`).expect(200);

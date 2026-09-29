@@ -25,11 +25,14 @@ export interface JobResults {
   signOns: { signedOn: number; notReady: number } | null;
   /** P21: closed businesses whose leftover balance was sent back. */
   closedSwept: number;
+  /** Day templates' dates generated this hour (three weeks ahead), or null in other minutes. */
+  templates: { stations: number; dates: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
   let lastDay = "";
   let lastMonth = "";
+  let lastHour = "";
 
   async function tick(): Promise<JobResults> {
     const now = deps.clock.now();
@@ -48,6 +51,16 @@ export function createJobs(deps: Deps, services: Services) {
       console.error("[jobs] scheduled sign-ons failed", error);
       return null;
     });
+    // Day templates: every hour, the dates three weeks ahead are generated (before the dead-air check reads them).
+    const hour = now.toISOString().slice(0, 13);
+    let templates: JobResults["templates"] = null;
+    if (hour !== lastHour) {
+      lastHour = hour;
+      templates = await services.log.templates.generateAll().catch((error) => {
+        console.error("[jobs] day templates failed", error);
+        return null;
+      });
+    }
     const onAir = await services.playout.onAirStations();
     await services.log.checkDeadAir(onAir);
     const claimsExpired = await services.trust.expireOverdue();
@@ -119,7 +132,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates };
   }
 
   let timer: NodeJS.Timeout | undefined;

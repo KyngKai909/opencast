@@ -3,8 +3,12 @@ import { schema } from "@opencast/db";
 import type { Airing, BreakContent, BreakRow, Listing, LogEntry } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
-import { addDays, localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
+import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
+import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+
+export type { OffAirSpanView } from "./offair.js";
 
 /** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
 export const DEAD_AIR_NOTE = "Filled automatically: dead air";
@@ -51,18 +55,36 @@ export interface EntryInput {
   localNote?: string;
 }
 
-/** G7: a "Repeat this day" still on the log. */
+/** G7: a "Repeat this day" still on the log (a day template, or a G7 copy made before them). */
 export interface RepeatView {
   id: string;
   day: string;
   pattern: "once" | "daily" | "weekly";
   until: string | null;
   entries: number;
+  template?: boolean;
+  weekday?: number | null;
+  label?: string;
+}
+
+/** Off air hours as the settings page reads them. */
+export interface OffAirHoursView {
+  timezone: string;
+  rules: Array<{ id: string; days: number[]; signOffAt: string; backAt: string; label: string }>;
+  next: OffAirSpanView | null;
 }
 
 type ListingPatch = { episodeTitle?: string | null; episodeDescription?: string | null; localNote?: string | null };
 
 export interface LogService {
+  /** Day templates (added 2026-09-29). */
+  templates: TemplateOps;
+  /** Planned off air time (off air hours and sign-off entries) overlapping a window. */
+  offAirSpans(stationId: string, from: Date, to: Date): Promise<OffAirSpanView[]>;
+  /** The planned off air time on at a moment, if any. */
+  offAirAt(stationId: string, at: Date): Promise<OffAirSpanView | null>;
+  offAirHours(stationId: string): Promise<OffAirHoursView>;
+  setOffAirHours(stationId: string, rules: Array<{ days: number[]; signOffAt: string; backAt: string }>): Promise<OffAirHoursView>;
   /** G1: what's in each break, in the order it airs (keyed by the break's start). */
   breakContents(stationId: string, slots: BreakSlotView[]): Promise<Map<string, BreakContent[]>>;
   /** G7: repeats with entries from `from` on. */
@@ -120,24 +142,28 @@ export interface LogService {
   /** Puts carried slots on the carrier's log. */
   placeCarried(input: { agreementId: string; carrierStationId: string; programId: string; starts: Date[]; replaceExisting: boolean }): Promise<{ placed: number; replaced: number; blockedByLimit: number }>;
 
-  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[] }>;
+  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[]; offAir: OffAirSpanView[] }>;
   add(stationId: string, userId: string, input: EntryInput): Promise<LogEntry>;
   update(stationId: string, entryId: string, input: Partial<EntryInput>): Promise<LogEntry>;
   remove(stationId: string, entryId: string): Promise<void>;
-  repeatDay(stationId: string, input: { day: string; pattern: "once" | "daily" | "weekly"; until: string; onto?: string }): Promise<{ created: number; skippedForConflicts: number }>;
+  repeatDay(stationId: string, input: { day: string; pattern: "once" | "daily" | "weekly"; until: string; onto?: string }): Promise<{ created: number; skippedForConflicts: number; templateId: string }>;
   fill(stationId: string, userId: string, input: { with: "repeat"; startsAt: string; endsAt: string; itemIds: string[] } | { with: "sign_off"; startsAt: string; endsAt: string }): Promise<LogEntry[]>;
-  deadAir(stationId: string): Promise<{ gaps: Gap[]; nextGapAt: string | null; logRunsUntil: string | null; warnings: Array<{ gapStartsAt: string; warnedAt: string; minutesBefore: 30 | 12 }> }>;
+  deadAir(stationId: string): Promise<{ gaps: Gap[]; nextGapAt: string | null; logRunsUntil: string | null; warnings: Array<{ gapStartsAt: string; warnedAt: string; minutesBefore: 30 | 12 }>; offAir: OffAirSpanView[] }>;
   /** The rolling dead-air check: warnings at 30 and 12 minutes before a gap. Run every minute by the scheduler. */
   checkDeadAir(stationIds: string[]): Promise<void>;
 }
 
 const E = schema.logEntries;
 const B = schema.breaks;
+const OH = schema.offAirHours;
 const MIN = 60_000;
 const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
 
-export function createLogService({ deps, services }: ModuleContext): LogService {
+export function createLogService(ctx: ModuleContext): LogService {
+  const { deps, services } = ctx;
   const { db } = deps;
+  const templates = createTemplateOps(ctx);
 
   async function load(stationIds: string[], from: Date, to: Date) {
     if (!stationIds.length) return [] as Row[];
@@ -261,15 +287,84 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     });
   }
 
-  function gapsIn(rows: Row[], from: Date, to: Date): Gap[] {
+  /** Dead air: time with nothing on the log, outside planned off air time. */
+  function gapsIn(rows: Row[], from: Date, to: Date, offAir: OffAirSpanView[] = []): Gap[] {
     const gaps: Gap[] = [];
     let cursor = from.getTime();
-    for (const row of [...rows].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())) {
-      if (row.startsAt.getTime() > cursor) gaps.push({ startsAt: new Date(cursor).toISOString(), endsAt: row.startsAt.toISOString() });
-      cursor = Math.max(cursor, row.endsAt.getTime());
+    const blocks = [
+      ...rows.map((r) => ({ s: r.startsAt.getTime(), e: r.endsAt.getTime() })),
+      ...offAir.map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.endsAt) }))
+    ].sort((a, b) => a.s - b.s);
+    for (const block of blocks) {
+      if (block.s > cursor) gaps.push({ startsAt: new Date(cursor).toISOString(), endsAt: new Date(Math.min(block.s, to.getTime())).toISOString() });
+      cursor = Math.max(cursor, block.e);
     }
     if (cursor < to.getTime()) gaps.push({ startsAt: new Date(cursor).toISOString(), endsAt: to.toISOString() });
-    return gaps.filter((g) => Date.parse(g.endsAt) > Date.parse(g.startsAt));
+    return gaps.filter((g) => Date.parse(g.endsAt) > Date.parse(g.startsAt) && Date.parse(g.startsAt) < to.getTime());
+  }
+
+  /**
+   * Planned off air time per station overlapping `[from, to)`. Reads a wider range (a day before,
+   * two after) so a stretch running past the window still knows when the station is back.
+   * `wholeStretches` keeps every span of a stretch that touches the window (viewers see a
+   * stretch from its sign-off, even when that was before the window).
+   */
+  async function offAirMap(stationIds: string[], from: Date, to: Date, wholeStretches = false): Promise<Map<string, OffAirSpanView[]>> {
+    const result = new Map<string, OffAirSpanView[]>(stationIds.map((id) => [id, []]));
+    if (!stationIds.length) return result;
+    const lo = new Date(from.getTime() - DAY);
+    const hi = new Date(to.getTime() + 2 * DAY);
+    const [rules, rows] = await Promise.all([db.select().from(OH).where(inArray(OH.stationId, stationIds)), load(stationIds, lo, hi)]);
+    for (const id of stationIds) {
+      const mine = rows.filter((r) => r.stationId === id);
+      const myRules = rules.filter((r) => r.stationId === id);
+      if (!myRules.length && !mine.some((r) => r.kind === "off_air")) continue;
+      const tz = myRules.length ? await stationTz(id) : "UTC";
+      const spans = offAirSpans(mine, myRules, tz, lo, hi);
+      const touches = (s: OffAirSpanView) => Date.parse(s.endsAt) > from.getTime() && Date.parse(s.startsAt) < to.getTime();
+      const stretches = new Set(spans.filter(touches).map((s) => s.backAt));
+      result.set(id, spans.filter((s) => (wholeStretches ? stretches.has(s.backAt) : touches(s))));
+    }
+    return result;
+  }
+
+  /**
+   * What viewers see (dial, guide, station page): the log's programs and live blocks, and each
+   * unbroken stretch of planned off air time as one `off_air` airing with the time it's back.
+   */
+  function viewerAirings(rows: Row[], spans: OffAirSpanView[], ctx: Awaited<ReturnType<typeof context>>): Airing[] {
+    const airings = rows.filter((r) => r.kind !== "off_air").map((r) => toAiring(r, ctx));
+    for (const stretch of offAirStretches(spans)) {
+      airings.push({
+        logEntryId: stretch.logEntryId,
+        title: "Off air",
+        episodeTitle: null,
+        code: "OPEN",
+        kind: "off_air",
+        startsAt: stretch.startsAt,
+        endsAt: stretch.backAt,
+        live: false,
+        carriedFrom: null,
+        programId: null,
+        episodeDescription: null,
+        backAt: stretch.backAt
+      });
+    }
+    return airings.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }
+
+  async function offAirView(stationId: string): Promise<OffAirHoursView> {
+    const now = deps.clock.now();
+    const [rules, tz, upcoming] = await Promise.all([
+      db.select().from(OH).where(eq(OH.stationId, stationId)).orderBy(asc(OH.createdAt)),
+      stationTz(stationId),
+      offAirMap([stationId], now, new Date(now.getTime() + 8 * DAY))
+    ]);
+    return {
+      timezone: tz,
+      rules: rules.map((r) => ({ id: r.id, days: [...r.days].sort(), signOffAt: hhmm(r.signOffAt), backAt: hhmm(r.backAt), label: ruleLabel(r) })),
+      next: upcoming.get(stationId)?.[0] ?? null
+    };
   }
 
   async function generateBreaks(stationId: string, from: Date, to: Date): Promise<Array<Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">>> {
@@ -393,6 +488,34 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
   }
 
   const service: LogService = {
+    templates,
+
+    async offAirSpans(stationId, from, to) {
+      return (await offAirMap([stationId], from, to)).get(stationId) ?? [];
+    },
+
+    async offAirAt(stationId, at) {
+      const spans = await service.offAirSpans(stationId, at, new Date(at.getTime() + 1000));
+      return spans.find((s) => Date.parse(s.startsAt) <= at.getTime() && Date.parse(s.endsAt) > at.getTime()) ?? null;
+    },
+
+    async offAirHours(stationId) {
+      return offAirView(stationId);
+    },
+
+    async setOffAirHours(stationId, rules) {
+      for (const [i, rule] of rules.entries()) {
+        if (rule.signOffAt === rule.backAt) throw badRequest("Sign off and back on can't be the same time.", { [`rules.${i}.backAt`]: "Same as sign off" });
+      }
+      await db.transaction(async (tx) => {
+        await tx.delete(OH).where(eq(OH.stationId, stationId));
+        if (rules.length) {
+          await tx.insert(OH).values(rules.map((r) => ({ stationId, days: [...new Set(r.days)].sort(), signOffAt: r.signOffAt, backAt: r.backAt })));
+        }
+      });
+      return offAirView(stationId);
+    },
+
     async breakContents(stationId, slots) {
       const result = new Map<string, BreakContent[]>();
       if (!slots.length) return result;
@@ -444,24 +567,35 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     },
 
     async repeats(stationId, from) {
+      const G = schema.repeatGroups;
       const rows = await db
-        .select({ group: schema.repeatGroups, n: sql<number>`count(${E.id})::int` })
-        .from(schema.repeatGroups)
-        .innerJoin(E, and(eq(E.repeatGroupId, schema.repeatGroups.id), gte(E.startsAt, from)))
-        .where(eq(schema.repeatGroups.stationId, stationId))
-        .groupBy(schema.repeatGroups.id)
-        .orderBy(asc(schema.repeatGroups.startsOn));
-      return rows.map((r) => ({ id: r.group.id, day: r.group.startsOn, pattern: r.group.pattern, until: r.group.endsOn, entries: r.n }));
+        .select({ group: G, n: sql<number>`count(${E.id})::int` })
+        .from(G)
+        .leftJoin(E, and(eq(E.repeatGroupId, G.id), gte(E.startsAt, from)))
+        .where(and(eq(G.stationId, stationId), sql`${G.removedAt} is null`))
+        .groupBy(G.id)
+        .orderBy(asc(G.startsOn), asc(G.createdAt));
+      const tz = rows.some((r) => r.group.template) ? await stationTz(stationId) : "UTC";
+      const fromDay = localDate(from, tz);
+      return rows
+        // G7 copies while they have entries to come; templates while they still repeat. G7's list
+        // has three patterns: weekday templates are in `listTemplates` only.
+        .filter((r) => (r.group.template ? !r.group.endsOn || r.group.endsOn >= fromDay : r.n > 0))
+        .flatMap((r) => (r.group.pattern === "weekdays" ? [] : [{ ...r, pattern: r.group.pattern }]))
+        .map((r) => ({
+          id: r.group.id,
+          day: r.group.startsOn,
+          pattern: r.pattern,
+          until: r.group.endsOn,
+          entries: r.n,
+          template: r.group.template,
+          weekday: r.group.pattern === "weekly" ? r.group.weekday : null,
+          label: templateLabel(r.group)
+        }));
     },
 
     async removeRepeat(stationId, repeatId) {
-      const [group] = await db.select().from(schema.repeatGroups).where(and(eq(schema.repeatGroups.id, repeatId), eq(schema.repeatGroups.stationId, stationId)));
-      if (!group) throw notFound("That repeat");
-      const removed = await db
-        .delete(E)
-        .where(and(eq(E.repeatGroupId, repeatId), gt(E.startsAt, deps.clock.now())))
-        .returning({ id: E.id });
-      return removed.length;
+      return templates.remove(stationId, repeatId);
     },
 
     async liveEntry(stationId, entryId) {
@@ -536,6 +670,8 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
       if (patch.episodeDescription !== undefined) set.episodeDescription = patch.episodeDescription || null;
       if (patch.localNote !== undefined) set.localNote = patch.localNote || null;
       const [updated] = Object.keys(set).length ? await db.update(E).set(set).where(eq(E.id, entryId)).returning() : [row];
+      // A day template's date edited by hand is an exception from now on.
+      if (Object.keys(set).length && row.templateDate) await templates.markEdited(stationId, [row.templateDate]);
       return (await listingViews([updated]))[0];
     },
 
@@ -612,23 +748,37 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     },
 
     async nowNext(stationIds, at) {
-      const rows = await load(stationIds, at, new Date(at.getTime() + 24 * HOUR));
+      const until = new Date(at.getTime() + 24 * HOUR);
+      const [rows, offAir] = await Promise.all([load(stationIds, at, until), offAirMap(stationIds, at, until, true)]);
       const ctx = await context(rows);
       const result = new Map<string, { now: Airing | null; next: Airing | null }>();
       for (const id of stationIds) {
-        const mine = rows.filter((r) => r.stationId === id);
-        const now = mine.find((r) => r.startsAt <= at && r.endsAt > at) ?? null;
-        const next = mine.find((r) => r.startsAt > at) ?? null;
-        result.set(id, { now: now ? toAiring(now, ctx) : null, next: next ? toAiring(next, ctx) : null });
+        const airings = viewerAirings(
+          rows.filter((r) => r.stationId === id),
+          offAir.get(id) ?? [],
+          ctx
+        );
+        const now = airings.find((a) => Date.parse(a.startsAt) <= at.getTime() && Date.parse(a.endsAt) > at.getTime()) ?? null;
+        const next = airings.find((a) => Date.parse(a.startsAt) > at.getTime()) ?? null;
+        result.set(id, { now, next });
       }
       return result;
     },
 
     async window(stationIds, from, to) {
-      const rows = await load(stationIds, from, to);
+      const [rows, offAir] = await Promise.all([load(stationIds, from, to), offAirMap(stationIds, from, to, true)]);
       const ctx = await context(rows);
-      const result = new Map<string, Airing[]>(stationIds.map((id) => [id, []]));
-      for (const row of rows) result.get(row.stationId)!.push(toAiring(row, ctx));
+      const result = new Map<string, Airing[]>();
+      for (const id of stationIds) {
+        result.set(
+          id,
+          viewerAirings(
+            rows.filter((r) => r.stationId === id),
+            offAir.get(id) ?? [],
+            ctx
+          ).filter((a) => Date.parse(a.endsAt) > from.getTime() && Date.parse(a.startsAt) < to.getTime())
+        );
+      }
       return result;
     },
 
@@ -655,7 +805,8 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     },
 
     async gaps(stationId, from, to) {
-      return gapsIn(await load([stationId], from, to), from, to);
+      const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
+      return gapsIn(rows, from, to, offAir);
     },
 
     async breaks(stationId, from, to) {
@@ -873,7 +1024,9 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
 
     async log(stationId, from, to) {
       if (to.getTime() - from.getTime() > 8 * 24 * HOUR) throw badRequest("Ask for a week at most.");
-      const rows = await load([stationId], from, to);
+      // Day templates: the dates in the window are generated (usually already, by the job).
+      await templates.generate(stationId, { through: localDate(to, await stationTz(stationId)) });
+      const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       const ctx = await context(rows);
       const breaks = await service.breaks(stationId, from, to);
       const [contents, repeats] = await Promise.all([service.breakContents(stationId, breaks), service.repeats(stationId, from)]);
@@ -883,8 +1036,9 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
         entries: rows.map((r) => toEntry(r, ctx)),
         // G1: each break's rows, in the order they air.
         breaks: breaks.map((b) => ({ ...b, rows: (contents.get(b.startsAt) ?? []).map(breakRow) })),
-        gaps: gapsIn(rows, from, to),
-        repeats
+        gaps: gapsIn(rows, from, to, offAir),
+        repeats,
+        offAir
       };
     },
 
@@ -908,6 +1062,8 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
           createdBy: userId
         })
         .returning();
+      // Adding to a date a day template made makes that date an exception.
+      await templates.markEdited(stationId, [localDate(row.startsAt, await stationTz(stationId))]);
       return toEntry(row, await context([row]));
     },
 
@@ -944,70 +1100,24 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
         })
         .where(eq(E.id, entryId))
         .returning();
+      const tz = await stationTz(stationId);
+      await templates.markEdited(stationId, [current.templateDate ?? localDate(current.startsAt, tz), localDate(row.startsAt, tz)]);
       return toEntry(row, await context([row]));
     },
 
     async remove(stationId, entryId) {
-      const removed = await db.delete(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId))).returning({ id: E.id });
+      const removed = await db
+        .delete(E)
+        .where(and(eq(E.id, entryId), eq(E.stationId, stationId)))
+        .returning({ startsAt: E.startsAt, templateDate: E.templateDate });
       if (!removed.length) throw notFound("That log entry");
+      await templates.markEdited(stationId, [removed[0].templateDate ?? localDate(removed[0].startsAt, await stationTz(stationId))]);
     },
 
     async repeatDay(stationId, input) {
-      const tz = await stationTz(stationId);
-      const { from, to } = localDay(input.day, tz);
-      const source = await load([stationId], from, to);
-      const days: string[] = [];
-      if (input.pattern === "once") {
-        if (!input.onto) throw badRequest("Choose the day to copy to.", { onto: "Required" });
-        days.push(input.onto);
-      } else {
-        const weekday = localWeekday(from, tz);
-        for (let d = addDays(input.day, 1); d <= input.until; d = addDays(d, 1)) {
-          if (input.pattern === "daily" || localWeekday(localDay(d, tz).from, tz) === weekday) days.push(d);
-        }
-      }
-      if (days.length > 120) throw badRequest("Repeat for at most 120 days at a time.");
-      const [group] = await db
-        .insert(schema.repeatGroups)
-        .values({
-          stationId,
-          pattern: input.pattern,
-          weekday: input.pattern === "weekly" ? localWeekday(from, tz) : null,
-          startTime: "00:00",
-          startsOn: input.day,
-          endsOn: input.pattern === "once" ? input.onto! : input.until
-        })
-        .returning();
-      let created = 0;
-      let skippedForConflicts = 0;
-      for (const day of days) {
-        const target = localDay(day, tz).from;
-        for (const row of source) {
-          const offset = row.startsAt.getTime() - from.getTime();
-          const startsAt = new Date(target.getTime() + offset);
-          const endsAt = new Date(startsAt.getTime() + (row.endsAt.getTime() - row.startsAt.getTime()));
-          try {
-            await db.insert(E).values({
-              stationId,
-              startsAt,
-              endsAt,
-              kind: row.kind,
-              code: row.code,
-              assetId: row.assetId,
-              programId: row.programId,
-              liveSourceId: row.liveSourceId,
-              carriageAgreementId: row.carriageAgreementId,
-              repeatGroupId: group.id,
-              localNote: row.localNote
-            });
-            created++;
-          } catch {
-            // Overlaps something already there, or breaks a carriage limit: leave the existing log alone.
-            skippedForConflicts++;
-          }
-        }
-      }
-      return { created, skippedForConflicts };
+      // Since 2026-09-29 "Repeat this day" makes a day template, running until `until`.
+      const { template, generated } = await templates.create(stationId, { fromDay: input.day, pattern: input.pattern, onto: input.onto, until: input.pattern === "once" ? undefined : input.until });
+      return { created: generated.created, skippedForConflicts: generated.skippedForConflicts, templateId: template.id };
     },
 
     async fill(stationId, userId, input) {
@@ -1043,8 +1153,8 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
     async deadAir(stationId) {
       const now = deps.clock.now();
       const until = new Date(now.getTime() + 24 * HOUR);
-      const rows = await load([stationId], now, until);
-      const gaps = gapsIn(rows, now, until);
+      const [rows, offAir] = await Promise.all([load([stationId], now, until), service.offAirSpans(stationId, now, until)]);
+      const gaps = gapsIn(rows, now, until, offAir);
       const [last] = await db.select({ endsAt: E.endsAt }).from(E).where(eq(E.stationId, stationId)).orderBy(desc(E.endsAt)).limit(1);
       const events = await db
         .select()
@@ -1058,14 +1168,18 @@ export function createLogService({ deps, services }: ModuleContext): LogService 
         gaps,
         nextGapAt: gaps[0]?.startsAt ?? null,
         logRunsUntil: last && last.endsAt > now ? last.endsAt.toISOString() : null,
-        warnings
+        warnings,
+        offAir
       };
     },
 
     async checkDeadAir(stationIds) {
       const now = deps.clock.now();
       for (const stationId of stationIds) {
-        const gaps = gapsIn(await load([stationId], now, new Date(now.getTime() + 31 * MIN)), now, new Date(now.getTime() + 31 * MIN));
+        const soon = new Date(now.getTime() + 31 * MIN);
+        // Planned off air time isn't dead air: never warned about.
+        const [rows, offAir] = await Promise.all([load([stationId], now, soon), service.offAirSpans(stationId, now, soon)]);
+        const gaps = gapsIn(rows, now, soon, offAir);
         for (const gap of gaps) {
           const gapStart = new Date(gap.startsAt);
           const minutesAway = (gapStart.getTime() - now.getTime()) / MIN;

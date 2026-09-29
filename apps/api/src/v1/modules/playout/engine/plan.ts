@@ -2,6 +2,10 @@
 // at their times, split around the breaks inside them; each break airs its spots
 // (already placed and paid for), then the credit, bumpers and the station ID,
 // which is always last. Open time airs station ID and bumpers, never nothing.
+//
+// Planned off air time (off air hours, a sign-off on the log) airs the sign-off slate for a minute,
+// then nothing: the runner ends the playlist and waits. The station ID airs in the last seconds
+// before the back time, where the runner signs on again, so the first program starts on time.
 
 import path from "node:path";
 import type { ModuleContext } from "../../../context.js";
@@ -18,7 +22,9 @@ export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_
 export type SegmentSource =
   | { kind: "file"; location: string; seekMs: number; mediaKind: "video" | "audio"; contentId?: string }
   | { kind: "image"; path: string }
-  | { kind: "live"; liveSourceId: string };
+  | { kind: "live"; liveSourceId: string }
+  /** Planned off air: no output at all until `backAt` (the playlist has ended). */
+  | { kind: "off"; backAt: Date };
 
 export interface Segment {
   key: string;
@@ -43,7 +49,12 @@ export interface Segment {
 }
 
 import { DEAD_AIR_NOTE } from "../../log/service.js";
+import { offAirStretches } from "../../log/offair.js";
 const BUMPER_MIN_MS = 1_000;
+/** How long the sign-off slate airs before the channel ends. */
+export const SIGN_OFF_SLATE_MS = 60_000;
+/** Shorter off air time than this just holds the slate. */
+const MIN_DARK_MS = 60_000;
 
 export function createPlanner({ deps, services }: ModuleContext, options: { cache?: ContentCache } = {}) {
   const slates = new Slates(path.join(deps.config.storageRoot, "slates"));
@@ -114,14 +125,18 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
     /** Everything that airs on a station between `from` and `to`, in order, with no gaps. */
     async plan(stationId: string, from: Date, to: Date): Promise<Segment[]> {
       const lookback = new Date(from.getTime() - 6 * 3_600_000);
-      const [entries, breaks, allFillers, station, credits, members] = await Promise.all([
+      const [allEntries, breaks, allFillers, station, credits, members, offAirSpans] = await Promise.all([
         services.log.entries(stationId, lookback, to),
         services.log.breaks(stationId, lookback, to),
         services.library.fillers(stationId),
         look(stationId),
         services.spots.creditsFor(stationId),
-        services.ledger.memberCredits(stationId)
+        services.ledger.memberCredits(stationId),
+        services.log.offAirSpans(stationId, lookback, to)
       ]);
+      // Planned off air time is its own block (sign-off entries included), from sign-off to back.
+      const offAirBlocks = offAirStretches(offAirSpans).map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.backAt), logEntryId: o.logEntryId }));
+      const entries = allEntries.filter((e) => e.kind !== "off_air");
       // Only station IDs and bumpers the cache has.
       const fillers = { stationIds: allFillers.stationIds.filter((f) => fileAt(f)), bumpers: allFillers.bumpers.filter((f) => fileAt(f)) };
       const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
@@ -197,19 +212,43 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
         segments.push(...(await filler(stationId, new Date(a), b - a, { key: `open:${a}`, reason: "station_id_fill", inBreak: false }, fillers, station)));
       };
 
+      const signOff = async (block: { s: number; e: number; logEntryId: string | null }) => {
+        const back = clockTime(new Date(block.e), tz);
+        const slate = { kind: "image" as const, path: await slates.offAir(station, back) };
+        const base = { code: "OPEN" as const, label: "Off air", reason: "slate" as const, inBreak: false, logEntryId: block.logEntryId ?? undefined };
+        const sid = fillers.stationIds[0];
+        const sidMs = Math.min(sid?.durationMs ?? STATION_ID_MS, 60_000);
+        if (block.e - block.s < SIGN_OFF_SLATE_MS + MIN_DARK_MS + sidMs) {
+          segments.push({ ...base, key: `off:${block.s}`, startsAt: new Date(block.s), endsAt: new Date(block.e), source: slate });
+          return;
+        }
+        segments.push({ ...base, key: `off:${block.s}`, startsAt: new Date(block.s), endsAt: new Date(block.s + SIGN_OFF_SLATE_MS), source: slate });
+        segments.push({ ...base, key: `off:${block.s}:dark`, startsAt: new Date(block.s + SIGN_OFF_SLATE_MS), endsAt: new Date(block.e - sidMs), source: { kind: "off", backAt: new Date(block.e) } });
+        // Back on: the station ID first.
+        segments.push(...(await filler(stationId, new Date(block.e - sidMs), sidMs, { key: `on:${block.e}`, reason: "planned", inBreak: false }, fillers, station, false)));
+      };
+
+      const blocks = [
+        ...entries.map((entry) => ({ s: entry.startsAt.getTime(), e: entry.endsAt.getTime(), entry, off: null })),
+        ...offAirBlocks.map((off) => ({ s: off.s, e: off.e, entry: null, off }))
+      ].sort((a, b) => a.s - b.s);
+
       let cursor = from.getTime();
-      for (const entry of entries) {
-        const s = entry.startsAt.getTime();
-        const e = entry.endsAt.getTime();
+      for (const block of blocks) {
+        const s = block.s;
+        const e = block.e;
         if (e <= cursor) continue;
         await openTime(cursor, s);
+        if (block.off) {
+          await signOff(block.off);
+          cursor = Math.max(cursor, e);
+          continue;
+        }
+        const entry = block.entry!;
         const inside = breaks.filter((b) => b.logEntryId === entry.id).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
         const reason: AsRunReason = entry.localNote === DEAD_AIR_NOTE ? "dead_air_fill" : "planned";
 
-        if (entry.kind === "off_air") {
-          const back = entries.find((x) => x.startsAt.getTime() >= e && x.kind !== "off_air");
-          segments.push({ key: `entry:${entry.id}`, startsAt: entry.startsAt, endsAt: entry.endsAt, code: "OPEN", label: "Off air", source: { kind: "image", path: await slates.offAir(station, back ? clockTime(back.startsAt, tz) : null) }, reason: "slate", inBreak: false, logEntryId: entry.id });
-        } else if (entry.kind === "live") {
+        if (entry.kind === "live") {
           let t = s;
           for (const b of inside) {
             const bs = Date.parse(b.startsAt);

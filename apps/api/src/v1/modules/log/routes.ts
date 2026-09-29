@@ -41,6 +41,40 @@ export function logRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) 
     return log.deadAir(params.stationId);
   });
 
+  // Day templates and off air hours (added 2026-09-29).
+  r.handle(api.listTemplates, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return { templates: await log.templates.list(params.stationId) };
+  });
+  r.handle(api.getTemplate, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.templates.get(params.stationId, params.templateId);
+  });
+  r.handle(api.createTemplate, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.templates.create(params.stationId, body);
+  });
+  r.handle(api.updateTemplate, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.templates.update(params.stationId, params.templateId, body);
+  });
+  r.handle(api.removeTemplate, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    await log.templates.get(params.stationId, params.templateId);
+    return { removed: await log.templates.remove(params.stationId, params.templateId) };
+  });
+  r.handle(api.getOffAirHours, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.offAirHours(params.stationId);
+  });
+  r.handle(api.setOffAirHours, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    const hours = await log.setOffAirHours(params.stationId, body.rules);
+    // Playout reads the new hours at its next plan.
+    await services.playout.replan(params.stationId);
+    return hours;
+  });
+
   // G7: undo a "Repeat this day".
   r.handle(api.removeRepeat, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
