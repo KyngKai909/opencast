@@ -144,7 +144,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const blocks = log.data ? timelineBlocks(log.data, win.from, win.to, t) : [];
   const timeline =
     view === "week" ? (
-      <div className="cc-week">
+      // On the phone the week scrolls sideways: focusable, so the keyboard can scroll it too.
+      <div className="cc-week" role="region" aria-label="The week" tabIndex={0}>
         {week.map((d) => {
           const w = viewWindow("day", d);
           return (
@@ -166,7 +167,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
         timeZone={STATION_TZ}
         maxHeight={phone ? undefined : setup ? 430 : 540}
         selectedId={selected ? `gap:${selected.key}` : undefined}
-        onSelect={(b) => b.kind === "dead" && set("fill", b.id.slice("gap:".length))}
+        selectable={(b) => b.kind === "dead"}
+        onSelect={(b) => set("fill", b.id.slice("gap:".length))}
         className="cc-log__tl"
       />
     );

@@ -192,8 +192,6 @@ Old names, for anyone looking at that project:
 | `@openchannel/worker` | `@opencast/worker` |
 | `build:service:web`, `start:service:web` | `build:service:control`, `start:service:control` |
 
-The browser still stores the connected wallet under `openchannel.creator.wallet.v1`, so existing sessions carry over.
-
 ## Docs
 
 - `docs/api.md`: every endpoint, generated from the contracts

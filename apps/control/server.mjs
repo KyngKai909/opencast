@@ -75,10 +75,9 @@ function normalizeBaseUrl(value) {
   return trimmed.replace(/\/+$/, "");
 }
 
+// The API's /v1, and the media it links to by path (/hls, /uploads). Master control never calls the old web app's /api routes.
 function isApiProxyPath(pathname) {
   return (
-    pathname === "/api" ||
-    pathname.startsWith("/api/") ||
     pathname.startsWith("/v1/") ||
     pathname.startsWith("/hls/") ||
     pathname.startsWith("/uploads/")
@@ -108,7 +107,7 @@ async function proxyApiRequest(req, res, requestUrl) {
   if (!apiProxyBaseUrl) {
     res.statusCode = 502;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.end(JSON.stringify({ error: "API proxy is not configured on web service." }));
+    res.end(JSON.stringify({ error: "API proxy is not configured on master control." }));
     return;
   }
 

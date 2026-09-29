@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
 import { listListings, updateListing, updateProgramCaptions, type Listing } from "../../api/ext/live";
+import { notYet } from "../../api/ext";
 import { now as clockNow, STATION_TZ } from "../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { dayLabel, descriptionCount } from "../../components/live/logic";
@@ -107,7 +108,10 @@ export default function Listings() {
           />
         }
       />
-      {q.isError ? (
+      {notYet(q.error) ? (
+        // The listings endpoint is proposed (G5): until the API has it, say so plainly.
+        <p className="cc-listings__empty">Listings can't be edited here yet. Viewers see each program's own description.</p>
+      ) : q.isError ? (
         <p role="alert" className="cc-listings__empty">
           {q.error.message}
         </p>

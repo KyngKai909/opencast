@@ -36,6 +36,8 @@ export interface LogTimelineProps {
   selectedId?: string;
   /** A block opens its pane (how to fill a gap, a program's details). */
   onSelect?: (block: TimelineBlock) => void;
+  /** Which blocks open a pane when `onSelect` is given (default: every block). The rest draw as they are, not as buttons. */
+  selectable?: (block: TimelineBlock) => boolean;
   /** Scroll inside this height (px). */
   maxHeight?: number;
   className?: string;
@@ -63,7 +65,7 @@ export function placeBlocks(blocks: TimelineBlock[], from: TimeInput, pxPerMinut
  * Master control's program log as a timeline, not a playlist (A3): each program at its start time,
  * breaks where they'll fall, and a gap drawn as dead air.
  */
-export function LogTimeline({ blocks, from, to, pxPerMinute = 1.12, timeZone, selectedId, onSelect, maxHeight, className }: LogTimelineProps) {
+export function LogTimeline({ blocks, from, to, pxPerMinute = 1.12, timeZone, selectedId, onSelect, selectable, maxHeight, className }: LogTimelineProps) {
   const a0 = ms(from);
   const total = ((ms(to) - a0) / 60_000) * pxPerMinute;
   const hours: number[] = [];
@@ -103,7 +105,7 @@ export function LogTimeline({ blocks, from, to, pxPerMinute = 1.12, timeZone, se
           const pos = { top, height };
           return (
             <div key={b.id} role="listitem" className="oc-tl__item" style={pos}>
-              {onSelect ? (
+              {onSelect && (!selectable || selectable(b)) ? (
                 <button type="button" className={classes} aria-pressed={sel} onClick={() => onSelect(b)}>
                   {inner}
                 </button>

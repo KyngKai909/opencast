@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
 import { getItemHistory, LibraryExt, LibraryItemExt, replaceFile } from "../../api/ext/live";
+import { notYet } from "../../api/ext";
 import { useAuth } from "../../auth/AuthProvider";
 import { now as clockNow, STATION_TZ } from "../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -143,6 +144,9 @@ export default function LibraryItem() {
               </div>
             )}
 
+            {/* Where it's scheduled and where it aired come from the proposed history (L5): without it, left out. */}
+            {!notYet(history.error) && (
+            <>
             <section className="cc-item__sec" aria-labelledby="cc-inlog-h">
               <SecTop
                 id="cc-inlog-h"
@@ -187,6 +191,8 @@ export default function LibraryItem() {
                 }))}
               />
             </section>
+            </>
+            )}
           </div>
 
           <div>

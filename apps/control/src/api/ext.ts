@@ -4,4 +4,12 @@
 // screens hide what depends on them. When a request lands in @opencast/contracts, delete its
 // extension here. Each area keeps its own in api/ext/<area>.ts.
 
-export {};
+import { ApiError } from "./client";
+
+/**
+ * A proposed endpoint (api/ext/*) the API doesn't answer yet: it says 404. The screen leaves out
+ * what needs it, rather than showing an error.
+ */
+export function notYet(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 404;
+}

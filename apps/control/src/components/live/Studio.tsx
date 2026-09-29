@@ -94,7 +94,8 @@ export function StudioPicture({ kind, camera, signalUrl, bug, lowerThird, standb
       bug={bug}
       lowerThird={dropped ? undefined : lt}
       corner={standby ? <Tally state="standby" on="picture" /> : undefined}
-      label={label}
+      // A picture is an image to a screen reader, unless it holds the camera's problem and its button.
+      label={!dropped && kind === "browser" && camera && !camera.stream && camera.problem ? undefined : label}
     >
       {picture}
     </PictureFrame>
