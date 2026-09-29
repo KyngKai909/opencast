@@ -28,6 +28,8 @@ const apps = new Set<App>(chosen.length ? chosen.flatMap((p) => needs[p] ?? [p a
 
 export default defineConfig({
   testDir: "tests",
+  // The real-API specs run with playwright.real.config.ts.
+  testIgnore: /\.real\.spec\.ts$/,
   outputDir: "test-results",
   timeout: 90_000,
   expect: { timeout: 15_000 },
@@ -37,12 +39,12 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   use: { channel: "chrome", trace: "retain-on-failure", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
   projects: [
-    { name: "viewer", testMatch: /viewer\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.viewer}` } },
-    { name: "control", testMatch: /control\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.control}` } },
-    { name: "spots", testMatch: /spots\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.spots}` } },
-    { name: "tv", testMatch: /tv\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.tv}`, viewport: { width: 1920, height: 1080 } } },
-    { name: "desk", testMatch: /desk\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.desk}` } },
-    { name: "site", testMatch: /site\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.site}` } }
+    { name: "viewer", outputDir: "test-results/viewer", testMatch: /viewer\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.viewer}` } },
+    { name: "control", outputDir: "test-results/control", testMatch: /control\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.control}` } },
+    { name: "spots", outputDir: "test-results/spots", testMatch: /spots\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.spots}` } },
+    { name: "tv", outputDir: "test-results/tv", testMatch: /tv\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.tv}`, viewport: { width: 1920, height: 1080 } } },
+    { name: "desk", outputDir: "test-results/desk", testMatch: /desk\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.desk}` } },
+    { name: "site", outputDir: "test-results/site", testMatch: /site\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.site}` } }
   ],
   webServer: [...apps].map((a) => server(WORKSPACE[a], PORTS[a]))
 });

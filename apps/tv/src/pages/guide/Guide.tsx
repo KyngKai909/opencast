@@ -78,9 +78,12 @@ export default function Guide() {
     if (signedIn && model && held && !optionsOpen && outletFind(model, held)) navigate(`/guide/options/${encodeURIComponent(held)}`, { replace: true });
   }, [signedIn, model, optionsOpen, navigate]);
 
-  // The window shows the picture alone: no banner over it while the guide is up.
+  // The window shows the picture alone: no banner over it while the guide is up. Tuning from the
+  // guide closes it, and the new channel's banner stays for the picture ("every change shows the
+  // banner").
+  const leaving = useRef(false);
   useEffect(() => {
-    if (player.banner) engine.hideBanner();
+    if (player.banner && !leaving.current) engine.hideBanner();
   }, [player.banner, engine]);
 
   const cell = model && focus ? focusedCell(model, focus) : null;
@@ -106,6 +109,7 @@ export default function Guide() {
       if (!c) return;
       const act = okAction(c, now);
       if (act === "tune") {
+        leaving.current = true;
         if (c.stationId !== player.currentId) void engine.tune(c.stationId, { input: "app" });
         navigate("/", { replace: true });
       } else if (act === "options") navigate(`/guide/options/${encodeURIComponent(c.key)}`, { replace: true });

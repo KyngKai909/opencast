@@ -42,7 +42,7 @@ describe("ProgressBar", () => {
   it("shows start, end and time left, and isn't seekable", () => {
     const { container, getByRole } = render(<ProgressBar start={at(20, 30)} end={at(21)} now={at(20, 42)} timeZone={TZ} />);
     expect(container.textContent).toBe("8:309:0018 min left");
-    const bar = getByRole("progressbar");
+    const bar = getByRole("progressbar", { name: "How far into the program" });
     expect(bar.getAttribute("aria-valuenow")).toBe("40");
     expect(container.querySelector("[role=slider]")).toBeNull();
   });

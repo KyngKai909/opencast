@@ -37,6 +37,7 @@ export function ProgressBar({ start, end, now, timeZone, size = "sm", showLeft =
     <div
       className={cx("oc-prog", size === "tv" && "oc-prog--tv", className)}
       role="progressbar"
+      aria-label="How far into the program"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={pct}
