@@ -156,12 +156,10 @@ jobs:
       - name: The database's tests
         if: matrix.suite == 'suite'
         run: npm test -w @opencast/db
-      # Two --exclude flags: the package script's `--exclude 'test/playout-{run,live}.test.ts'` is
-      # misparsed by Vitest's CLI and selects only playout-live.test.ts.
+      # Everything but the real-time playout tests, which the other leg runs one file at a time.
       - name: The API's suite
         if: matrix.suite == 'suite'
-        working-directory: apps/api
-        run: npx vitest run --exclude test/playout-run.test.ts --exclude test/playout-live.test.ts
+        run: npm run test:suite -w @opencast/api
       - name: The real-time playout tests
         if: matrix.suite == 'realtime'
         run: npm run test:realtime -w @opencast/api
