@@ -2,9 +2,10 @@
 // budget, the estimates that turn a rate into dollars and a budget into days, and the pause story
 // as a timeline. Pure functions, tested in format.test.ts.
 
-import { SPOT_RESUMED_LABELS, SPOT_STATE_LABELS, type SpotState, type TargetMatch } from "@opencast/contracts";
+import { SPOT_RESUMED_LABELS, SPOT_STATE_LABELS, type SpotPauseStory, type SpotState, type TargetMatch } from "@opencast/contracts";
 import { clock, money, type TagVariant, type TimelineItem } from "@opencast/ui";
-import type { FilledWith, PauseStory, SpotX } from "../../api/ext/spots";
+import type { SpotX } from "../../api/ext/spots";
+import type { FilledWith } from "../../api/types";
 
 const TZ = "America/Los_Angeles";
 
@@ -258,7 +259,7 @@ function daypartOf(at: string): string {
  * What happened, as the paused page tells it (biz-spots 04.1): the budget reached, out of the
  * market with the stations told, the held airings that still air, and where it stands now.
  */
-export function pauseTimeline(title: string, p: PauseStory): TimelineItem[] {
+export function pauseTimeline(title: string, p: SpotPauseStory): TimelineItem[] {
   const names = p.stations.map((s) => s.station.callSign ?? s.station.name);
   const at = whenWords(p.pausedAt);
   const items: TimelineItem[] = [];

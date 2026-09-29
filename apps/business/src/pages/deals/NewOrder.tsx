@@ -7,9 +7,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { spotsApi } from "@opencast/contracts";
+import { spotsApi, type ProductionOrder } from "@opencast/contracts";
 import { Button, Field, Icon, Segmented, TextAreaField, money, useToast } from "@opencast/ui";
-import type { OrderX } from "../../api/ext/deals";
 import { call } from "../../api/client";
 import { useBusiness } from "../../business/BusinessContext";
 import { errorText, useMakers, useOrder, useProfile, useRefresh } from "../../components/deals/data";
@@ -40,7 +39,7 @@ function NewOrderPage() {
   const [params] = useSearchParams();
   const today = marketDate(useNow(60_000));
   const profile = useProfile(b);
-  const makers = useMakers(profile.data?.marketIds[0]);
+  const makers = useMakers(b, profile.data?.marketIds[0]);
   const from = useOrder(b, params.get("from") ?? undefined);
   const files = useRef<HTMLInputElement>(null);
   const filesId = useId();
@@ -57,7 +56,7 @@ function NewOrderPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Starting again after a maker passed: the same brief, and the other makers.
-  const prior: OrderX | undefined = from.data;
+  const prior: ProductionOrder | undefined = from.data;
   useEffect(() => {
     if (!prior) return;
     setTitle(prior.title);

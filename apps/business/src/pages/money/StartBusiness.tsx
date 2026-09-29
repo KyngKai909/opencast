@@ -11,7 +11,6 @@ import { accountsApi, spotsApi, stationsApi, type Business } from "@opencast/con
 import { Button, ChipRow, ControlTitle, Field, Reach, Segmented, SelectField, Tag } from "@opencast/ui";
 import { ApiError, call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { getCategoryReach, lookupPlace } from "../../api/ext/money";
 import { useClear } from "../../auth/clear";
 import { useMe } from "../../business/BusinessContext";
 import { CATEGORIES } from "../../components/money/categories";
@@ -51,7 +50,7 @@ export default function StartBusiness() {
 
   const openMarkets = (markets.data ?? []).filter((m) => m.open);
   const marketId = where === "online" ? (marketIds[0] ?? null) : (me.data?.market?.id ?? openMarkets[0]?.id ?? null);
-  const reach = useApi(getCategoryReach, { params: { marketId: marketId ?? "" }, query: { category } }, { enabled: !!category && !!marketId, retry: false, staleTime: 300_000 });
+  const reach = useApi(spotsApi.getCategoryReach, { params: { marketId: marketId ?? "" }, query: { category } }, { enabled: !!category && !!marketId, retry: false, staleTime: 300_000 });
   const reachText = reach.data ? reachWords(reach.data) : null;
 
   const place = where === "online" ? "Online" : where === "location" ? townOf(address) : town.trim();
@@ -80,8 +79,8 @@ export default function StartBusiness() {
       const locations = [];
       if (where !== "online") {
         const q = where === "location" ? address.trim() : town.trim();
-        const found = await call(lookupPlace, { query: { q } }).catch((err: unknown) => {
-          // P10 isn't in the API yet: say what still works.
+        const found = await call(spotsApi.lookupPlace, { query: { q } }).catch((err: unknown) => {
+          // 503 not_available: this server has no place lookup (PLACES_URL). Say what still works.
           if (err instanceof ApiError && err.code === "not_available") err = new Error("Addresses can't be looked up here yet. Choose Online to go on.");
           throw Object.assign(err instanceof Error ? err : new Error(String(err)), { field: where === "location" ? "address" : "town" });
         });

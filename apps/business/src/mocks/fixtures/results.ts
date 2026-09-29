@@ -680,9 +680,10 @@ export function connectionsOf(businessId: string): { clearPay: boolean; checkout
   return { clearPay: businessId === OSC_ID, checkout: null };
 }
 
-/** P12: the Redeem tool is on for businesses with a storefront. */
+/** P12: the Redeem tool, as the business set it (Settings, Connections); on unless it's online. */
 export function redeemOn(businessId: string): boolean {
-  return dbBusiness(businessId)?.customersWhere !== "online";
+  const b = dbBusiness(businessId);
+  return b?.redeemOn ?? b?.customersWhere !== "online";
 }
 
 export function redeemedToday(businessId: string, at: Date = now()): number {

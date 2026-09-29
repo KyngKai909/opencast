@@ -7,7 +7,7 @@ import { spotsApi, type CustomersWhere } from "@opencast/contracts";
 import { Button, Field, Modal, SelectField, Sheet } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, call } from "../../api/client";
-import { addressPlace, cityPlace } from "./place";
+import { lookUpPlace } from "./place";
 import "./common.css";
 import "./InviteModal.css";
 
@@ -25,10 +25,10 @@ export function LocationModal({ businessId, where, open, onClose, phone }: { bus
   const save = async (e?: FormEvent) => {
     e?.preventDefault();
     setError(null);
-    const place = area ? cityPlace(text) : addressPlace(text);
-    if (!place) return setError({ field: "text", message: area ? "Enter a city in the Inland Empire, like Riverside." : "Enter a street and a city, like 1150 E Washington St, Colton." });
     setBusy(true);
     try {
+      const place = await lookUpPlace(text, area);
+      if (!place) return setError({ field: "text", message: area ? "Enter a city in the Inland Empire, like Riverside." : "Enter a street and a city, like 1150 E Washington St, Colton." });
       await call(spotsApi.addLocation, {
         params: { businessId },
         body: {

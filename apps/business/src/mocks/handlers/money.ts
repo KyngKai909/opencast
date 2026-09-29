@@ -4,7 +4,6 @@
 
 import { http, HttpResponse, type HttpHandler } from "msw";
 import { ledgerApi, spotsApi, stationsApi, type Balance, type Business, type FundingSource, type Movement } from "@opencast/contracts";
-import { BalanceX, DepositQuoteX, getCategoryReach, lookupPlace } from "../../api/ext/money";
 import { now } from "../../lib/clock";
 import { roleOn } from "../access";
 import { balanceOf, dbBusiness, getDb, move, saveDb } from "../db";
@@ -106,7 +105,7 @@ function bodyOf<T>(schema: { safeParse(v: unknown): { success: true; data: T } |
 }
 
 /** The balance, with the account USDC from Clear is sent to (E7). */
-const balanceReply = (id: string) => reply(BalanceX, { ...(balanceOf(id) satisfies Balance), depositAddress: depositAddressOf(id) });
+const balanceReply = (id: string) => reply(ledgerApi.getBalance.response, { ...(balanceOf(id) satisfies Balance), depositAddress: depositAddressOf(id) });
 
 export const moneyHandlers: HttpHandler[] = [
   http.get(path(ledgerApi.getBalance), ({ request, params }) => {
@@ -163,7 +162,7 @@ export const moneyHandlers: HttpHandler[] = [
     const body = bodyOf(ledgerApi.quoteDeposit.body, await request.json().catch(() => null));
     if (body instanceof Response) return body;
     const basis = estimateBasis(getDb().spots.filter((s) => s.businessId === id));
-    return reply(DepositQuoteX, {
+    return reply(ledgerApi.quoteDeposit.response, {
       amountMicros: body.amountMicros,
       feeMicros: depositFee(body.amountMicros, body.method),
       arrives: body.method === "clear_bank" ? "In 1 to 2 business days" : "Right away",
@@ -314,21 +313,21 @@ export const moneyHandlers: HttpHandler[] = [
 
   http.get(path(stationsApi.listMarkets), () => reply(stationsApi.listMarkets.response, [{ ...MARKET, open: true }])),
 
-  http.get(path(getCategoryReach), ({ request, params }) => {
+  http.get(path(spotsApi.getCategoryReach), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     if (String(params.marketId) !== MARKET.id) return fail(404, "not_found", "That market wasn't found.");
     const category = new URL(request.url).searchParams.get("category") ?? "";
     if (!category) return fail(400, "invalid", "Choose a category.");
-    return reply(getCategoryReach.response, categoryReach(category));
+    return reply(spotsApi.getCategoryReach.response, categoryReach(category));
   }),
 
-  http.get(path(lookupPlace), ({ request }) => {
+  http.get(path(spotsApi.lookupPlace), ({ request }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const q = new URL(request.url).searchParams.get("q") ?? "";
     const place = findPlace(q);
     if (!place) return fail(404, "not_found", "That place isn't in a market Opencast is in yet. Check the town.");
-    return reply(lookupPlace.response, place);
+    return reply(spotsApi.lookupPlace.response, place);
   })
 ];

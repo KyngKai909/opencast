@@ -1,16 +1,16 @@
 // biz-results 05.1 and biz-settings 05.1 redeem a code at the counter (/redeem).
 // For a business that takes codes in person: type the code (or scan the customer's screen), see
-// the check before it counts (valid, first use for this customer, where it was saved: B5's check,
-// which counts nothing), then Redeem (spots.redeemCode). Owners and managers only: viewers see
-// redemptions in Results. The tool and today's count are P12. Against an API without B5's check,
-// the page skips straight to Redeem, and says what redeemCode answers.
+// the check before it counts (valid, first use for this customer, where it was saved: B5's
+// spots.redeemCheck, which counts nothing), then Redeem (spots.redeemCode). Owners and managers
+// only: viewers see redemptions in Results. Whether the tool is on and today's count are P12's
+// spots.redeemToday; while it's off (Settings, Connections), redeeming answers 409 redeem_off.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { spotsApi } from "@opencast/contracts";
+import type { RedeemAnswer } from "../../api/types";
 import { Button, ControlTitle, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../api/client";
-import { RedeemAnswer, redeemCheck, redeemToday } from "../../api/ext/results";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -31,14 +31,14 @@ export default function Redeem() {
   const qc = useQueryClient();
   useShellOptions({ title: "Redeem a code" });
   const allowed = b.can("advertise");
-  const today = useApi(redeemToday, { params: { businessId: b.id } }, { enabled: allowed, retry: false });
+  const today = useApi(spotsApi.redeemToday, { params: { businessId: b.id } }, { enabled: allowed, retry: false });
 
   const [code, setCode] = useState("");
   const [customerRef, setCustomerRef] = useState<string | undefined>();
   const [mode, setMode] = useState<"type" | "scan">("type");
   const [checked, setChecked] = useState<Answer | null>(null);
-  // B5 isn't in the API yet: redeem without the check.
-  const [noCheck, setNoCheck] = useState(false);
+  // Turned off since the page opened (409 redeem_off).
+  const [off, setOff] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -50,12 +50,11 @@ export default function Redeem() {
       const mine = ++seq.current;
       setError(null);
       try {
-        const a = await call(redeemCheck, { params: { businessId: b.id }, body: { code: value, ...(ref ? { customerRef: ref } : {}) } }, RedeemAnswer);
+        const a = await call(spotsApi.redeemCheck, { params: { businessId: b.id }, body: { code: value, ...(ref ? { customerRef: ref } : {}) } });
         if (mine === seq.current) setChecked(a);
       } catch (e) {
         if (mine !== seq.current) return;
-        if (e instanceof ApiError && e.status === 404) setNoCheck(true);
-        else setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+        setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
       }
     },
     [b.id]
@@ -63,10 +62,10 @@ export default function Redeem() {
 
   // Check once typing stops.
   useEffect(() => {
-    if (mode !== "type" || checked || noCheck || code.length < 3) return;
+    if (mode !== "type" || checked || code.length < 3) return;
     const t = setTimeout(() => void check(code, customerRef), 600);
     return () => clearTimeout(t);
-  }, [code, customerRef, mode, checked, noCheck, check]);
+  }, [code, customerRef, mode, checked, check]);
 
   const reset = () => {
     seq.current++;
@@ -89,17 +88,20 @@ export default function Redeem() {
     setBusy(true);
     setError(null);
     try {
-      const a = await call(spotsApi.redeemCode, { params: { businessId: b.id }, body: { code, ...(customerRef ? { customerRef } : {}) } }, RedeemAnswer);
+      const a = await call(spotsApi.redeemCode, { params: { businessId: b.id }, body: { code, ...(customerRef ? { customerRef } : {}) } });
       if (!a.valid) {
         setChecked(a);
         return;
       }
-      void qc.invalidateQueries({ queryKey: [redeemToday.method, redeemToday.path] });
+      void qc.invalidateQueries({ queryKey: [spotsApi.redeemToday.method, spotsApi.redeemToday.path] });
       void qc.invalidateQueries({ queryKey: [spotsApi.getResults.method, spotsApi.getResults.path] });
       toast.show({ message: `Redeemed ${a.code ?? code}${a.offer ? `, ${a.offer}` : ""}.` });
       reset();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+      if (e instanceof ApiError && e.code === "redeem_off") {
+        setOff(true);
+        void qc.invalidateQueries({ queryKey: [spotsApi.redeemToday.method, spotsApi.redeemToday.path] });
+      } else setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
     } finally {
       setBusy(false);
     }
@@ -129,11 +131,14 @@ export default function Redeem() {
       </div>
     );
   if (today.isLoading) return <Quiet />;
-  if (today.data && !today.data.on)
+  if (off || (today.data && !today.data.on))
     return (
       <div className="bz-redeem">
         {title}
         <p className="bz-redeem__quiet">Redeem is off for this business. Turn it on in Settings to mark codes used at the counter.</p>
+        <Button size="sm" href={`${b.base}/settings/connections`}>
+          Settings
+        </Button>
       </div>
     );
 
@@ -142,8 +147,8 @@ export default function Redeem() {
     : null;
 
   // Checked (biz-results 05.1): the code, the check, Redeem.
-  if (checked || noCheck) {
-    const valid = checked ? checked.valid : true;
+  if (checked) {
+    const valid = checked.valid;
     return (
       <div className="bz-redeem bz-redeem--checked">
         {title}
@@ -151,7 +156,7 @@ export default function Redeem() {
         <button type="button" className="bz-redeem__field bz-redeem__field--set" onClick={reset} aria-label={`${code}. Type another code`}>
           {code}
         </button>
-        {checked && <CheckResult valid={valid} heading={valid ? (checked.offer ?? code) : code} message={checked.message} />}
+        <CheckResult valid={valid} heading={valid ? (checked.offer ?? code) : code} message={checked.message} />
         {error && (
           <p className="bz-redeem__error" role="alert">
             {error}

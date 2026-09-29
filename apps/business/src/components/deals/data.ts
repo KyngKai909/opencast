@@ -1,31 +1,31 @@
-// The area's reads and writes: each through the contract endpoint (or the proposed one, P16), with
-// the extended schemas, and the refreshes a write needs (the balance moves with a hold).
+// The area's reads and writes, each through the contract endpoint, and the refreshes a write needs
+// (the balance moves with a hold).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ledgerApi, spotsApi, type EndpointDef } from "@opencast/contracts";
-import { listSponsorTargets, MakersX, OrdersX, OrderX, SponsorshipsX } from "../../api/ext/deals";
 import { ApiError, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
 import type { BusinessState } from "../../business/BusinessContext";
 
 export function useSponsorships(b: BusinessState, opts: { refetchInterval?: number } = {}) {
-  return useApi(spotsApi.listBusinessSponsorships, { params: { businessId: b.id } }, { schema: SponsorshipsX, enabled: b.can("advertise"), retry: false, ...opts });
+  return useApi(spotsApi.listBusinessSponsorships, { params: { businessId: b.id } }, { enabled: b.can("advertise"), retry: false, ...opts });
 }
 
 export function useTargets(b: BusinessState) {
-  return useApi(listSponsorTargets, { params: { businessId: b.id } }, { enabled: b.can("advertise"), retry: false });
+  return useApi(spotsApi.listSponsorTargets, { params: { businessId: b.id } }, { enabled: b.can("advertise"), retry: false });
 }
 
 export function useOrders(b: BusinessState, opts: { refetchInterval?: number } = {}) {
-  return useApi(spotsApi.listBusinessOrders, { params: { businessId: b.id } }, { schema: OrdersX, enabled: b.can("advertise"), retry: false, ...opts });
+  return useApi(spotsApi.listBusinessOrders, { params: { businessId: b.id } }, { enabled: b.can("advertise"), retry: false, ...opts });
 }
 
 export function useOrder(b: BusinessState, orderId: string | undefined) {
-  return useApi(spotsApi.getOrder, { params: { orderId: orderId ?? "" } }, { schema: OrderX, enabled: b.can("advertise") && !!orderId, retry: false });
+  return useApi(spotsApi.getOrder, { params: { orderId: orderId ?? "" } }, { enabled: b.can("advertise") && !!orderId, retry: false });
 }
 
-export function useMakers(marketId: string | undefined) {
-  return useApi(spotsApi.listMakers, { query: { marketId } }, { schema: MakersX, retry: false });
+/** The makers, with each one's history with this business (P18). */
+export function useMakers(b: BusinessState, marketId: string | undefined) {
+  return useApi(spotsApi.listMakers, { query: { marketId, businessId: b.id } }, { retry: false });
 }
 
 export function useBalance(b: BusinessState) {
@@ -39,7 +39,7 @@ export function useProfile(b: BusinessState) {
 /** Everything a sponsorship or order write can change: the lists, the order, the balance, the spots. */
 const TOUCHES: EndpointDef[] = [
   spotsApi.listBusinessSponsorships,
-  listSponsorTargets,
+  spotsApi.listSponsorTargets,
   spotsApi.listBusinessOrders,
   spotsApi.getOrder,
   spotsApi.listSpots,

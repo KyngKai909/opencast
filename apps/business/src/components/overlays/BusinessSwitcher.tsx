@@ -9,7 +9,6 @@ import { spotsApi } from "@opencast/contracts";
 import { Icon, Sheet } from "@opencast/ui";
 import { useQueries } from "@tanstack/react-query";
 import { call } from "../../api/client";
-import { BusinessX } from "../../api/ext";
 import { logoOf } from "../../business/logo";
 import { useBusiness, useMyBusinesses } from "../../business/BusinessContext";
 import { useIsPhone } from "../../layout/shell";
@@ -49,7 +48,7 @@ function useRows(): Row[] {
   const profiles = useQueries({
     queries: mine.map((m) => ({
       queryKey: ["switcher-logo", m.business.id],
-      queryFn: () => call(spotsApi.getBusiness, { params: { businessId: m.business.id } }, BusinessX),
+      queryFn: () => call(spotsApi.getBusiness, { params: { businessId: m.business.id } }),
       staleTime: 60_000,
       retry: false
     }))

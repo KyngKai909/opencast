@@ -3,7 +3,7 @@
 // screen readers, not copy.
 
 import { Button, Icon } from "@opencast/ui";
-import type { CreditFlag } from "../../api/ext/deals";
+import type { CreditFlag } from "../../api/types";
 import { flagWords } from "./format";
 import "./CreditRules.css";
 

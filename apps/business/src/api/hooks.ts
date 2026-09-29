@@ -19,7 +19,7 @@ function schemaId(schema: object | undefined): number {
   return id;
 }
 
-/** Reads an endpoint. Pass `schema` for an extended response (docs/contract-requests.md). */
+/** Reads an endpoint. Pass `schema` to read the response another way (api/ext/spots.ts's SpotX). */
 export function useApi<E extends EndpointDef, S extends z.ZodType = E["response"]>(
   endpoint: E,
   args: CallArgs = {},

@@ -9,7 +9,6 @@
 import { useParams, useSearchParams } from "react-router";
 import { spotsApi } from "@opencast/contracts";
 import { Button, ControlTitle, Funnel, KeyValueList, useToast, type KeyValueRow } from "@opencast/ui";
-import { BusinessX } from "../../api/ext";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -34,7 +33,7 @@ export default function Code() {
   const [params, setParams] = useSearchParams();
   const sel = selectionFrom(params, now);
   const res = useResults(b.id, sel);
-  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessX, staleTime: 60_000 });
+  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { staleTime: 60_000 });
   useShellOptions({ title: code });
 
   const overlay = phone ? "sheet" : "modal";
@@ -61,7 +60,7 @@ export default function Code() {
     return (
       <div className="bz-code">
         <ControlTitle title={code} />
-        <p className="bz-code__quiet">{res.data.codes ? `${code} isn't one of your codes.` : "Codes and customers aren't available yet."}</p>
+        <p className="bz-code__quiet">{`${code} isn't one of your codes.`}</p>
         <Button size="sm" href={`${b.base}/results`}>
           Where it aired
         </Button>

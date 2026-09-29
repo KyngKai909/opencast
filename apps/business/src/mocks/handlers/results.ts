@@ -1,10 +1,10 @@
 // airings with proof (spots.listSpotAirings), results (spots.getResults), codes and customers (saveOffer, redeemCode, scanCode), statements (ledger.listStatements).
-// The Results area owns this file. Also its proposed endpoints (api/ext/results.ts): checking a
-// code before redeeming it (B5) and the Redeem tool's day (P12); and a statement's CSV.
+// The Results area owns this file. Also checking a code before redeeming it (B5), the Redeem
+// tool's day (P12), and a statement's CSV.
 
 import { http, type HttpHandler } from "msw";
-import { ledgerApi, spotsApi, type StationIdent } from "@opencast/contracts";
-import { BizStatementsX, RedeemAnswer, ResultsX, SpotAiringsX, redeemCheck, redeemToday, type ResultsAiringX, type ResultsCode, type ResultsPeriod } from "../../api/ext/results";
+import { ledgerApi, spotsApi, type ResultsAiring, type ResultsCode, type StationIdent } from "@opencast/contracts";
+import type { ResultsPeriod } from "../../api/types";
 import { now } from "../../lib/clock";
 import { roleOn } from "../access";
 import { dbBusiness, getDb, membership } from "../db";
@@ -93,7 +93,7 @@ const inRange = (r: Range, iso: string, at: Date) => {
 
 // ---------------------------------------------------------------- results
 
-export function asResultsAiring(a: AsRun): ResultsAiringX {
+export function asResultsAiring(a: AsRun): ResultsAiring {
   const s = stationOf(a.stationId)!;
   const spot = getDb().spots.find((x) => x.id === a.spotId);
   const title = spot?.title ?? "A spot";
@@ -269,7 +269,7 @@ export const resultsHandlers: HttpHandler[] = [
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
     const q = new URL(request.url).searchParams;
-    return reply(ResultsX, buildResults(id, rangeFor(q, id)));
+    return reply(spotsApi.getResults.response, buildResults(id, rangeFor(q, id)));
   }),
 
   http.get(path(spotsApi.listSpotAirings), ({ request, params }) => {
@@ -280,7 +280,7 @@ export const resultsHandlers: HttpHandler[] = [
     const r = roleOn(spot.businessId, p, "see");
     if (r instanceof Response) return r;
     const at = now();
-    return reply(SpotAiringsX, {
+    return reply(spotsApi.listSpotAirings.response, {
       held: heldOf(spot.businessId)
         .filter((h) => h.spotId === spot.id)
         .map((h) => ({ airingId: h.airingId, station: stationOf(h.stationId)!, scheduledAt: h.scheduledAt, heldMicros: h.heldMicros })),
@@ -308,7 +308,7 @@ export const resultsHandlers: HttpHandler[] = [
     return reply(spotsApi.saveOffer.response, { savedUntil: marketDate(Date.parse(s.at) + CODE_RULES.savedForDays * DAY), savedFrom: stationOf(s.stationId) });
   }),
 
-  http.post(path(redeemCheck), async ({ request, params }) => {
+  http.post(path(spotsApi.redeemCheck), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -316,7 +316,7 @@ export const resultsHandlers: HttpHandler[] = [
     if (r instanceof Response) return r;
     const body = await codeBody(request);
     if (!body) return fail(400, "invalid", "Type a code.");
-    return reply(RedeemAnswer, answer(id, checkCode(id, body.code, body.customerRef)));
+    return reply(spotsApi.redeemCode.response, answer(id, checkCode(id, body.code, body.customerRef)));
   }),
 
   http.post(path(spotsApi.redeemCode), async ({ request, params }) => {
@@ -325,19 +325,19 @@ export const resultsHandlers: HttpHandler[] = [
     const id = String(params.businessId);
     const r = roleOn(id, p, "advertise", NOT_FOR_VIEWERS);
     if (r instanceof Response) return r;
-    if (!redeemOn(id)) return fail(409, "redeem_off", "Redeem is off for this business.");
+    if (!redeemOn(id)) return fail(409, "redeem_off", "Redeem is off for this business. Turn it on in Settings.");
     const body = await codeBody(request);
     if (!body) return fail(400, "invalid", "Type a code.");
-    return reply(RedeemAnswer, answer(id, redeem(id, body.code, body.customerRef), true));
+    return reply(spotsApi.redeemCode.response, answer(id, redeem(id, body.code, body.customerRef), true));
   }),
 
-  http.get(path(redeemToday), ({ request, params }) => {
+  http.get(path(spotsApi.redeemToday), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
     const r = roleOn(id, p, "advertise", NOT_FOR_VIEWERS);
     if (r instanceof Response) return r;
-    return reply(redeemToday.response, { on: redeemOn(id), redeemedToday: redeemedToday(id), clearPay: connectionsOf(id).clearPay });
+    return reply(spotsApi.redeemToday.response, { on: redeemOn(id), redeemedToday: redeemedToday(id), clearPay: connectionsOf(id).clearPay });
   }),
 
   http.get(path(ledgerApi.listStatements), ({ request, params }) => {
@@ -346,7 +346,7 @@ export const resultsHandlers: HttpHandler[] = [
     const id = String(params.businessId);
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
-    return reply(BizStatementsX, statementsOf(id).map((s) => asStatement(id, s)));
+    return reply(ledgerApi.listStatements.response, statementsOf(id).map((s) => asStatement(id, s)));
   }),
 
   http.get(path(ledgerApi.getStatementCsv), ({ request, params }) => {

@@ -5,8 +5,7 @@
 //
 // The rules the handlers apply live here as plain functions, so they're tested without a server.
 
-import type { Business, BusinessLocation, Invite, Movement, NotificationPrefs } from "@opencast/contracts";
-import type { ReceiptX } from "../../api/ext/settings";
+import type { Business, BusinessLocation, Invite, Movement, NotificationPrefs, Receipt } from "@opencast/contracts";
 import { now } from "../../lib/clock";
 import type { DbMember } from "../db";
 import { CYPRESS_ID, OSC_ID } from "./businesses";
@@ -166,7 +165,7 @@ export function prefsFor(personId: string, businessId: string, role: Role): Noti
 // ---- Receipts ----
 
 /** A receipt for a movement that's one: money added (prepayment), an order or a sponsorship (expenses). */
-export function receiptOf(m: Movement): ReceiptX | null {
+export function receiptOf(m: Movement): Receipt | null {
   const base = { id: m.id, at: m.at, amountMicros: Math.abs(m.amountMicros), pdfUrl: `/mock-media/receipts/${m.id}.pdf` };
   switch (m.kind) {
     case "added": {
@@ -184,9 +183,9 @@ export function receiptOf(m: Movement): ReceiptX | null {
 }
 
 /** Every receipt and statement issued by `at`, newest first. */
-export function receiptsFor(businessId: string, movements: Movement[], statements: MockStatement[], at: Date): ReceiptX[] {
-  const fromMoves = movements.map(receiptOf).filter((r): r is ReceiptX => r !== null);
-  const fromStatements: ReceiptX[] = statements
+export function receiptsFor(businessId: string, movements: Movement[], statements: MockStatement[], at: Date): Receipt[] {
+  const fromMoves = movements.map(receiptOf).filter((r): r is Receipt => r !== null);
+  const fromStatements: Receipt[] = statements
     .filter((s) => s.businessId === businessId && Date.parse(s.issuedAt) <= at.getTime())
     .map((s) => ({ id: s.id, kind: "statement", title: s.title, detail: s.detail, amountMicros: s.amountMicros, at: s.issuedAt, pdfUrl: `/mock-media/receipts/${s.id}.pdf` }));
   return [...fromMoves, ...fromStatements].filter((r) => Date.parse(r.at) <= at.getTime()).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));

@@ -8,7 +8,6 @@ import { ledgerApi } from "@opencast/contracts";
 import { money, useToast } from "@opencast/ui";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { BalanceX } from "../../api/ext/money";
 import { shortAddress, useClear } from "../../auth/clear";
 import { useRefreshMoney } from "./useAddMoney";
 import "./ClearFunding.css";
@@ -54,7 +53,7 @@ export function useClearFunding(businessId: string) {
 
 /** Read-only: where to send money from inside Clear. The address comes from the balance (E7); without it, only the words. */
 export function ClearReadOnly({ businessId }: { businessId: string }) {
-  const balance = useApi(ledgerApi.getBalance, { params: { businessId } }, { schema: BalanceX });
+  const balance = useApi(ledgerApi.getBalance, { params: { businessId } });
   const address = balance.data?.depositAddress ?? null;
   return (
     <div className="bz-clear-ro">

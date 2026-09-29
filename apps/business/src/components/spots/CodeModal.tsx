@@ -1,5 +1,6 @@
 // "Change" on the code check (biz-spots 02.1): the code's words and the offer customers save with
-// it. Where it sits and when it shows aren't changeable yet (contract request P4).
+// it. Opencast picks the letters at upload (P4, `code.pickedBy`); changing only the offer sends the
+// same letters, so they stay Opencast's. Where it sits and when it shows aren't changeable.
 
 import { useState } from "react";
 import { spotsApi } from "@opencast/contracts";

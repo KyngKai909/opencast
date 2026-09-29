@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { OrderX, SponsorshipX } from "../../api/ext/deals";
+import type { ProductionOrder, Sponsorship } from "@opencast/contracts";
 import * as f from "./format";
 
 const BEAT = { id: "b", kind: "station", callSign: "BEAT", handle: "beat", name: "Inland Beat", colour: "#8C3B7A", band: "tv", channel: "12.1", marketSlug: "inland-empire", homeCity: "Redlands" } as const;
 const STUDIO = { ...BEAT, kind: "studio", callSign: null, channel: null, name: "Opencast Studio", colour: null } as const;
 const TODAY = "2026-09-26";
 
-const sp = (o: Partial<SponsorshipX>): SponsorshipX => ({
+const sp = (o: Partial<Sponsorship>): Sponsorship => ({
   id: "s",
   business: { id: "x", name: "Orange Street Coffee" },
   station: BEAT,
@@ -80,7 +80,7 @@ describe("the credit flags' words", () => {
   });
 });
 
-const order = (o: Partial<OrderX>): OrderX => ({
+const order = (o: Partial<ProductionOrder>): ProductionOrder => ({
   id: "o",
   business: { id: "x", name: "Orange Street Coffee" },
   maker: BEAT,

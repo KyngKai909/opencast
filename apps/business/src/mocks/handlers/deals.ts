@@ -1,5 +1,5 @@
 // sponsorships (checkCredit, offerSponsorship, listBusinessSponsorships, endSponsorship, and the
-// proposed sponsor-targets, P16) and made to order (listMakers, orderSpot, listBusinessOrders,
+// sponsor-targets, P16) and made to order (listMakers, orderSpot, listBusinessOrders,
 // getOrder, attachBriefFile, acceptQuote, reviewDelivery, addOrderNote, cancelOrder).
 // Master control's side is answered here too, for the mock-only control that stands in for the
 // station (decideSponsorship, quoteOrder, deliverOrder, markOwnMistake) and for Opencast's review
@@ -8,8 +8,8 @@
 
 import { http, type HttpHandler } from "msw";
 import { spotsApi } from "@opencast/contracts";
-import { CreditCheckX, listSponsorTargets, MakersX, OrdersX, OrderX, SponsorshipsX, SponsorshipX } from "../../api/ext/deals";
 import { roleOn } from "../access";
+import { OSC_ID } from "../fixtures/businesses";
 import * as deals from "../fixtures/deals";
 import { fail, needsUser, path, reply } from "../respond";
 
@@ -29,8 +29,8 @@ function sponsorshipFor(id: string) {
   return deals.getDeals().sponsorships.find((x) => x.id === id);
 }
 
-const order = (o: deals.FxOrder, status = 200) => reply(OrderX, deals.publicOrder(o), status);
-const sponsorship = (x: deals.FxSponsorship, status = 200) => reply(SponsorshipX, deals.publicSponsorship(x), status);
+const order = (o: deals.FxOrder, status = 200) => reply(spotsApi.getOrder.response, deals.publicOrder(o), status);
+const sponsorship = (x: deals.FxSponsorship, status = 200) => reply(spotsApi.offerSponsorship.response, deals.publicSponsorship(x), status);
 
 export const dealsHandlers: HttpHandler[] = [
   // ---- Sponsorships ----
@@ -38,17 +38,17 @@ export const dealsHandlers: HttpHandler[] = [
   http.post(path(spotsApi.checkCredit), async ({ request }) => {
     const body = spotsApi.checkCredit.body.safeParse(await json(request));
     if (!body.success) return fail(400, "bad_request", "A credit is 200 characters at most.");
-    return reply(CreditCheckX, deals.checkCredit(body.data.text));
+    return reply(spotsApi.checkCredit.response, deals.checkCredit(body.data.text));
   }),
 
-  http.get(path(listSponsorTargets), ({ request, params }) => {
+  http.get(path(spotsApi.listSponsorTargets), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
     const r = roleOn(id, p, "advertise", "Viewers see results, airings and statements.");
     if (r instanceof Response) return r;
     deals.settle();
-    return reply(listSponsorTargets.response, deals.targetsFor(id));
+    return reply(spotsApi.listSponsorTargets.response, deals.targetsFor(id));
   }),
 
   http.get(path(spotsApi.listBusinessSponsorships), ({ request, params }) => {
@@ -59,7 +59,7 @@ export const dealsHandlers: HttpHandler[] = [
     if (r instanceof Response) return r;
     deals.settle();
     const list = deals.getDeals().sponsorships.filter((x) => x.business.id === id);
-    return reply(SponsorshipsX, list.map(deals.publicSponsorship));
+    return reply(spotsApi.listBusinessSponsorships.response, list.map(deals.publicSponsorship));
   }),
 
   http.post(path(spotsApi.offerSponsorship), async ({ request, params }) => {
@@ -102,7 +102,9 @@ export const dealsHandlers: HttpHandler[] = [
   http.get(path(spotsApi.listMakers), ({ request }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
-    return reply(MakersX, deals.MAKERS);
+    // P18: each maker's history with the business asked about (Orange Street's Fall menu, by BEAT).
+    const businessId = new URL(request.url).searchParams.get("businessId");
+    return reply(spotsApi.listMakers.response, deals.MAKERS.map((m) => ({ ...m, history: businessId === OSC_ID ? m.history : null })));
   }),
 
   http.get(path(spotsApi.listBusinessOrders), ({ request, params }) => {
@@ -112,7 +114,7 @@ export const dealsHandlers: HttpHandler[] = [
     const r = roleOn(id, p, "advertise", "Viewers see results, airings and statements.");
     if (r instanceof Response) return r;
     deals.settle();
-    return reply(OrdersX, deals.getDeals().orders.filter((o) => o.business.id === id).map(deals.publicOrder));
+    return reply(spotsApi.listBusinessOrders.response, deals.getDeals().orders.filter((o) => o.business.id === id).map(deals.publicOrder));
   }),
 
   http.post(path(spotsApi.orderSpot), async ({ request, params }) => {

@@ -2,16 +2,15 @@
 // held (acceptQuote; the mock holds it through move(..., { hold: true })), and the promise says when
 // it goes to the maker and when it comes back. A modal on the web, a sheet on the phone.
 
-import { spotsApi } from "@opencast/contracts";
+import { spotsApi, type ProductionOrder } from "@opencast/contracts";
 import { Button, KeyValueList, Modal, PromiseList, Sheet, money, useToast } from "@opencast/ui";
-import type { OrderX } from "../../api/ext/deals";
 import { useBusiness } from "../../business/BusinessContext";
 import { errorText, useBalance, useWrite } from "./data";
 import { callSign, dayText } from "./format";
 import { ErrorLine } from "./parts";
 import "./AcceptQuote.css";
 
-export function AcceptQuote({ order, open, phone, onClose }: { order: OrderX; open: boolean; phone: boolean; onClose: () => void }) {
+export function AcceptQuote({ order, open, phone, onClose }: { order: ProductionOrder; open: boolean; phone: boolean; onClose: () => void }) {
   const b = useBusiness();
   const toast = useToast();
   const balance = useBalance(b);

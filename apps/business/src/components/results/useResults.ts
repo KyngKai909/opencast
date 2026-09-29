@@ -2,7 +2,6 @@
 // and the results for it (spots.getResults, with P14's periods).
 
 import { spotsApi } from "@opencast/contracts";
-import { ResultsX } from "../../api/ext/results";
 import { useApi } from "../../api/hooks";
 import { monthOf, type Period } from "./format";
 
@@ -22,7 +21,7 @@ export function selectionFrom(params: URLSearchParams, now: Date): Selection {
   return { period, month, week };
 }
 
-/** The query for getResults: the contract's month, plus P14's period and week. */
+/** The query for getResults: the month, and P14's period and week. */
 export function queryFor(sel: Selection): Record<string, string> {
   const q: Record<string, string> = { month: sel.month };
   if (sel.period !== "month") q.period = sel.period;
@@ -31,5 +30,5 @@ export function queryFor(sel: Selection): Record<string, string> {
 }
 
 export function useResults(businessId: string, sel: Selection, enabled = true) {
-  return useApi(spotsApi.getResults, { params: { businessId }, query: queryFor(sel) }, { schema: ResultsX, enabled, staleTime: 15_000 });
+  return useApi(spotsApi.getResults, { params: { businessId }, query: queryFor(sel) }, { enabled, staleTime: 15_000 });
 }

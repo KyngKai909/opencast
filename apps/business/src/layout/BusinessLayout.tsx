@@ -7,7 +7,6 @@ import { ledgerApi, spotsApi } from "@opencast/contracts";
 import { BusinessShell, type BusinessPage, type ShellItems } from "@opencast/ui";
 import { useApi } from "../api/hooks";
 import BusinessSwitcher from "../components/overlays/BusinessSwitcher";
-import { BusinessX } from "../api/ext";
 import { logoOf } from "../business/logo";
 import { PAGE_ABILITY, VIEWER_REASON } from "../business/abilities";
 import { BusinessProvider, useBusiness, useMe, useResolvedBusiness } from "../business/BusinessContext";
@@ -64,7 +63,7 @@ function Frame() {
     (Object.keys(PAGE_SEGMENT) as BusinessPage[]).map((p) => [p, { ...badges[p], ...(b.can(PAGE_ABILITY[p]) ? {} : { disabled: VIEWER_REASON, count: undefined }) }])
   );
   const linkTo = (p: BusinessPage) => `${b.base}/${PAGE_SEGMENT[p]}`;
-  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessX, staleTime: 60_000 });
+  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { staleTime: 60_000 });
   const logo = logoOf(profile.data, b.business.name);
   const openSwitcher = () => setParams((p) => (p.set("switch", "1"), p));
   const name = me.data?.displayName ?? me.data?.email ?? "You";

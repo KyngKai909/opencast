@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TargetMatch } from "@opencast/contracts";
-import type { PauseStory, SpotX } from "../../api/ext/spots";
+import type { SpotPauseStory, TargetMatch } from "@opencast/contracts";
+import type { SpotX } from "../../api/ext/spots";
 import {
   budgetEstimate,
   budgetShare,
@@ -179,7 +179,7 @@ describe("typed amounts", () => {
 });
 
 describe("the pause story", () => {
-  const story: PauseStory = {
+  const story: SpotPauseStory = {
     reason: "budget_spent",
     pausedAt: "2026-10-12T22:10:00.000Z",
     lastHold: { amountMicros: $(1.9), station: station("BEAT", "12.1") },

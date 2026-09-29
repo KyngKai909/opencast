@@ -5,9 +5,8 @@
 
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
-import { SPONSORSHIP_DECLINE_LABELS, spotsApi, type SponsorshipDeclineReason } from "@opencast/contracts";
+import { SPONSORSHIP_DECLINE_LABELS, spotsApi, type Sponsorship, type SponsorshipDeclineReason } from "@opencast/contracts";
 import { Button, KeyValueList, Modal, Sheet, Table, money, useToast, type Column } from "@opencast/ui";
-import type { SponsorshipX } from "../../api/ext/deals";
 import { call } from "../../api/client";
 import { useBusiness } from "../../business/BusinessContext";
 import { CreditSlate } from "../../components/deals/CreditSlate";
@@ -52,7 +51,7 @@ function SponsorshipsPage() {
 
   // "BEAT said yes to your sponsorship" (06.2): the push is the OS's; in the app, a toast when a
   // request on screen is answered.
-  const seen = useRef<Map<string, SponsorshipX["state"]>>(new Map());
+  const seen = useRef<Map<string, Sponsorship["state"]>>(new Map());
   useEffect(() => {
     for (const x of rows) {
       const before = seen.current.get(x.id);
@@ -68,7 +67,7 @@ function SponsorshipsPage() {
 
   const openId = params.get(phone ? "sheet" : "modal") === "sponsorship" ? params.get("id") : null;
   const open = openId ? rows.find((x) => x.id === openId) ?? null : null;
-  const show = (x: SponsorshipX) => setParams((p) => (p.set(phone ? "sheet" : "modal", "sponsorship"), p.set("id", x.id), p));
+  const show = (x: Sponsorship) => setParams((p) => (p.set(phone ? "sheet" : "modal", "sponsorship"), p.set("id", x.id), p));
   const close = () => setParams((p) => (p.delete("modal"), p.delete("sheet"), p.delete("id"), p), { replace: true });
 
   const requested = rows.filter((x) => x.state === "requested");
@@ -130,7 +129,7 @@ function SponsorshipsPage() {
     );
   }
 
-  const columns: Column<SponsorshipX>[] = [
+  const columns: Column<Sponsorship>[] = [
     { key: "sw", width: "14px", cell: (x) => <span className="bz-sp__sw" style={{ background: x.station.colour ?? "var(--ink)" }} aria-hidden="true" /> },
     {
       key: "what",
@@ -195,7 +194,7 @@ function SponsorshipsPage() {
 }
 
 /** One sponsorship: its credit as it airs, the amount and dates, and ending it. */
-function SponsorshipDetail({ x, today, onDone }: { x: SponsorshipX; today: string; onDone: () => void }) {
+function SponsorshipDetail({ x, today, onDone }: { x: Sponsorship; today: string; onDone: () => void }) {
   const b = useBusiness();
   const toast = useToast();
   const profile = useProfile(b);
@@ -226,7 +225,7 @@ function SponsorshipDetail({ x, today, onDone }: { x: SponsorshipX; today: strin
                 { params: { sponsorshipId: x.id } },
                 {
                   onSuccess: (out) => {
-                    const done = out as SponsorshipX;
+                    const done = out as Sponsorship;
                     const last = endsOn(done, today);
                     toast.show({ message: last ? `It ends with its paid month, ${dayText(last)}.` : "Ended." });
                     onDone();

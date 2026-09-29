@@ -179,14 +179,42 @@ describe("receipts and funding", () => {
   });
 });
 
+describe("connections", () => {
+  it("connects a checkout with its secret, shows the owner where webhooks go, and disconnects", async () => {
+    expect((await api("POST", `/businesses/${OSC}/connections/checkout`, { as: "tomas", body: { token: "whsec_test", provider: "stripe" } })).status).toBe(403);
+    expect((await api("POST", `/businesses/${OSC}/connections/checkout`, { body: { token: "whsec_test" } })).status).toBe(400);
+    const on = await api("POST", `/businesses/${OSC}/connections/checkout`, { body: { token: "whsec_test", provider: "stripe" } });
+    expect(on.json.checkout).toMatchObject({ connected: true, provider: "stripe" });
+    expect(on.json.checkout.webhookUrl).toMatch(/\/v1\/webhooks\/checkout\//);
+    expect((await api("GET", `/businesses/${OSC}/connections`, { as: "tomas" })).json.checkout.webhookUrl).toBeNull();
+    const off = await api("DELETE", `/businesses/${OSC}/connections/checkout`);
+    expect(off.json.checkout).toMatchObject({ connected: false, provider: null });
+  });
+});
+
 describe("closing the account", () => {
-  it("is the owner's, takes the name, returns what's available and empties the team", async () => {
+  it("is the owner's, takes the name, waits for orders being made, returns what's available and empties the team", async () => {
     expect((await api("POST", `/businesses/${OSC}/close`, { as: "tomas", body: { confirmName: "Orange Street Coffee" } })).status).toBe(403);
     expect((await api("POST", `/businesses/${OSC}/close`, { body: { confirmName: "Orange Street" } })).status).toBe(400);
+    // Weekend brunch is delivered and waiting for review: approve or settle it first.
+    const busy = await api("POST", `/businesses/${OSC}/close`, { body: { confirmName: "Orange Street Coffee" } });
+    expect(busy.status).toBe(409);
+    expect(busy.json.error.code).toBe("order_in_progress");
+    const { getDeals } = await import("../fixtures/deals");
+    for (const o of getDeals().orders) if (o.state === "delivered") o.state = "approved";
     const r = await api("POST", `/businesses/${OSC}/close`, { body: { confirmName: "orange street coffee" } });
     expect(r.json).toMatchObject({ returnedMicros: 412_500_000, heldMicros: 14_200_000 });
     expect(db.balanceOf(OSC).availableMicros).toBe(0);
     expect(db.getDb().members.filter((m) => m.businessId === OSC)).toHaveLength(0);
     expect((await api("GET", `/businesses/${OSC}`)).status).toBe(404);
+  });
+  it("won't send money back to a card", async () => {
+    const bal = db.balanceOf(OSC);
+    bal.fundingSources = bal.fundingSources.filter((f) => f.kind === "card");
+    const { getDeals } = await import("../fixtures/deals");
+    for (const o of getDeals().orders) if (o.state === "delivered") o.state = "approved";
+    const r = await api("POST", `/businesses/${OSC}/close`, { body: { confirmName: "Orange Street Coffee" } });
+    expect(r.status).toBe(409);
+    expect(r.json.error.code).toBe("no_source");
   });
 });

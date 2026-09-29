@@ -3,7 +3,7 @@
 // Owners and managers; a viewer gets the rail's reason.
 
 import { Button, Table, money, type Column } from "@opencast/ui";
-import type { OrderX } from "../../api/ext/deals";
+import type { ProductionOrder } from "@opencast/contracts";
 import { useBusiness } from "../../business/BusinessContext";
 import { errorText, useOrders } from "../../components/deals/data";
 import { orderAction, orderLine, orderTag, stationLabel } from "../../components/deals/format";
@@ -25,12 +25,12 @@ function OrdersPage() {
   const rows = orders.data ?? [];
   const short = b.business.name.split(" ").slice(0, 2).join(" ");
 
-  const go = (o: OrderX) => {
+  const go = (o: ProductionOrder) => {
     const action = orderAction(o);
     return action === "Spot" ? `${b.base}/spots/${o.spotId}` : `${b.base}/orders/${o.id}`;
   };
 
-  const columns: Column<OrderX>[] = [
+  const columns: Column<ProductionOrder>[] = [
     {
       key: "order",
       header: "Order",

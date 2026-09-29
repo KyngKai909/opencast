@@ -6,14 +6,13 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { accountsApi, spotsApi, type BusinessLocation, type CustomersWhere } from "@opencast/contracts";
 import { Button, Field, Notice, Segmented, SelectField, TitleCard } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { ApiError, call, type CallArgs } from "../../api/client";
+import { ApiError, apiUrl, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { BusinessSettingsX, settingsExtApi } from "../../api/ext/settings";
 import { logoOf } from "../../business/logo";
 import type { BusinessState } from "../../business/BusinessContext";
 import { Quiet } from "../../pages/common";
 import { addressLine, websiteShown, websiteToSave, whereLine } from "./format";
-import { addressPlace, cityPlace } from "./place";
+import { lookUpPlace, type Place } from "./place";
 import { READ_ONLY, accessFor } from "./rules";
 import "./common.css";
 import "./ProfileSection.css";
@@ -50,7 +49,7 @@ function oops(e: unknown): string {
 }
 
 export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLocation: () => void }) {
-  const q = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessSettingsX });
+  const q = useApi(spotsApi.getBusiness, { params: { businessId: b.id } });
   const qc = useQueryClient();
   const edit = accessFor(b.role).profile === "edit";
   const [name, setName] = useState("");
@@ -101,7 +100,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
     }
   };
   const update = (body: CallArgs["body"]) => () => call(spotsApi.updateBusiness, { params, body });
-  const updateLocation = (l: BusinessLocation, body: CallArgs["body"]) => () => call(settingsExtApi.updateLocation, { params: { ...params, locationId: l.id }, body });
+  const updateLocation = (l: BusinessLocation, body: CallArgs["body"]) => () => call(spotsApi.updateLocation, { params: { ...params, locationId: l.id }, body });
   const errorFor = (f: FieldName) => (error?.field === f ? error.message : undefined);
 
   const saveName = () => {
@@ -122,9 +121,19 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
     if (await run("category", [update({ category: v })])) setRecategorised(v);
   };
 
-  const saveAddress = () => {
+  /** The lookup's answer, or null with the error shown by the field. */
+  const find = async (text: string, area: boolean): Promise<Place | null | undefined> => {
+    try {
+      return await lookUpPlace(text, area);
+    } catch (e) {
+      setError({ field: "where", message: oops(e) });
+      return undefined;
+    }
+  };
+  const saveAddress = async () => {
     if (first && first.kind === "location" && address.trim() === addressLine(first)) return;
-    const place = addressPlace(address);
+    const place = await find(address, false);
+    if (place === undefined) return;
     if (!place) return setError({ field: "where", message: "Enter a street and a city, like 204 Orange St, Redlands." });
     const body = { kind: "location", ...place, radiusMiles: null };
     void run("where", [
@@ -132,8 +141,9 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
       ...(data.customersWhere !== "location" ? [update({ customersWhere: "location" })] : [])
     ]);
   };
-  const saveServiceArea = (miles: number, cityText = city) => {
-    const place = cityPlace(cityText);
+  const saveServiceArea = async (miles: number, cityText = city) => {
+    const place = await find(cityText, true);
+    if (place === undefined) return;
     if (!place) return setError({ field: "where", message: `Enter a city in the ${MARKET_NAME}, like Riverside.` });
     if (first && first.kind === "service_area" && first.city === place.city && first.radiusMiles === miles && data.customersWhere === "service_area") return;
     void run("where", [
@@ -147,7 +157,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
     setError(null);
     setMode(v);
     if (v === "online") void run("where", [update({ customersWhere: "online" })]);
-    else if (v === "service_area" && first) saveServiceArea(first.radiusMiles ?? 10, first.city);
+    else if (v === "service_area" && first) void saveServiceArea(first.radiusMiles ?? 10, first.city);
     else if (v === "location" && first?.kind === "location") void run("where", [update({ customersWhere: "location" })]);
     // A location from a service area needs its street first: saved when the address is entered.
   };
@@ -162,7 +172,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
     } catch {
       return setError({ field: "logo", message: "That image couldn't be read. Try a PNG or JPEG." });
     }
-    void run("logo", [() => call(settingsExtApi.uploadLogo, { params, body: { file: f } })]);
+    void run("logo", [() => call(spotsApi.uploadLogo, { params, body: { file: f } })]);
   };
 
   const removeLocation = (l: BusinessLocation) => void run("locations", [() => call(spotsApi.removeLocation, { params: { ...params, locationId: l.id } })]);
@@ -184,7 +194,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
         {!edit && <p className="bz-readonly">{READ_ONLY.profile}</p>}
         <div className="bz-logo">
           {data.logoUrl ? (
-            <img className="bz-logo__sq" src={data.logoUrl} alt={`${data.name}'s logo`} />
+            <img className="bz-logo__sq" src={apiUrl(data.logoUrl)} alt={`${data.name}'s logo`} />
           ) : (
             <span className="bz-logo__sq" style={{ background: logo.colour }} aria-hidden="true">
               {logo.initials}
@@ -239,14 +249,14 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
               disabled={!edit}
               autoComplete="street-address"
               onChange={(e) => setAddress(e.target.value)}
-              onBlur={saveAddress}
-              onKeyDown={(e) => e.key === "Enter" && saveAddress()}
+              onBlur={() => void saveAddress()}
+              onKeyDown={(e) => e.key === "Enter" && void saveAddress()}
             />
           )}
           {mode === "service_area" && (
             <div className="bz-profile__area">
-              <Field aria-label="City" value={city} placeholder="City" disabled={!edit} onChange={(e) => setCity(e.target.value)} onBlur={() => saveServiceArea(currentMiles)} onKeyDown={(e) => e.key === "Enter" && saveServiceArea(currentMiles)} />
-              <SelectField aria-label="Miles around it" value={String(currentMiles)} disabled={!edit || busy || !first} onChange={(e) => saveServiceArea(Number(e.target.value))}>
+              <Field aria-label="City" value={city} placeholder="City" disabled={!edit} onChange={(e) => setCity(e.target.value)} onBlur={() => void saveServiceArea(currentMiles)} onKeyDown={(e) => e.key === "Enter" && void saveServiceArea(currentMiles)} />
+              <SelectField aria-label="Miles around it" value={String(currentMiles)} disabled={!edit || busy || !first} onChange={(e) => void saveServiceArea(Number(e.target.value))}>
                 {MILES.map((m) => (
                   <option key={m} value={m}>
                     {m} miles

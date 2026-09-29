@@ -6,9 +6,8 @@
 // Owners and managers; accepting and approving are the spend right.
 
 import { useParams, useSearchParams } from "react-router";
-import { spotsApi } from "@opencast/contracts";
+import { spotsApi, type ProductionOrder } from "@opencast/contracts";
 import { Button, KeyValueList, StepRail, money, useToast } from "@opencast/ui";
-import type { OrderX } from "../../api/ext/deals";
 import { ApiError, call } from "../../api/client";
 import { useBusiness } from "../../business/BusinessContext";
 import { AcceptQuote } from "../../components/deals/AcceptQuote";
@@ -76,13 +75,13 @@ function OrderPage() {
   );
 }
 
-function OrderBody({ order: o, today, nowMs, onAccept }: { order: OrderX; today: string; nowMs: number; onAccept: () => void }) {
+function OrderBody({ order: o, today, nowMs, onAccept }: { order: ProductionOrder; today: string; nowMs: number; onAccept: () => void }) {
   const b = useBusiness();
   const toast = useToast();
   const cancel = useWrite(spotsApi.cancelOrder);
   const cs = callSign(o.maker);
   const price = o.quote ? money(o.quote.priceMicros) : null;
-  const doCancel = () => cancel.mutate({ params: { orderId: o.id } }, { onSuccess: (out) => toast.show({ message: (out as OrderX).refundedMicros ? `Cancelled. ${money((out as OrderX).refundedMicros!)} is back.` : "Cancelled." }) });
+  const doCancel = () => cancel.mutate({ params: { orderId: o.id } }, { onSuccess: (out) => toast.show({ message: (out as ProductionOrder).refundedMicros ? `Cancelled. ${money((out as ProductionOrder).refundedMicros!)} is back.` : "Cancelled." }) });
   const cancelError = <ErrorLine>{cancel.error ? errorText(cancel.error) : null}</ErrorLine>;
 
   switch (o.state) {
@@ -190,7 +189,7 @@ function OrderBody({ order: o, today, nowMs, onAccept }: { order: OrderX; today:
 }
 
 /** The brief as sent (the maker's frame 03.1 shows the same lines). */
-function Brief({ order: o }: { order: OrderX }) {
+function Brief({ order: o }: { order: ProductionOrder }) {
   return (
     <section className="bz-order__brief" aria-label="The brief">
       <KeyValueList
@@ -207,7 +206,7 @@ function Brief({ order: o }: { order: OrderX }) {
 }
 
 /** Mock mode: the maker's and Opencast's side, through their own endpoints. */
-function OrderMock({ order: o }: { order: OrderX }) {
+function OrderMock({ order: o }: { order: ProductionOrder }) {
   const refresh = useRefresh();
   const cs = callSign(o.maker);
   const id = { params: { orderId: o.id } };

@@ -7,9 +7,8 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { spotsApi } from "@opencast/contracts";
+import { spotsApi, type ProductionOrder } from "@opencast/contracts";
 import { Button, Field, Icon, ScrubBar, clock, duration, money, useToast } from "@opencast/ui";
-import type { OrderX } from "../../api/ext/deals";
 import { useBusiness, useMe } from "../../business/BusinessContext";
 import { MARKET_TZ } from "../../lib/clock";
 import { errorText, useWrite } from "./data";
@@ -18,23 +17,23 @@ import { callSign, changesButton, dayText, deliveredLine, noteWhen, roundsInclud
 import { ErrorLine } from "./parts";
 import "./Review.css";
 
-type Note = OrderX["notes"][number];
+type Note = ProductionOrder["notes"][number];
 
 /** This round's notes: the ones on the delivery under review. */
-export function currentNotes(o: Pick<OrderX, "notes" | "roundsUsed">): Note[] {
+export function currentNotes(o: Pick<ProductionOrder, "notes" | "roundsUsed">): Note[] {
   return o.notes.filter((n) => n.round === o.roundsUsed + 1);
 }
 
-function lastDelivery(o: OrderX) {
+function lastDelivery(o: ProductionOrder) {
   return o.deliveries[o.deliveries.length - 1] ?? null;
 }
 
-function lengthOf(o: OrderX) {
+function lengthOf(o: ProductionOrder) {
   return lastDelivery(o)?.durationMs ?? o.lengthSec * 1000;
 }
 
 /** Approve, and say where it went. */
-function useApprove(o: OrderX) {
+function useApprove(o: ProductionOrder) {
   const toast = useToast();
   const review = useWrite(spotsApi.reviewDelivery);
   const approve = (then?: () => void) =>
@@ -50,7 +49,7 @@ function useApprove(o: OrderX) {
   return { approve, review };
 }
 
-export function ReviewDelivery({ order: o, nowMs, readOnly }: { order: OrderX; nowMs: number; readOnly?: boolean }) {
+export function ReviewDelivery({ order: o, nowMs, readOnly }: { order: ProductionOrder; nowMs: number; readOnly?: boolean }) {
   const b = useBusiness();
   const me = useMe();
   const toast = useToast();
@@ -160,7 +159,7 @@ export function ReviewDelivery({ order: o, nowMs, readOnly }: { order: OrderX; n
   );
 }
 
-export function PhoneReview({ order: o, today }: { order: OrderX; today: string }) {
+export function PhoneReview({ order: o, today }: { order: ProductionOrder; today: string }) {
   const b = useBusiness();
   const navigate = useNavigate();
   const delivery = lastDelivery(o);

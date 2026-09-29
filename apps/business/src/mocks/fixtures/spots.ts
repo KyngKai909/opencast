@@ -9,8 +9,9 @@
 // market on Monday); what each station does when Fall menu pauses (BEAT's backup rotation, another
 // spot on CIVC, station ID on SAZN).
 
-import type { Business, Spot, StationIdent, TargetMatch, UploadCheck } from "@opencast/contracts";
-import type { BackStory, FilledWith, PauseStory, SpotStill, SpotX, TargetingX } from "../../api/ext/spots";
+import type { Business, Spot, SpotBackStory, SpotPauseStory, SpotStill, StationIdent, Targeting, TargetMatch, UploadCheck } from "@opencast/contracts";
+import type { SpotX } from "../../api/ext/spots";
+import type { FilledWith } from "../../api/types";
 import { now } from "../../lib/clock";
 import { balanceOf, getDb, move, saveDb } from "../db";
 import { uid } from "./people";
@@ -102,7 +103,7 @@ export function airingCost(rate: Spot["rate"], tunedIn: number): number {
  * Which stations would see a spot in their market, and why a nearby one wouldn't: a kind or the
  * radio band not chosen, left out by name, too far, or not in the market yet.
  */
-export function matchStations(business: Business, rate: Spot["rate"], t: Partial<TargetingX>): TargetMatch[] {
+export function matchStations(business: Business, rate: Spot["rate"], t: Partial<Targeting>): TargetMatch[] {
   const online = business.customersWhere === "online";
   const within = t.withinMiles ?? 10;
   const places = business.locations.filter((l) => !t.locationIds?.length || t.locationIds.includes(l.id));
@@ -181,8 +182,8 @@ export interface SpotMock {
   still: SpotStill;
   /** Station ids with the spot in rotation (P5). */
   rotation: string[];
-  pause: PauseStory | null;
-  back: BackStory | null;
+  pause: SpotPauseStory | null;
+  back: SpotBackStory | null;
   pace: number | null;
   /** Review passes on its own at this time (ms since 1970), in mock mode. */
   reviewReadyAt: number | null;
@@ -321,12 +322,27 @@ export function settle(s: Spot) {
   }
 }
 
-/** The spot with the fields the screens ask for (SpotX). */
+/** P4: how a code works, as the API sends it (the letters' corner and the last :10; once per customer). */
+export function codeOut(code: NonNullable<Spot["code"]>): NonNullable<Spot["code"]> {
+  return { pickedBy: "opencast", oncePerCustomer: true, savedForDays: code.windowDays, placement: "bottom_left", showsForLastMs: 10_000, ...code };
+}
+
+/** The spot as the API sends it, with the mock's own state (still, rotation, pause, pace). */
 export function spotOut(s: Spot): SpotX {
   settle(s);
   const m = mockOf(s);
   const inRotation = s.state === "in_rotation" || s.state === "paused_daily_cap" ? m.rotation.map((id) => stationById(id)).filter((x): x is StationIdent => !!x) : [];
-  return { ...s, targeting: { ...s.targeting, bands: m.bands ?? ["tv"] }, inRotationOn: inRotation.length, still: m.still, inRotationStations: inRotation, pause: m.pause, back: m.back, pacePerDayMicros: m.pace };
+  return {
+    ...s,
+    code: s.code ? codeOut(s.code) : null,
+    targeting: { ...s.targeting, bands: m.bands ?? ["tv"] },
+    inRotationOn: inRotation.length,
+    still: m.still,
+    inRotationStations: inRotation,
+    pause: m.pause,
+    back: m.back,
+    pacePerDayMicros: m.pace
+  };
 }
 
 // ---- Airing, pausing and coming back ----
@@ -334,7 +350,7 @@ export function spotOut(s: Spot): SpotX {
 /** What each station does with the time when a spot pauses (biz-spots 04.1). */
 const FILLS: Record<string, FilledWith> = { BEAT: "backup_rotation", CIVC: "another_spot", SAZN: "station_id" };
 
-function pauseStory(s: Spot, reason: PauseStory["reason"], lastHold: PauseStory["lastHold"]): PauseStory {
+function pauseStory(s: Spot, reason: SpotPauseStory["reason"], lastHold: SpotPauseStory["lastHold"]): SpotPauseStory {
   const m = mockOf(s);
   return {
     reason,

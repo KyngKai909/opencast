@@ -1,8 +1,7 @@
 // Opencast for business against the real API (playwright.real.config.ts): every route opens, as
-// Maya (Orange Street Coffee's owner), and shows its page, not an error. What the API doesn't
-// answer yet (the proposed endpoints in apps/business/src/api/ext) is listed on each test as
-// `api-miss` annotations, so the run says what still runs on mocks; a page error, a blank page or a
-// response that fails its contract fails the test.
+// Maya (Orange Street Coffee's owner), and shows its page, not an error. Every endpoint the app
+// reads is in the API now (the business app's requests landed 2026-09-29), so an API 404 or 5xx
+// fails the test, as do a page error, a blank page or a response that fails its contract.
 
 import type { Page } from "@playwright/test";
 import { api, expect, seed, signIn, test } from "../lib/real";
@@ -48,7 +47,8 @@ const ROUTES: Record<string, Route> = {
   "/:b/balance": { path: (b) => `/${b}/balance`, heading: "Balance" },
   "/:b/balance?modal=add": { path: (b) => `/${b}/balance?modal=add`, heading: "Balance", dialog: "Add money" },
   "/:b/balance?modal=withdraw": { path: (b) => `/${b}/balance?modal=withdraw`, heading: "Balance", dialog: "Take money out" },
-  "/:b/balance/statements": { path: (b) => `/${b}/balance/statements`, heading: /Statements|Balance/ },
+  // The newest statement opens: this month's, so far (E3).
+  "/:b/balance/statements": { path: (b) => `/${b}/balance/statements`, heading: /statement/i },
   "/:b/redeem": { path: (b) => `/${b}/redeem`, heading: /Redeem/ },
   ...Object.fromEntries(
     ["business", "team", "money", "notifications", "connections", "close"].map((s) => [`/:b/settings/${s}`, { path: (b: string) => `/${b}/settings/${s}`, heading: "Settings", level: 2 }])
@@ -74,7 +74,7 @@ async function tour(page: Page, path: string, r: Pick<Route, "heading" | "level"
   if (r.dialog) await expect(page.getByRole("dialog", { name: r.dialog })).toBeVisible();
   await page.waitForLoadState("networkidle");
   await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
-  for (const m of [...new Set(misses)]) test.info().annotations.push({ type: "api-miss", description: m });
+  expect([...new Set(misses)], "API 404s and 5xxs").toEqual([]);
   expect(errors, "page errors").toEqual([]);
   await expect(page.getByText(/Something went wrong|doesn't match/)).toHaveCount(0);
 }

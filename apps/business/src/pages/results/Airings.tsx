@@ -7,9 +7,8 @@
 // shown (P15: no CSV endpoint yet).
 
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { spotsApi } from "@opencast/contracts";
+import { spotsApi, type ResultsAiring } from "@opencast/contracts";
 import { Button, ControlTitle, Lines, Table, money, type Column } from "@opencast/ui";
-import { SpotAiringsX, type ResultsAiringX } from "../../api/ext/results";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -33,9 +32,9 @@ export default function Airings() {
   useShellOptions({ title: "Airings" });
 
   const month = useResults(b.id, sel, !spotId);
-  const bySpot = useApi(spotsApi.listSpotAirings, { params: { spotId: spotId ?? "" } }, { schema: SpotAiringsX, enabled: !!spotId });
+  const bySpot = useApi(spotsApi.listSpotAirings, { params: { spotId: spotId ?? "" } }, { enabled: !!spotId });
   const q = spotId ? bySpot : month;
-  const all: ResultsAiringX[] = (spotId ? bySpot.data?.aired : month.data?.airings) ?? [];
+  const all: ResultsAiring[] = (spotId ? bySpot.data?.aired : month.data?.airings) ?? [];
   const rows = stationId ? all.filter((a) => a.station.id === stationId) : all;
   const selected = rows.find((a) => a.asRunId === asRunId) ?? (phone ? undefined : rows[0]);
   const search = params.toString() ? `?${params}` : "";
@@ -52,7 +51,7 @@ export default function Airings() {
     saveText(`${slug(b.business.name)}-airings-${what}.csv`, airingsCsv(rows.map((a) => ({ ...a, station: { callSign: a.station.callSign, channel: a.station.channel } }))));
   };
 
-  const columns: Column<ResultsAiringX>[] = [
+  const columns: Column<ResultsAiring>[] = [
     { key: "at", header: "Aired", width: phone ? "86px" : "104px", cell: (a) => <span className="bz-air__t">{rowTime(a.startedAt, now)}</span> },
     ...(phone
       ? []
@@ -61,12 +60,12 @@ export default function Airings() {
             key: "st",
             header: "Station",
             width: "76px",
-            cell: (a: ResultsAiringX) => (
+            cell: (a: ResultsAiring) => (
               <span className="bz-air__st">
                 <span className="bz-air__ch">{a.station.channel}</span> {a.station.callSign}
               </span>
             )
-          } satisfies Column<ResultsAiringX>
+          } satisfies Column<ResultsAiring>
         ]),
     {
       key: "in",
@@ -85,7 +84,7 @@ export default function Airings() {
       kind: "amount",
       cell: (a) => <span className={a.inFull ? undefined : "oc-table__cell--short"}>{airedWords(a.airedMs, a.spot.lengthSec)}</span>
     },
-    ...(phone ? [] : [{ key: "tuned", header: "Tuned in", width: "64px", kind: "amount", cell: (a: ResultsAiringX) => a.tunedIn.toLocaleString("en-US") } satisfies Column<ResultsAiringX>]),
+    ...(phone ? [] : [{ key: "tuned", header: "Tuned in", width: "64px", kind: "amount", cell: (a: ResultsAiring) => a.tunedIn.toLocaleString("en-US") } satisfies Column<ResultsAiring>]),
     { key: "cost", header: "Cost", width: "60px", kind: "amount", cell: (a) => money(a.costMicros) }
   ];
 
@@ -115,7 +114,7 @@ export default function Airings() {
       ) : (
         <div className="bz-air__split">
           {phone && selected && <ProofPanel airing={selected} now={now} />}
-          <Table<ResultsAiringX>
+          <Table<ResultsAiring>
             label="Airings"
             className="bz-air__table"
             columns={columns}

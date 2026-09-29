@@ -3,11 +3,11 @@
 // (remove, make default), closing the account. The Settings area owns this file.
 
 import { http, HttpResponse, type HttpHandler } from "msw";
-import { accountsApi, Me, notificationsApi, spotsApi, type Business, type Invite, type NotificationPrefs } from "@opencast/contracts";
-import { ConnectionsX, BusinessSettingsX, settingsExtApi } from "../../api/ext/settings";
+import { accountsApi, ledgerApi, Me, notificationsApi, spotsApi, type Business, type Connections, type Invite, type NotificationPrefs } from "@opencast/contracts";
 import { roleOn } from "../access";
 import { balanceOf, dbBusiness, getDb, move, saveDb } from "../db";
 import { LOGOS } from "../fixtures/businesses";
+import { getDeals } from "../fixtures/deals";
 import { personByEmail, type MockPerson } from "../fixtures/people";
 import {
   ALWAYS_ON,
@@ -39,8 +39,14 @@ function business(id: string): Business | Response {
   return b;
 }
 
-function profile(b: Business) {
-  return { ...b, logoMark: LOGOS[b.id], shortName: settingsState().shortNames[b.id] ?? null };
+function profile(b: Business): Business {
+  return {
+    ...b,
+    logoMark: LOGOS[b.id],
+    shortName: b.shortName ?? settingsState().shortNames[b.id] ?? b.name,
+    // P12: on unless the business turned it off, or it's online and never turned it on.
+    redeemOn: b.redeemOn ?? b.customersWhere !== "online"
+  };
 }
 
 function badBody(message = "Check what you entered and try again.") {
@@ -120,7 +126,7 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
-    return reply(BusinessSettingsX, profile(b));
+    return reply(spotsApi.getBusiness.response, profile(b));
   }),
 
   http.patch(path(spotsApi.updateBusiness), async ({ request, params }) => {
@@ -140,7 +146,7 @@ export const settingsHandlers: HttpHandler[] = [
     if (ein !== undefined) b.einLast4 = ein === null ? null : ein.replace(/\D/g, "").slice(-4);
     if (body.customersWhere === "online" && !b.marketIds.length) b.marketIds = [MARKET.id];
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(spotsApi.getBusiness.response, profile(b));
   }),
 
   http.post(path(spotsApi.addLocation), async ({ request, params }) => {
@@ -164,10 +170,10 @@ export const settingsHandlers: HttpHandler[] = [
       radiusMiles: body.radiusMiles ?? null
     });
     saveDb();
-    return reply(BusinessSettingsX, profile(b), 201);
+    return reply(spotsApi.getBusiness.response, profile(b), 201);
   }),
 
-  http.patch(path(settingsExtApi.updateLocation), async ({ request, params }) => {
+  http.patch(path(spotsApi.updateLocation), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -177,12 +183,12 @@ export const settingsHandlers: HttpHandler[] = [
     if (r instanceof Response) return r;
     const loc = b.locations.find((l) => l.id === String(params.locationId));
     if (!loc) return fail(404, "not_found", "That location wasn't found.");
-    const body = await bodyOf(request, settingsExtApi.updateLocation.body!);
+    const body = await bodyOf(request, spotsApi.updateLocation.body!);
     if (body instanceof Response) return body;
     Object.assign(loc, body);
     if (loc.kind === "location") loc.radiusMiles = null;
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(spotsApi.getBusiness.response, profile(b));
   }),
 
   http.delete(path(spotsApi.removeLocation), ({ request, params }) => {
@@ -202,10 +208,10 @@ export const settingsHandlers: HttpHandler[] = [
     if (!check.ok) return fail(409, "location_in_use", check.message);
     b.locations = b.locations.filter((l) => l.id !== locationId);
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(spotsApi.getBusiness.response, profile(b));
   }),
 
-  http.post(path(settingsExtApi.uploadLogo), async ({ request, params }) => {
+  http.post(path(spotsApi.uploadLogo), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -231,7 +237,7 @@ export const settingsHandlers: HttpHandler[] = [
       return badBody("That image couldn't be read. Try a PNG or JPEG.");
     }
     saveDb();
-    return reply(BusinessSettingsX, profile(b));
+    return reply(spotsApi.getBusiness.response, profile(b));
   }),
 
   // ---- The team ----
@@ -380,7 +386,7 @@ export const settingsHandlers: HttpHandler[] = [
 
   // ---- Connections ----
 
-  http.get(path(settingsExtApi.getConnections), ({ request, params }) => {
+  http.get(path(spotsApi.getConnections), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -388,10 +394,10 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
-    return reply(ConnectionsX, connectionsOf(id));
+    return reply(spotsApi.getConnections.response, connectionsOf(id, r.role === "owner"));
   }),
 
-  http.post(path(settingsExtApi.connect), async ({ request, params }) => {
+  http.post(path(spotsApi.connect), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -399,22 +405,40 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "manage", "Only the owner can connect other services.");
     if (r instanceof Response) return r;
-    const body = await bodyOf(request, settingsExtApi.connect.body!);
+    const body = await bodyOf(request, spotsApi.connect.body!);
     if (body instanceof Response) return body;
     const s = settingsState();
     const c = (s.connections[id] ??= { clearPay: false, checkout: null });
     if (params.kind === "clear_pay") c.clearPay = true;
     else if (params.kind === "checkout") {
       if (!body.provider) return badBody("Choose Shopify, Stripe or Square.");
+      // Connecting again replaces the one before (the secret itself isn't kept by the mock).
       c.checkout = body.provider;
     } else return fail(404, "not_found", "That connection wasn't found.");
     saveSettings();
-    return reply(ConnectionsX, connectionsOf(id));
+    return reply(spotsApi.connect.response, connectionsOf(id, true));
+  }),
+
+  http.delete(path(spotsApi.disconnect), ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const id = String(params.businessId);
+    const b = business(id);
+    if (b instanceof Response) return b;
+    const r = roleOn(id, p, "manage", "Only the owner can connect other services.");
+    if (r instanceof Response) return r;
+    const s = settingsState();
+    const c = (s.connections[id] ??= { clearPay: false, checkout: null });
+    if (params.kind === "clear_pay") c.clearPay = false;
+    else if (params.kind === "checkout") c.checkout = null;
+    else return fail(404, "not_found", "That connection wasn't found.");
+    saveSettings();
+    return reply(spotsApi.disconnect.response, connectionsOf(id, true));
   }),
 
   // ---- Money and receipts ----
 
-  http.get(path(settingsExtApi.listReceipts), ({ request, params }) => {
+  http.get(path(ledgerApi.listReceipts), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -422,7 +446,7 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "see");
     if (r instanceof Response) return r;
-    return reply(settingsExtApi.listReceipts.response, receiptsFor(id, getDb().movements[id] ?? [], settingsState().statements, mockNow()));
+    return reply(ledgerApi.listReceipts.response, receiptsFor(id, getDb().movements[id] ?? [], settingsState().statements, mockNow()));
   }),
 
   // The receipts' documents.
@@ -451,7 +475,7 @@ export const settingsHandlers: HttpHandler[] = [
     return new HttpResponse("Not found", { status: 404 });
   }),
 
-  http.delete(path(settingsExtApi.removeFundingSource), ({ request, params }) => {
+  http.delete(path(ledgerApi.removeFundingSource), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -465,10 +489,10 @@ export const settingsHandlers: HttpHandler[] = [
     if (src.isDefault) return fail(409, "default_source", "That's your default. Make another one the default first.");
     bal.fundingSources = bal.fundingSources.filter((f) => f !== src);
     saveDb();
-    return reply(settingsExtApi.removeFundingSource.response, bal.fundingSources);
+    return reply(ledgerApi.removeFundingSource.response, bal.fundingSources);
   }),
 
-  http.post(path(settingsExtApi.makeDefaultFundingSource), ({ request, params }) => {
+  http.post(path(ledgerApi.makeDefaultFundingSource), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -480,12 +504,12 @@ export const settingsHandlers: HttpHandler[] = [
     if (!bal.fundingSources.some((f) => f.id === String(params.sourceId))) return fail(404, "not_found", "That funding source wasn't found.");
     for (const f of bal.fundingSources) f.isDefault = f.id === String(params.sourceId);
     saveDb();
-    return reply(settingsExtApi.makeDefaultFundingSource.response, bal.fundingSources);
+    return reply(ledgerApi.makeDefaultFundingSource.response, bal.fundingSources);
   }),
 
   // ---- Closing the account ----
 
-  http.post(path(settingsExtApi.closeBusiness), async ({ request, params }) => {
+  http.post(path(spotsApi.closeBusiness), async ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
@@ -493,17 +517,20 @@ export const settingsHandlers: HttpHandler[] = [
     if (b instanceof Response) return b;
     const r = roleOn(id, p, "manage", "Only the owner can close the account.");
     if (r instanceof Response) return r;
-    const body = await bodyOf(request, settingsExtApi.closeBusiness.body!);
+    const body = await bodyOf(request, spotsApi.closeBusiness.body!);
     if (body instanceof Response) return body;
     if (body.confirmName.trim().toLowerCase() !== b.name.toLowerCase()) return badBody(`Type ${b.name} to close it.`);
+    // An order being made or reviewed has money held for the maker: finish or settle it first.
+    if (getDeals().orders.some((o) => o.business.id === id && ["accepted", "delivered", "changes_requested", "disputed"].includes(o.state)))
+      return fail(409, "order_in_progress", "A production order is being made for you. Approve it, or cancel it once its delivery date passes, then close the account.");
     const db = getDb();
     const bal = balanceOf(id);
     const returned = bal.availableMicros;
     const held = bal.heldMicros;
-    if (returned > 0) {
-      const to = bal.fundingSources.find((f) => f.isDefault)?.label ?? null;
-      move(id, { kind: "withdrawn", label: "Returned on closing", amountMicros: -returned, detail: to });
-    }
+    // The available balance goes back to the default bank or Clear account, never a card.
+    const to = [...bal.fundingSources].sort((x, y) => Number(y.isDefault) - Number(x.isDefault)).find((f) => f.kind !== "card");
+    if (returned > 0 && !to) return fail(409, "no_source", "Add a bank or Clear account to send your money back to, then close the account. Money can't go back to a card.");
+    if (returned > 0) move(id, { kind: "withdrawn", label: "Returned on closing", amountMicros: -returned, detail: to!.label });
     for (const s of db.spots) if (s.businessId === id && s.state !== "ended") s.state = "ended";
     // Nobody is on its team any more: it leaves everyone's switcher.
     db.members = db.members.filter((m) => m.businessId !== id);
@@ -513,14 +540,19 @@ export const settingsHandlers: HttpHandler[] = [
     st.invites = st.invites.filter((i) => i.businessId !== id);
     saveDb();
     saveSettings();
-    return reply(settingsExtApi.closeBusiness.response, { closedAt, returnedMicros: returned, heldMicros: held });
+    return reply(spotsApi.closeBusiness.response, { closedAt, returnedMicros: returned, heldMicros: held });
   })
 ];
 
-function connectionsOf(id: string) {
+/** P20: what the business is connected to; the checkout's webhook address is the owner's to see. */
+function connectionsOf(id: string, owner: boolean): Connections {
   const c = settingsState().connections[id] ?? { clearPay: false, checkout: null };
   return {
     clearPay: { connected: c.clearPay },
-    checkout: { connected: c.checkout !== null, provider: c.checkout }
+    checkout: {
+      connected: c.checkout !== null,
+      provider: c.checkout,
+      webhookUrl: c.checkout && owner ? `https://api.opencast.example/v1/webhooks/checkout/mock-${id.slice(-8)}` : null
+    }
   };
 }

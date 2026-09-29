@@ -6,9 +6,8 @@
 // balance in days. A business sees only its own results: no benchmarks against anyone else.
 
 import { useSearchParams } from "react-router";
-import { ledgerApi } from "@opencast/contracts";
+import { ledgerApi, type Results as ResultsData } from "@opencast/contracts";
 import { ControlTitle, KeyValueList, Lines, Segmented, SplitBar, StatRow, Table, money, type Column } from "@opencast/ui";
-import type { ResultsX } from "../../api/ext/results";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -19,7 +18,7 @@ import { Section } from "../../components/results/Section";
 import { Quiet } from "../common";
 import "./Results.css";
 
-type StationRow = ResultsX["byStation"][number] & { total?: boolean };
+type StationRow = ResultsData["byStation"][number] & { total?: boolean };
 
 const PERIOD_TITLE = (sel: Selection, now: Date): string =>
   sel.period === "week" ? "This week" : sel.period === "all" ? "All time" : sel.month === monthOf(now) ? monthName(sel.month) : `${monthName(sel.month)} ${sel.month.slice(0, 4)}`;

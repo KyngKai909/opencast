@@ -1,6 +1,7 @@
-// The Spots pages' reads and writes: every spot read goes through the extended schema (SpotX), and
-// every write refreshes what changes with a spot: the list, the spot, the balance and movements
-// (the shell's "Available"), and the Results area's reads.
+// The Spots pages' reads and writes: every spot read goes through SpotX (the contract's spot, with
+// older hand pauses read as waiting for you), and every write refreshes what changes with a spot:
+// the list, the spot, the balance and movements (the shell's "Available"), and the Results area's
+// reads.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ledgerApi, spotsApi, type EndpointDef } from "@opencast/contracts";

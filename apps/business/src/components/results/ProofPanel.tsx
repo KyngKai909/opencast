@@ -3,13 +3,13 @@
 // spot, the cost worked out as stations see it, and code scans in the hour after.
 
 import { KeyValueList, PictureFrame, clock } from "@opencast/ui";
-import type { ResultsAiringX } from "../../api/ext/results";
+import type { ResultsAiring } from "@opencast/contracts";
 import { MARKET_TZ } from "../../lib/clock";
 import { airedWords, proofHeading, tenths } from "./format";
 import { Section } from "./Section";
 import "./ProofPanel.css";
 
-export function ProofPanel({ airing, now }: { airing: ResultsAiringX; now: Date }) {
+export function ProofPanel({ airing, now }: { airing: ResultsAiring; now: Date }) {
   const cs = airing.station.callSign ?? airing.station.name;
   const ended = airing.inFull ? `${tenths(airing.endedAt)}, in full` : `${tenths(airing.endedAt)}, ${airedWords(airing.airedMs, airing.spot.lengthSec)}`;
   return (

@@ -10,11 +10,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { spotsApi, stationsApi, type Business, type TargetMatch } from "@opencast/contracts";
+import { spotsApi, stationsApi, type Business, type Targeting, type TargetMatch } from "@opencast/contracts";
 import { Button, ChipRow, Field, money, Segmented } from "@opencast/ui";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import type { SpotX, TargetingX } from "../../api/ext/spots";
+import type { SpotX } from "../../api/ext/spots";
 import { useBusiness } from "../../business/BusinessContext";
 import { errorText, useBalance, useSpot, useSpotWrite } from "../../components/spots/data";
 import { budgetEstimate, parseDollars, plural, scaleCost, summarizeMatches, targetingWords } from "../../components/spots/format";
@@ -67,7 +67,7 @@ function RateForm({ spot, business }: { spot: SpotX; business: Business }) {
   const totalError = total === null || total <= 0 ? "Enter a budget, like $300.00" : undefined;
   const capError = capText.trim() && (cap === null || cap <= 0) ? "Enter an amount, or leave it empty for no cap" : cap !== null && total !== null && cap > total ? "The most per day can't be more than the total" : undefined;
 
-  const targeting: Partial<TargetingX> = useMemo(
+  const targeting: Partial<Targeting> = useMemo(
     () => ({
       withinMiles: online ? null : within,
       marketIds: online ? marketIds : [],

@@ -4,14 +4,14 @@
 // the receipts and statements only.
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { ledgerApi, spotsApi, type Business, type FundingSource } from "@opencast/contracts";
+import { ledgerApi, spotsApi, type Business, type FundingSource, type Receipt } from "@opencast/contracts";
 import { Button, Field, Tag, Toggle, ToggleLock, money } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { ApiError, call, type CallArgs } from "../../api/client";
+import { ApiError, apiUrl, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { BusinessSettingsX, settingsExtApi, type ReceiptX } from "../../api/ext/settings";
 import { shortAddress, useClear } from "../../auth/clear";
 import type { BusinessState } from "../../business/BusinessContext";
+import { config } from "../../config";
 import { MARKET_TZ } from "../../lib/clock";
 import { Quiet } from "../../pages/common";
 import { fundingDetail, fundingTitle, shortDay } from "./format";
@@ -36,9 +36,9 @@ export function topUpLine(t: Business["autoTopUp"], source: Pick<FundingSource, 
 export function MoneySection({ b }: { b: BusinessState }) {
   const access = accessFor(b.role);
   const params = { businessId: b.id };
-  const biz = useApi(spotsApi.getBusiness, { params }, { schema: BusinessSettingsX, enabled: access.funding !== "hidden" });
+  const biz = useApi(spotsApi.getBusiness, { params }, { enabled: access.funding !== "hidden" });
   const balance = useApi(ledgerApi.getBalance, { params }, { enabled: access.funding !== "hidden" });
-  const receipts = useApi(settingsExtApi.listReceipts, { params }, { retry: false });
+  const receipts = useApi(ledgerApi.listReceipts, { params });
   const clear = useClear();
   const qc = useQueryClient();
   const [error, setError] = useState<{ where: string; message: string } | null>(null);
@@ -103,10 +103,10 @@ export function MoneySection({ b }: { b: BusinessState }) {
               ) : (
                 owner && (
                   <>
-                    <Button variant="text" size="sm" disabled={busy} onClick={() => void run("funding", () => call(settingsExtApi.makeDefaultFundingSource, { params: { ...params, sourceId: f.id } }), "balance")}>
+                    <Button variant="text" size="sm" disabled={busy} onClick={() => void run("funding", () => call(ledgerApi.makeDefaultFundingSource, { params: { ...params, sourceId: f.id } }), "balance")}>
                       Make default
                     </Button>
-                    <Button size="sm" disabled={busy} onClick={() => void run("funding", () => call(settingsExtApi.removeFundingSource, { params: { ...params, sourceId: f.id } }), "balance")}>
+                    <Button size="sm" disabled={busy} onClick={() => void run("funding", () => call(ledgerApi.removeFundingSource, { params: { ...params, sourceId: f.id } }), "balance")}>
                       Remove
                     </Button>
                   </>
@@ -226,11 +226,6 @@ export function MoneySection({ b }: { b: BusinessState }) {
         </div>
         {receipts.isLoading ? (
           <Quiet />
-        ) : receipts.error instanceof ApiError && receipts.error.status === 404 ? (
-          // E4 isn't in the API yet: the statements are still on the balance.
-          <p className="bz-note">
-            Receipts aren't listed here yet. Each month's statement is under <a href={`${b.base}/balance/statements`}>Balance, Statements</a>.
-          </p>
         ) : !receipts.data ? (
           <p className="bz-error" role="alert">
             {(receipts.error as Error | null)?.message ?? "Something went wrong. Try again."}
@@ -251,10 +246,15 @@ export function MoneySection({ b }: { b: BusinessState }) {
 }
 
 /**
- * Opens a receipt's PDF in a new tab. Fetched first, so the mock (which a new tab's own request
- * wouldn't reach) can answer it; a plain link otherwise.
+ * Opens a receipt's PDF in a new tab: the API's link is signed for the business and opens without
+ * signing in. On mocks it's fetched first, so the mock (which a new tab's own request wouldn't
+ * reach) can answer it.
  */
 function openPdf(url: string) {
+  if (!config.mock) {
+    window.open(url, "_blank", "noreferrer");
+    return;
+  }
   const w = window.open("", "_blank");
   fetch(url)
     .then((res) => (res.ok ? res.blob() : Promise.reject(new Error(String(res.status)))))
@@ -269,7 +269,8 @@ function openPdf(url: string) {
     });
 }
 
-function ReceiptRow({ r }: { r: ReceiptX }) {
+function ReceiptRow({ r }: { r: Receipt }) {
+  const pdf = apiUrl(r.pdfUrl);
   return (
     <li className="bz-rc__row">
       <span className="bz-rc__t">{shortDay(r.at, MARKET_TZ)}</span>
@@ -281,13 +282,13 @@ function ReceiptRow({ r }: { r: ReceiptX }) {
       <Button
         size="sm"
         block
-        href={r.pdfUrl}
+        href={pdf}
         target="_blank"
         rel="noreferrer"
         aria-label={`${r.title}, ${shortDay(r.at, MARKET_TZ)}, PDF`}
         onClick={(e) => {
           e.preventDefault();
-          openPdf(r.pdfUrl);
+          openPdf(pdf);
         }}
       >
         PDF

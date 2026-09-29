@@ -1,7 +1,7 @@
 // Calls the API from the contracts: each endpoint's method, path and schemas come from
 // @opencast/contracts, so a call can't drift from what the API mounts. Responses are parsed
-// with the endpoint's response schema (extended with fields the apps have asked for, see
-// docs/contract-requests.md), so a wrong shape fails loudly here, not three screens later.
+// with the endpoint's response schema (or one given, like api/ext/spots.ts's reading of a spot), so
+// a wrong shape fails loudly here, not three screens later.
 
 import { API_PREFIX, buildPath, ErrorResponse, type EndpointDef } from "@opencast/contracts";
 import type { z } from "zod";
@@ -9,6 +9,14 @@ import { config } from "../config";
 
 export type Token = () => Promise<string | null>;
 let getToken: Token = async () => null;
+
+/**
+ * An address the API gave for something it serves itself (a receipt's PDF, a logo, a checkout's
+ * webhook address): full once the API has API_PUBLIC_URL (A117); a path on the API before that.
+ */
+export function apiUrl(u: string): string {
+  return u.startsWith("/") && !u.startsWith("//") && /^https?:\/\//.test(config.apiBase) ? `${config.apiBase}${u}` : u;
+}
 
 /** Sign-in hands the client a way to get the current access token. */
 export function setTokenSource(t: Token) {
@@ -63,8 +71,8 @@ export async function call<E extends EndpointDef, S extends z.ZodType = E["respo
   if (!res.ok) {
     const e = ErrorResponse.safeParse(json);
     if (e.success) throw new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields);
-    // A 404 without the API's error body is a route the API doesn't have: one of the proposed
-    // endpoints in api/ext (docs/contract-requests.md) that hasn't landed yet.
+    // A 404 without the API's error body is a route this API doesn't have (an older API than the
+    // contracts, or the mock-only spot actions in api/ext/spots.ts).
     if (res.status === 404) throw new ApiError(404, "not_available", "That isn't available yet.");
     throw new ApiError(res.status, "error", "Something went wrong. Try again.");
   }

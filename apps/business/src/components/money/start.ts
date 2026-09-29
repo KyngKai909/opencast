@@ -1,7 +1,7 @@
 // Getting started's words and small rules (biz-funding 01.1): the website as a URL, the town in a
 // typed address for the preview, and how many stations can carry a category, said.
 
-import type { CategoryReach } from "../../api/ext/money";
+import type { CategoryReach } from "@opencast/contracts";
 import { categoryInSentence } from "./categories";
 
 /** "orangestreet.example" → "https://orangestreet.example"; blank stays blank. */

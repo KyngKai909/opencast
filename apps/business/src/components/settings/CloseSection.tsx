@@ -1,15 +1,16 @@
 // Settings, Close account (the rail's last item; no frame draws it). The owner's alone: what
-// closing does to spots, money and the team, then typing the name to close it. P21 proposes the
-// endpoint; the mock takes the spots out, returns the available balance and empties the team.
+// closing does to spots, money and the team, then typing the name to close it (P21,
+// spots.closeBusiness). The available balance goes back to the default bank or Clear account, never
+// a card. It's refused while an order is being made or reviewed (409 order_in_progress), and when
+// there's money to send back and nowhere to send it (409 no_source): each says what to do first.
 
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { accountsApi, ledgerApi } from "@opencast/contracts";
+import { accountsApi, ledgerApi, spotsApi } from "@opencast/contracts";
 import { Button, Field, money, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { settingsExtApi } from "../../api/ext/settings";
 import type { BusinessState } from "../../business/BusinessContext";
 import { Quiet } from "../../pages/common";
 import "./common.css";
@@ -23,24 +24,30 @@ export function CloseSection({ b }: { b: BusinessState }) {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What has to happen first, when the API refused (409): finish the order, or add a bank.
+  const [first, setFirst] = useState<"order_in_progress" | "no_source" | null>(null);
   const name = b.business.name;
 
   if (balance.isLoading) return <Quiet />;
   const bal = balance.data;
-  const source = bal?.fundingSources.find((f) => f.isDefault)?.label.replace(/^Clear,\s*/, "") ?? "your default funding source";
+  // Money goes back to the default bank or Clear account (never a card), else the first other one.
+  const back = [...(bal?.fundingSources ?? [])].sort((x, y) => Number(y.isDefault) - Number(x.isDefault)).find((f) => f.kind !== "card");
+  const source = back?.label.replace(/^Clear,\s*/, "") ?? null;
   const matches = typed.trim().toLowerCase() === name.toLowerCase();
 
   const close = async (e: FormEvent) => {
     e.preventDefault();
     if (!matches) return setError(`Type ${name} to close it.`);
     setError(null);
+    setFirst(null);
     setBusy(true);
     try {
-      const r = await call(settingsExtApi.closeBusiness, { params: { businessId: b.id }, body: { confirmName: typed.trim() } });
+      const r = await call(spotsApi.closeBusiness, { params: { businessId: b.id }, body: { confirmName: typed.trim() } });
       toast.show({ message: r.returnedMicros > 0 ? `${name} is closed. ${money(r.returnedMicros)} is on its way to ${source}` : `${name} is closed` });
       await qc.invalidateQueries({ queryKey: [accountsApi.getMe.method, accountsApi.getMe.path] });
       navigate("/", { replace: true });
     } catch (err) {
+      if (err instanceof ApiError && (err.code === "order_in_progress" || err.code === "no_source")) setFirst(err.code);
       setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
       setBusy(false);
     }
@@ -61,9 +68,11 @@ export function CloseSection({ b }: { b: BusinessState }) {
         <div>
           <b>Your money comes back</b>
           <small>
-            {bal
+            {bal && source
               ? `${money(bal.availableMicros)} goes back to ${source}.${bal.heldMicros > 0 ? ` ${money(bal.heldMicros)} held for airings stations have scheduled pays for those airings, and anything left follows.` : ""}`
-              : `What's available goes back to ${source}.`}
+              : bal && bal.availableMicros > 0
+                ? `${money(bal.availableMicros)} can't go back to a card. Add a bank or Clear account in Money and receipts first.`
+                : `What's available goes back to ${source ?? "your bank or Clear account"}.`}
           </small>
         </div>
       </div>
@@ -74,11 +83,16 @@ export function CloseSection({ b }: { b: BusinessState }) {
         </div>
       </div>
       <form className="bz-close__form" onSubmit={close} noValidate>
-        <Field label={`Type ${name} to close it`} value={typed} autoComplete="off" onChange={(e) => (setTyped(e.target.value), setError(null))} error={error ?? undefined} />
+        <Field label={`Type ${name} to close it`} value={typed} autoComplete="off" onChange={(e) => (setTyped(e.target.value), setError(null), setFirst(null))} error={error ?? undefined} />
         <Button variant="ink" type="submit" disabled={busy || !matches}>
           Close the account
         </Button>
       </form>
+      {first && (
+        <Button size="sm" className="bz-close__first" href={first === "order_in_progress" ? `${b.base}/orders` : `${b.base}/settings/money`}>
+          {first === "order_in_progress" ? "Made for you" : "Money and receipts"}
+        </Button>
+      )}
     </div>
   );
 }

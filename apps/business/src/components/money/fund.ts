@@ -3,7 +3,7 @@
 
 import type { FundingSource } from "@opencast/contracts";
 import { money, type PromiseLine } from "@opencast/ui";
-import type { DepositQuoteX } from "../../api/ext/money";
+import type { DepositQuote } from "../../api/types";
 
 export const PROMISE: PromiseLine[] = [
   { lead: "It sits in your balance.", rest: "Nothing is spent by adding it." },
@@ -21,7 +21,7 @@ export function methodPhrase(kind: FundingSource["kind"]): string {
  * "At $8.00 per 1,000 people tuned in, $250 is roughly 120 airings on a station like BEAT 12.1."
  * Without the quote's basis (E6) it says only the airings; with no estimate, nothing.
  */
-export function estimateLine(q: Pick<DepositQuoteX, "roughAirings" | "basis">, amountMicros: number): string | null {
+export function estimateLine(q: Pick<DepositQuote, "roughAirings" | "basis">, amountMicros: number): string | null {
   if (q.roughAirings === null) return null;
   const amount = money(amountMicros, { trimCents: true });
   const airings = `roughly ${q.roughAirings} ${q.roughAirings === 1 ? "airing" : "airings"}`;

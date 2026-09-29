@@ -459,3 +459,15 @@ Words for what the API answers now (A1, A2, A3, O2, N3, N5). The API's own messa
 | Settings, Notifications | "How early": "At the start", "{N} minutes before", "An hour before", "{N} hours before"; Quiet hours: "Nothing between {10:00 pm} and {8:00 am}" from the account's window |
 | Desk, a set-up station's Claim row | "Claim"; "{Crate} hasn't been invited to claim it yet", "Claim invite sent {Sept 24}", "Claim link sent {Sept 20}"; buttons "Invite to claim" (on air, not invited yet), "Send the claim link", "Send the link again"; toasts "Claim invite sent to {name}.", "Claim link sent to {name}." |
 | Desk, a station set up before setups were kept (N5 null) | "It was set up before its recipe was kept, so its recipe, sign-on time and import aren't shown here." |
+
+### apps/business: the landed requests (contracts of 2026-09-29)
+
+Words for what the API answers now (P11, P12, P20, P21, E4). The API's own messages are shown as they come for the rest (`logo_size`, `not_an_image`, `default_source`, `deposit_pending`, `order_in_progress`, `no_source`, `redeem_off`, P10's `not_available`).
+
+| Where | Words |
+|---|---|
+| Settings, Connections, the checkout | after choosing one: "Shopify's app secret" / "In Shopify, under your app's API credentials"; "Stripe's signing secret" / "In Stripe, on the webhook's page. It starts whsec_"; "Square's signature key" / "In Square, on the webhook subscription's page"; "Connect {Stripe}", "Back"; "Paste {Stripe's signing secret} to connect."; toast "{Stripe} is connected."; connected, the owner sees "Send {Stripe}'s order webhooks to" and the address; "Disconnect" on Clear Pay and the checkout |
+| Settings, Connections, Clear Pay (Clear's connect flow isn't in the app) | "Clear Pay connects from Clear, and that isn't set up here yet." |
+| Settings, Connections, the Redeem tool | "Redeem in the app", "Owners and managers mark codes used at the counter, from Redeem on their phone"; managers and viewers see "On" / "Off" |
+| Redeem, while it's off | the "Settings" button under "Redeem is off for this business…" |
+| Settings, Close account | "{$20.00} can't go back to a card. Add a bank or Clear account in Money and receipts first." (money available, only cards); "What's available goes back to your bank or Clear account." (nothing to name); after a refusal, "Made for you" (an order being made) or "Money and receipts" (nowhere to send the money) |

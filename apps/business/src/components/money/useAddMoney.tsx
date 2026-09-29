@@ -8,7 +8,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ledgerApi, type FundingSource } from "@opencast/contracts";
 import { money, useToast } from "@opencast/ui";
 import { call } from "../../api/client";
-import { DepositQuoteX } from "../../api/ext/money";
 import { ProviderWidget } from "./ProviderWidget";
 
 type Kind = FundingSource["kind"];
@@ -26,7 +25,7 @@ export function useRefreshMoney() {
 export function useQuote(businessId: string, amountMicros: number | null, method: Kind | null) {
   return useQuery({
     queryKey: ["quoteDeposit", businessId, amountMicros, method],
-    queryFn: () => call(ledgerApi.quoteDeposit, { params: { businessId }, body: { amountMicros, method } }, DepositQuoteX),
+    queryFn: () => call(ledgerApi.quoteDeposit, { params: { businessId }, body: { amountMicros, method } }),
     enabled: !!amountMicros && amountMicros > 0 && !!method,
     staleTime: 60_000,
     retry: false

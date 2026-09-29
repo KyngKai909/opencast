@@ -17,3 +17,7 @@
 }
 .bz-conn__end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .bz-conn__row small.bz-conn__mono { font: 500 12.5px var(--font-mono); color: var(--ink); margin: 1px 0 2px; }
+/* A checkout's secret (not drawn: the settings field, under the row's words) and its webhook address. */
+.bz-conn__secret { display: grid; gap: 4px; margin-top: 10px; max-width: 420px; }
+.bz-conn__secret .bz-conn__pick { margin-top: 6px; }
+.bz-conn__row small.bz-conn__url { overflow-wrap: anywhere; }

@@ -2,9 +2,9 @@
 // (the shared labels from states.ts, with whose turn it is), the order's steps, the credit flags'
 // words, and dates. Pure, so the rules are tested (format.test.ts).
 
-import { ORDER_STATE_LABELS, SPONSORSHIP_DECLINE_LABELS, SPONSORSHIP_STATE_LABELS, type OrderState, type StationIdent } from "@opencast/contracts";
+import { ORDER_STATE_LABELS, SPONSORSHIP_DECLINE_LABELS, SPONSORSHIP_STATE_LABELS, type OrderState, type ProductionOrder, type Sponsorship, type StationIdent } from "@opencast/contracts";
 import { duration, money, type StepState } from "@opencast/ui";
-import type { CreditFlag, OrderX, SponsorshipX } from "../../api/ext/deals";
+import type { CreditFlag } from "../../api/types";
 import { MARKET_TZ } from "../../lib/clock";
 
 // ---- Dates ----
@@ -72,13 +72,13 @@ const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** "Beat Tape Live on BEAT 12.1", "All of BEAT 12.1"; `short` drops the channel (the phone). */
-export function sponsorshipTitle(x: Pick<SponsorshipX, "station" | "program">, short = false): string {
+export function sponsorshipTitle(x: Pick<Sponsorship, "station" | "program">, short = false): string {
   const where = short ? callSign(x.station) : stationLabel(x.station);
   return x.program ? `${x.program.title} on ${where}` : `All of ${where}`;
 }
 
 /** "One program, weekly, live" (L1); "Credited in every break" for a whole station. */
-export function sponsorshipLine(x: Pick<SponsorshipX, "program" | "programFormat">): string {
+export function sponsorshipLine(x: Pick<Sponsorship, "program" | "programFormat">): string {
   if (!x.program) return "Credited in every break";
   return x.programFormat ? `One program, ${lower(x.programFormat)}` : "One program";
 }
@@ -86,7 +86,7 @@ export function sponsorshipLine(x: Pick<SponsorshipX, "program" | "programFormat
 export type TagTone = "you" | "wait" | "on" | "plain";
 
 /** The business's words for the state, and its tone: amber while it waits on the station, solid once it's on. */
-export function sponsorshipTag(x: Pick<SponsorshipX, "state" | "station">, short = false): { text: string; tone: TagTone } {
+export function sponsorshipTag(x: Pick<Sponsorship, "state" | "station">, short = false): { text: string; tone: TagTone } {
   const text = SPONSORSHIP_STATE_LABELS[x.state].business.replace("{station}", callSign(x.station));
   switch (x.state) {
     case "requested":
@@ -102,24 +102,24 @@ export function sponsorshipTag(x: Pick<SponsorshipX, "state" | "station">, short
 }
 
 /** "BEAT's reason: We're full." for a declined request. */
-export function declineLine(x: Pick<SponsorshipX, "state" | "declineReason" | "station">): string | null {
+export function declineLine(x: Pick<Sponsorship, "state" | "declineReason" | "station">): string | null {
   if (x.state !== "declined" || !x.declineReason) return null;
   return `${callSign(x.station)}'s reason: ${SPONSORSHIP_DECLINE_LABELS[x.declineReason]}.`;
 }
 
 /** The Since column: "August 1" once started, "From October 1" before. */
-export function sinceText(x: Pick<SponsorshipX, "startsOn">, today: string): string {
+export function sinceText(x: Pick<Sponsorship, "startsOn">, today: string): string {
   return x.startsOn > today ? `From ${dayText(x.startsOn)}` : dayText(x.startsOn);
 }
 
 /** The phone's line: "$75.00 a month, from October 1", "$50.00 a month, since August". */
-export function phoneLine(x: Pick<SponsorshipX, "startsOn" | "monthlyMicros">, today: string): string {
+export function phoneLine(x: Pick<Sponsorship, "startsOn" | "monthlyMicros">, today: string): string {
   const when = x.startsOn > today ? `from ${dayText(x.startsOn)}` : `since ${monthText(x.startsOn)}`;
   return `${money(x.monthlyMicros)} a month, ${when}`;
 }
 
 /** A running sponsorship that won't renew ends with its paid month: the last day of this month. */
-export function endsOn(x: Pick<SponsorshipX, "state" | "renewsOn" | "startsOn">, today: string): string | null {
+export function endsOn(x: Pick<Sponsorship, "state" | "renewsOn" | "startsOn">, today: string): string | null {
   if (x.renewsOn !== null || (x.state !== "credited" && x.state !== "approved")) return null;
   const first = nextFirst(x.startsOn > today ? x.startsOn : today);
   const [y, m] = first.split("-").map(Number) as [number, number];
@@ -128,14 +128,14 @@ export function endsOn(x: Pick<SponsorshipX, "state" | "renewsOn" | "startsOn">,
 }
 
 /** "What's committed next month" (06.2): every approved or credited sponsorship that renews on the next 1st. */
-export function nextMonthHold(list: Pick<SponsorshipX, "state" | "monthlyMicros" | "renewsOn">[], today: string): { on: string; micros: number } {
+export function nextMonthHold(list: Pick<Sponsorship, "state" | "monthlyMicros" | "renewsOn">[], today: string): { on: string; micros: number } {
   const on = nextFirst(today);
   const micros = list.filter((x) => (x.state === "approved" || x.state === "credited") && x.renewsOn === on).reduce((sum, x) => sum + x.monthlyMicros, 0);
   return { on, micros };
 }
 
 /** Is it still something the business supports (or asked for)? */
-export function isLive(x: Pick<SponsorshipX, "state">): boolean {
+export function isLive(x: Pick<Sponsorship, "state">): boolean {
   return x.state === "requested" || x.state === "approved" || x.state === "credited";
 }
 
@@ -192,13 +192,13 @@ export function orderTurn(state: OrderState): TagTone {
 }
 
 /** The state tag: "Delivered, review by Oct 2". */
-export function orderTag(o: Pick<OrderX, "state" | "autoApproveAt">): { text: string; tone: TagTone } {
+export function orderTag(o: Pick<ProductionOrder, "state" | "autoApproveAt">): { text: string; tone: TagTone } {
   const text = ORDER_STATE_LABELS[o.state].business.replace("{date}", o.autoApproveAt ? shortDay(o.autoApproveAt) : "");
   return { text: text.replace(/, review by $/, ""), tone: orderTurn(o.state) };
 }
 
 /** ":30, asked September 24", ":15, delivered September 25", ":30, approved September 22". */
-export function orderLine(o: Pick<OrderX, "state" | "lengthSec" | "createdAt" | "deliveredAt" | "approvedAt">): string {
+export function orderLine(o: Pick<ProductionOrder, "state" | "lengthSec" | "createdAt" | "deliveredAt" | "approvedAt">): string {
   const len = duration(o.lengthSec * 1000);
   if (o.state === "approved") return `${len}, approved ${dayText(o.approvedAt ?? o.deliveredAt ?? o.createdAt)}`;
   if (o.state === "delivered" && o.deliveredAt) return `${len}, delivered ${dayText(o.deliveredAt)}`;
@@ -206,7 +206,7 @@ export function orderLine(o: Pick<OrderX, "state" | "lengthSec" | "createdAt" | 
 }
 
 /** The row's action: Review a delivery, open the Spot it became, or Open the order. */
-export function orderAction(o: Pick<OrderX, "state" | "spotId">): "Review" | "Spot" | "Open" {
+export function orderAction(o: Pick<ProductionOrder, "state" | "spotId">): "Review" | "Spot" | "Open" {
   if (o.state === "delivered") return "Review";
   if (o.state === "approved" && o.spotId) return "Spot";
   return "Open";
@@ -239,7 +239,7 @@ export function voiceName(voicedBy: string | null): string | null {
 }
 
 /** "From BEAT 12.1, voiced by Jen Park. Delivered today, a day early." (06.1). */
-export function deliveredLine(o: Pick<OrderX, "maker" | "quote" | "deliveredAt">, today: string): string {
+export function deliveredLine(o: Pick<ProductionOrder, "maker" | "quote" | "deliveredAt">, today: string): string {
   const voice = voiceName(o.quote?.voicedBy ?? null);
   const from = `From ${stationLabel(o.maker)}${voice ? `, voiced by ${voice}` : ""}.`;
   if (!o.deliveredAt) return from;
@@ -251,7 +251,7 @@ export function deliveredLine(o: Pick<OrderX, "maker" | "quote" | "deliveredAt">
 }
 
 /** "A :15 from Opencast Studio, delivered September 25." (05.1). */
-export function orderSubtitle(o: Pick<OrderX, "lengthSec" | "maker" | "deliveredAt">): string | null {
+export function orderSubtitle(o: Pick<ProductionOrder, "lengthSec" | "maker" | "deliveredAt">): string | null {
   if (!o.deliveredAt) return null;
   return `A ${duration(o.lengthSec * 1000)} from ${stationLabel(o.maker)}, delivered ${dayText(o.deliveredAt)}.`;
 }
@@ -265,7 +265,7 @@ export function noteWhen(createdAt: string, nowMs: number, clockText: (t: string
 }
 
 /** The ask-for-changes button: a round used, a fix that isn't, or Opencast's review when none are left. */
-export function changesButton(o: Pick<OrderX, "quote" | "roundsUsed" | "notes">, usesARound: boolean): { label: string; decision: "request_changes" | "dispute" } {
+export function changesButton(o: Pick<ProductionOrder, "quote" | "roundsUsed" | "notes">, usesARound: boolean): { label: string; decision: "request_changes" | "dispute" } {
   const left = (o.quote?.roundsIncluded ?? 0) - o.roundsUsed;
   if (!usesARound) return { label: "Ask for the fixes", decision: "request_changes" };
   if (left <= 0) return { label: "Ask Opencast to review it", decision: "dispute" };

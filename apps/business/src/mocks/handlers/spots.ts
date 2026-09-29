@@ -1,13 +1,13 @@
-// spots for a business: listing, creating, uploading, checks, matching stations, submitting,
-// pausing and resuming, ending. The Spots area owns this file.
+// spots for a business: listing, creating, uploading (and the code Opencast picks then, P4),
+// checks, matching stations, submitting, pausing and resuming, ending. The Spots area owns this file.
 //
 // Plus one mock-only endpoint (/v1/mock/spots/:spotId/:action) standing in for what review and
 // stations do on their side: pass review, add it to their rotations, air it. Review also passes by
 // itself REVIEW_MS after submitting.
 
 import { http, type HttpHandler } from "msw";
-import { spotsApi, type Spot } from "@opencast/contracts";
-import { MockSpotAction, mockSpotAction, SpotsX, SpotX, TargetingX } from "../../api/ext/spots";
+import { spotsApi, Targeting, type Spot } from "@opencast/contracts";
+import { MockSpotAction, mockSpotAction, SpotsX, SpotX } from "../../api/ext/spots";
 import { now } from "../../lib/clock";
 import { roleOn } from "../access";
 import { balanceOf, dbBusiness, getDb } from "../db";
@@ -79,7 +79,6 @@ export const spotsHandlers: HttpHandler[] = [
     const b = dbBusiness(id)!;
     const d = body.data;
     const mine = getDb().spots.filter((s) => s.businessId === id);
-    const code = d.code ?? { code: codeFor(b, getDb().spots.map((s) => s.code?.code ?? "")), offer: "10% off", windowDays: 7 };
     const spot: Spot = {
       id: newSpotId(),
       businessId: id,
@@ -100,7 +99,8 @@ export const spotsHandlers: HttpHandler[] = [
         dayparts: d.targeting.dayparts ?? [],
         excludedStationIds: d.targeting.excludedStationIds ?? []
       },
-      code,
+      // P4: Opencast picks the code at upload, unless the business typed its own.
+      code: d.code ? { ...d.code, pickedBy: "business" } : null,
       file: null,
       productionOrderId: null,
       createdAt: now().toISOString()
@@ -125,7 +125,7 @@ export const spotsHandlers: HttpHandler[] = [
     if (p instanceof Response) return p;
     const s = spotFor(String(params.spotId), p, "advertise");
     if (s instanceof Response) return s;
-    const body = spotsApi.updateSpot.body.extend({ targeting: TargetingX.partial() }).partial().safeParse(await request.json().catch(() => null));
+    const body = spotsApi.updateSpot.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "invalid", "Check the rate and budget and try again.");
     const d = body.data;
     if (s.state === "ended") return fail(409, "ended", "It's ended. Its results stay, but it can't change.");
@@ -137,7 +137,8 @@ export const spotsHandlers: HttpHandler[] = [
     if (d.startsOn !== undefined) s.startsOn = d.startsOn;
     if (d.endsOn !== undefined) s.endsOn = d.endsOn;
     if (d.code !== undefined) {
-      s.code = d.code;
+      // The same letters stay Opencast's (only the offer changed); others are the business's own.
+      s.code = d.code && { ...d.code, pickedBy: s.code && d.code.code === s.code.code ? (s.code.pickedBy ?? "opencast") : "business" };
       // The code check names the code on the frame.
       if (s.file) s.file = { ...s.file, checks: s.file.checks.map((c) => (c.check === "code" && d.code ? { ...c, label: `Code ${d.code.code} added` } : c)) };
     }
@@ -170,6 +171,8 @@ export const spotsHandlers: HttpHandler[] = [
     } catch {
       // No object URLs (tests): the still stands in.
     }
+    // P4: a spot without a code gets one as it's checked: Opencast's letters, the title as the offer.
+    if (!s.code) s.code = { code: codeFor(dbBusiness(s.businessId)!, getDb().spots.map((x) => x.code?.code ?? "")), offer: s.title, windowDays: 7, pickedBy: "opencast" };
     s.file = { url, previewUrl: null, durationMs: s.lengthSec * 1000, originalFilename: file.name || null, checks: uploadChecks(s.lengthSec, s.code?.code ?? null, scaled) };
     saveSpots();
     return reply(SpotX, spotOut(s));
@@ -180,7 +183,7 @@ export const spotsHandlers: HttpHandler[] = [
     if (p instanceof Response) return p;
     const s = spotFor(String(params.spotId), p, "advertise");
     if (s instanceof Response) return s;
-    const body = TargetingX.partial().safeParse((await request.json().catch(() => null)) ?? {});
+    const body = Targeting.partial().safeParse((await request.json().catch(() => null)) ?? {});
     if (!body.success) return fail(400, "invalid", "Check who it's for and try again.");
     const b = dbBusiness(s.businessId)!;
     return reply(spotsApi.matchStations.response, { stations: matchStations(b, s.rate, { ...s.targeting, bands: mockOf(s).bands, ...body.data }) });

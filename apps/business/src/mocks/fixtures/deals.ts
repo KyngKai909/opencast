@@ -20,8 +20,8 @@
 // way when the mock starts (Council Watch's September, Weekend brunch's $150.00) are outside the
 // mock's books (inventory "worth raising" 10). Money only moves for what happens in the mock.
 
-import type { Spot, StationIdent } from "@opencast/contracts";
-import type { CreditCheckX, CreditFlag, MakerX, OrderX, SponsorshipX, SponsorTarget } from "../../api/ext/deals";
+import type { CreditCheck, ProductionOrder, Sponsorship, SponsorTarget, Spot, StationIdent } from "@opencast/contracts";
+import type { CreditFlag, Maker } from "../../api/types";
 import { MARKET_TZ, now } from "../../lib/clock";
 import { balanceOf, dbBusiness, getDb, move, returnHeld as dbReturnHeld, saveDb, spendHeld as dbSpendHeld } from "../db";
 import { OSC_ID } from "./businesses";
@@ -100,7 +100,7 @@ const PRICE_OR_OFFER = /(\$\s?\d[\d,.]*|\d+\s?% off|\bhalf off\b|\bfree\b|\bdisc
  * nothing else. Each flag says what to replace (start, end) and with what (`suggestion`, empty
  * to remove), and `quote` is the words its title names.
  */
-export function checkCredit(text: string): CreditCheckX {
+export function checkCredit(text: string): CreditCheck {
   const flags: CreditFlag[] = [];
   const taken = (s: number, e: number) => flags.some((f) => s < f.end && e > f.start);
 
@@ -160,7 +160,7 @@ export const TARGETS: FxTarget[] = [
   { station: CIVC, program: { id: PROGRAM_IDS.councilWatch, title: "Council Watch" }, schedule: "Tuesdays at 7:00 pm", programFormat: "Weekly", minMonthlyMicros: $(50), maxSponsors: 2, others: 0, membersCredit: null, where: "In CIVC's breaks during the program" }
 ];
 
-export const MAKERS: MakerX[] = [
+export const MAKERS: Maker[] = [
   { station: BEAT, turnaround: "About a week", fromMicros: $(100), samples: 4, history: "Made your Fall menu spot", specialty: null },
   { station: SAZN, turnaround: "About 10 days", fromMicros: $(150), samples: 6, history: null, specialty: "Food and kitchens" },
   { station: STUDIO, turnaround: "About 5 days", fromMicros: $(140), samples: 12, history: null, specialty: "Any category" }
@@ -175,14 +175,14 @@ export const MOCK_QUOTES: Record<string, { priceMicros: number; days: number; ro
 
 // ---- State ----
 
-export interface FxSponsorship extends SponsorshipX {
+export interface FxSponsorship extends Sponsorship {
   /** Months held in the mock's books and not yet paid to the station ("2026-10"). */
   heldMonths: string[];
   /** The last month the monthly hold has been looked at; earlier months are settled. */
   settledThrough: string;
 }
 
-export interface FxOrder extends OrderX {
+export interface FxOrder extends ProductionOrder {
   /** The price is held in the mock's books (accepted in the mock, not before it started). */
   heldInBooks: boolean;
 }
@@ -629,12 +629,12 @@ export function markOwnMistake(o: FxOrder, noteId: string): FxOrder | Fail {
 }
 
 /** The notes on the delivery under review (this round's). */
-export function roundNotes(o: Pick<OrderX, "notes" | "roundsUsed">) {
+export function roundNotes(o: Pick<ProductionOrder, "notes" | "roundsUsed">) {
   return o.notes.filter((n) => n.round === o.roundsUsed + 1);
 }
 
 /** Asking for changes uses a round unless every note in it is the maker's own mistake. */
-export function changesUseARound(o: Pick<OrderX, "notes" | "roundsUsed">): boolean {
+export function changesUseARound(o: Pick<ProductionOrder, "notes" | "roundsUsed">): boolean {
   const notes = roundNotes(o);
   return notes.length === 0 || notes.some((n) => !n.makersMistake);
 }
@@ -749,10 +749,10 @@ export function resolveOrderDispute(o: FxOrder, outcome: "pay_maker" | "refund" 
 }
 
 /** The order as the API returns it (without the mock's bookkeeping). */
-export function publicOrder({ heldInBooks: _, ...o }: FxOrder): OrderX {
+export function publicOrder({ heldInBooks: _, ...o }: FxOrder): ProductionOrder {
   return o;
 }
 
-export function publicSponsorship({ heldMonths: _h, settledThrough: _s, ...x }: FxSponsorship): SponsorshipX {
+export function publicSponsorship({ heldMonths: _h, settledThrough: _s, ...x }: FxSponsorship): Sponsorship {
   return x;
 }

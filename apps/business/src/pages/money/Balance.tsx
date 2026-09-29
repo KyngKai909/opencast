@@ -10,7 +10,6 @@ import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { ledgerApi, spotsApi, type Movement } from "@opencast/contracts";
 import { BalanceBar, Button, ControlTitle, KeyValueList, Movements, Runway, Segmented, StatRow, Toggle, useToast, type Movement as MovementRow } from "@opencast/ui";
-import { BusinessX } from "../../api/ext";
 import { shortAddress, useClear } from "../../auth/clear";
 import { useApi, useApiMutation } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
@@ -59,7 +58,7 @@ export default function Balance() {
   const balance = useApi(ledgerApi.getBalance, { params: { businessId: b.id } }, { refetchInterval: 30_000 });
   const movements = useApi(ledgerApi.listMovements, { params: { businessId: b.id }, query: { filter, limit } });
   const added = useApi(ledgerApi.listMovements, { params: { businessId: b.id }, query: { filter: "money", limit: 20 } }, { enabled: b.can("spend") });
-  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { schema: BusinessX, staleTime: 60_000 });
+  const profile = useApi(spotsApi.getBusiness, { params: { businessId: b.id } }, { staleTime: 60_000 });
   const spots = useApi(spotsApi.listSpots, { params: { businessId: b.id } }, { retry: false });
   const statements = useApi(ledgerApi.listStatements, { params: { businessId: b.id } }, { retry: false, staleTime: 300_000 });
   const update = useApiMutation(spotsApi.updateBusiness, { invalidates: [spotsApi.getBusiness] });

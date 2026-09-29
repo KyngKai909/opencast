@@ -5,7 +5,7 @@
 // sponsorship form, an order from asked to approved), in both grounds, at 1280 and at 406 wide.
 
 import { expect, test, type Page } from "@playwright/test";
-import { WIDTHS, axeBothGrounds, reducedMotion, type Width } from "./business.support";
+import { OSC, PEOPLE, WIDTHS, axeBothGrounds, reducedMotion, signInAs, type Width } from "./business.support";
 
 /** Moves to another area: the rail on the web; on the phone, the area's address. */
 async function openArea(page: Page, width: Width, name: string, path: string) {
@@ -205,3 +205,40 @@ for (const width of Object.keys(WIDTHS) as Width[]) {
     expect(failures, failures.join("\n\n")).toEqual([]);
   });
 }
+
+test("the owner connects an online checkout with its secret, and turns Redeem off and on", async ({ page }) => {
+  await page.setViewportSize(WIDTHS.web);
+  await reducedMotion(page);
+  await signInAs(page, PEOPLE.owner);
+  const failures: string[] = [];
+
+  await page.goto(`${OSC}/settings/connections`);
+  const checkout = page.locator(".bz-conn__row", { hasText: "Your online checkout" });
+  await checkout.getByRole("button", { name: "Connect" }).click();
+  await checkout.getByRole("button", { name: "Stripe" }).click();
+  await checkout.getByRole("button", { name: "Connect Stripe" }).click();
+  await expect(page.getByText("Paste Stripe's signing secret to connect.")).toBeVisible();
+  await checkout.getByLabel("Stripe's signing secret").fill("whsec_test");
+  failures.push(...(await axeBothGrounds(page, "connections, a checkout's secret")));
+  await checkout.getByRole("button", { name: "Connect Stripe" }).click();
+  await expect(page.getByText("Stripe is connected.", { exact: true })).toBeVisible();
+  await expect(checkout).toContainText("Stripe is connected. Codes used online are counted too");
+  await expect(checkout).toContainText("Send Stripe's order webhooks to");
+  await expect(checkout).toContainText("/v1/webhooks/checkout/");
+  failures.push(...(await axeBothGrounds(page, "connections, a checkout connected")));
+  await checkout.getByRole("button", { name: "Disconnect" }).click();
+  await expect(checkout).toContainText("Connect Shopify, Stripe or Square and codes used online are counted too");
+
+  // The Redeem tool: off, the page says so; on again, it takes codes.
+  await page.getByRole("switch", { name: "Redeem in the app" }).click();
+  await expect(page.getByRole("switch", { name: "Redeem in the app" })).toHaveAttribute("aria-checked", "false");
+  await page.goto(`${OSC}/redeem`);
+  await expect(page.getByText("Redeem is off for this business. Turn it on in Settings to mark codes used at the counter.")).toBeVisible();
+  await page.getByRole("link", { name: "Settings" }).last().click();
+  await page.getByRole("switch", { name: "Redeem in the app" }).click();
+  await expect(page.getByRole("switch", { name: "Redeem in the app" })).toHaveAttribute("aria-checked", "true");
+  await page.goto(`${OSC}/redeem`);
+  await expect(page.getByPlaceholder("Type a code")).toBeVisible();
+
+  expect(failures, failures.join("\n\n")).toEqual([]);
+});

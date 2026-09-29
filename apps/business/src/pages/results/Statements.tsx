@@ -3,7 +3,6 @@
 import { Navigate } from "react-router";
 import { ledgerApi } from "@opencast/contracts";
 import { Button, ControlTitle } from "@opencast/ui";
-import { BizStatementsX } from "../../api/ext/results";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { Quiet } from "../common";
@@ -11,7 +10,7 @@ import "./Statement.css";
 
 export default function Statements() {
   const b = useBusiness();
-  const list = useApi(ledgerApi.listStatements, { params: { businessId: b.id } }, { schema: BizStatementsX });
+  const list = useApi(ledgerApi.listStatements, { params: { businessId: b.id } });
   if (list.isLoading) return <Quiet />;
   const newest = list.data?.[0];
   if (newest) return <Navigate to={`${b.base}/balance/statements/${newest.id}`} replace />;

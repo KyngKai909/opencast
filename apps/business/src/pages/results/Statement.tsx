@@ -8,10 +8,10 @@
 
 import { useState } from "react";
 import { useParams } from "react-router";
-import { ledgerApi } from "@opencast/contracts";
+import { ledgerApi, type Statement as StatementData } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, money, useToast, type KeyValueRow } from "@opencast/ui";
-import { ApiError, call } from "../../api/client";
-import { BizStatementsX, type BizStatementLine, type BizStatementX } from "../../api/ext/results";
+import { ApiError, apiUrl, call } from "../../api/client";
+import type { StatementLine } from "../../api/types";
 import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useShellOptions } from "../../layout/shell";
@@ -20,7 +20,7 @@ import { Section } from "../../components/results/Section";
 import { Quiet } from "../common";
 import "./Statement.css";
 
-export function statementWords(st: BizStatementX, businessName: string) {
+export function statementWords(st: StatementData, businessName: string) {
   const month = monthName(st.periodStart.slice(0, 7));
   const title = `${month} statement`;
   const description = st.inProgress
@@ -30,10 +30,10 @@ export function statementWords(st: BizStatementX, businessName: string) {
 }
 
 /** The balance lines (E3's group "balance"); without groups, every line. */
-export function balanceRows(st: BizStatementX): KeyValueRow[] {
+export function balanceRows(st: StatementData): KeyValueRow[] {
   const grouped = st.lines.some((l) => l.group);
   const lines = grouped ? st.lines.filter((l) => l.group === "balance") : st.lines;
-  const row = (l: BizStatementLine): KeyValueRow => ({
+  const row = (l: StatementLine): KeyValueRow => ({
     title: l.label,
     detail: l.detail ?? undefined,
     amount: l.amountMicros,
@@ -55,7 +55,7 @@ export default function Statement() {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
   useShellOptions({ title: "Statement" });
-  const list = useApi(ledgerApi.listStatements, { params: { businessId: b.id } }, { schema: BizStatementsX });
+  const list = useApi(ledgerApi.listStatements, { params: { businessId: b.id } });
   const st = list.data?.find((x) => x.id === statementId);
 
   if (list.isLoading) return <Quiet />;
@@ -94,7 +94,7 @@ export default function Statement() {
         end={
           <>
             {st.pdfUrl && (
-              <Button size="sm" href={st.pdfUrl} download={`${slug(b.business.name)}-statement-${st.periodStart.slice(0, 7)}.pdf`}>
+              <Button size="sm" href={apiUrl(st.pdfUrl)} download={`${slug(b.business.name)}-statement-${st.periodStart.slice(0, 7)}.pdf`}>
                 Download PDF
               </Button>
             )}

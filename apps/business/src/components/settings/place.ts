@@ -1,6 +1,11 @@
-// P10 (interim): an address or a city to coordinates, until the API geocodes. `LocationInput`
-// needs latitude and longitude, and the profile takes a typed address ("204 Orange St, Redlands,
-// CA 92373") or a city and a radius. The cities of the Inland Empire market, at their centres.
+// An address or a city to coordinates, for the profile and Add a location: `LocationInput` needs
+// latitude and longitude, and they take a typed address ("204 Orange St, Redlands, CA 92373") or a
+// city and a radius. The API's place lookup answers (P10, spots.lookupPlace); where the server has
+// none set up (503 not_available), the cities of the Inland Empire market, at their centres, stand
+// in, as they did before the lookup existed.
+
+import { spotsApi } from "@opencast/contracts";
+import { ApiError, call } from "../../api/client";
 
 const CITIES: Record<string, [number, number]> = {
   redlands: [34.0556, -117.1825],
@@ -56,4 +61,23 @@ export function addressPlace(text: string): Place | null {
   const city = cityPlace(parts[parts.length - 1]!);
   if (!city) return null;
   return { ...city, streetAddress: parts.slice(0, -1).join(", ") };
+}
+
+/**
+ * A typed address (`area` false: it needs a street) or a city (`area` true), through the API's
+ * lookup, or this table when the server has no lookup. Null when nothing matches; the lookup's
+ * other errors are thrown.
+ */
+export async function lookUpPlace(text: string, area: boolean): Promise<Place | null> {
+  const q = text.trim();
+  if (q.length < 2) return null;
+  try {
+    const p = await call(spotsApi.lookupPlace, { query: { q } });
+    if (area) return { streetAddress: null, city: p.city, latitude: p.latitude, longitude: p.longitude };
+    return p.streetAddress ? { streetAddress: p.streetAddress, city: p.city, latitude: p.latitude, longitude: p.longitude } : null;
+  } catch (e) {
+    if (e instanceof ApiError && e.code === "not_available") return area ? cityPlace(q) : addressPlace(q);
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
 }
