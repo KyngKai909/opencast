@@ -18,7 +18,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/tv` | `@opencast/tv` | TV mode: watching, the guide, the menu rail, presets, radio, sleep, pledge by QR, first launch with a sign-in code, settings; the same build is the Cast receiver (`receiver.html`) and the iPhone's second screen (`?mirror`) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
 | `apps/spots` | `@opencast/spots` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
-| `apps/desk` | `@opencast/desk` | Network desk, internal (empty) | apps |
+| `apps/desk` | `@opencast/desk` | Network desk, Opencast's internal tool: the market board, the creator pipeline, asking permission, setting up claimable stations from recipes, listed sources and the catalog station, held earnings. Admin sign-in only | apps |
 | `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
 | `packages/db` | `@opencast/db` | Drizzle schema, SQL migrations, the legacy migration | platform |
@@ -118,17 +118,28 @@ Runs the business app at http://localhost:5181 on mock data, at the same Saturda
 
 `npm run dev -w @opencast/spots` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/spots/.env.example`).
 
+### Network desk
+
+```bash
+npm run dev:mock -w @opencast/desk
+```
+
+Runs Network desk at http://localhost:5182 on mock data, at the same Saturday evening. It's for the Opencast team only: sign in as `dee@opencast.example` (Dee A.) with any six digits except 000000; any other address signs in and is told the desk is for the team. A mock-only panel under the pipeline plays the creator's side (their answer, the sign-on time arriving, the claim and its approval), so a creator can go found, asked, said yes, set up from a recipe, on air and claimed. The mock remembers what you change in `localStorage` (keys starting `oc-mock-desk-`). `npm run dev -w @opencast/desk` runs it on :5178 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`; see `apps/desk/.env.example`).
+
+The creator's permission page is the viewer's `/permission/:token` (public, outside the phone shell). On the viewer's mock, `/permission/desert-skate-films-2026-0926` is unanswered, `/permission/desert-skate-films-said-yes` is after the yes, and links the desk's mock sends open there too.
+
 ### TV mode
 
 ```bash
 npm run dev:mock -w @opencast/tv
 ```
 
-Runs TV mode at http://localhost:5175 on mock data, at 1920×1080 like the frames, with the clock at Saturday 8:42 pm (`?clock=<ISO time>` starts it elsewhere, in mock mode only). The keyboard stands in for the remote: arrows, Enter for OK, Escape or Backspace for Back, PageUp and PageDown for CH, digits and the dot, ContextMenu for Menu (or hold Back), and hold Enter on a preset to replace it. The first launch shows the sign-in code; add `?approveCode=5` to have the mock approve it after five seconds (or call `__ocApproveTvCode()`), or choose "Watch without signing in". The TV remembers itself in `localStorage` (`oc-tv-device`). Mock switches: `?offAir=CIVC`, `?standby=CIVC`, `?guideState=loading|error|empty`, `?codeTtl=<s>`, `?noMarket`.
+Runs TV mode at http://localhost:5175 on mock data, at 1920×1080 like the frames, with the clock at Saturday 8:42 pm (`?clock=<ISO time>` starts it elsewhere, in mock mode only). The keyboard stands in for the remote: arrows, Enter for OK, Escape or Backspace for Back, PageUp and PageDown for CH, digits and the dot, ContextMenu for Menu (or hold Back), and hold Enter on a preset to replace it. The first launch shows the sign-in code; add `?approveCode=5` to have the mock approve it after five seconds (or call `__ocApproveTvCode()`), or choose "Watch without signing in". The TV remembers itself in `localStorage` (`oc-tv-device`: its `tvId` and device token from `registerTv`, its TV session once signed in, settings and presets). `__ocSignOutTvRemotely()` plays the account signing this TV out. Mock switches: `?offAir=CIVC`, `?standby=CIVC`, `?guideState=loading|error|empty`, `?codeTtl=<s>`, `?noMarket`.
 
 One build, three inputs, as the reference draws it:
 - **The TV app** (Android TV and Fire TV in Phase 8, TV browsers now): the remote's keys, through the player's `keyboardInput` "tv" profile.
 - **The Cast receiver**, `/receiver.html`: Google's Cast Application Framework on a Chromecast, with Opencast's namespace `urn:x-cast:org.useopencast.tv`. In mock mode a stand-in carries the same messages over a BroadcastChannel, and the viewer's phone remote reaches it through `/mock-cast-bridge.html` (served by the dev server in mock mode only). Open http://localhost:5174, tune in at phone width, choose the cast button and "Cast to Living room TV", and the remote drives the receiver in the other tab.
+- **Phones through the relay** (the TV app, where there's no Cast: Fire TV, Android TV): the API's `/tv/remote` Server-Sent Events carry the same commands and state. Phones signed in to the TV's account drive it directly; a guest's phone pairs with the 4-digit code in Settings, Remote and phones. In mock mode the relay rides the same bridge and channel as the Cast stand-in (the mock TV is "Den TV"; its first pair code is 4821).
 - **The iPhone's second screen**, `/?mirror&device=Kai's iPhone&market=inland-empire`: the Phase 8 Swift plugin loads this on the external display and passes the phone remote's commands over the bridge (`window.postMessage({ opencast: "command", command })`).
 
 `npm run dev -w @opencast/tv` runs it against the API (`VITE_API_BASE`, `VITE_VIEWER_URL` for the sign-in and pledge QR codes, `VITE_CAST_APP_ID`; see `apps/tv/.env.example`). The viewer needs `VITE_CAST_APP_ID` for its Cast sender (Chrome only on the web) and `VITE_TV_URL` for the mock bridge.

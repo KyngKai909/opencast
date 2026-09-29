@@ -31,7 +31,9 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
   const next = c.next;
   const source: ReactNode = air?.carriedFrom ? `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}` : air?.live ? (size === "tv" ? <LiveFrom note={(air as { note?: string | null }).note} /> : "Live") : null;
   // Casting or mirroring, the hint row says where the controls are, and Back isn't a key there.
-  const chip = hints.some((h) => h.kind === "chip");
+  // Casting and mirroring show only a chip: the phone has the controls, so there's no Back hint.
+  // The TV app keeps its key hints beside a phone's chip, and Back still works there.
+  const chip = hints.some((h) => h.kind === "chip") && !hints.some((h) => h.kind !== "chip");
   return (
     <div className={cx("oc-banner", `oc-banner--${size}`)} role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
       <div className="oc-banner__id">
