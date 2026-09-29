@@ -161,6 +161,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         // Back to live after it: the run sheet splits the live block around the break.
         runner.replan(true);
       }
+      // G3: a live block ended early. The log already moved up: hand back to it now.
+      if (command.action === "end_live") runner?.replan(true);
       // sign_on and sign_off change who's on air; the runners follow below.
       await db.update(schema.commands).set({ consumedAt: deps.clock.now() }).where(eq(schema.commands.id, command.id));
     }

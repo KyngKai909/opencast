@@ -21,4 +21,9 @@ export function trustRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return trust.remove(params.claimId);
   });
   r.handle(api.resolveClaim, ({ params, body }) => trust.resolve(params.claimId, body.outcome));
+  // B6: the file behind an answer.
+  r.handle(api.attachToClaim, async ({ user, params, file }) => {
+    await accounts.requireStation(user, await trust.stationOfClaim(params.claimId), [...staff]);
+    return trust.attach(params.claimId, user.id, file);
+  });
 }

@@ -82,6 +82,9 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Deleting the account of someone who owns a business (A3) | `accounts.deleteAccount` | refused (409 `owns_business`) until a business can be closed or handed over (P21) |
 | Deleting the Privy user (and its embedded wallet) with the account (A3) | accounts | not done: the wallet may be where a creator's escrow is paid |
 | Quiet hours: which notices they hold back (O2) | `notifications.inQuietHours` | pushes in the viewer scope (reminders, switch over, presets going live, station news); on by default, 22:00 to 08:00 in the account's market's time |
+| What moves up when a live block ends early (G3) | `log.endEarly` | the programs right after it, in order, until a gap, a live block, a carried program or a program whose breaks already hold spots; what's left becomes a gap the dead-air fill takes |
+| How far ahead the switcher warns of dead air (A5) | `accounts.stationStatus` | six hours, on-air stations only |
+| Who may upload a claim's attachment, and what (B6) | `trust.attach` | owner or operator (as answering); PDF, images or text, 20 MB |
 
 ## Built with a stand-in, to replace
 
@@ -94,6 +97,10 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Midnight for daily caps | Los Angeles time | Each market's own time zone |
 | Carried episodes' slot length | Rounded up to the next half hour, which leaves the barter break | The maker's own slot length, if the designs want one |
 | Stations that take production orders | `takesOrders` on the station (studios always do) | Confirm with the design |
+| "Cached for air" on an item's history (L5) | Prepared, no claim on it, and on a log within 24 hours: the API can't see the worker's disk | The worker reporting what it holds (a table the cache sync writes) |
+| Live source quality and output bitrate (S14, G2) | Always null | The worker's feeds and muxer reporting resolution and bitrate |
+| Captions (L7) | Tracks are uploaded or edited (WebVTT, SRT converted); nothing generates them, and they aren't in the playout output | Speech-to-text, and a subtitle rendition in the HLS (X2) |
+| A spot's still colour on the market (P23) | Picked from eight colours by the business's id | A colour the business chooses, or a frame of the spot |
 
 ## Storage
 

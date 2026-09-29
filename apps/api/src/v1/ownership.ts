@@ -11,7 +11,8 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.translators",
     "broadcast.live_sources",
     "broadcast.host_assignments",
-    "broadcast.speakers"
+    "broadcast.speakers",
+    "broadcast.lower_thirds"
   ],
   library: [
     "broadcast.programs",
@@ -24,7 +25,8 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.contents",
     "broadcast.content_refs",
     "broadcast.content_previews",
-    "broadcast.content_preview_needs"
+    "broadcast.content_preview_needs",
+    "broadcast.caption_tracks"
   ],
   log: ["broadcast.log_entries", "broadcast.repeat_groups", "broadcast.breaks", "broadcast.dead_air_events"],
   playout: ["broadcast.playout_state", "broadcast.commands", "broadcast.livepeer_config", "broadcast.schedules", "broadcast.as_run"],

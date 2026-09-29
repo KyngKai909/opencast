@@ -162,6 +162,9 @@ export const programs = broadcast.table(
     rightsNote: text("rights_note"),
     /** Required credit when the work is under a licence (CC BY). */
     attribution: text("attribution"),
+    /** L7 (added 2026-09-29): how its airings are captioned, and in what language. Null: not said. */
+    captionsMode: text("captions_mode", { enum: ["none", "generated_live", "generated", "uploaded"] }),
+    captionsLanguage: text("captions_language"),
     createdAt: createdAt()
   },
   (t) => [
@@ -215,6 +218,8 @@ export const assets = broadcast.table(
     widthPx: integer("width_px"),
     heightPx: integer("height_px"),
     loudnessLufs: real("loudness_lufs"),
+    /** Audio channels in the file (1 mono, 2 stereo, more surround), from the probe. Null for items made before 2026-09-29. */
+    audioChannels: smallint("audio_channels"),
     captions: text("captions", { enum: ["none", "generated", "uploaded"] }).notNull().default("none"),
     originalFilename: text("original_filename"),
     /** The old model's id, for the migration report. */
@@ -271,7 +276,7 @@ export const contentRefs = broadcast.table(
     cid: text("cid")
       .notNull()
       .references(() => contents.cid),
-    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file"] }).notNull(),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment"] }).notNull(),
     ownerId: uuid("owner_id").notNull(),
     createdAt: createdAt()
   },
@@ -443,6 +448,8 @@ export const logEntries = broadcast.table(
     localNote: text("local_note"),
     episodeTitle: text("episode_title"),
     episodeDescription: text("episode_description"),
+    /** G3 (added 2026-09-29): a live block ended early. `ends_at` is moved to this moment; the log after it moved up. */
+    endedEarlyAt: at("ended_early_at"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -554,7 +561,8 @@ export const commands = broadcast.table("commands", {
   stationId: uuid("station_id")
     .notNull()
     .references(() => stations.id),
-  action: text("action", { enum: ["sign_on", "sign_off", "skip", "previous", "cue_break"] }).notNull(),
+  /** `end_live` (added 2026-09-29): a live block ended early; playout hands back to the log. */
+  action: text("action", { enum: ["sign_on", "sign_off", "skip", "previous", "cue_break", "end_live"] }).notNull(),
   issuedBy: uuid("issued_by").references(() => users.id),
   createdAt: createdAt(),
   consumedAt: at("consumed_at")
@@ -657,4 +665,44 @@ export const deadAirEvents = broadcast.table("dead_air_events", {
   autoFilledAt: at("auto_filled_at"),
   resolvedAt: at("resolved_at"),
   createdAt: createdAt()
+});
+
+/**
+ * L7 (added 2026-09-29): an item's caption track, uploaded or edited in master control. WebVTT,
+ * kept as text (a track is small). Generated captions don't exist yet.
+ */
+export const captionTracks = broadcast.table(
+  "caption_tracks",
+  {
+    assetId: uuid("asset_id")
+      .primaryKey()
+      .references(() => assets.id),
+    /** BCP 47 ("en", "es"). */
+    language: text("language").notNull(),
+    vtt: text("vtt").notNull(),
+    source: text("source", { enum: ["uploaded", "edited"] }).notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [check("caption_track_size", sql`octet_length(${t.vtt}) <= 1048576`)]
+);
+
+/**
+ * S15 (added 2026-09-29): the lower third on a live block, so a second device reads what's
+ * showing. `speaker_id` points into the program's speaker list, which is replaced as a whole
+ * (no foreign key); the name and title are copied so the state stands on its own.
+ */
+export const lowerThirds = broadcast.table("lower_thirds", {
+  logEntryId: uuid("log_entry_id")
+    .primaryKey()
+    .references(() => logEntries.id),
+  stationId: uuid("station_id")
+    .notNull()
+    .references(() => stations.id),
+  hidden: boolean("hidden").notNull().default(false),
+  speakerId: uuid("speaker_id"),
+  name: text("name").notNull(),
+  title: text("title"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: at("updated_at").notNull().defaultNow()
 });

@@ -7,7 +7,7 @@
 import os from "node:os";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ProductionOrder } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
@@ -36,8 +36,10 @@ export interface OrdersPart {
   resolveDispute(orderId: string, input: { outcome: "pay_maker" | "refund" | "split"; makerMicros?: number; note?: string }): Promise<ProductionOrder>;
   /** Approves deliveries with no answer after 7 days. Run by the scheduler. */
   autoApproveOrders(): Promise<number>;
-  /** Tells the maker a spot it made is listed, if the business asked. */
+  /** Tells the maker a spot it made is listed, if the business or the maker asked. */
   notifyMakerListed(spotId: string): Promise<void>;
+  /** P24: the maker asks to be told when the spot is listed (at once if it already is). */
+  tellMeWhenListed(orderId: string): Promise<ProductionOrder>;
 }
 
 export function createOrders(
@@ -65,11 +67,15 @@ export function createOrders(
   async function views(rows: Array<typeof O.$inferSelect>): Promise<ProductionOrder[]> {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
-    const [names, idents, files, notes] = await Promise.all([
+    const spotIds = rows.map((r) => r.spotId).filter((v): v is string => Boolean(v));
+    const [names, idents, files, notes, listed] = await Promise.all([
       services.spots.businessNames(rows.map((r) => r.advertiserId)),
       services.stations.idents(rows.map((r) => r.makerStationId)),
       db.select().from(F).where(inArray(F.orderId, ids)).orderBy(asc(F.createdAt)),
-      db.select().from(N).where(inArray(N.orderId, ids)).orderBy(asc(N.createdAt))
+      db.select().from(N).where(inArray(N.orderId, ids)).orderBy(asc(N.createdAt)),
+      spotIds.length
+        ? db.select({ id: schema.spotsTable.id, listedAt: schema.spotsTable.listedAt, rateKind: schema.spotsTable.rateKind, rateMicros: schema.spotsTable.rateMicros }).from(schema.spotsTable).where(inArray(schema.spotsTable.id, spotIds))
+        : Promise.resolve([])
     ]);
     const authors = await services.accounts.displayNames(notes.map((n) => n.authorId));
     const content = services.library.content;
@@ -98,7 +104,12 @@ export function createOrders(
           autoApproveAt: r.autoApproveAt?.toISOString() ?? null,
           spotId: r.spotId,
           tellMakerWhenListed: r.tellMakerWhenListed,
-          createdAt: r.createdAt.toISOString()
+          createdAt: r.createdAt.toISOString(),
+          makerToldWhenListed: r.makerAskedListedAt !== null,
+          listedRate: (() => {
+            const spot = r.spotId ? listed.find((x) => x.id === r.spotId) : undefined;
+            return spot?.listedAt ? { kind: spot.rateKind, micros: spot.rateMicros } : null;
+          })()
         }
       ];
     });
@@ -348,8 +359,23 @@ export function createOrders(
       return due.length;
     },
 
+    async tellMeWhenListed(orderId) {
+      const found = await row(orderId);
+      if (found.makerAskedListedAt) return (await views([found]))[0];
+      const [updated] = await db.update(O).set({ makerAskedListedAt: deps.clock.now() }).where(eq(O.id, orderId)).returning();
+      // Listed already: told now.
+      if (updated.spotId) {
+        const [spot] = await db.select({ listedAt: schema.spotsTable.listedAt }).from(schema.spotsTable).where(eq(schema.spotsTable.id, updated.spotId));
+        if (spot?.listedAt) await part.notifyMakerListed(updated.spotId);
+      }
+      return (await views([updated]))[0];
+    },
+
     async notifyMakerListed(spotId) {
-      const [order] = await db.select().from(O).where(and(eq(O.spotId, spotId), eq(O.tellMakerWhenListed, true)));
+      const [order] = await db
+        .select()
+        .from(O)
+        .where(and(eq(O.spotId, spotId), or(eq(O.tellMakerWhenListed, true), isNotNull(O.makerAskedListedAt))));
       if (!order) return;
       const team = await services.accounts.stationMemberIds(order.makerStationId, ["owner", "operator"]);
       await services.notifications.notify(team, {

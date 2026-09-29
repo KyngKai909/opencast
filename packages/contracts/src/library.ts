@@ -2,6 +2,13 @@ import { z } from "zod";
 import { endpoint } from "./core.js";
 import { Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 
+/** L7 (added 2026-09-29): how a program's airings are captioned, and in what language (BCP 47, "en"). */
+export const Captions = z.object({ mode: z.enum(["none", "generated_live", "generated", "uploaded"]), language: z.string().max(35).nullable() });
+export type Captions = z.infer<typeof Captions>;
+
+/** L5 (added 2026-09-29): the audio in a file. */
+export const AudioLayout = z.enum(["mono", "stereo", "surround"]);
+
 export const RightsBasis = z.enum(["made_it", "owner_permission", "public_domain", "permission_record", "licence_record"]);
 export const RIGHTS_BASIS_LABELS = {
   made_it: "I made it",
@@ -59,6 +66,10 @@ export const LibraryItem = z.object({
     })
     .nullable()
     .optional(),
+  /** L5 (added 2026-09-29): from the file's audio channels; null for files prepared before this. */
+  audioLayout: AudioLayout.nullable().optional(),
+  /** L7 (added 2026-09-29): its caption track's language, when it has one. */
+  captionLanguage: z.string().nullable().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -84,7 +95,22 @@ export const Program = z.object({
   /** Added 2026-09-28, for ads from partners: IAB Content Taxonomy 3.0 ids, a content rating, and whether it's aimed at children (no personalized ads). */
   iabCategories: z.array(z.string()).optional(),
   rating: ContentRating.nullable().optional(),
-  childDirected: z.boolean().optional()
+  childDirected: z.boolean().optional(),
+  /** L7 (added 2026-09-29): null until the station says. */
+  captions: Captions.nullable().optional(),
+  /**
+   * L1 (added 2026-09-29): its format, from its episodes and where it airs: series or one-off, how
+   * often it airs on the maker's log over the next four weeks (null when that's not a pattern),
+   * the typical (median) episode length, and the bands it's for.
+   */
+  format: z
+    .object({
+      kind: z.enum(["series", "one_off"]),
+      cadence: z.enum(["weekly", "nightly", "weeknights"]).nullable(),
+      episodeLengthMs: Millis.nullable(),
+      bands: z.array(z.enum(["tv", "radio"]))
+    })
+    .optional()
 });
 
 export const Library = z.object({
@@ -109,6 +135,42 @@ export const ImportJob = z.object({
 
 const StationParams = z.object({ stationId: Id });
 const ItemParams = z.object({ itemId: Id });
+
+/**
+ * L5 (added 2026-09-29): where an item is scheduled and where it aired, on this station and on
+ * the stations that carry it, from the log and the as-run log.
+ */
+export const ItemHistory = z.object({
+  itemId: Id,
+  /** On the log from now on, soonest first (carriers too). */
+  scheduled: z.array(z.object({ entryId: Id, startsAt: Timestamp, station: StationIdent, note: z.string().nullable() })),
+  /** From the as-run log, newest first (up to 200). */
+  aired: z.array(z.object({ startedAt: Timestamp, station: StationIdent, carried: z.boolean(), audioOnly: z.boolean(), note: z.string().nullable() })),
+  /** Log entries from now on, on every station. */
+  logEntries: z.number().int(),
+  /** Stations carrying its program now. */
+  carriers: z.number().int(),
+  /**
+   * Prepared, available (no claim on it) and on a log within the next 24 hours, which the
+   * playout worker fetches ahead (it reads 48 hours ahead). The API doesn't see the worker's disk.
+   */
+  cachedForAir: z.boolean(),
+  audioLayout: AudioLayout.nullable(),
+  /** The caption track's language, else the program's captions language. */
+  captionLanguage: z.string().nullable(),
+  carriage: z.object({ offered: z.boolean(), program: z.string().nullable(), terms: z.enum(["cash", "barter", "cash_and_barter", "free"]).nullable() })
+});
+export type ItemHistory = z.infer<typeof ItemHistory>;
+
+/** L7 (added 2026-09-29): an item's caption track (WebVTT). */
+export const CaptionTrack = z.object({
+  itemId: Id,
+  language: z.string(),
+  source: z.enum(["uploaded", "edited"]),
+  vtt: z.string(),
+  updatedAt: Timestamp
+});
+export type CaptionTrack = z.infer<typeof CaptionTrack>;
 
 const ItemFields = z.object({
   title: z.string().min(1).max(200),
@@ -278,6 +340,63 @@ export const libraryApi = {
       episodes: z.array(z.object({ id: Id, title: z.string(), episodeNumber: z.number().int().nullable(), durationMs: Millis.nullable() })),
       upcoming: z.array(z.object({ logEntryId: Id, startsAt: Timestamp, station: StationIdent }))
     })
+  }),
+
+  // ---- Added 2026-09-29: L5, L6, L7 ----
+
+  getItemHistory: endpoint({
+    method: "GET",
+    path: "/library/:itemId/history",
+    auth: "user",
+    summary: "L5: where an item is scheduled and where it aired (carriers too), usage and readiness (owner, operator)",
+    params: ItemParams,
+    response: ItemHistory
+  }),
+  replaceFile: endpoint({
+    method: "POST",
+    path: "/library/:itemId/file",
+    auth: "user",
+    summary:
+      "L6: replace the file (owner, operator). The item keeps its id, rights, history and schedule; the new file goes through the same checks and preparation as an upload, and the old one airs until it's ready. 422 `unreadable_file`, `wrong_kind` (audio for video or the other way), `too_long_for_log` (longer than a slot it's in); 409 `claim_open`, `not_an_upload`.",
+    params: ItemParams,
+    multipart: true,
+    body: z.object({}),
+    response: LibraryItem
+  }),
+  updateProgramCaptions: endpoint({
+    method: "PATCH",
+    path: "/programs/:programId/captions",
+    auth: "user",
+    summary: "L7: how a program is captioned, and in what language (owner, operator)",
+    params: z.object({ programId: Id }),
+    body: Captions,
+    response: Captions
+  }),
+  getCaptionTrack: endpoint({
+    method: "GET",
+    path: "/library/:itemId/captions",
+    auth: "user",
+    summary: "L7: the item's caption track, to edit (owner, operator). 404 when it has none.",
+    params: ItemParams,
+    response: CaptionTrack
+  }),
+  putCaptionTrack: endpoint({
+    method: "PUT",
+    path: "/library/:itemId/captions",
+    auth: "user",
+    summary:
+      "L7: upload or edit the caption track (owner, operator): WebVTT, or SRT (turned into WebVTT), up to 1 MB. The item's captions become `uploaded`. 422 `not_captions` when it isn't either.",
+    params: ItemParams,
+    body: z.object({ language: z.string().min(2).max(35), text: z.string().min(1).max(1_048_576), source: z.enum(["uploaded", "edited"]).default("uploaded") }),
+    response: CaptionTrack
+  }),
+  removeCaptionTrack: endpoint({
+    method: "DELETE",
+    path: "/library/:itemId/captions",
+    auth: "user",
+    summary: "L7: remove the caption track (owner, operator); the item's captions go back to none",
+    params: ItemParams,
+    response: Ok
   })
 };
 

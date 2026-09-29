@@ -6,7 +6,8 @@ import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Claim } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
-import { notFound, refused } from "../../errors.js";
+import type { UploadedFile } from "../../http.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 
 export interface StandingView {
   status: "good" | "offers_paused";
@@ -38,7 +39,14 @@ export interface TrustService {
   resolve(claimId: string, outcome: "upheld" | "withdrawn" | "restored"): Promise<Claim>;
   /** Open claims past their deadline: removed from the library. Run by the scheduler. */
   expireOverdue(): Promise<number>;
+  /** B6: a file that backs an answer, stored by content ID. */
+  attach(claimId: string, userId: string, file: UploadedFile | null): Promise<{ attachmentUrl: string; fileName: string }>;
 }
+
+/** B6: what an answer can be backed by. */
+const ATTACHMENT_TYPES = /^(application\/pdf|image\/(png|jpeg|gif|webp|heic)|text\/plain)$/;
+const ATTACHMENT_EXTENSIONS = /\.(pdf|png|jpe?g|gif|webp|heic|txt)$/i;
+const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 
 const DAY = 86_400_000;
 
@@ -68,11 +76,19 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
   async function views(rows: Array<typeof C.$inferSelect>): Promise<Claim[]> {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
-    const [answers, takedowns, titles] = await Promise.all([
+    const [answers, takedowns, titles, attachments] = await Promise.all([
       db.select().from(A).where(inArray(A.claimId, ids)),
       db.select().from(T).where(inArray(T.claimId, ids)),
-      services.library.titles({ itemIds: rows.map((r) => r.assetId), programIds: [] })
+      services.library.titles({ itemIds: rows.map((r) => r.assetId), programIds: [] }),
+      db.select().from(schema.claimAttachments).where(inArray(schema.claimAttachments.claimId, ids))
     ]);
+    // B6: an answer's attachment is re-linked each time (the store's links can expire).
+    const fresh = new Map(await Promise.all(attachments.map(async (a) => [a.contentId, await services.library.content.url(a.contentId)] as const)));
+    const linkOf = (claimId: string, url: string | null) => {
+      if (!url) return null;
+      const stored = attachments.find((a) => a.claimId === claimId && url.includes(a.contentId));
+      return stored ? (fresh.get(stored.contentId) ?? url) : url;
+    };
     const replacements = await services.library.titles({
       itemIds: takedowns.map((t) => t.replacedWithAssetId).filter((v): v is string => Boolean(v)),
       programIds: []
@@ -103,7 +119,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
             ? {
                 basis: answer.basis,
                 note: answer.note,
-                attachmentUrl: answer.attachmentUrl,
+                attachmentUrl: linkOf(r.id, answer.attachmentUrl),
                 answeredAt: answer.answeredAt.toISOString(),
                 claimantReplyDueAt: answer.claimantReplyDueAt.toISOString()
               }
@@ -266,6 +282,27 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
         await services.library.content.unlock(await services.library.contentOfItems([claim.assetId]), claimId);
       }
       return (await views([await one(claimId)]))[0];
+    },
+
+    async attach(claimId, userId, file) {
+      if (!file) throw badRequest("Choose a file to attach.", { file: "Required" });
+      const claim = await one(claimId);
+      if (claim.status !== "open") throw new HttpError(409, "not_open", "That claim has been dealt with.");
+      if (!ATTACHMENT_TYPES.test(file.mimeType) && !ATTACHMENT_EXTENSIONS.test(file.originalName)) {
+        throw refused("wrong_file_type", "Attach a PDF, a picture or a text file.");
+      }
+      if (file.size > ATTACHMENT_MAX_BYTES) throw refused("too_big", "Attach a file of 20 MB or less.");
+      const content = services.library.content;
+      // Read once or twice: Infrequent Access.
+      const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(schema.claimAttachments)
+          .values({ claimId, contentId: stored.cid, fileName: file.originalName, contentType: file.mimeType || "application/octet-stream", bytes: stored.bytes, uploadedBy: userId, createdAt: deps.clock.now() })
+          .returning();
+        await content.addRef(tx, stored.cid, "claim_attachment", row.id);
+      });
+      return { attachmentUrl: await content.url(stored.cid), fileName: file.originalName };
     },
 
     async expireOverdue() {

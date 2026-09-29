@@ -136,7 +136,9 @@ export const TeamMember = z.object({
   email: z.string().nullable(),
   role: z.string(),
   note: z.string().nullable(),
-  lastInAt: Timestamp.nullable()
+  lastInAt: Timestamp.nullable(),
+  /** A4 (added 2026-09-29): a station host's live programs (absent for other roles and businesses). */
+  programIds: z.array(Id).optional()
 });
 
 export const Invite = z.object({
@@ -146,7 +148,9 @@ export const Invite = z.object({
   role: z.enum(["operator", "host", "manager", "viewer"]),
   expiresAt: Timestamp,
   acceptedAt: Timestamp.nullable(),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  /** A4 (added 2026-09-29): the live programs a host invite hosts once accepted. */
+  programIds: z.array(Id).optional()
 });
 
 export const Team = z.object({ members: z.array(TeamMember), invites: z.array(Invite) });
@@ -195,6 +199,19 @@ export type AccountExport = z.infer<typeof AccountExport>;
 /** An Opencast admin, for "Run by" (A6). */
 export const OpencastTeamMember = z.object({ id: Id, name: z.string(), email: z.string() });
 export type OpencastTeamMember = z.infer<typeof OpencastTeamMember>;
+
+/**
+ * A5 (added 2026-09-29): a station you're on, for the switcher: on air, and the next dead air
+ * within the next six hours ("Dead air in 40 min"), with when it ends (how long it lasts).
+ * Off air, there's no dead air to warn about.
+ */
+export const StationStatus = z.object({
+  stationId: Id,
+  onAir: z.boolean(),
+  deadAirAt: Timestamp.nullable(),
+  deadAirEndsAt: Timestamp.nullable().optional()
+});
+export type StationStatus = z.infer<typeof StationStatus>;
 
 const StationParams = z.object({ stationId: Id });
 const BusinessParams = z.object({ businessId: Id });
@@ -335,7 +352,9 @@ export const accountsApi = {
       email: z.email().optional(),
       phone: z.string().optional(),
       role: z.enum(["operator", "host"]),
-      note: z.string().max(120).optional()
+      note: z.string().max(120).optional(),
+      /** A4 (added 2026-09-29): for a host, the live programs they'll host. They must be this station's live programs. */
+      programIds: z.array(Id).max(50).optional()
     }),
     response: Invite
   }),
@@ -477,6 +496,16 @@ export const accountsApi = {
     auth: "admin",
     summary: "A6: the Opencast team (admins), who can run a claimable station",
     response: z.array(OpencastTeamMember)
+  }),
+
+  // ---- Added 2026-09-29: A5 ----
+
+  myStationStatus: endpoint({
+    method: "GET",
+    path: "/me/stations/status",
+    auth: "user",
+    summary: "A5: each station you're on: on air, and the next dead air within six hours, in the order of your memberships",
+    response: z.array(StationStatus)
   })
 };
 

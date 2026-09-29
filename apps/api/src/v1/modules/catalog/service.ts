@@ -2,8 +2,9 @@ import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Agreement, CarriageRequest, Offer, StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
-import { badRequest, notFound, refused } from "../../errors.js";
-import { addDays, localDay, localWeekday, roundUpToMinute, zonedTime } from "../../lib/time.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
+import { addDays, clockTime, localDay, localWeekday, roundUpToMinute, zonedTime } from "../../lib/time.js";
+import { DEAD_AIR_NOTE } from "../log/service.js";
 
 type Term = "barter" | "cash" | "cash_plus_barter" | "free";
 
@@ -19,6 +20,7 @@ export interface AgreementRef {
   airingsPerEpisode: number | null;
   windowDays: number;
   liveOnly: boolean;
+  audioOnly: boolean;
   startedAt: Date;
   endsAt: Date | null;
 }
@@ -34,7 +36,12 @@ export interface TermsInput {
   noticeDays: number;
   approval: "any_station" | "i_approve";
   radioBandAllowed: boolean;
+  /** C3 (added 2026-09-29). */
+  cashPlusBarter?: { priceMicros: number; unit: "per_airing" | "per_hour"; makerMsPerHour: number } | null;
+  barterFill?: "spots" | "credit_only";
 }
+
+type FitSlot = NonNullable<Offer["fit"]>[number];
 
 export interface CatalogService {
   agreementsByIds(ids: string[]): Promise<Map<string, AgreementRef>>;
@@ -48,11 +55,21 @@ export interface CatalogService {
   chargeCarriedAiring(input: { agreementId: string; carrierStationId: string; logEntryId: string }): Promise<number>;
   /** The program's open offer, if it has one. */
   openOfferFor(programId: string): Promise<string | null>;
+  /** L5: the deals an open offer of the program allows, or null when it isn't offered. */
+  openOfferTerms(programId: string): Promise<Term[] | null>;
   /** Active agreements a station is party to, for earnings and playout. */
   activeAgreements(stationId: string): Promise<AgreementRef[]>;
 
-  browse(filter: { forStation?: string; category?: string; band?: "tv" | "radio"; term?: Term; fitsSchedule?: boolean; q?: string }): Promise<Offer[]>;
-  offer(offerId: string): Promise<Offer & { episodes: Array<{ id: string; title: string; durationMs: number | null; breakPointsMs: number[]; previewUrl: string | null }>; carriedBy: Array<{ station: StationIdent; since: string }> }>;
+  browse(filter: { forStation?: string; category?: string; band?: "tv" | "radio"; term?: Term; fitsSchedule?: boolean; q?: string; maker?: string; makerKind?: "station" | "studio" | "catalog"; gap?: string }): Promise<Offer[]>;
+  offer(offerId: string, forStation?: string): Promise<
+    Offer & {
+      episodes: Array<{ id: string; title: string; durationMs: number | null; breakPointsMs: number[]; previewUrl: string | null; episodeNumber: number | null; firstAiredAt: string | null; firstAiredOn: StationIdent | null; captions: "none" | "generated" | "uploaded" }>;
+      carriedBy: Array<{ station: StationIdent; since: string; slots: Array<{ weekday: number; time: string }> }>;
+    }
+  >;
+  /** C4: the carrier withdraws a request the maker hasn't answered. */
+  withdraw(requestId: string): Promise<CarriageRequest>;
+  carrierOfRequest(requestId: string): Promise<string>;
   countPreview(offerId: string): Promise<number>;
   makerOfOffer(offerId: string): Promise<string>;
   offerProgram(programId: string, terms: TermsInput): Promise<Offer>;
@@ -88,6 +105,7 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       airingsPerEpisode: a.airingsPerEpisode,
       windowDays: a.windowDays,
       liveOnly: a.liveOnly,
+      audioOnly: a.audioOnly,
       startedAt: a.startedAt,
       endsAt: a.endsAt
     };
@@ -118,16 +136,26 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       .groupBy(schema.offerPreviews.offerId);
     const previewsBy = new Map(previews.map((p) => [p.offerId, p.n]));
     let gaps: Array<{ startsAt: string; endsAt: string }> | null = null;
+    let schedule: Awaited<ReturnType<typeof fitSlotsFor>> | null = null;
     if (forStation) {
       const now = deps.clock.now();
-      gaps = await services.log.gaps(forStation, now, new Date(now.getTime() + 7 * DAY));
+      [gaps, schedule] = await Promise.all([services.log.gaps(forStation, now, new Date(now.getTime() + 7 * DAY)), fitSlotsFor(forStation)]);
     }
+    // L1, C3, C9: the program's format, the maker's break time an hour, and who underwrites it.
+    const makerIds = [...new Set(rows.map((r) => r.makerStationId))];
+    const [formats, rules, credits] = await Promise.all([
+      Promise.all(rows.map(async (r) => [r.programId, await services.library.format(r.programId)] as const)).then((e) => new Map(e)),
+      Promise.all(makerIds.map(async (id) => [id, await services.stations.breakRule(id)] as const)).then((e) => new Map(e)),
+      Promise.all(makerIds.map(async (id) => [id, await services.spots.creditsFor(id)] as const)).then((e) => new Map(e))
+    ]);
     return rows.flatMap((r) => {
       const program = programs.get(r.programId);
       const maker = profiles.get(r.makerStationId);
       if (!program || !maker) return [];
       const eps = episodes.get(r.programId) ?? [];
       const longest = Math.max(0, ...eps.map((e) => e.durationMs ?? 0));
+      const rule = rules.get(r.makerStationId);
+      const underwriter = (credits.get(r.makerStationId) ?? []).find((c) => c.programId === r.programId)?.business ?? null;
       return [
         {
           id: r.id,
@@ -138,7 +166,10 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
             category: program.category,
             live: program.live,
             episodeCount: eps.length,
-            rightsNote: program.rightsNote
+            rightsNote: program.rightsNote,
+            format: formats.get(r.programId),
+            colour: maker.ident.colour,
+            advisory: program.advisory
           },
           maker: maker.ident,
           makerKind: maker.kind === "studio" ? "studio" : maker.kind === "catalog" ? "catalog" : "station",
@@ -155,10 +186,76 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
           liveOnly: r.liveOnly,
           noticeDays: r.noticeDays,
           approval: r.approval,
-          radioBandAllowed: r.radioBandAllowed
+          radioBandAllowed: r.radioBandAllowed,
+          ...(schedule ? { fit: fitsFor(schedule, eps.map((e) => e.durationMs).filter((v): v is number => Boolean(v))) } : {}),
+          breakMsPerHour: rule ? (rule.mode === "every_n_minutes" && rule.everyMinutes ? Math.round((60 / rule.everyMinutes) * rule.lengthMs) : rule.spotMsPerHour) : 0,
+          cashPlusBarter: r.cpbPriceMicros && r.cpbPriceUnit ? { priceMicros: r.cpbPriceMicros, unit: r.cpbPriceUnit, makerMsPerHour: r.cpbMakerMsPerHour ?? 0 } : null,
+          barterFill: r.barterFill,
+          defaultTerm: (r.termsOffered as Term[])[0],
+          underwriter,
+          offeredAt: r.createdAt.toISOString()
         }
       ];
     });
+  }
+
+  /**
+   * C1: the browsing station's next 24 hours: dead-air gaps, and runs of library repeats
+   * (filled automatically, or from a "Repeat this day").
+   */
+  async function fitSlotsFor(stationId: string) {
+    const now = deps.clock.now();
+    const until = new Date(now.getTime() + DAY);
+    const [gaps, entries, tz] = await Promise.all([services.log.gaps(stationId, now, until), services.log.entries(stationId, now, until), services.stations.timezoneOf(stationId)]);
+    const runs: Array<{ startsAt: Date; endsAt: Date }> = [];
+    for (const e of entries.filter((x) => x.kind === "program" && !x.carriageAgreementId && (x.localNote === DEAD_AIR_NOTE || x.repeatGroupId))) {
+      const last = runs.at(-1);
+      if (last && last.endsAt.getTime() === e.startsAt.getTime()) last.endsAt = e.endsAt;
+      else runs.push({ startsAt: e.startsAt, endsAt: e.endsAt });
+    }
+    return { gaps: gaps.map((g) => ({ startsAt: new Date(g.startsAt), endsAt: new Date(g.endsAt) })), runs, tz };
+  }
+
+  function fitsFor(schedule: Awaited<ReturnType<typeof fitSlotsFor>>, lengths: number[]): FitSlot[] {
+    if (!lengths.length) return [];
+    const slotted = lengths.map((ms) => roundUpToMinute(ms));
+    const fits = (from: Date, to: Date) => slotted.some((ms) => ms <= to.getTime() - from.getTime());
+    const exact = (from: Date, to: Date) => slotted.some((ms) => Math.abs(to.getTime() - from.getTime() - ms) <= 5 * 60_000);
+    const { tz } = schedule;
+    return [
+      ...schedule.gaps
+        .filter((g) => fits(g.startsAt, g.endsAt))
+        .map((g) => ({
+          reason: "dead_air" as const,
+          label: `${clockTime(g.startsAt, tz)} gap`,
+          title: `${clockTime(g.startsAt, tz)} to ${clockTime(g.endsAt, tz)}`,
+          startsAt: g.startsAt.toISOString(),
+          endsAt: g.endsAt.toISOString(),
+          exact: exact(g.startsAt, g.endsAt)
+        })),
+      ...schedule.runs
+        .filter((r) => fits(r.startsAt, r.endsAt))
+        .map((r) => ({
+          reason: "library_repeats" as const,
+          label: `${clockTime(r.startsAt, tz)} repeats`,
+          title: `Library repeats from ${clockTime(r.startsAt, tz)}`,
+          startsAt: r.startsAt.toISOString(),
+          endsAt: r.endsAt.toISOString(),
+          exact: exact(r.startsAt, r.endsAt)
+        }))
+    ];
+  }
+
+  /** C3: the body's cash-plus-barter price and fill, as columns. */
+  function termsColumns(terms: Partial<TermsInput>) {
+    const { cashPlusBarter, barterFill, ...rest } = terms;
+    return {
+      ...rest,
+      ...(cashPlusBarter !== undefined
+        ? { cpbPriceMicros: cashPlusBarter?.priceMicros ?? null, cpbPriceUnit: cashPlusBarter?.unit ?? null, cpbMakerMsPerHour: cashPlusBarter?.makerMsPerHour ?? null }
+        : {}),
+      ...(barterFill !== undefined ? { barterFill } : {})
+    };
   }
 
   async function requestViews(rows: Array<typeof Q.$inferSelect>): Promise<CarriageRequest[]> {
@@ -167,7 +264,20 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
     const offerBy = new Map(offers.map((o) => [o.id, o]));
     const programs = await services.library.programsByIds(offers.map((o) => o.programId));
     const idents = await services.stations.idents([...rows.map((r) => r.carrierStationId), ...offers.map((o) => o.makerStationId)]);
-    const rules = new Map(await Promise.all([...new Set(rows.map((r) => r.carrierStationId))].map(async (id) => [id, await services.stations.breakRule(id)] as const)));
+    const carrierIds = [...new Set(rows.map((r) => r.carrierStationId))];
+    const rules = new Map(await Promise.all(carrierIds.map(async (id) => [id, await services.stations.breakRule(id)] as const)));
+    // C4: the agreement once approved. C7: the carrier as the maker sees it.
+    const now = deps.clock.now();
+    const [agreed, profiles, members, carrying] = await Promise.all([
+      db.select({ id: G.id, requestId: G.requestId }).from(G).where(inArray(G.requestId, rows.map((r) => r.id))),
+      services.stations.profiles(carrierIds),
+      Promise.all(carrierIds.map(async (id) => [id, (await services.ledger.memberCredits(id)).members] as const)).then((e) => new Map(e)),
+      db
+        .select({ carrierStationId: G.carrierStationId, n: sql<number>`count(distinct ${G.programId})::int` })
+        .from(G)
+        .where(and(inArray(G.carrierStationId, carrierIds), or(isNull(G.endsAt), gt(G.endsAt, now))))
+        .groupBy(G.carrierStationId)
+    ]);
     return rows.flatMap((r) => {
       const offer = offerBy.get(r.offerId);
       const program = offer && programs.get(offer.programId);
@@ -189,7 +299,14 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
           declineReason: r.declineReason,
           carrierSpotMsPerHour: rules.get(r.carrierStationId)?.spotMsPerHour ?? 180_000,
           createdAt: r.createdAt.toISOString(),
-          decidedAt: r.decidedAt?.toISOString() ?? null
+          decidedAt: r.decidedAt?.toISOString() ?? null,
+          agreementId: agreed.find((a) => a.requestId === r.id)?.id ?? null,
+          carrierProfile: {
+            description: profiles.get(r.carrierStationId)?.description ?? null,
+            members: members.get(r.carrierStationId) ?? null,
+            carriesPrograms: carrying.find((c) => c.carrierStationId === r.carrierStationId)?.n ?? 0,
+            blockedCategories: profiles.get(r.carrierStationId)?.blockedCategories ?? []
+          }
         }
       ];
     });
@@ -199,11 +316,12 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
     if (!rows.length) return [];
     const now = deps.clock.now();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const [programs, idents, airings, paid] = await Promise.all([
+    const [programs, idents, airings, paid, requests] = await Promise.all([
       services.library.programsByIds(rows.map((r) => r.programId)),
       services.stations.idents(rows.flatMap((r) => [r.makerStationId, r.carrierStationId])),
       services.playout.carriedAirings(rows.map((r) => r.id), monthStart, now),
-      services.ledger.carriagePaid(rows.map((r) => r.id), monthStart, now)
+      services.ledger.carriagePaid(rows.map((r) => r.id), monthStart, now),
+      db.select({ id: Q.id, slots: Q.slots }).from(Q).where(inArray(Q.id, rows.map((r) => r.requestId)))
     ]);
     return rows.flatMap((r) => {
       const program = programs.get(r.programId);
@@ -231,7 +349,10 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
           endNoticeGivenAt: r.endNoticeGivenAt?.toISOString() ?? null,
           endsAt: r.endsAt?.toISOString() ?? null,
           airingsThisMonth: airings.get(r.id) ?? 0,
-          paidThisMonthMicros: paid.get(r.id) ?? 0
+          paidThisMonthMicros: paid.get(r.id) ?? 0,
+          // C6: when the carrier airs it, and the offer it came from.
+          slots: (requests.find((q) => q.id === r.requestId)?.slots as Array<{ weekday: number; time: string }> | undefined) ?? [],
+          offerId: r.offerId
         }
       ];
     });
@@ -240,10 +361,15 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
   function validateTerms(terms: Partial<TermsInput>, makerKind: string) {
     const offered = terms.termsOffered ?? [];
     if (offered.includes("free") && makerKind !== "catalog") throw badRequest("Free carriage is the Opencast catalog's term.");
-    if ((offered.includes("cash") || offered.includes("cash_plus_barter")) && (!terms.cashPriceMicros || !terms.cashPriceUnit)) {
+    const cpb = terms.cashPlusBarter;
+    if (offered.includes("cash_plus_barter") && cpb) {
+      // C3: cash plus barter priced on its own.
+      if (!cpb.makerMsPerHour) throw badRequest("Say how much break time you fill each hour under cash plus barter.", { cashPlusBarter: "Required" });
+    }
+    if ((offered.includes("cash") || (offered.includes("cash_plus_barter") && !cpb)) && (!terms.cashPriceMicros || !terms.cashPriceUnit)) {
       throw badRequest("Set a cash price and whether it's per airing or per hour.", { cashPriceMicros: "Required" });
     }
-    if ((offered.includes("barter") || offered.includes("cash_plus_barter")) && !terms.barterMakerMsPerHour) {
+    if ((offered.includes("barter") || (offered.includes("cash_plus_barter") && !cpb)) && !terms.barterMakerMsPerHour) {
       throw badRequest("Say how much break time you fill each hour under barter.", { barterMakerMsPerHour: "Required" });
     }
   }
@@ -257,9 +383,14 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       makerStationId: offer.makerStationId,
       carrierStationId: request.carrierStationId,
       term: request.term,
-      cashPriceMicros: request.term === "cash" || request.term === "cash_plus_barter" ? offer.cashPriceMicros : null,
-      cashPriceUnit: request.term === "cash" || request.term === "cash_plus_barter" ? offer.cashPriceUnit : null,
-      barterMakerMsPerHour: request.term === "barter" || request.term === "cash_plus_barter" ? offer.barterMakerMsPerHour : null,
+      // C3: cash plus barter at its own price and split, when the offer sets one.
+      ...(request.term === "cash_plus_barter" && offer.cpbPriceMicros && offer.cpbPriceUnit
+        ? { cashPriceMicros: offer.cpbPriceMicros, cashPriceUnit: offer.cpbPriceUnit, barterMakerMsPerHour: offer.cpbMakerMsPerHour }
+        : {
+            cashPriceMicros: request.term === "cash" || request.term === "cash_plus_barter" ? offer.cashPriceMicros : null,
+            cashPriceUnit: request.term === "cash" || request.term === "cash_plus_barter" ? offer.cashPriceUnit : null,
+            barterMakerMsPerHour: request.term === "barter" || request.term === "cash_plus_barter" ? offer.barterMakerMsPerHour : null
+          }),
       airingsPerEpisode: offer.airingsPerEpisode,
       windowDays: offer.windowDays,
       liveOnly: offer.liveOnly,
@@ -327,6 +458,11 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       return row?.id ?? null;
     },
 
+    async openOfferTerms(programId) {
+      const [row] = await db.select({ terms: O.termsOffered }).from(O).where(and(eq(O.programId, programId), eq(O.status, "offered")));
+      return row ? (row.terms as Term[]) : null;
+    },
+
     async carrierCount(programId) {
       return (await activeCarriers([programId])).get(programId)?.length ?? 0;
     },
@@ -341,8 +477,18 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
     },
 
     async browse(filter) {
-      const rows = await db.select().from(O).where(eq(O.status, "offered")).orderBy(desc(O.createdAt));
+      // C2: one maker's offers include the withdrawn ones.
+      const rows = await db
+        .select()
+        .from(O)
+        .where(filter.maker ? eq(O.makerStationId, filter.maker) : eq(O.status, "offered"))
+        .orderBy(desc(O.createdAt));
       let offers = await offerViews(rows, filter.forStation);
+      if (filter.makerKind) offers = offers.filter((o) => o.makerKind === filter.makerKind);
+      if (filter.gap) {
+        const at = Date.parse(filter.gap);
+        offers = offers.filter((o) => (o.fit ?? []).some((f) => f.reason === "dead_air" && f.startsAt && Math.abs(Date.parse(f.startsAt) - at) < 60_000));
+      }
       if (filter.forStation) offers = offers.filter((o) => o.maker.id !== filter.forStation);
       if (filter.category) offers = offers.filter((o) => o.program.category === filter.category);
       if (filter.band === "radio") offers = offers.filter((o) => o.radioBandAllowed);
@@ -355,20 +501,56 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       return offers;
     },
 
-    async offer(offerId) {
+    async offer(offerId, forStation) {
       const rows = await db.select().from(O).where(eq(O.id, offerId));
-      const [view] = await offerViews(rows);
+      const [view] = await offerViews(rows, forStation);
       if (!view) throw notFound("That offer");
       const [episodes, carriers] = await Promise.all([services.library.episodes(view.program.id), activeCarriers([view.program.id])]);
-      const idents = await services.stations.idents((carriers.get(view.program.id) ?? []).map((a) => a.carrierStationId));
+      const agreements = carriers.get(view.program.id) ?? [];
+      // C5: each episode's first airing anywhere. C6: when each carrier airs it.
+      const [first, requests] = await Promise.all([
+        services.playout.firstAired(episodes.map((e) => e.id)),
+        agreements.length ? db.select({ id: Q.id, slots: Q.slots }).from(Q).where(inArray(Q.id, agreements.map((a) => a.requestId))) : Promise.resolve([])
+      ]);
+      const idents = await services.stations.idents([...agreements.map((a) => a.carrierStationId), ...[...first.values()].map((f) => f.stationId)]);
       return {
         ...view,
-        episodes: await Promise.all(episodes.map(async (e) => ({ id: e.id, title: e.title, durationMs: e.durationMs, breakPointsMs: e.breakPointsMs, previewUrl: await services.library.content.previewUrl(e.contentId) }))),
-        carriedBy: (carriers.get(view.program.id) ?? []).flatMap((a) => {
+        episodes: await Promise.all(
+          episodes.map(async (e) => {
+            const aired = first.get(e.id);
+            return {
+              id: e.id,
+              title: e.title,
+              durationMs: e.durationMs,
+              breakPointsMs: e.breakPointsMs,
+              previewUrl: await services.library.content.previewUrl(e.contentId),
+              episodeNumber: e.episodeNumber,
+              firstAiredAt: aired?.startedAt.toISOString() ?? null,
+              firstAiredOn: aired ? (idents.get(aired.stationId) ?? null) : null,
+              captions: e.captions
+            };
+          })
+        ),
+        carriedBy: agreements.flatMap((a) => {
           const station = idents.get(a.carrierStationId);
-          return station ? [{ station, since: a.startedAt.toISOString() }] : [];
+          const slots = (requests.find((q) => q.id === a.requestId)?.slots as Array<{ weekday: number; time: string }> | undefined) ?? [];
+          return station ? [{ station, since: a.startedAt.toISOString(), slots }] : [];
         })
       };
+    },
+
+    async withdraw(requestId) {
+      const [row] = await db.select().from(Q).where(eq(Q.id, requestId));
+      if (!row) throw notFound("That request");
+      if (row.status !== "asked") throw new HttpError(409, "decided", row.status === "withdrawn" ? "It was withdrawn already." : "The maker has answered it already.");
+      const [updated] = await db.update(Q).set({ status: "withdrawn", decidedAt: deps.clock.now() }).where(eq(Q.id, requestId)).returning();
+      return (await requestViews([updated]))[0];
+    },
+
+    async carrierOfRequest(requestId) {
+      const [row] = await db.select({ carrier: Q.carrierStationId }).from(Q).where(eq(Q.id, requestId));
+      if (!row) throw notFound("That request");
+      return row.carrier;
     },
 
     async countPreview(offerId) {
@@ -401,7 +583,7 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       validateTerms(terms, kind ?? "station");
       const [row] = await db
         .insert(O)
-        .values({ programId, makerStationId, ...terms })
+        .values({ programId, makerStationId, ...termsColumns(terms), termsOffered: terms.termsOffered, createdAt: deps.clock.now(), updatedAt: deps.clock.now() })
         .returning();
       await previewEpisodes(row.id, programId);
       return (await offerViews([row]))[0];
@@ -412,10 +594,16 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
       if (!current) throw notFound("That offer");
       const kind = await services.stations.kindOf(current.makerStationId);
       const merged = { ...current, ...patch };
-      validateTerms({ ...merged, termsOffered: merged.termsOffered as Term[], windowDays: merged.windowDays === 30 ? 30 : 7 }, kind ?? "station");
+      const cashPlusBarter =
+        patch.cashPlusBarter !== undefined
+          ? patch.cashPlusBarter
+          : current.cpbPriceMicros && current.cpbPriceUnit
+            ? { priceMicros: current.cpbPriceMicros, unit: current.cpbPriceUnit, makerMsPerHour: current.cpbMakerMsPerHour ?? 0 }
+            : null;
+      validateTerms({ ...merged, cashPlusBarter, termsOffered: merged.termsOffered as Term[], windowDays: merged.windowDays === 30 ? 30 : 7 }, kind ?? "station");
       const [row] = await db
         .update(O)
-        .set({ ...patch, updatedAt: deps.clock.now() })
+        .set({ ...termsColumns(patch), updatedAt: deps.clock.now() })
         .where(eq(O.id, offerId))
         .returning();
       // Previews exist only while it's offered in the market.

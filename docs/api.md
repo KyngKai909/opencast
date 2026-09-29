@@ -2,9 +2,9 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-223 endpoints in 14 modules.
+243 endpoints in 14 modules.
 
-## accounts (33)
+## accounts (34)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -41,8 +41,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `downloadData` | GET | `/me/export` | signed in | A3: everything the account holds, as JSON (save it as a file) |
 | `deleteAccount` | DELETE | `/me` | signed in | A3: delete the account now (no grace period). Presets, reminders, watch history, notices and TVs go; pledges stop after this month; team places are left. 409 `owns_station` or `owns_business` while the person owns one: hand it over (or close it) first. |
 | `listOpencastTeam` | GET | `/admin/team` | Opencast admin | A6: the Opencast team (admins), who can run a claimable station |
+| `myStationStatus` | GET | `/me/stations/status` | signed in | A5: each station you're on: on air, and the next dead air within six hours, in the order of your memberships |
 
-## stations (26)
+## stations (29)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -72,8 +73,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `setHosts` | PUT | `/stations/:stationId/programs/:programId/hosts` | signed in | Who can go live on a live program (hosts see only their blocks) |
 | `getSpeakers` | GET | `/programs/:programId/speakers` | signed in | The lower-thirds speaker list for a live program |
 | `setSpeakers` | PUT | `/programs/:programId/speakers` | signed in | Replace the speaker list |
+| `listHosts` | GET | `/stations/:stationId/hosts` | signed in | A4: every live program and who hosts it (owner, operator; a host gets only their own programs) |
+| `getLowerThird` | GET | `/stations/:stationId/log/:entryId/lower-third` | signed in | S15: the lower third on a live block (owner, operator, its host). Before anyone sets it: the first speaker, showing. |
+| `setLowerThird` | PUT | `/stations/:stationId/log/:entryId/lower-third` | signed in | S15: show a speaker (their name and title are taken from the list), free text, or hide it (owner, operator, its host). 409 `not_live`. |
 
-## library (15)
+## library (21)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -92,8 +96,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `createProgram` | POST | `/stations/:stationId/programs` | signed in | Make a program (a series) for listings, sponsorship and carriage |
 | `updateProgram` | PATCH | `/programs/:programId` | signed in | Change a program's listing |
 | `getProgram` | GET | `/programs/:programId` | anyone | A program page: listing, episodes, upcoming airings |
+| `getItemHistory` | GET | `/library/:itemId/history` | signed in | L5: where an item is scheduled and where it aired (carriers too), usage and readiness (owner, operator) |
+| `replaceFile` | POST | `/library/:itemId/file` | signed in | L6: replace the file (owner, operator). The item keeps its id, rights, history and schedule; the new file goes through the same checks and preparation as an upload, and the old one airs until it's ready. 422 `unreadable_file`, `wrong_kind` (audio for video or the other way), `too_long_for_log` (longer than a slot it's in); 409 `claim_open`, `not_an_upload`. |
+| `updateProgramCaptions` | PATCH | `/programs/:programId/captions` | signed in | L7: how a program is captioned, and in what language (owner, operator) |
+| `getCaptionTrack` | GET | `/library/:itemId/captions` | signed in | L7: the item's caption track, to edit (owner, operator). 404 when it has none. |
+| `putCaptionTrack` | PUT | `/library/:itemId/captions` | signed in | L7: upload or edit the caption track (owner, operator): WebVTT, or SRT (turned into WebVTT), up to 1 MB. The item's captions become `uploaded`. 422 `not_captions` when it isn't either. |
+| `removeCaptionTrack` | DELETE | `/library/:itemId/captions` | signed in | L7: remove the caption track (owner, operator); the item's captions go back to none |
 
-## log (7)
+## log (12)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -104,6 +114,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `repeatDay` | POST | `/stations/:stationId/log/repeat` | signed in | Build one day and repeat it: every day, every week on that day, or once |
 | `fillGap` | POST | `/stations/:stationId/log/fill` | signed in | Fill a gap: repeat from the library (in order, with the break rule), or sign off until a time |
 | `getDeadAir` | GET | `/stations/:stationId/dead-air` | signed in | Gaps in the next 24 hours and warnings sent |
+| `removeRepeat` | DELETE | `/stations/:stationId/log/repeats/:repeatId` | signed in | G7: take a repeat's entries off the log from now on (owner, operator). What already aired stays in the as-run log. |
+| `endEarly` | POST | `/stations/:stationId/log/:entryId/end-early` | signed in | G3: end a live block now (owner, operator, or its host). The block ends here, the programs after it move up, and playout hands back to the log at once; the as-run log records the live airing to this moment. Only while it's on air: 409 `not_on_air`, `ended`; 409 `not_live` for anything else. |
+| `getLiveBlock` | GET | `/stations/:stationId/log/:entryId/live` | signed in | G3: a live block's state: ended early or not, and whether its signal is in (owner, operator, its host) |
+| `listListings` | GET | `/stations/:stationId/listings` | signed in | G5: every program and live airing in a window (at most 8 days) with its listing and status (owner, operator) |
+| `updateListing` | PATCH | `/stations/:stationId/listings/:entryId` | signed in | G5: an airing's episode title and description, or a carried program's local note (owner, operator). A carried program's title and description are the maker's: 409 `from_the_maker`. |
 
 ## playout (6)
 
@@ -116,7 +131,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getStatus` | GET | `/stations/:stationId/playout` | signed in | What's on air now, and the output |
 | `getAsRun` | GET | `/stations/:stationId/as-run` | signed in | What actually aired, to the second |
 
-## catalog (11)
+## catalog (12)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -131,8 +146,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listAgreements` | GET | `/stations/:stationId/carriage/agreements` | signed in | What this station carries, and who carries its programs |
 | `endAgreement` | POST | `/carriage/agreements/:agreementId/end` | signed in | Give notice to end carriage (either side). It ends after the notice period. |
 | `placeInLog` | POST | `/carriage/agreements/:agreementId/place` | signed in | Put the agreed slots on the carrier's log: next unaired episode, in order, replacing what's there |
+| `withdrawRequest` | POST | `/carriage/requests/:requestId/withdraw` | signed in | C4: withdraw a request the maker hasn't answered (the carrier's owner or operator). 409 `decided` once it's approved or declined. |
 
-## spots (48)
+## spots (50)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -184,6 +200,8 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `redeemCode` | POST | `/businesses/:businessId/redeem` | signed in | Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use. |
 | `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
+| `tellMeWhenListed` | POST | `/orders/:orderId/tell-me-when-listed` | signed in | P24: the maker asks to be told when the business lists the spot it made (the maker's owner or operator). Told once, when it's listed; at once if it already is. |
+| `listSpotCategories` | GET | `/spot-categories` | anyone | S17: every spot category, in one list: what a business is, what markets filter by, and (`blockable`) what a station can block |
 
 ## ledger (20)
 
@@ -217,7 +235,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `heartbeat` | POST | `/heartbeat` | anyone (personal if signed in), or a TV signed in | Players send this every 30 seconds while tuned in |
 | `getAudience` | GET | `/stations/:stationId/audience` | signed in | The station's own numbers (never shown to viewers) |
 
-## trust (5)
+## trust (6)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -226,6 +244,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `answerClaim` | POST | `/claims/:claimId/answer` | signed in | Answer with a rights basis and an attestation. The item airs again; the claimant has 10 business days to respond. |
 | `removeClaimedItem` | POST | `/claims/:claimId/remove` | signed in | Take the item down instead of answering |
 | `resolveClaim` | POST | `/claims/:claimId/resolve` | Opencast admin | Opencast records the outcome: upheld, withdrawn or restored |
+| `attachToClaim` | POST | `/claims/:claimId/attachments` | signed in | B6: upload the permission or licence that backs an answer (owner, operator; a PDF, image or text file up to 20 MB). Returns the `attachmentUrl` `answerClaim` takes. 409 `not_open` once the claim is answered or closed; 422 `wrong_file_type`, `too_big`. |
 
 ## notifications (4)
 
@@ -246,7 +265,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `holdChannel` | POST | `/admin/reservations/:reservationId/channel` | Opencast admin | Hold a channel number for a reservation; no other station can take it |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
-## network (24)
+## network (25)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -274,6 +293,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listListedSources` | GET | `/admin/listed-sources` | Opencast admin | City and county streams |
 | `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a city stream on the dial. Viewers get the source's own player. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |
+| `getClaimPage` | GET | `/claim/:token` | anyone | N10: the creator's claim page, by the link we sent them (their permission link's token), and the claim's status once started. 404 when there's no station to claim from it. |
 
 ## tv (17)
 

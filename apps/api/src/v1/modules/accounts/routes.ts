@@ -116,6 +116,8 @@ export function accountsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return { ok: true as const };
   });
   r.handle(api.listOpencastTeam, () => accounts.opencastTeam());
+  // A5: the station switcher.
+  r.handle(api.myStationStatus, ({ user }) => accounts.stationStatus(user.id));
 
   r.handle(api.resendInvite, ({ user, params }) => accounts.resendInvite(user, params.inviteId));
   r.handle(api.acceptInvite, async ({ user, params }) => {

@@ -121,7 +121,7 @@ function resolveStorageRoot(configured: string | undefined): string {
 
 function resolveWebDistDir(configured: string | undefined): string {
   if (!configured || !configured.trim()) {
-    return path.join(workspaceRoot, "apps", "control", "dist");
+    return path.join(workspaceRoot, "apps", "web", "dist");
   }
 
   const value = configured.trim();

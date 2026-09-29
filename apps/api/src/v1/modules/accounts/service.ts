@@ -98,7 +98,9 @@ export interface AccountsService {
   notificationTiming(userId: string): Promise<{ timing: NotificationTiming; timezone: string }>;
 
   team(scope: TeamScope): Promise<TeamView>;
-  invite(user: CurrentUser, scope: TeamScope, input: { email?: string; phone?: string; role: string; note?: string }): Promise<InviteRow>;
+  invite(user: CurrentUser, scope: TeamScope, input: { email?: string; phone?: string; role: string; note?: string; programIds?: string[] }): Promise<InviteRow>;
+  /** A5: each station the person is on, in membership order: on air, and the next dead air within six hours. */
+  stationStatus(userId: string): Promise<Array<{ stationId: string; onAir: boolean; deadAirAt: string | null; deadAirEndsAt: string | null }>>;
   updateMember(scope: TeamScope, userId: string, input: { role?: string; note?: string | null }): Promise<void>;
   removeMember(scope: TeamScope, userId: string): Promise<void>;
   transferStationOwnership(stationId: string, fromUserId: string, toUserId: string): Promise<void>;
@@ -140,6 +142,7 @@ export interface InviteRow {
   expiresAt: string;
   acceptedAt: string | null;
   createdAt: string;
+  programIds?: string[];
 }
 
 export interface TeamView {
@@ -150,6 +153,7 @@ export interface TeamView {
     role: string;
     note: string | null;
     lastInAt: string | null;
+    programIds?: string[];
   }>;
   invites: InviteRow[];
 }
@@ -260,7 +264,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       role: row.role,
       expiresAt: row.expiresAt.toISOString(),
       acceptedAt: iso(row.acceptedAt),
-      createdAt: row.createdAt.toISOString()
+      createdAt: row.createdAt.toISOString(),
+      ...(row.programIds ? { programIds: row.programIds } : {})
     };
   }
 
@@ -844,6 +849,21 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       for (const { stationId } of hostOf) await services.stations.removeHost(stationId, userId);
     },
 
+    async stationStatus(userId) {
+      const rows = await db.select({ stationId: schema.stationMemberships.stationId }).from(schema.stationMemberships).where(eq(schema.stationMemberships.userId, userId));
+      const ids = rows.map((r) => r.stationId);
+      const status = await services.playout.statusFor(ids);
+      const now = deps.clock.now();
+      return Promise.all(
+        ids.map(async (stationId) => {
+          const onAir = status.get(stationId)?.onAir ?? false;
+          // Off air there's no dead air to warn about.
+          const [gap] = onAir ? await services.log.gaps(stationId, now, new Date(now.getTime() + 6 * 3_600_000)) : [];
+          return { stationId, onAir, deadAirAt: gap?.startsAt ?? null, deadAirEndsAt: gap?.endsAt ?? null };
+        })
+      );
+    },
+
     async opencastTeam() {
       const rows = await db
         .select({ id: u.id, displayName: u.displayName, email: u.email })
@@ -885,9 +905,11 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           )
         );
       const order = { owner: 0, operator: 1, manager: 1, host: 2, viewer: 2 } as Record<string, number>;
+      // A4: a host's live programs.
+      const hosting = scope.kind === "station" ? await services.stations.hostPrograms(scope.id) : new Map<string, string[]>();
       return {
         members: members
-          .map((m) => ({ ...m, lastInAt: iso(m.lastInAt) }))
+          .map((m) => ({ ...m, lastInAt: iso(m.lastInAt), ...(scope.kind === "station" && m.role === "host" ? { programIds: hosting.get(m.userId) ?? [] } : {}) }))
           .sort((a, b) => (order[a.role] ?? 9) - (order[b.role] ?? 9)),
         invites: invites.map(inviteRow)
       };
@@ -896,6 +918,13 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
     async invite(user, scope, input) {
       if (!input.email && !input.phone) {
         throw badRequest("Give an email or a phone number.", { email: "Email or phone" });
+      }
+      // A4: a host invite can name the live programs they'll host.
+      const programIds = input.programIds?.length ? [...new Set(input.programIds)] : null;
+      if (programIds) {
+        if (scope.kind !== "station" || input.role !== "host") throw badRequest("Only a host invite names programs.", { programIds: "Hosts only" });
+        const live = new Set((await services.library.programsForStation(scope.id)).filter((p) => p.live).map((p) => p.id));
+        if (programIds.some((id) => !live.has(id))) throw badRequest("Hosts host this station's live programs.", { programIds: "Not a live program here" });
       }
       const [row] = await db
         .insert(schema.invites)
@@ -906,7 +935,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           phone: input.phone ?? null,
           role: input.role as InviteRow["role"],
           invitedBy: user.id,
-          expiresAt: new Date(deps.clock.now().getTime() + INVITE_DAYS * 86_400_000)
+          expiresAt: new Date(deps.clock.now().getTime() + INVITE_DAYS * 86_400_000),
+          programIds
         })
         .returning();
       const teamName =
@@ -983,6 +1013,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       if (row.expiresAt.getTime() < deps.clock.now().getTime()) throw refused("invite_expired", "This invite has expired. Ask for a new one.");
       await db.transaction(async (tx) => {
         if (row.stationId) await service.addStationMember(tx, row.stationId, user.id, row.role as StationRole);
+        // A4: the programs the invite named, still live programs of the station.
+        if (row.stationId && row.role === "host" && row.programIds?.length) await services.stations.addHost(tx, row.stationId, user.id, row.programIds);
         if (row.advertiserId) await service.addBusinessMember(tx, row.advertiserId, user.id, row.role as BusinessRole);
         await tx.update(schema.invites).set({ acceptedAt: deps.clock.now(), acceptedBy: user.id }).where(eq(schema.invites.id, inviteId));
       });

@@ -120,6 +120,13 @@
       "when": 1790663146845,
       "tag": "0016_account_data_pledge_cards_and_desk_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790665058529,
+      "tag": "0017_live_blocks_listings_captions_and_fields",
+      "breakpoints": true
     }
   ]
 }

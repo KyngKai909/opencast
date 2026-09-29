@@ -2,11 +2,11 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { and, asc, eq, ilike, inArray, isNull, max, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { LibraryItem } from "@opencast/contracts";
+import type { CaptionTrack, ItemHistory, LibraryItem } from "@opencast/contracts";
 import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
-import { badRequest, notFound, refused } from "../../errors.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { createContent, type Content } from "./content.js";
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
@@ -18,10 +18,14 @@ export interface ItemRef {
   programId: string | null;
   title: string;
   episodeNumber: number | null;
+  /** The episode's description (up to 160 characters). */
+  episodeDescription: string | null;
   code: LogCode;
   durationMs: number | null;
   status: "preparing" | "ready" | "failed";
   rightsConfirmed: boolean;
+  /** Captions on the file (L7): none, generated or uploaded. */
+  captions: "none" | "generated" | "uploaded";
   source: "upload" | "link" | "creator_work" | "library";
   mediaKind: "video" | "audio";
   /** The current file's content ID: what playout airs, from the worker's cache. */
@@ -98,6 +102,18 @@ export interface LibraryService {
   createProgram(stationId: string, input: { title: string; description?: string; category?: string; advisory: "none" | "language" | "mature"; live: boolean } & Omit<ProgramAdFields, "iabCategories">): Promise<ProgramView>;
   updateProgram(programId: string, input: Partial<{ title: string; description: string | null; category: string | null; advisory: "none" | "language" | "mature"; live: boolean }> & ProgramAdFields): Promise<ProgramView>;
   program(programId: string): Promise<ProgramView>;
+  /** L1: a program's format, from its episodes and its maker's log. */
+  format(programId: string): Promise<ProgramFormat>;
+  /** L5: where an item is scheduled and aired, and whether it's ready. */
+  history(itemId: string): Promise<ItemHistory>;
+  /** L6: a new file for an item, through the same checks and preparation as an upload. */
+  replaceFile(itemId: string, file: UploadedFile | null): Promise<LibraryItem>;
+  /** L7: a program's captions mode and language. */
+  setProgramCaptions(programId: string, captions: { mode: "none" | "generated_live" | "generated" | "uploaded"; language: string | null }): Promise<{ mode: "none" | "generated_live" | "generated" | "uploaded"; language: string | null }>;
+  /** L7: an item's caption track. */
+  captionTrack(itemId: string): Promise<CaptionTrack>;
+  putCaptionTrack(itemId: string, userId: string, input: { language: string; text: string; source: "uploaded" | "edited" }): Promise<CaptionTrack>;
+  removeCaptionTrack(itemId: string): Promise<void>;
   /** Waits for uploads and imports started so far (tests, shutdown). */
   settle(): Promise<void>;
 }
@@ -127,6 +143,15 @@ export interface ProgramView extends Omit<ProgramRef, "stationId"> {
   iabCategories: string[];
   rating: ContentRating | null;
   childDirected: boolean;
+  /** L7: null until the station says. */
+  captions: { mode: "none" | "generated_live" | "generated" | "uploaded"; language: string | null } | null;
+}
+
+export interface ProgramFormat {
+  kind: "series" | "one_off";
+  cadence: "weekly" | "nightly" | "weeknights" | null;
+  episodeLengthMs: number | null;
+  bands: Array<"tv" | "radio">;
 }
 
 type ProgramAdFields = { rating?: ContentRating | null; childDirected?: boolean; iabCategories?: string[] | null };
@@ -194,10 +219,12 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       programId: r.programId,
       title: r.title,
       episodeNumber: r.episodeNumber,
+      episodeDescription: r.episodeDescription,
       code: r.code,
       durationMs: r.durationMs,
       status: r.status,
       rightsConfirmed: confirmed.has(r.id),
+      captions: r.captions,
       source: r.source,
       mediaKind: r.mediaKind,
       contentId: files.get(r.id)?.contentId ?? null,
@@ -215,11 +242,13 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
   async function toItems(rows: Array<typeof A.$inferSelect>): Promise<LibraryItem[]> {
     const ids = rows.map((r) => r.id);
     if (!ids.length) return [];
-    const [rights, breakPoints, files] = await Promise.all([
+    const [rights, breakPoints, files, tracks] = await Promise.all([
       db.select().from(R).where(inArray(R.assetId, ids)),
       db.select().from(schema.assetBreakPoints).where(inArray(schema.assetBreakPoints.assetId, ids)),
-      currentFiles(ids)
+      currentFiles(ids),
+      db.select({ assetId: schema.captionTracks.assetId, language: schema.captionTracks.language }).from(schema.captionTracks).where(inArray(schema.captionTracks.assetId, ids))
     ]);
+    const trackLanguage = new Map(tracks.map((t) => [t.assetId, t.language]));
     const info = await content.info([...files.values()].flatMap((f) => [f.contentId, f.originalContentId]).filter((v): v is string => Boolean(v)));
     const names = await services.accounts.displayNames(rights.map((r) => r.confirmedBy).filter((v): v is string => Boolean(v)));
     const rightsBy = new Map(rights.map((r) => [r.assetId, r]));
@@ -270,6 +299,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             ipfs: original?.ipfs ?? prepared.ipfs ?? null
           };
         })(),
+        audioLayout: audioLayoutOf(r.audioChannels),
+        captionLanguage: trackLanguage.get(r.id) ?? null,
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -319,7 +350,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           listingStatus: p.description ? ("complete" as const) : ("needs_description" as const),
           iabCategories: iabContentCategories({ override: p.iabCategories, category: p.category, fallbackCategory: profiles.get(p.stationId)?.category }),
           rating: p.rating,
-          childDirected: p.childDirected
+          childDirected: p.childDirected,
+          captions: p.captionsMode ? { mode: p.captionsMode, language: p.captionsLanguage } : null
         }
       ];
     });
@@ -342,7 +374,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     }
   }
 
-  async function prepareInBackground(itemId: string, stationId: string, file: string, mediaKind: "video" | "audio") {
+  async function prepareInBackground(itemId: string, stationId: string, file: string, mediaKind: "video" | "audio", replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
     try {
       await db.update(A).set({ prepProgress: 10 }).where(eq(A.id, itemId));
       const [prepared, loudness] = await Promise.all([deps.media.prepare(file, { scope: stationId, itemId, mediaKind }), deps.media.loudness(file).catch(() => null)]);
@@ -358,12 +390,21 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         await content.addRef(tx, original.cid, "asset_original", row.id);
         // Prepared for air: levelled to broadcast loudness by the compression profile.
         await tx.update(A).set({ status: "ready", prepProgress: 100, loudnessLufs: loudness }).where(eq(A.id, itemId));
+        // L6: the new file's length and picture take over once it airs, not before.
+        if (replacing) {
+          const p = replacing.probe;
+          await tx
+            .update(A)
+            .set({ durationMs: p.durationMs, widthPx: p.width, heightPx: p.height, audioChannels: p.audioChannels ?? null, originalFilename: replacing.originalName })
+            .where(eq(A.id, itemId));
+        }
       });
       // The local copies were only for the work; the store has them now.
       await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(file, { force: true })]);
       await afterReady(itemId, stationId, ready.cid);
     } catch (error) {
-      await db.update(A).set({ status: "failed", prepProgress: null }).where(eq(A.id, itemId));
+      // A replacement that fails leaves the item as it was: the old file still airs.
+      await db.update(A).set(replacing ? { status: "ready", prepProgress: 100 } : { status: "failed", prepProgress: null }).where(eq(A.id, itemId));
       throw error;
     }
   }
@@ -419,7 +460,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         const title = path.basename(file).replace(/\.[^.]+$/, "");
         await db
           .update(A)
-          .set({ mediaKind: probe.mediaKind, durationMs: probe.durationMs, widthPx: probe.width, heightPx: probe.height, title: item.title ?? title })
+          .set({ mediaKind: probe.mediaKind, durationMs: probe.durationMs, widthPx: probe.width, heightPx: probe.height, audioChannels: probe.audioChannels ?? null, title: item.title ?? title })
           .where(eq(A.id, row.id));
         item.status = "processing";
         await setItems(items, "running");
@@ -675,6 +716,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             durationMs: probe.durationMs,
             widthPx: probe.width,
             heightPx: probe.height,
+            audioChannels: probe.audioChannels ?? null,
             originalFilename: file.originalName,
             status: "preparing",
             prepProgress: 0
@@ -830,10 +872,156 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return view;
     },
 
+    async format(programId) {
+      const [row] = await db.select().from(P).where(eq(P.id, programId));
+      if (!row) throw notFound("That program");
+      const [episodes, cadence, idents] = await Promise.all([service.episodes(programId), services.log.cadence(row.stationId, programId), services.stations.idents([row.stationId])]);
+      const lengths = episodes.map((e) => e.durationMs).filter((v): v is number => v !== null).sort((a, b) => a - b);
+      const median = lengths.length ? lengths[Math.floor((lengths.length - 1) / 2)] : null;
+      const band = idents.get(row.stationId)?.band ?? null;
+      const allAudio = episodes.length > 0 && episodes.every((e) => e.mediaKind === "audio");
+      return {
+        kind: episodes.length > 1 || row.isLive ? "series" : "one_off",
+        cadence,
+        episodeLengthMs: median,
+        bands: allAudio ? ["radio"] : band ? [band] : ["tv"]
+      };
+    },
+
+    async history(itemId) {
+      const row = await itemRow(itemId);
+      const [[ref], schedule, aired, track, program, carriers, terms] = await Promise.all([
+        toRefs([row]),
+        services.log.itemSchedule(itemId, 50),
+        services.playout.airedItem(itemId, 200),
+        db.select().from(schema.captionTracks).where(eq(schema.captionTracks.assetId, itemId)),
+        row.programId ? db.select().from(P).where(eq(P.id, row.programId)) : Promise.resolve([]),
+        row.programId ? services.catalog.carrierCount(row.programId) : Promise.resolve(0),
+        row.programId && row.source !== "link" ? services.catalog.openOfferTerms(row.programId) : Promise.resolve(null)
+      ]);
+      const idents = await services.stations.idents([...schedule.entries.map((e) => e.stationId), ...aired.map((a) => a.stationId)]);
+      const agreements = await services.catalog.agreementsByIds(aired.map((a) => a.carriageAgreementId).filter((v): v is string => Boolean(v)));
+      const now = deps.clock.now().getTime();
+      const dueToday = schedule.entries.some((e) => Date.parse(e.startsAt) < now + 24 * 3_600_000);
+      const term = terms?.[0];
+      return {
+        itemId,
+        scheduled: schedule.entries.flatMap((e) => {
+          const station = idents.get(e.stationId);
+          return station ? [{ entryId: e.entryId, startsAt: e.startsAt, station, note: e.localNote }] : [];
+        }),
+        aired: aired.flatMap((a) => {
+          const station = idents.get(a.stationId);
+          if (!station) return [];
+          const agreement = a.carriageAgreementId ? agreements.get(a.carriageAgreementId) : undefined;
+          return [
+            {
+              startedAt: a.startedAt.toISOString(),
+              station,
+              carried: a.stationId !== row.stationId,
+              audioOnly: row.mediaKind === "audio" || station.band === "radio" || Boolean(agreement?.audioOnly),
+              note: a.reason === "dead_air_fill" ? "Filled dead air" : null
+            }
+          ];
+        }),
+        logEntries: schedule.total,
+        carriers,
+        cachedForAir: row.status === "ready" && Boolean(ref?.contentId || ref?.location) && !ref?.contentUnavailable && dueToday,
+        audioLayout: audioLayoutOf(row.audioChannels),
+        captionLanguage: track[0]?.language ?? program[0]?.captionsLanguage ?? null,
+        carriage: {
+          offered: Boolean(terms),
+          program: program[0]?.title ?? null,
+          terms: term ? (term === "cash_plus_barter" ? "cash_and_barter" : term) : null
+        }
+      };
+    },
+
+    async replaceFile(itemId, file) {
+      if (!file) throw badRequest("Choose a file to upload.", { file: "Required" });
+      const row = await itemRow(itemId);
+      if (row.source !== "upload") throw new HttpError(409, "not_an_upload", row.source === "link" ? "It came from a link: import it again instead." : "Only uploads can be replaced here.");
+      const [ref] = await toRefs([row]);
+      if (ref?.contentUnavailable) throw new HttpError(409, "claim_open", "A rights claim is open against this file. Answer the claim first.");
+      if (row.status === "preparing") throw new HttpError(409, "preparing", "It's still being prepared. Try again when it's ready.");
+      // The same checks as an upload: it has to read as video or audio.
+      const probe = await deps.media.probe(file.path).catch(() => null);
+      if (!probe || probe.durationMs === null) throw refused("unreadable_file", "That file can't be read as video or audio.");
+      if (probe.mediaKind !== row.mediaKind) throw refused("wrong_kind", row.mediaKind === "video" ? "That's audio. Replace a video with a video." : "That's video. Replace audio with audio.");
+      // It has to fit every slot it's already on the log in.
+      const { shortestSlotMs } = await services.log.itemSchedule(itemId, 1);
+      if (shortestSlotMs !== null && probe.durationMs > shortestSlotMs + 1000) {
+        throw refused("too_long_for_log", "The new file is longer than a slot it's on the log in. Make the slot longer first, or use a shorter cut.");
+      }
+      const keep = path.join(deps.config.storageRoot, "uploads", row.stationId, "originals");
+      await fs.mkdir(keep, { recursive: true });
+      const kept = path.join(keep, `${path.basename(file.path)}${path.extname(file.originalName)}`);
+      await fs.copyFile(file.path, kept);
+      // The current file airs until the new one is ready.
+      await db.update(A).set({ status: "preparing", prepProgress: 0 }).where(eq(A.id, itemId));
+      background(prepareInBackground(itemId, row.stationId, kept, probe.mediaKind, { probe, originalName: file.originalName }));
+      return service.item(itemId);
+    },
+
+    async setProgramCaptions(programId, captions) {
+      await db.update(P).set({ captionsMode: captions.mode, captionsLanguage: captions.language }).where(eq(P.id, programId));
+      return captions;
+    },
+
+    async captionTrack(itemId) {
+      await itemRow(itemId);
+      const [track] = await db.select().from(schema.captionTracks).where(eq(schema.captionTracks.assetId, itemId));
+      if (!track) throw notFound("Its caption track");
+      return { itemId, language: track.language, source: track.source, vtt: track.vtt, updatedAt: track.updatedAt.toISOString() };
+    },
+
+    async putCaptionTrack(itemId, userId, input) {
+      await itemRow(itemId);
+      const vtt = toWebVtt(input.text);
+      if (!vtt) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
+      const values = { assetId: itemId, language: input.language, vtt, source: input.source, updatedBy: userId, updatedAt: deps.clock.now() };
+      await db.transaction(async (tx) => {
+        await tx.insert(schema.captionTracks).values(values).onConflictDoUpdate({ target: schema.captionTracks.assetId, set: values });
+        await tx.update(A).set({ captions: "uploaded" }).where(eq(A.id, itemId));
+      });
+      return service.captionTrack(itemId);
+    },
+
+    async removeCaptionTrack(itemId) {
+      await itemRow(itemId);
+      await db.transaction(async (tx) => {
+        await tx.delete(schema.captionTracks).where(eq(schema.captionTracks.assetId, itemId));
+        await tx.update(A).set({ captions: "none" }).where(eq(A.id, itemId));
+      });
+    },
+
     async settle() {
       await content.settle();
       while (jobs.size) await Promise.all([...jobs]);
     }
   };
   return service;
+}
+
+/** L5: the audio layout from the file's channels. */
+function audioLayoutOf(channels: number | null): "mono" | "stereo" | "surround" | null {
+  if (!channels) return null;
+  return channels === 1 ? "mono" : channels === 2 ? "stereo" : "surround";
+}
+
+const SRT_TIME = /(\d{2}:\d{2}:\d{2}),(\d{3})/g;
+
+/** L7: WebVTT as it is, or SRT turned into WebVTT; null when it's neither. */
+export function toWebVtt(text: string): string | null {
+  const clean = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
+  if (/^WEBVTT(\s|$)/.test(clean)) return `${clean}\n`;
+  // SRT: numbered cues with "00:00:01,000 --> 00:00:03,500".
+  if (/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/.test(clean)) {
+    const cues = clean
+      .split(/\n{2,}/)
+      .map((block) => block.split("\n").filter((line, i) => !(i === 0 && /^\d+$/.test(line.trim()))).join("\n"))
+      .map((block) => block.replace(SRT_TIME, "$1.$2"));
+    return `WEBVTT\n\n${cues.join("\n\n")}\n`;
+  }
+  return null;
 }

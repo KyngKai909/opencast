@@ -174,17 +174,32 @@ export interface StatementView {
   periodEnd: string;
   openingMicros: number;
   closingMicros: number;
-  lines: Array<{ label: string; detail: string | null; amountMicros: number; notSetYet: boolean }>;
+  lines: Array<{ label: string; detail: string | null; amountMicros: number; notSetYet: boolean; group?: StatementGroup; airings?: number }>;
   issuedAt: string;
   csvUrl: string;
   pdfUrl: string | null;
+  paidOn?: string | null;
+  destination?: string | null;
+}
+
+type StatementGroup = "spots" | "sponsors_pledges" | "carriage" | "shared" | "card_fees" | "production" | "other";
+
+/** E3: the group a statement line belongs to, from its label (statements issued before this carry no group). */
+function statementGroup(label: string, accountKind: string): StatementGroup {
+  if (accountKind === "advertiser_available") return /^Spent/.test(label) ? "spots" : /fee/i.test(label) ? "card_fees" : "other";
+  if (label === "Spots") return "spots";
+  if (label === "Sponsors" || label === "Pledges") return "sponsors_pledges";
+  if (label === "Your programs on other stations" || label === "Programs you carry") return "carriage";
+  if (label === "The pool" || label === "Opencast's share") return "shared";
+  if (label === "Made for you") return "production";
+  return "other";
 }
 
 export interface StationEarningsView {
   period: "week" | "month" | "year";
   lines: {
     spots: { micros: number; airings: number; businesses: number };
-    sponsors: { micros: number; sponsors: number };
+    sponsors: { micros: number; sponsors: number; list?: Array<{ name: string; monthlyMicros: number }> };
     pledges: { micros: number; members: number; newMembers: number };
     carriageIn: { micros: number; detail: string };
     carriageOut: { micros: number; detail: string };
@@ -195,9 +210,9 @@ export interface StationEarningsView {
     partnerAds: { on: boolean; micros: number; pendingMicros: number };
   };
   totalMicros: number;
-  held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number };
+  held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number; tonightBreaks?: number };
   account: { availableMicros: number; paidOutThisMonthMicros: number };
-  nextPayout: { on: string; schedule: "weekly" | "monthly"; destination: string | null } | null;
+  nextPayout: { on: string; schedule: "weekly" | "monthly"; destination: string | null; amountMicros?: number } | null;
 }
 
 export interface PledgeView {
@@ -1007,18 +1022,34 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           : [];
       if (!accountIds.length) return [];
       const rows = await db.select().from(schema.statements).where(inArray(schema.statements.accountId, accountIds)).orderBy(desc(schema.statements.periodStart));
-      return rows.map((s) => ({
-        id: s.id,
-        period: s.period,
-        periodStart: s.periodStart,
-        periodEnd: s.periodEnd,
-        openingMicros: s.openingMicros,
-        closingMicros: s.closingMicros,
-        lines: s.lines as StatementView["lines"],
-        issuedAt: s.issuedAt.toISOString(),
-        csvUrl: `/v1/statements/${s.id}/csv`,
-        pdfUrl: null
-      }));
+      const accountKind = owner.businessId ? "advertiser_available" : "station_earnings";
+      // E3: the payout after each period (stations are paid after the week closes).
+      const paid = await db
+        .select()
+        .from(schema.payouts)
+        .where(and(inArray(schema.payouts.accountId, accountIds), inArray(schema.payouts.status, ["sent", "confirmed"])))
+        .orderBy(asc(schema.payouts.scheduledFor));
+      return rows.map((s) => {
+        const payout = owner.stationId ? paid.find((p) => p.accountId === s.accountId && p.scheduledFor > s.periodEnd) : undefined;
+        return {
+          id: s.id,
+          period: s.period,
+          periodStart: s.periodStart,
+          periodEnd: s.periodEnd,
+          openingMicros: s.openingMicros,
+          closingMicros: s.closingMicros,
+          lines: (s.lines as StatementView["lines"]).map((l) => {
+            const group = l.group ?? statementGroup(l.label, accountKind);
+            const counted = /^(\d+) entr/.exec(l.detail ?? "");
+            return { ...l, group, ...(l.airings === undefined && group === "spots" && counted && accountKind !== "advertiser_available" ? { airings: Number(counted[1]) } : {}) };
+          }),
+          issuedAt: s.issuedAt.toISOString(),
+          csvUrl: `/v1/statements/${s.id}/csv`,
+          pdfUrl: null,
+          paidOn: payout?.scheduledFor ?? null,
+          destination: payout?.destination ?? null
+        };
+      });
     },
 
     async stationEarnings(stationId, period) {
@@ -1080,12 +1111,13 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.pledges.stationId, stationId), gte(schema.pledges.startedAt, from)));
       const payoutAccount = kind === "escrow_owed" ? null : await service.payoutAccount(stationId).catch(() => null);
       const rule = await services.stations.breakRule(stationId);
+      const [sponsorList, available] = await Promise.all([services.spots.activeSponsors(stationId), balanceOf([account])]);
 
       return {
         period,
         lines: {
           spots: { micros: spots, airings: settleCount, businesses: await services.spots.businessesAiredOn(stationId, from, now) },
-          sponsors: { micros: sponsors, sponsors: await services.spots.activeSponsorCount(stationId) },
+          sponsors: { micros: sponsors, sponsors: await services.spots.activeSponsorCount(stationId), list: sponsorList },
           pledges: { micros: pledges, members: pledgeMembers.members, newMembers: joined.n },
           carriageIn: { micros: carriageIn, detail: "Your programs on other stations" },
           carriageOut: { micros: carriageOut, detail: "Programs you carry" },
@@ -1100,13 +1132,20 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           tonightMicros: heldSum(tonight),
           tonightAirings: tonight.length,
           restOfWeekMicros: heldSum(rest),
-          restOfWeekAirings: rest.length
+          restOfWeekAirings: rest.length,
+          tonightBreaks: new Set(tonight.map((t) => t.breakId)).size
         },
-        account: { availableMicros: await balanceOf([account]), paidOutThisMonthMicros: Number(payouts[0].sum) },
+        account: { availableMicros: available, paidOutThisMonthMicros: Number(payouts[0].sum) },
         nextPayout:
           kind === "escrow_owed"
             ? null
-            : { on: nextPayoutOn.toISOString().slice(0, 10), schedule: config.payoutSchedule, destination: payoutAccount?.status === "active" ? payoutAccount.destination.label : null }
+            : {
+                on: nextPayoutOn.toISOString().slice(0, 10),
+                schedule: config.payoutSchedule,
+                destination: payoutAccount?.status === "active" ? payoutAccount.destination.label : null,
+                // E2: what it would pay if it went now.
+                amountMicros: Math.max(0, available)
+              }
       };
     },
 
@@ -1521,13 +1560,19 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           line.count++;
           lines.set(label, line);
         }
-        const out: Array<{ label: string; detail: string | null; amountMicros: number; notSetYet: boolean }> = [...lines.values()].map((l) => ({
-          label: l.label,
-          detail: `${l.count} ${l.count === 1 ? "entry" : "entries"}`,
-          amountMicros: l.amountMicros,
-          notSetYet: false
-        }));
-        if (account.kind !== "advertiser_available") out.push({ label: "Opencast's share", detail: null, amountMicros: 0, notSetYet: config.opencastSpotShareBps === 0 });
+        const out: StatementView["lines"] = [...lines.values()].map((l) => {
+          const group = statementGroup(l.label, account.kind);
+          return {
+            label: l.label,
+            detail: `${l.count} ${l.count === 1 ? "entry" : "entries"}`,
+            amountMicros: l.amountMicros,
+            notSetYet: false,
+            // E3: each settled spot entry is one airing.
+            group,
+            ...(group === "spots" && account.kind !== "advertiser_available" ? { airings: l.count } : {})
+          };
+        });
+        if (account.kind !== "advertiser_available") out.push({ label: "Opencast's share", detail: null, amountMicros: 0, notSetYet: config.opencastSpotShareBps === 0, group: "shared" });
         const [row] = await db
           .insert(schema.statements)
           .values({

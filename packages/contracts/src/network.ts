@@ -249,6 +249,40 @@ export const ListedSource = z.object({
 
 const CreatorParams = z.object({ creatorId: Id });
 
+/**
+ * N10 (added 2026-09-29): the creator's claim page, public by the link we sent them (the same
+ * token as their permission page). Their station, what it holds for them, and the claim once
+ * it's started.
+ */
+export const ClaimPage = z.object({
+  station: StationIdent,
+  /** Who it's for: the person's name when known, else the creator's. */
+  personName: z.string(),
+  /** The yes the station was set up from; null for a station set up under a licence. */
+  saidYesAt: Timestamp.nullable(),
+  /** "a station of your skate films and park session edits". */
+  works: z.string(),
+  /** "your skate films". */
+  worksShort: z.string(),
+  sourcePlatform: z.enum(["youtube", "vimeo", "internet_archive", "instagram", "facebook", "soundcloud", "bandcamp", "other"]),
+  onAirSince: Timestamp.nullable(),
+  /** Viewers with the station as a preset. */
+  presetCount: z.number().int(),
+  /** Held in escrow, plus earned and not yet deposited. */
+  heldMicros: Micros,
+  escrowContract: z.string().nullable(),
+  escrowStationId: z.number().int(),
+  handover: z
+    .object({
+      handoverId: Id,
+      kind: z.enum(["claim", "stop"]),
+      status: z.enum(["verifying", "approved", "waiting_period", "completed", "cancelled"]),
+      payableAfter: Timestamp.nullable()
+    })
+    .nullable()
+});
+export type ClaimPage = z.infer<typeof ClaimPage>;
+
 export const networkApi = {
   getBoard: endpoint({
     method: "GET",
@@ -514,6 +548,17 @@ export const networkApi = {
     summary: "Sync listings from the agenda calendar now",
     params: z.object({ sourceId: Id }),
     response: ListedSource
+  }),
+
+  // ---- Added 2026-09-29: N10 ----
+
+  getClaimPage: endpoint({
+    method: "GET",
+    path: "/claim/:token",
+    auth: "public",
+    summary: "N10: the creator's claim page, by the link we sent them (their permission link's token), and the claim's status once started. 404 when there's no station to claim from it.",
+    params: z.object({ token: z.string().min(8) }),
+    response: ClaimPage
   })
 };
 
@@ -522,6 +567,7 @@ export type MarketBoard = z.infer<typeof MarketBoard>;
 export type Creator = z.infer<typeof Creator>;
 export type CreatorWork = z.infer<typeof CreatorWork>;
 export type PermissionPage = z.infer<typeof PermissionPage>;
+
 export type Recipe = z.infer<typeof Recipe>;
 export type HeldEarnings = z.infer<typeof HeldEarnings>;
 export type ListedSource = z.infer<typeof ListedSource>;

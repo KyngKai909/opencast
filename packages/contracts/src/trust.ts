@@ -99,6 +99,21 @@ export const trustApi = {
     params: z.object({ claimId: Id }),
     body: z.object({ outcome: z.enum(["upheld", "withdrawn", "restored"]) }),
     response: Claim
+  }),
+
+  // ---- Added 2026-09-29: B6 ----
+
+  attachToClaim: endpoint({
+    method: "POST",
+    path: "/claims/:claimId/attachments",
+    auth: "user",
+    summary:
+      "B6: upload the permission or licence that backs an answer (owner, operator; a PDF, image or text file up to 20 MB). Returns the `attachmentUrl` `answerClaim` takes. 409 `not_open` once the claim is answered or closed; 422 `wrong_file_type`, `too_big`.",
+    params: z.object({ claimId: Id }),
+    multipart: true,
+    body: z.object({}),
+    response: z.object({ attachmentUrl: z.string(), fileName: z.string() }),
+    status: 201
   })
 };
 

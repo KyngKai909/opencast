@@ -16,6 +16,8 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.askPermission, ({ user, params, body }) => network.askPermission(params.creatorId, user.id, body));
   // The creator's page needs no account.
   r.handle(api.getPermissionPage, ({ params }) => network.permissionPage(params.token));
+  // N10: the claim page, by the same link (no account needed to read it).
+  r.handle(api.getClaimPage, ({ params }) => network.claimPage(params.token));
   r.handle(api.answerPermission, ({ params, body, req }) => network.answerPermission(params.token, body, req.ip ?? null));
   // B8: stop from the link (no account, like the yes), or claim from it (signed in).
   r.handle(api.stopFromLink, ({ params, req }) => network.stopFromLink(params.token, req.ip ?? null));

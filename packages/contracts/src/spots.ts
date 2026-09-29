@@ -34,7 +34,9 @@ export const Business = z.object({
   receiptsEmail: z.string().nullable(),
   legalName: z.string().nullable(),
   einLast4: z.string().nullable(),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  /** P25 (added 2026-09-29): the name in tight places ("Orange Street"): its own, else the name. */
+  shortName: z.string().optional()
 });
 export type Business = z.infer<typeof Business>;
 
@@ -116,9 +118,54 @@ export const TargetMatch = z.object({
 
 // The station side --------------------------------------------------------------
 
+/** P23 (added 2026-09-29): a market spot's preview. */
+export const SpotPreview = z.object({
+  /** The spot's file (a storage URL); null until it has one. */
+  url: z.string().nullable(),
+  /** The still's colour while there's no picture: the business's, derived from its id. */
+  colour: z.string(),
+  /** The line on the still: its on-screen offer, else its title. */
+  line: z.string().nullable()
+});
+
+/**
+ * P6 (added 2026-09-29): why a spot paused, as the station sees it. `heldTonightMs`: the time it
+ * still had in this station's breaks from the pause to the end of the station's day (held, so it
+ * airs); `filledBy`: businesses whose backup-rotation spots aired here since.
+ */
+export const PauseStory = z.object({
+  reason: z.enum(["budget_spent", "balance"]),
+  pausedAt: Timestamp,
+  heldTonightMs: Millis,
+  filledBy: z.array(z.string())
+});
+
+/** P6 (added 2026-09-29): why it came back. */
+export const BackStory = z.object({ reason: z.enum(["raised_budget", "added_money"]), backAt: Timestamp });
+
 export const MarketSpot = z.object({
-  spot: z.object({ id: Id, title: z.string(), lengthSec: z.number().int(), category: z.string(), onScreen: z.string().nullable() }),
-  business: z.object({ id: Id, name: z.string(), category: z.string(), city: z.string().nullable(), online: z.boolean() }),
+  spot: z.object({
+    id: Id,
+    title: z.string(),
+    lengthSec: z.number().int(),
+    category: z.string(),
+    onScreen: z.string().nullable(),
+    /** P23 (added 2026-09-29). */
+    preview: SpotPreview.optional()
+  }),
+  business: z.object({
+    id: Id,
+    name: z.string(),
+    category: z.string(),
+    city: z.string().nullable(),
+    online: z.boolean(),
+    /** P25 (added 2026-09-29). */
+    shortName: z.string().optional()
+  }),
+  /** P6 (added 2026-09-29): while it's paused for its budget or balance. */
+  pause: PauseStory.nullable().optional(),
+  /** P6 (added 2026-09-29): once it's back after one of those, until it's back in this station's rotation. */
+  back: BackStory.nullable().optional(),
   miles: z.number().nullable(),
   rate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }),
   upToPerDay: z.number().int().nullable(),
@@ -138,12 +185,31 @@ export const Rotation = z.object({
   spots: z.array(z.object({ spotId: Id, title: z.string(), business: z.string(), lengthSec: z.number().int(), paused: z.boolean() }))
 });
 
+/** G1 (added 2026-09-29): one thing in a break, as the station's Breaks page lists it. */
+export const BreakContent = z.object({
+  id: z.string(),
+  kind: z.enum(["producer", "station_id", "bumper", "underwriting", "spot", "sponsor", "open"]),
+  title: z.string(),
+  lengthMs: Millis,
+  spotId: Id.nullable(),
+  business: z.string().nullable(),
+  shortName: z.string().nullable(),
+  /** Which rotation placed it (spots only). */
+  rotation: z.enum(["main", "backup"]).nullable(),
+  note: z.string().nullable()
+});
+export type BreakContent = z.infer<typeof BreakContent>;
+
 export const Avail = z.object({
   breakStartsAt: Timestamp,
   context: z.string(),
   lengthMs: Millis,
   openMs: Millis,
-  producerShareMs: Millis
+  producerShareMs: Millis,
+  /** G1 (added 2026-09-29): the stored break's id (null before it's stored), its origin and contents. */
+  breakId: Id.nullable().optional(),
+  origin: z.enum(["rule", "cued_live", "carried_barter"]).optional(),
+  contents: z.array(BreakContent).optional()
 });
 
 // Sponsorships ------------------------------------------------------------------
@@ -172,7 +238,13 @@ export const Sponsorship = z.object({
   declineReason: SponsorshipDeclineReason.nullable(),
   startsOn: DateOnly,
   renewsOn: DateOnly.nullable(),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  /**
+   * P22 (added 2026-09-29): the sponsor as the station sees it: its category, the city it gives
+   * (or null, online), miles from the station's studio to its nearest place, and what else it
+   * sponsors ("Council Watch on CIVC"). On the station's list only.
+   */
+  profile: z.object({ category: z.string(), city: z.string().nullable(), miles: z.number().nullable(), elsewhere: z.array(z.string()) }).optional()
 });
 
 export const SponsorshipSetting = z.object({
@@ -183,8 +255,16 @@ export const SponsorshipSetting = z.object({
   closed: z.boolean(),
   sponsors: z.number().int(),
   /** Carried programs are sponsored through their maker: "REEL's to sponsor". */
-  sponsoredThrough: StationIdent.nullable()
+  sponsoredThrough: StationIdent.nullable(),
+  /** L1 (added 2026-09-29): the program's format in words ("Weekly, live", "Series"); null for the station row. */
+  format: z.string().nullable().optional()
 });
+
+/**
+ * P17 (added 2026-09-29): the members' credit: the name read in it ("members of Inland Beat"), how
+ * many members (active pledges) and how many asked to be named on air.
+ */
+export const MembersCredit = z.object({ creditName: z.string(), members: z.number().int(), named: z.number().int() });
 
 // Production orders -------------------------------------------------------------
 
@@ -228,7 +308,11 @@ export const ProductionOrder = z.object({
   autoApproveAt: Timestamp.nullable(),
   spotId: Id.nullable(),
   tellMakerWhenListed: z.boolean(),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  /** P24 (added 2026-09-29): the maker asked to be told when the spot is listed (`tellMeWhenListed`). */
+  makerToldWhenListed: z.boolean().optional(),
+  /** P24 (added 2026-09-29): the rate its spot is listed at; null until it's listed. */
+  listedRate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }).nullable().optional()
 });
 
 // Codes and results --------------------------------------------------------------
@@ -315,7 +399,9 @@ export const spotsApi = {
         autoTopUp: z.object({ on: z.boolean(), amountMicros: Micros.nullable(), belowDays: z.number().int().min(1).max(14) }),
         receiptsEmail: z.email().nullable(),
         legalName: z.string().nullable(),
-        ein: z.string().regex(/^\d{2}-?\d{7}$/).nullable()
+        ein: z.string().regex(/^\d{2}-?\d{7}$/).nullable(),
+        /** P25 (added 2026-09-29): null goes back to the name. */
+        shortName: z.string().min(1).max(24).nullable()
       })
       .partial(),
     response: Business
@@ -514,7 +600,7 @@ export const spotsApi = {
     auth: "user",
     summary: "Requests and sponsors, and the station's sponsorship settings",
     params: StationParams,
-    response: z.object({ sponsorships: z.array(Sponsorship), settings: z.array(SponsorshipSetting) })
+    response: z.object({ sponsorships: z.array(Sponsorship), settings: z.array(SponsorshipSetting), members: MembersCredit.nullable().optional() })
   }),
   decideSponsorship: endpoint({
     method: "POST",
@@ -714,8 +800,59 @@ export const spotsApi = {
     params: StationParams,
     query: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) }),
     response: z.array(z.object({ spotId: Id, business: z.string(), customers: z.number().int() }))
+  }),
+
+  // ---- Added 2026-09-29: P24, S17 ----
+
+  tellMeWhenListed: endpoint({
+    method: "POST",
+    path: "/orders/:orderId/tell-me-when-listed",
+    auth: "user",
+    summary: "P24: the maker asks to be told when the business lists the spot it made (the maker's owner or operator). Told once, when it's listed; at once if it already is.",
+    params: OrderParams,
+    response: ProductionOrder
+  }),
+  listSpotCategories: endpoint({
+    method: "GET",
+    path: "/spot-categories",
+    auth: "public",
+    summary: "S17: every spot category, in one list: what a business is, what markets filter by, and (`blockable`) what a station can block",
+    response: z.array(z.object({ name: z.string(), blockable: z.boolean() }))
   })
 };
+
+/**
+ * S17 (added 2026-09-29): the spot categories, the same list `listSpotCategories` returns. The
+ * blockable ones are the categories stations commonly refuse.
+ */
+export const SPOT_CATEGORIES: ReadonlyArray<{ name: string; blockable: boolean }> = [
+  { name: "Alcohol", blockable: true },
+  { name: "Gambling", blockable: true },
+  { name: "Cannabis", blockable: true },
+  { name: "Political", blockable: true },
+  { name: "Payday loans", blockable: true },
+  { name: "Vaping", blockable: true },
+  { name: "Tobacco", blockable: true },
+  { name: "Dating", blockable: true },
+  { name: "Adult", blockable: true },
+  { name: "Weapons", blockable: true },
+  { name: "Coffee and food", blockable: false },
+  { name: "Food", blockable: false },
+  { name: "Retail", blockable: false },
+  { name: "Services", blockable: false },
+  { name: "Auto", blockable: false },
+  { name: "Health", blockable: false },
+  { name: "Underwriting", blockable: false },
+  { name: "Nonprofit", blockable: false },
+  { name: "Real estate", blockable: false },
+  { name: "Legal", blockable: false },
+  { name: "Religion", blockable: false },
+  { name: "Education", blockable: false },
+  { name: "Events", blockable: false },
+  { name: "Fitness", blockable: false },
+  { name: "Travel", blockable: false },
+  { name: "Finance", blockable: false }
+];
 
 export type CustomersWhere = z.infer<typeof CustomersWhere>;
 export type BusinessLocation = z.infer<typeof BusinessLocation>;

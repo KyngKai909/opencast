@@ -184,6 +184,35 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         stayed.set(e.programId, { first: acc.first + first, last: acc.last + last });
       }
 
+      // U1: by program, one row per airing that has started, newest first.
+      const airings = ((await services.log.window([stationId], from, to)).get(stationId) ?? []).filter(
+        (a) => a.kind !== "off_air" && a.code === "PGM" && Date.parse(a.startsAt) <= now.getTime()
+      );
+      const byProgram = airings
+        .map((a) => {
+          const start = Date.parse(a.startsAt);
+          const end = Math.min(Date.parse(a.endsAt), now.getTime());
+          const over = samples.filter((m) => m.minute.getTime() >= minuteOf(new Date(start)).getTime() && m.minute.getTime() < end);
+          const minutes = Math.max(1, Math.ceil((end - minuteOf(new Date(start)).getTime()) / MINUTE));
+          const onNow = Date.parse(a.endsAt) > now.getTime();
+          const first = sampleAt.get(minuteOf(new Date(start)).getTime()) ?? 0;
+          const last = sampleAt.get(minuteOf(new Date(Date.parse(a.endsAt) - MINUTE)).getTime()) ?? 0;
+          return {
+            key: a.logEntryId ?? `${a.startsAt}:${a.title}`,
+            programId: a.programId,
+            title: a.title,
+            airedAt: a.startsAt,
+            airings: 1,
+            source: a.live ? ("live" as const) : a.carriedFrom ? ("carried" as const) : ("library" as const),
+            carriedFrom: a.carriedFrom,
+            averageTunedIn: Math.round(over.reduce((sum, m) => sum + m.tunedIn, 0) / minutes),
+            peakTunedIn: over.reduce((max, m) => Math.max(max, m.tunedIn), 0),
+            stayedToTheEnd: onNow || first === 0 ? null : Math.round((last / first) * 100),
+            onNow
+          };
+        })
+        .sort((a, b) => (b.airedAt ?? "").localeCompare(a.airedAt ?? ""));
+
       const translators = await services.stations.translators(stationId);
       const translatorCounts = translators.length
         ? await db
@@ -212,7 +241,13 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           translatorId: t.id,
           name: t.name,
           viewers: translatorCounts.find((c) => c.translatorId === t.id)?.viewers ?? 0
-        }))
+        })),
+        byProgram,
+        // U3: the same window a week earlier, the whole way (minutes with anyone tuned in), and every break.
+        comparison: lastWeek
+          .map((r) => ({ minute: new Date(r.minute.getTime() + weekMs).toISOString(), tunedIn: r.tunedIn }))
+          .sort((a, b) => a.minute.localeCompare(b.minute)),
+        breaks: breaks.map((b) => ({ startsAt: b.startsAt, endsAt: new Date(Date.parse(b.startsAt) + b.lengthMs).toISOString() }))
       };
     }
   };

@@ -16,10 +16,10 @@ These change what the API accepts, or add something no fixture can stand in for.
 |---|---|---|---|---|---|
 | B1 | **A draft spot without a rate or budget.** `createSpot` requires positive `rate.micros` and `budget.totalMicros`, and `Spot.rate` and `budget` aren't nullable. Allow null while `state = draft` (or `createSpot` with only title, length and category) | Upload (spots 02) comes before rate and budget (spots 03). An approved production order "becomes a spot waiting for a rate and budget". A placeholder rate would show in stations' markets | biz-spots 02.1, 03.1; orders 05.1, 06.2 (4) | No | 5 |
 | B2 | **Done 2026-09-28** (monorepo; `api.tv`, see docs/contracts-changelog.md): `registerTv`, `createTvCode` (now `device` auth), `pollTvCode`, `approveTvCode`, `signOutThisTv` (`device`: the device token or the TV session), `listTvs`, `signOutTv`, `recordCastTarget`; TV sessions accepted as `user` where `tvSession: true`; plus the remote relay for TVs without Cast. **TV sign-in by code, and TVs on the account.** Needed: `POST /tv/codes` (public: code, QR URL, expiry, poll token, and as in OAuth's device flow `enterAt`, the address to type, and `pollSeconds`); `GET /tv/codes/:pollToken` (pending, approved with a TV session, expired); `POST /tv/codes/:code/approve` (user); the API accepting a TV session as `user`; `listTvs`, `signOutTv`, and the TV signing itself out (`DELETE /tv/session`). Built against a mock in `apps/tv/src/api/ext/signIn.ts` | A TV has no Privy token, so it can't read presets or reminders after "sign in on your phone". You shows "Your TVs" with Sign out and "Add a TV, enter a code" | tv 05.3; you 02.1, 06.2; tv-update 04.1 (5) | UI only | 6 |
-| B3 | **Browser and phone go-live ingest.** `addLiveSource` returns no WHIP or WebRTC endpoint or token for a browser source | Going live from a browser or phone can't send video | live-listings 01.1, 02.1, 05.1, 05.2 (4) | UI only | 4 |
+| B3 | Partly done 2026-09-29 (monorepo): `LiveSource.ingest` `{ whipUrl, token }` for browser sources with a Livepeer stream (browser sources get one when Livepeer is set up); null without Livepeer. **Browser and phone go-live ingest.** `addLiveSource` returns no WHIP or WebRTC endpoint or token for a browser source | Going live from a browser or phone can't send video | live-listings 01.1, 02.1, 05.1, 05.2 (4) | UI only | 4 |
 | B4 | **Listed airings can be reminded.** `Airing` has `logEntryId` but no `listedAiringId`, which `addReminder` needs for a listed stream | Remind me on city meetings (RDLS) in home, the guide and search | home 01.1, 05.1; station-pages 03.1; tv 03.2 (4) | No | 3 |
 | B5 | **Check a code before redeeming.** `redeemCode` validates and counts in one call. Add a dry run (`confirm: false` or `/redeem/check`), returning when and where the offer was saved and its text | Calling it to show the check would count the use | biz-results 05.1; biz-settings 05.1 (2) | No | 5 |
-| B6 | **Answer a claim with a file.** `answerClaim` takes `attachmentUrl`, but nothing uploads the attachment | "Attach the permission" | rights 03.1 (1) | UI only | 4 |
+| B6 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `POST /claims/:claimId/attachments` → `{ attachmentUrl, fileName }` (PDF, image or text, 20 MB). **Answer a claim with a file.** `answerClaim` takes `attachmentUrl`, but nothing uploads the attachment | "Attach the permission" | rights 03.1 (1) | UI only | 4 |
 | B7 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `askPermission` body `workIds`; only the ticked works are covered, the rest left out with their reason. No dry run (the desk previews on its side). **Ticked works, and a preview before sending.** `askPermission` has no `workIds`, and nothing edits a work after `addWorks`. Its schedule preview exists only in the response, after sending. Add `workIds` and a `dryRun` or preview endpoint | The desk ticks works and previews the message before it goes out, and "only ticked works are covered by the yes" | desk 03.1 (1) | No | 7 |
 | B8 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user), `PermissionPage.stoppedAt` and `claim`. A claim before the station exists joins it at setup. **Stop from the permission link, and Claim now before there's a station.** `answerPermission` refuses a second answer, and `startHandover` needs a user and a `stationId` | 06.2: "This link works to stop it at any time"; "Claim it now and skip the team-run part" | desk 06.2 (1) | No | 7 |
 | B9 | **No K or W prefix on call signs.** `CallSign` is `/^[A-Z]{3,5}$/` in contracts and domain | The style guide's dial rules. `KBEA` passes `checkCallSign` and `join` today | site S.10; control A.1; desk 04.1 (3) | Client pre-check | 1 |
@@ -31,8 +31,8 @@ These change what the API accepts, or add something no fixture can stand in for.
 | A1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /me/sign-out-everywhere`: tokens issued before, and sessions seen before, answer 401 `signed_out`; TVs and their phones are signed out. **Sign out everywhere** (Settings, Account) | you 05.1 | UI only | 3 |
 | A2 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `GET /me/watch-history` (`lastChannel`, 30 days) and `DELETE /me/watch-history`; the heartbeat is `optional` and keeps history only when sent signed in and `keepWatchHistory` isn't off. The tuned-in session stays anonymous. **Watch history and last channel**: store (when `keepWatchHistory`), read the last channel, clear. The heartbeat carries no user, by design | you 05.1; tv 02.1 ("It opens tuned in") | Device-local for one device | 3 |
 | A3 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /me/export` (emails a link), `GET /me/export` (the JSON), `DELETE /me` (at once; 409 `owns_station` / `owns_business`; pledges stop after this month). **Your data**: download (export) and delete the account | you 05.1 | UI only | 3 |
-| A4 | **Host blocks readable, and invites that carry them.** `setHosts` is write-only, and `inviteToStation` can't name blocks. Add a GET (or `blocks` on `TeamMember`), and `programIds` on host invites | station-settings 03.1, 03.2; every host-scoped screen | Yes | 4 |
-| A5 | **Station switcher status**: on air and needs attention ("Dead air in 40 min") per membership in `Me` | station-settings 04.1, 05.2 | Fan-out per station | 4 |
+| A4 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /stations/:stationId/hosts`; `programIds` on host invites, `Invite.programIds`, `TeamMember.programIds`. **Host blocks readable, and invites that carry them.** `setHosts` is write-only, and `inviteToStation` can't name blocks. Add a GET (or `blocks` on `TeamMember`), and `programIds` on host invites | station-settings 03.1, 03.2; every host-scoped screen | Yes | 4 |
+| A5 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /me/stations/status` → `[{ stationId, onAir, deadAirAt, deadAirEndsAt }]`. **Station switcher status**: on air and needs attention ("Dead air in 40 min") per membership in `Me` | station-settings 04.1, 05.2 | Fan-out per station | 4 |
 | A6 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `GET /admin/team` → `[{ id, name, email }]`. **Opencast team list** for `setUpClaimable.operatorUserId` ("Run by Dee A.") | desk 04.1 | Yes | 7 |
 | A7 | **Done 2026-09-28** (monorepo): typed as `ViewerSettings.tv` (`TvSettings`), the same six fields, all optional. Quiet hours not typed (O2). **`ViewerSettings` sections are strict**: nested `watching`, `market` and the rest strip unknown keys. Type the TV-only rows (channel-up direction, banner seconds, number-entry wait, include radio band, picture quality, audio evening-out) and quiet hours, or make the sections `.loose()`. Until then the TV keeps them under a top-level `settings.tv` key, which the top-level `.loose()` keeps: `{ channelUp, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut }` | tv-update 04.1; you 06.3 | Top-level keys | 3 |
 | A8 | (minor) `TeamMember.role` is `z.string()`; make it `StationRole` or `BusinessRole` | station-settings 03.1 | n/a | 4 |
@@ -58,10 +58,10 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | S11 | **Open channels for signed-out viewers**: a thin market's "Any channel from 2 to 69 is open except 5" (`availableChannels` is `user`) | home 08.2 | Yes | 3 |
 | S12 | **One airing by id, public**: for share links that tune in or offer a reminder | home 07.1 | Yes | 3 |
 | S13 | **Done 2026-09-28** (monorepo): `DialRow.signal: "ok" | "standby"` (optional). **Stand by as a state**: a live block waiting for its signal (`DialRow.signal` or `Airing.kind: standby`) | tv 05.2 | Yes | 6 |
-| S14 | **Live source detail**: signal quality ("Receiving, 1080p", bitrate), and a private rehearsal preview for encoders | live-listings 01.1 | Yes | 4 |
-| S15 | **Live lower third state**: which speaker is showing, or free text, or hidden, readable by a second device (and composited for encoder sources) | live-listings 02.1, 05.2 | Client-side for the browser source | 4 |
+| S14 | Partly done 2026-09-29 (monorepo): `LiveSource.previewUrl` (the source's Livepeer playback); `quality` is always null (not measured). **Live source detail**: signal quality ("Receiving, 1080p", bitrate), and a private rehearsal preview for encoders | live-listings 01.1 | Yes | 4 |
+| S15 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET|PUT /stations/:stationId/log/:entryId/lower-third`. Not composited for encoder sources yet. **Live lower third state**: which speaker is showing, or free text, or hidden, readable by a second device (and composited for encoder sources) | live-listings 02.1, 05.2 | Client-side for the browser source | 4 |
 | S16 | **Translator Connect** (YouTube and Twitch OAuth), or the design moves to a key form | master-control A.5 | UI only | 4 |
-| S17 | **Spot categories**: one list of valid categories, for blocked categories, market filters and a business's category | station-settings 02.1; master-control C.2; biz-funding 01.1 | Constant | 4 |
+| S17 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /spot-categories` and the `SPOT_CATEGORIES` constant (`{ name, blockable }`). **Spot categories**: one list of valid categories, for blocked categories, market filters and a business's category | station-settings 02.1; master-control C.2; biz-funding 01.1 | Constant | 4 |
 | S18 | **Studio to station**: claiming a channel as a studio | market 04.1 | UI only | 4 |
 | S19 | **The program on each search airing**: `program {id, title}` on `SearchResult` airings, for the airing's title card and its link to the program page | station-pages 03.1 | Yes | 3 |
 
@@ -69,39 +69,39 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| L1 | **Program format**: typical episode length, cadence ("Weekly", "Nightly"), series or one-off, band or media kind (audio only). Used by the market, offers, sponsorships and the program page | market 01.1, 05.1; offering 01.1; master-control B.1; sponsorships 01.1, 04.1 | Yes | 4 |
+| L1 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Program.format` `{ kind, cadence, episodeLengthMs, bands }` on `getProgram` and offers, `colour` and `advisory` on offers, `SponsorshipSetting.format`. **Program format**: typical episode length, cadence ("Weekly", "Nightly"), series or one-off, band or media kind (audio only). Used by the market, offers, sponsorships and the program page | market 01.1, 05.1; offering 01.1; master-control B.1; sponsorships 01.1, 04.1 | Yes | 4 |
 | L2 | **Carriers of a program**: total, outside the market, and the list | station-pages 02.1; home 07.1 | Yes | 3 |
 | L3 | **Where to watch**: `upcoming[]` with `endsAt`, on now, episode, slot text ("Saturdays at 8:30 pm") | station-pages 02.1; home 07.1 | Yes | 3 |
 | L4 | **Episode airings**: aired or not, last airing, next airing (with its `logEntryId`), episode description | station-pages 02.1 | Yes | 3 |
-| L5 | **An item's history**: scheduled and aired, including on carrying stations; usage counts; cached on playout; audio layout; caption language | live-listings 04.1 | Yes | 4 |
-| L6 | **Replace an item's file**, keeping its history and schedule | live-listings 04.1 | UI only | 4 |
-| L7 | **Captions mode and language** on a program | live-listings 03.1 | Yes | 4 |
+| L5 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /library/:itemId/history`; `LibraryItem.audioLayout`, `captionLanguage`. **An item's history**: scheduled and aired, including on carrying stations; usage counts; cached on playout; audio layout; caption language | live-listings 04.1 | Yes | 4 |
+| L6 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `POST /library/:itemId/file`. **Replace an item's file**, keeping its history and schedule | live-listings 04.1 | UI only | 4 |
+| L7 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `PATCH /programs/:programId/captions`, `Program.captions`; an item's track: `GET|PUT|DELETE /library/:itemId/captions` (WebVTT or SRT). Nothing generates captions yet. **Captions mode and language** on a program | live-listings 03.1 | Yes | 4 |
 
 ## log and playout
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| G1 | **Break contents**: each break's rows (code, title, start, length, whose time: the station's, the maker's barter, backup). Used by the Monitor rundown, Breaks, "then 6 more" and the paused notice | master-control A.7, C.1, C.3, P.1; biz-spots 05.1 | Yes | 4 |
-| G2 | **Monitor status**: the next item and its picture for the preview monitor, on air since, output bitrate | master-control A.7 | Yes | 4 |
-| G3 | **End early** during a live block (hands back to the log) | live-listings 02.1, 05.2 | UI only | 4 |
+| G1 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `BreakSlot.rows` on `getLog`, `Avail.breakId`, `origin`, `contents` on `getAvails`. **Break contents**: each break's rows (code, title, start, length, whose time: the station's, the maker's barter, backup). Used by the Monitor rundown, Breaks, "then 6 more" and the paused notice | master-control A.7, C.1, C.3, P.1; biz-spots 05.1 | Yes | 4 |
+| G2 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `PlayoutStatus.onAirSince`, `next`, `output.bitrateKbps` (always null: not measured; `next.pictureUrl` null: no stills). **Monitor status**: the next item and its picture for the preview monitor, on air since, output bitrate | master-control A.7 | Yes | 4 |
+| G3 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `POST /stations/:stationId/log/:entryId/end-early` (the log moves up; playout hands back at once) and `GET …/live`; `LogEntry.endedEarlyAt`. **End early** during a live block (hands back to the log) | live-listings 02.1, 05.2 | UI only | 4 |
 | G4 | **Fill a gap by carrying**: a `carry` option on `fillGap` for one night | master-control A.4, P.2; market 06.1 | No | 4 |
-| G5 | **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1; home 03.1 (tuned in: "Tonight: a steamboat, a haunted barn…", read from `Airing.episodeDescription`) | Yes | 4 |
-| G6 | **Test output before sign-on**: a playback URL for "Watch it" | master-control A.6 | Yes | 4 |
-| G7 | **Repeats readable**: `repeats[]` on `getLog` (what "Repeat this day" set up, until when), so the log can show and undo them | master-control A.4 | Yes | 4 |
+| G5 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /stations/:stationId/listings`, `PATCH /stations/:stationId/listings/:entryId`; `LogEntry.episodeDescription`, `Airing.episodeDescription`. **Per-airing listing**: `episodeDescription` returned on `LogEntry`, and a listing status per airing | live-listings 03.1; home 03.1 (tuned in: "Tonight: a steamboat, a haunted barn…", read from `Airing.episodeDescription`) | Yes | 4 |
+| G6 | Partly done 2026-09-29 (monorepo): `SignOnCheck.watchUrl` on the output check once the output exists (after the first sign-on); there's no test signal before sign-on. **Test output before sign-on**: a playback URL for "Watch it" | master-control A.6 | Yes | 4 |
+| G7 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `ProgramLog.repeats[]` `{ id, day, pattern, until, entries }` and `DELETE /stations/:stationId/log/repeats/:repeatId`. **Repeats readable**: `repeats[]` on `getLog` (what "Repeat this day" set up, until when), so the log can show and undo them | master-control A.4 | Yes | 4 |
 
 ## catalog
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| C1 | **Why it fits**: the slot label and range, the reason (dead air, library repeats, weak slot), length, exact fit. Also offers that fit a given gap (from, to, minimum length) | market 01.1, 02.1, 06.1; master-control A.4, A.7 | Dead air only | 4 |
-| C2 | **Browse**: filters for kind, maker kind, maker station (Offered by BEAT, studio, catalog), approval, gap window; sort (fits, carried by most, newest); facet counts | market 01.1, 04.1, 05.1, 06.1; offering 01.1 | Client-side on fixtures | 4 |
-| C3 | **A price per deal**: cash and cash plus barter each with a fee and a barter split; the program's break time per hour | master-control B.2; offering 02.1 | No | 4 |
-| C4 | **Carry in one step, and undo**: `requestCarriage` returning the agreement when approval isn't needed; withdraw a request (the enum has `withdrawn`); mark an airing as the repeat of an episode | master-control B.3; market 06.1 | Delayed send | 4 |
-| C5 | **Episodes**: first aired (date and station), captions | market 02.1, 03.1 | Yes | 4 |
-| C6 | **Slots on agreements and carriers**: when each carrier airs it | market 02.1; offering 04.1 | Yes | 4 |
-| C7 | **Carrier profile on a request**: members, how many programs it carries, blocked categories | offering 03.1 | Yes | 4 |
-| C8 | **A default deal** on an offer (one-tap carry) | market 06.1 | `termsOffered[0]` | 4 |
-| C9 | **Catalog underwriter** and upcoming shelves | market 05.1 | Static | 4 |
+| C1 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Offer.fit[]` with `forStation` (dead air and library repeats; no `weak_slot` yet), and `gap` on browse. **Why it fits**: the slot label and range, the reason (dead air, library repeats, weak slot), length, exact fit. Also offers that fit a given gap (from, to, minimum length) | market 01.1, 02.1, 06.1; master-control A.4, A.7 | Dead air only | 4 |
+| C2 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `maker`, `makerKind`, `gap` on browse; `offeredAt`. Facets stay client-side. **Browse**: filters for kind, maker kind, maker station (Offered by BEAT, studio, catalog), approval, gap window; sort (fits, carried by most, newest); facet counts | market 01.1, 04.1, 05.1, 06.1; offering 01.1 | Client-side on fixtures | 4 |
+| C3 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `breakMsPerHour`, `cashPlusBarter`, `barterFill` (and on `offerProgram`, `updateOffer`). **A price per deal**: cash and cash plus barter each with a fee and a barter split; the program's break time per hour | master-control B.2; offering 02.1 | No | 4 |
+| C4 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `CarriageRequest.agreementId`; `POST /carriage/requests/:requestId/withdraw`. Marking an airing as a repeat isn't built. **Carry in one step, and undo**: `requestCarriage` returning the agreement when approval isn't needed; withdraw a request (the enum has `withdrawn`); mark an airing as the repeat of an episode | master-control B.3; market 06.1 | Delayed send | 4 |
+| C5 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): the offer's `episodes[].episodeNumber`, `firstAiredAt`, `firstAiredOn`, `captions`. **Episodes**: first aired (date and station), captions | market 02.1, 03.1 | Yes | 4 |
+| C6 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `carriedBy[].slots`, `Agreement.slots`, `offerId`. **Slots on agreements and carriers**: when each carrier airs it | market 02.1; offering 04.1 | Yes | 4 |
+| C7 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `CarriageRequest.carrierProfile`. **Carrier profile on a request**: members, how many programs it carries, blocked categories | offering 03.1 | Yes | 4 |
+| C8 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Offer.defaultTerm`. **A default deal** on an offer (one-tap carry) | market 06.1 | `termsOffered[0]` | 4 |
+| C9 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Offer.underwriter` (a sponsor credited on the program). Upcoming shelves aren't built. **Catalog underwriter** and upcoming shelves | market 05.1 | Static | 4 |
 
 ## spots
 
@@ -112,7 +112,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | P3 | **Captions**: the track, and editing it | biz-spots 02.1 | UI only | 5 |
 | P4 | **Code placement and limits**: position, timing, "once per customer", and who picks the code string (the design says Opencast generates it; the contract takes it from the business) | biz-spots 02.1; biz-results 03.1 | Yes | 5 |
 | P5 | **Which stations a spot is in rotation on** (`StationIdent[]`, not a count) | biz-spots 04.1, 06.1 | Yes | 5 |
-| P6 | **The pause story**: when and why it paused, the last hold, held airings that still aired, what each station did with the time, told when back. The station-side notice needs the same data: the reason, time held tonight, the backup that filled it, the resume reason | biz-spots 04.1, 05.1 | From notice text | 5 |
+| P6 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `MarketSpot.pause` and `back` (and the `its_back` state). **The pause story**: when and why it paused, the last hold, held airings that still aired, what each station did with the time, told when back. The station-side notice needs the same data: the reason, time held tonight, the backup that filled it, the resume reason | biz-spots 04.1, 05.1 | From notice text | 5 |
 | P7 | **Estimates**: airings a day and days of budget; days for a raise ("$200 more is about 17 days") | biz-spots 03.1, 04.1, 06.2 | Client-side | 5 |
 | P8 | **Band in targeting** ("Radio band" as a kind of station) | biz-spots 03.1 | No | 5 |
 | P9 | **Category reach**: how many stations in a market can carry a category, and which block it | biz-funding 01.1; biz-settings 01.1 | Yes | 5 |
@@ -123,15 +123,15 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | P14 | **Results periods**: week and all time, not only month | biz-results 01.1, 05.2 | Yes | 5 |
 | P15 | **Results CSV**, why an airing was short, when the proof frame was captured; paging | biz-results 02.1 | Yes | 5 |
 | P16 | **What a business can sponsor**: stations and programs with minimum, room left and schedule line (`listStationSponsorships` is the station's own) | sponsorships 02.1 | Yes | 5 |
-| P17 | **Credit preview**: the members' credit name, and co-sponsors | sponsorships 02.1, 03.1, 05.1 | Yes | 5 |
+| P17 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `listStationSponsorships.members` `{ creditName, members, named }`. Co-sponsors come from the sponsorships list. **Credit preview**: the members' credit name, and co-sponsors | sponsorships 02.1, 03.1, 05.1 | Yes | 5 |
 | P18 | **Makers**: history with this business, specialty, the samples themselves; brief files before sending (multipart `orderSpot`, or a draft order) | orders 02.1 | Yes | 5 |
 | P19 | **Delivery checks and length**; `approvedAt` and `quotedAt` | orders 01.1, 05.1 | Yes | 5 |
 | P20 | **Connections**: Clear Pay and an online checkout (fields and connect endpoints) | biz-settings 04.1; biz-results 03.1 | UI only | 5 |
 | P21 | **Close account** (business) | biz-settings rail | UI only | 5 |
-| P22 | **Sponsor profile** for the station: business category, city, distance, sponsors elsewhere; and members who asked to be named | sponsorships 03.1 | Yes | 4 |
-| P23 | **Market spot preview URL** for stations | master-control C.2 | Yes | 4 |
-| P24 | **Maker "Tell me when it's listed"** on the station side | orders 06.2 | Drop the button | 4 |
-| P25 | **A business's short name** (`business.shortName`: "Orange Street", "Inland Tire"), used in thumbnails, break summaries and notices | master-control C.3; biz-spots 05.1 | Yes | 4 |
+| P22 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Sponsorship.profile` on the station's list. **Sponsor profile** for the station: business category, city, distance, sponsors elsewhere; and members who asked to be named | sponsorships 03.1 | Yes | 4 |
+| P23 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `MarketSpot.spot.preview` `{ url, colour, line }`. **Market spot preview URL** for stations | master-control C.2 | Yes | 4 |
+| P24 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `POST /orders/:orderId/tell-me-when-listed`; `makerToldWhenListed`, `listedRate`. **Maker "Tell me when it's listed"** on the station side | orders 06.2 | Drop the button | 4 |
+| P25 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `Business.shortName` (settable), `MarketSpot.business.shortName`, and in break contents. **A business's short name** (`business.shortName`: "Orange Street", "Inland Tire"), used in thumbnails, break summaries and notices | master-control C.3; biz-spots 05.1 | Yes | 4 |
 | P26 | **Edit a location in place** (`PATCH /businesses/:id/locations/:locationId`): only add and remove exist, and adding puts it last, so editing the first address would reorder them | biz-settings 01.1 | Yes | 5 |
 
 ## ledger
@@ -139,8 +139,8 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
 | E1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Pledge.card`, `Pledge.receipts.items`, `cadence` on `updatePledge`, `POST /me/pledges/:pledgeId/card-session`. Receipt documents (`url`) are null for now. **Pledges**: the card on file and changing it; receipts (list and documents); changing monthly or once | you 04.1, 02.1 | UI only | 3 |
-| E2 | **Station earnings detail**: sponsor names, the airings and breaks held tonight, the next payout amount | earnings 02.1 | Derived | 4 |
-| E3 | **Statement structure**: line groups, per-thousand fields (rate, airings, average tuned in), paid-on date and destination, in progress or final, closing split into available and held | earnings 03.1; biz-results 04.1 | Detail strings | 4 |
+| E2 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `lines.sponsors.list`, `held.tonightBreaks`, `nextPayout.amountMicros`. **Station earnings detail**: sponsor names, the airings and breaks held tonight, the next payout amount | earnings 02.1 | Derived | 4 |
+| E3 | Partly done 2026-09-29 (monorepo; see docs/contracts-changelog.md): lines' `group` and `airings`, `paidOn`, `destination`. Per-thousand `rate` and `averageTunedIn` not sent yet; the closing balance isn't split. **Statement structure**: line groups, per-thousand fields (rate, airings, average tuned in), paid-on date and destination, in progress or final, closing split into available and held | earnings 03.1; biz-results 04.1 | Detail strings | 4 |
 | E4 | **Receipts for a business**: prepayment, expense or statement, with a PDF each | biz-settings 03.1 | Yes | 5 |
 | E5 | **Funding sources**: remove, make default | biz-settings 03.1; biz-funding 03.1 | UI only | 5 |
 | E6 | (minor) **Deposit quote basis** (rate, reference station); **withdrawal arrival**; the usual top-up amount | biz-funding 02.1, 04.1, 06.1 | Copy or derived | 5 |
@@ -150,9 +150,9 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| U1 | **By program, per airing**: aired at, source, average, peak, stayed to the end, on now | earnings 01.1, 04.1 | Yes | 4 |
+| U1 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `AudienceReport.byProgram[]`. **By program, per airing**: aired at, source, average, peak, stayed to the end, on now | earnings 01.1, 04.1 | Yes | 4 |
 | U2 | **Mirroring as a platform** (`Platform` has phone, cast, web, tv_app) | tv-update 01.1 | Send `phone` | 8 |
-| U3 | **Last week across the whole window** (`comparison[]`; `series[].lastWeek` stops at now) and the window's breaks (`breaks[]`) for the shaded bands | earnings 01.1 | Yes | 4 |
+| U3 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `AudienceReport.comparison[]` and `breaks[]`. **Last week across the whole window** (`comparison[]`; `series[].lastWeek` stops at now) and the window's breaks (`breaks[]`) for the shaded bands | earnings 01.1 | Yes | 4 |
 
 ## trust
 
@@ -176,7 +176,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | N7 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `MarketBoard.stats.market`, `slots[].signOnAt`, `creatorId`. **Board stats for the whole market** (both bands), and structured slot status | desk 01.1 | Yes | 7 |
 | N8 | **A listed source without a channel** yet | desk 05.1 | Yes | 7 |
 | N9 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `HeldEarnings.unclaimedPeriodDays`, `chain`, `stations[].licenceName`, and the invite dates. Pending handovers show as `claim_pending` (A125: `creatorId`, `creatorName`, `stationsHoldingMoney` too). **Held earnings**: unclaimed period and date, licence name, pending handovers (so `approveHandover` is reachable), chain | desk 07.1 | Config | 7 |
-| N10 | **The creator's claim page**: said-yes date, days on air, presets, held amount, source platform to connect, and a GET for the handover's status after starting | rights 05.1 | Yes | 4 |
+| N10 | **Done 2026-09-29** (monorepo; see docs/contracts-changelog.md): `GET /claim/:token` → `ClaimPage` (the permission link's token). **The creator's claim page**: said-yes date, days on air, presets, held amount, source platform to connect, and a GET for the handover's status after starting | rights 05.1 | Yes | 4 |
 | N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
 | N12 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.pronoun`, accepted by `addCreator` and `updateCreator`. **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
 
@@ -239,6 +239,8 @@ As in the viewer: every proposed field is an optional extension of a contract sc
 - **P6** `pause` and `back` on a market spot. **P17** the members' credit. **P22** sponsor profile. **P23** spot preview (url, still). **P24** `POST /orders/:id/tell-me-when-listed`, `makerToldWhenListed`, `listedRate`.
 - **E2** sponsors listed on earnings, `held.tonightBreaks`, `nextPayout.amountMicros`. **E3** per line `group`, `airings`, `rate`, `averageTunedIn`; `paidOn` and `destination` on statements. **U1** `byProgram[]` on the audience.
 - **T1** `takedowns[].airings[]`, `term`, `carrierNotice`. **B6** `POST /claims/:id/attachments`. **N10** `GET /claim/:token` with the handover's status. **O1** the `signed_on_off` notification key.
+
+Landed 2026-09-29 (see docs/contracts-changelog.md): A4, A5, G1, G2, G3, G5, G7, L1, L5, L6, L7, S15, S17, C1 to C9, P6, P17, P22 to P25, E2, U1, U3, B6, N10 as proposed (a few with extra fields); G6, S14, B3 and E3 in part. Still proposed only: T1, T4, S16, the members' co-sponsors (P17) and C1's `weak_slot`.
 
 ## How the business app carries them (Phase 5)
 

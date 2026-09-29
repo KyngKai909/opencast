@@ -127,6 +127,15 @@ export interface StationsService {
   setHosts(stationId: string, programId: string, userIds: string[]): Promise<string[]>;
   speakers(programId: string): Promise<SpeakerView[]>;
   setSpeakers(programId: string, speakers: Array<{ name: string; title: string | null }>): Promise<SpeakerView[]>;
+  /** A4: each host's live programs on a station. */
+  hostPrograms(stationId: string): Promise<Map<string, string[]>>;
+  /** A4: makes someone a host of these programs too (an accepted invite). Programs that aren't the station's are skipped. */
+  addHost(db: Executor, stationId: string, userId: string, programIds: string[]): Promise<void>;
+  /** A4: every live program and who hosts it; `onlyFor` limits it to one host's programs. */
+  hosts(stationId: string, onlyFor?: string): Promise<Array<{ programId: string; title: string; hosts: Array<{ userId: string; displayName: string | null }> }>>;
+  /** S15: the lower third on a live block (the default before anyone sets it: the first speaker). */
+  lowerThird(stationId: string, entryId: string, programId: string | null): Promise<LowerThirdView>;
+  setLowerThird(stationId: string, entryId: string, programId: string | null, userId: string, input: { hidden: boolean; speakerId: string | null; name: string; title: string | null }): Promise<LowerThirdView>;
 }
 
 export type SetupPatch = Partial<{
@@ -176,6 +185,18 @@ export interface LiveSourceView {
   streamKeyPreview: string | null;
   signal: "not_connected" | "receiving";
   createdAt: string;
+  quality?: string | null;
+  previewUrl?: string | null;
+  ingest?: { whipUrl: string; token: string } | null;
+}
+
+export interface LowerThirdView {
+  entryId: string;
+  hidden: boolean;
+  speakerId: string | null;
+  name: string;
+  title: string | null;
+  updatedAt: string | null;
 }
 
 export interface SpeakerView {
@@ -190,6 +211,10 @@ const C = schema.channels;
 const DEFAULT_TZ = "America/Los_Angeles";
 const PUBLIC_STATUSES = new Set(["on_air", "off_air"]);
 const INGEST_SERVER = process.env.LIVE_INGEST_SERVER ?? (hasLivepeerApiKey() ? "rtmp://rtmp.livepeer.com/live" : "rtmp://localhost:1935/live");
+/** B3: Livepeer's WebRTC ingest (WHIP), by stream key. */
+const WHIP_BASE = (process.env.LIVEPEER_WHIP_BASE ?? "https://livepeer.studio/webrtc").replace(/\/+$/, "");
+/** S14: a source's own playback on Livepeer, the team's private preview of what it's sending. */
+const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepeercdn.studio/hls").replace(/\/+$/, "");
 
 export function createStationsService({ deps, services }: ModuleContext): StationsService {
   const { db } = deps;
@@ -283,7 +308,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       server: row.kind === "encoder" ? INGEST_SERVER : null,
       streamKeyPreview: preview(row.streamKey),
       signal: "not_connected",
-      createdAt: row.createdAt.toISOString()
+      createdAt: row.createdAt.toISOString(),
+      // S14: signal quality isn't measured yet.
+      quality: null,
+      previewUrl: row.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${row.livepeerPlaybackId}/index.m3u8` : null,
+      // B3: a browser source sent through Livepeer publishes over WHIP with its stream key.
+      ingest: row.kind === "browser" && row.livepeerStreamId && row.streamKey ? { whipUrl: `${WHIP_BASE}/${row.streamKey}`, token: row.streamKey } : null
     };
   }
 
@@ -720,8 +750,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const [station] = await db.select({ callSign: S.callSign, name: S.name }).from(S).where(eq(S.id, stationId));
       let streamKey = input.kind === "encoder" ? newKey(`${station?.callSign ?? station?.name ?? "live"}-${input.name}`) : null;
       let livepeer: { streamId: string; playbackId: string } | null = null;
-      if (input.kind === "encoder" && hasLivepeerApiKey()) {
-        // Encoders send to Livepeer; playout reads the source back from Livepeer's playback.
+      if (hasLivepeerApiKey()) {
+        // Encoders (RTMP) and browsers (WHIP, B3) send to Livepeer; playout reads the source back from Livepeer's playback.
         const stream = await createLivepeerStream(`${station?.callSign ?? station?.name} live: ${input.name}`);
         streamKey = stream.streamKey;
         livepeer = { streamId: stream.streamId, playbackId: stream.playbackId };
@@ -762,6 +792,56 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (userIds.length) await tx.insert(schema.hostAssignments).values(userIds.map((userId) => ({ stationId, programId, userId })));
       });
       return userIds;
+    },
+
+    async hostPrograms(stationId) {
+      const rows = await db.select().from(schema.hostAssignments).where(eq(schema.hostAssignments.stationId, stationId));
+      const by = new Map<string, string[]>();
+      for (const r of rows) by.set(r.userId, [...(by.get(r.userId) ?? []), r.programId]);
+      return by;
+    },
+
+    async addHost(tx, stationId, userId, programIds) {
+      if (!programIds.length) return;
+      const live = new Set((await services.library.programsForStation(stationId)).filter((p) => p.live).map((p) => p.id));
+      const wanted = programIds.filter((id) => live.has(id));
+      if (wanted.length) await tx.insert(schema.hostAssignments).values(wanted.map((programId) => ({ stationId, userId, programId }))).onConflictDoNothing();
+    },
+
+    async hosts(stationId, onlyFor) {
+      const [programs, assignments] = await Promise.all([services.library.programsForStation(stationId), db.select().from(schema.hostAssignments).where(eq(schema.hostAssignments.stationId, stationId))]);
+      const names = await services.accounts.displayNames([...new Set(assignments.map((a) => a.userId))]);
+      return programs
+        .filter((p) => p.live)
+        .filter((p) => !onlyFor || assignments.some((a) => a.programId === p.id && a.userId === onlyFor))
+        .map((p) => ({
+          programId: p.id,
+          title: p.title,
+          hosts: assignments.filter((a) => a.programId === p.id).map((a) => ({ userId: a.userId, displayName: names.get(a.userId) ?? null }))
+        }));
+    },
+
+    async lowerThird(stationId, entryId, programId) {
+      const [row] = await db.select().from(schema.lowerThirds).where(and(eq(schema.lowerThirds.logEntryId, entryId), eq(schema.lowerThirds.stationId, stationId)));
+      if (row) return { entryId, hidden: row.hidden, speakerId: row.speakerId, name: row.name, title: row.title, updatedAt: row.updatedAt.toISOString() };
+      const [first] = programId ? await service.speakers(programId) : [];
+      return { entryId, hidden: false, speakerId: first?.id ?? null, name: first?.name ?? "", title: first?.title ?? null, updatedAt: null };
+    },
+
+    async setLowerThird(stationId, entryId, programId, userId, input) {
+      let { name, title } = input;
+      if (input.speakerId) {
+        // A speaker from the list: their name and title as the list has them.
+        const speaker = programId ? (await service.speakers(programId)).find((sp) => sp.id === input.speakerId) : undefined;
+        if (!speaker) throw badRequest("That speaker isn't on the program's list.", { speakerId: "Not on the list" });
+        name = speaker.name;
+        title = speaker.title;
+      } else if (!input.hidden && !name.trim()) {
+        throw badRequest("Give a name to show.", { name: "Required" });
+      }
+      const values = { logEntryId: entryId, stationId, hidden: input.hidden, speakerId: input.speakerId, name, title, updatedBy: userId, updatedAt: deps.clock.now() };
+      await db.insert(schema.lowerThirds).values(values).onConflictDoUpdate({ target: schema.lowerThirds.logEntryId, set: values });
+      return service.lowerThird(stationId, entryId, programId);
     },
 
     async speakers(programId) {
