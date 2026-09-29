@@ -292,6 +292,7 @@ describe("a business and its owner's Clear wallet", () => {
     expect(elsewhere.body.error.code).toBe("transfer_already_used");
   });
 
+  // Builds a second test server, which takes more than the default 5 s under the full suite.
   it("the Stripe-only server has no Clear", async () => {
     const stripeOnly = await createHarness({
       payments: (clock) => {
@@ -311,7 +312,7 @@ describe("a business and its owner's Clear wallet", () => {
     } finally {
       await stripeOnly.close();
     }
-  });
+  }, 30_000);
 });
 
 describe("with Clear and no chain to check against", () => {
