@@ -58,6 +58,8 @@ export interface PlayoutService {
   /** A planned sign-on ("Signs on Monday, 6:00 am"). */
   scheduleSignOn(stationId: string, at: Date): Promise<void>;
   nextSignOn(stationIds: string[]): Promise<Map<string, Date>>;
+  /** Cancels a station's scheduled sign-ons (a creator stopped it before it signed on). */
+  cancelSignOns(stationId: string): Promise<void>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
@@ -321,6 +323,13 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const result = new Map<string, Date>();
       for (const r of rows) if (!result.has(r.stationId)) result.set(r.stationId, r.startAt);
       return result;
+    },
+
+    async cancelSignOns(stationId) {
+      await db
+        .update(schema.schedules)
+        .set({ enabled: false })
+        .where(and(eq(schema.schedules.stationId, stationId), eq(schema.schedules.enabled, true), gte(schema.schedules.startAt, deps.clock.now())));
     },
 
     async carriedAirings(agreementIds, from, to) {

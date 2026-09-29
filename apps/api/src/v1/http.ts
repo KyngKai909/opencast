@@ -215,10 +215,12 @@ export class RouteRegistrar {
     let user: CurrentUser;
     try {
       user = await this.services.accounts.userForToken(token);
-    } catch {
+    } catch (error) {
       if (endpoint.auth === "public" || endpoint.auth === "optional") {
         return callers;
       }
+      // Signed out everywhere, or the account deleted: say so (`signed_out`, `account_deleted`).
+      if (error instanceof HttpError && error.status === 401) throw error;
       throw unauthorized("Your sign-in has expired. Sign in again.");
     }
     if (endpoint.auth === "admin" && !user.isAdmin) {

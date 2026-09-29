@@ -34,6 +34,8 @@ export interface Remote {
   phoneForToken(tokenHash: string): Promise<{ id: string; deviceId: string } | null>;
   /** The TV's session ended: its account's phones are told `ended` and dropped; with tellTv, the TV is told too. */
   accountSignedOut(tvId: string, options?: { tellTv?: boolean }): Promise<void>;
+  /** A1: the person's phones stop driving any TV: guest pairings made signed in as them, and account phones. */
+  dropPhonesOf(userId: string): Promise<void>;
   /** Which of these TVs have a phone on this account connected now. */
   accountPhonesConnected(tvIds: string[], userId: string): Promise<Set<string>>;
   openTvStream(tvId: string, stream: EventStream): Promise<void>;
@@ -132,6 +134,18 @@ export function createRemote({ deps, services }: ModuleContext, r: RemoteDeps): 
       await publish(`phones:${tvId}`, { event: "ended", data: { reason: "signed_out" }, only: { kind: "account" } });
       if (options.tellTv) await publish(`tv:${tvId}`, { event: "signed_out", data: {} });
       await phonesChanged(tvId);
+    },
+
+    async dropPhonesOf(userId) {
+      const dropped = await db
+        .update(P)
+        .set({ removedAt: now() })
+        .where(and(eq(P.userId, userId), isNull(P.removedAt)))
+        .returning({ id: P.id, deviceId: P.deviceId });
+      for (const phone of dropped) {
+        await publish(`phones:${phone.deviceId}`, { event: "ended", data: { reason: "signed_out" }, only: { phoneId: phone.id } });
+      }
+      for (const tvId of new Set(dropped.map((p) => p.deviceId))) await phonesChanged(tvId);
     },
 
     async accountPhonesConnected(tvIds, userId) {

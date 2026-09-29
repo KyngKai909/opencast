@@ -77,6 +77,11 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Listing a stream from outside a market (a county meeting covering two markets) | network | not supported |
 | When a maker's rotation is empty: is its barter share given back to the carrier, or filled with a station ID? | playout, Phase 5 | a station ID |
 | The revenue split for licensed catalogs | catalog | none |
+| Watch history when the setting was never touched (A2) | `accounts.keepsWatchHistory` | kept (unset counts as on, as the viewer's settings show it); off clears it |
+| A grace period before an account is deleted (A3) | `accounts.deleteAccount` | none: at once, as the frames say "This can't be undone" |
+| Deleting the account of someone who owns a business (A3) | `accounts.deleteAccount` | refused (409 `owns_business`) until a business can be closed or handed over (P21) |
+| Deleting the Privy user (and its embedded wallet) with the account (A3) | accounts | not done: the wallet may be where a creator's escrow is paid |
+| Quiet hours: which notices they hold back (O2) | `notifications.inQuietHours` | pushes in the viewer scope (reminders, switch over, presets going live, station news); on by default, 22:00 to 08:00 in the account's market's time |
 
 ## Built with a stand-in, to replace
 

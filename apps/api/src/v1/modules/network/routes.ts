@@ -17,6 +17,11 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   // The creator's page needs no account.
   r.handle(api.getPermissionPage, ({ params }) => network.permissionPage(params.token));
   r.handle(api.answerPermission, ({ params, body, req }) => network.answerPermission(params.token, body, req.ip ?? null));
+  // B8: stop from the link (no account, like the yes), or claim from it (signed in).
+  r.handle(api.stopFromLink, ({ params, req }) => network.stopFromLink(params.token, req.ip ?? null));
+  r.handle(api.claimFromLink, ({ user, params }) => network.claimFromLink(user, params.token));
+  r.handle(api.remindCreator, ({ params }) => network.remindCreator(params.creatorId));
+  r.handle(api.sendClaimInvite, ({ params, body }) => network.sendClaimInvite(params.creatorId, body.kind));
   r.handle(api.listRecipes, () => network.recipes());
   r.handle(api.saveRecipe, ({ body }) => network.saveRecipe(body));
   r.handle(api.setUpClaimable, ({ params, body }) => network.setUpClaimable(params.creatorId, body));

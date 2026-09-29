@@ -22,7 +22,15 @@ export const NoticeKind = z.enum([
   "rights_claim",
   "invite",
   "weekly_summary",
-  "code_used"
+  "code_used",
+  /** O1 (added 2026-09-28), viewer: a preset station starts a live program. Off unless turned on. */
+  "preset_live",
+  /** O1, viewer: news from a station you support. Off unless turned on. */
+  "station_news",
+  /** O1, station team: the station signed on or off. */
+  "signed_on_off",
+  /** O1, business: a station added your spot to its rotation. */
+  "spot_added"
 ]);
 
 export const Notice = z.object({

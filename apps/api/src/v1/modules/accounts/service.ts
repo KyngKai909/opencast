@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { ClearLink, Me, StationIdent } from "@opencast/contracts";
+import type { AccountExport, ClearLink, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { ClearLookupUnavailable } from "../../clearLink.js";
@@ -12,6 +12,23 @@ export type BusinessRole = "owner" | "manager" | "viewer";
 type PresetInput = { stationId: string; key: number | null };
 
 const INVITE_DAYS = 7;
+/** Watch history is kept this long (the settings say "Kept for 30 days"). */
+const WATCH_HISTORY_DAYS = 30;
+/** Heartbeats closer than this to the last one on the same station extend it, rather than start a new stretch. */
+const WATCH_GAP_MS = 2 * 60_000;
+
+/** Tokens issued before this second, or from a session ended by it, answer 401. */
+const signedOut = () => new HttpError(401, "signed_out", "You were signed out. Sign in again.");
+const accountDeleted = () => new HttpError(401, "account_deleted", "This account was deleted. Sign in again to start a new one.");
+/**
+ * "Sign out everywhere" and deleting an account are compared with the token's `iat`, which is
+ * Privy's wall clock, so they're recorded by the wall clock too, not the business clock.
+ */
+const wallClock = () => new Date();
+const second = (d: Date) => Math.floor(d.getTime() / 1000);
+
+/** Unset counts as on, as the settings show it. */
+export const keepsWatchHistory = (settings: unknown) => (settings as { privacy?: { keepWatchHistory?: boolean } } | null)?.privacy?.keepWatchHistory !== false;
 /** Station kinds Opencast runs itself: admins act as their owner. */
 const OPENCAST_RUN_KINDS = new Set(["claimable", "catalog", "listed"]);
 
@@ -63,6 +80,22 @@ export interface AccountsService {
   linkClear(user: CurrentUser): Promise<ClearLink>;
   /** Forgets it. Funding sources and payout destinations that used it stop working. */
   unlinkClear(userId: string): Promise<void>;
+
+  // ---- Added 2026-09-28: A1, A2, A3, A6, O2 ----
+  /** A1: refuses every token issued before now, and every session seen before now; TVs signed out too. */
+  signOutEverywhere(userId: string): Promise<void>;
+  /** A2: from a signed-in heartbeat, while keepWatchHistory is on. */
+  recordWatching(userId: string, stationId: string): Promise<void>;
+  watchHistory(userId: string): Promise<WatchHistory>;
+  clearWatchHistory(userId: string): Promise<void>;
+  /** A3: emails a link to the download. */
+  exportData(userId: string): Promise<{ email: string; readyBy: string }>;
+  downloadData(userId: string): Promise<AccountExport>;
+  deleteAccount(userId: string): Promise<void>;
+  /** A6: the Opencast team (admins). */
+  opencastTeam(): Promise<OpencastTeamMember[]>;
+  /** O2: the person's notification timing, and the time zone it's read in (their market's). */
+  notificationTiming(userId: string): Promise<{ timing: NotificationTiming; timezone: string }>;
 
   team(scope: TeamScope): Promise<TeamView>;
   invite(user: CurrentUser, scope: TeamScope, input: { email?: string; phone?: string; role: string; note?: string }): Promise<InviteRow>;
@@ -127,9 +160,15 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
   const { db } = deps;
   const u = schema.users;
 
-  async function findOrCreateUser(privyDid: string) {
+  async function findOrCreateUser(privyDid: string, issuedAt: Date | null, sid: string | null) {
     const [existing] = await db.select().from(u).where(eq(u.privyDid, privyDid));
-    if (existing) {
+    if (existing?.deletedAt) {
+      // A token from before the account was deleted is refused; a sign-in since starts a new account.
+      const before = !issuedAt || second(issuedAt) < second(existing.deletedAt);
+      const [ended] = sid ? await db.select().from(schema.signInSessions).where(and(eq(schema.signInSessions.userId, existing.id), eq(schema.signInSessions.sid, sid))) : [];
+      if (before || ended) throw accountDeleted();
+      await db.update(u).set({ privyDid: null }).where(eq(u.id, existing.id));
+    } else if (existing) {
       return existing;
     }
     const linked = await deps.auth.linkedAccounts(privyDid).catch(() => []);
@@ -270,12 +309,27 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
   const service: AccountsService = {
     async userForToken(token) {
       const verified = await deps.auth.verify(token);
-      const user = await findOrCreateUser(verified.privyDid);
+      const user = await findOrCreateUser(verified.privyDid, verified.issuedAt, verified.sessionId);
+      // A1: signed out everywhere. Tokens from before it are refused by their iat; a session seen
+      // before it stays ended even after Privy refreshes its token.
+      if (user.signedOutAt && (!verified.issuedAt || second(verified.issuedAt) < second(user.signedOutAt))) throw signedOut();
+      if (verified.sessionId) {
+        const S = schema.signInSessions;
+        const [session] = await db
+          .select({ endedAt: S.endedAt })
+          .from(S)
+          .where(and(eq(S.userId, user.id), eq(S.sid, verified.sessionId)));
+        if (session?.endedAt) throw signedOut();
+        if (!session) await db.insert(S).values({ userId: user.id, sid: verified.sessionId, firstSeenAt: wallClock() }).onConflictDoNothing();
+      }
       return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin };
     },
 
     async currentUser(userId) {
-      const [user] = await db.select({ id: u.id, privyDid: u.privyDid, isAdmin: u.isAdmin }).from(u).where(eq(u.id, userId));
+      const [user] = await db
+        .select({ id: u.id, privyDid: u.privyDid, isAdmin: u.isAdmin })
+        .from(u)
+        .where(and(eq(u.id, userId), isNull(u.deletedAt)));
       return user ?? null;
     },
 
@@ -384,6 +438,10 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       }
       if (Object.keys(patch).length) {
         await db.update(u).set(patch).where(eq(u.id, userId));
+      }
+      // Turning watch history off stops keeping it, and forgets what was kept.
+      if (input.settings && !keepsWatchHistory(input.settings) && (input.settings as { privacy?: object }).privacy) {
+        await service.clearWatchHistory(userId);
       }
       return service.me(userId);
     },
@@ -536,10 +594,15 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       const views = await reminderRows(rows);
       const now = deps.clock.now().getTime();
       const byId = new Map(rows.map((r) => [r.id, r.userId]));
+      // O2: "How early", per person (at the start unless they said otherwise).
+      const userIds = [...new Set(rows.map((r) => r.userId))];
+      const people = userIds.length ? await db.select({ id: u.id, settings: u.settings }).from(u).where(inArray(u.id, userIds)) : [];
+      const lead = new Map(people.map((p) => [p.id, (p.settings as { notifications?: NotificationTiming } | null)?.notifications?.leadMinutes ?? 0]));
       return views
         .filter((v) => {
           const startsAt = Date.parse(v.airing.startsAt);
-          return startsAt >= now && startsAt - now <= withinMinutes * 60_000;
+          const window = Math.max(withinMinutes, lead.get(byId.get(v.id)!) ?? 0);
+          return startsAt >= now && startsAt - now <= window * 60_000;
         })
         .map((v) => ({ ...v, userId: byId.get(v.id)! }));
     },
@@ -640,6 +703,163 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         .from(schema.advertiserMemberships)
         .where(eq(schema.advertiserMemberships.advertiserId, businessId));
       return rows.filter((r) => !roles || roles.includes(r.role)).map((r) => r.userId);
+    },
+
+    async signOutEverywhere(userId) {
+      const at = wallClock();
+      await db.update(u).set({ signedOutAt: at }).where(eq(u.id, userId));
+      await db
+        .update(schema.signInSessions)
+        .set({ endedAt: at })
+        .where(and(eq(schema.signInSessions.userId, userId), isNull(schema.signInSessions.endedAt)));
+      // TVs (their own sessions) and the phones driving them.
+      await services.tv.signOutEverywhere(userId);
+    },
+
+    async recordWatching(userId, stationId) {
+      const W = schema.watchHistory;
+      const [user] = await db.select({ settings: u.settings, deletedAt: u.deletedAt }).from(u).where(eq(u.id, userId));
+      if (!user || user.deletedAt || !keepsWatchHistory(user.settings)) return;
+      const at = deps.clock.now();
+      const [last] = await db.select().from(W).where(eq(W.userId, userId)).orderBy(desc(W.lastAt)).limit(1);
+      if (last && last.stationId === stationId && at >= last.lastAt && at.getTime() - last.lastAt.getTime() <= WATCH_GAP_MS) {
+        await db.update(W).set({ lastAt: at }).where(eq(W.id, last.id));
+        return;
+      }
+      await db.insert(W).values({ userId, stationId, startedAt: at, lastAt: at });
+      await db.delete(W).where(and(eq(W.userId, userId), sql`${W.lastAt} < ${new Date(at.getTime() - WATCH_HISTORY_DAYS * 86_400_000)}`));
+    },
+
+    async watchHistory(userId) {
+      const W = schema.watchHistory;
+      const [user] = await db.select({ settings: u.settings }).from(u).where(eq(u.id, userId));
+      const since = new Date(deps.clock.now().getTime() - WATCH_HISTORY_DAYS * 86_400_000);
+      const rows = await db
+        .select()
+        .from(W)
+        .where(and(eq(W.userId, userId), gte(W.lastAt, since)))
+        .orderBy(desc(W.lastAt))
+        .limit(200);
+      const idents = await stationIdents(rows.map((r) => r.stationId));
+      const items = rows.flatMap((r) => {
+        const station = idents.get(r.stationId);
+        return station ? [{ station, startedAt: r.startedAt.toISOString(), endedAt: r.lastAt.toISOString() }] : [];
+      });
+      return {
+        keep: keepsWatchHistory(user?.settings),
+        lastChannel: items[0] ? { station: items[0].station, at: items[0].endedAt } : null,
+        items
+      };
+    },
+
+    async clearWatchHistory(userId) {
+      await db.delete(schema.watchHistory).where(eq(schema.watchHistory.userId, userId));
+    },
+
+    async exportData(userId) {
+      const [email] = await service.emailsOf(userId);
+      if (!email) throw conflict("no_email", "Add an email to your account first: the link goes there.");
+      const now = deps.clock.now();
+      // The file is made when it's downloaded (signed in), so the link carries nothing itself.
+      await deps.notifier.email(email, {
+        title: "Your Opencast data",
+        body: "Everything your account holds, in one file: presets, reminders, watch history, pledges and receipts, notices, TVs and settings. Sign in to download it.",
+        link: `${deps.config.appOrigin.replace(/\/+$/, "")}/settings/data?download=1`
+      });
+      return { email, readyBy: now.toISOString() };
+    },
+
+    async downloadData(userId) {
+      const [user] = await db.select().from(u).where(eq(u.id, userId));
+      if (!user) throw notFound("Your account");
+      const P = schema.notificationPrefs;
+      const [me, presets, reminderRowsAll, history, pledges, prefs, notices, tvs] = await Promise.all([
+        service.me(userId),
+        service.presets(userId),
+        db.select().from(schema.reminders).where(eq(schema.reminders.userId, userId)).then(reminderRows),
+        service.watchHistory(userId),
+        services.ledger.pledges(userId),
+        db.select().from(P).where(eq(P.userId, userId)),
+        services.notifications.list(userId, { limit: 1000 }),
+        services.tv.listTvs(userId)
+      ]);
+      return {
+        exportedAt: deps.clock.now().toISOString(),
+        account: { id: me.id, displayName: me.displayName, email: me.email, market: me.market, createdAt: user.createdAt.toISOString(), settings: me.settings },
+        identities: me.identities,
+        memberships: me.memberships,
+        presets,
+        reminders: reminderRowsAll,
+        watchHistory: history.items,
+        pledges,
+        notificationPrefs: prefs.map((p) => ({ scope: p.scope === "advertiser" ? ("business" as const) : p.scope, scopeId: p.scopeId, prefs: p.prefs as Record<string, { push: boolean; email: boolean }> })),
+        notices,
+        tvs,
+        clear: me.clear ?? null
+      };
+    },
+
+    async deleteAccount(userId) {
+      const [owner] = await db
+        .select({ stationId: schema.stationMemberships.stationId })
+        .from(schema.stationMemberships)
+        .where(and(eq(schema.stationMemberships.userId, userId), eq(schema.stationMemberships.role, "owner")))
+        .limit(1);
+      if (owner) throw conflict("owns_station", "You own a station. Make someone on its team the owner first, then delete your account.");
+      const [business] = await db
+        .select({ id: schema.advertiserMemberships.advertiserId })
+        .from(schema.advertiserMemberships)
+        .where(and(eq(schema.advertiserMemberships.userId, userId), eq(schema.advertiserMemberships.role, "owner")))
+        .limit(1);
+      if (business) throw conflict("owns_business", "You own a business on Opencast. Close it (or ask us to move it) first, then delete your account.");
+
+      // Other modules first: pledges stop after this month, TVs sign out, notices go.
+      await services.ledger.stopPledgesOf(userId);
+      await services.tv.forgetUser(userId);
+      await services.notifications.forgetUser(userId);
+
+      const hostOf = await db
+        .select({ stationId: schema.stationMemberships.stationId })
+        .from(schema.stationMemberships)
+        .where(eq(schema.stationMemberships.userId, userId));
+      const at = wallClock();
+      await db.transaction(async (tx) => {
+        await tx.delete(schema.presets).where(eq(schema.presets.userId, userId));
+        await tx.delete(schema.presetKeyUse).where(eq(schema.presetKeyUse.userId, userId));
+        await tx.delete(schema.reminders).where(eq(schema.reminders.userId, userId));
+        await tx.delete(schema.notificationPrefs).where(eq(schema.notificationPrefs.userId, userId));
+        await tx.delete(schema.devices).where(eq(schema.devices.userId, userId));
+        await tx.delete(schema.watchHistory).where(eq(schema.watchHistory.userId, userId));
+        await tx.delete(schema.identities).where(eq(schema.identities.userId, userId));
+        await tx.delete(schema.stationMemberships).where(eq(schema.stationMemberships.userId, userId));
+        await tx.delete(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.userId, userId));
+        await tx.update(schema.clearLinks).set({ unlinkedAt: at }).where(and(eq(schema.clearLinks.userId, userId), isNull(schema.clearLinks.unlinkedAt)));
+        await tx.update(schema.signInSessions).set({ endedAt: at }).where(and(eq(schema.signInSessions.userId, userId), isNull(schema.signInSessions.endedAt)));
+        // The row stays, empty, because the ledger and others' records point at it.
+        await tx
+          .update(u)
+          .set({ displayName: null, email: null, marketId: null, isAdmin: false, settings: {}, signedOutAt: at, deletedAt: at })
+          .where(eq(u.id, userId));
+      });
+      for (const { stationId } of hostOf) await services.stations.removeHost(stationId, userId);
+    },
+
+    async opencastTeam() {
+      const rows = await db
+        .select({ id: u.id, displayName: u.displayName, email: u.email })
+        .from(u)
+        .where(and(eq(u.isAdmin, true), isNull(u.deletedAt)))
+        .orderBy(asc(u.displayName));
+      return rows.map((r) => ({ id: r.id, name: r.displayName ?? r.email ?? "Opencast team", email: r.email ?? "" }));
+    },
+
+    async notificationTiming(userId) {
+      const [user] = await db.select({ settings: u.settings, marketId: u.marketId }).from(u).where(eq(u.id, userId));
+      const market = user?.marketId ? (await services.network.marketsByIds([user.marketId])).get(user.marketId) : undefined;
+      return {
+        timing: ((user?.settings as { notifications?: NotificationTiming } | null)?.notifications ?? {}) as NotificationTiming,
+        timezone: market?.timezone ?? "America/Los_Angeles"
+      };
     },
 
     async team(scope) {

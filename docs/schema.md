@@ -20,7 +20,7 @@ npm run db:generate  # after editing packages/db/src/schema, write the next migr
 
 | Schema | Tables |
 |---|---|
-| `accounts` (10) | users, identities, station_memberships, advertiser_memberships, invites, presets, preset_key_use, reminders, notification_prefs, devices |
+| `accounts` (12) | users, identities, station_memberships, advertiser_memberships, invites, presets, preset_key_use, reminders, notification_prefs, devices, sign_in_sessions, watch_history (migration 0016: `sign_in_sessions` for sign out everywhere, `watch_history` kept only while the person's setting is on; `users.signed_out_at` and `deleted_at`) |
 | `broadcast` (24) | stations, channels, programs, assets, asset_files, asset_folders, asset_break_points, rights_confirmations, log_entries, repeat_groups, breaks, break_rules, blocked_categories, live_sources, host_assignments, speakers, schedules, playout_state, commands, translators, livepeer_config, import_jobs, as_run, dead_air_events |
 | `catalog` (4) | offers, requests, agreements, offer_previews |
 | `spots` (18) | advertisers, advertiser_locations, advertiser_markets, spots, spot_files, upload_checks, targeting, codes, code_events, rotations, rotation_spots, airings, sponsorship_settings, sponsorships, sponsorship_months, production_orders, order_files, order_notes |

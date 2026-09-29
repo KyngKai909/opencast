@@ -36,7 +36,14 @@ export const audienceApi = {
   heartbeat: endpoint({
     method: "POST",
     path: "/heartbeat",
-    auth: "public",
+    /**
+     * `optional` since 2026-09-28 (was `public`; anyone can still call it). Sent signed in (a Privy
+     * token, or a TV session), it also keeps the person's watch history (A2) when their
+     * keepWatchHistory setting is on. The tuned-in session itself stays anonymous: it's never
+     * linked to the person.
+     */
+    auth: "optional",
+    tvSession: true,
     summary: "Players send this every 30 seconds while tuned in",
     body: Heartbeat,
     response: z.object({ ok: z.literal(true), nextInMs: z.number().int() })

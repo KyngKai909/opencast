@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { BusinessRole, Id, Market, Ok, StationIdent, StationRole, Timestamp } from "./common.js";
+import { Pledge } from "./ledger.js";
+import { Notice, NotificationPrefs } from "./notifications.js";
+import { Tv } from "./tv.js";
 
 export const Identity = z.object({
   kind: z.enum(["email", "apple", "google", "wallet"]),
@@ -34,6 +37,25 @@ export const TvSettings = z
   .partial();
 export type TvSettings = z.infer<typeof TvSettings>;
 
+/**
+ * Notification timing (O2, added 2026-09-28), kept in `settings.notifications`. Every field is
+ * optional; what's shown when a field is absent is the default the sender uses.
+ */
+export const NotificationTiming = z
+  .object({
+    /** Reminder emails: "The evening before" (the only choice drawn). Absent: with the reminder. */
+    emailWhen: z.enum(["evening_before"]),
+    /** How early a reminder comes, in minutes before the start. Absent: at the start (within 5 minutes). */
+    leadMinutes: z.number().int().min(0).max(1440),
+    /** "Nothing between 10:00 pm and 8:00 am". On unless turned off: no pushes about your viewing in the window (notices still land in the app). */
+    quietHours: z.boolean(),
+    /** The window, in the account's market's time. Absent: 22:00 to 08:00. */
+    quietFrom: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+    quietTo: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+  })
+  .partial();
+export type NotificationTiming = z.infer<typeof NotificationTiming>;
+
 /** The eight settings sections. Unknown keys are kept, so the apps can add settings. */
 export const ViewerSettings = z
   .object({
@@ -53,7 +75,9 @@ export const ViewerSettings = z
     privacy: z.object({ keepWatchHistory: z.boolean() }).partial().optional(),
     tvs: z.object({ lockScreenRemote: z.boolean(), othersOnWifiCanChange: z.boolean() }).partial().optional(),
     /** A7 (added 2026-09-28): the TV app's own rows. */
-    tv: TvSettings.optional()
+    tv: TvSettings.optional(),
+    /** O2 (added 2026-09-28): reminder timing and quiet hours. */
+    notifications: NotificationTiming.optional()
   })
   .loose();
 
@@ -126,6 +150,51 @@ export const Invite = z.object({
 });
 
 export const Team = z.object({ members: z.array(TeamMember), invites: z.array(Invite) });
+
+/**
+ * Watch history and the last channel (A2, added 2026-09-28). Kept from signed-in heartbeats only
+ * while `settings.privacy.keepWatchHistory` is on (unset counts as on, as the settings show it),
+ * for 30 days. `keep` says whether it's being kept now.
+ */
+export const WatchHistory = z.object({
+  keep: z.boolean(),
+  /** The station watched most recently, for "It opens tuned in". */
+  lastChannel: z.object({ station: StationIdent, at: Timestamp }).nullable(),
+  /** Newest first: each stretch of watching one station. */
+  items: z.array(z.object({ station: StationIdent, startedAt: Timestamp, endedAt: Timestamp }))
+});
+export type WatchHistory = z.infer<typeof WatchHistory>;
+
+/** A receipt for a pledge payment (E1). */
+export const PledgeReceipt = z.object({ id: Id, on: z.iso.date(), amountMicros: z.number().int(), url: z.string().nullable() });
+
+/** Everything the account holds, as one JSON file (A3, added 2026-09-28). */
+export const AccountExport = z.object({
+  exportedAt: Timestamp,
+  account: z.object({
+    id: Id,
+    displayName: z.string().nullable(),
+    email: z.string().nullable(),
+    market: Market.nullable(),
+    createdAt: Timestamp,
+    settings: ViewerSettings
+  }),
+  identities: z.array(Identity),
+  memberships: z.array(Membership),
+  presets: z.array(Preset),
+  reminders: z.array(Reminder),
+  watchHistory: WatchHistory.shape.items,
+  pledges: z.array(Pledge),
+  notificationPrefs: z.array(z.object({ scope: z.enum(["viewer", "station", "business"]), scopeId: Id.nullable(), prefs: NotificationPrefs })),
+  notices: z.array(Notice),
+  tvs: z.array(Tv),
+  clear: ClearLink.nullable()
+});
+export type AccountExport = z.infer<typeof AccountExport>;
+
+/** An Opencast admin, for "Run by" (A6). */
+export const OpencastTeamMember = z.object({ id: Id, name: z.string(), email: z.string() });
+export type OpencastTeamMember = z.infer<typeof OpencastTeamMember>;
 
 const StationParams = z.object({ stationId: Id });
 const BusinessParams = z.object({ businessId: Id });
@@ -352,6 +421,62 @@ export const accountsApi = {
     summary: "Join the team the invite is for",
     params: z.object({ inviteId: Id }),
     response: Me
+  }),
+
+  // ---- Added 2026-09-28: A1, A2, A3, A6 ----
+
+  signOutEverywhere: endpoint({
+    method: "POST",
+    path: "/me/sign-out-everywhere",
+    auth: "user",
+    summary:
+      "A1: sign out every phone, computer and TV. Every Privy token issued before now, and every later token of a session seen before now, answers 401 `signed_out`; TVs signed in to the account are signed out and their phones dropped. This device signs out too.",
+    response: Ok
+  }),
+  getWatchHistory: endpoint({
+    method: "GET",
+    path: "/me/watch-history",
+    auth: "user",
+    tvSession: true,
+    summary: "A2: the last channel and the last 30 days of watching (empty while keepWatchHistory is off)",
+    response: WatchHistory
+  }),
+  clearWatchHistory: endpoint({
+    method: "DELETE",
+    path: "/me/watch-history",
+    auth: "user",
+    tvSession: true,
+    summary: "A2: clear watch history and the last channel",
+    response: Ok
+  }),
+  exportData: endpoint({
+    method: "POST",
+    path: "/me/export",
+    auth: "user",
+    summary: "A3: email a link to download everything the account holds (the link opens the app, which calls downloadData). 409 `no_email` without an email.",
+    response: z.object({ email: z.string(), readyBy: Timestamp })
+  }),
+  downloadData: endpoint({
+    method: "GET",
+    path: "/me/export",
+    auth: "user",
+    summary: "A3: everything the account holds, as JSON (save it as a file)",
+    response: AccountExport
+  }),
+  deleteAccount: endpoint({
+    method: "DELETE",
+    path: "/me",
+    auth: "user",
+    summary:
+      "A3: delete the account now (no grace period). Presets, reminders, watch history, notices and TVs go; pledges stop after this month; team places are left. 409 `owns_station` or `owns_business` while the person owns one: hand it over (or close it) first.",
+    response: Ok
+  }),
+  listOpencastTeam: endpoint({
+    method: "GET",
+    path: "/admin/team",
+    auth: "admin",
+    summary: "A6: the Opencast team (admins), who can run a claimable station",
+    response: z.array(OpencastTeamMember)
   })
 };
 

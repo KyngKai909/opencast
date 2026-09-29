@@ -7,10 +7,10 @@
 // never left airing something unpaid: if a business can't cover a per-thousand
 // airing's real cost, Opencast absorbs the gap and records it.
 
-import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
-import { badRequest, conflict, notFound, refused } from "../../errors.js";
+import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { stripeCardFeeMicros, walletDestination, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
 import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
 
@@ -98,7 +98,11 @@ export interface LedgerService {
   moveToBank(stationId: string, micros: number): Promise<{ payoutId: string; scheduledFor: string }>;
   pledge(userId: string, stationId: string, input: { cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean }): Promise<{ pledge: PledgeView; checkoutUrl: string | null }>;
   pledges(userId: string): Promise<PledgeView[]>;
-  updatePledge(userId: string, pledgeId: string, input: { amountMicros?: number; creditOnAir?: boolean; stop?: true }): Promise<PledgeView>;
+  updatePledge(userId: string, pledgeId: string, input: { amountMicros?: number; creditOnAir?: boolean; stop?: true; cadence?: "monthly" | "once" }): Promise<PledgeView>;
+  /** E1: a page to change the card on a monthly pledge. */
+  pledgeCardSession(userId: string, pledgeId: string, returnTo?: string): Promise<{ url: string }>;
+  /** A3: every pledge of the person's stops after this month. */
+  stopPledgesOf(userId: string): Promise<void>;
   /** Pledges for on-air member credits. */
   memberCredits(stationId: string): Promise<{ members: number; named: string[] }>;
   /** A claimable station's money: owed to escrow (settled, not yet deposited) and in escrow. */
@@ -205,7 +209,8 @@ export interface PledgeView {
   startedAt: string;
   nextChargeOn: string | null;
   endsAfter: string | null;
-  receipts: { count: number; totalMicros: number };
+  receipts: { count: number; totalMicros: number; items: Array<{ id: string; on: string; amountMicros: number; url: string | null }> };
+  card: { label: string; expired: boolean; expiresOn: string | null } | null;
 }
 
 const L = schema.accountsTable;
@@ -1124,7 +1129,10 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         cadence: input.cadence,
         returnUrl: `${deps.config.appOrigin}/stations/${stationId}`
       });
-      await db.update(schema.pledges).set({ stripeRef: started.providerRef }).where(eq(schema.pledges.id, row.id));
+      await db
+        .update(schema.pledges)
+        .set({ stripeRef: started.providerRef, ...(started.card ? { cardLabel: started.card.label, cardExpiresOn: started.card.expiresOn } : {}) })
+        .where(eq(schema.pledges.id, row.id));
       // Paid now (the fake), or when Stripe says so (the webhook).
       if (started.paidNow) await pledgeReceived(row.id, input.amountMicros, started.feeMicros, started.providerRef);
       return { pledge: (await service.pledges(userId)).find((p) => p.id === row.id)!, checkoutUrl: started.checkoutUrl };
@@ -1133,18 +1141,29 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     async pledges(userId) {
       const rows = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, userId)).orderBy(desc(schema.pledges.startedAt));
       const idents = await services.stations.idents(rows.map((r) => r.stationId));
+      // Each payment is a pledge entry; what the person paid is what came in from the card network.
       const receipts = rows.length
         ? await db
-            .select({ pledgeId: E.sourceId, n: sql<number>`count(distinct ${E.id})::int` })
+            .select({
+              id: E.id,
+              pledgeId: E.sourceId,
+              occurredAt: E.occurredAt,
+              micros: sql<number>`sum(case when ${P.amountMicros} < 0 then -${P.amountMicros} else 0 end)::bigint`
+            })
             .from(E)
+            .innerJoin(P, eq(P.entryId, E.id))
             .where(and(eq(E.kind, "pledge"), inArray(E.sourceId, rows.map((r) => r.id))))
-            .groupBy(E.sourceId)
+            .groupBy(E.id)
+            .orderBy(desc(E.occurredAt))
         : [];
-      const receiptsBy = new Map(receipts.map((r) => [r.pledgeId, r.n]));
+      const today = deps.clock.now().toISOString().slice(0, 10);
       return rows.flatMap((r) => {
         const station = idents.get(r.stationId);
         if (!station) return [];
-        const count = receiptsBy.get(r.id) ?? 0;
+        const items = receipts
+          .filter((x) => x.pledgeId === r.id)
+          .map((x) => ({ id: x.id, on: x.occurredAt.toISOString().slice(0, 10), amountMicros: Number(x.micros), url: null }));
+        const count = items.length;
         const next = new Date(r.startedAt);
         next.setUTCMonth(next.getUTCMonth() + Math.max(1, count));
         return [
@@ -1157,7 +1176,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             startedAt: r.startedAt.toISOString(),
             nextChargeOn: r.cadence === "monthly" && !r.endsAfter ? next.toISOString().slice(0, 10) : null,
             endsAfter: r.endsAfter,
-            receipts: { count, totalMicros: count * r.amountMicros }
+            receipts: { count, totalMicros: items.reduce((sum, x) => sum + x.amountMicros, 0), items },
+            card: r.cardLabel ? { label: r.cardLabel, expiresOn: r.cardExpiresOn, expired: Boolean(r.cardExpiresOn && r.cardExpiresOn < today) } : null
           }
         ];
       });
@@ -1167,18 +1187,65 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       const [row] = await db.select().from(schema.pledges).where(and(eq(schema.pledges.id, pledgeId), eq(schema.pledges.userId, userId)));
       if (!row) throw notFound("That pledge");
       const now = deps.clock.now();
+      const today = now.toISOString().slice(0, 10);
       const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      // E1: monthly or once. A monthly pledge set to once isn't charged again: it ends after this
+      // month, like stopping. Set back to monthly before then, it carries on.
+      let endsAfter: string | null | undefined = input.stop ? monthEnd : undefined;
+      let end = Boolean(input.stop && row.cadence === "monthly");
+      let resume = false;
+      if (input.cadence === "monthly" && row.cadence === "once") throw refused("new_pledge_needed", "A one-time pledge can't become monthly. Pledge again, monthly.");
+      if (input.cadence === "once" && row.cadence === "monthly" && !row.endsAfter) {
+        endsAfter = monthEnd;
+        end = true;
+      }
+      if (input.cadence === "monthly" && row.cadence === "monthly" && row.endsAfter && !input.stop) {
+        if (row.endsAfter < today) throw refused("pledge_ended", "This pledge has ended. Pledge again to start it.");
+        endsAfter = null;
+        resume = true;
+      }
       await db
         .update(schema.pledges)
         .set({
           ...(input.amountMicros !== undefined ? { amountMicros: input.amountMicros } : {}),
           ...(input.creditOnAir !== undefined ? { creditOnAir: input.creditOnAir } : {}),
-          // Stopping ends it after the current month.
-          ...(input.stop ? { endsAfter: monthEnd } : {})
+          ...(endsAfter !== undefined ? { endsAfter } : {})
         })
         .where(eq(schema.pledges.id, pledgeId));
-      if (input.stop && row.cadence === "monthly" && row.stripeRef) await deps.payments.endPledge(row.stripeRef);
+      if (end && row.stripeRef) await deps.payments.endPledge(row.stripeRef);
+      if (resume && row.stripeRef) await deps.payments.resumePledge(row.stripeRef);
       return (await service.pledges(userId)).find((p) => p.id === pledgeId)!;
+    },
+
+    async pledgeCardSession(userId, pledgeId, returnTo) {
+      const [row] = await db.select().from(schema.pledges).where(and(eq(schema.pledges.id, pledgeId), eq(schema.pledges.userId, userId)));
+      if (!row) throw notFound("That pledge");
+      if (row.cadence !== "monthly" || row.endsAfter || !row.stripeRef) {
+        throw refused("no_card_to_change", row.cadence === "once" ? "A one-time pledge has nothing more to charge." : "This pledge isn't charged again.");
+      }
+      const returnUrl = `${deps.config.appOrigin.replace(/\/+$/, "")}${returnTo ?? `/you/pledges/${pledgeId}`}`;
+      let session;
+      try {
+        session = await deps.payments.pledgeCardSession({ pledgeId, providerRef: row.stripeRef, returnUrl });
+      } catch (error) {
+        console.error("[ledger] card session failed", error);
+        throw new HttpError(502, "provider_unavailable", "Couldn't open the card page just now. Try again in a moment.");
+      }
+      if (session.card) await db.update(schema.pledges).set({ cardLabel: session.card.label, cardExpiresOn: session.card.expiresOn }).where(eq(schema.pledges.id, pledgeId));
+      return { url: session.url };
+    },
+
+    async stopPledgesOf(userId) {
+      const now = deps.clock.now();
+      const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+      const rows = await db
+        .select()
+        .from(schema.pledges)
+        .where(and(eq(schema.pledges.userId, userId), eq(schema.pledges.cadence, "monthly"), isNull(schema.pledges.endsAfter)));
+      for (const row of rows) {
+        await db.update(schema.pledges).set({ endsAfter: monthEnd }).where(eq(schema.pledges.id, row.id));
+        if (row.stripeRef) await deps.payments.endPledge(row.stripeRef).catch((error) => console.error(`[ledger] ending pledge ${row.id} at the provider failed`, error));
+      }
     },
 
     checkRunway: (businessId) => checkRunway(businessId),
@@ -1195,7 +1262,17 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           return;
         }
         case "pledge_paid":
+          if (event.card) await db.update(schema.pledges).set({ cardLabel: event.card.label, cardExpiresOn: event.card.expiresOn }).where(eq(schema.pledges.id, event.pledgeId));
           return pledgeReceived(event.pledgeId, event.amountMicros, event.feeMicros, event.providerRef);
+        case "pledge_started":
+          await db
+            .update(schema.pledges)
+            .set({ stripeRef: event.providerRef, ...(event.card ? { cardLabel: event.card.label, cardExpiresOn: event.card.expiresOn } : {}) })
+            .where(eq(schema.pledges.id, event.pledgeId));
+          return;
+        case "pledge_card":
+          await db.update(schema.pledges).set({ cardLabel: event.card.label, cardExpiresOn: event.card.expiresOn }).where(eq(schema.pledges.id, event.pledgeId));
+          return;
         case "pledge_ended": {
           const today = deps.clock.now().toISOString().slice(0, 10);
           await db.update(schema.pledges).set({ endsAfter: today }).where(and(eq(schema.pledges.id, event.pledgeId), sql`${schema.pledges.endsAfter} is null`));

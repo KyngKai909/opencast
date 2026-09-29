@@ -843,6 +843,12 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           .where(and(eq(schema.rotationSpots.rotationId, rotation.id), isNull(schema.rotationSpots.removedAt)));
         if (spotIds.length) await tx.insert(schema.rotationSpots).values(spotIds.map((spotId, position) => ({ rotationId: rotation.id, spotId, position })));
       });
+      // The business hears about spots newly added (O1).
+      const added = spotIds.filter((id) => !already.has(id));
+      if (added.length) {
+        const owners = await db.select({ id: SP.id, advertiserId: SP.advertiserId }).from(SP).where(inArray(SP.id, added));
+        for (const o of owners) deps.bus.emit("spot.added_to_rotation", { spotId: o.id, businessId: o.advertiserId, stationId, backup: kind === "backup" });
+      }
       const views = await service.rotations(stationId);
       return kind === "main" ? views.main : views.backup;
     },

@@ -67,6 +67,8 @@ export interface LibraryService {
   searchPrograms(q: string): Promise<ProgramRef[]>;
   /** For sign-on checks: items and how many have confirmed rights; programs missing a listing. */
   readiness(stationId: string): Promise<{ items: number; rightsConfirmed: number; programsNeedingDescription: number }>;
+  /** A claimable station's works from its creator: how many are prepared for air, of how many (N5). */
+  creatorWorkImports(stationIds: string[]): Promise<Map<string, { done: number; total: number }>>;
   hasLinkImports(programId: string): Promise<boolean>;
   /** A station's own station IDs and bumpers, ready for air with rights confirmed. */
   fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[] }>;
@@ -511,6 +513,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .where(ilike(P.title, `%${q.replace(/[%_]/g, "")}%`))
         .limit(20);
       return rows.map(programRef);
+    },
+
+    async creatorWorkImports(stationIds) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: A.stationId, total: sql<number>`count(*)::int`, done: sql<number>`count(*) filter (where ${A.status} = 'ready')::int` })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), eq(A.source, "creator_work"), isNull(A.archivedAt)))
+        .groupBy(A.stationId);
+      return new Map(rows.map((r) => [r.stationId, { done: r.done, total: r.total }]));
     },
 
     async readiness(stationId) {

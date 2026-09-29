@@ -47,6 +47,10 @@ export interface TvService {
   /** Ends a TV's session on this account, or forgets a cast target. */
   signOutTv(userId: string, tvId: string): Promise<Tv[]>;
   recordCastTarget(userId: string, input: { kind: "chromecast" | "airplay"; name: string }): Promise<Tv>;
+  /** A1: every TV signed in to the account signs out (and is told), and the phones the person drives TVs with are dropped. */
+  signOutEverywhere(userId: string): Promise<void>;
+  /** A3: signs out everywhere and forgets the account's cast targets. */
+  forgetUser(userId: string): Promise<void>;
   /** The live session on a TV, if it's signed in. */
   liveSession(tvId: string): Promise<{ id: string; userId: string } | null>;
   remote: Remote;
@@ -332,6 +336,21 @@ export function createTvService(ctx: ModuleContext): TvService {
       }
       const [row] = await db.insert(T).values({ userId, kind: input.kind, name, lastUsedAt: at, createdAt: at }).returning();
       return targetView(row);
+    },
+
+    async signOutEverywhere(userId) {
+      const ended = await db
+        .update(S)
+        .set({ endedAt: now(), endedBy: "account" })
+        .where(and(eq(S.userId, userId), isNull(S.endedAt)))
+        .returning({ deviceId: S.deviceId });
+      for (const { deviceId } of ended) await service.remote.accountSignedOut(deviceId, { tellTv: true });
+      await service.remote.dropPhonesOf(userId);
+    },
+
+    async forgetUser(userId) {
+      await service.signOutEverywhere(userId);
+      await db.delete(T).where(eq(T.userId, userId));
     },
 
     remote: undefined as unknown as Remote

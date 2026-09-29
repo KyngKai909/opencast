@@ -255,6 +255,28 @@ describe("the Stripe adapter against stripe-mock", async () => {
     }
   });
 
+  it.runIf(available)("E1: a card page for a monthly pledge, and the new card read back from its webhook", async () => {
+    const session = await cards.cardSession({ pledgeId: "pl-1", providerRef: "sub_123", returnUrl: "https://app.opencast.test/you/pledges/pl-1" });
+    expect(session.url).toMatch(/^https:\/\//);
+    await expect(cards.cardSession({ pledgeId: "pl-1", providerRef: "cs_123", returnUrl: "https://app.opencast.test/" })).rejects.toThrow(/hasn't started/);
+    await cards.resumeSubscription("sub_123");
+
+    const stripe = new Stripe("sk_test_123");
+    const event = (object: object) => JSON.stringify({ id: "evt_1", object: "event", type: "checkout.session.completed", data: { object }, api_version: "2025-01-01", created: 1, livemode: false });
+    const sign = (payload: string) => stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_x" });
+    const setup = event({ id: "cs_setup", object: "checkout.session", mode: "setup", setup_intent: "seti_123", metadata: { pledgeId: "pl-1", subscription: "sub_123" } });
+    // stripe-mock's setup intents have no payment method: say this one took pm_123 (its fixture card).
+    const retrieve = cards.stripe.setupIntents.retrieve;
+    cards.stripe.setupIntents.retrieve = (async () => ({ id: "seti_123", payment_method: "pm_123" })) as never;
+    try {
+      expect(await cards.parse(Buffer.from(setup), sign(setup))).toMatchObject({ kind: "pledge_card", pledgeId: "pl-1", card: { label: "Visa ending 4242" } });
+    } finally {
+      cards.stripe.setupIntents.retrieve = retrieve;
+    }
+    const started = event({ id: "cs_sub", object: "checkout.session", mode: "subscription", subscription: "sub_123", metadata: { pledgeId: "pl-2" } });
+    expect(await cards.parse(Buffer.from(started), sign(started))).toMatchObject({ kind: "pledge_started", pledgeId: "pl-2", providerRef: "sub_123" });
+  });
+
   it.runIf(available)("opens a Connect Express account for a station, and transfers to it", async () => {
     const station = { type: "station" as const, id: "22222222-2222-4222-8222-222222222222", name: "Inland Beat" };
     const connect = await cards.connectAccount(station, accounts, "https://app.opencast.test/stations/st-1/earnings");
