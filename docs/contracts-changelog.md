@@ -2,6 +2,46 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-28: TVs, sign-in by code, the phone remote's relay, the market from where you are (B2, S10, A7, S13)
+
+All additive; nothing existing changed shape. New file `tv.ts` (`api.tv`); two endpoints in `api.stations`.
+
+Core:
+
+- `Auth` gains `"device"`: a TV app, with its `deviceToken` or its TV session token as `Authorization: Bearer`.
+- `EndpointDef.tvSession` (optional): the endpoint also accepts a TV session token as `user`, acting as the person who approved the TV (never as an admin). Set on `accounts.getMe`, `updateMe`, `mergeDevice`, `listPresets`, `savePreset`, `reorderPresets`, `removePreset`, `suggestPresetKey`, `usePresetKey`, `listReminders`, `addReminder`, `updateReminder`, `removeReminder`, and `ledger.listMyPledges`. Any other `user` or `admin` endpoint answers a TV session 403 `tv_not_allowed`; a signed-out TV session answers 401 `tv_signed_out`.
+- `EndpointDef.events` (optional): the endpoint is a Server-Sent Events stream; each key is an event name and its schema is the event's `data` (JSON). `response` describes them as `{ event, data }`. A `: ping` comment comes every 25 s. EventSource can't send `Authorization`: read streams with `fetch` and a reader (or an EventSource that takes headers).
+
+TVs and sign-in by code (B2), `api.tv`:
+
+- `registerTv` `POST /tv/devices` (public), body `{ platform: "android_tv" | "fire_tv" | "google_tv" | "tv_browser" | "web", name? }` → 201 `RegisteredTv` `{ tvId, deviceToken }`. Keep the token; it's shown once.
+- `createTvCode` `POST /tv/codes` (device) → 201 `TvCode` `{ code, qrUrl, enterAt, expiresAt, pollToken, pollSeconds }`. `code` is 6 characters with no 0, O, 1 or I ("K7Q4MP"; show it as "K7Q 4MP"), 10 minutes; `qrUrl` is `${APP_ORIGIN}/tv?code=K7Q4MP`; `enterAt` is the viewer's host + `/tv`; `pollSeconds` is 3. A new code replaces the TV's earlier ones.
+- `pollTvCode` `GET /tv/codes/:pollToken` (public) → `TvCodeStatus`: `{ status: "pending" }`, `{ status: "approved", token, signedInAs }` (the TV session, handed over once; the next poll says expired) or `{ status: "expired" }`. Unknown poll token: 404.
+- `approveTvCode` `POST /tv/codes/:code/approve` (user) → `Tv`. The code may have spaces or be lower case. 404 `code_not_found` (wrong or run out), 409 `code_used`, 429 `too_many_tries` (10 wrong codes in 15 minutes per person). Signing a TV in again replaces its session.
+- `signOutThisTv` `DELETE /tv/session` (device) → `Ok`. The mock declared it `user`; the TV session token still works here, and so does the device token.
+- `listTvs` `GET /me/tvs` (user) → `Tv[]`; `signOutTv` `DELETE /me/tvs/:tvId` (user) → `Tv[]` (ends a TV's session remotely, or forgets a cast target; 404 otherwise); `recordCastTarget` `POST /me/tvs/cast-targets` (user), body `{ kind: "chromecast" | "airplay", name }` → 201 `Tv` (the same name again, any case, is the same target, marked used).
+- `Tv`: `{ id, name, kind: "tv_app" | "chromecast" | "airplay", platform: TvPlatform | null, signedIn, lastUsedAt, online, castingNow }`. `online`: the TV app's relay stream is open (10 s grace after it closes). `castingNow`: a phone on this account is connected to its remote. Both false for cast targets. `platform` is the enum value (the apps label it "Fire TV"); `name` defaults to the platform's name.
+
+The remote relay, `api.tv` (the Cast receiver's command and state messages):
+
+- `RemoteCommand`: a discriminated union on `type`, the shapes `parseCastCommand` accepts, without `from`: `channel {dir}`, `digit {digit 0-9}`, `dot`, `tune {channel "12.1"}`, `preset {key 1-6}`, `savePreset {key 1-6}`, `last`, `info`, `guide`, `presets`, `menu`, `back`, `select`, `focus {dir}`, `pause`, `play`, `togglePlay`, `backToLive`, `sleep {until: minutes 1-240 | "end_of_program" | null}`.
+- `RemoteState`: `{ stationId, paused, changedBy, sleepEndsAt }` (ms since the epoch). `RemotePhone`: `{ id, name, kind: "account" | "guest", connected, pairedAt, lastCommandAt }`.
+- The TV (device): `tvRemoteEvents` `GET /tv/remote/events` (SSE: `command` `{ command, from: { phoneId, name }, at }`, `phones` `{ phones: RemotePhone[] }` (also first thing on open), `signed_out` `{}` when the account signs it out); `postRemoteState` `POST /tv/remote/state` body `RemoteState` → `Ok`; `endRemote` `POST /tv/remote/end` → `Ok` (phones get `ended` `tv_ended`); `createPairCode` `POST /tv/remote/pair-code` → 201 `{ code: "4821", expiresAt }` (5 minutes, a new one replaces the last); `listRemotePhones` `GET /tv/remote/phones`; `removeRemotePhone` `DELETE /tv/remote/phones/:phoneId` → `RemotePhone[]`.
+- A phone: `pairPhone` `POST /tv/remote/pair` (optional auth), body `{ code, name }` → 201 `{ tvId, tvName, phoneToken }` (404 `code_not_found`; 429 `too_many_tries` after 10 wrong in 10 minutes, per account or per connection); `phoneRemoteEvents` `GET /tv/remote/:tvId/events` (SSE: `state` (also on open, if the TV has said), `ended` `{ reason: "tv_ended" | "unpaired" | "signed_out" }`, then the stream closes); `sendRemoteCommand` `POST /tv/remote/:tvId/commands` body `{ command, name }` → 202 `Ok` (409 `tv_not_connected` when the TV's stream isn't open). The caller is a phone signed in to the TV's account (its Privy token) or a guest phone (its `phoneToken`); anyone else 403 `not_paired`, an unknown TV 404.
+- Who may change the channel stays the TV's decision (`anyone` or only the phone that started), as on Cast: the relay only says who sent each command.
+
+The market from where you are (S10), `api.stations`:
+
+- `MarketLookup` `{ market: Market | null, nearby: Array<{ market, miles: number | null }> }`. `miles` is null when where the person is isn't known. (The TV mock's `MarketByConnection` had `miles: number`.)
+- `marketForConnection` `GET /markets/by-connection` (public): from the request's address, never stored or logged. A lookup giving a ZIP uses the ZIP's market (nearby with miles from its centre); one giving coordinates works as by-location. No lookup configured (`GEOIP_URL`), a private address or no answer: `{ market: null, nearby: <open markets, miles null> }`.
+- `marketForLocation` `GET /markets/by-location?lat=&lng=` (public): the nearest market within 50 miles of its centre (open or not), and the others within 60 miles with miles from the point, nearest first; nothing that close: `market` null and the open markets by distance.
+
+Settings (A7): `ViewerSettings.tv` (optional, `TvSettings`, every field optional): `{ channelUp: "up_the_dial" | "down_the_dial", bannerSeconds: 3 | 5 | 8, numberWaitSeconds: 1 | 1.5 | 2 | 3, includeRadioBand, quality: "auto" | "data_saver" | "best", eveningOut }`. It was kept already (the top level is loose); now a value outside these is refused (400). `updateMe` replaces the whole `tv` section, as with every section.
+
+Stand by (S13): `DialRow.signal` (optional): `"standby"` while a live block is on the stand-by slate waiting for its signal, `"ok"` otherwise, absent when the station isn't on air and for listed city streams.
+
+Audience: `Platform` gains `"mirror"` (TV mode on the iPhone's second screen), accepted by `heartbeat`. `AudienceReport.byPlatform.mirror` (optional in the schema, always sent now).
+
 ## 2026-09-28: Clear as a Privy global wallet, and ads from partners (new fields and endpoints)
 
 All additive; nothing existing changed shape.

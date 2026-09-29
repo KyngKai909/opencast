@@ -28,6 +28,7 @@ npm run db:generate  # after editing packages/db/src/schema, write the next migr
 | `trust` (4) | claims, answers, takedowns, policy |
 | `network` (15) | markets, zip_markets, waitlist_signups, call_sign_reservations, channel_holds, creators, creator_works, permission_requests, permission_records, permission_record_works, licence_records, recipes, listed_sources, listed_airings, handovers |
 | `audience` (3) | sessions, minute_samples, translator_samples |
+| `tv` (7) | devices, sessions, sign_in_codes, cast_targets, pair_codes, remote_phones, code_attempts (migration 0015: the TV app's devices, sign-in by code, and the phone remote's relay; `accounts.devices` from Phase 3 is unused and kept) |
 
 ### Shapes worth knowing
 

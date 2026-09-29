@@ -38,7 +38,12 @@ export const DialRow = z.object({
   now: Airing.nullable(),
   next: Airing.nullable(),
   /** Listed city streams play in the source's own player. */
-  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable()
+  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable(),
+  /**
+   * S13 (added 2026-09-28): `standby` while a live block is on the stand-by slate waiting for its
+   * signal; `ok` otherwise. Absent when the station isn't on air (and from listed city streams).
+   */
+  signal: z.enum(["ok", "standby"]).optional()
 });
 
 export const Dial = z.object({
@@ -155,6 +160,16 @@ export const AvailableChannels = z.object({
   channels: z.array(z.object({ channel: ChannelNumber, state: z.enum(["open", "taken", "held"]) }))
 });
 
+/**
+ * A market found from where someone is (S10, added 2026-09-28). `miles` is from the market's
+ * centre to the person's, or null when where they are isn't known (only the markets are).
+ */
+export const MarketLookup = z.object({
+  market: Market.nullable(),
+  nearby: z.array(z.object({ market: Market, miles: z.number().nullable() }))
+});
+export type MarketLookup = z.infer<typeof MarketLookup>;
+
 const StationParams = z.object({ stationId: Id });
 
 export const stationsApi = {
@@ -166,6 +181,25 @@ export const stationsApi = {
     summary: "Your ZIP decides your market. Location isn't stored.",
     params: z.object({ zip: z.string().regex(/^\d{5}$/) }),
     response: z.object({ market: Market.nullable(), nearby: z.array(z.object({ market: Market, miles: z.number() })) })
+  }),
+  /** S10 (added 2026-09-28): TV first launch. */
+  marketForConnection: endpoint({
+    method: "GET",
+    path: "/markets/by-connection",
+    auth: "public",
+    summary:
+      "The market for the request's internet address, which isn't stored or logged. With no lookup configured, or a private address, `market` is null and `nearby` is the open markets (miles null).",
+    response: MarketLookup
+  }),
+  /** S10 (added 2026-09-28): "Use my location". */
+  marketForLocation: endpoint({
+    method: "GET",
+    path: "/markets/by-location",
+    auth: "public",
+    summary:
+      "The market for a point (the device's location), which isn't stored: the nearest market within 50 miles of its centre, and others within 60 miles, nearest first. Nothing that close: `market` null and the open markets by distance.",
+    query: z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180) }),
+    response: MarketLookup
   }),
   getDial: endpoint({
     method: "GET",

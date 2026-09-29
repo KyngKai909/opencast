@@ -36,6 +36,8 @@ describe("live block", () => {
   it("stands by without a signal, airs the encoder while it's there, and stands by again", async () => {
     const engine = createEngine({ deps: h.deps, services: h.services }, { liveListen: { host: "127.0.0.1", port: PORT }, log: (l) => logs.push(l) });
     let pushed = false;
+    // S13: what the dial reads, as it goes (runs of the same value collapsed).
+    const standingBy: boolean[] = [];
     while (Date.now() < t0 + 25_000) {
       if (!pushed && Date.now() >= t0 + 5_000) {
         pushed = true;
@@ -43,6 +45,10 @@ describe("live block", () => {
       }
       await engine.tick();
       await new Promise((r) => setTimeout(r, 500));
+      if (Date.now() > t0 + 3_000 && Date.now() < t0 + 23_000) {
+        const [state] = await h.db.select().from(schema.playoutState).where(eq(schema.playoutState.stationId, stationId));
+        if (standingBy[standingBy.length - 1] !== state.standingBy) standingBy.push(state.standingBy);
+      }
     }
     await engine.stopAll();
     await h.deps.bus.settle();
@@ -59,6 +65,8 @@ describe("live block", () => {
     // No gaps between them: the station never went silent.
     expect(live.startedAt.getTime() - before.endedAt.getTime()).toBeLessThan(500);
     expect(after.startedAt.getTime() - live.endedAt.getTime()).toBeLessThan(500);
+
+    expect(standingBy).toEqual([true, false, true]);
 
     const notices = await h.db.select().from(schema.notices);
     expect(notices.some((n) => n.kind === "signal_lost")).toBe(true);

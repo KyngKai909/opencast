@@ -544,6 +544,8 @@ export const playoutState = broadcast.table("playout_state", {
   currentStartedAt: at("current_started_at"),
   currentOffsetMs: millis("current_offset_ms").notNull().default(0),
   lastError: text("last_error"),
+  /** A live block is on the stand-by slate, waiting for its signal. */
+  standingBy: boolean("standing_by").notNull().default(false),
   updatedAt: at("updated_at").notNull().defaultNow()
 });
 

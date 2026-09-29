@@ -33,11 +33,13 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 
 | Variable | api | worker | Notes |
 |---|---|---|---|
-| `DATABASE_URL`, `REDIS_URL` | ✓ | ✓ | references to Postgres and Redis |
+| `DATABASE_URL`, `REDIS_URL` | ✓ | ✓ | references to Postgres and Redis. The API uses Redis pub/sub for the TV remote's relay, so phones and TVs on different API replicas reach each other; without it the relay only works within one replica |
 | `NODE_ENV` | ✓ | ✓ | `production` (hides error details; a live Stripe key is refused otherwise) |
 | `PORT` | 8080 | 8080 | the public domains point at 8080 |
 | `APP_ORIGIN` | ✓ | ✓ | the viewer's URL (links in notices, Stripe return URLs) |
 | `WEB_ORIGIN` | ✓ | | every app's origin, comma-separated (CORS) |
+| `GEOIP_URL` | ✓ | | optional: an ip-to-postal lookup with `{ip}` in it (answering a ZIP as text, or JSON with a ZIP and/or coordinates), for `GET /markets/by-connection` (a TV's first launch). Unset: that endpoint answers no market and the open markets. Addresses are never stored or logged |
+| `TRUST_PROXY_HOPS` | ✓ | | how many proxies add `X-Forwarded-For` entries before the API (default 1, Railway's edge): the client's address is that many entries from the end |
 | `STORAGE_ROOT` | `/tmp/opencast` | `/data/storage` | the API only keeps temporary files; the worker's HLS and proof frames live on its volume |
 | `WORKER_CACHE_DIR`, `WORKER_CACHE_GB` | | ✓ | `/data/cache`; 4.5 on staging, 99.5 in production |
 | `LEGACY_PLAYOUT` | | `off` | no station is on the old queue model |

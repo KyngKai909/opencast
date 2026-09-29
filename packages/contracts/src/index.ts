@@ -19,6 +19,7 @@ import { spotsApi } from "./spots.js";
 import { stationsApi } from "./stations.js";
 import { trustApi } from "./trust.js";
 import { waitlistApi } from "./waitlist.js";
+import { tvApi } from "./tv.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -35,6 +36,7 @@ export * from "./trust.js";
 export * from "./notifications.js";
 export * from "./waitlist.js";
 export * from "./network.js";
+export * from "./tv.js";
 
 export const API_PREFIX = "/v1";
 
@@ -52,7 +54,8 @@ export const api = {
   trust: trustApi,
   notifications: notificationsApi,
   waitlist: waitlistApi,
-  network: networkApi
+  network: networkApi,
+  tv: tvApi
 } as const;
 
 export const HealthResponse = z.object({

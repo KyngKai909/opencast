@@ -12,6 +12,8 @@ export const trust = pgSchema("trust");
 export const network = pgSchema("network");
 export const audience = pgSchema("audience");
 export const notify = pgSchema("notify");
+/** The TV app: devices, their sign-ins by code, and the phone remote's relay. */
+export const tv = pgSchema("tv");
 
 export const band = broadcast.enum("band", ["tv", "radio"]);
 

@@ -19,6 +19,14 @@ export interface NetworkService extends DeskPart {
   marketForZip(zip: string): Promise<Market | null>;
   /** Other markets within `maxMiles` of this one's centre, nearest first. */
   nearbyMarkets(marketId: string, maxMiles?: number): Promise<Array<{ market: Market; miles: number }>>;
+  /**
+   * The market for a point (a device's location, or where its connection is): the nearest market
+   * within 50 miles of its centre, and the others within 60 miles, nearest first. With nothing that
+   * close, no market and the open markets by distance. The point isn't stored.
+   */
+  marketNear(point: { lat: number; lng: number }): Promise<{ market: Market | null; nearby: Array<{ market: Market; miles: number | null }> }>;
+  /** Open markets by name, for when where someone is isn't known. */
+  openMarkets(): Promise<Market[]>;
   listedAiringsByIds(ids: string[]): Promise<Map<string, ListedAiringRef>>;
   listedAiringsInWindow(stationIds: string[], from: Date, to: Date): Promise<Map<string, ListedAiringRef[]>>;
   searchListedAirings(q: string, after: Date): Promise<ListedAiringRef[]>;
@@ -95,6 +103,34 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
         .map((r) => ({ market: toMarket(r), miles: Math.round(miles(centre, { lat: Number(r.latitude), lng: Number(r.longitude) })) }))
         .filter((r) => r.miles <= maxMiles)
         .sort((a, b) => a.miles - b.miles);
+    },
+
+    async marketNear(point) {
+      const rows = await db.select().from(m);
+      const placed = rows
+        .filter((r) => r.latitude && r.longitude)
+        .map((r) => ({ row: r, miles: Math.round(miles(point, { lat: Number(r.latitude), lng: Number(r.longitude) })) }))
+        .sort((a, b) => a.miles - b.miles);
+      const home = placed.find((p) => p.miles <= 50);
+      if (home) {
+        return {
+          market: toMarket(home.row),
+          nearby: placed.filter((p) => p !== home && p.miles <= 60).map((p) => ({ market: toMarket(p.row), miles: p.miles }))
+        };
+      }
+      const open = rows.filter((r) => r.openedAt !== null);
+      const distance = new Map(placed.map((p) => [p.row.id, p.miles]));
+      return {
+        market: null,
+        nearby: open
+          .map((r) => ({ market: toMarket(r), miles: distance.get(r.id) ?? null }))
+          .sort((a, b) => (a.miles ?? Infinity) - (b.miles ?? Infinity) || a.market.name.localeCompare(b.market.name))
+      };
+    },
+
+    async openMarkets() {
+      const rows = await db.select().from(m).orderBy(asc(m.name));
+      return rows.filter((r) => r.openedAt !== null).map(toMarket);
     },
 
     async listedAiringsByIds(ids) {

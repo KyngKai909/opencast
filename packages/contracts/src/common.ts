@@ -33,7 +33,8 @@ export const StationKind = z.enum(["station", "studio", "claimable", "listed", "
 export const StationRole = z.enum(["owner", "operator", "host"]);
 export const BusinessRole = z.enum(["owner", "manager", "viewer"]);
 
-export const Platform = z.enum(["phone", "cast", "web", "tv_app"]);
+/** Where a player is. `mirror` (added 2026-09-28): TV mode on the iPhone's second screen. */
+export const Platform = z.enum(["phone", "cast", "web", "tv_app", "mirror"]);
 
 /** Cursor pagination for long lists. */
 export const PageQuery = z.object({

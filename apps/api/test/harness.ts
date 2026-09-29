@@ -16,6 +16,8 @@ import { ffmpegPipeline } from "../src/v1/media.js";
 import { fakePayments } from "../src/v1/payments/index.js";
 import { localObjectStore, type IpfsPublisher } from "../src/v1/storage.js";
 import type { Deps, Services } from "../src/v1/context.js";
+import { noGeoLookup } from "../src/v1/geo.js";
+import { memoryRelayBus } from "../src/v1/relay.js";
 
 export const APP_ID = "test-app";
 
@@ -65,7 +67,9 @@ export interface User {
   delete(url: string): request.Test;
 }
 
-export async function createHarness(options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"]; chain?: Deps["chain"] } = {}): Promise<Harness> {
+export async function createHarness(
+  options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"]; chain?: Deps["chain"]; geo?: Deps["geo"]; relay?: Deps["relay"]; sseHeartbeatMs?: number } = {}
+): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
   const linked = new Map<string, LinkedAccount[]>();
@@ -112,13 +116,16 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
     clock,
     auth: verifier,
     clear,
+    geo: options.geo ?? noGeoLookup,
+    relay: options.relay ?? memoryRelayBus(),
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",
       escrowContractAddress: options.chain?.escrow ?? null,
       // Base Sepolia's test USDC: only its address is used here, nothing is sent.
       usdc: { chainId: 84532, address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
-      production: false
+      production: false,
+      sseHeartbeatMs: options.sseHeartbeatMs
     }
   };
   const { router, services } = createV1(deps);
@@ -172,6 +179,7 @@ export async function createHarness(options: { realTime?: boolean; payments?: (c
       // Background work (preparing uploads, rendering previews) finishes before the database goes.
       await services.library.settle();
       await deps.bus.settle();
+      await deps.relay.close();
       await database.drop();
     }
   };

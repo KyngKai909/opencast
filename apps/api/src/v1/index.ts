@@ -32,6 +32,8 @@ import { createWaitlistService } from "./modules/waitlist/service.js";
 import { waitlistRoutes } from "./modules/waitlist/routes.js";
 import { createNetworkService } from "./modules/network/service.js";
 import { networkRoutes } from "./modules/network/routes.js";
+import { createTvService } from "./modules/tv/service.js";
+import { tvRoutes } from "./modules/tv/routes.js";
 
 export function createV1(deps: Deps): { router: Router; services: Services; deps: Deps } {
   const services = {} as Services;
@@ -49,6 +51,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   services.notifications = createNotificationsService(ctx);
   services.waitlist = createWaitlistService(ctx);
   services.network = createNetworkService(ctx);
+  services.tv = createTvService(ctx);
 
   const router = express.Router();
   // Webhooks first: they need the raw body, before anything reads it as JSON.
@@ -68,6 +71,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   notificationsRoutes(registrar, ctx);
   waitlistRoutes(registrar, ctx);
   networkRoutes(registrar, ctx);
+  tvRoutes(registrar, ctx);
   router.use(errorHandler(deps.config.production));
   return { router, services, deps };
 }
