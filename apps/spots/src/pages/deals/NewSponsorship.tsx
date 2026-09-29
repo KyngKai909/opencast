@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { spotsApi } from "@opencast/contracts";
 import { Button, Field, money, useToast } from "@opencast/ui";
 import { CreditCheckX, type CreditFlag, type SponsorTarget } from "../../api/ext/deals";
-import { call } from "../../api/client";
+import { ApiError, call } from "../../api/client";
 import { useBusiness } from "../../business/BusinessContext";
 import { CreditEditor } from "../../components/deals/CreditEditor";
 import { CreditRules } from "../../components/deals/CreditRules";
@@ -118,6 +118,9 @@ function NewSponsorshipPage() {
           <div className="bz-ns__picks">
             {targets.isLoading ? (
               <QuietRows />
+            ) : targets.error instanceof ApiError && targets.error.status === 404 ? (
+              // P16 isn't in the API yet: nothing to choose from.
+              <p className="bz-ns__quiet">The stations and programs that take sponsors can't be listed here yet.</p>
             ) : targets.error ? (
               <ErrorLine>{errorText(targets.error)}</ErrorLine>
             ) : list.length === 0 ? (

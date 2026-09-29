@@ -38,7 +38,7 @@ export function MoneySection({ b }: { b: BusinessState }) {
   const params = { businessId: b.id };
   const biz = useApi(spotsApi.getBusiness, { params }, { schema: BusinessSettingsX, enabled: access.funding !== "hidden" });
   const balance = useApi(ledgerApi.getBalance, { params }, { enabled: access.funding !== "hidden" });
-  const receipts = useApi(settingsExtApi.listReceipts, { params });
+  const receipts = useApi(settingsExtApi.listReceipts, { params }, { retry: false });
   const clear = useClear();
   const qc = useQueryClient();
   const [error, setError] = useState<{ where: string; message: string } | null>(null);
@@ -226,6 +226,11 @@ export function MoneySection({ b }: { b: BusinessState }) {
         </div>
         {receipts.isLoading ? (
           <Quiet />
+        ) : receipts.error instanceof ApiError && receipts.error.status === 404 ? (
+          // E4 isn't in the API yet: the statements are still on the balance.
+          <p className="bz-note">
+            Receipts aren't listed here yet. Each month's statement is under <a href={`${b.base}/balance/statements`}>Balance, Statements</a>.
+          </p>
         ) : !receipts.data ? (
           <p className="bz-error" role="alert">
             {(receipts.error as Error | null)?.message ?? "Something went wrong. Try again."}

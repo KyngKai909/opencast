@@ -81,6 +81,8 @@ export default function StartBusiness() {
       if (where !== "online") {
         const q = where === "location" ? address.trim() : town.trim();
         const found = await call(lookupPlace, { query: { q } }).catch((err: unknown) => {
+          // P10 isn't in the API yet: say what still works.
+          if (err instanceof ApiError && err.code === "not_available") err = new Error("Addresses can't be looked up here yet. Choose Online to go on.");
           throw Object.assign(err instanceof Error ? err : new Error(String(err)), { field: where === "location" ? "address" : "town" });
         });
         locations.push(

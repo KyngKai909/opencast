@@ -171,7 +171,7 @@ function NewOrderPage() {
                   value: m.station.id,
                   colour: m.station.colour,
                   title: stationLabel(m.station),
-                  line: [m.turnaround, m.history ?? m.specialty, `${m.samples} samples`].filter(Boolean).join(". "),
+                  line: [m.turnaround, m.history ?? m.specialty, m.samples > 0 && `${m.samples} ${m.samples === 1 ? "sample" : "samples"}`].filter(Boolean).join(". "),
                   end: m.fromMicros !== null ? `From ${money(m.fromMicros, { trimCents: true })}` : undefined
                 }))}
               />

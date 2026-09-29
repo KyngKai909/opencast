@@ -64,6 +64,16 @@ export const TargetingX = Targeting.extend({ bands: z.array(z.enum(["tv", "radio
 export type TargetingX = z.infer<typeof TargetingX>;
 
 
+/**
+ * The API records a pause by hand as a spent budget (spots.pauseSpot: "a manual pause reads like a
+ * spent budget"), so it answers `paused_budget` where the frames say "Waiting for you" (biz-spots
+ * 04.1). A spot paused for its budget with budget left was paused by hand: read it that way, so the
+ * page offers "Bring it back" (resumeSpot) rather than raising a budget that isn't spent.
+ */
+function pausedByHand<T extends { state: Spot["state"]; budget: Spot["budget"] }>(s: T): T {
+  return s.state === "paused_budget" && s.budget.usedMicros < s.budget.totalMicros ? { ...s, state: "waiting_for_you" } : s;
+}
+
 export const SpotX = Spot.extend({
   targeting: TargetingX,
   still: SpotStill.optional(),
@@ -72,7 +82,7 @@ export const SpotX = Spot.extend({
   back: BackStory.nullable().optional(),
   /** P7: what it has been spending a day lately; null before it has aired. */
   pacePerDayMicros: Micros.nullable().optional()
-});
+}).transform(pausedByHand);
 export type SpotX = z.infer<typeof SpotX>;
 export const SpotsX = z.array(SpotX);
 
