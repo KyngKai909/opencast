@@ -27,6 +27,13 @@ export interface ObjectStore {
   deletePrefix(prefix: string): Promise<void>;
   /** A URL an app can fetch the object from. */
   url(key: string): Promise<string>;
+  /**
+   * A lasting public URL for the object (a bucket's custom domain, or the API's `/objects` in
+   * development), or null when the store has none (its URLs are presigned). Playlists point at these.
+   */
+  publicUrl?(key: string): string | null;
+  /** Reads an object (the proof frame and translators read prepared segments). */
+  open?(key: string): Promise<Readable>;
 }
 
 export interface IpfsPublisher {
@@ -157,6 +164,13 @@ export function localObjectStore(root: string, publicBase = "/objects"): ObjectS
     },
     async url(key) {
       return `${publicBase}/${key}`;
+    },
+    publicUrl(key) {
+      return `${publicBase}/${key}`;
+    },
+    async open(key) {
+      await fs.access(at(key));
+      return createReadStream(at(key));
     }
   };
 }
@@ -244,6 +258,13 @@ export function s3ObjectStore(config: S3Config): ObjectStore {
     async url(key) {
       if (config.publicBase) return `${config.publicBase.replace(/\/+$/, "")}/${key}`;
       return getSignedUrl(client, new GetObjectCommand({ Bucket, Key: key }), { expiresIn: config.presignSeconds ?? 6 * 3600 });
+    },
+    publicUrl(key) {
+      return config.publicBase ? `${config.publicBase.replace(/\/+$/, "")}/${key}` : null;
+    },
+    async open(key) {
+      const result = await client.send(new GetObjectCommand({ Bucket, Key: key }));
+      return result.Body as Readable;
     }
   };
   return store;
@@ -297,5 +318,9 @@ export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string, publ
 /** Object keys. Files are keyed by their content ID; previews sit under the ID they preview. */
 export const objectKey = {
   file: (cid: string) => cid,
-  preview: (cid: string) => `previews/${cid}`
+  preview: (cid: string) => `previews/${cid}`,
+  /** A prepared item's rendition (playlist and segments), under its content ID (or slate key). Added 2026-09-29. */
+  prepared: (key: string, rendition: string) => `prepared/${key}/${rendition}`,
+  /** A spot's proof frame, with the station's bug, kept a year. */
+  proof: (stationId: string, airingId: string) => `proof/${stationId}/${airingId}.jpg`
 };

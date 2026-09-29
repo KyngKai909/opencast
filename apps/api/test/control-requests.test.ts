@@ -228,7 +228,9 @@ describe("an item's history (L5) and captions (L7)", () => {
       aired: [{ startedAt: "2026-09-28T03:00:00.000Z", station: { callSign: "BEAT" }, carried: false, audioOnly: false, note: null }],
       logEntries: 1,
       carriers: 0,
-      cachedForAir: true,
+      // Not prepared for air (nothing has asked the worker to prepare it here).
+      cachedForAir: false,
+      preparation: { status: "not_asked", renditions: [], preparedAt: null },
       audioLayout: null,
       captionLanguage: null,
       carriage: { offered: false, program: "Late Crate", terms: null }

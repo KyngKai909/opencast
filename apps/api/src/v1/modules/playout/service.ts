@@ -1,18 +1,18 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { breakCue, decoratePlaylist } from "./engine/scte35.js";
 import { publicUrl } from "../../lib/url.js";
-import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
-import { dateRangeTag, HLS_CLASS } from "@opencast/contracts";
 import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
+import { objectKey } from "../../storage.js";
+import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
+import { renderMaster, renderMedia, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
+import { logReadiness } from "./engine/readiness.js";
+import { refKey } from "./engine/prepare.js";
 
-type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours";
+type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared";
 
 export interface SignOnCheck {
   key: CheckKey;
@@ -33,6 +33,8 @@ export interface PlayoutStatusView {
   next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null } | null;
   /** Planned off air time on now, or the next within 24 hours. */
   offAir?: (OffAirSpanView & { now: boolean }) | null;
+  /** Added 2026-09-29: whether what's on the log in the next 48 hours is prepared for air. */
+  readiness?: { items: number; ready: number; firstNotReady: { itemId: string; title: string; airsAt: string; status: "queued" | "preparing" | "failed" | "not_asked" } | null } | null;
 }
 
 export interface AsRunView {
@@ -58,8 +60,12 @@ export interface PlayoutService {
   asRun(stationId: string, from: Date, to: Date): Promise<AsRunView[]>;
   /** As-run rows for spot airings, for billing and results. */
   asRunForAirings(airingIds: string[]): Promise<Map<string, typeof schema.asRun.$inferSelect>>;
-  /** A station's live HLS playlist with SCTE-35 cues for its breaks (EXT-X-DATERANGE). */
-  playlistWithCues(stationId: string): Promise<string | null>;
+  /**
+   * The channel's playlists (prepare once, then assemble): `master.m3u8` (also `index.m3u8`) and
+   * one media playlist per rendition (`v720.m3u8`…), rendered from its assembled timeline. Null
+   * when there's no such playlist (or nothing published yet). `maxAge` is the cache time.
+   */
+  playlist(stationId: string, file: string): Promise<{ body: string; maxAge: number } | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** Stations that aired anything in a window (from the as-run log). */
@@ -85,6 +91,8 @@ export interface PlayoutService {
   onAirSince(stationIds: string[]): Promise<Map<string, Date>>;
   /** The log or off air hours changed: playout reads them again now. */
   replan(stationId: string): Promise<void>;
+  /** Where an item's preparation for air stands, for a band (the library's item history). */
+  preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null }>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
@@ -94,43 +102,67 @@ const HOUR = 3_600_000;
 export function createPlayoutService({ deps, services }: ModuleContext): PlayoutService {
   const { db } = deps;
   const P = schema.playoutState;
-  const L = schema.livepeerConfig;
 
-  async function livepeer(stationIds: string[]) {
-    if (!stationIds.length) return new Map<string, typeof L.$inferSelect>();
-    const rows = await db.select().from(L).where(inArray(L.stationId, stationIds));
-    return new Map(rows.map((r) => [r.stationId, r]));
+  const ladder = Number(process.env.PREPARE_LADDER_SCALE) > 0 ? scaledLadder(Number(process.env.PREPARE_LADDER_SCALE)) : LADDER;
+  const channelUrl = (stationId: string) => publicUrl(deps, `/hls/${stationId}/master.m3u8`);
+  /** Segment lengths per prepared key and rendition (they never change once prepared). */
+  const lengths = new Map<string, number[]>();
+  /** Rendered playlists, for a second (a burst of viewers costs one render). */
+  const rendered = new Map<string, { at: number; value: { body: string; maxAge: number } | null }>();
+  const bandOf = async (stationId: string): Promise<Band> => (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
+
+  function segmentUrl(key: string, rendition: string, index: number) {
+    const path = `${objectKey.prepared(key, rendition)}/seg_${String(index).padStart(5, "0")}.ts`;
+    // The bucket's public domain (R2's custom domain); without one, the API passes them through.
+    return deps.storage.objects.publicUrl?.(path) ?? publicUrl(deps, `/hls/${path}`);
   }
 
-  async function ensureOutput(stationId: string) {
-    const [current] = await db.select().from(L).where(eq(L.stationId, stationId));
-    if (current?.streamId || !hasLivepeerApiKey()) return;
-    const [ident] = [...(await services.stations.idents([stationId])).values()];
-    try {
-      const stream = await createLivepeerStream(`${ident?.callSign ?? ident?.name ?? stationId} (Opencast)`);
-      await db
-        .insert(L)
-        .values({ stationId, enabled: true, ...stream, updatedAt: deps.clock.now() })
-        .onConflictDoUpdate({ target: L.stationId, set: { ...stream, lastError: null, updatedAt: deps.clock.now() } });
-    } catch (error) {
-      await db
-        .insert(L)
-        .values({ stationId, enabled: true, lastError: String((error as Error).message), updatedAt: deps.clock.now() })
-        .onConflictDoUpdate({ target: L.stationId, set: { lastError: String((error as Error).message), updatedAt: deps.clock.now() } });
+  async function renderPlaylist(stationId: string, file: string): Promise<{ body: string; maxAge: number } | null> {
+    const band = await bandOf(stationId);
+    const now = deps.clock.now();
+    const C = schema.channelItems;
+    const [latest] = await db
+      .select({ run: C.run, kind: C.kind, startsAt: C.startsAt })
+      .from(C)
+      .where(and(eq(C.stationId, stationId), lte(C.startsAt, now)))
+      .orderBy(desc(C.seq), desc(C.startsAt))
+      .limit(1);
+    if (!latest) return null;
+    if (file === "master.m3u8" || file === "index.m3u8") return { body: renderMaster(band, ladder), maxAge: 30 };
+    const rendition = file.replace(/\.m3u8$/, "") as RenditionName;
+    if (!BAND_RENDITIONS[band].includes(rendition)) return null;
+    // After a planned sign-off the ended playlist stays as it was until the next run starts.
+    const edge = latest.kind === "end" ? latest.startsAt : now;
+    const rows = (await db
+      .select()
+      .from(C)
+      .where(and(eq(C.stationId, stationId), eq(C.run, latest.run), lte(C.startsAt, now), gt(C.endsAt, new Date(edge.getTime() - WINDOW_MS - 60_000))))
+      .orderBy(asc(C.seq), asc(C.startsAt))) as ChannelRow[];
+    const [end] = latest.kind === "end" ? [] : await db.select().from(C).where(and(eq(C.stationId, stationId), eq(C.run, latest.run), eq(C.kind, "end"), lte(C.startsAt, now))).limit(1);
+    if (end) rows.push(end as ChannelRow);
+    const keys = [...new Set(rows.map((r) => r.preparedKey).filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
+    if (keys.length) {
+      const found = await db
+        .select({ key: schema.preparedRenditions.key, segmentMs: schema.preparedRenditions.segmentMs })
+        .from(schema.preparedRenditions)
+        .where(and(eq(schema.preparedRenditions.rendition, rendition), inArray(schema.preparedRenditions.key, keys)));
+      for (const f of found) lengths.set(`${f.key}/${rendition}`, f.segmentMs);
     }
+    const body = renderMedia({ rows, rendition, now: now.getTime(), lengths: (key) => lengths.get(`${key}/${rendition}`) ?? null, uri: (key, index) => segmentUrl(key, rendition, index) });
+    return body ? { body, maxAge: 1 } : null;
   }
 
   const service: PlayoutService = {
     async statusFor(stationIds) {
       if (!stationIds.length) return new Map();
-      const [states, outputs] = await Promise.all([db.select().from(P).where(inArray(P.stationId, stationIds)), livepeer(stationIds)]);
+      const states = await db.select().from(P).where(inArray(P.stationId, stationIds));
       const byId = new Map(states.map((s) => [s.stationId, s]));
       return new Map(
         stationIds.map((id) => {
-          const out = outputs.get(id);
           const onAir = byId.get(id)?.onAir ?? false;
           const standingBy = onAir && (byId.get(id)?.standingBy ?? false);
-          return [id, { onAir, playbackUrl: onAir ? (out?.enabled && out.playbackUrl ? out.playbackUrl : publicUrl(deps, `/hls/${id}/index.m3u8`)) : null, standingBy }];
+          // The channel's own playlists, assembled from prepared segments (and Livepeer's during live blocks).
+          return [id, { onAir, playbackUrl: onAir ? channelUrl(id) : null, standingBy }];
         })
       );
     },
@@ -138,15 +170,16 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     async checks(stationId) {
       const now = deps.clock.now();
       const day = new Date(now.getTime() + 24 * HOUR);
-      const [identity, gaps, breaks, readiness, entries, output, offAir, tz] = await Promise.all([
+      const [identity, gaps, breaks, readiness, entries, prepared, offAir, tz, [aired]] = await Promise.all([
         services.stations.identityReady(stationId),
         services.log.gaps(stationId, now, day),
         services.log.breaks(stationId, now, day),
         services.library.readiness(stationId),
         services.log.entries(stationId, now, day),
-        livepeer([stationId]),
+        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, day)),
         services.log.offAirSpans(stationId, now, day),
-        services.stations.timezoneOf(stationId)
+        services.stations.timezoneOf(stationId),
+        db.select({ id: schema.channelItems.id }).from(schema.channelItems).where(eq(schema.channelItems.stationId, stationId)).limit(1)
       ]);
       const rule = await services.stations.breakRule(stationId);
 
@@ -168,7 +201,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const hourly = rule.mode !== "none" || sidEntries.length > 0 ? longest <= HOUR : false;
 
       const liveEntries = entries.filter((e) => e.kind === "live");
-      const out = output.get(stationId);
+      const preparedCount = prepared.filter((p) => p.ready).length;
       const checks: SignOnCheck[] = [
         { key: "call_sign_chosen", label: "Call sign chosen", passed: identity.callSign, blocking: true, detail: null },
         { key: "channel_chosen", label: "Channel chosen", passed: identity.channel, blocking: true, detail: null },
@@ -210,11 +243,19 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         {
           key: "output",
           label: "Output ready",
-          passed: Boolean(out?.ingestUrl) || !hasLivepeerApiKey(),
+          // Prepare once, then assemble: the channel is its own playlists; nothing to set up.
+          passed: true,
           blocking: false,
-          detail: out?.lastError ?? (hasLivepeerApiKey() ? "Set up on sign-on" : "Local output only"),
-          // G6: the output's playback, once there is one (Livepeer's is made at the first sign-on).
-          watchUrl: out?.playbackUrl ?? null
+          detail: "Assembled from prepared items",
+          // G6: where the channel plays, once it has aired (null before).
+          watchUrl: aired ? channelUrl(stationId) : null
+        },
+        {
+          key: "items_prepared",
+          label: "Items prepared for air",
+          passed: preparedCount === prepared.length,
+          blocking: false,
+          detail: prepared.length ? `${preparedCount} of ${prepared.length} in the next 24 hours${preparedCount < prepared.length ? ". The rest are being prepared; anything not ready at air time airs station ID and bumpers" : ""}` : null
         }
       ];
       // Planned off air time isn't a gap; say so, so nobody wonders.
@@ -238,7 +279,6 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         const failing = checks.filter((c) => c.blocking && !c.passed).map((c) => c.label.toLowerCase());
         throw refused("not_ready", `Not ready to sign on: ${failing.join(", ")}.`);
       }
-      await ensureOutput(stationId);
       const { first } = await db.transaction(async (tx) => {
         const result = await services.stations.markSignedOn(tx, stationId);
         await tx
@@ -281,21 +321,27 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async status(stationId) {
-      const [[state], out] = await Promise.all([db.select().from(P).where(eq(P.stationId, stationId)), livepeer([stationId])]);
+      const [state] = await db.select().from(P).where(eq(P.stationId, stationId));
       const now = deps.clock.now();
       const [current] = (await services.log.entries(stationId, now, new Date(now.getTime() + 1000))).filter((e) => e.startsAt <= now && e.endsAt > now);
       const titles = current ? (await services.log.airingsByIds([current.id])).get(current.id) : undefined;
       const [nextBreak] = (await services.log.breaks(stationId, now, new Date(now.getTime() + 6 * HOUR))).filter((b) => Date.parse(b.startsAt) > now.getTime());
-      const output = out.get(stationId);
       const onAir = state?.onAir ?? false;
       // G2: since when, and what's next for the preview monitor.
-      const [since, next, offAir] = await Promise.all([
+      const [since, next, offAir, prepared] = await Promise.all([
         onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()),
         services.log.nextEntry(stationId, now),
-        services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR))
+        services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR)),
+        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR)))
       ]);
+      const notReady = prepared.filter((p) => !p.ready).sort((a, b) => a.airsAt.getTime() - b.airsAt.getTime())[0];
       const plannedOff = offAir[0] ? { ...offAir[0], now: Date.parse(offAir[0].startsAt) <= now.getTime() } : null;
       return {
+        readiness: {
+          items: prepared.length,
+          ready: prepared.filter((p) => p.ready).length,
+          firstNotReady: notReady ? { itemId: notReady.itemId, title: notReady.title, airsAt: notReady.airsAt.toISOString(), status: (notReady.status as "queued" | "preparing" | "failed" | null) ?? "not_asked" } : null
+        },
         offAir: plannedOff,
         onAirSince: since.get(stationId)?.toISOString() ?? null,
         next: next
@@ -314,8 +360,9 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           state?.onAir && current
             ? { title: titles?.title ?? "On air", code: current.code, startedAt: current.startsAt.toISOString(), itemId: current.assetId }
             : null,
-        lastError: state?.lastError ?? output?.lastError ?? null,
-        output: { livepeerEnabled: output?.enabled ?? false, playbackUrl: output?.playbackUrl ?? null, bitrateKbps: null },
+        lastError: state?.lastError ?? null,
+        // The channel's playlists are assembled; Livepeer only transcodes live blocks' sources.
+        output: { livepeerEnabled: false, playbackUrl: onAir ? channelUrl(stationId) : null, bitrateKbps: null },
         nextBreakAt: nextBreak?.startsAt ?? null
       };
     },
@@ -348,26 +395,15 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return new Map(rows.map((r) => [r.airingId!, r]));
     },
 
-    async playlistWithCues(stationId) {
-      const file = path.join(deps.config.storageRoot, "hls", stationId, "index.m3u8");
-      const playlist = await fs.readFile(file, "utf8").catch(() => null);
-      if (playlist === null) return null;
-      const now = deps.clock.now();
-      // Every break in the window, stored or only generated from the rule, carries its cue.
-      const breaks = await services.log.breaks(stationId, new Date(now.getTime() - 5 * 60_000), new Date(now.getTime() + 2 * 60_000));
-      const decorated = decoratePlaylist(
-        playlist,
-        breaks.map((b) => breakCue(stationId, b))
-      );
-      // Planned off air: the sign-off slate carries when the station is back (the worker ends the
-      // playlist with #EXT-X-ENDLIST after it).
-      const off = await services.log.offAirAt(stationId, now);
-      if (!off) return decorated;
-      const tag = dateRangeTag({ id: `sign-off-${stationId}-${Date.parse(off.startsAt)}`, class: HLS_CLASS.signOff, start: Date.parse(off.startsAt), attributes: { backAt: off.backAt } });
-      const lines = decorated.split("\n");
-      const first = lines.findIndex((l) => l.startsWith("#EXTINF") || l.startsWith("#EXT-X-PROGRAM-DATE-TIME"));
-      lines.splice(first < 0 ? lines.length : first, 0, tag);
-      return lines.join("\n");
+    async playlist(stationId, file) {
+      const id = `${stationId}/${file}`;
+      const hit = rendered.get(id);
+      const at = deps.clock.now().getTime();
+      if (hit && Math.abs(at - hit.at) < 1_000) return hit.value;
+      const value = await renderPlaylist(stationId, file);
+      rendered.set(id, { at, value });
+      if (rendered.size > 5_000) rendered.clear();
+      return value;
     },
 
     async stationsThatAired(from, to) {
@@ -474,6 +510,22 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .where(and(inArray(schema.commands.stationId, stationIds), eq(schema.commands.action, "sign_on")))
         .groupBy(schema.commands.stationId);
       return new Map(rows.map((r) => [r.stationId, new Date(r.at)]));
+    },
+
+    async preparation(ref, band) {
+      const key = refKey(ref);
+      if (!key) return { status: "not_asked", renditions: [], preparedAt: null };
+      const [[item], renditions] = await Promise.all([
+        db.select().from(schema.preparedItems).where(eq(schema.preparedItems.key, key)),
+        db.select({ rendition: schema.preparedRenditions.rendition }).from(schema.preparedRenditions).where(eq(schema.preparedRenditions.key, key))
+      ]);
+      const done = renditions.map((r) => r.rendition).sort();
+      const ready = BAND_RENDITIONS[band].every((r) => done.includes(r));
+      return {
+        status: ready ? "ready" : ((item?.status === "ready" ? "queued" : item?.status) ?? "not_asked"),
+        renditions: done,
+        preparedAt: item?.preparedAt?.toISOString() ?? null
+      };
     },
 
     async carriedAirings(agreementIds, from, to) {

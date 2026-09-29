@@ -1,73 +1,98 @@
-// Planned off air in the current worker (added 2026-09-29): after the sign-off slate the outputs
-// close and the playlist ends with #EXT-X-ENDLIST; at the back time a new playlist starts. ffmpeg
-// in real time, about 25 seconds (a new playlist takes a few seconds to appear).
-import { promises as fs } from "node:fs";
-import path from "node:path";
+// Planned off air in the assembled channel (a radio-band station, so the ladder is AAC 128k and
+// 64k): the sign-off slate, then the playlist ends with #EXT-X-ENDLIST and nothing is written or
+// logged as aired while the station is dark; at the back time a new playlist starts from the
+// station ID. No FFmpeg: items are "prepared" by a fake transcoder, on a frozen clock.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { createPlanner, type Segment } from "../src/v1/modules/playout/engine/plan.js";
-import { StationRunner } from "../src/v1/modules/playout/engine/runner.js";
-import { createHarness, market, stationFixture, type Harness } from "./harness.js";
+import { HLS_CLASS, parseDateRanges } from "@opencast/contracts";
+import { createEngine, type Engine } from "../src/v1/modules/playout/engine/index.js";
+import { createHarness, dummyFile, fakeTranscoder, itemFixture, market, prepareQueued, stationFixture, type Harness } from "./harness.js";
 
 let h: Harness;
+let engine: Engine;
 let stationId: string;
 
+async function runUntil(iso: string, stepMs = 2_000) {
+  const end = Date.parse(iso);
+  while (h.clock.now().getTime() < end) {
+    h.clock.advance(Math.min(stepMs, end - h.clock.now().getTime()));
+    await engine.tick();
+    await prepareQueued(h, engine.preparer);
+  }
+}
+const playlist = async (file = "a128.m3u8") => (await h.services.playout.playlist(stationId, file))?.body ?? null;
+const rows = () => h.db.select().from(schema.channelItems).where(eq(schema.channelItems.stationId, stationId)).orderBy(asc(schema.channelItems.seq));
+
 beforeAll(async () => {
-  h = await createHarness({ realTime: true });
+  h = await createHarness();
+  h.clock.set("2026-10-02T05:59:52.000Z");
   const m = await market(h);
-  stationId = (await stationFixture(h, { callSign: "BEAT", name: "Inland Beat", marketId: m.id, tenths: 121, signedOn: true, colour: "#8C3B7A" })).id;
+  const owner = await h.signIn("Nite");
+  stationId = (await stationFixture(h, { callSign: "NITE", name: "Night Radio", ownerId: owner.id, marketId: m.id, tenths: 881, band: "radio", signedOn: true })).id;
+  await owner
+    .put(`/v1/stations/${stationId}/break-rule`, { mode: "after_every_program", everyMinutes: null, lengthMs: 120_000, spotMsPerHour: 180_000, sameSpotPerHour: 2, fillOrder: ["SPT", "UND", "BMP", "SID"], openTimeTo: "station_id_and_bumpers", blockedCategories: [] })
+    .expect(200);
+  await itemFixture(h, stationId, { title: "NITE ident", code: "SID", durationMs: 4_000, location: await dummyFile() });
+  const show = await itemFixture(h, stationId, { title: "Night Desk", durationMs: 56_000, location: await dummyFile() });
+  await owner.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-02T06:00:00.000Z", endsAt: "2026-10-02T06:01:00.000Z", itemId: show.id }).expect(201);
+  await owner.post(`/v1/stations/${stationId}/log`, { kind: "off_air", startsAt: "2026-10-02T06:01:00.000Z", endsAt: "2026-10-02T06:10:00.000Z" }).expect(201);
+  await owner.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-02T06:10:00.000Z", endsAt: "2026-10-02T06:11:00.000Z", itemId: show.id }).expect(201);
   await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), translators: false });
+  await engine.tick();
+  await prepareQueued(h, engine.preparer);
 }, 60_000);
-afterAll(() => h.close());
 
-const sleepUntil = (t: number) => new Promise((r) => setTimeout(r, Math.max(0, t - Date.now())));
+afterAll(async () => {
+  await engine?.stopAll();
+  await h.close();
+});
 
-describe("off air in the worker", () => {
-  it("ends the playlist after the sign-off slate, and starts a new one at the back time", async () => {
-    const logs: string[] = [];
-    const planner = createPlanner({ deps: h.deps, services: h.services });
-    const look = { callSign: "BEAT", channel: "12.1", name: "Inland Beat", homeCity: null, colour: "#8C3B7A" };
-    const t0 = Math.ceil((Date.now() + 2_000) / 1000) * 1000;
-    const slate = await planner.slates.offAir(look, "6:00 am");
-    const sid = await planner.slates.stationId(look);
-    const at = (s: number) => new Date(t0 + s * 1000);
-    const segments: Segment[] = [
-      { key: "slate", startsAt: at(0), endsAt: at(4), code: "OPEN", label: "Off air", source: { kind: "image", path: slate }, reason: "slate", inBreak: false },
-      { key: "dark", startsAt: at(4), endsAt: at(9), code: "OPEN", label: "Off air", source: { kind: "off", backAt: at(9) }, reason: "slate", inBreak: false },
-      { key: "sid", startsAt: at(9), endsAt: at(22), code: "OPEN", label: "Station ID slate", source: { kind: "image", path: sid }, reason: "station_id_fill", inBreak: false }
-    ];
-    const hlsDir = path.join(h.deps.config.storageRoot, "hls", stationId);
-    const runner = new StationRunner({ deps: h.deps, services: h.services }, stationId, {
-      hlsDir,
-      outputs: [],
-      plan: async () => segments,
-      slates: planner.slates,
-      look: { ...look, bug: { mode: "off", opacity: 78 } },
-      liveInput: async () => null,
-      appOrigin: "https://app.opencast.test",
-      log: (line) => logs.push(`${new Date().toISOString()} ${line}`)
-    });
-    await sleepUntil(t0 - 500);
-    runner.start();
+describe("off air in the assembled channel", () => {
+  it("airs the radio band's renditions only", async () => {
+    await runUntil("2026-10-02T06:00:30.000Z");
+    const master = (await playlist("master.m3u8"))!;
+    expect(master.split("\n").filter((l) => l.endsWith(".m3u8"))).toEqual(["a128.m3u8", "a64.m3u8"]);
+    expect(await h.services.playout.playlist(stationId, "v720.m3u8")).toBeNull();
+    // No picture on the radio band: no bug, no codes.
+    expect(parseDateRanges((await playlist())!).some((r) => r.class === HLS_CLASS.bug)).toBe(false);
+  }, 30_000);
 
-    await sleepUntil(t0 + 7_000);
-    const ended = await fs.readFile(path.join(hlsDir, "index.m3u8"), "utf8");
+  it("ends the playlist after the sign-off slate, with when it's back", async () => {
+    await runUntil("2026-10-02T06:02:10.000Z");
+    const ended = (await playlist())!;
     expect(ended.trimEnd().endsWith("#EXT-X-ENDLIST")).toBe(true);
-    expect(ended).toMatch(/seg_\d+\.ts/);
+    const signOff = parseDateRanges(ended).find((r) => r.class === HLS_CLASS.signOff)!;
+    expect(new Date(signOff.start).toISOString()).toBe("2026-10-02T06:01:00.000Z");
+    expect(signOff.attributes.backAt).toBe("2026-10-02T06:10:00.000Z");
+    expect(ended).toContain("#EXT-X-PROGRAM-DATE-TIME:2026-10-02T06:01:00.000Z");
 
-    await sleepUntil(t0 + 20_000);
-    const back = await fs.readFile(path.join(hlsDir, "index.m3u8"), "utf8").catch((error) => {
-      console.log(logs.join("\n"));
-      throw error;
-    });
-    expect(back).not.toMatch(/#EXT-X-ENDLIST/);
-    expect(back).toMatch(/seg_000000000\.ts/);
-    await runner.stop();
+    // Dark: the same ended playlist, nothing new written or logged as aired.
+    await runUntil("2026-10-02T06:08:00.000Z", 30_000);
+    expect(await playlist()).toBe(ended);
+    const all = await rows();
+    expect(all.filter((r) => r.startsAt > new Date("2026-10-02T06:02:00Z") && r.startsAt < new Date("2026-10-02T06:09:56Z"))).toEqual([]);
+    expect(all.find((r) => r.kind === "end")!.startsAt.toISOString()).toBe("2026-10-02T06:02:00.000Z");
+  }, 30_000);
 
-    // What aired: the slate and the station ID. Nothing while off air.
-    const rows = await h.db.select().from(schema.asRun).where(eq(schema.asRun.stationId, stationId)).orderBy(asc(schema.asRun.startedAt));
-    expect(rows.map((r) => r.reason)).toEqual(["slate", "station_id_fill"]);
-    expect(rows[1].startedAt.getTime()).toBeGreaterThanOrEqual(t0 + 8_500);
-  }, 60_000);
+  it("starts a new playlist from the station ID at the back time", async () => {
+    await runUntil("2026-10-02T06:09:40.000Z", 10_000);
+    await runUntil("2026-10-02T06:10:10.000Z");
+    const back = (await playlist())!;
+    expect(back).not.toContain("#EXT-X-ENDLIST");
+    const items = parseDateRanges(back).filter((r) => r.class === HLS_CLASS.item);
+    expect(items.map((r) => `${new Date(r.start).toISOString().slice(11, 19)} ${r.attributes.code}`)).toEqual(["06:09:56 SID", "06:10:00 PGM"]);
+    // Numbering carries on from the last playlist.
+    const all = await rows();
+    const end = all.find((r) => r.kind === "end")!;
+    const sequence = Number(/#EXT-X-MEDIA-SEQUENCE:(\d+)/.exec(back)![1]);
+    expect(sequence).toBe(end.seq);
+    expect(Number(/#EXT-X-DISCONTINUITY-SEQUENCE:(\d+)/.exec(back)![1])).toBeGreaterThan(end.disc);
+
+    // What aired: the program, its break, the slate; nothing while dark; then the station ID.
+    const aired = await h.db.select().from(schema.asRun).where(eq(schema.asRun.stationId, stationId)).orderBy(asc(schema.asRun.startedAt));
+    const fromSix = aired.filter((r) => r.startedAt >= new Date("2026-10-02T06:00:00Z"));
+    expect(fromSix.map((r) => `${r.startedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual(["06:00:00 PGM planned", "06:00:56 SID planned", "06:01:00 OPEN slate", "06:09:56 SID planned"]);
+  }, 30_000);
 });

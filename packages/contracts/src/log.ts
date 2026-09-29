@@ -501,8 +501,11 @@ export const logApi = {
 };
 
 export const SignOnCheck = z.object({
-  /** `off_air_hours` (added 2026-09-29): informational, never blocking; there when off air time is planned in the next 24 hours. */
-  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours"]),
+  /**
+   * `off_air_hours` (added 2026-09-29): informational, never blocking; there when off air time is planned in the next 24 hours.
+   * `items_prepared` (added 2026-09-29, prepare once): never blocking; how many items on the next 24 hours of the log are prepared for air.
+   */
+  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours", "items_prepared"]),
   label: z.string(),
   passed: z.boolean(),
   /** Blockers stop sign-on; warnings don't. */
@@ -546,7 +549,21 @@ export const PlayoutStatus = z.object({
    * Added 2026-09-29: planned off air time on now (`now` true: the channel shows the sign-off slate,
    * then ends until `backAt`), else the next within 24 hours ("Signs off at 2:00 am"); null for none.
    */
-  offAir: OffAirSpan.extend({ now: z.boolean() }).nullable().optional()
+  offAir: OffAirSpan.extend({ now: z.boolean() }).nullable().optional(),
+  /**
+   * Added 2026-09-29 (prepare once, then assemble): the items on the log in the next 48 hours, how
+   * many are prepared in every rendition the station's band airs, and the first that isn't
+   * (`status`: queued, being prepared, failed, or not asked for yet). Anything not ready at air
+   * time airs station ID and bumpers instead, and the station is told an hour before.
+   */
+  readiness: z
+    .object({
+      items: z.number().int(),
+      ready: z.number().int(),
+      firstNotReady: z.object({ itemId: Id, title: z.string(), airsAt: Timestamp, status: z.enum(["queued", "preparing", "failed", "not_asked"]) }).nullable()
+    })
+    .nullable()
+    .optional()
 });
 
 export const AsRunRow = z.object({

@@ -101,7 +101,17 @@ export interface StationsService {
   /** A claimed station becomes its creator's own: an ordinary station, earning into its own account. */
   handOver(db: Executor, stationId: string): Promise<void>;
   /** How playout draws the station: colour, bug, city. */
-  look(stationId: string): Promise<{ callSign: string | null; channel: string | null; name: string; homeCity: string | null; colour: string | null; bug: { mode: "off" | "call_sign_and_channel" | "logo"; opacity: number }; logoUrl: string | null } | null>;
+  look(stationId: string): Promise<{
+    callSign: string | null;
+    channel: string | null;
+    name: string;
+    homeCity: string | null;
+    colour: string | null;
+    bug: { mode: "off" | "call_sign_and_channel" | "logo"; opacity: number; position: string };
+    logoUrl: string | null;
+    /** The band it's on (TV unless it has a radio channel): what it's prepared and assembled for. */
+    band: Band;
+  } | null>;
   /** Stations that take orders, and studios. */
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key. */
@@ -518,8 +528,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         name: profile.ident.name,
         homeCity: profile.ident.homeCity,
         colour: profile.ident.colour,
-        bug: { mode: found.station.bugMode, opacity: found.station.bugOpacity },
-        logoUrl: found.station.logoUrl
+        bug: { mode: found.station.bugMode, opacity: found.station.bugOpacity, position: found.station.bugPosition },
+        logoUrl: found.station.logoUrl,
+        band: found.channel?.band ?? "tv"
       };
     },
 

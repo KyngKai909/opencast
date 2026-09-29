@@ -87,7 +87,7 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart, B
   /** Held airings more than an hour past their slot that never aired: their holds go back. */
   releaseUnaired(): Promise<number>;
   /** The files of every spot a station could air soon: placed airings, and its rotations. */
-  upcomingSpotContent(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; spotId: string; contentId: string; airsAt: Date | null }>>;
+  upcomingSpotContent(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; spotId: string; contentId: string; airsAt: Date | null; durationMs?: number }>>;
   /** What's placed in each break, in order, with what playout needs to air it. */
   breakAirings(breakIds: string[]): Promise<Map<string, BreakAiring[]>>;
   /** Spots placed on a station in a window (for the hourly cap and same-spot limit). */
@@ -1233,12 +1233,12 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const SF = schema.spotFiles;
       const [placed, rotated] = await Promise.all([
         db
-          .select({ stationId: AI.stationId, spotId: AI.spotId, contentId: SF.contentId, airsAt: AI.scheduledAt })
+          .select({ stationId: AI.stationId, spotId: AI.spotId, contentId: SF.contentId, airsAt: AI.scheduledAt, durationMs: SF.durationMs })
           .from(AI)
           .innerJoin(SF, and(eq(SF.spotId, AI.spotId), eq(SF.current, true)))
           .where(and(inArray(AI.stationId, stationIds), gte(AI.scheduledAt, from), lt(AI.scheduledAt, to))),
         db
-          .select({ stationId: schema.rotations.stationId, spotId: schema.rotationSpots.spotId, contentId: SF.contentId })
+          .select({ stationId: schema.rotations.stationId, spotId: schema.rotationSpots.spotId, contentId: SF.contentId, durationMs: SF.durationMs })
           .from(schema.rotationSpots)
           .innerJoin(schema.rotations, eq(schema.rotations.id, schema.rotationSpots.rotationId))
           .innerJoin(SP, eq(SP.id, schema.rotationSpots.spotId))
@@ -1246,9 +1246,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           .where(and(inArray(schema.rotations.stationId, stationIds), isNull(schema.rotationSpots.removedAt), eq(SP.status, "listed")))
       ]);
       return [
-        ...placed.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: r.airsAt }] : [])),
+        ...placed.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: r.airsAt, durationMs: r.durationMs }] : [])),
         // In rotation: could be placed in any break from now on.
-        ...rotated.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: null }] : []))
+        ...rotated.flatMap((r) => (r.contentId ? [{ stationId: r.stationId, spotId: r.spotId, contentId: r.contentId, airsAt: null, durationMs: r.durationMs }] : []))
       ];
     },
 

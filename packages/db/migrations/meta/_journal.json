@@ -141,6 +141,13 @@
       "when": 1790675704232,
       "tag": "0019_off_air_hours_and_day_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790678475350,
+      "tag": "0020_prepare_once_then_assemble",
+      "breakpoints": true
     }
   ]
 }

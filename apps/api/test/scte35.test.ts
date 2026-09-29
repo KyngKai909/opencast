@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakDateRanges, crc32Mpeg2, decodeSpliceInsert, decoratePlaylist, encodeSpliceInsert } from "../src/v1/modules/playout/engine/scte35.js";
+import { breakCue, crc32Mpeg2, decodeSpliceInsert, encodeSpliceInsert } from "../src/v1/modules/playout/engine/scte35.js";
 
 describe("SCTE-35", () => {
   it("CRC-32/MPEG-2 matches the standard check value", () => {
@@ -21,12 +21,11 @@ describe("SCTE-35", () => {
     expect(decodeSpliceInsert(bytes).crcOk).toBe(false);
   });
 
-  it("writes EXT-X-DATERANGE pairs into a live playlist before the first segment", () => {
-    const playlist = ["#EXTM3U", "#EXT-X-VERSION:6", "#EXT-X-TARGETDURATION:2", "#EXT-X-PROGRAM-DATE-TIME:2026-10-01T03:28:28.000Z", "#EXTINF:2.0,", "seg_1.ts", ""].join("\n");
-    const decorated = decoratePlaylist(playlist, [{ id: "brk-1", startsAt: new Date("2026-10-01T03:28:30Z"), durationMs: 90_000, eventId: 1 }]);
-    const lines = decorated.split("\n");
-    expect(lines[3]).toMatch(/^#EXT-X-DATERANGE:ID="brk-1",START-DATE="2026-10-01T03:28:30.000Z",PLANNED-DURATION=90.000,SCTE35-OUT=0xFC/);
-    expect(lines[4]).toMatch(/DURATION=90.000,SCTE35-IN=0xFC/);
-    expect(breakDateRanges({ id: "b", startsAt: new Date(0), durationMs: 1000, eventId: 2 })).toHaveLength(2);
+  it("cues every break the same way on every playlist refresh, stored or not", () => {
+    const stored = breakCue("station-1", { id: "9f1c2d3e-0000-4000-8000-000000000000", startsAt: "2026-10-01T03:28:30.000Z", lengthMs: 90_000 });
+    expect(stored).toMatchObject({ id: "9f1c2d3e-0000-4000-8000-000000000000", durationMs: 90_000, eventId: 0x9f1c2d3e });
+    const generated = breakCue("station-1", { id: null, startsAt: "2026-10-01T03:28:30.000Z", lengthMs: 90_000 });
+    expect(generated.id).toBe(`brk-station-1-${Date.parse("2026-10-01T03:28:30.000Z")}`);
+    expect(breakCue("station-1", { id: null, startsAt: "2026-10-01T03:28:30.000Z", lengthMs: 90_000 })).toEqual(generated);
   });
 });

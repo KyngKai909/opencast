@@ -1,13 +1,14 @@
-// A station's evening, compressed to about four and a half minutes, for the
+// A station's evening, compressed to about six and a half minutes, for the
 // Phase 5 check. Seeds the dev database; the running worker airs it.
 //
 //   npx tsx scripts/demo-evening.ts            (from apps/worker, with the dev stack running)
 //
 //   0:00  PGM  Late Crate, then a break: a spot, the credit, station ID
-//   1:15  PGM  Saturday Reel, carried from REEL under barter: REEL's spot in its share
-//   2:15  LIVE Crate Talk from an encoder (push to the printed RTMP URL)
-//   3:15  (nothing on the log: filled from the library when nobody acts)
-//   4:15  OFF  signed off
+//   1:16  PGM  Saturday Reel, carried from REEL under barter: REEL's spot in its share
+//   2:16  LIVE Crate Talk: through Livepeer when the source has a Livepeer playback ID (set
+//         LIVEPEER_API_KEY and add the source in master control); without one it airs the stand-by slate
+//   3:16  (nothing on the log: filled from the library when nobody acts)
+//   4:16  OFF  signed off (the sign-off slate, then the playlist ends), back at 6:24 from the station ID
 
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -58,7 +59,7 @@ async function station(callSign: string, name: string, colour: string, tenths: n
 }
 async function item(stationId: string, title: string, code: "PGM" | "BMP" | "SID", file: string, seconds: number, programId?: string) {
   const [a] = await db.insert(schema.assets).values({ stationId, programId: programId ?? null, title, code, source: "upload", mediaKind: "video", durationMs: seconds * 1000, status: "ready" }).returning();
-  // Stored by content ID; the worker copies it into its cache before air.
+  // Stored by content ID; the worker prepares it (the ladder, once) before air.
   const { cid } = await services.library.content.store(file, { storageClass: "standard" });
   const [f] = await db.insert(schema.assetFiles).values({ assetId: a.id, version: 1, contentId: cid }).returning();
   await services.library.content.addRef(db, cid, "asset_file", f.id);
@@ -121,12 +122,12 @@ const key = `demo-${randomUUID().slice(0, 8)}`;
 const [live] = await db.insert(schema.liveSources).values({ stationId: beat.id, kind: "encoder", name: "Studio A", streamKey: key }).returning();
 const [crateTalk] = await db.insert(schema.programs).values({ stationId: beat.id, title: "Crate Talk", description: "Live from Studio A.", isLive: true }).returning();
 await db.insert(schema.logEntries).values([
-  { stationId: beat.id, startsAt: at(0), endsAt: at(75), kind: "program", code: "PGM", assetId: crate.id, programId: lateCrateProgram.id },
-  { stationId: beat.id, startsAt: at(75), endsAt: at(135), kind: "program", code: "PGM", assetId: film.id, programId: reelProgram.id, carriageAgreementId: agreement.id },
-  { stationId: beat.id, startsAt: at(135), endsAt: at(195), kind: "live", code: "PGM", liveSourceId: live.id, programId: crateTalk.id },
-  { stationId: beat.id, startsAt: at(255), endsAt: at(285), kind: "off_air", code: "OPEN" }
+  { stationId: beat.id, startsAt: at(0), endsAt: at(76), kind: "program", code: "PGM", assetId: crate.id, programId: lateCrateProgram.id },
+  { stationId: beat.id, startsAt: at(76), endsAt: at(136), kind: "program", code: "PGM", assetId: film.id, programId: reelProgram.id, carriageAgreementId: agreement.id },
+  { stationId: beat.id, startsAt: at(136), endsAt: at(196), kind: "live", code: "PGM", liveSourceId: live.id, programId: crateTalk.id },
+  { stationId: beat.id, startsAt: at(256), endsAt: at(384), kind: "off_air", code: "OPEN" }
 ]);
 await db.insert(schema.playoutState).values({ stationId: beat.id, onAir: true }).onConflictDoUpdate({ target: schema.playoutState.stationId, set: { onAir: true } });
 
-console.log(JSON.stringify({ station: beat.callSign, stationId: beat.id, producer: reel.callSign, t0: new Date(t0).toISOString(), live: `rtmp://127.0.0.1:${process.env.LIVE_LISTEN_PORT ?? 1935}/live/${key}`, hls: `http://localhost:8787/hls/${beat.id}/index.m3u8` }, null, 2));
+console.log(JSON.stringify({ station: beat.callSign, stationId: beat.id, producer: reel.callSign, t0: new Date(t0).toISOString(), liveSource: live.id, hls: `http://localhost:8787/hls/${beat.id}/master.m3u8` }, null, 2));
 process.exit(0);

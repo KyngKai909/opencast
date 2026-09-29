@@ -1,11 +1,8 @@
-// Ready for ads from partners (the programmatic backfill isn't built): every break carries its
-// SCTE-35 cue, every station and program has IAB categories, programs have a rating and a
+// Ready for ads from partners (the programmatic backfill isn't built): every station and program
+// has IAB categories, programs have a rating and a
 // child-directed flag, the station has its switch, and earnings have the line.
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { decodeSpliceInsert } from "../src/v1/modules/playout/engine/scte35.js";
-import { createHarness, itemFixture, market, stationFixture, type Harness, type User } from "./harness.js";
+import { createHarness, market, stationFixture, type Harness, type User } from "./harness.js";
 
 let h: Harness;
 let owner: User;
@@ -84,44 +81,5 @@ describe("the station's switch", () => {
     expect(earnings.body.lines.partnerAds).toEqual({ on: true, micros: 0, pendingMicros: 0 });
     await operator.put(`/v1/stations/${stationId}/break-rule`, { ...rule, adsFromPartners: false }).expect(200);
     expect((await owner.get(`/v1/stations/${stationId}/earnings?period=week`).expect(200)).body.lines.partnerAds.on).toBe(false);
-  });
-});
-
-describe("break markers", () => {
-  it("every break in a live playlist carries SCTE-35 out and in cues, stored or not", async () => {
-    const ep = await itemFixture(h, stationId, { title: "Episode" });
-    await owner.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-01T20:00:00.000Z", endsAt: "2026-10-01T20:30:00.000Z", itemId: ep.id }).expect(201);
-    await owner.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-01T20:30:00.000Z", endsAt: "2026-10-01T21:00:00.000Z", itemId: ep.id }).expect(201);
-    const dir = path.join(h.deps.config.storageRoot, "hls", stationId);
-    await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, "index.m3u8"), ["#EXTM3U", "#EXT-X-VERSION:6", "#EXT-X-TARGETDURATION:2", "#EXT-X-PROGRAM-DATE-TIME:2026-10-01T20:27:00.000Z", "#EXTINF:2.0,", "seg_1.ts", ""].join("\n"));
-
-    const cuesAt = async (iso: string) => {
-      h.clock.set(iso);
-      const playlist = (await h.services.playout.playlistWithCues(stationId))!;
-      const window = await h.services.log.breaks(stationId, new Date(Date.parse(iso) - 5 * 60_000), new Date(Date.parse(iso) + 2 * 60_000));
-      const tags = playlist.split("\n").filter((l) => l.startsWith("#EXT-X-DATERANGE"));
-      return { window, tags };
-    };
-
-    // Generated from the rule, not stored yet: still cued.
-    const before = await cuesAt("2026-10-01T20:27:00.000Z");
-    expect(before.window).toHaveLength(1);
-    expect(before.window[0].id).toBeNull();
-    expect(before.tags).toHaveLength(2);
-    const out = before.tags[0].match(/SCTE35-OUT=0x([0-9A-F]+)/)![1];
-    const back = before.tags[1].match(/SCTE35-IN=0x([0-9A-F]+)/)![1];
-    expect(decodeSpliceInsert(Buffer.from(out, "hex"))).toMatchObject({ outOfNetwork: true, durationMs: before.window[0].lengthMs, crcOk: true });
-    expect(decodeSpliceInsert(Buffer.from(back, "hex"))).toMatchObject({ outOfNetwork: false, crcOk: true });
-    // The same cue on the next refresh.
-    expect((await cuesAt("2026-10-01T20:27:00.000Z")).tags).toEqual(before.tags);
-
-    // Stored (as playout does 20 minutes ahead): cued by its ID.
-    await h.services.log.ensureBreaks(stationId, new Date("2026-10-01T20:00:00.000Z"), new Date("2026-10-01T21:00:00.000Z"));
-    const stored = await cuesAt("2026-10-01T20:57:00.000Z");
-    expect(stored.window).toHaveLength(1);
-    expect(stored.window[0].id).not.toBeNull();
-    expect(stored.tags).toHaveLength(2);
-    expect(stored.tags[0]).toContain(`ID="${stored.window[0].id}"`);
   });
 });

@@ -294,3 +294,51 @@ export async function itemFixture(
   }
   return item;
 }
+
+/** A small file of random bytes (a distinct content ID each time), for items that are never decoded. */
+export async function dummyFile(): Promise<string> {
+  const { promises: fs } = await import("node:fs");
+  const dir = path.join(os.tmpdir(), "opencast-test-dummies");
+  await fs.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `${randomUUID()}.mp4`);
+  await fs.writeFile(file, Buffer.from(randomUUID().repeat(8)));
+  return file;
+}
+
+/**
+ * Prepares without FFmpeg (tests that assemble a channel): each rendition gets a few bytes per
+ * segment and a playlist that says each segment is 4 s long (the last one the rest). Keys in
+ * `fail` fail, as a broken file would.
+ */
+export function fakeTranscoder() {
+  const jobs: string[] = [];
+  const fail = new Set<string>();
+  const transcoder = async (job: import("../src/v1/modules/playout/engine/prepare.js").TranscodeJob) => {
+    const { promises: fs } = await import("node:fs");
+    jobs.push(job.key);
+    if (fail.has(job.key)) throw new Error("not a media file");
+    const durationMs = job.source.kind === "slate" ? job.source.seconds * 1000 : (job.durationMs ?? 8_000);
+    const lengths: number[] = [];
+    for (let left = durationMs; left > 0; left -= 4_000) lengths.push(Math.min(4_000, left));
+    const renditions: Record<string, { segmentMs: number[] }> = {};
+    for (const r of job.renditions) {
+      const dir = path.join(job.outDir, r.name);
+      await fs.mkdir(dir, { recursive: true });
+      await Promise.all(lengths.map((_, i) => fs.writeFile(path.join(dir, `seg_${String(i).padStart(5, "0")}.ts`), Buffer.from(`${job.key}/${r.name}/${i}`))));
+      await fs.writeFile(path.join(dir, "index.m3u8"), ["#EXTM3U", ...lengths.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, `seg_${String(i).padStart(5, "0")}.ts`]), "#EXT-X-ENDLIST", ""].join("\n"));
+      renditions[r.name] = { segmentMs: lengths };
+    }
+    return { durationMs, renditions };
+  };
+  return Object.assign(transcoder, { jobs, fail });
+}
+
+/** Prepares everything queued, until nothing is left. */
+export async function prepareQueued(h: Harness, preparer: { pump(): Promise<void>; settle(): Promise<void> }) {
+  for (let i = 0; i < 100; i++) {
+    await preparer.pump();
+    await preparer.settle();
+    const [queued] = await h.db.select({ key: schema.preparedItems.key }).from(schema.preparedItems).where(eq(schema.preparedItems.status, "queued")).limit(1);
+    if (!queued) return;
+  }
+}

@@ -4,8 +4,12 @@
 // which is always last. Open time airs station ID and bumpers, never nothing.
 //
 // Planned off air time (off air hours, a sign-off on the log) airs the sign-off slate for a minute,
-// then nothing: the runner ends the playlist and waits. The station ID airs in the last seconds
-// before the back time, where the runner signs on again, so the first program starts on time.
+// then nothing: the channel's playlist ends and waits. The station ID airs in the last seconds
+// before the back time, where a new playlist starts, so the first program starts on time.
+//
+// The assembler (assemble.ts) turns the run sheet into the channel's playlists from prepared
+// segments. An item that isn't prepared yet doesn't air: the planner is told what's ready
+// (`isReady`) and plans the log's usual fill in its place, marking it `missing`.
 
 import path from "node:path";
 import type { ModuleContext } from "../../../context.js";
@@ -14,12 +18,12 @@ import type { BreakSlotView } from "../../log/service.js";
 import { clockTime } from "../../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
 import { Slates, type StationLook } from "./slates.js";
-import type { ContentCache } from "./cache.js";
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
 export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
 
 export type SegmentSource =
+  /** A prepared item: by content ID, or (before content IDs) its old location. */
   | { kind: "file"; location: string; seekMs: number; mediaKind: "video" | "audio"; contentId?: string }
   | { kind: "image"; path: string }
   | { kind: "live"; liveSourceId: string }
@@ -44,7 +48,14 @@ export interface Segment {
   liveSourceId?: string;
   /** A spot's code and QR, drawn for its last :10. */
   code10?: { code: string; offer: string };
-  /** Fill airing in place of something whose file wasn't in the cache. */
+  spotId?: string;
+  /** The whole break this segment is part of (for its SCTE-35 cue). */
+  breakSpan?: { startsAt: Date; lengthMs: number };
+  /** The sign-off slate: when the station is back. */
+  backAt?: Date;
+  /** Which generated slate an image is (the assembler prepares it at the segment's length). */
+  slate?: "station_id" | "credit" | "off_air" | "stand_by";
+  /** Fill airing in place of something that isn't prepared yet. */
   missing?: { itemId: string; title: string; contentId: string; airsAt: Date };
 }
 
@@ -56,14 +67,20 @@ export const SIGN_OFF_SLATE_MS = 60_000;
 /** Shorter off air time than this just holds the slate. */
 const MIN_DARK_MS = 60_000;
 
-export function createPlanner({ deps, services }: ModuleContext, options: { cache?: ContentCache } = {}) {
-  const slates = new Slates(path.join(deps.config.storageRoot, "slates"));
-  const cache = options.cache;
+export interface PlannerOptions {
+  /** Is the item prepared for this station's band? Without it, everything counts as ready. */
+  isReady?: (ref: { contentId: string | null; location: string | null }, stationId: string) => boolean;
+  slatesDir?: string;
+}
 
-  /** Where playout reads a file: from the worker cache by content ID, or a legacy path. Never a download. */
-  function fileAt(ref: { contentId: string | null; location: string | null }): string | null {
-    if (ref.contentId) return cache?.has(ref.contentId) ? cache.pathOf(ref.contentId) : null;
-    return ref.location;
+export function createPlanner({ deps, services }: ModuleContext, options: PlannerOptions = {}) {
+  const slates = new Slates(options.slatesDir ?? path.join(deps.config.storageRoot, "slates"));
+
+  /** What the assembler airs: a prepared item (by content ID or old location), or null when it isn't ready. */
+  function fileAt(stationId: string, ref: { contentId: string | null; location: string | null }): string | null {
+    if (!ref.contentId && !ref.location) return null;
+    if (options.isReady && !options.isReady(ref, stationId)) return null;
+    return ref.contentId ? `cid:${ref.contentId}` : ref.location!;
   }
 
   async function look(stationId: string): Promise<StationLook & { bug: { mode: string; opacity: number } }> {
@@ -93,7 +110,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
       // A bumper is never cut short; what's left holds on the station ID slate.
       if (bumper.durationMs! > left) break;
       const len = bumper.durationMs!;
-      out.push({ key: `${context.key}:bmp:${n}`, startsAt: new Date(cursor), endsAt: new Date(cursor + len), code: "BMP", label: bumper.title, source: { kind: "file", location: fileAt(bumper)!, seekMs: 0, mediaKind: bumper.mediaKind, contentId: bumper.contentId ?? undefined }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId, itemId: bumper.id });
+      out.push({ key: `${context.key}:bmp:${n}`, startsAt: new Date(cursor), endsAt: new Date(cursor + len), code: "BMP", label: bumper.title, source: { kind: "file", location: fileAt(stationId, bumper)!, seekMs: 0, mediaKind: bumper.mediaKind, contentId: bumper.contentId ?? undefined }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId, itemId: bumper.id });
       cursor += len;
       left -= len;
       n++;
@@ -101,7 +118,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
     }
     if (left > 0) {
       // Holds on the station ID slate.
-      out.push({ key: `${context.key}:open`, startsAt: new Date(cursor), endsAt: new Date(cursor + left), code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await slates.stationId(station) }, reason: context.reason, inBreak: context.inBreak, breakId: context.breakId });
+      out.push({ key: `${context.key}:open`, startsAt: new Date(cursor), endsAt: new Date(cursor + left), code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await slates.stationId(station) }, slate: "station_id", reason: context.reason, inBreak: context.inBreak, breakId: context.breakId });
       cursor += left;
     }
     out.push({
@@ -110,7 +127,8 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
       endsAt: new Date(cursor + sidMs),
       code: "SID",
       label: sid?.title ?? `${station.callSign ?? station.name} ${station.channel ?? ""}`.trim(),
-      source: sid ? { kind: "file", location: fileAt(sid)!, seekMs: 0, mediaKind: sid.mediaKind, contentId: sid.contentId ?? undefined } : { kind: "image", path: await slates.stationId(station) },
+      source: sid ? { kind: "file", location: fileAt(stationId, sid)!, seekMs: 0, mediaKind: sid.mediaKind, contentId: sid.contentId ?? undefined } : { kind: "image", path: await slates.stationId(station) },
+      slate: sid ? undefined : "station_id",
       reason: context.reason,
       inBreak: context.inBreak,
       breakId: context.breakId,
@@ -137,8 +155,8 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
       // Planned off air time is its own block (sign-off entries included), from sign-off to back.
       const offAirBlocks = offAirStretches(offAirSpans).map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.backAt), logEntryId: o.logEntryId }));
       const entries = allEntries.filter((e) => e.kind !== "off_air");
-      // Only station IDs and bumpers the cache has.
-      const fillers = { stationIds: allFillers.stationIds.filter((f) => fileAt(f)), bumpers: allFillers.bumpers.filter((f) => fileAt(f)) };
+      // Only station IDs and bumpers that are prepared.
+      const fillers = { stationIds: allFillers.stationIds.filter((f) => fileAt(stationId, f)), bumpers: allFillers.bumpers.filter((f) => fileAt(stationId, f)) };
       const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
       const [items, airings, programs, offAir] = await Promise.all([
         services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v))),
@@ -159,8 +177,8 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
         // Spots, producer's share first; already held, so they air even if paused since.
         for (const airing of slot.id ? (airings.get(slot.id) ?? []) : []) {
           const len = airing.lengthSec * 1000;
-          const at = fileAt(airing);
-          // Not in the cache: it doesn't air (its hold goes back), and the break fills as usual.
+          const at = fileAt(stationId, airing);
+          // Not prepared: it doesn't air (its hold goes back), and the break fills as usual.
           if (!at && airing.contentId && !missing) missing = { itemId: airing.spotId, title: airing.title, contentId: airing.contentId, airsAt: new Date(start) };
           if (!at || cursor + len > end) continue;
           out.push({
@@ -175,7 +193,8 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
             breakId: slot.id ?? undefined,
             airingId: airing.airingId,
             agreementId: airing.carriageAgreementId ?? undefined,
-            code10: airing.code ?? undefined
+            code10: airing.code ?? undefined,
+            spotId: airing.spotId
           });
           cursor += len;
         }
@@ -194,6 +213,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
             code: "UND",
             label: `${subject} is made possible by`,
             source: { kind: "image", path: await slates.credit(station, { subject, sponsors: sponsors.map((s) => ({ business: s.business, creditText: s.creditText })), members: members.named }) },
+            slate: "credit",
             reason: "planned",
             inBreak: true,
             breakId: slot.id ?? undefined
@@ -204,7 +224,8 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
         // Reported when the break airs; if the file arrives first, the break is planned again with it.
         const firstAfterSpots = out.findIndex((s) => s.code !== "SPT");
         if (missing && firstAfterSpots >= 0) out[firstAfterSpots] = { ...out[firstAfterSpots], missing };
-        return out;
+        const breakSpan = { startsAt: new Date(start), lengthMs: slot.lengthMs };
+        return out.map((seg) => ({ ...seg, breakSpan }));
       };
 
       const openTime = async (a: number, b: number) => {
@@ -215,7 +236,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
       const signOff = async (block: { s: number; e: number; logEntryId: string | null }) => {
         const back = clockTime(new Date(block.e), tz);
         const slate = { kind: "image" as const, path: await slates.offAir(station, back) };
-        const base = { code: "OPEN" as const, label: "Off air", reason: "slate" as const, inBreak: false, logEntryId: block.logEntryId ?? undefined };
+        const base = { code: "OPEN" as const, label: "Off air", reason: "slate" as const, inBreak: false, logEntryId: block.logEntryId ?? undefined, slate: "off_air" as const, backAt: new Date(block.e) };
         const sid = fillers.stationIds[0];
         const sidMs = Math.min(sid?.durationMs ?? STATION_ID_MS, 60_000);
         if (block.e - block.s < SIGN_OFF_SLATE_MS + MIN_DARK_MS + sidMs) {
@@ -259,10 +280,10 @@ export function createPlanner({ deps, services }: ModuleContext, options: { cach
           if (t < e) segments.push({ key: `entry:${entry.id}:${t}`, startsAt: new Date(t), endsAt: new Date(e), code: "PGM", label: "Live", source: { kind: "live", liveSourceId: entry.liveSourceId! }, reason: "live", inBreak: false, logEntryId: entry.id, programId: entry.programId ?? undefined, liveSourceId: entry.liveSourceId ?? undefined });
         } else {
           const item = entry.assetId ? items.get(entry.assetId) : undefined;
-          const at = item ? fileAt(item) : null;
+          const at = item ? fileAt(stationId, item) : null;
           const playable = item && at && item.durationMs && !item.contentUnavailable && !offAir.has(item.id) && !item.archived;
           if (!playable) {
-            // Pulled by a claim, not ready, or not in the cache: station ID and bumpers, never nothing.
+            // Pulled by a claim, not ready, or not prepared: station ID and bumpers, never nothing.
             const before = segments.length;
             await openTime(s, e);
             if (item?.contentId && !item.contentUnavailable && !at && segments[before]) {

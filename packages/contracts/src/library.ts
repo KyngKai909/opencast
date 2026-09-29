@@ -151,10 +151,23 @@ export const ItemHistory = z.object({
   /** Stations carrying its program now. */
   carriers: z.number().int(),
   /**
-   * Prepared, available (no claim on it) and on a log within the next 24 hours, which the
-   * playout worker fetches ahead (it reads 48 hours ahead). The API doesn't see the worker's disk.
+   * Prepared for air (in every rendition its station's band airs) and available (no claim on it).
+   * Since 2026-09-29 (prepare once, then assemble) this is `preparation.status === "ready"`; before,
+   * it meant due within 24 hours, when the old worker copied files into its cache.
    */
   cachedForAir: z.boolean(),
+  /**
+   * Added 2026-09-29 (prepare once): where the item's preparation for air stands. `ready` in every
+   * rendition its band airs; `queued` or `preparing`; `failed` (the file couldn't be transcoded);
+   * `not_asked` (not wanted yet: rights not confirmed, or nothing airs it). `renditions` done so far.
+   */
+  preparation: z
+    .object({
+      status: z.enum(["ready", "queued", "preparing", "failed", "not_asked"]),
+      renditions: z.array(z.string()),
+      preparedAt: Timestamp.nullable()
+    })
+    .optional(),
   audioLayout: AudioLayout.nullable(),
   /** The caption track's language, else the program's captions language. */
   captionLanguage: z.string().nullable(),

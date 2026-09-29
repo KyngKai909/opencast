@@ -304,7 +304,7 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     });
   });
 
-  // Files the playout server doesn't have: the station and Network desk both hear.
+  // Items not prepared for air (prepare once, then assemble): the station and Network desk both hear.
   deps.bus.on("station.file_not_ready", async (e) => {
     const tz = await services.stations.timezoneOf(e.stationId);
     const when = clockTime(new Date(e.airsAt), tz);
@@ -313,8 +313,8 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       kind: "file_not_ready",
       title: e.missedAtAir ? `${e.title} didn't air` : `${e.title} isn't ready for ${when}`,
       body: e.missedAtAir
-        ? `Its file wasn't on the playout server at ${when}, so station ID and bumpers aired in its place.`
-        : `Its file isn't on the playout server yet. It's being copied; if it doesn't arrive, station ID and bumpers air in its place.`,
+        ? `It wasn't prepared for air by ${when}, so station ID and bumpers aired in its place.`
+        : `It isn't prepared for air yet. It's in the queue; if it isn't ready in time, station ID and bumpers air in its place.`,
       link: `/stations/${e.stationId}/log`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: `file:${e.missedAtAir ? "missed" : "late"}:${e.stationId}:${e.itemId}:${e.airsAt}`

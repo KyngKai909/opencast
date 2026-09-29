@@ -1,171 +1,253 @@
-// The playout engine: one runner per station on air. Each tick it applies
-// commands (sign on, sign off, skip, cue a break), keeps runners in step with
-// who's on air, fills breaks ahead of time (holding the money), and fills dead
-// air that nobody filled. Runs in the worker, under its Redis leader lock.
+// The playout engine: prepare once, then assemble (platform prompt, Phase 5). Runs in the worker,
+// under its Redis leader lock. Each tick it:
+//
+//   - prepares what's queued (prepare.ts: FFmpeg, once per content ID, earliest airtime first);
+//   - every hour checks the next 48 hours of every station's log and queues anything not prepared;
+//     every minute warns the station and the Network desk about anything airing within the hour
+//     that still isn't; every few minutes queues items whose rights were just confirmed;
+//   - applies commands (sign on and off, skip, cue a break, end a live block early, replan);
+//   - fills breaks ahead of time (holding the money) and fills dead air nobody filled;
+//   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
+//   - runs the translators that are on (translator.ts).
+//
+// The old worker cache and continuous encode are gone: the worker needs only scratch space.
 
+import os from "node:os";
 import path from "node:path";
 import { asc, eq, isNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
-import { ContentCache, type Need } from "./cache.js";
+import { ChannelAssembler, pruneChannelItems, type ChannelLook } from "./assemble.js";
 import { createFiller } from "./fill.js";
+import { LADDER, scaledLadder, type Band, type Ladder } from "./ladder.js";
 import { createPlanner } from "./plan.js";
-import { StationRunner, type Output } from "./runner.js";
+import { createPreparer, ffmpegTranscoder, refKey, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
+import { TranslatorRelay } from "./translator.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
 const FILL_EVERY_MS = 30_000;
 /** A gap still empty this close to its start is filled from the library. */
 const DEAD_AIR_FILL_AT_MS = 60_000;
-/** The cache reads this far ahead, this often. */
-const CACHE_AHEAD_MS = 48 * 3_600_000;
-const CACHE_EVERY_MS = 3_600_000;
-/** Not cached this close to air: the station and Network desk are told. */
-const CACHE_WARN_MS = 3_600_000;
-const CACHE_CHECK_EVERY_MS = 60_000;
+/** The readiness check reads this far ahead, this often. */
+const READY_AHEAD_MS = 48 * 3_600_000;
+const READY_EVERY_MS = 3_600_000;
+/** Not prepared this close to air: the station and Network desk are told. */
+const READY_WARN_MS = 3_600_000;
+const READY_WARN_EVERY_MS = 60_000;
+/** Items whose rights were just confirmed are queued this often. */
+const RIGHTS_EVERY_MS = 5 * 60_000;
+const TRANSLATORS_EVERY_MS = 10_000;
+const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepeercdn.studio/hls").replace(/\/+$/, "");
 
 export interface EngineOptions {
-  /** Where the local RTMP listener for encoders binds when Livepeer isn't set up. */
-  liveListen?: { host: string; port: number };
-  /** The worker cache: a directory on its volume, and how much of it to use. */
-  cache?: { dir?: string; capacityBytes?: number };
   log?: (line: string) => void;
+  /** The rendition ladder (tests shrink it: `ladderScale`). */
+  ladder?: Ladder;
+  ladderScale?: number;
+  /** How items are transcoded (FFmpeg on the worker by default). */
+  transcoder?: Transcoder;
+  /** x264 preset for preparation (veryfast by default; tests use ultrafast). */
+  preset?: string;
+  /** Preparation scratch space (WORKER_SCRATCH_DIR). */
+  scratchDir?: string;
+  prepareConcurrency?: number;
+  /** Where a live source's HLS is read (tests point at a local fake); Livepeer's playback by default. */
+  liveUrl?: (liveSourceId: string) => Promise<string | null>;
+  /** Translators on (default) or off. */
+  translators?: boolean;
+  /** How far ahead the channel's rows are written. */
+  leadMs?: number;
+}
+
+export interface ReadinessSummary {
+  checkedAt: string | null;
+  /** Items on the logs in the next 48 hours (programs, spots placed or in rotation, fillers). */
+  items: number;
+  ready: number;
+  waiting: number;
+  firstNotReady: { stationId: string; title: string; airsAt: string } | null;
 }
 
 export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   const { deps, services } = ctx;
   const { db } = deps;
   const log = options.log ?? ((line: string) => console.log(line));
-  const gb = Number(process.env.WORKER_CACHE_GB ?? 100);
-  const cache = new ContentCache(
-    options.cache?.dir ?? process.env.WORKER_CACHE_DIR ?? path.join(deps.config.storageRoot, "cache"),
-    // Leave a tenth of the volume free.
-    options.cache?.capacityBytes ?? Math.floor(gb * 0.9 * 1024 ** 3),
-    (cid, dest) => services.library.content.fetch(cid, dest),
+  const scratchDir = options.scratchDir ?? process.env.WORKER_SCRATCH_DIR ?? path.join(os.tmpdir(), "opencast-worker");
+  // PREPARE_LADDER_SCALE (development only) shrinks the ladder; the API reads the same variable for the master playlist.
+  const scale = options.ladderScale ?? (Number(process.env.PREPARE_LADDER_SCALE) || undefined);
+  const ladder = options.ladder ?? (scale ? scaledLadder(scale) : LADDER);
+  const preparer = createPreparer(ctx, {
+    ladder,
+    transcoder: options.transcoder ?? ffmpegTranscoder({ preset: options.preset ?? process.env.PREPARE_PRESET ?? "veryfast" }),
+    scratchDir,
+    concurrency: options.prepareConcurrency ?? Number(process.env.PREPARE_CONCURRENCY ?? 1),
     log
-  );
-  const planner = createPlanner(ctx, { cache });
+  });
+  const bands = new Map<string, Band>();
+  const planner = createPlanner(ctx, { isReady: (ref, stationId) => preparer.isReady(ref, bands.get(stationId) ?? "tv") });
   const filler = createFiller(ctx);
-  const runners = new Map<string, StationRunner>();
+  const assemblers = new Map<string, ChannelAssembler>();
+  const looks = new Map<string, ChannelLook>();
+  const translators = new Map<string, Map<string, { relay: TranslatorRelay; signature: string }>>();
   const lastFill = new Map<string, number>();
-  let cacheReady: Promise<void> | undefined;
-  let lastCacheSync = 0;
-  let lastCacheCheck = 0;
   const warned = new Set<string>();
+  let initialized = false;
+  let lastSweep = 0;
+  let lastWarn = 0;
+  let lastRights = 0;
+  let lastPrune = 0;
+  let lastTranslators = 0;
+  let rightsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
+  let readiness: ReadinessSummary = { checkedAt: null, items: 0, ready: 0, waiting: 0, firstNotReady: null };
 
-  /** What every station needs in the next 48 hours, and what's been taken down. */
-  async function cacheNeeds(): Promise<{ needs: Need[]; gone: string[] }> {
+  // A program that just became ready airs from its next segment boundary: plan again.
+  preparer.onReady((key) => {
+    if (!key.startsWith("slate-")) for (const a of assemblers.values()) a.replan();
+  });
+
+  async function bandOf(stationIds: string[]) {
+    const unknown = stationIds.filter((id) => !bands.has(id));
+    if (unknown.length) for (const [id, ident] of await services.stations.idents(unknown)) bands.set(id, ident.band ?? "tv");
+    return (id: string) => bands.get(id) ?? "tv";
+  }
+
+  /** Everything every station can air in the next 48 hours, earliest first; queued unless prepared. */
+  async function sweep() {
     const now = deps.clock.now();
+    const to = new Date(now.getTime() + READY_AHEAD_MS);
     const onAir = await services.playout.onAirStations();
-    const items = await services.log.upcomingItems(now, new Date(now.getTime() + CACHE_AHEAD_MS));
-    const stationIds = [...new Set([...onAir, ...items.map((i) => i.stationId)])];
-    const current = await services.library.currentContent(items.map((i) => i.itemId));
-    const wanted: Array<{ cid: string; airsAt: Date }> = items.flatMap((i) => (current.get(i.itemId) ? [{ cid: current.get(i.itemId)!, airsAt: i.startsAt }] : []));
+    const entries = await services.log.upcomingItems(now, to);
+    const stationIds = [...new Set([...onAir, ...entries.map((e) => e.stationId)])];
+    const band = await bandOf(stationIds);
+    const items = await services.library.itemsByIds([...new Set(entries.map((e) => e.itemId))]);
+    const wants: WantRef[] = [];
+    const logWants: Array<WantRef & { stationId: string; title: string }> = [];
+    for (const e of entries) {
+      const item = items.get(e.itemId);
+      if (!item || item.contentUnavailable || item.archived) continue;
+      const want = { contentId: item.contentId, location: item.location, mediaKind: item.mediaKind, band: band(e.stationId), durationMs: item.durationMs, neededAt: e.startsAt };
+      wants.push(want);
+      logWants.push({ ...want, stationId: e.stationId, title: item.title });
+    }
     for (const stationId of stationIds) {
       // Station IDs and bumpers can air any time; so can what fills dead air, a little later.
       const { stationIds: ids, bumpers } = await services.library.fillers(stationId);
-      for (const f of [...ids, ...bumpers]) if (f.contentId) wanted.push({ cid: f.contentId, airsAt: now });
-      for (const r of await services.library.repeatable(stationId, 5)) if (r.contentId) wanted.push({ cid: r.contentId, airsAt: new Date(now.getTime() + 2 * 3_600_000) });
+      for (const f of [...ids, ...bumpers]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
+      for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
     // Barter breaks inside carried programs air the producer's spots: their rotations too.
-    const producers = new Set<string>();
+    const producers = new Map<string, Band>();
     for (const stationId of stationIds) {
-      for (const a of await services.catalog.activeAgreements(stationId)) if (a.carrierStationId === stationId && a.term !== "cash") producers.add(a.makerStationId);
+      for (const a of await services.catalog.activeAgreements(stationId)) if (a.carrierStationId === stationId && a.term !== "cash") producers.set(a.makerStationId, band(stationId));
     }
-    for (const s of await services.spots.upcomingSpotContent([...new Set([...stationIds, ...producers])], now, new Date(now.getTime() + CACHE_AHEAD_MS))) {
-      wanted.push({ cid: s.contentId, airsAt: s.airsAt ?? now });
+    for (const s of await services.spots.upcomingSpotContent([...new Set([...stationIds, ...producers.keys()])], now, to)) {
+      const b = bands.get(s.stationId) ?? producers.get(s.stationId) ?? "tv";
+      wants.push({ contentId: s.contentId, mediaKind: "video", band: b, durationMs: s.durationMs, neededAt: s.airsAt ?? now });
+      if (producers.has(s.stationId) && producers.get(s.stationId) !== b) wants.push({ contentId: s.contentId, mediaKind: "video", band: producers.get(s.stationId)!, durationMs: s.durationMs, neededAt: s.airsAt ?? now });
     }
-    const info = await services.library.content.info([...wanted.map((w) => w.cid), ...cache.ids()]);
-    const needs = wanted.flatMap((w) => {
-      const i = info.get(w.cid);
-      return i && !i.deleted && !i.locked ? [{ cid: w.cid, bytes: i.bytes, airsAt: w.airsAt }] : [];
-    });
-    const gone = cache.ids().filter((cid) => !info.get(cid) || info.get(cid)!.deleted);
-    return { needs, gone };
+    await preparer.want(wants);
+    await preparer.refresh(wants.map((w) => refKey(w)).filter((k): k is string => Boolean(k)));
+    const keys = new Map<string, boolean>();
+    for (const w of wants) {
+      const key = refKey(w);
+      if (key) keys.set(`${key}/${w.band}`, (keys.get(`${key}/${w.band}`) ?? true) && preparer.isReady(key, w.band));
+    }
+    const notReady = logWants.filter((w) => !preparer.isReady(w, w.band)).sort((a, b) => a.neededAt!.getTime() - b.neededAt!.getTime())[0];
+    const ready = [...keys.values()].filter(Boolean).length;
+    readiness = {
+      checkedAt: now.toISOString(),
+      items: keys.size,
+      ready,
+      waiting: keys.size - ready,
+      firstNotReady: notReady ? { stationId: notReady.stationId, title: notReady.title, airsAt: notReady.neededAt!.toISOString() } : null
+    };
   }
 
-  async function syncCache() {
-    lastCacheSync = deps.clock.now().getTime();
-    const before = cache.stats().files;
-    const { needs, gone } = await cacheNeeds();
-    await cache.sync(needs, gone);
-    // New files: plan again so they air.
-    if (cache.stats().files !== before) for (const runner of runners.values()) runner.replan();
-  }
-
-  /** Anything on the log within the hour that isn't cached: tell the station and Network desk, and fetch it now. */
-  async function checkReady() {
-    lastCacheCheck = deps.clock.now().getTime();
+  /** Anything on the log within the hour that isn't prepared: the station and Network desk are told. */
+  async function warnNotReady() {
     const now = deps.clock.now();
-    const soon = await services.log.upcomingItems(now, new Date(now.getTime() + CACHE_WARN_MS));
-    const current = await services.library.currentContent(soon.map((i) => i.itemId));
-    const late = soon.filter((i) => current.get(i.itemId) && !cache.has(current.get(i.itemId)!) && i.startsAt > now);
+    const soon = (await services.log.upcomingItems(now, new Date(now.getTime() + READY_WARN_MS))).filter((i) => i.startsAt > now && !warned.has(i.entryId));
+    if (!soon.length) return;
+    const band = await bandOf(soon.map((i) => i.stationId));
+    const items = await services.library.itemsByIds(soon.map((i) => i.itemId));
+    const late = soon.filter((i) => {
+      const item = items.get(i.itemId);
+      return item && !item.contentUnavailable && refKey(item) && !preparer.isReady(item, band(i.stationId));
+    });
     if (!late.length) return;
-    const titles = await services.library.titles({ itemIds: late.map((i) => i.itemId), programIds: [] });
+    await preparer.refresh(late.map((i) => refKey(items.get(i.itemId)!)!));
     for (const i of late) {
-      if (warned.has(i.entryId)) continue;
+      const item = items.get(i.itemId)!;
+      if (preparer.isReady(item, band(i.stationId))) continue;
       warned.add(i.entryId);
-      deps.bus.emit("station.file_not_ready", { stationId: i.stationId, itemId: i.itemId, title: titles.items.get(i.itemId) ?? "An item", airsAt: i.startsAt.toISOString(), missedAtAir: false });
+      deps.bus.emit("station.file_not_ready", { stationId: i.stationId, itemId: i.itemId, title: item.title, airsAt: i.startsAt.toISOString(), missedAtAir: false });
     }
-    void syncCache().catch((error) => log(`[cache] sync failed: ${(error as Error).message}`));
+    // First in the queue.
+    await preparer.want(late.map((i) => {
+      const item = items.get(i.itemId)!;
+      return { contentId: item.contentId, location: item.location, mediaKind: item.mediaKind, band: band(i.stationId), durationMs: item.durationMs, neededAt: i.startsAt };
+    }));
   }
 
-  async function outputs(stationId: string): Promise<Output[]> {
-    const [config] = await db.select().from(schema.livepeerConfig).where(eq(schema.livepeerConfig.stationId, stationId));
-    const relays = await services.stations.relays(stationId);
-    return [
-      ...(config?.enabled && config.ingestUrl ? [{ kind: "livepeer" as const, url: config.ingestUrl, slateDuringBreaks: false }] : []),
-      ...relays.map((r) => ({ kind: "relay" as const, url: `${r.rtmpUrl.replace(/\/+$/, "")}/${r.streamKey}`, slateDuringBreaks: r.breakHandling === "station_id_slate" }))
-    ];
+  /** Items whose rights were confirmed (or files replaced) lately: prepared before anyone schedules them. */
+  async function queueConfirmed() {
+    const since = rightsSince;
+    rightsSince = deps.clock.now();
+    const items = await services.library.preparableSince(since, 500);
+    if (!items.length) return;
+    const band = await bandOf(items.map((i) => i.stationId));
+    await preparer.want(items.map((i) => ({ contentId: i.contentId, location: i.location, mediaKind: i.mediaKind, band: band(i.stationId), durationMs: i.durationMs, neededAt: null })));
   }
 
-  async function liveInput(liveSourceId: string) {
+  async function liveUrl(liveSourceId: string) {
+    if (options.liveUrl) return options.liveUrl(liveSourceId);
     const source = await services.stations.liveSourceSignal(liveSourceId);
-    if (!source) return null;
-    if (source.livepeerPlaybackId) return { url: `https://livepeercdn.studio/hls/${source.livepeerPlaybackId}/index.m3u8`, listen: false };
-    if (!source.streamKey) return null;
-    const { host, port } = options.liveListen ?? { host: "0.0.0.0", port: Number(process.env.LIVE_LISTEN_PORT ?? 1935) };
-    return { url: `rtmp://${host}:${port}/live/${source.streamKey}`, listen: true };
+    // Livepeer's playback of the source. No Livepeer: the source can't air (the stand-by slate does).
+    return source?.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${source.livepeerPlaybackId}/index.m3u8` : null;
   }
 
-  async function startRunner(stationId: string) {
-    const look = await services.stations.look(stationId);
-    if (!look) return;
-    const runner = new StationRunner(ctx, stationId, {
-      hlsDir: path.join(deps.config.storageRoot, "hls", stationId),
-      outputs: await outputs(stationId),
-      plan: (from, to) => planner.plan(stationId, from, to),
-      slates: planner.slates,
+  async function startAssembler(stationId: string) {
+    const found = await services.stations.look(stationId);
+    if (!found) return;
+    const look: ChannelLook = { ...found, bug: { ...found.bug } };
+    bands.set(stationId, look.band);
+    looks.set(stationId, look);
+    const assembler = new ChannelAssembler(ctx, stationId, {
       look,
-      liveInput,
+      plan: (from, to) => planner.plan(stationId, from, to),
+      preparer,
+      slates: planner.slates,
+      liveUrl,
       appOrigin: deps.config.appOrigin,
-      onSignalLost: () => deps.bus.emit("station.signal_lost", { stationId, liveSourceId: null }),
-      cache,
-      onFileMissing: (m) => deps.bus.emit("station.file_not_ready", { stationId, itemId: m.itemId, title: m.title, airsAt: m.airsAt.toISOString(), missedAtAir: true }),
+      scratchDir,
+      leadMs: options.leadMs,
+      onMissing: (m) => deps.bus.emit("station.file_not_ready", { stationId, itemId: m.itemId, title: m.title, airsAt: m.airsAt.toISOString(), missedAtAir: true }),
+      onSignalLost: (liveSourceId) => deps.bus.emit("station.signal_lost", { stationId, liveSourceId }),
       log
     });
-    runners.set(stationId, runner);
-    runner.start();
+    assemblers.set(stationId, assembler);
+    await assembler.start();
   }
 
   async function applyCommands() {
     const pending = await db.select().from(schema.commands).where(isNull(schema.commands.consumedAt)).orderBy(asc(schema.commands.createdAt));
     for (const command of pending) {
-      const runner = runners.get(command.stationId);
-      if (command.action === "skip" || command.action === "previous") runner?.skip();
-      if (command.action === "cue_break" && runner) {
+      const assembler = assemblers.get(command.stationId);
+      if (command.action === "skip" || command.action === "previous") await assembler?.skip();
+      if (command.action === "cue_break" && assembler) {
         const rule = await services.stations.breakRule(command.stationId);
         const now = deps.clock.now();
         const [live] = (await services.log.entries(command.stationId, now, new Date(now.getTime() + 1))).filter((e) => e.kind === "live" && e.startsAt <= now && e.endsAt > now);
         const slot = await services.log.cueBreak(command.stationId, now, rule.lengthMs, live?.id ?? null);
         await filler.fillOne(command.stationId, slot, await services.stations.timezoneOf(command.stationId), (await services.spots.creditsFor(command.stationId)).length > 0);
         // Back to live after it: the run sheet splits the live block around the break.
-        runner.replan(true);
+        assembler.replan(true);
       }
       // G3: a live block ended early. The log already moved up: hand back to it now.
-      if (command.action === "end_live") runner?.replan(true);
-      // The off air hours changed: read the log again (a station off air notices at once).
-      if (command.action === "replan") runner?.replan();
-      // sign_on and sign_off change who's on air; the runners follow below.
+      if (command.action === "end_live") assembler?.replan(true);
+      // The log or the off air hours changed: read the log again (a station off air notices at once).
+      if (command.action === "replan") assembler?.replan();
+      // sign_on and sign_off change who's on air; the assemblers follow below.
       await db.update(schema.commands).set({ consumedAt: deps.clock.now() }).where(eq(schema.commands.id, command.id));
     }
   }
@@ -178,65 +260,133 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       // Fill to the next thing on the log, or an hour.
       const [full] = await services.log.gaps(stationId, new Date(gap.startsAt), new Date(Date.parse(gap.startsAt) + 3_600_000));
       if (!full) continue;
-      const placed = await services.log.fillDeadAir(stationId, full);
+      // Repeats of what's prepared (anything else would air station ID and bumpers anyway).
+      const band = bands.get(stationId) ?? "tv";
+      const placed = await services.log.fillDeadAir(stationId, full, { usable: (item) => preparer.isReady(item, band) });
       if (placed) {
         log(`[playout] filled dead air on ${stationId} from ${full.startsAt} with ${placed} repeats`);
-        runners.get(stationId)?.replan();
+        assemblers.get(stationId)?.replan();
       }
     }
   }
 
-  return {
-    runners,
-    planner,
-    filler,
-    cache,
+  async function stopTranslators(stationId: string) {
+    const running = translators.get(stationId);
+    if (!running) return;
+    translators.delete(stationId);
+    await Promise.all([...running.values()].map((t) => t.relay.stop()));
+  }
 
-    /** For the worker's health endpoint. */
-    stats() {
-      return { stationsOnAir: runners.size, cache: cache.stats() };
-    },
-
-    async tick() {
-      // First tick: read the cache from the volume and fill it before anything airs.
-      if (!cacheReady) cacheReady = cache.init().then(syncCache);
-      await cacheReady;
-      const clock = deps.clock.now().getTime();
-      if (clock - lastCacheSync >= CACHE_EVERY_MS) void syncCache().catch((error) => log(`[cache] sync failed: ${(error as Error).message}`));
-      if (clock - lastCacheCheck >= CACHE_CHECK_EVERY_MS) await checkReady();
-      await applyCommands();
-      const onAir = new Set(await services.playout.onAirStations());
-      for (const [stationId, runner] of runners) {
-        if (!onAir.has(stationId)) {
-          runners.delete(stationId);
-          await runner.stop();
+  /** Relays for translators that are on, for stations on air. */
+  async function syncTranslators(onAir: Set<string>) {
+    for (const stationId of [...translators.keys()]) if (!onAir.has(stationId)) await stopTranslators(stationId);
+    if (options.translators === false) return;
+    for (const stationId of onAir) {
+      const look = looks.get(stationId);
+      if (!look) continue;
+      const targets = await services.stations.relays(stationId);
+      const running = translators.get(stationId) ?? new Map();
+      for (const [id, t] of running) {
+        const target = targets.find((x) => x.id === id);
+        if (!target || TranslatorRelay.signature(target) !== t.signature) {
+          running.delete(id);
+          await t.relay.stop();
         }
       }
+      for (const target of targets) {
+        if (running.has(target.id)) continue;
+        const relay = new TranslatorRelay(ctx, stationId, target, { look, preparer, slates: planner.slates, log });
+        relay.start();
+        running.set(target.id, { relay, signature: TranslatorRelay.signature(target) });
+      }
+      translators.set(stationId, running);
+    }
+  }
+
+  const engine = {
+    assemblers,
+    planner,
+    filler,
+    preparer,
+
+    /** For the worker's health endpoint. */
+    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; translators: Array<{ stationId: string; translatorId: string; bytesThisSession: number }> }> {
+      return {
+        stationsOnAir: assemblers.size,
+        preparation: await preparer.stats(),
+        readiness,
+        translators: [...translators].flatMap(([stationId, running]) => [...running].map(([translatorId, t]) => ({ stationId, translatorId, bytesThisSession: t.relay.bytesSent })))
+      };
+    },
+
+    /** The readiness check now (tests; the tick runs it hourly). */
+    sweep,
+    warnNotReady,
+
+    async tick() {
+      if (!initialized) {
+        await preparer.init();
+        initialized = true;
+      }
       const now = deps.clock.now().getTime();
-      for (const stationId of onAir) {
-        if (!runners.has(stationId)) {
-          await startRunner(stationId);
-          // Its station IDs, bumpers and rotation may not be cached yet.
-          void syncCache().catch((error) => log(`[cache] sync failed: ${(error as Error).message}`));
+      if (now - lastRights >= RIGHTS_EVERY_MS) {
+        lastRights = now;
+        await queueConfirmed().catch((error) => log(`[prepare] queueing confirmed items failed: ${(error as Error).message}`));
+      }
+      if (now - lastSweep >= READY_EVERY_MS) {
+        lastSweep = now;
+        await sweep().catch((error) => log(`[ready] the readiness check failed: ${(error as Error).message}`));
+      }
+      if (now - lastWarn >= READY_WARN_EVERY_MS) {
+        lastWarn = now;
+        await warnNotReady().catch((error) => log(`[ready] warning failed: ${(error as Error).message}`));
+      }
+      if (now - lastPrune >= 3_600_000) {
+        lastPrune = now;
+        await pruneChannelItems(ctx).catch(() => undefined);
+      }
+      void preparer.pump().catch((error) => log(`[prepare] ${(error as Error).message}`));
+      await applyCommands();
+      const onAir = new Set(await services.playout.onAirStations());
+      for (const [stationId, assembler] of assemblers) {
+        if (!onAir.has(stationId)) {
+          assemblers.delete(stationId);
+          // Signed off: the playlist ends.
+          await assembler.stop({ signOff: true });
+          await db
+            .update(schema.playoutState)
+            .set({ currentAssetId: null, currentLogEntryId: null, currentStartedAt: null, standingBy: false, updatedAt: deps.clock.now() })
+            .where(eq(schema.playoutState.stationId, stationId));
         }
+      }
+      for (const stationId of onAir) {
+        if (!assemblers.has(stationId)) await startAssembler(stationId);
         await fillDeadAir(stationId);
         if (now - (lastFill.get(stationId) ?? 0) >= FILL_EVERY_MS) {
           lastFill.set(stationId, now);
           const results = await filler.fillAhead(stationId, deps.clock.now(), FILL_AHEAD_MS);
-          if (results.some((r) => r.placed.length)) {
-            runners.get(stationId)?.replan();
-            // Newly placed spots: make sure their files are here.
-            void syncCache().catch((error) => log(`[cache] sync failed: ${(error as Error).message}`));
-          }
+          if (results.some((r) => r.placed.length)) assemblers.get(stationId)?.replan();
         }
+        await assemblers
+          .get(stationId)
+          ?.tick()
+          .catch((error) => log(`[assemble] ${stationId}: ${(error as Error).message}`));
+      }
+      if (now - lastTranslators >= TRANSLATORS_EVERY_MS || [...translators.keys()].some((id) => !onAir.has(id))) {
+        lastTranslators = now;
+        await syncTranslators(onAir).catch((error) => log(`[translator] ${(error as Error).message}`));
       }
     },
 
+    /** Stops everything without ending the playlists (shutdown, or leadership lost). */
     async stopAll() {
-      for (const runner of runners.values()) await runner.stop();
-      runners.clear();
+      for (const stationId of [...translators.keys()]) await stopTranslators(stationId);
+      for (const assembler of assemblers.values()) await assembler.stop({ signOff: false });
+      assemblers.clear();
+      // Preparations under way are left: the next leader queues them again.
     }
   };
+  return engine;
 }
 
 export type Engine = ReturnType<typeof createEngine>;

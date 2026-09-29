@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { and, asc, eq, ilike, inArray, isNull, max, sql } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { CaptionTrack, ItemHistory, LibraryItem } from "@opencast/contracts";
 import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
@@ -58,8 +58,13 @@ export interface LibraryService {
   contentOfItems(itemIds: string[]): Promise<string[]>;
   /** Other stations' items made from the same files (a takedown pulls them too). */
   itemsSharingContent(itemIds: string[]): Promise<string[]>;
-  /** Every item's current content ID, for the worker cache. */
+  /** Every item's current content ID. */
   currentContent(itemIds: string[]): Promise<Map<string, string>>;
+  /**
+   * Items to prepare for air (added 2026-09-29, prepare once): ready, rights confirmed, not archived,
+   * whose rights were confirmed or whose file changed since `since`.
+   */
+  preparableSince(since: Date, limit: number): Promise<ItemRef[]>;
   /** Publishes the station's own original to IPFS. Public, and it can't be taken back. */
   exportToIpfs(itemId: string): Promise<{ contentId: string; ipfsCid: string; url: string }>;
   titles(input: { itemIds: string[]; programIds: string[] }): Promise<{ items: Map<string, string>; programs: Map<string, string> }>;
@@ -503,6 +508,17 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return new Map([...files].flatMap(([id, f]) => (f.contentId ? [[id, f.contentId] as [string, string]] : [])));
     },
 
+    async preparableSince(since, limit) {
+      const rows = await db
+        .selectDistinct({ asset: A })
+        .from(A)
+        .innerJoin(R, eq(R.assetId, A.id))
+        .innerJoin(F, eq(F.assetId, A.id))
+        .where(and(eq(A.status, "ready"), isNull(A.archivedAt), or(gte(R.confirmedAt, since), gte(F.createdAt, since))))
+        .limit(limit);
+      return (await toRefs(rows.map((r) => r.asset))).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable);
+    },
+
     async exportToIpfs(itemId) {
       const row = await itemRow(itemId);
       if (row.source !== "upload") throw refused("not_yours", "Only a station's own uploads can be exported to IPFS.");
@@ -899,10 +915,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         row.programId ? services.catalog.carrierCount(row.programId) : Promise.resolve(0),
         row.programId && row.source !== "link" ? services.catalog.openOfferTerms(row.programId) : Promise.resolve(null)
       ]);
-      const idents = await services.stations.idents([...schedule.entries.map((e) => e.stationId), ...aired.map((a) => a.stationId)]);
+      const idents = await services.stations.idents([row.stationId, ...schedule.entries.map((e) => e.stationId), ...aired.map((a) => a.stationId)]);
+      const preparation = ref && (ref.contentId || ref.location) ? await services.playout.preparation(ref, idents.get(row.stationId)?.band ?? "tv") : { status: "not_asked" as const, renditions: [], preparedAt: null };
       const agreements = await services.catalog.agreementsByIds(aired.map((a) => a.carriageAgreementId).filter((v): v is string => Boolean(v)));
-      const now = deps.clock.now().getTime();
-      const dueToday = schedule.entries.some((e) => Date.parse(e.startsAt) < now + 24 * 3_600_000);
       const term = terms?.[0];
       return {
         itemId,
@@ -926,7 +941,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         }),
         logEntries: schedule.total,
         carriers,
-        cachedForAir: row.status === "ready" && Boolean(ref?.contentId || ref?.location) && !ref?.contentUnavailable && dueToday,
+        // Prepared for air (prepare once): the worker has nothing else to fetch.
+        cachedForAir: preparation.status === "ready" && !ref?.contentUnavailable,
+        preparation,
         audioLayout: audioLayoutOf(row.audioChannels),
         captionLanguage: track[0]?.language ?? program[0]?.captionsLanguage ?? null,
         carriage: {

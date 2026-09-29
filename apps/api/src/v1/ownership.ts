@@ -38,7 +38,18 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.day_template_dates",
     "broadcast.off_air_hours"
   ],
-  playout: ["broadcast.playout_state", "broadcast.commands", "broadcast.livepeer_config", "broadcast.schedules", "broadcast.as_run"],
+  playout: [
+    "broadcast.playout_state",
+    "broadcast.commands",
+    "broadcast.livepeer_config",
+    "broadcast.schedules",
+    "broadcast.as_run",
+    // Added 2026-09-29 (migration 0020): prepare once, then assemble.
+    "broadcast.prepared_items",
+    "broadcast.prepared_renditions",
+    "broadcast.channel_items",
+    "broadcast.translator_sessions"
+  ],
   catalog: ["catalog.*"],
   spots: ["spots.*"],
   ledger: ["ledger.*"],

@@ -1,14 +1,20 @@
-// The playout worker. The leader (Redis lease) runs the playout engine, which airs
-// every station on air from its program log from files in its cache, and the minute
-// tick (reminders, dead-air warnings, deadlines). Followers wait. The old queue loop
-// runs too while stations on the old model still need it (LEGACY_PLAYOUT=on).
-// GET /health reports leadership, stations on air and the cache; GET /hls/<station>/… serves its HLS.
+// The playout worker: prepare once, then assemble. The leader (Redis lease) runs the playout
+// engine, which prepares items for air (FFmpeg, once per content ID, into object storage),
+// assembles every station on air into its playlists (pointing at prepared segments, and at
+// Livepeer's during live blocks), runs translators that are on, and the minute tick (reminders,
+// dead-air warnings, deadlines). Followers wait. The worker needs only scratch space
+// (WORKER_SCRATCH_DIR) for preparation and translators.
+//
+// GET /health reports leadership, stations on air, preparation (items prepared, waiting, and the
+// time preparing takes) and readiness; GET /hls/<station>/master.m3u8 (and <rendition>.m3u8) serves
+// a channel's playlists, rendered from the database, so any replica answers them.
+//
+// The old queue loop (the model before the program log) only runs with LEGACY_PLAYOUT=on.
 
-import fs from "node:fs";
 import http from "node:http";
-import path from "node:path";
+import { gzipSync } from "node:zlib";
 import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
-import { HLS_ROOT, STORAGE_ROOT } from "./config.js";
+import { STORAGE_ROOT } from "./config.js";
 import { startLegacyPlayout, workerInstanceId } from "./legacy.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
 
@@ -19,7 +25,7 @@ const deps = createDeps(process.env, STORAGE_ROOT);
 const { services } = createV1(deps);
 const engine = createEngine({ deps, services }, { log: (line) => console.log(line) });
 const jobs = createJobs(deps, services);
-const legacy = process.env.LEGACY_PLAYOUT === "off" ? null : startLegacyPlayout();
+const legacy = process.env.LEGACY_PLAYOUT === "on" ? startLegacyPlayout() : null;
 
 let leader = false;
 let lastJobs = 0;
@@ -59,34 +65,51 @@ async function tick() {
 
 // Railway gives the worker a PORT; locally it's WORKER_HEALTH_PORT (the dev stack's PORT belongs to the web app).
 const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? (process.env.RAILWAY_ENVIRONMENT ? process.env.PORT : undefined) ?? 8788);
-const HLS_SEGMENT = /^\/hls\/([0-9a-f-]{36})\/(index\.m3u8|seg_\d+\.ts)$/;
+const PLAYLIST = /^\/hls\/([0-9a-f-]{36})\/([a-z0-9]+\.m3u8)$/;
+const PREPARED = /^\/hls\/(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.ts)$/;
+const LOCAL_OBJECT = /^\/objects\/((?:prepared|proof)\/[\w/.-]+)$/;
 const health = http.createServer((req, res) => {
   const url = (req.url ?? "").split("?")[0];
   if (url === "/health") {
-    const { stationsOnAir, cache } = engine.stats();
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, cache, at: new Date().toISOString() }));
+    engine
+      .stats()
+      .then(({ stationsOnAir, preparation, readiness, translators }) => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, preparation, readiness, translators, at: new Date().toISOString() }));
+      })
+      .catch((error) => res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: (error as Error).message })));
     return;
   }
-  // The stations' HLS, from this worker's disk (it's the one writing it): live playlists carry the break cues.
-  const hls = HLS_SEGMENT.exec(url);
-  if (hls && req.method === "GET") {
-    const [, stationId, file] = hls;
-    const headers = { "access-control-allow-origin": "*", "cache-control": file === "index.m3u8" ? "no-cache" : "public, max-age=60" };
-    if (file === "index.m3u8") {
-      services.playout
-        .playlistWithCues(stationId)
-        .then((playlist) => {
-          if (!playlist) return void res.writeHead(404, headers).end();
-          res.writeHead(200, { ...headers, "content-type": "application/vnd.apple.mpegurl" }).end(playlist);
-        })
-        .catch(() => res.writeHead(500, headers).end());
-      return;
-    }
-    const stream = fs.createReadStream(path.join(HLS_ROOT, stationId, file));
-    stream.on("open", () => res.writeHead(200, { ...headers, "content-type": "video/mp2t" }));
-    stream.on("error", () => res.writeHead(404, headers).end());
-    stream.pipe(res);
+  if (req.method !== "GET") return void res.writeHead(404).end();
+  const cors = { "access-control-allow-origin": "*" };
+  // A channel's playlists, from its assembled timeline (any replica can answer), with a short cache.
+  const playlist = PLAYLIST.exec(url);
+  if (playlist) {
+    services.playout
+      .playlist(playlist[1], playlist[2])
+      .then((found) => {
+        if (!found) return void res.writeHead(404, { ...cors, "cache-control": "no-cache" }).end();
+        const headers = { ...cors, "content-type": "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}`, vary: "Accept-Encoding" };
+        // A 30-minute window is tens of kilobytes of repetitive lines: gzip takes it to a few.
+        if (/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) res.writeHead(200, { ...headers, "content-encoding": "gzip" }).end(gzipSync(found.body));
+        else res.writeHead(200, headers).end(found.body);
+      })
+      .catch(() => res.writeHead(500, cors).end());
+    return;
+  }
+  // Prepared segments, when storage has no public domain; and local disk in development.
+  const prepared = PREPARED.exec(url);
+  const local = LOCAL_OBJECT.exec(url);
+  const key = prepared?.[1] ?? local?.[1];
+  if (key && deps.storage.objects.open && !key.includes("..")) {
+    deps.storage.objects
+      .open(key)
+      .then((stream) => {
+        res.writeHead(200, { ...cors, "content-type": key.endsWith(".jpg") ? "image/jpeg" : "video/mp2t", "cache-control": "public, max-age=31536000, immutable" });
+        stream.on("error", () => res.destroy());
+        stream.pipe(res);
+      })
+      .catch(() => res.writeHead(404, cors).end());
     return;
   }
   res.writeHead(404).end();

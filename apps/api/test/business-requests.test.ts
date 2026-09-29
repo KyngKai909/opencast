@@ -460,7 +460,8 @@ describe("the platform's fixes", () => {
   it("playback addresses are full URLs on the API's origin (A117)", async () => {
     await h.db.insert(schema.playoutState).values({ stationId: civcId, onAir: true }).onConflictDoNothing();
     const status = await h.services.playout.statusFor([civcId]);
-    expect(status.get(civcId)?.playbackUrl).toBe(`${PUBLIC}/hls/${civcId}/index.m3u8`);
+    // The channel's master playlist (prepare once, then assemble).
+    expect(status.get(civcId)?.playbackUrl).toBe(`${PUBLIC}/hls/${civcId}/master.m3u8`);
   });
 
   it("a claimable station signs on at its scheduled time, and its creator is on air (A124)", async () => {

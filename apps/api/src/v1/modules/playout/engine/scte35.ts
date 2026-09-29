@@ -131,28 +131,3 @@ export function breakCue(stationId: string, brk: { id: string | null; startsAt: 
   const id = `brk-${stationId}-${startsAt.getTime()}`;
   return { id, startsAt, durationMs: brk.lengthMs, eventId: crc32Mpeg2(Buffer.from(id, "utf8")) };
 }
-
-/** The EXT-X-DATERANGE tag pair for one break. */
-export function breakDateRanges(input: { id: string; startsAt: Date; durationMs: number; eventId: number }): string[] {
-  const out = toHex(encodeSpliceInsert({ eventId: input.eventId, outOfNetwork: true, durationMs: input.durationMs, autoReturn: true }));
-  const back = toHex(encodeSpliceInsert({ eventId: input.eventId, outOfNetwork: false }));
-  const seconds = (input.durationMs / 1000).toFixed(3);
-  return [
-    `#EXT-X-DATERANGE:ID="${input.id}",START-DATE="${input.startsAt.toISOString()}",PLANNED-DURATION=${seconds},SCTE35-OUT=${out}`,
-    `#EXT-X-DATERANGE:ID="${input.id}",START-DATE="${input.startsAt.toISOString()}",DURATION=${seconds},SCTE35-IN=${back}`
-  ];
-}
-
-/**
- * Adds the cues to a live HLS playlist. Tags go before the first segment,
- * as the spec allows DATERANGE anywhere in a media playlist; players match
- * them to segments by PROGRAM-DATE-TIME.
- */
-export function decoratePlaylist(playlist: string, breaks: Array<{ id: string; startsAt: Date; durationMs: number; eventId: number }>): string {
-  if (!breaks.length) return playlist;
-  const lines = playlist.split("\n");
-  const first = lines.findIndex((l) => l.startsWith("#EXTINF") || l.startsWith("#EXT-X-PROGRAM-DATE-TIME"));
-  const at = first < 0 ? lines.length : first;
-  const tags = breaks.flatMap((b) => breakDateRanges(b));
-  return [...lines.slice(0, at), ...tags, ...lines.slice(at)].join("\n");
-}

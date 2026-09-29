@@ -14,6 +14,7 @@ import type { DayTemplate, DayTemplateEntry, TemplateGeneration } from "@opencas
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 import { addDays, localDate, localDay, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
+import { snapToSegment } from "../../lib/segments.js";
 
 const G = schema.repeatGroups;
 const TE = schema.dayTemplateEntries;
@@ -420,7 +421,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         let skipped = 0;
         for (const e of templateEntries.filter((x) => x.templateId === t.id)) {
           const startsAt = zonedTime(date, minuteText(e.startMinute), tz);
-          const endsAt = new Date(startsAt.getTime() + e.lengthMs);
+          // On a segment boundary (the template keeps the day's lengths as they were made).
+          const endsAt = new Date(startsAt.getTime() + snapToSegment(e.lengthMs));
           if (startsAt <= now) continue;
           if (e.kind === "program") {
             const item = e.assetId ? items.get(e.assetId) : undefined;

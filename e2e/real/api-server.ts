@@ -181,14 +181,15 @@ const v1 = createV1(deps);
 const app = express();
 const origins = new Set((process.env.WEB_ORIGIN ?? "").split(",").map((o) => o.trim()).filter(Boolean));
 app.use(cors({ origin: (origin, cb) => cb(null, !origin || origins.size === 0 || origins.has(origin)) }));
-// As the API server: live playlists with their break cues, and objects from local storage.
-app.get("/hls/:stationId/index.m3u8", async (req, res, next) => {
+// As the API server: a channel's assembled playlists, and objects from local storage.
+app.get("/hls/:stationId/:file", async (req, res, next) => {
+  if (!/^[a-z0-9]+\.m3u8$/.test(req.params.file)) return next();
   try {
-    const playlist = await v1.services.playout.playlistWithCues(req.params.stationId);
+    const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file);
     if (playlist === null) return next();
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-    res.setHeader("Cache-Control", "no-store");
-    res.send(playlist);
+    res.setHeader("Cache-Control", `public, max-age=${playlist.maxAge}`);
+    res.send(playlist.body);
   } catch (error) {
     next(error);
   }

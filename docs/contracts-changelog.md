@@ -2,6 +2,23 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: prepare once, then assemble (playout, Phase 5)
+
+The worker no longer encodes channels. Every item is prepared once (FFmpeg on the worker: TV 1080p, 720p, 480p, 360p and AAC 128k audio-only; radio band AAC 128k and 64k; 4-second segments, aligned keyframes, loudness levelled to -24 LUFS, 10 ms edge fades) into object storage under its content ID, and each channel's playlists are assembled from those segments (and Livepeer's during live blocks) with the tags in `hls.ts`. Additive: new optional fields, one enum widened in a response only, and new playlist URLs. Migration 0020 adds four tables only (`prepared_items`, `prepared_renditions`, `channel_items`, `translator_sessions`; see docs/schema.md).
+
+Changed (additive):
+
+- `PlayoutStatus.readiness` (`getStatus`, the Monitor): `{ items, ready, firstNotReady: { itemId, title, airsAt, status: queued | preparing | failed | not_asked } | null }` over the next 48 hours of the log. Null or absent before this change.
+- `SignOnCheck.key` gains `items_prepared` (response only): never blocking, "N of M in the next 24 hours".
+- `ItemHistory.preparation` (L5, `getItemHistory`): `{ status: ready | queued | preparing | failed | not_asked, renditions, preparedAt }`. `ItemHistory.cachedForAir` keeps its shape and now means prepared for air in every rendition of its station's band (before: due within 24 hours).
+- The station's playback URL (`DialRow`/station `playback.url`, the guide, `PlayoutStatus.output.playbackUrl`, `SignOnCheck.watchUrl` on `output`) is now the channel's master playlist, `/hls/<stationId>/master.m3u8` on `HLS_PUBLIC_URL` (or the API's origin). The master lists `v720.m3u8` first, then `v1080`, `v480`, `v360` and the audio-only `a128` (TV), or `a128` and `a64` (radio). `/hls/<stationId>/index.m3u8` answers the same master playlist for older links. Media playlists keep 30 minutes (X1), are cached for a second (the master for 30), and are gzipped when asked. Segments are absolute URLs on the bucket's public domain (`R2_PUBLIC_BASE`), or `/objects/…` locally.
+- `PlayoutStatus.output.livepeerEnabled` is always false now: Livepeer no longer carries a station's output, only live blocks' sources. The `output` sign-on check always passes ("Assembled from prepared items"); its `watchUrl` is null until the channel has aired.
+- The log's times are on 4-second segment boundaries: `createEntry`, `updateEntry`, day templates and dead-air fill round what they're given to the nearest boundary (never refused); `endEarly` ends at the nearest boundary; a cued break starts at the next one; a maker's break points move to the nearest boundary. An entry's slot may be up to 2 s shorter than its item after rounding.
+
+What the playlists carry (unchanged contract, now written by the worker): `#EXT-X-DISCONTINUITY` between items and into and out of live blocks, `#EXT-X-PROGRAM-DATE-TIME` on each item's first segment, and DATERANGE tags: `item` (not on the station ID slate holds, which are `OPEN`), `break` with `SCTE35-OUT` and `SCTE35-IN` in one tag for the whole break, `bug` (TV only, not over credits, station IDs or holds), `code` for a spot's last 10 s, `live` (also over the stand-by slate while the source isn't connected), `lower-third` over live blocks (a new ID each time it changes), and `sign-off` with `backAt`, followed by `#EXT-X-ENDLIST`. A new playlist starts from the station ID at the back time; media and discontinuity sequence numbers carry on.
+
+Worker: `GET /health` reports `preparation` (items prepared, waiting, preparing, failed, and the last day's preparation time per hour of media), `readiness` (the last 48-hour check) and translators. The notice for an item not ready says "isn't prepared for air" instead of "isn't on the playout server".
+
 ## 2026-09-29: day templates and off air hours (handoff 5)
 
 For the platform prompt's Phase 5 timeline rules ("Off air is a choice; dead air is a mistake", "Day templates") and master control's program log ("Repeat this day" with Every Saturday, Weekdays, Every day, Once; "Off air hours"). Additive: new endpoints, new optional fields, one enum widened in a response only (`SignOnCheck.key`). Migration 0019 adds three tables and nullable (or defaulted) columns only.

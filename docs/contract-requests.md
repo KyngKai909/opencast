@@ -202,8 +202,8 @@ Phase 7 built against these as optional extensions (`apps/web/src/desk/api/ext.t
 
 | # | Request | Why | Phase |
 |---|---|---|---|
-| X1 | **Live playlists keep 30 minutes** (the worker's HLS and Livepeer's output: a DVR window of at least 30 minutes) | Pause holds your place for up to 30 minutes, then offers Back to live. With a short window the player can only hold what the playlist still lists | 3 |
-| X2 | **A subtitle rendition in the live output** (WebVTT in the HLS, or CEA-608 in the video) | Captions, with the size setting, come from the stream; the player shows whatever rendition it's given | 3 |
+| X1 | **Done 2026-09-29** (prepare once, then assemble): the channel's media playlists keep 30 minutes. **Live playlists keep 30 minutes** (the worker's HLS and Livepeer's output: a DVR window of at least 30 minutes) | Pause holds your place for up to 30 minutes, then offers Back to live. With a short window the player can only hold what the playlist still lists | 3 |
+| X2 | Not yet (2026-09-29): nothing generates captions, and prepared items don't carry uploaded tracks yet. **A subtitle rendition in the live output** (WebVTT in the HLS, or CEA-608 in the video) | Captions, with the size setting, come from the stream; the player shows whatever rendition it's given | 3 |
 
 
 ## How the viewer carries them (Phase 3)
@@ -242,6 +242,15 @@ Landed 2026-09-29 as above. What the apps change:
 - **The off air hours setting** is `getOffAirHours` / `setOffAirHours` (`rules` replace the lot: `{ days, signOffAt, backAt }`, labels come back). "Sign off at 11:40 pm" in the dead-air card stays `fillGap` `with: "sign_off"` up to when the hours start (or when the log resumes); the two join into one stretch, back when the hours end.
 - **The Monitor** shows `PlayoutStatus.offAir` ("Off air, back at 6:00 am" when `now`, else "Signs off at 2:00 am"). The sign-on pre-flight may carry an `off_air_hours` check (informational) and passes `log_covers_24h` with the hours empty.
 - **Viewer and TV**: an `off_air` airing on the dial (`DialRow.backAt`, `now.backAt`), in the guide and on the station page is one block from sign-off to `backAt` ("Off air, back at 6:00 am"); `onAir` is false. A player tuned in when the station signs off sees the sign-off slate, then the playlist ends (`#EXT-X-ENDLIST`); it stops sending heartbeats (the heartbeat's `offAirUntil` and `nextInMs` say when to try again) and reloads the playlist at `backAt`. Mocks: add `offAir` to the log fixtures and an off air row to the dial and guide fixtures.
+
+### Prepare once, then assemble (Phase 5 playout)
+
+Landed 2026-09-29 (see docs/contracts-changelog.md). What the apps change:
+
+- **The log editor snaps to 4-second segment boundaries** (programs, live blocks, off air; the stream changes item there). The API rounds anything it's sent to the nearest boundary, so an unsnapped editor still works, but the time it shows should be the one the API answers.
+- **Master control's Monitor** can show `PlayoutStatus.readiness` ("12 of 13 items ready for the next 48 hours; Borrowed Tape at 8:40 pm is being prepared"), and the sign-on pre-flight may show the `items_prepared` check (never blocking). `output.livepeerEnabled` is always false; drop anything that reads it.
+- **The library's item history** can show `preparation` ("Prepared for air", "Being prepared", "Couldn't be prepared") in place of the old cache wording.
+- **Players** (viewer, TV, casting) play the station's `playback.url`, now a master playlist with a rendition ladder instead of a single rendition; nothing else changes (`packages/player` already reads the tags). Neighbour pre-warm can fetch `master.m3u8` and the first rendition's playlist; both are cached briefly and gzipped.
 
 ## How the business app carries them (Phase 5)
 

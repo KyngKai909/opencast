@@ -8,7 +8,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { cidFromSha256, contentIdOf, sha256FromCid } from "../src/v1/storage.js";
-import { ContentCache } from "../src/v1/modules/playout/engine/cache.js";
 import { createPlanner } from "../src/v1/modules/playout/engine/plan.js";
 import { anon, createHarness, itemFixture, market, stationFixture, testClip, type Harness, type User } from "./harness.js";
 
@@ -168,69 +167,23 @@ describe("IPFS", () => {
   }, 60_000);
 });
 
-describe("the worker cache", () => {
-  const need = (cid: string, minutes: number, bytes = 100) => ({ cid, bytes, airsAt: new Date(Date.parse("2026-09-22T19:00:00.000Z") + minutes * 60_000) });
-  const cids = Array.from({ length: 4 }, (_, i) => `b${String(i).repeat(58).replace(/[0-9]/g, (d) => "abcd"[Number(d)])}`);
-
-  async function freshCache(capacity: number) {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cache-"));
-    const fetched: string[] = [];
-    const cache = new ContentCache(dir, capacity, async (cid, dest) => {
-      fetched.push(cid);
-      await fs.writeFile(dest, Buffer.alloc(100));
-    });
-    await cache.init();
-    return { cache, fetched, dir };
-  }
-
-  it("copies in the earliest airtimes first, and evicts what airs furthest away", async () => {
-    const { cache, fetched } = await freshCache(300);
-    await cache.sync([need(cids[2], 90), need(cids[0], 10), need(cids[1], 30)]);
-    expect(fetched).toEqual([cids[0], cids[1], cids[2]]);
-    // Something airing sooner arrives: the one airing last makes way.
-    await cache.sync([need(cids[0], 10), need(cids[1], 30), need(cids[2], 90), need(cids[3], 20)]);
-    expect(cache.has(cids[3])).toBe(true);
-    expect(cache.has(cids[2])).toBe(false);
-  });
-
-  it("never evicts something needed sooner to fit something later", async () => {
-    const { cache } = await freshCache(200);
-    await cache.sync([need(cids[0], 10), need(cids[1], 20)]);
-    await cache.sync([need(cids[0], 10), need(cids[1], 20), need(cids[2], 300)]);
-    expect(cache.has(cids[2])).toBe(false);
-    expect(cache.stats().pending).toBe(1);
-  });
-
-  it("drops taken-down files, keeps its files across a restart, and counts hits and misses", async () => {
-    const { cache, dir } = await freshCache(1000);
-    await cache.sync([need(cids[0], 10), need(cids[1], 20)]);
-    await cache.sync([need(cids[0], 10)], [cids[1]]);
-    expect(cache.has(cids[1])).toBe(false);
-    const again = new ContentCache(dir, 1000, async () => undefined);
-    await again.init();
-    expect(again.has(cids[0])).toBe(true);
-    expect(again.take(cids[0])).toBe(path.join(dir, cids[0]));
-    expect(again.take(cids[2])).toBeNull();
-    expect(again.stats()).toMatchObject({ hits: 1, misses: 1, hitRate: 0.5, files: 1, bytesCached: 100 });
-  });
-
-  it("airs the usual fill when a file isn't cached, and says what was missing", async () => {
-    const item = await itemFixture(h, beatId, { location: await testClip(10), title: "Not copied yet" });
+describe("items not prepared for air", () => {
+  it("air the usual fill, and say what was missing", async () => {
+    const item = await itemFixture(h, beatId, { location: await testClip(10), title: "Not prepared yet" });
     await kai.post(`/v1/stations/${beatId}/log`, { kind: "program", startsAt: "2026-09-24T03:00:00.000Z", itemId: item.id }).expect(201);
-    const empty = new ContentCache(await fs.mkdtemp(path.join(os.tmpdir(), "cache-")), 1 << 30, async () => undefined);
-    const planner = createPlanner({ deps: h.deps, services: h.services }, { cache: empty });
+    const cid = (await h.services.library.currentContent([item.id])).get(item.id)!;
+    const prepared = new Set<string>();
+    const planner = createPlanner({ deps: h.deps, services: h.services }, { isReady: (ref) => Boolean(ref.contentId && prepared.has(ref.contentId)) });
     const sheet = await planner.plan(beatId, new Date("2026-09-24T03:00:00.000Z"), new Date("2026-09-24T03:01:00.000Z"));
     expect(sheet.some((s) => s.code === "PGM")).toBe(false);
-    expect(sheet[0].missing).toMatchObject({ itemId: item.id, title: "Not copied yet" });
-    // With the file cached, the program airs from the cache.
-    const cid = (await h.services.library.currentContent([item.id])).get(item.id)!;
-    const full = new ContentCache(await fs.mkdtemp(path.join(os.tmpdir(), "cache-")), 1 << 30, (c, dest) => h.services.library.content.fetch(c, dest));
-    await full.sync([{ cid, bytes: 1, airsAt: new Date() }]);
-    const aired = await createPlanner({ deps: h.deps, services: h.services }, { cache: full }).plan(beatId, new Date("2026-09-24T03:00:00.000Z"), new Date("2026-09-24T03:01:00.000Z"));
-    expect(aired[0]).toMatchObject({ code: "PGM", source: { kind: "file", location: full.pathOf(cid), contentId: cid } });
+    expect(sheet[0].missing).toMatchObject({ itemId: item.id, title: "Not prepared yet" });
+    // Once prepared, the program airs (by its content ID).
+    prepared.add(cid);
+    const aired = await planner.plan(beatId, new Date("2026-09-24T03:00:00.000Z"), new Date("2026-09-24T03:01:00.000Z"));
+    expect(aired[0]).toMatchObject({ code: "PGM", source: { kind: "file", contentId: cid } });
   });
 
-  it("tells the station and Network desk when a file due within the hour isn't cached", async () => {
+  it("tells the station and Network desk when an item due within the hour isn't prepared", async () => {
     await h.signIn("Dee", { admin: true });
     h.deps.bus.emit("station.file_not_ready", { stationId: beatId, itemId: "00000000-0000-4000-8000-000000000001", title: "Late Crate, ep. 15", airsAt: "2026-09-22T19:40:00.000Z", missedAtAir: false });
     await h.deps.bus.settle();

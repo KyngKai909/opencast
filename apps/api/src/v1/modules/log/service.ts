@@ -4,6 +4,7 @@ import type { Airing, BreakContent, BreakRow, Listing, LogEntry } from "@opencas
 import type { ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+import { nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
@@ -129,7 +130,8 @@ export interface LogService {
    * Nobody filled the gap: repeat from the library, in order, and record that it happened.
    * Whatever doesn't fit airs station ID and bumpers.
    */
-  fillDeadAir(stationId: string, gap: Gap): Promise<number>;
+  /** `usable` (playout's): only items it can air now (prepared for air). */
+  fillDeadAir(stationId: string, gap: Gap, options?: { usable?(item: ItemRef): boolean }): Promise<number>;
   /** Adds a break now, cued from a live block. */
   cueBreak(stationId: string, at: Date, lengthMs: number, logEntryId: string | null): Promise<BreakSlotView>;
   /** "During Saturday Reel" / "After Late Crate, ep. 14" for stored breaks. */
@@ -389,7 +391,8 @@ export function createLogService(ctx: ModuleContext): LogService {
           : Array.from({ length: Math.floor(itemMs / (rule.everyMinutes * MIN)) }, (_, i) => (i + 1) * rule.everyMinutes! * MIN).filter((p) => p < itemMs);
         let shift = 0;
         for (const point of points) {
-          const startsAt = new Date(row.startsAt.getTime() + point + shift);
+          // At the segment boundary nearest the maker's break point.
+          const startsAt = new Date(row.startsAt.getTime() + snapToSegment(point) + shift);
           const perBreakShare = barterPerHour ? Math.min(rule.lengthMs, Math.round(barterPerHour / (60 / rule.everyMinutes))) : 0;
           slots.push({
             startsAt: startsAt.toISOString(),
@@ -455,8 +458,9 @@ export function createLogService(ctx: ModuleContext): LogService {
   }
 
   async function validate(stationId: string, input: EntryInput, excludeId?: string) {
-    const startsAt = new Date(input.startsAt);
-    let endsAt = input.endsAt ? new Date(input.endsAt) : null;
+    // On segment boundaries (the stream changes item there): rounded to the nearest, never refused.
+    const startsAt = snapDate(new Date(input.startsAt));
+    let endsAt = input.endsAt ? snapDate(new Date(input.endsAt)) : null;
     let code: Row["code"] = "PGM";
     let programId = input.programId ?? null;
 
@@ -472,7 +476,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       code = item.code;
       programId = programId ?? item.programId;
       endsAt = endsAt ?? new Date(startsAt.getTime() + roundUpToMinute(item.durationMs ?? 30 * MIN));
-      if (item.durationMs && endsAt.getTime() - startsAt.getTime() < item.durationMs - 1000) {
+      // A second's grace, plus up to a segment's rounding.
+      if (item.durationMs && endsAt.getTime() - startsAt.getTime() < item.durationMs - 1000 - SEGMENT_MS / 2) {
         throw badRequest("The slot is shorter than the item.", { endsAt: "Too short" });
       }
     } else if (input.kind === "live") {
@@ -607,8 +612,9 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async endEarly(stationId, entryId) {
       const row = await service.liveEntry(stationId, entryId);
-      // To the second: the as-run log's live airing ends here too.
-      const at = new Date(Math.floor(deps.clock.now().getTime() / 1000) * 1000);
+      // At the nearest segment boundary, where the stream can change item.
+      const clock = deps.clock.now().getTime();
+      const at = new Date(snapToSegment(clock) > row.startsAt.getTime() ? snapToSegment(clock) : nextSegment(clock));
       if (row.endedEarlyAt) throw new HttpError(409, "ended", "It has already ended.");
       if (!(row.startsAt <= at && at < row.endsAt)) throw new HttpError(409, "not_on_air", "It can end early only while it's on air.");
       const shift = row.endsAt.getTime() - at.getTime();
@@ -870,11 +876,12 @@ export function createLogService(ctx: ModuleContext): LogService {
       return [...counts].map(([stationId, entries]) => ({ stationId, entries }));
     },
 
-    async fillDeadAir(stationId, gap) {
+    async fillDeadAir(stationId, gap, options = {}) {
       const startsAt = new Date(gap.startsAt);
       const endsAt = new Date(gap.endsAt);
-      const items = await services.library.repeatable(stationId, 20);
-      let cursor = startsAt.getTime();
+      const items = (await services.library.repeatable(stationId, 20)).filter((i) => options.usable?.(i) ?? true);
+      // From a segment boundary (the stream changes item there).
+      let cursor = nextSegment(startsAt.getTime());
       let placed = 0;
       for (let i = 0; items.length && i < 200; i++) {
         const item = items[i % items.length];
@@ -908,7 +915,9 @@ export function createLogService(ctx: ModuleContext): LogService {
       await db.update(B).set({ filledAt: deps.clock.now() }).where(eq(B.id, breakId));
     },
 
-    async cueBreak(stationId, at, lengthMs, logEntryId) {
+    async cueBreak(stationId, atTime, lengthMs, logEntryId) {
+      // From the next segment boundary.
+      const at = new Date(nextSegment(atTime.getTime()));
       const [row] = await db.insert(B).values({ stationId, startsAt: at, lengthMs, logEntryId, origin: "cued_live" }).returning();
       return {
         id: row.id,

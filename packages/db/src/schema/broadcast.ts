@@ -805,3 +805,136 @@ export const lowerThirds = broadcast.table("lower_thirds", {
   updatedBy: uuid("updated_by").references(() => users.id),
   updatedAt: at("updated_at").notNull().defaultNow()
 });
+
+// --- Prepare once, then assemble (migration 0020, 2026-09-29) --------------------------------
+
+/**
+ * An item prepared for air: transcoded once to the fixed ladder (4-second segments, aligned
+ * keyframes, levelled loudness, a few milliseconds of fade at each edge) and stored under
+ * `prepared/<key>/<rendition>/` in object storage. Keyed by the file's content ID, so a carried
+ * or catalog program is prepared once for every station that airs it. Generated slates (station
+ * ID holds, underwriting credits, sign-off and stand-by) use a `slate-…` key made from their
+ * picture and length; files from before content IDs use `loc-…`, made from their old location.
+ * `renditions` is what's wanted (the union of the bands that air it); each one done is a row in
+ * `prepared_renditions`.
+ */
+export const preparedItems = broadcast.table(
+  "prepared_items",
+  {
+    key: text("key").primaryKey(),
+    /** The file's content ID (null for slates and old locations). */
+    contentId: text("content_id"),
+    kind: text("kind", { enum: ["file", "slate"] }).notNull().default("file"),
+    /** Files from before content IDs: the disk path or URL it's read from. */
+    sourceLocation: text("source_location"),
+    mediaKind: text("media_kind", { enum: ["video", "audio"] }).notNull().default("video"),
+    status: text("status", { enum: ["queued", "preparing", "ready", "failed"] }).notNull().default("queued"),
+    renditions: text("renditions").array().notNull().default(sql`'{}'::text[]`),
+    /** The item's length: known before (from the library) and measured after. */
+    durationMs: millis("duration_ms"),
+    /** When it's first needed on air, as far as the readiness check knows: earliest first. */
+    neededAt: at("needed_at"),
+    attempts: smallint("attempts").notNull().default(0),
+    error: text("error"),
+    /** Wall-clock time the last preparation took, and what it stored. */
+    prepMs: integer("prep_ms"),
+    bytes: bigint("bytes", { mode: "number" }),
+    queuedAt: at("queued_at").notNull().defaultNow(),
+    startedAt: at("started_at"),
+    preparedAt: at("prepared_at")
+  },
+  (t) => [index("prepared_items_queue").on(t.status, t.neededAt), index("prepared_items_content").on(t.contentId)]
+);
+
+/** One rendition of a prepared item: its segments' lengths, in order (the playlist's EXTINFs). */
+export const preparedRenditions = broadcast.table(
+  "prepared_renditions",
+  {
+    key: text("key")
+      .notNull()
+      .references(() => preparedItems.key),
+    rendition: text("rendition").notNull(),
+    segments: integer("segments").notNull(),
+    segmentMs: jsonb("segment_ms").$type<number[]>().notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+    preparedAt: at("prepared_at").notNull().defaultNow()
+  },
+  (t) => [primaryKey({ columns: [t.key, t.rendition] })]
+);
+
+/**
+ * A channel's assembled timeline: what its playlists point at, in order, a row per item (or live
+ * stretch). The worker writes rows a few seconds ahead; a segment is published (appears in the
+ * playlist) once its program date-time plus length has passed. Rows are the playlist's state, so
+ * any replica, or the API, renders the same playlist. `seq` is the media sequence number of the
+ * row's first segment, `disc` the discontinuity sequence at it; `run` starts again after a
+ * planned sign-off (a new playlist). Kept two days; the as-run log is the record.
+ */
+export const channelItems = broadcast.table(
+  "channel_items",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    run: integer("run").notNull(),
+    seq: bigint("seq", { mode: "number" }).notNull(),
+    disc: integer("disc").notNull(),
+    /** An #EXT-X-DISCONTINUITY goes before it. */
+    discontinuity: boolean("discontinuity").notNull().default(true),
+    startsAt: at("starts_at").notNull(),
+    endsAt: at("ends_at").notNull(),
+    /** `prepared` segments, `live` segments (Livepeer's), or `end`: the playlist ends here (#EXT-X-ENDLIST). */
+    kind: text("kind", { enum: ["prepared", "live", "end"] }).notNull(),
+    preparedKey: text("prepared_key"),
+    firstSegment: integer("first_segment").notNull().default(0),
+    segments: integer("segments").notNull().default(0),
+    /** Segment lengths on the channel's timeline (ms). */
+    segmentMs: jsonb("segment_ms").$type<number[]>().notNull().default([]),
+    /** Live: each rendition's segment URLs. */
+    liveUris: jsonb("live_uris").$type<Record<string, string[]>>(),
+    /** The #EXT-X-DATERANGE lines that go with it. */
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    /** What the as-run entry says when it's written. */
+    reason: text("reason").notNull(),
+    planKey: text("plan_key"),
+    inBreak: boolean("in_break").notNull().default(false),
+    logEntryId: uuid("log_entry_id"),
+    breakId: uuid("break_id"),
+    assetId: uuid("asset_id"),
+    programId: uuid("program_id"),
+    airingId: uuid("airing_id"),
+    agreementId: uuid("agreement_id"),
+    liveSourceId: uuid("live_source_id"),
+    /** Still growing (a live stretch being appended to). */
+    open: boolean("open").notNull().default(false),
+    /** The as-run entry written once its last segment was published. */
+    asRunId: uuid("as_run_id"),
+    createdAt: createdAt()
+  },
+  (t) => [index("channel_items_station_seq").on(t.stationId, t.seq), index("channel_items_station_ends").on(t.stationId, t.endsAt)]
+);
+
+/** A translator relaying the channel: one row per session, with what it sent (egress). */
+export const translatorSessions = broadcast.table(
+  "translator_sessions",
+  {
+    id: id(),
+    /** No foreign key: a translator can be removed, and its egress stays on record. */
+    translatorId: uuid("translator_id").notNull(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** `copy`: stream-copied; `composite`: re-encoded to draw the bug. */
+    mode: text("mode", { enum: ["copy", "composite"] }).notNull(),
+    swapsBreaks: boolean("swaps_breaks").notNull().default(false),
+    startedAt: at("started_at").notNull(),
+    endedAt: at("ended_at"),
+    bytesSent: bigint("bytes_sent", { mode: "number" }).notNull().default(0),
+    lastError: text("last_error"),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [index("translator_sessions_translator").on(t.translatorId, t.startedAt)]
+);
