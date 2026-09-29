@@ -2,7 +2,7 @@
 
 You're working in `github.com/KyngKai909/untitled-project`, the Opencast repo (package scope `@openchannel`, product name Opencast, a working name). Your job is to turn it into a monorepo, replace the JSON-blob state with a real schema, split the API into modules, extend the playout worker for the product that's now designed, and deploy the services to Railway.
 
-A second prompt builds the apps (`apps/control`, `apps/viewer`, `apps/tv`, `apps/site`, `apps/spots`, `apps/desk`) at the same time. You and that prompt meet at `packages/contracts`. You own the backend and the contracts; the apps prompt owns everything under `apps/*` except `api` and `worker`, and `packages/ui` and `packages/player`. If you need to change a contract after the apps prompt has started using it, add a version or a new field rather than changing the shape of an existing one, and note it in `docs/contracts-changelog.md`.
+A second prompt builds the apps (`apps/web`, `apps/business`, `apps/tv`, `apps/site`) at the same time. You and that prompt meet at `packages/contracts`. You own the backend and the contracts; the apps prompt owns everything under `apps/*` except `api` and `worker`, and `packages/ui` and `packages/player`. If you need to change a contract after the apps prompt has started using it, add a version or a new field rather than changing the shape of an existing one, and note it in `docs/contracts-changelog.md`.
 
 ## Ground rules
 
@@ -59,14 +59,14 @@ Target layout:
 
 ```
 apps/
-  control/    master control (today's apps/web, moved, behaviour unchanged)
+  web/        the Opencast app, one account and one sign-in for everyone: the viewer at /,
+              master control at /control, Network desk at /desk (admins only). Starts as
+              today's apps/web, whose current pages become the /control area, behaviour unchanged
   api/        today's apps/api
   worker/     today's apps/worker
-  viewer/     empty scaffold, owned by the apps prompt
-  tv/         empty scaffold, owned by the apps prompt
-  site/       empty scaffold, owned by the apps prompt
-  spots/      empty scaffold, owned by the apps prompt
-  desk/       empty scaffold, owned by the apps prompt (Network desk, Opencast's internal tool)
+  business/   empty scaffold, owned by the apps prompt (Opencast for business, the advertiser side)
+  tv/         empty scaffold, owned by the apps prompt (a TV build of the same app, and the Cast receiver)
+  site/       empty scaffold, owned by the apps prompt (the marketing page)
 packages/
   domain/     today's packages/shared (types and pure rules)
   contracts/  new: request and response schemas shared by apps and API
@@ -79,7 +79,7 @@ docs/
 - Rename the package scope to `@opencast/*`. Keep a note of the old `@openchannel/*` names, because the Railway services are still named after them.
 - Keep npm workspaces. Add Turborepo for `build`, `dev`, `typecheck` and `lint` only if it removes real duplication in the root scripts; say which you chose and why.
 - Every app and package gets its own `tsconfig` extending `tsconfig.base.json`, and `npm run typecheck` passes at the root.
-- `apps/control` must run exactly as `apps/web` did: upload, playlist, schedules, Livepeer provisioning, go live and station preview.
+- Today's master control pages in `apps/web` must keep working exactly as before, now under `/control`: upload, playlist, schedules, Livepeer provisioning, go live and station preview.
 - Update `railway.json`, `nixpacks.toml` and the `build:service:*` and `start:service:*` scripts for the new paths, but don't deploy.
 
 **STOP.** Show the tree and confirm the old flow still works locally.
@@ -243,11 +243,11 @@ Every movement of money is a balanced ledger entry. A reversal is a new entry, n
 
 Services, each its own Railway service:
 - `api`, `worker`
-- `control` (master control), `viewer` (web app), `spots` (advertiser app), `desk` (Network desk, behind admin sign-in), `site` (marketing), `tv` (TV mode web build and the Chromecast receiver, static)
+- `web` (the Opencast app: viewer, master control and Network desk; the desk's admin-only access is enforced by the API's role checks, not by a separate deploy), `business` (Opencast for business), `site` (marketing, static), `tv` (the TV build and the Chromecast receiver, static)
 - Postgres and Redis as Railway plugins
 - a Railway volume for the worker's cache, sized from the audit (start at 100 GB), and R2 credentials as variables on `api` and `worker` only
 
-For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: `api.`, `control.`, `app.`, `spots.`, `www.` and `tv.` on whatever domain is chosen.
+For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: the root for `site`, `app.` for `web`, `business.`, `tv.` (the Cast receiver's registered URL) and `api.`, on whatever domain is chosen.
 
 Create a `staging` environment first and deploy everything there. Don't point production at the new services until you're told to; the existing `@openchannel/*` services keep running until then.
 
