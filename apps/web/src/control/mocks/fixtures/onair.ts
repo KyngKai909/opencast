@@ -27,8 +27,8 @@ export const MOCK_STREAMS = ["civc", "beat", "reel", "sazn", "prep", "nite", "ha
 
 // ---- Sign-on (A.6) ----
 
-/** "Test signal received": what the test output measured (the mock's encoder). */
-export const TEST_SIGNAL = { detail: "720p at 3.2 Mbps, audio at −16 LUFS", bitrateKbps: 3200 };
+/** The Monitor's "Signal": the output bitrate the mock's encoder reports while on air. */
+export const TEST_SIGNAL = { bitrateKbps: 3200 };
 
 /** A new station's break rule until its settings say otherwise: a 2:00 break after every program. */
 export const DEFAULT_BREAK_MS = 2 * 60_000;

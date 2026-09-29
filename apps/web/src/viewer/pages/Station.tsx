@@ -212,13 +212,13 @@ export default function StationPage() {
   const tonightLeft = dayAirings.some((a) => Date.parse(a.endsAt) > t.getTime());
   const programDescription = (a: AiringX) => page.programs.find((p) => p.id === a.programId)?.description ?? null;
 
-  const items: ScheduleItem[] = rows.map((a) => ({ id: a.logEntryId ?? a.listedAiringId ?? a.startsAt, start: a.startsAt, end: a.endsAt, title: a.title, subtitle: rowSubtitle(a) }));
+  // Off air isn't something to be reminded of: no bell on its row.
+  const items: ScheduleItem[] = rows.map((a) => ({ id: a.logEntryId ?? a.listedAiringId ?? a.startsAt, start: a.startsAt, end: a.endsAt, title: a.title, subtitle: rowSubtitle(a), remindable: !isOffAir(a) }));
   const status = scheduleStatus(items, t);
   const openable = items.map((it, i) => (status[i] === "next" && !isOffAir(rows[i]) && (rows[i]!.logEntryId || rows[i]!.listedAiringId) ? { ...it, title: <button type="button" className="vw-sch-open" onClick={() => setListing(rows[i]!)}>{it.title}</button> } : it));
   const byId = new Map(items.map((it, i) => [it.id, rows[i]!]));
   const remindRow = (it: ScheduleItem) => {
     const a = byId.get(it.id);
-    // Off air isn't something to be reminded of.
     if (a && !isOffAir(a)) remind({ airing: a, station: s });
   };
 

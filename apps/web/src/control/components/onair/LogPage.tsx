@@ -4,7 +4,7 @@
 // fill a gap, set the break rule, repeat the day (G8: day templates) and set the off air hours.
 // The same page is setup step 3 and the station's Program log; on the phone the fill choices open
 // as a sheet (P.2, `?fill=<gapStart>`). `?day=` is a weekday of this week ("sat") or a date
-// ("2026-10-03", from a template's dates).
+// ("2026-10-03", from a template's dates); `?entry=` picks out an entry (from the Monitor).
 // Times are on 4-second segment boundaries (prepare once, then assemble): what's drawn, and the
 // gaps a fill is sent for, are snapped as the API snaps them, so the times shown are its answer.
 
@@ -141,6 +141,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
 
   const gaps = useMemo(() => (log.data ? openGaps(log.data.gaps, deadAir.data?.gaps ?? [], win.to, t) : []), [log.data, deadAir.data, win.to, t]);
   const fillParam = params.get("fill");
+  // An airing picked out from elsewhere (the Monitor's "Prepared for air", G13), until a gap is picked.
+  const entryParam = params.get("entry");
   const fromDeadAir = fillParam ? deadAir.data?.gaps.find((g) => g.startsAt === fillParam) : undefined;
   const selected: (Gap & { key: string }) | null =
     gaps.find((g) => g.key === fillParam || g.startsAt === fillParam) ?? (fromDeadAir ? { ...snapSpan(fromDeadAir), key: fromDeadAir.startsAt } : null) ?? (phone ? null : (gaps[0] ?? null));
@@ -183,7 +185,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
         pxPerMinute={view === "day" ? 0.5 : 1.12}
         timeZone={STATION_TZ}
         maxHeight={phone ? undefined : setup ? 430 : 540}
-        selectedId={selected ? `gap:${selected.key}` : undefined}
+        selectedId={entryParam && !fillParam ? entryParam : selected ? `gap:${selected.key}` : undefined}
         selectable={(b) => b.kind === "dead"}
         onSelect={(b) => set("fill", b.id.slice("gap:".length))}
         className="cc-log__tl"

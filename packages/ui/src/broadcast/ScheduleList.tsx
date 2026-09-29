@@ -12,6 +12,8 @@ export interface ScheduleItem {
   title: ReactNode;
   /** The line under it. Compose Live with <LiveText />: "Live, from the Redlands studio". */
   subtitle?: ReactNode;
+  /** Whether a later row offers the bell (week, with `onRemind`). Default true; false for rows there's nothing to be reminded of, like planned off air. */
+  remindable?: boolean;
 }
 
 export type ScheduleStatus = "past" | "now" | "next";
@@ -24,7 +26,7 @@ export interface ScheduleListProps {
   variant?: "tonight" | "week" | "week-phone";
   /** A heading above the rows: "On BEAT tonight". */
   heading?: ReactNode;
-  /** Future rows get a bell (week): remind me about this one. */
+  /** Future rows get a bell (week): remind me about this one. A row with `remindable: false` doesn't. */
   onRemind?: (item: ScheduleItem) => void;
   timeZone?: string;
   className?: string;
@@ -66,7 +68,7 @@ export function ScheduleList({ items, now, variant = "tonight", heading, onRemin
                 {it.subtitle != null && <small>{it.subtitle}</small>}
               </div>
               {variant === "week" &&
-                (st === "next" && onRemind ? <IconButton icon="bell" label="Remind me" bare onClick={() => onRemind(it)} /> : <span />)}
+                (st === "next" && onRemind && it.remindable !== false ? <IconButton icon="bell" label="Remind me" bare onClick={() => onRemind(it)} /> : <span />)}
             </div>
           );
         })}
