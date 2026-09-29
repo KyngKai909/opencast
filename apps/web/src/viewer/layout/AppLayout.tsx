@@ -151,7 +151,7 @@ export function AppLayout() {
   // With search open over the page (?q=), no section is current (station-pages 03.1).
   const openSearch = () => (phone ? navigate("/search") : setParams((p) => (p.set("q", ""), p)));
   const row = np.row;
-  // "BEAT 12.1, carried from REEL"; on radio, the episode: "NITE 88.3, The Hollow Door, part 2".
+  // "BEAT 12.1, carried from REEL"; on radio, the episode: "NITE 88.4, The Hollow Door, part 2".
   const stationLine = row
     ? [[row.station.callSign, row.station.channel].filter(Boolean).join(" "), row.now?.carriedFrom?.callSign ? `carried from ${row.now.carriedFrom.callSign}` : row.station.band === "radio" ? row.now?.episodeTitle : null].filter(Boolean).join(", ")
     : "";

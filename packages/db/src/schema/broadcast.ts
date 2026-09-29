@@ -132,7 +132,7 @@ export const channels = broadcast.table(
     check(
       "channel_number_in_band",
       sql`(${t.band} = 'tv' and ${t.tenths} between 21 and 699 and ${t.tenths} % 10 <> 0)
-       or (${t.band} = 'radio' and ${t.tenths} between 881 and 1079 and ${t.tenths} % 2 = 1)`
+       or (${t.band} = 'radio' and ${t.tenths} between 882 and 1078 and ${t.tenths} % 2 = 0)`
     ),
     uniqueIndex("channels_number_in_market").on(t.marketId, t.band, t.tenths).where(sql`${t.releasedAt} is null`),
     uniqueIndex("channels_one_primary").on(t.stationId).where(sql`${t.isPrimary} and ${t.releasedAt} is null`)

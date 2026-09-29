@@ -40,6 +40,7 @@ From the apps prompt, the style guide and the reference files' intros and notes.
 
 - **The dial is in channel order,** the same every time. There's no recommendation feed. The hero is the market's live programming first, never a pick by popularity. [prompt; home 01]
 - **Numbers tune.** Typing a channel or frequency anywhere a viewer can type tunes to it: search's "Tune to" row, the TV keypad, the phone remote keypad. [prompt; station pages 03]
+- **The radio band is on even tenths,** 88.2 to 107.8 (8, 8, 4 tunes 88.4; a dot fills the first one, 88. is 88.2). Real US FM stations are only on odd tenths, so a typed odd one (99.1) is never a station: it says "No station on 991" and names the nearest two, as any empty number does. TV numbers are Opencast's own and may match broadcast ones. [platform prompt, changed 2026-09-29; A139]
 - **Keys on the web:** 1 to 6 tune presets from anywhere; the arrow keys change channel on the tuned-in page; `/` opens search; Esc closes search and returns you to exactly where you were. [prompt; home 01; station pages 03]
 - **No scrub bar** except the syndication market's episode preview and production-order review, where a station or business is checking something rather than watching it. Players show a progress bar. [prompt; market 03; production orders 05]
 - **Sign-in appears only** when someone saves, reminds or pledges. It names that action and completes it afterwards. There's no sign-in wall. [prompt; you 01]

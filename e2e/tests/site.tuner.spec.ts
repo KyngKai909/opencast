@@ -14,8 +14,8 @@ const DIAL = [
   ["18.1", "SAZN", "Sazón", "Tamales for forty"],
   ["24.1", "REEL", "Saturday Reel", "Cartoons from 1928 to 1934"],
   ["31.1", "PREP", "Inland Preps", "Football: Redlands East Valley at Citrus Valley"],
-  ["88.3", "NITE", "Night Desk", "Radio dramas from the 1940s"],
-  ["101.9", "CRAT", "Crate", "The Producers’ Hour"]
+  ["88.4", "NITE", "Night Desk", "Radio dramas from the 1940s"],
+  ["102.0", "CRAT", "Crate", "The Producers’ Hour"]
 ] as const;
 
 const readout = (page: Page): Locator => page.locator(".st-readout");
@@ -48,10 +48,10 @@ test("the rocker: channel up and down, wrapping at the ends", async ({ page }) =
   await down.click();
   await down.click();
   await showing(page, 0);
-  // Down from the first wraps to the last: 101.9, radio, live, no bug on a radio picture.
+  // Down from the first wraps to the last: 102.0, radio, live, no bug on a radio picture.
   await down.click();
   await showing(page, 7);
-  await expect(picture(page)).toContainText("101.9");
+  await expect(picture(page)).toContainText("102.0");
   await expect(page.getByRole("group", { name: "A sample of the Opencast dial" }).getByText("Radio band", { exact: true })).toBeVisible();
   await expect(page.locator(".st-set .oc-bug")).toHaveCount(0);
   await up.click();
@@ -85,7 +85,7 @@ test("the arrow keys tune while the tuner is on screen, and not from a field", a
   await showing(page, 2);
 });
 
-test("number keys: 1 2 tunes 12.1, 8 8 3 the radio's 88.3, and 13 has no station", async ({ page }) => {
+test("number keys: 1 2 tunes 12.1, 8 8 4 the radio's 88.4, and 13 and 991 have no station", async ({ page }) => {
   await opened(page);
 
   // "12" reads 12 with .1 filled in, names who's there, and tunes after the wait.
@@ -98,17 +98,25 @@ test("number keys: 1 2 tunes 12.1, 8 8 3 the radio's 88.3, and 13 has no station
   // Enter tunes straight away.
   await page.keyboard.press("8");
   await page.keyboard.press("8");
-  await page.keyboard.press("3");
-  await expect(readout(page)).toContainText("883NITENight Desk");
+  await page.keyboard.press("4");
+  await expect(readout(page)).toContainText("884NITENight Desk");
   await page.keyboard.press("Enter");
   await showing(page, 6);
-  await expect(picture(page)).toContainText("88.3");
+  await expect(picture(page)).toContainText("88.4");
 
   // A number with no station says so, then goes; the channel stays.
   await page.keyboard.press("1");
   await page.keyboard.press("3");
   await expect(readout(page)).toContainText("No station on 13");
   await expect(readout(page)).not.toContainText("No station on 13", { timeout: 6_000 });
+  await showing(page, 6);
+
+  // Nor has a real FM number: the radio band is on even tenths.
+  await page.keyboard.press("9");
+  await page.keyboard.press("9");
+  await page.keyboard.press("1");
+  await expect(readout(page)).toContainText("No station on 991");
+  await expect(readout(page)).not.toContainText("No station on 991", { timeout: 6_000 });
   await showing(page, 6);
 
   // Escape drops what's typed.

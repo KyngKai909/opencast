@@ -35,13 +35,13 @@ export const STATIONS: MockStation[] = [
   station(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", IE, { category: "Food", description: "Home cooking from Inland Empire kitchens.", members: 96, stream: { kind: "hls", slug: "sazn" } }, "station", "Fontana"),
   station(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", IE, { category: "Classic", description: "Restored public-domain films, cartoons and newsreels.", members: 301, stream: { kind: "hls", slug: "reel" } }, "station", "Riverside"),
   station(31, "PREP", "31.1", "Inland Preps", "#1F5E8C", "tv", IE, { category: "Sports", description: "High school football, basketball and the Friday scoreboard.", members: 142, stream: { kind: "hls", slug: "prep" } }, "station", "Rialto"),
-  station(883, "NITE", "88.3", "Night Desk", "#33507A", "radio", IE, { category: "Classic", description: "Old-time radio overnight.", members: 96, stream: { kind: "hls", slug: "nite" } }, "station", "Riverside"),
-  station(907, "HALL", "90.7", "Study Hall", "#56508A", "radio", IE, { category: "Music", description: "Slow beats for late work.", members: 64, stream: { kind: "hls", slug: "hall" } }),
-  station(1019, "CRAT", "101.9", "Crate", "#7E2F35", "radio", IE, { category: "Music", description: "Producers and their tapes.", stream: { kind: "hls", slug: "crat" } }, "claimable"),
-  station(1043, "VOZE", "104.3", "La Voz", "#1D6A70", "radio", IE, { category: "Music", description: "Oldies en español.", stream: { kind: "hls", slug: "voze" } }, "station", "San Bernardino"),
+  station(883, "NITE", "88.4", "Night Desk", "#33507A", "radio", IE, { category: "Classic", description: "Old-time radio overnight.", members: 96, stream: { kind: "hls", slug: "nite" } }, "station", "Riverside"),
+  station(907, "HALL", "90.8", "Study Hall", "#56508A", "radio", IE, { category: "Music", description: "Slow beats for late work.", members: 64, stream: { kind: "hls", slug: "hall" } }),
+  station(1019, "CRAT", "102.0", "Crate", "#7E2F35", "radio", IE, { category: "Music", description: "Producers and their tapes.", stream: { kind: "hls", slug: "crat" } }, "claimable"),
+  station(1043, "VOZE", "104.4", "La Voz", "#1D6A70", "radio", IE, { category: "Music", description: "Oldies en español.", stream: { kind: "hls", slug: "voze" } }, "station", "San Bernardino"),
   // A thin market (home 08.2): two stations so far.
   station(5, "MOJV", "5.1", "Mojave Community", "#4F5B2A", "tv", HD, { category: "Public affairs", description: "Victorville and the High Desert.", stream: { kind: "hls", slug: "civc" } }, "station", "Victorville"),
-  station(961, "DUST", "96.1", "Dust Radio", "#7E2F35", "radio", HD, { category: "Music", description: "Desert rock and country.", stream: { kind: "hls", slug: "crat" } }, "station", "Apple Valley")
+  station(961, "DUST", "96.2", "Dust Radio", "#7E2F35", "radio", HD, { category: "Music", description: "Desert rock and country.", stream: { kind: "hls", slug: "crat" } }, "station", "Apple Valley")
 ];
 
 export const MARKETS = [

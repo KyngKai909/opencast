@@ -44,6 +44,12 @@ describe("signing on a new station", () => {
     expect(state("13.1")).toBe("open");
     expect((await api(`/stations/${id}/channel`, { method: "PUT", body: { marketId: channels.body.market.id, band: "tv", channel: "12.1" } })).status).toBe(409);
     expect((await api(`/stations/${id}/channel`, { method: "PUT", body: { marketId: channels.body.market.id, band: "tv", channel: "13.1" } })).status).toBe(200);
+    // The radio band is on even tenths: a real FM number (odd) isn't on it.
+    const radio = await api("/markets/inland-empire/channels?band=radio");
+    const freqs = radio.body.channels.map((x: { channel: string }) => x.channel);
+    expect([freqs.length, freqs[0], freqs[freqs.length - 1]]).toEqual([99, "88.2", "107.8"]);
+    expect(radio.body.channels.find((x: { channel: string }) => x.channel === "88.4").state).toBe("taken");
+    expect((await api(`/stations/${id}/channel`, { method: "PUT", body: { marketId: channels.body.market.id, band: "radio", channel: "99.1" } })).status).toBe(422);
 
     expect((await api("/call-signs/BEAT")).body).toMatchObject({ valid: true, available: false });
     expect((await api("/call-signs/TEST")).body).toMatchObject({ valid: true, available: true });

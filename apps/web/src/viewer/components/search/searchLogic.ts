@@ -5,30 +5,36 @@
 
 import { channelValue } from "../station/when";
 
-/** The digits of a channel or frequency ("12", "883", "88.3", "12."), or null for a title ("24 Hours"). */
+/** The digits of a channel or frequency ("12", "884", "88.4", "12."), or null for a title ("24 Hours"). */
 export function numberQuery(q: string): string | null {
   const t = q.trim();
   return /^\d{1,4}(\.\d?)?$/.test(t) ? t : null;
 }
 
 export interface ChannelMatch {
-  /** The channel it reads as: "12.1", "88.3". */
+  /** The channel it reads as: "12.1", "88.4". */
   channel: string;
   /** Whether a station is on it. */
   found: boolean;
 }
 
+/** The radio band's majors, 88 to 107 (88.2 to 107.8, even tenths). */
+const onRadioBand = (major: number) => major >= 88 && major <= 107;
+
 /**
  * What typed digits tune to, as the keypad reads them: a TV channel fills in ".1" (12 → 12.1);
- * three or four digits with no TV station are a frequency, the last digit the tenth (883 → 88.3,
- * 1019 → 101.9); a dot is taken as typed.
+ * three or four digits with no TV station are a frequency, the last digit the tenth (884 → 88.4,
+ * 1020 → 102.0); a dot is taken as typed, a trailing one filled with the major's first number
+ * (12. → 12.1, 88. → 88.2, 99. → 99.0). The radio band is on even tenths, so an odd one (991, a
+ * real FM number) reads as 99.1 with no station: the nearest are named.
  */
 export function matchChannel(typed: string, channels: string[]): ChannelMatch | null {
   const t = numberQuery(typed);
   if (!t) return null;
   const has = (c: string) => channels.includes(c);
   if (t.includes(".")) {
-    const c = t.endsWith(".") ? `${t}1` : t;
+    const major = Number(t.slice(0, t.indexOf(".")));
+    const c = t.endsWith(".") ? `${t}${onRadioBand(major) ? (major === 88 ? "2" : "0") : "1"}` : t;
     return { channel: c, found: has(c) };
   }
   const tv = `${t}.1`;
@@ -36,6 +42,7 @@ export function matchChannel(typed: string, channels: string[]): ChannelMatch | 
   if (t.length >= 3) {
     const radio = `${t.slice(0, -1)}.${t.slice(-1)}`;
     if (has(radio)) return { channel: radio, found: true };
+    if (onRadioBand(Number(t.slice(0, -1)))) return { channel: radio, found: false };
   }
   return { channel: tv, found: false };
 }

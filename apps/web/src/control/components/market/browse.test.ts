@@ -7,7 +7,7 @@ function offer(title: string, o: Partial<Offer> & { kind?: "series" | "one_off";
   return {
     id: title,
     program: { id: title, title, description: null, category, live, episodeCount: 10, rightsNote: null, format: { kind, cadence: null, episodeLengthMs: 3_600_000, bands } },
-    maker: { id: "m", kind: "station", callSign: "HALL", handle: "hall", name: "Study Hall", colour: null, band: "radio", channel: "90.7", marketSlug: "inland-empire", homeCity: null },
+    maker: { id: "m", kind: "station", callSign: "HALL", handle: "hall", name: "Study Hall", colour: null, band: "radio", channel: "90.8", marketSlug: "inland-empire", homeCity: null },
     makerKind: "station",
     status: "offered",
     carriers: 1,

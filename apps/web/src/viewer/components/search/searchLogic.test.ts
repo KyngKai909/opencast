@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { highlight, matchChannel, namedOnce, nearestChannels, numberQuery, orderAirings, type Orderable } from "./searchLogic";
 import { withRecent } from "./recent";
 
-const DIAL = ["7.1", "9.1", "12.1", "18.1", "24.1", "31.1", "88.3", "90.7", "101.9", "104.3"];
+const DIAL = ["7.1", "9.1", "12.1", "18.1", "24.1", "31.1", "88.4", "90.8", "102.0", "104.4"];
 
 describe("numbers tune", () => {
   it("tells a channel or frequency from a title", () => {
     expect(numberQuery("12")).toBe("12");
-    expect(numberQuery(" 883 ")).toBe("883");
-    expect(numberQuery("88.3")).toBe("88.3");
+    expect(numberQuery(" 884 ")).toBe("884");
+    expect(numberQuery("88.4")).toBe("88.4");
     expect(numberQuery("12.")).toBe("12.");
     expect(numberQuery("24 Hours")).toBeNull();
     expect(numberQuery("town hall")).toBeNull();
@@ -16,12 +16,12 @@ describe("numbers tune", () => {
     expect(numberQuery("")).toBeNull();
   });
 
-  it("reads digits as the keypad does: 12 is 12.1, 883 is 88.3", () => {
+  it("reads digits as the keypad does: 12 is 12.1, 884 is 88.4", () => {
     expect(matchChannel("12", DIAL)).toEqual({ channel: "12.1", found: true });
     expect(matchChannel("24", DIAL)).toEqual({ channel: "24.1", found: true });
-    expect(matchChannel("883", DIAL)).toEqual({ channel: "88.3", found: true });
-    expect(matchChannel("1019", DIAL)).toEqual({ channel: "101.9", found: true });
-    expect(matchChannel("88.3", DIAL)).toEqual({ channel: "88.3", found: true });
+    expect(matchChannel("884", DIAL)).toEqual({ channel: "88.4", found: true });
+    expect(matchChannel("1020", DIAL)).toEqual({ channel: "102.0", found: true });
+    expect(matchChannel("88.4", DIAL)).toEqual({ channel: "88.4", found: true });
     expect(matchChannel("12.", DIAL)).toEqual({ channel: "12.1", found: true });
   });
 
@@ -30,6 +30,19 @@ describe("numbers tune", () => {
     expect(matchChannel("12.2", DIAL)).toEqual({ channel: "12.2", found: false });
     expect(nearestChannels("13.1", DIAL)).toEqual(["9.1", "12.1"]);
     expect(matchChannel("24 Hours", DIAL)).toBeNull();
+  });
+
+  it("never finds a real FM number: an odd radio tenth reads as a frequency with no station, near its neighbours", () => {
+    expect(matchChannel("883", DIAL)).toEqual({ channel: "88.3", found: false });
+    expect(matchChannel("1019", DIAL)).toEqual({ channel: "101.9", found: false });
+    expect(matchChannel("99.1", DIAL)).toEqual({ channel: "99.1", found: false });
+    expect(nearestChannels("101.9", DIAL)).toEqual(["102.0", "104.4"]);
+    expect(nearestChannels("88.3", DIAL)).toEqual(["88.4", "90.8"]);
+  });
+
+  it("fills a dot with the major's first number: .1 on TV, the first even tenth on radio", () => {
+    expect(matchChannel("88.", DIAL)).toEqual({ channel: "88.2", found: false });
+    expect(matchChannel("102.", DIAL)).toEqual({ channel: "102.0", found: true });
   });
 });
 

@@ -19,6 +19,15 @@ What the playlists carry:
 
 Worker: radio encoders push to the leader's RTMP ingest (`WORKER_INGEST_PORT`, 1935 by default; `off` turns it off); the key is checked against radio stations' live sources, and a wrong key is refused. `GET /health` gains `live`: `{ sessions, liveSeconds, cpuSeconds, cpuSecondsPerLiveHour }` for packaging radio live sound since the worker started. Relays: a radio station's relay airs its sound over the background (or its colour with its call sign and channel) with the bug, and a spot's code, offer and QR for its last 10 s in the player's style, all prepared once, so nothing is encoded while it relays (`translator_sessions.mode` is `copy`). A TV station's relay draws the code into the segments it shows in. Live segments the worker stored go with their channel rows after two days.
 
+## 2026-09-29: the radio band on even tenths
+
+No shape changes (the schemas never checked the tenth: `ChannelNumber` is still `/^\d{1,3}\.\d$/`); behaviour only, and migration 0022. The radio band is now 88.2 to 107.8 in even tenths, so no Opencast number matches a real US FM station (those are all on odd tenths). TV is unchanged.
+
+- `chooseChannel`, the desk's creator proposals and set-up, listed sources and waitlist channel holds refuse a radio number on an odd tenth (400, "Radio runs from 88.2 to 107.8, in even tenths." on `chooseChannel`); 88.2, 100.0 and 107.8 are accepted where 88.1 and 107.9 were.
+- `availableChannels?band=radio` lists the 99 even tenths (88.2 … 107.8; before, 100 odd ones); `getBoard`'s radio `slots[].major` runs 882 … 1078.
+- `search` never tunes to an odd radio tenth ("99.1" has no `tuneTo`).
+- Migration 0022 moves every radio channel and waitlist hold on an odd tenth up one tenth (99.1 to 99.2) when that's free in its market, else to the nearest free even tenth; released ones and the desk's proposals move up one tenth. Nothing is deleted. The seed's LOFI is on 99.2, and a third network station, BEAT (radio 94.2), is added.
+
 ## 2026-09-29: captions, prepared once and carried by the channel (X2)
 
 The platform prompt's Phase 5 ("captions are generated here, once"), for uploaded and embedded tracks. Additive: two optional body fields, one optional response field and two optional body fields on translators, and new playlist files. Migration 0021 adds one table (`prepared_captions`) and two columns (`caption_tracks.content_id`, nullable; `translators.burn_captions`, default false). Captions from speech are not built (they need a provider): see X2 in docs/contract-requests.md.

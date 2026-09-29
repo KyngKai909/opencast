@@ -12,7 +12,7 @@ npm run db:generate  # after editing packages/db/src/schema, write the next migr
 ## Conventions
 
 - **Money** is `bigint` micro-dollars (1 USDC base unit). "262 × $8.00 ÷ 1,000" is 2,096,000, exactly, and rounding happens once where a rule says so (see `open-decisions.md`).
-- **Durations** are milliseconds. **Channel numbers** are stored in tenths: `12.2` is `122`, `88.1` is `881`.
+- **Durations** are milliseconds. **Channel numbers** are stored in tenths: `12.2` is `122`, `88.2` is `882`.
 - **Ids** are UUIDs. Migrated rows keep their old ids.
 - **Times** are `timestamptz`.
 
@@ -53,7 +53,7 @@ npm run db:generate  # after editing packages/db/src/schema, write the next migr
 | Call sign immutable after first sign-on | `stations_guard` trigger | call signs › are fixed after first sign-on |
 | Channel number unique within market and band | `channels_number_in_market` partial unique index (unreleased channels) | channels › are unique within a market and band |
 | Channel number immutable after first sign-on | `channels_guard` trigger (no update, no delete) | channels › are fixed after first sign-on |
-| Channel number in its band's range | `channel_number_in_band` check (TV 2.1 to 69.9, radio 88.1 to 107.9 in odd tenths) | channels › TV is 2.1 to 69.9; radio… |
+| Channel number in its band's range | `channel_number_in_band` check (TV 2.1 to 69.9, radio 88.2 to 107.8 in even tenths, since migration 0022: real US FM stations are on odd tenths) | channels › TV is 2.1 to 69.9; radio… |
 | Station colour holds 4.5:1 against white | `colour_contrast` check calling `public.contrast_on_white`, and `isValidStationColour` in `packages/domain` | stations › colour must hold 4.5:1 |
 | A log entry can't reference an asset without a rights confirmation | the foreign key from `log_entries.asset_id` goes to `rights_confirmations`, not `assets` | program log › can't reference an asset without a rights confirmation |
 | (added) The log never overlaps on a station | `log_entries_no_overlap` exclusion constraint | program log › never overlaps |

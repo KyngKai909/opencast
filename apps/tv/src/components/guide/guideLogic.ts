@@ -181,7 +181,7 @@ export function visibleRows(m: GuideModel, f: GuideFocus): GuideRow[] {
   return m.rows.slice(p * PAGE, p * PAGE + PAGE);
 }
 
-/** Numbers: digits typed so far, then the row they name ("12" is 12.1, "883" is 88.3), or -1. */
+/** Numbers: digits typed so far, then the row they name ("12" is 12.1, "884" is 88.4), or -1. */
 export function typeKey(typed: string, key: number | "."): string {
   return (typed + String(key)).slice(-5);
 }

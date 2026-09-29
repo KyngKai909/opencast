@@ -7,7 +7,7 @@ import type { AiringX, DialRowX, DialX } from "../../api/ext";
 
 // ---------- channel order ----------
 
-/** "12.1" → [12, 1]; "88.3" → [88, 3]. */
+/** "12.1" → [12, 1]; "88.4" → [88, 4]. */
 function channelParts(channel: string | null | undefined): [number, number] {
   const [a = "0", b = "0"] = (channel ?? "0.0").split(".");
   return [Number(a) || 0, Number(b) || 0];

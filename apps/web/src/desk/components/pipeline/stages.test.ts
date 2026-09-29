@@ -6,7 +6,7 @@ import type { Creator } from "@opencast/contracts";
 
 const NOW = new Date("2026-09-27T03:42:12Z");
 let all: Creator[];
-const held = new Map([["95.5", "GOSP"], ["41.1", "TACO"]]);
+const held = new Map([["95.6", "GOSP"], ["41.1", "TACO"]]);
 const ctx: Ctx = { now: NOW, timeZone: "America/Los_Angeles", held };
 const by = (name: string) => all.find((c) => c.displayName === name)!;
 
@@ -37,10 +37,10 @@ describe("each row", () => {
     const row = (n: string) => [stationCell(by(n), held), nextLine(by(n), ctx).text];
     expect(row("Tía Lupe’s Kitchen")).toEqual(["33.1 LUPE", "Signs on Monday, 6:00 am"]);
     expect(row("Desert Skate Films")).toEqual(["38.1 or 45.1", "Ask, with a preview of their station"]);
-    expect(row("Mojave Field Recordings")).toEqual(["91.9 FLDR", "On air with credit. Claim invite sent Sept 24"]);
+    expect(row("Mojave Field Recordings")).toEqual(["92.0 FLDR", "On air with credit. Claim invite sent Sept 24"]);
     expect(row("Riverside Poetry Collective")).toEqual(["Radio band", "Reminder due today"]);
-    expect(row("Inland Gospel Choirs")).toEqual(["95.5, held", "Waitlist holds 95.5; pick another"]);
-    expect(row("Marcus Reyes")).toEqual(["101.9 CRAT", "Claim link sent Sept 20"]);
+    expect(row("Inland Gospel Choirs")).toEqual(["95.6, held", "Waitlist holds 95.6; pick another"]);
+    expect(row("Marcus Reyes")).toEqual(["102.0 CRAT", "Claim link sent Sept 20"]);
     expect(row("Sazón family kitchen")).toEqual(["18.1 SAZN", "Claimed August 28. Running it themselves"]);
     expect(row("Inland Jazz Society")).toEqual(["", "Said no Sept 2. Don’t ask again"]);
   });

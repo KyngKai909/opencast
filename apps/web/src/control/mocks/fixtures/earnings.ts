@@ -838,7 +838,7 @@ export function audienceReport(stationId: string, fromIso: string, toIso: string
 
 // ---------------------------------------------------------------- held for creators (rights 05.x; network desk)
 
-/** CRAT 101.9, run by Opencast for Marcus Reyes since August 12: $214.60 held in escrow for him. */
+/** CRAT 102.0, run by Opencast for Marcus Reyes since August 12: $214.60 held in escrow for him. */
 export const CRAT_ESCROW = {
   contractAddress: "0x5ee2c4d1a0b7e93f6a2d8c15b4e07f39d6a1a41d",
   escrowStationId: 101,

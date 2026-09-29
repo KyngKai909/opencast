@@ -4,9 +4,13 @@ import {
   formatChannelNumber,
   isSubchannel,
   isValidCallSign,
+  isValidChannelNumber,
   isValidStationColour,
   licenceAllowsCarriage,
-  parseChannelNumber
+  parseChannelNumber,
+  RADIO_BAND_MAX_TENTHS,
+  RADIO_BAND_MIN_TENTHS,
+  radioBandTenths
 } from "../src/index.js";
 
 describe("call signs", () => {
@@ -25,19 +29,43 @@ describe("channel numbers", () => {
     }
   });
 
-  it("parses the radio band 88.1 to 107.9 in odd tenths", () => {
-    expect(parseChannelNumber("radio", "88.1")).toEqual({ band: "radio", tenths: 881 });
-    expect(parseChannelNumber("radio", "107.9")).toEqual({ band: "radio", tenths: 1079 });
-    for (const bad of ["88.2", "87.9", "108.1", "100.0"]) {
+  it("parses the radio band 88.2 to 107.8 in even tenths", () => {
+    expect(parseChannelNumber("radio", "88.2")).toEqual({ band: "radio", tenths: 882 });
+    expect(parseChannelNumber("radio", "99.2")).toEqual({ band: "radio", tenths: 992 });
+    expect(parseChannelNumber("radio", "100.0")).toEqual({ band: "radio", tenths: 1000 });
+    expect(parseChannelNumber("radio", "107.8")).toEqual({ band: "radio", tenths: 1078 });
+    for (const bad of ["88.0", "87.8", "108.0", "88", "99.2.1"]) {
       expect(parseChannelNumber("radio", bad)).toBeUndefined();
     }
+  });
+
+  it("never takes a real FM number: every odd tenth is off the radio band", () => {
+    for (let tenths = 881; tenths <= 1079; tenths += 2) {
+      expect(isValidChannelNumber({ band: "radio", tenths })).toBe(false);
+    }
+    for (const real of ["88.1", "99.1", "101.9", "107.9"]) {
+      expect(parseChannelNumber("radio", real)).toBeUndefined();
+    }
+  });
+
+  it("lists the band: 99 frequencies from 88.2 to 107.8", () => {
+    const band = radioBandTenths();
+    expect(band).toHaveLength(99);
+    expect([band[0], band[band.length - 1]]).toEqual([RADIO_BAND_MIN_TENTHS, RADIO_BAND_MAX_TENTHS]);
+    expect(band.every((tenths) => isValidChannelNumber({ band: "radio", tenths }))).toBe(true);
+  });
+
+  it("leaves TV alone: 2.1 to 69.9 with subchannels, whatever broadcast uses", () => {
+    expect(parseChannelNumber("tv", "4.1")).toEqual({ band: "tv", tenths: 41 });
+    expect(parseChannelNumber("tv", "12.2")).toEqual({ band: "tv", tenths: 122 });
   });
 
   it("formats and spots subchannels", () => {
     expect(formatChannelNumber({ band: "tv", tenths: 122 })).toBe("12.2");
     expect(isSubchannel({ band: "tv", tenths: 122 })).toBe(true);
     expect(isSubchannel({ band: "tv", tenths: 121 })).toBe(false);
-    expect(isSubchannel({ band: "radio", tenths: 881 })).toBe(false);
+    expect(isSubchannel({ band: "radio", tenths: 882 })).toBe(false);
+    expect(formatChannelNumber({ band: "radio", tenths: 1020 })).toBe("102.0");
   });
 });
 

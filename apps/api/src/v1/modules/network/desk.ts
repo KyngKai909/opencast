@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { formatChannelNumber, parseChannelNumber, type Band } from "@opencast/domain";
+import { formatChannelNumber, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
 import { RecipeBreakRule, type ClaimPage, type Creator, type CreatorWork, type HeldEarnings, type ListedSource, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
@@ -431,7 +431,7 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         services.playout.nextSignOn(onBand.map((s) => s.id)),
         onBand.length ? db.select({ id: CR.id, stationId: CR.stationId }).from(CR).where(inArray(CR.stationId, onBand.map((s) => s.id))) : Promise.resolve([])
       ]);
-      const majors = band === "tv" ? Array.from({ length: 68 }, (_, i) => i + 2) : Array.from({ length: 100 }, (_, i) => 881 + i * 2);
+      const majors = band === "tv" ? Array.from({ length: 68 }, (_, i) => i + 2) : radioBandTenths();
       const slots: MarketBoard["slots"] = majors.map((major) => {
         const here = onBand.filter((s) => {
           const tenths = Math.round(Number(s.ident.channel) * 10);

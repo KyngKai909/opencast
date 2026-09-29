@@ -20,7 +20,7 @@ function row(id: string, callSign: string, channel: string, band: "tv" | "radio"
   } as DialRowX;
 }
 
-const DIAL = [row("c", "CIVC", "7.1", "tv"), row("r", "RDLS", "9.1", "tv"), row("b", "BEAT", "12.1", "tv"), row("n", "NITE", "88.3", "radio"), row("h", "HALL", "90.7", "radio"), row("x", "CRAT", "101.9", "radio"), row("v", "VOZE", "104.3", "radio")];
+const DIAL = [row("c", "CIVC", "7.1", "tv"), row("r", "RDLS", "9.1", "tv"), row("b", "BEAT", "12.1", "tv"), row("n", "NITE", "88.4", "radio"), row("h", "HALL", "90.8", "radio"), row("x", "CRAT", "102.0", "radio"), row("v", "VOZE", "104.4", "radio")];
 
 function airing(title: string, start: string, end: string, o: Partial<AiringX> = {}): AiringX {
   return { logEntryId: title, title, episodeTitle: null, code: "PGM", kind: "program", startsAt: start, endsAt: end, live: false, carriedFrom: null, programId: null, note: null, listedAiringId: null, ...o };
@@ -94,13 +94,13 @@ describe("the swipe on the picture", () => {
 
 describe("the radio band's hint", () => {
   it("says where down wraps at the bottom of the band", () => {
-    expect(bandHint(DIAL, "n")).toBe("Down wraps to 104.3, up is 90.7");
+    expect(bandHint(DIAL, "n")).toBe("Down wraps to 104.4, up is 90.8");
   });
   it("says where up wraps at the top", () => {
-    expect(bandHint(DIAL, "v")).toBe("Down is 101.9, up wraps to 88.3");
+    expect(bandHint(DIAL, "v")).toBe("Down is 102.0, up wraps to 88.4");
   });
   it("stays in the band", () => {
-    expect(bandHint(DIAL, "h")).toBe("Down is 88.3, up is 101.9");
+    expect(bandHint(DIAL, "h")).toBe("Down is 88.4, up is 102.0");
   });
 });
 

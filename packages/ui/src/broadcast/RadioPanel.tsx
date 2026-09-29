@@ -5,7 +5,7 @@ import { LevelMeter } from "./LevelMeter";
 import { stationStyle } from "./time";
 
 export interface RadioPanelProps {
-  /** The frequency: it's the picture. "88.3" */
+  /** The frequency: it's the picture. "88.4" */
   frequency: string;
   callSign: string;
   /** "Night Desk, Riverside". */

@@ -11,7 +11,7 @@ import { useGround } from "../lib/a11y";
 const WIDTHS = { web: { width: 1280, height: 800 }, phone: { width: 390, height: 844 } } as const;
 
 /** Kai's six keys in the mock (mocks/db.ts, from you 02.1 and 03.1). */
-const KAI_KEYS = ["BEAT 12.1", "CIVC 7.1", "NITE 88.3", "REEL 24.1", "CRAT 101.9", "HALL 90.7"];
+const KAI_KEYS = ["BEAT 12.1", "CIVC 7.1", "NITE 88.4", "REEL 24.1", "CRAT 102.0", "HALL 90.8"];
 
 /** The toast that confirms an action (role status), by its words. */
 const toast = (page: Page, text: string | RegExp) => page.getByRole("status").filter({ hasText: text });
@@ -67,7 +67,7 @@ for (const width of ["web", "phone"] as const) {
       const replace = page.getByRole("dialog", { name: "Where should PREP 31.1 go?" });
       await expect(replace).toBeVisible();
       await expect(replace).toContainText("All six keys are taken");
-      // The key used least is preselected (the API suggests it): "Replace key 3, NITE 88.3".
+      // The key used least is preselected (the API suggests it): "Replace key 3, NITE 88.4".
       const chosen = replace.getByRole("radio", { checked: true });
       await expect(chosen).toHaveCount(1);
       let key = 0;

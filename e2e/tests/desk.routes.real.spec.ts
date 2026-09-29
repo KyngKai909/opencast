@@ -27,7 +27,7 @@ interface Visit {
 const VISITS: Visit[] = [
   { name: "board, TV band", path: `${IE}/board`, h1: "Inland Empire", says: (p) => p.getByRole("heading", { name: "TV band" }) },
   { name: "board, a free channel selected", path: `${IE}/board?ch=33`, h1: "Inland Empire", says: (p) => p.getByRole("button", { pressed: true }).first() },
-  { name: "board, radio band", path: `${IE}/board?ch=101.9`, h1: "Inland Empire", says: (p) => p.getByRole("heading", { name: "Radio band" }) },
+  { name: "board, radio band", path: `${IE}/board?ch=102.0`, h1: "Inland Empire", says: (p) => p.getByRole("heading", { name: "Radio band" }) },
   { name: "pipeline", path: `${IE}/pipeline`, h1: "Creator pipeline", says: (p) => p.getByRole("table", { name: "Creators" }) },
   { name: "pipeline, said yes", path: `${IE}/pipeline?stage=said_yes`, h1: "Creator pipeline", says: (p) => p.getByRole("group", { name: "Stages" }).getByRole("button", { pressed: true }) },
   { name: "pipeline, add a creator", path: `${IE}/pipeline?add=1`, h1: "Creator pipeline", says: (p) => p.getByRole("dialog", { name: "Add a creator" }) },

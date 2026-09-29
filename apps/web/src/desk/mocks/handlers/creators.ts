@@ -23,12 +23,12 @@ function dateIn(days: number, timeZone = "America/Los_Angeles"): string {
   return f;
 }
 
-/** Whether a channel is on the band: TV 2.1 to 69.9; radio 88.1 to 107.9 on odd tenths. */
+/** Whether a channel is on the band: TV 2.1 to 69.9; radio 88.2 to 107.8 on even tenths (never a real FM number). */
 export function channelOnBand(band: "tv" | "radio", channel: string): boolean {
   if (!/^\d{1,3}\.\d$/.test(channel)) return false;
   const t = Math.round(Number(channel) * 10);
   if (band === "tv") return t >= 21 && t <= 699 && t % 10 !== 0;
-  return t >= 881 && t <= 1079 && t % 2 === 1;
+  return t >= 882 && t <= 1078 && t % 2 === 0;
 }
 
 function view(c: DbCreator) {

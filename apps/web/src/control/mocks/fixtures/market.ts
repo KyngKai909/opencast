@@ -22,19 +22,19 @@ function other(n: number, callSign: string | null, channel: string | null, name:
   return { id: uid(n), kind, callSign, handle: (callSign ?? name).toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, colour, band, channel, marketSlug: market, homeCity: city };
 }
 
-/** The viewer's DUST 96.1 (same id): High Desert, the next market over. */
-export const DUST = other(961, "DUST", "96.1", "Dust Radio", "#7E2F35", "radio", "high-desert", "Apple Valley");
+/** The viewer's DUST 96.2 (same id): High Desert, the next market over. */
+export const DUST = other(961, "DUST", "96.2", "Dust Radio", "#7E2F35", "radio", "high-desert", "Apple Valley");
 /** Opencast's own catalog: a maker with no channel (market 05.1). */
 export const CATALOG = other(5100, null, null, "Opencast catalog", "#26345A", null, null, null, "catalog");
 /** Stations in Los Angeles that carry market programs; stations see them as a count ("3 stations in Los Angeles"). */
 const LA = [
   ["ECHO", "33.1", "Echo Park TV", "tv"],
-  ["LOFI", "89.9", "Lo-fi LA", "radio"],
+  ["LOFI", "90.0", "Lo-fi LA", "radio"],
   ["PARK", "45.1", "Parkside", "tv"],
   ["SILV", "38.1", "Silver Lake", "tv"],
-  ["VNCE", "91.5", "Venice Radio", "radio"],
+  ["VNCE", "91.6", "Venice Radio", "radio"],
   ["ARTS", "27.1", "Arts District", "tv"],
-  ["ELYS", "93.1", "Elysian", "radio"],
+  ["ELYS", "93.2", "Elysian", "radio"],
   ["BOYL", "41.1", "Boyle Heights", "tv"]
 ].map(([cs, ch, nm, band], i) => other(7000 + i, cs!, ch!, nm!, "#33507A", band as Band, "los-angeles", "Los Angeles"));
 

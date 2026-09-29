@@ -100,7 +100,7 @@ export function money(micros: number, options: MoneyOptions = {}): string {
   return body;
 }
 
-/** A channel as it's written on the dial: "12.1" for TV, "88.3" for radio. */
+/** A channel as it's written on the dial: "12.1" for TV, "88.4" for radio. */
 export function channel(major: number, minor: number): string {
   return `${major}.${minor}`;
 }

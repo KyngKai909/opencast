@@ -27,7 +27,7 @@ export default function Pipeline() {
   const navigate = useNavigate();
   const toast = useToast();
   const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
-  // The waitlist's holds, for "95.5, held" and "Waitlist holds 95.5; pick another".
+  // The waitlist's holds, for "95.6, held" and "Waitlist holds 95.6; pick another".
   const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { enabled: !!market });
   const radio = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "radio" } }, { enabled: !!market });
   const remind = useApiMutation(networkApi.remindCreator, { invalidates: [networkApi.listCreators] });

@@ -10,7 +10,7 @@ export type StationBandVariant =
   | "phone";  /* the station page on the phone (.ph-band) */
 
 export interface StationBandProps {
-  /** "12.1", or "88.3" on the radio band. */
+  /** "12.1", or "88.4" on the radio band. */
   channel: string;
   callSign: string;
   /** The station colour. It must hold 4.5:1 against white; a failing colour is marked data-contrast="fails". */
