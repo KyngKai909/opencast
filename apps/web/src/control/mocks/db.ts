@@ -7,6 +7,7 @@
 // earnings, claims…) lives in its own mocks/fixtures/<area>.ts, and may keep its own saved state.
 
 import type { ClearLink, Folder, LibraryItem, LiveSource, Program, StationIdent, StationSetup } from "@opencast/contracts";
+import { snapSpan, snapTime } from "@opencast/ui";
 import { seedEvening, seedLiveSources, type DbBreak, type DbLogEntry } from "./fixtures/evening";
 import { seedLibrary } from "./fixtures/library";
 import { seedOffAirRules, type DbOffAirRule } from "./fixtures/offair";
@@ -51,7 +52,8 @@ export interface Db {
   offAirRules: DbOffAirRule[];
 }
 
-export const DB_VERSION = 5;
+// 6: the log's times on 4-second segment boundaries (prepare once, then assemble).
+export const DB_VERSION = 6;
 const KEY = "oc-mock-control-db";
 
 function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStation["setup"] {
@@ -78,8 +80,9 @@ export function seed(): Db {
   const library = seedLibrary();
   const evening = seedEvening(library.items);
   const { templates, log: weekdays } = seedTemplates(evening.log, library.items);
-  const log = [...weekdays, ...evening.log];
-  const breaks = evening.breaks;
+  // On segment boundaries, as the API answers them (the seed already is; this keeps it so).
+  const log = [...weekdays, ...evening.log].map(snapSpan);
+  const breaks = evening.breaks.map((b) => ({ ...b, startsAt: snapTime(b.startsAt) }));
   const ours = [BEAT, HALL, CRAT, LAB];
   const stations: DbStation[] = STATIONS.filter((s) => ours.includes(s)).map((ident) => ({
     ident,

@@ -8,7 +8,7 @@ export { PlayerEngine, CAPTION_SCALE, captionLineFor, type PlayerState, type Eng
 export { Deck, SignedOffError, type WarmMode, type DeckWarmMode, type DeckState } from "./engine/Deck";
 export { defaultDriver, hlsDriver, nativeDriver, JOIN_CONFIG, type MediaDriver, type MediaHandle, type AttachOptions, type PlaylistInfo, type Quality } from "./engine/driver";
 export { onScreenAt, mergeRanges, signOffIn, CODE_SECONDS, type OnScreen } from "./engine/timeline";
-export { Prefetch, loadMedia, isLive, mediaPlaylist, variants, startVariant, syncSegment, type Fetch, type MediaPlaylist, type Variant } from "./engine/playlist";
+export { Prefetch, loadMedia, isLive, mediaPlaylist, variants, pictureVariants, startVariant, syncSegment, type Fetch, type MediaPlaylist, type Variant } from "./engine/playlist";
 export { startHeartbeat, httpHeartbeat, sessionId, type SendHeartbeat, type HeartbeatBody } from "./heartbeat";
 export * from "./input";
 export * from "./react";

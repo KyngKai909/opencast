@@ -4,6 +4,10 @@
 //
 // Only what those need: variants, segments, the target duration, program date-times and ENDLIST.
 // The DATERANGE tags are read with the contract's parser (parseDateRanges), never here.
+//
+// A station's playback URL is a master playlist with a rendition ladder (prepare once, then
+// assemble): TV 1080p, 720p, 480p and 360p plus an audio-only rendition, the reference (720p)
+// listed first; radio AAC 128k and 64k. A picture is never started on the audio-only rendition.
 
 import type { Quality } from "./driver";
 
@@ -13,7 +17,12 @@ export interface Variant {
   url: string;
   bandwidth: number;
   height: number;
+  /** Sound only: CODECS names no video codec and there's no RESOLUTION (a TV ladder's audio-only rendition, or radio's). */
+  audioOnly: boolean;
 }
+
+/** Video codecs a CODECS attribute may name. */
+const VIDEO_CODEC = /^(avc[1-4]|hvc1|hev1|dvh1|dvhe|av01|vp0?9|vp08|mp4v)\b/i;
 
 export interface MediaPlaylist {
   url: string;
@@ -33,27 +42,41 @@ export function isMaster(text: string): boolean {
 
 /** The master playlist's variants, in the order listed. */
 export function variants(master: string, base: string): Variant[] {
-  const out: Variant[] = [];
+  const out: Array<Variant & { codecs: string | null }> = [];
   const lines = master.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!line.startsWith("#EXT-X-STREAM-INF:")) continue;
     const uri = lines.slice(i + 1).find((l) => l.trim() && !l.startsWith("#"));
     if (!uri) continue;
-    const bandwidth = Number(/BANDWIDTH=(\d+)/.exec(line)?.[1] ?? 0);
+    const bandwidth = Number(/[:,]BANDWIDTH=(\d+)/.exec(line)?.[1] ?? 0);
     const height = Number(/RESOLUTION=\d+x(\d+)/.exec(line)?.[1] ?? 0);
-    out.push({ url: resolve(uri.trim(), base), bandwidth, height });
+    const codecs = /CODECS="([^"]*)"/.exec(line)?.[1] ?? null;
+    out.push({ url: resolve(uri.trim(), base), bandwidth, height, codecs, audioOnly: false });
   }
-  return out;
+  // Sound only: no RESOLUTION, and CODECS names no video codec. Without CODECS, a variant with no
+  // RESOLUTION next to ones that have it is the sound-only one (as hls.js reads a ladder).
+  const pictures = out.some((v) => v.height > 0);
+  return out.map(({ codecs, ...v }) => ({
+    ...v,
+    audioOnly: !v.height && (codecs !== null ? !codecs.split(",").some((c) => VIDEO_CODEC.test(c.trim())) : pictures)
+  }));
+}
+
+/** The variants a picture can play: every one but the audio-only rendition, unless that's all there is (radio). */
+export function pictureVariants(list: Variant[]): Variant[] {
+  const pictures = list.filter((v) => !v.audioOnly);
+  return pictures.length ? pictures : list;
 }
 
 /**
  * The variant the player will start on, so a pre-warmed first segment is the one it asks for:
- * the top for "best", otherwise the lowest (a quick first picture; ABR climbs from there).
+ * the top for "best", otherwise the lowest (a quick first picture; ABR climbs from there). Never
+ * the audio-only rendition while there are pictures (hls.js leaves it out of a TV ladder too).
  */
 export function startVariant(list: Variant[], quality: Quality): Variant | null {
   if (!list.length) return null;
-  const by = [...list].sort((a, b) => a.height - b.height || a.bandwidth - b.bandwidth);
+  const by = [...pictureVariants(list)].sort((a, b) => a.height - b.height || a.bandwidth - b.bandwidth);
   return quality === "best" ? by[by.length - 1]! : by[0]!;
 }
 

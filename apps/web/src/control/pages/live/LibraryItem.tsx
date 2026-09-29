@@ -1,6 +1,7 @@
 // 04.1 a library item (/:callSign/library/items/:itemId?folder=:folderId): the file, how it was
 // prepared for air, its rights, whether it's offered for carriage, where it's scheduled and every
 // time it has aired (L5), replacing its file (L6), and removing it (guarded while anything uses it).
+// "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared.
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -16,6 +17,7 @@ import { useStation } from "../../station/StationContext";
 import { FolderRail, ItemStatus, refreshLibrary, RightsPane } from "../../components/live/LibraryParts";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
+import { preparationWords } from "../../components/onair/readiness";
 import { SecTop } from "../../components/live/Studio";
 import { sendFile } from "../../components/live/upload";
 import { NotFound, Quiet } from "../common";
@@ -82,6 +84,7 @@ export default function LibraryItem() {
   const sound = item.status === "ready" ? `${h?.audioLayout ? `${h.audioLayout[0]!.toUpperCase()}${h.audioLayout.slice(1)}, ` : ""}levelled to broadcast loudness` : null;
   const captions = item.captions === "none" ? "None" : `${item.captions === "generated" ? "Generated" : "Uploaded"}${h?.captionLanguage ? `, ${languageName(h.captionLanguage)}` : ""}`;
   const contentId = item.storage?.contentId;
+  const prepared = preparationWords(h?.preparation?.status);
 
   return (
     <div className="cc-libwrap">
@@ -201,7 +204,8 @@ export default function LibraryItem() {
                   ...(item.storage ? [{ label: "Stored", value: item.storage.sharedWith > 0 ? "Once, shared by every station airing it" : "Once" }] : []),
                   ...(contentId ? [{ label: "Content ID", value: <span className="oc-mono cc-item__cid">{shortId(contentId)}</span> }] : []),
                   ...(item.storage?.ipfs ? [{ label: "On IPFS", value: <a href={item.storage.ipfs.url} target="_blank" rel="noreferrer" className="oc-mono cc-item__cid">{shortId(item.storage.ipfs.cid)}</a> }] : []),
-                  ...(h?.cachedForAir ? [{ label: "Ready for tonight", value: "Cached on the playout server" }] : [])
+                  // Prepare once, then assemble: where its preparation for air stands (not asked for yet: no line).
+                  ...(prepared ? [{ label: "For air", value: prepared }] : [])
                 ]}
               />
               {item.status === "ready" && !sound && <small className="cc-item__quiet">{readyLine(item)}</small>}

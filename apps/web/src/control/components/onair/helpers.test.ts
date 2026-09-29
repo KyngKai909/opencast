@@ -57,4 +57,12 @@ describe("the log's timeline", () => {
     expect(openGaps([{ startsAt: T("06:40"), endsAt: T("09:00") }], deadAir, T("09:00"), Date.parse("2026-09-27T06:30:30.000Z"))).toEqual([{ key: T("06:40"), startsAt: T("06:40"), endsAt: T("13:00") }]);
     expect(openGaps([{ startsAt: T("06:40"), endsAt: T("09:00") }], [], T("10:00"), Date.parse("2026-09-27T07:00:30.000Z"))).toEqual([{ key: T("06:40"), startsAt: T("07:01"), endsAt: T("09:00") }]);
   });
+
+  it("draws and offers times on 4-second segment boundaries, as the API answers them", () => {
+    const S = (hms: string) => `2026-09-27T${hms}.000Z`;
+    const odd = { ...log, entries: [{ ...log.entries[0], startsAt: S("03:30:01"), endsAt: S("03:58:30") }], breaks: [], gaps: [] };
+    const [b] = timelineBlocks(odd, T("01:00"), T("09:00"), Date.parse(T("03:42")));
+    expect([b.start, b.end]).toEqual([S("03:30:00"), S("03:58:32")]);
+    expect(openGaps([{ startsAt: S("06:40:30"), endsAt: S("08:59:59") }], [], T("10:00"), Date.parse(T("03:42")))).toEqual([{ key: S("06:40:30"), startsAt: S("06:40:32"), endsAt: T("09:00") }]);
+  });
 });

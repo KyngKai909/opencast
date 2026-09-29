@@ -2,10 +2,12 @@
 // plays forever on the wall clock, in a sliding window of segments, so a player joins wherever
 // the "broadcast" is, mid-program, exactly as it will with real stations.
 //
-//   /<slug>/master.m3u8   video (or audio) and a caption rendition
-//   /<slug>/live.m3u8     the media playlist, a sliding window
+//   /<slug>/master.m3u8   the rendition ladder and a caption rendition (index.m3u8 answers it too)
+//   /<slug>/<r>.m3u8      a rendition's media playlist, a sliding window: TV v360 (listed first,
+//                         as the worker lists its reference rendition), v540, v216 and the
+//                         audio-only a64; radio a128 and a64
 //   /<slug>/subs.m3u8     the caption playlist, the same window
-//   /<slug>/seg_NNN.ts, /<slug>/sub_NNN.vtt, /<slug>/off_NNN.ts, /<slug>/suboff_NNN.vtt
+//   /<slug>/<r>_seg_NNN.ts, /<slug>/<r>_off_NNN.ts, /<slug>/sub_NNN.vtt, /<slug>/suboff_NNN.vtt
 //   /<slug>/logo.svg      a station logo, for the logo bug (SAZN's)
 //
 // The playlist is written the way the worker assembles a channel (platform prompt, Phase 5, and
@@ -221,6 +223,20 @@ function signOffAsked(req) {
   return values.map((v) => (["1", "on", "true", "yes"].includes(v.toLowerCase()) ? DEFAULT_SIGNOFF : v.toLowerCase()));
 }
 
+/**
+ * The station's master playlist, written as the worker writes a channel's (renderMaster): the
+ * reference rendition first, then the rest best first, each with its bandwidth, codecs and (for
+ * pictures) resolution and frame rate, and the caption rendition.
+ */
+export function masterPlaylist(station) {
+  const lines = ["#EXTM3U", "#EXT-X-VERSION:6", "#EXT-X-INDEPENDENT-SEGMENTS", '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,URI="subs.m3u8"'];
+  for (const r of station.renditions) {
+    const picture = r.audioOnly ? "" : `,RESOLUTION=${r.width}x${r.height},FRAME-RATE=25.000`;
+    lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${r.bandwidth},AVERAGE-BANDWIDTH=${r.averageBandwidth},CODECS="${r.codecs}"${picture},SUBTITLES="subs"`, `${r.name}.m3u8`);
+  }
+  return lines.join("\n") + "\n";
+}
+
 const logoSvg = (s) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="96" viewBox="0 0 240 96"><rect x="3" y="3" width="234" height="90" rx="45" fill="none" stroke="#fff" stroke-width="6"/><text x="120" y="63" text-anchor="middle" font-family="Helvetica Neue, Arial" font-weight="800" font-size="44" fill="#fff">${s.name}</text></svg>`;
 
@@ -243,7 +259,7 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
       res.end("No mock streams yet: run `npm run mock:streams -w @opencast/player`.");
       return;
     }
-    if (!m.items) {
+    if (!m.items || m.version !== 2) {
       res.statusCode = 503;
       res.end("The mock streams are from an older generator: run `npm run mock:streams -w @opencast/player` again.");
       return;
@@ -295,21 +311,10 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
       else finish();
     };
 
-    if (name === "master.m3u8") {
-      const video = station.audioOnly ? 'CODECS="mp4a.40.2"' : 'RESOLUTION=960x540,CODECS="avc1.4d401f,mp4a.40.2"';
-      return send(
-        "application/vnd.apple.mpegurl",
-        [
-          "#EXTM3U",
-          '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en",DEFAULT=NO,AUTOSELECT=YES,URI="subs.m3u8"',
-          `#EXT-X-STREAM-INF:BANDWIDTH=${station.audioOnly ? 110000 : 650000},${video},SUBTITLES="subs"`,
-          "live.m3u8",
-          ""
-        ].join("\n")
-      );
-    }
+    if (name === "master.m3u8" || name === "index.m3u8") return send("application/vnd.apple.mpegurl", masterPlaylist(station));
     const pad = (i) => String(i).padStart(3, "0");
-    if (name === "live.m3u8") {
+    const rendition = station.renditions.find((r) => `${r.name}.m3u8` === name);
+    if (rendition) {
       const spot = m.spot;
       const host = req.headers?.host ?? "localhost";
       const breakSegments = n - m.items[0].count;
@@ -317,14 +322,15 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
         const so = it.code === "OFF" ? timeline.signOffs.find((x) => x.S === k0) : null;
         return tagsFor({ station: { ...station, spot }, it, k0, pdt, seg, host, breakSegments, backAt: so ? new Date(pdt(so.B)).toISOString() : null });
       };
-      return send("application/vnd.apple.mpegurl", playlist({ timeline, last, window, seg, pdt, tags, file: (a) => (a.kind === "off" ? `off_${pad(a.file)}.ts` : `seg_${pad(a.file)}.ts`) }));
+      const r = rendition.name;
+      return send("application/vnd.apple.mpegurl", playlist({ timeline, last, window, seg, pdt, tags, file: (a) => (a.kind === "off" ? `${r}_off_${pad(a.file)}.ts` : `${r}_seg_${pad(a.file)}.ts`) }));
     }
     if (name === "subs.m3u8") {
       return send("application/vnd.apple.mpegurl", playlist({ timeline, last, window, seg, pdt, tags: null, file: (a) => (a.kind === "off" ? `suboff_${pad(a.file)}.vtt` : `sub_${pad(a.file)}.vtt`) }));
     }
     if (name === "logo.svg") return send("image/svg+xml", logoSvg(station));
     const file = path.join(root, slug, name);
-    if (/^((seg|off)_\d{3}\.ts|(sub|suboff)_\d{3}\.vtt)$/.test(name) && fs.existsSync(file)) {
+    if (/^([a-z0-9]+_(seg|off)_\d{3}\.ts|(sub|suboff)_\d{3}\.vtt)$/.test(name) && fs.existsSync(file)) {
       return send(name.endsWith(".ts") ? "video/mp2t" : "text/vtt", { file });
     }
     return next();

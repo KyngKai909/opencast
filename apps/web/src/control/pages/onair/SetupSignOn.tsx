@@ -2,6 +2,7 @@
 // tally above the ink Sign on button, so signing on is the tally lighting in the same place.
 // The first sign-on fixes the call sign and channel, then master control opens the Monitor.
 // Planned off air in the next 24 hours shows as a line of its own (`off_air_hours`), never a warning.
+// Items prepared for air (`items_prepared`) never blocks.
 
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -66,7 +67,9 @@ export default function SetupSignOn() {
         return null;
     }
   };
-  // Off air hours planned (G9) only informs: it's fine as it is, with nothing to fix.
+  // Off air hours planned (G9) only informs: it's fine as it is, with nothing to fix. So does
+  // "Items prepared for air" while everything is; while something isn't, it's a warning with the
+  // API's detail and no fix (preparation runs by itself; sign-on isn't held for it).
   const items: Check[] = list.map((c) =>
     isInformational(c)
       ? { state: "fine", title: c.label, detail: c.detail ?? undefined }

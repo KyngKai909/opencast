@@ -154,7 +154,7 @@ describe("BEAT's audience tonight", () => {
     const a = tonight();
     expect(a.series.at(-1)).toMatchObject({ minute: at("20:42"), tunedIn: 312 });
     expect(a.comparison!.at(-1)!.minute).toBe(at("23:00"));
-    expect(a.breaks!.map((b) => b.startsAt)).toEqual([at("20:28:30"), at("20:44"), at("20:59"), at("21:29")]);
+    expect(a.breaks!.map((b) => b.startsAt)).toEqual([at("20:28:28"), at("20:44"), at("20:59"), at("21:29")]);
     expect(a.series.find((p) => p.minute === at("20:29"))!.inBreak).toBe(true);
   });
 

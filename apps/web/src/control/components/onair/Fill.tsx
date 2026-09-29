@@ -1,11 +1,12 @@
 // Filling a gap (A.4's pane, P.2's sheet): repeat from the library, carry from the syndication
 // market, or sign off. The same three choices in both places; the pane writes them out in full,
-// the phone names the program and when the station is back.
+// the phone names the program and when the station is back. What's sent and shown is on segment
+// boundaries (snapSpan), as the API places it.
 
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { type CarriageTerm, catalogApi, libraryApi, logApi, type LogEntry, type Offer, stationsApi } from "@opencast/contracts";
-import { ChoiceList, clock, useToast, type Choice } from "@opencast/ui";
+import { ChoiceList, clock, snapSpan, useToast, type Choice } from "@opencast/ui";
 import { call } from "../../../api/client";
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { STATION_TZ } from "../../../lib/clock";
@@ -40,8 +41,10 @@ export function useFill({ stationId, base, gap, phone }: { stationId: string; ba
   const market = useApi(catalogApi.browse, { query: { forStation: stationId, fitsSchedule: true, gap: gap?.startsAt } }, { enabled: !!gap, retry: false });
   const fill = useApiMutation(logApi.fillGap, { invalidates: LOG_READS });
   const [chosen, setChosen] = useState<FillWith | null>(null);
+  // The gap on segment boundaries: the times the fill is sent with and the ones it's shown with.
+  const span = gap ? snapSpan({ startsAt: gap.startsAt, endsAt: gap.endsAt }) : null;
 
-  const plan = gap && library.data ? planRepeat(library.data.items, library.data.programs, gap, rule.data?.lengthMs ?? DEFAULT_BREAK_MS) : null;
+  const plan = span && library.data ? planRepeat(library.data.items, library.data.programs, span, rule.data?.lengthMs ?? DEFAULT_BREAK_MS) : null;
   const offers = gap ? fitting(market.data ?? [], gap) : [];
   const first = offers[0];
   const value: FillWith = chosen ?? (plan ? "repeat" : "sign_off");
@@ -57,7 +60,7 @@ export function useFill({ stationId, base, gap, phone }: { stationId: string; ba
               helper: offers.length >= 2 ? `${offers[0].program.title} and ${offers[1].program.title} both fit this slot` : first ? `${first.program.title} fits this slot` : "See what fits this slot in the market",
               disabled: !base
             },
-        { value: "sign_off", title: `Sign off at ${clock(gap.startsAt, { timeZone: STATION_TZ })}`, helper: phone ? `Back at ${clock(gap.endsAt, { timeZone: STATION_TZ })}` : "Viewers see \"Off air\" and when you're back" }
+        { value: "sign_off", title: `Sign off at ${clock(span!.startsAt, { timeZone: STATION_TZ })}`, helper: phone ? `Back at ${clock(span!.endsAt, { timeZone: STATION_TZ })}` : "Viewers see \"Off air\" and when you're back" }
       ]
     : [];
 
@@ -67,19 +70,19 @@ export function useFill({ stationId, base, gap, phone }: { stationId: string; ba
   };
 
   const submit = (onDone?: () => void) => {
-    if (!gap) return;
+    if (!gap || !span) return;
     if (value === "carry") {
       if (base) navigate(`${base}/market?gap=${encodeURIComponent(gap.startsAt)}`);
       return;
     }
-    const span = spanText(gap.startsAt, gap.endsAt);
-    const body = value === "repeat" && plan ? { with: "repeat", startsAt: gap.startsAt, endsAt: gap.endsAt, itemIds: plan.itemIds } : { with: "sign_off", startsAt: gap.startsAt, endsAt: gap.endsAt };
+    const words = spanText(span.startsAt, span.endsAt);
+    const body = value === "repeat" && plan ? { with: "repeat", startsAt: span.startsAt, endsAt: span.endsAt, itemIds: plan.itemIds } : { with: "sign_off", startsAt: span.startsAt, endsAt: span.endsAt };
     fill.mutate(
       { params, body },
       {
         onSuccess: (made) => {
           const entries = made as LogEntry[];
-          toast.show({ message: value === "repeat" ? `Filled ${span} from your library.` : `Off air from ${span}.`, onUndo: undo(entries) });
+          toast.show({ message: value === "repeat" ? `Filled ${words} from your library.` : `Off air from ${words}.`, onUndo: undo(entries) });
           setChosen(null);
           onDone?.();
         }

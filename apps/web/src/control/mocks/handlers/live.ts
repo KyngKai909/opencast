@@ -3,6 +3,7 @@
 
 import { http, type HttpHandler } from "msw";
 import { libraryApi, logApi, stationsApi, type Listing } from "@opencast/contracts";
+import { endEarlyAt } from "@opencast/ui";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import type { DbLogEntry } from "../fixtures/evening";
@@ -297,7 +298,8 @@ export const liveHandlers: HttpHandler[] = [
     if (e instanceof Response) return e;
     const denied = goesLive(id, e.programId, p);
     if (denied) return denied;
-    const t = now().toISOString();
+    // At the nearest segment boundary after its start, where the stream can change item (as the API).
+    const t = new Date(endEarlyAt(now().getTime(), e.startsAt)).toISOString();
     if (!(e.startsAt <= t && t < e.endsAt)) return fail(409, "not_on_air", "It can end early only while it's on air.");
     if (liveState().endedEarly[e.id]) return fail(409, "ended", "It has already ended.");
     liveState().endedEarly[e.id] = t;

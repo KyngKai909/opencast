@@ -4,16 +4,19 @@
 // in the log, on the Monitor's rundown and on the rail's badge at once. Off air hours and day
 // templates (G8, G9) are kept in ../schedule.ts; their own endpoints are in templates.ts.
 // Planned off air isn't dead air: gaps leave it out, so nothing warns about it or fills it.
+// The log's times are on 4-second segment boundaries, as the API keeps them: what's sent is
+// rounded to the nearest (never refused), and a cued break starts at the next one.
 
 import { http } from "msw";
 import { logApi, playoutApi, type BreakSlot, type LogEntry } from "@opencast/contracts";
-import { clock, stationColourPasses } from "@opencast/ui";
+import { clock, nextSegment, snapTime, stationColourPasses } from "@opencast/ui";
 import { buildRundown, currentIndex, type RundownRow } from "../../components/onair/rundown";
 import { addDays, broadcastDay, isoDate, timeOn } from "../../components/onair/time";
 import { now, STATION_TZ } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationBreaks, stationLog, type DbStation } from "../db";
 import { breakSlot, type DbBreak, type DbFill, type DbLogEntry } from "../fixtures/evening";
 import { DEFAULT_BREAK_MS, MOCK_STREAMS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState } from "../fixtures/onair";
+import { itemsPreparedCheck, readinessOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
 import { createTemplate, generateWindow, logDays, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
@@ -93,6 +96,7 @@ function status(st: DbStation) {
     onAir,
     now: onAir && cur && cur.kind !== "gap" ? { title: cur.title, code: cur.code, startedAt: cur.at, itemId: cur.entryId ? (stationLog(st.ident.id).find((e) => e.id === cur.entryId)?.itemId ?? null) : null } : null,
     lastError: null,
+    // Livepeer no longer carries a station's output (prepare once, then assemble): always false.
     output: { livepeerEnabled: false, playbackUrl: onAir ? outputUrl(st) : null, bitrateKbps: onAir ? TEST_SIGNAL.bitrateKbps : null },
     nextBreakAt: onAir ? (nextBreak?.startsAt ?? null) : null,
     onAirSince: st.onAir ? st.onAirSince : null,
@@ -108,7 +112,9 @@ function status(st: DbStation) {
             pictureUrl: null
           }
         : null,
-    offAir: off ? { ...off, now: Date.parse(off.startsAt) <= t.getTime() } : null
+    offAir: off ? { ...off, now: Date.parse(off.startsAt) <= t.getTime() } : null,
+    // The next 48 hours of the log: how many items are prepared for air, and the first that isn't.
+    readiness: readinessOf(st.ident.id, t.getTime())
   };
 }
 
@@ -157,7 +163,7 @@ export function signOnChecks(st: DbStation) {
   const entries = stationLog(id, from, to);
   const breaks = stationBreaks(id, from, to);
   const lib = getDb().library.items.filter((i) => i.stationId === id);
-  const checks: Array<{ key: "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours"; label: string; passed: boolean; blocking: boolean; detail: string | null; watchUrl?: string | null }> = [];
+  const checks: Array<{ key: "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared"; label: string; passed: boolean; blocking: boolean; detail: string | null; watchUrl?: string | null }> = [];
 
   if (!st.ident.callSign) checks.push({ key: "call_sign_chosen", label: "Choose a call sign", passed: false, blocking: true, detail: "Three to five capital letters, on the Your station step" });
   if (!st.ident.channel) checks.push({ key: "channel_chosen", label: "Choose a channel", passed: false, blocking: true, detail: "On the Your station step" });
@@ -212,6 +218,9 @@ export function signOnChecks(st: DbStation) {
   // Listings: programs on the log that still need a description (a warning).
   const programs = getDb().library.programs.filter((p) => p.station.id === id && p.listingStatus === "needs_description" && entries.some((e) => e.programId === p.id));
   for (const p of programs) checks.push({ key: "listings_complete", label: `${p.title} needs a description`, passed: false, blocking: false, detail: "Viewers see the series description until it has one" });
+
+  // Items prepared for air in the next 24 hours (never blocking).
+  checks.push(itemsPreparedCheck(id, t.getTime()));
 
   // Planned off air isn't a gap: say so, so nobody wonders (informational, never blocking).
   const firstOff = plannedOff[0];
@@ -277,7 +286,8 @@ export const logHandlers = [
     if (r instanceof Response) return r;
     const body = logApi.addEntry.body!.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "That entry isn't complete.");
-    const b = body.data;
+    // On segment boundaries: rounded to the nearest, never refused.
+    const b = { ...body.data, startsAt: snapTime(body.data.startsAt), endsAt: body.data.endsAt ? snapTime(body.data.endsAt) : body.data.endsAt };
     const id = r.station.ident.id;
     let title = "Program";
     let endsAt = b.endsAt;
@@ -320,8 +330,8 @@ export const logHandlers = [
     const body = logApi.updateEntry.body!.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "That change isn't complete.");
     const b = body.data;
-    const startsAt = b.startsAt ?? e.startsAt;
-    const endsAt = b.endsAt ?? e.endsAt;
+    const startsAt = b.startsAt ? snapTime(b.startsAt) : e.startsAt;
+    const endsAt = b.endsAt ? snapTime(b.endsAt) : e.endsAt;
     if (endsAt <= startsAt) return fail(400, "bad_request", "It has to end after it starts.");
     const clash = overlaps(e.stationId, startsAt, endsAt, e.id);
     if (clash) return fail(409, "conflict", `That time already has ${clash.title} on the log.`);
@@ -390,7 +400,7 @@ export const logHandlers = [
     if (r instanceof Response) return r;
     const body = logApi.fillGap.body!.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "Say how to fill the gap.");
-    const b = body.data;
+    const b = { ...body.data, startsAt: snapTime(body.data.startsAt), endsAt: snapTime(body.data.endsAt) };
     const id = r.station.ident.id;
     if (b.endsAt <= b.startsAt) return fail(400, "bad_request", "The gap has to end after it starts.");
     const clash = overlaps(id, b.startsAt, b.endsAt);
@@ -480,7 +490,8 @@ export const logHandlers = [
     const r = roleOn(request, String(params.stationId), ["owner", "operator", "host"]);
     if (r instanceof Response) return r;
     const id = r.station.ident.id;
-    const t = new Date(Math.floor(now().getTime() / 1000) * 1000).toISOString();
+    // From the next segment boundary.
+    const t = new Date(nextSegment(now().getTime())).toISOString();
     const live = stationLog(id).find((e) => e.kind === "live" && e.startsAt <= t && t < e.endsAt);
     if (!r.station.onAir || !live) return fail(409, "not_live", "A break can be cued during a live program.");
     const m = membership(id, r.person.id);

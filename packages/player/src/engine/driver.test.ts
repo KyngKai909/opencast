@@ -13,10 +13,15 @@ class FakeHls {
   static ErrorTypes = { NETWORK_ERROR: "networkError", MEDIA_ERROR: "mediaError" };
   static isSupported = () => true;
   private listeners = new Map<string, Listener[]>();
-  levels = [
+  levels: Array<{ bitrate: number; height: number; videoCodec?: string }> = [
     { bitrate: 650000, height: 360 },
     { bitrate: 2400000, height: 720 }
   ];
+  removed: number[] = [];
+  removeLevel(i: number) {
+    this.removed.push(i);
+    this.levels = this.levels.filter((_, j) => j !== i);
+  }
   startLevel = -1;
   autoLevelCapping = -1;
   loadLevel = -1;
@@ -82,6 +87,27 @@ describe("hls.js, set up for joins", () => {
     expect(h.programDate()).toBeNull();
     hls.playingDate = new Date(1_000_000);
     expect(h.programDate()).toBe(1_000_000);
+  });
+});
+
+describe("hls.js and the rendition ladder", () => {
+  it("never plays the audio-only rendition for a picture, and still starts where the pre-warm fetched", () => {
+    hlsDriver().attach(document.createElement("video"), "/x/master.m3u8", () => {}, { start: { bandwidth: 650000, syncCount: 3 } });
+    const hls = made[0]!;
+    // A master without CODECS: hls.js keeps the sound-only level, lowest (height 0).
+    hls.levels = [{ bitrate: 140000, height: 0 }, { bitrate: 650000, height: 360 }, { bitrate: 2400000, height: 720 }];
+    hls.emit(FakeHls.Events.MANIFEST_PARSED);
+    expect(hls.removed).toEqual([0]);
+    expect(hls.levels.map((l) => l.height)).toEqual([360, 720]);
+    expect(hls.startLevel).toBe(0);
+  });
+
+  it("radio keeps its ladder", () => {
+    hlsDriver().attach(document.createElement("video"), "/x/master.m3u8", () => {});
+    const hls = made[0]!;
+    hls.levels = [{ bitrate: 72000, height: 0 }, { bitrate: 140000, height: 0 }];
+    hls.emit(FakeHls.Events.MANIFEST_PARSED);
+    expect(hls.removed).toEqual([]);
   });
 });
 

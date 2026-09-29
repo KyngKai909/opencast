@@ -4,6 +4,8 @@
 // "Run by Opencast"). Everything ticks from the station clock and reads the shared log, so a break
 // filled from the spot market shows here as soon as it's saved. Planned off air (G9) reads "Off
 // air, back at 6:00 am" while it's on, and "Signs off at 2:00 am" when it's coming within 24 hours.
+// "Prepared for air" (PlayoutStatus.readiness) says how many of the next 48 hours' items are ready,
+// and names the first that isn't.
 
 import { useMemo, type ReactNode } from "react";
 import { audienceApi, catalogApi, type Offer, playoutApi, stationsApi } from "@opencast/contracts";
@@ -12,6 +14,7 @@ import { useApi, useApiMutation } from "../../../api/hooks";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "../../components/onair/data";
 import { monitorOffAirText } from "../../components/onair/offAir";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
+import { readinessLine } from "../../components/onair/readiness";
 import { breakLine, buildRundown, currentIndex, nextBreak, rundownFrom, type RundownRow } from "../../components/onair/rundown";
 import { broadcastDay, dayClock, monthDay } from "../../components/onair/time";
 import { useShellOptions, useIsPhone } from "../../layout/shell";
@@ -148,6 +151,9 @@ export default function Monitor() {
   const runsUntil = deadAir.data?.logRunsUntil ?? null;
   const shortLog = !!deadAir.data?.nextGapAt;
   if (deadAir.data) health.push({ label: "Log runs until", value: runsUntil ? dayClock(runsUntil) : "Nothing on the log", attention: shortLog, textValue: !runsUntil });
+  // Prepare once, then assemble: the next 48 hours' items, prepared for air.
+  const ready = readinessLine(status?.readiness, t);
+  if (ready) health.push({ label: "Prepared for air", value: ready.text, textValue: true, good: ready.good, attention: ready.attention });
   if (offAirText) health.push({ label: "Off air hours", value: offAirText, textValue: true });
 
   // From the market: programs that fit this station's open time.
@@ -231,7 +237,7 @@ export default function Monitor() {
         </div>
         {health.length > 0 && (
           <div className="cc-pm__sec cc-pm__sec--last">
-            <KeyValueList variant="health" items={health.filter((h) => h.label === "Tuned in" || h.label === "Log runs until" || h.label === "Off air hours")} />
+            <KeyValueList variant="health" items={health.filter((h) => h.label === "Tuned in" || h.label === "Log runs until" || h.label === "Prepared for air" || h.label === "Off air hours")} />
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 // Makes the mock stations the player is developed and tested against: a 60-second loop per
-// station, cut into 2-second HLS segments, with a caption rendition. The live server
-// (live-hls.mjs) serves them as sliding-window live playlists, so tuning in joins mid-program.
+// station, cut into 2-second HLS segments, in a small rendition ladder, with a caption rendition.
+// The live server (live-hls.mjs) serves them as sliding-window live playlists behind a master
+// playlist, so tuning in joins mid-program.
 //
 //   npm run mock:streams -w @opencast/player
 //   npm run mock:streams -w @opencast/player -- nite hall   (only these stations, again)
@@ -16,6 +17,12 @@
 //   SID  0:56–1:00  the station ID (segments 28–29)
 // so the live playlist has a real discontinuity between items. A sign-off slate (3 segments,
 // off_000–002) is made too, for the planned sign-off live-hls.mjs can switch on.
+//
+// The ladder, like the worker's (TV 1080p, 720p, 480p, 360p and audio only; radio AAC 128k and
+// 64k), only smaller: TV 540p, 360p and 216p and a 64k audio-only rendition; radio 128k and 64k.
+// Every rendition of an item is its own encode from the same frames and tone, with keyframes on
+// every segment, so the renditions' segments line up and a player can switch between them. The
+// files are <rendition>_seg_NNN.ts and <rendition>_off_NNN.ts.
 //
 // Nothing is burned into the picture that the player draws: no bug, no lower third, no code.
 // Those come from the playlist's DATERANGE tags. The picture keeps the bottom of the frame (the
@@ -33,6 +40,35 @@ const SEGMENT = 2;
 const LOOP = 60;
 const W = 960;
 const H = 540;
+
+/**
+ * The ladder per band, the reference rendition first (players start there; its segments pin the
+ * captions). Video renditions share the audio (AAC 96k); `kbps` is the video's.
+ */
+const LADDERS = {
+  tv: [
+    { name: "v360", kind: "video", width: 640, height: 360, kbps: 220, audioKbps: 96 },
+    { name: "v540", kind: "video", width: 960, height: 540, kbps: 400, audioKbps: 96 },
+    { name: "v216", kind: "video", width: 384, height: 216, kbps: 110, audioKbps: 96 },
+    { name: "a64", kind: "audio", width: 0, height: 0, kbps: 0, audioKbps: 64 }
+  ],
+  radio: [
+    { name: "a128", kind: "audio", width: 0, height: 0, kbps: 0, audioKbps: 128 },
+    { name: "a64", kind: "audio", width: 0, height: 0, kbps: 0, audioKbps: 64 }
+  ]
+};
+const VIDEO_CODECS = "avc1.4d401f,mp4a.40.2";
+const AUDIO_CODECS = "mp4a.40.2";
+/** A rendition as the master playlist lists it. */
+const variantOf = (r) => ({
+  name: r.name,
+  audioOnly: r.kind === "audio",
+  width: r.width,
+  height: r.height,
+  bandwidth: Math.round((r.kbps * 1.25 + r.audioKbps) * 1000),
+  averageBandwidth: Math.round((r.kbps + r.audioKbps) * 1000),
+  codecs: r.kind === "audio" ? AUDIO_CODECS : VIDEO_CODECS
+});
 
 /** The loop's items, in segments. live-hls.mjs writes the tags from this (via manifest.json). */
 const ITEMS = [
@@ -117,44 +153,52 @@ function vttTime(sec) {
 const toneInput = (seconds, freq) => ["-f", "lavfi", "-t", String(seconds), "-i", `sine=frequency=${freq}:sample_rate=48000,volume=0.06[t];anoisesrc=color=pink:amplitude=0.05:sample_rate=48000,lowpass=f=6000[n];[t][n]amix=inputs=2:normalize=0,tremolo=f=0.6:d=0.7`];
 
 /**
- * Encodes one item on its own (its own timestamps, as a prepared item has) into `name_NNN.ts`
- * segments in `dir`, renamed to `prefix` + the loop's numbering from `first`.
+ * Encodes one item on its own (its own timestamps, as a prepared item has), once per rendition of
+ * the station's ladder, into `part_NNN.ts` segments, renamed in `dir` to
+ * `<rendition>_<prefix>` + the loop's numbering from `first`.
  */
 async function encodeItem(s, dir, { item, seconds, firstSecond, tone, prefix, first }) {
   const work = path.join(dir, `work_${item}`);
   fs.mkdirSync(path.join(work, "frames"), { recursive: true });
-  const hls = ["-f", "hls", "-hls_time", String(SEGMENT), "-hls_list_size", "0", "-hls_segment_filename", "part_%03d.ts", "item.m3u8"];
-  if (s.band === "radio") {
-    // AAC frames don't land on 2 s: a hair short, so the item's tail stays in its last segment
-    // rather than making a tiny extra one (the player jumps the 50 ms hole at the join).
-    run([...toneInput(seconds - 0.05, tone), "-c:a", "aac", "-b:a", "96k", ...hls], work);
-  } else {
+  const ladder = LADDERS[s.band];
+  if (ladder.some((r) => r.kind === "video")) {
     for (let i = 0; i < seconds; i++) {
       await sharp(Buffer.from(frameSvg(s, item, firstSecond + i))).png().toFile(path.join(work, "frames", `f_${String(i).padStart(3, "0")}.png`));
     }
-    run(
-      [
-        "-framerate", "1", "-i", "frames/f_%03d.png", ...toneInput(seconds, tone),
-        "-vf", "fps=25,format=yuv420p", "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "main",
-        "-b:v", "500k", "-maxrate", "600k", "-bufsize", "1200k",
-        "-g", String(25 * SEGMENT), "-keyint_min", String(25 * SEGMENT), "-sc_threshold", "0",
-        "-c:a", "aac", "-b:a", "96k", "-shortest", ...hls
-      ],
-      work
-    );
   }
-  const parts = fs.readdirSync(work).filter((f) => /^part_\d{3}\.ts$/.test(f)).sort();
-  if (parts.length !== seconds / SEGMENT) throw new Error(`${s.callSign} ${item}: ${parts.length} segments, expected ${seconds / SEGMENT}`);
-  parts.forEach((f, i) => fs.renameSync(path.join(work, f), path.join(dir, `${prefix}${String(first + i).padStart(3, "0")}.ts`)));
+  for (const r of ladder) {
+    const out = path.join(work, r.name);
+    fs.mkdirSync(out, { recursive: true });
+    const hls = ["-f", "hls", "-hls_time", String(SEGMENT), "-hls_list_size", "0", "-hls_segment_filename", path.join(out, "part_%03d.ts"), path.join(out, "item.m3u8")];
+    if (r.kind === "audio") {
+      // AAC frames don't land on 2 s: a hair short, so the item's tail stays in its last segment
+      // rather than making a tiny extra one (the player jumps the 50 ms hole at the join).
+      run([...toneInput(seconds - 0.05, tone), "-c:a", "aac", "-b:a", `${r.audioKbps}k`, ...hls], work);
+    } else {
+      run(
+        [
+          "-framerate", "1", "-i", "frames/f_%03d.png", ...toneInput(seconds, tone),
+          "-vf", `fps=25,scale=${r.width}:${r.height},format=yuv420p`, "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "main",
+          "-b:v", `${r.kbps}k`, "-maxrate", `${Math.round(r.kbps * 1.2)}k`, "-bufsize", `${r.kbps * 2}k`,
+          "-g", String(25 * SEGMENT), "-keyint_min", String(25 * SEGMENT), "-sc_threshold", "0",
+          "-c:a", "aac", "-b:a", `${r.audioKbps}k`, "-shortest", ...hls
+        ],
+        work
+      );
+    }
+    const parts = fs.readdirSync(out).filter((f) => /^part_\d{3}\.ts$/.test(f)).sort();
+    if (parts.length !== seconds / SEGMENT) throw new Error(`${s.callSign} ${item} ${r.name}: ${parts.length} segments, expected ${seconds / SEGMENT}`);
+    parts.forEach((f, i) => fs.renameSync(path.join(out, f), path.join(dir, `${r.name}_${prefix}${String(first + i).padStart(3, "0")}.ts`)));
+  }
   fs.rmSync(work, { recursive: true, force: true });
 }
 
 fs.mkdirSync(OUT, { recursive: true });
-const manifest = { segmentSeconds: SEGMENT, loopSeconds: LOOP, segments: LOOP / SEGMENT, items: ITEMS, slateSegments: SLATE_SEGMENTS, spot: MOCK_SPOT, stations: [] };
+const manifest = { version: 2, segmentSeconds: SEGMENT, loopSeconds: LOOP, segments: LOOP / SEGMENT, items: ITEMS, slateSegments: SLATE_SEGMENTS, spot: MOCK_SPOT, stations: [] };
 
 const only = process.argv.slice(2);
 for (const s of MOCK_STATIONS) {
-  const entry = { slug: s.slug, callSign: s.callSign, channel: s.channel, name: s.name, colour: s.colour, title: s.title, band: s.band, audioOnly: s.band === "radio" };
+  const entry = { slug: s.slug, callSign: s.callSign, channel: s.channel, name: s.name, colour: s.colour, title: s.title, band: s.band, audioOnly: s.band === "radio", renditions: LADDERS[s.band].map(variantOf) };
   if (only.length && !only.includes(s.slug)) {
     manifest.stations.push(entry);
     continue;
@@ -168,7 +212,8 @@ for (const s of MOCK_STATIONS) {
   }
   await encodeItem(s, dir, { item: "OFF", seconds: SLATE_SEGMENTS * SEGMENT, firstSecond: 0, tone: Math.round(s.tone / 2), prefix: "off_", first: 0 });
 
-  // One WebVTT file per segment, pinned to that segment's first timestamp.
+  // One WebVTT file per segment, pinned to the reference rendition's segment's first timestamp.
+  const ref = LADDERS[s.band][0].name;
   const captionFor = (i) => {
     const code = ITEMS.find((it) => i >= it.from && i < it.from + it.count)?.code;
     if (code === "SPT") return `${MOCK_SPOT.title}.`;
@@ -181,14 +226,14 @@ for (const s of MOCK_STATIONS) {
   };
   for (let i = 0; i < LOOP / SEGMENT; i++) {
     const n = String(i).padStart(3, "0");
-    writeVtt(path.join(dir, `seg_${n}.ts`), path.join(dir, `sub_${n}.vtt`), captionFor(i));
+    writeVtt(path.join(dir, `${ref}_seg_${n}.ts`), path.join(dir, `sub_${n}.vtt`), captionFor(i));
   }
   for (let i = 0; i < SLATE_SEGMENTS; i++) {
     const n = String(i).padStart(3, "0");
-    writeVtt(path.join(dir, `off_${n}.ts`), path.join(dir, `suboff_${n}.vtt`), "Signing off.");
+    writeVtt(path.join(dir, `${ref}_off_${n}.ts`), path.join(dir, `suboff_${n}.vtt`), "Signing off.");
   }
   manifest.stations.push(entry);
-  console.log(`${s.callSign} ${s.channel}: ${LOOP / SEGMENT} segments in ${ITEMS.length} items, and a ${SLATE_SEGMENTS}-segment sign-off slate`);
+  console.log(`${s.callSign} ${s.channel}: ${LOOP / SEGMENT} segments in ${ITEMS.length} items, and a ${SLATE_SEGMENTS}-segment sign-off slate, in ${LADDERS[s.band].map((r) => r.name).join(", ")}`);
 }
 
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));

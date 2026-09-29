@@ -7,6 +7,7 @@ import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
 import type { MockPerson } from "../fixtures/people";
+import { preparationOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
 
 type Role = "owner" | "operator" | "host";
@@ -184,7 +185,7 @@ export const libraryHandlers = [
     const past = entries.filter((e) => e.endsAt <= t).map((e) => ({ startedAt: e.startsAt, station: st, carried: false, audioOnly: false, note: e.localNote }));
     const aired = [...past, ...extraAired(item.title)].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
     const u = usage(item);
-    const day = new Date(Date.parse(t) + 24 * 3600e3).toISOString();
+    const preparation = preparationOf(item, Date.parse(t));
     const carriage = item.programId ? PROGRAM_CARRIAGE[item.programId] : undefined;
     const program = item.programId ? getDb().library.programs.find((pr) => pr.id === item.programId) : undefined;
     return reply(libraryApi.getItemHistory.response, {
@@ -193,7 +194,9 @@ export const libraryHandlers = [
       aired,
       logEntries: u.logEntries,
       carriers: u.carriers,
-      cachedForAir: item.status === "ready" && future.some((e) => e.startsAt < day),
+      // Prepare once, then assemble: prepared for air in every rendition of its band.
+      cachedForAir: preparation.status === "ready",
+      preparation,
       audioLayout: audioLayout(item),
       captionLanguage: item.captions === "none" ? null : "en",
       carriage: { offered: !!carriage && item.offerable, program: program?.title ?? null, terms: carriage?.terms ?? null }

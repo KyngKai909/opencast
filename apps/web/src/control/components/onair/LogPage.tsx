@@ -5,6 +5,8 @@
 // The same page is setup step 3 and the station's Program log; on the phone the fill choices open
 // as a sheet (P.2, `?fill=<gapStart>`). `?day=` is a weekday of this week ("sat") or a date
 // ("2026-10-03", from a template's dates).
+// Times are on 4-second segment boundaries (prepare once, then assemble): what's drawn, and the
+// gaps a fill is sent for, are snapped as the API snaps them, so the times shown are its answer.
 
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
@@ -22,6 +24,8 @@ import {
   clock,
   duration,
   minutesText,
+  snapSpan,
+  snapTime,
   useToast,
   type TimelineBlock
 } from "@opencast/ui";
@@ -60,7 +64,8 @@ export const OFF_AIR_MARK = "cc-log__off";
 export function timelineBlocks(log: Pick<ProgramLog, "entries" | "breaks" | "gaps" | "offAir">, from: string, to: string, now = Date.now()): TimelineBlock[] {
   const a = Date.parse(from);
   const z = Date.parse(to);
-  const clip = (s: string, e: string) => ({ start: new Date(Math.max(a, Date.parse(s))).toISOString(), end: new Date(Math.min(z, Date.parse(e))).toISOString() });
+  // On segment boundaries, as the API answers them; then clipped to the window.
+  const clip = (s: string, e: string) => ({ start: new Date(Math.max(a, Date.parse(snapTime(s)))).toISOString(), end: new Date(Math.min(z, Date.parse(snapTime(e)))).toISOString() });
   const inside = (s: string, e: string) => Date.parse(e) > a && Date.parse(s) < z;
   const offAir = log.offAir ?? [];
   const offTitle = <span className={OFF_AIR_MARK}>Off air</span>;
@@ -90,16 +95,17 @@ export function timelineBlocks(log: Pick<ProgramLog, "entries" | "breaks" | "gap
 
 /**
  * The gaps still ahead in the window: from now at the earliest (in whole minutes), and, where a
- * gap runs to the window's edge, as far as it really goes (the next 24 hours' dead air).
+ * gap runs to the window's edge, as far as it really goes (the next 24 hours' dead air). On
+ * segment boundaries (whole minutes are), so a fill is sent, and shown, as the API will place it.
  */
 export function openGaps(windowGaps: Gap[], deadAir: Gap[], windowTo: string, t: number): Array<Gap & { key: string }> {
   const nowMin = Math.ceil(t / MIN) * MIN;
   return windowGaps
     .filter((g) => Date.parse(g.endsAt) - Math.max(nowMin, Date.parse(g.startsAt)) >= 5 * MIN)
     .map((g) => {
-      const startsAt = new Date(Math.max(nowMin, Date.parse(g.startsAt))).toISOString();
+      const startsAt = new Date(Math.max(nowMin, Date.parse(snapTime(g.startsAt)))).toISOString();
       const longer = g.endsAt === windowTo ? deadAir.find((d) => Date.parse(d.startsAt) <= Date.parse(startsAt) && Date.parse(d.endsAt) > Date.parse(g.endsAt)) : undefined;
-      return { key: g.startsAt, startsAt, endsAt: longer?.endsAt ?? g.endsAt };
+      return { key: g.startsAt, startsAt, endsAt: snapTime(longer?.endsAt ?? g.endsAt) };
     });
 }
 
@@ -137,7 +143,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const fillParam = params.get("fill");
   const fromDeadAir = fillParam ? deadAir.data?.gaps.find((g) => g.startsAt === fillParam) : undefined;
   const selected: (Gap & { key: string }) | null =
-    gaps.find((g) => g.key === fillParam || g.startsAt === fillParam) ?? (fromDeadAir ? { ...fromDeadAir, key: fromDeadAir.startsAt } : null) ?? (phone ? null : (gaps[0] ?? null));
+    gaps.find((g) => g.key === fillParam || g.startsAt === fillParam) ?? (fromDeadAir ? { ...snapSpan(fromDeadAir), key: fromDeadAir.startsAt } : null) ?? (phone ? null : (gaps[0] ?? null));
   const fill = useFill({ stationId, base, gap: selected, phone });
 
   if (log.isLoading) return <Quiet />;

@@ -168,7 +168,7 @@ function beatLedger(): Ledger {
     // Tonight: 9 airings in 4 breaks, $21.60. The rest of the week: 41 airings on Sunday, $16.80.
     held: [
       { at: at("21:58"), airings: 2, micros: $(4.8), breakKey: "21:58" },
-      { at: at("22:28:30"), airings: 3, micros: $(7.2), breakKey: "22:28:30" },
+      { at: at("22:28:28"), airings: 3, micros: $(7.2), breakKey: "22:28:28" },
       { at: at("23:04"), airings: 2, micros: $(4.8), breakKey: "23:04" },
       { at: at("23:38"), airings: 2, micros: $(4.8), breakKey: "23:38" },
       { at: at("+1 18:00"), airings: 41, micros: $(16.8), breakKey: "sunday" }
@@ -800,8 +800,10 @@ export function audienceReport(stationId: string, fromIso: string, toIso: string
     (e) => Date.parse(e.startsAt) < Math.min(t.getTime(), to) && Date.parse(e.endsAt) > from
   );
   const byProgram: AudienceProgram[] = airings.map((e) => {
-    const s = Math.max(0, Math.round((Date.parse(e.startsAt) - evening) / MIN));
-    const endM = Math.round((Date.parse(e.endsAt) - evening) / MIN);
+    // Whole minutes on the line: a part minute at either end counts from the next (times are on
+    // 4-second segment boundaries, so 8:28:28 pm ends in the 8:28 minute).
+    const s = Math.max(0, Math.ceil((Date.parse(e.startsAt) - evening) / MIN));
+    const endM = Math.ceil((Date.parse(e.endsAt) - evening) / MIN);
     const vals = curve.slice(s, Math.min(endM, curve.length));
     const onNow = Date.parse(e.startsAt) <= t.getTime() && t.getTime() < Date.parse(e.endsAt);
     return {

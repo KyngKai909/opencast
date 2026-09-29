@@ -107,7 +107,23 @@ export function livePlaylist(o: { first: number; count?: number; pdt?: number; e
   return lines.join("\n") + "\n";
 }
 
-export const MASTER = ["#EXTM3U", '#EXT-X-STREAM-INF:BANDWIDTH=2400000,RESOLUTION=1280x720', "hi.m3u8", '#EXT-X-STREAM-INF:BANDWIDTH=650000,RESOLUTION=640x360', "live.m3u8", ""].join("\n");
+/**
+ * A TV station's master playlist, as a ladder: 720p, 360p and the audio-only rendition (the
+ * lowest bandwidth, which a picture never starts on).
+ */
+export const MASTER = [
+  "#EXTM3U",
+  '#EXT-X-STREAM-INF:BANDWIDTH=2400000,CODECS="avc1.64001f,mp4a.40.2",RESOLUTION=1280x720',
+  "hi.m3u8",
+  '#EXT-X-STREAM-INF:BANDWIDTH=650000,CODECS="avc1.64001e,mp4a.40.2",RESOLUTION=640x360',
+  "live.m3u8",
+  '#EXT-X-STREAM-INF:BANDWIDTH=140000,CODECS="mp4a.40.2"',
+  "audio.m3u8",
+  ""
+].join("\n");
+
+/** A radio station's master playlist: AAC 128k (listed first, the reference) and 64k. */
+export const RADIO_MASTER = ["#EXTM3U", '#EXT-X-STREAM-INF:BANDWIDTH=140000,CODECS="mp4a.40.2"', "a128.m3u8", '#EXT-X-STREAM-INF:BANDWIDTH=72000,CODECS="mp4a.40.2"', "a64.m3u8", ""].join("\n");
 
 /** Lets pending promises and zero-delay timers run under fake timers. */
 export async function flush(ms = 0) {

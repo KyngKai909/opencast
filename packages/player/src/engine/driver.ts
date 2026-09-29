@@ -85,7 +85,19 @@ export const JOIN_CONFIG = {
 /** Data saver's ceiling, in picture lines. */
 export const DATA_SAVER_LINES = 480;
 
-type LevelInfo = { height?: number; bitrate: number };
+type LevelInfo = { height?: number; bitrate: number; videoCodec?: string };
+
+/**
+ * The levels a picture mustn't play: the audio-only rendition of a TV ladder (no height and no
+ * video codec, next to levels that have pictures). hls.js leaves it out itself when the master
+ * says its CODECS, as the API's does; this covers a master that doesn't. A radio ladder (sound
+ * only throughout) keeps every level.
+ */
+export function audioOnlyLevels(levels: readonly LevelInfo[]): number[] {
+  const picture = (l: LevelInfo) => !!l.height || !!l.videoCodec;
+  if (!levels.some(picture)) return [];
+  return levels.flatMap((l, i) => (picture(l) ? [] : [i]));
+}
 
 /**
  * The highest level data saver allows: the tallest picture up to 480 lines, at the lowest
@@ -222,6 +234,8 @@ export function hlsDriver(): MediaDriver {
       const quality = new QualityRules(hls);
       // Before the first segment loads (the autostart runs after MANIFEST_PARSED's listeners).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Pictures only: never the TV ladder's audio-only rendition (ABR mustn't drop to it).
+        for (const i of audioOnlyLevels(hls.levels).reverse()) hls.removeLevel(i);
         const bw = options.start?.bandwidth;
         if (bw) {
           const i = hls.levels.findIndex((l) => l.bitrate === bw);

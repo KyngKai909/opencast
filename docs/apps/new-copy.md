@@ -501,3 +501,14 @@ Words for what the API answers now (A4, A5, B3, B6, C4, G3, G5, G7, L5 to L7, N1
 | Off air hours, the form | title "Off air hours"; "Signs off on" (the nights, Mon to Sun); "Sign off", "Sign back on"; "Remove"; "Add off air hours" (up to seven); "Choose at least one night."; "Save", "Cancel"; toast "Off air hours saved." |
 | Monitor | "Right now" gains "Off air hours": "Off air, back at {6:00 am}" or "Signs off at {2:00 am}" (within 24 hours); while off air on the schedule the line under "Monitor" reads "Off air, back at {6:00 am}." and there's no Sign on; the rundown's off air hours: "Off air" / "Back at {6:00 am}", and a sign-off reads "Back at {6:00 am}" |
 | Ready to sign on | the API's "Off air hours planned" line shows as ready with its detail and no fix, and isn't counted in "{Five} checks." |
+
+### apps/web: master control, prepare once, then assemble (contracts of 2026-09-29)
+
+"Prepared for air", "Being prepared" and "Couldn't be prepared" are the contract requests' words; the example "12 of 13 items ready for the next 48 hours; Borrowed Tape at 8:40 pm is being prepared" is too. The API's own words are shown as they come for the sign-on check "Items prepared for air" and its detail ("11 of 12 in the next 24 hours. The rest are being prepared; anything not ready at air time airs station ID and bumpers"). The log's times are on 4-second boundaries, with no new words: the setup foot's "Programs are placed in whole minutes; breaks are placed for you." stays true (every whole minute is a boundary). What the frames don't have:
+
+| Where | Words |
+|---|---|
+| Monitor, Right now (and the phone's Monitor) | "Prepared for air": "{12} of {13} items ready for the next 48 hours" ("1 of 1 item …"); with one not ready, "; {Late Crate, ep. 15} at {10:00 pm} is being prepared" (queued or preparing), "couldn't be prepared" (failed) or "isn't prepared yet" (not asked for); another broadcast day's time says its day ("at {8:00 pm Sunday}"). Standby when one couldn't be prepared, or one airs within the hour unprepared; no line when the next 48 hours have no items |
+| Ready to sign on | the API's "Items prepared for air" line: shown as fine and not counted in "{Four} checks." while everything is prepared; while something isn't, a warning ("… one is a warning you can sign on through.") with the API's detail and no fix |
+| A library item, Prepared for air | "For air": "Prepared for air", "Being prepared" (queued or preparing) or "Couldn't be prepared", in place of "Ready for tonight: Cached on the playout server"; no line until something asks for it (`not_asked`) |
+

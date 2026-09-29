@@ -1,7 +1,8 @@
 // The line under "Ready to sign on" (A.6): how many checks, how many are done, and what's left.
 // Warnings don't stop sign-on; blockers do (a gap in the next 24 hours, no station ID, rights).
 // Some lines only inform (G9's `off_air_hours`: off air is planned, and it isn't dead air): they're
-// listed, never counted as checks.
+// listed, never counted as checks. `items_prepared` (prepare once, then assemble; never blocking)
+// informs while everything is prepared, and counts as a warning while something isn't.
 
 import { countWord } from "./time";
 
@@ -13,9 +14,12 @@ export interface CheckLike {
 
 /** Checks that only inform: shown as fine, never counted, never blocking. */
 export const INFORMATIONAL_CHECKS: ReadonlySet<string> = new Set(["off_air_hours"]);
+/** Checks that inform while they pass, and are warnings while they don't. */
+export const WARNING_WHEN_FAILED: ReadonlySet<string> = new Set(["items_prepared"]);
 
 export function isInformational(c: CheckLike): boolean {
-  return !!c.key && INFORMATIONAL_CHECKS.has(c.key);
+  if (!c.key) return false;
+  return INFORMATIONAL_CHECKS.has(c.key) || (WARNING_WHEN_FAILED.has(c.key) && c.passed);
 }
 
 /** "Five checks. Four are done; one is a warning you can sign on through." */

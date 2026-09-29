@@ -15,6 +15,7 @@
 // stays as the frames draw it until someone looks ahead.
 
 import type { DayTemplateEntry, LibraryItem, RepeatPattern, StationIdent } from "@opencast/contracts";
+import { snapLength } from "@opencast/ui";
 import { addDays, broadcastDay, isoDate, localParts, localTime, weekdayOf, type Ymd } from "../../components/onair/time";
 import type { DbLogEntry } from "./evening";
 import { BEAT, uid } from "./stations";
@@ -118,7 +119,8 @@ export function toTemplateEntry(e: DbLogEntry, id: string): DbTemplateEntry {
 export function placeOn(te: Pick<DayTemplateEntry, "startTime" | "lengthMs">, date: string): { startsAt: string; endsAt: string } {
   const [h, m] = te.startTime.split(":").map(Number);
   const startsAt = localTime(ymd(date), h < 6 ? h + 24 : h, m);
-  return { startsAt, endsAt: new Date(Date.parse(startsAt) + te.lengthMs).toISOString() };
+  // The slot on segment boundaries, as the API makes it (startsAt + the length snapped).
+  return { startsAt, endsAt: new Date(Date.parse(startsAt) + snapLength(te.lengthMs)).toISOString() };
 }
 
 /** A template entry as a log entry on a date. */
