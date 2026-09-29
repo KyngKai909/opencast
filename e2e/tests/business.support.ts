@@ -1,4 +1,4 @@
-// Shared by the business app's specs (apps/spots on its mock, :5181): who signs in, the mock's
+// Shared by the business app's specs (apps/business on its mock, :5181): who signs in, the mock's
 // ids, and waiting for a screen to settle before axe reads it.
 
 import { expect, type Page } from "@playwright/test";
@@ -11,7 +11,7 @@ export const PEOPLE = {
 } as const;
 export type Role = keyof typeof PEOPLE;
 
-/** The mock's ids (apps/spots/src/mocks/fixtures). */
+/** The mock's ids (apps/business/src/mocks/fixtures). */
 const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 export const OSC = `/${uid(60001)}`;
 export const IDS = {

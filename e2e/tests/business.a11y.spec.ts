@@ -1,10 +1,10 @@
-// axe on every route of Opencast for business (apps/spots), both grounds, at 1280 and at 406
+// axe on every route of Opencast for business (apps/business), both grounds, at 1280 and at 406
 // wide, including the overlays reached by ?modal= / ?sheet= / ?switch=1, for each role where the
 // screens differ. The setup steps and the screens only a flow reaches (a new spot's checks and
 // rate, the code modal, raising a budget, accepting a fresh quote) are checked in spots.flow.spec.ts.
 
 import { expect, test } from "@playwright/test";
-import { IDS, OSC, PEOPLE, WIDTHS, axeBothGrounds, reducedMotion, signInAs, type Role, type Width } from "./spots.support";
+import { IDS, OSC, PEOPLE, WIDTHS, axeBothGrounds, reducedMotion, signInAs, type Role, type Width } from "./business.support";
 
 test.use({ actionTimeout: 20_000 });
 

@@ -242,7 +242,7 @@ Sign-in reuses the reference's sign-in words; "Master control is where stations 
 | Rights | "No claims about anything BEAT has aired.", the "offers paused" standing, the operator note, the answered and closed timeline lines, the remove confirmation, "Choose a file", the phone's "finish on a computer" line, the send blockers, the toasts. Every claim word is in `components/station/claimWords.ts` |
 | Claiming a station | the verifying, waiting, completed and stop states; the wrong-account line; the stop dialog |
 
-### apps/spots (Phase 5)
+### apps/business (Phase 5)
 
 Sign-in reuses the reference's words; its foot line "Local spots on local stations, paid for only when they air." is new. Mock-only panels (the station's answers, spending a budget) and mock error messages aren't listed. Screens no frame draws are written in full in their files: Close account (`components/settings/CloseSection.tsx`), the web Add money modal (`components/money/AddMoney.tsx`), the order states after a quote (`pages/deals/Order.tsx`), the redeem states other than "good" (`components/results/CheckResult.tsx`).
 

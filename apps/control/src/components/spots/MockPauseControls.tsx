@@ -1,5 +1,5 @@
 // Mock mode only: the business side of a pause, so the station's side can be seen (biz-spots 05).
-// The business app (apps/spots) pauses and resumes for real; this stands in for it on mocks.
+// The business app (apps/business) pauses and resumes for real; this stands in for it on mocks.
 
 import { useState } from "react";
 import { Button, SelectField } from "@opencast/ui";

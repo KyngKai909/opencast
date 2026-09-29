@@ -16,14 +16,14 @@ const server = (workspace: string, port: number) => ({
   timeout: 120_000
 });
 
-export const PORTS = { viewer: 5174, tv: 5175, control: 5179, spots: 5181, desk: 5182, site: 5183 } as const;
+export const PORTS = { viewer: 5174, tv: 5175, control: 5179, business: 5181, desk: 5182, site: 5183 } as const;
 
 // Start only the servers the chosen projects need (`--project tv` needs TV mode only; the viewer's
 // casting flows need TV mode too). With no --project, every app.
-const WORKSPACE = { viewer: "@opencast/viewer", tv: "@opencast/tv", control: "@opencast/control", spots: "@opencast/spots", desk: "@opencast/desk", site: "@opencast/site" } as const;
+const WORKSPACE = { viewer: "@opencast/viewer", tv: "@opencast/tv", control: "@opencast/control", business: "@opencast/business", desk: "@opencast/desk", site: "@opencast/site" } as const;
 type App = keyof typeof WORKSPACE;
 // `--project a b c` or `--project a --project b` or `--project=a`: every project name given.
-const PROJECTS = ["viewer", "tv", "control", "spots", "desk", "site"];
+const PROJECTS = ["viewer", "tv", "control", "business", "desk", "site"];
 const chosen = process.argv.flatMap((a, i, all) => {
   if (a.startsWith("--project=")) return [a.slice(10)];
   if (a !== "--project") return [];
@@ -49,7 +49,7 @@ export default defineConfig({
   projects: [
     { name: "viewer", outputDir: "test-results/viewer", testMatch: /viewer\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.viewer}` } },
     { name: "control", outputDir: "test-results/control", testMatch: /control\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.control}` } },
-    { name: "spots", outputDir: "test-results/spots", testMatch: /spots\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.spots}` } },
+    { name: "business", outputDir: "test-results/business", testMatch: /business\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.business}` } },
     { name: "tv", outputDir: "test-results/tv", testMatch: /tv\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.tv}`, viewport: { width: 1920, height: 1080 } } },
     { name: "desk", outputDir: "test-results/desk", testMatch: /desk\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.desk}` } },
     { name: "site", outputDir: "test-results/site", testMatch: /site\..*\.spec\.ts/, use: { baseURL: `http://localhost:${PORTS.site}` } }

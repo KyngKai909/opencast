@@ -5,7 +5,7 @@
 // sponsorship form, an order from asked to approved), in both grounds, at 1280 and at 406 wide.
 
 import { expect, test, type Page } from "@playwright/test";
-import { WIDTHS, axeBothGrounds, reducedMotion, type Width } from "./spots.support";
+import { WIDTHS, axeBothGrounds, reducedMotion, type Width } from "./business.support";
 
 /** Moves to another area: the rail on the web; on the phone, the area's address. */
 async function openArea(page: Page, width: Width, name: string, path: string) {

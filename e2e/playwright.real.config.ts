@@ -13,7 +13,7 @@ import { REAL_PORTS, ROOT, WORKSPACES, type RealApp } from "./real/shared";
 
 // Start only the servers the chosen projects need, as playwright.config.ts does.
 // `--project a b c` or `--project a --project b` or `--project=a`: every project name given.
-const PROJECTS = ["viewer", "tv", "control", "spots", "desk", "site"];
+const PROJECTS = ["viewer", "tv", "control", "business", "desk", "site"];
 const chosen = process.argv.flatMap((a, i, all) => {
   if (a.startsWith("--project=")) return [a.slice(10)];
   if (a !== "--project") return [];
@@ -42,7 +42,7 @@ export default defineConfig({
   projects: [
     { name: "viewer", outputDir: "test-results/real/viewer", testMatch: spec("viewer"), use: { baseURL: baseURL("viewer") } },
     { name: "control", outputDir: "test-results/real/control", testMatch: spec("control"), use: { baseURL: baseURL("control") } },
-    { name: "spots", outputDir: "test-results/real/spots", testMatch: spec("spots"), use: { baseURL: baseURL("spots") } },
+    { name: "business", outputDir: "test-results/real/business", testMatch: spec("business"), use: { baseURL: baseURL("business") } },
     { name: "tv", outputDir: "test-results/real/tv", testMatch: spec("tv"), use: { baseURL: baseURL("tv"), viewport: { width: 1920, height: 1080 } } },
     { name: "desk", outputDir: "test-results/real/desk", testMatch: spec("desk"), use: { baseURL: baseURL("desk") } },
     { name: "site", outputDir: "test-results/real/site", testMatch: spec("site"), use: { baseURL: baseURL("site") } }

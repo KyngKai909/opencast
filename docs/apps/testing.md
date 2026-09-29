@@ -22,7 +22,7 @@ Worker answers every API call from the reference files' fixtures:
 | `viewer` | apps/viewer (needs TV mode too, for casting) | 5174 |
 | `tv` | apps/tv | 5175 |
 | `control` | apps/control | 5179 |
-| `spots` | apps/spots | 5181 |
+| `spots` | apps/business | 5181 |
 | `desk` | apps/desk (needs the viewer too, for the permission page) | 5182 |
 | `site` | apps/site | 5183 |
 

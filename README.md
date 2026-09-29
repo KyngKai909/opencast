@@ -17,7 +17,7 @@ The build is driven by two prompts in `docs/prompts/`, working from the referenc
 | `apps/viewer` | `@opencast/viewer` | Viewer app, web and phone: the dial, tuned in, the guide, station and program pages, search, the radio band, You, presets, pledges, settings; a PWA | apps |
 | `apps/tv` | `@opencast/tv` | TV mode: watching, the guide, the menu rail, presets, radio, sleep, pledge by QR, first launch with a sign-in code, settings; the same build is the Cast receiver (`receiver.html`) and the iPhone's second screen (`?mirror`) | apps |
 | `apps/site` | `@opencast/site` | Marketing site (empty) | apps |
-| `apps/spots` | `@opencast/spots` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
+| `apps/business` | `@opencast/business` | Opencast for business: getting started, the balance, spots, where they aired, sponsorships, spots made to order, settings | apps |
 | `apps/desk` | `@opencast/desk` | Network desk, Opencast's internal tool: the market board, the creator pipeline, asking permission, setting up claimable stations from recipes, listed sources and the catalog station, held earnings. Admin sign-in only | apps |
 | `apps/gallery` | `@opencast/gallery` | Every `@opencast/ui` component in every state, on both grounds, beside its reference frame | apps |
 | `packages/domain` | `@opencast/domain` | Types and pure rules (the old `packages/shared`) | platform |
@@ -113,12 +113,12 @@ Runs master control at http://localhost:5179 against mock data, with the clock h
 ### Opencast for business
 
 ```bash
-npm run dev:mock -w @opencast/spots
+npm run dev:mock -w @opencast/business
 ```
 
 Runs the business app at http://localhost:5181 on mock data, at the same Saturday evening as master control's mock. Sign in with any six digits except 000000; the email picks who you are: `jess@orangestreet.example` owns Orange Street Coffee, `tomas@orangestreet.example` manages it, `ana@ledgerline.example` is its bookkeeper (a viewer), `devon@inlandcreative.example` manages it and Cypress Dental, and any other address is someone new who starts a business. Mock-only panels (marked "Mock") play the station's side: approving a sponsorship, quoting and delivering an order, airing a spot until its budget is spent. The mock remembers what you change in `localStorage` (keys starting `oc-mock-spots-`).
 
-`npm run dev -w @opencast/spots` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/spots/.env.example`).
+`npm run dev -w @opencast/business` runs it on :5177 against the API (`VITE_API_BASE`, `VITE_PRIVY_APP_ID`, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID`; see `apps/business/.env.example`).
 
 ### Network desk
 

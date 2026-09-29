@@ -1,6 +1,6 @@
 // Opencast for business against the real API (playwright.real.config.ts): every route opens, as
 // Maya (Orange Street Coffee's owner), and shows its page, not an error. What the API doesn't
-// answer yet (the proposed endpoints in apps/spots/src/api/ext) is listed on each test as
+// answer yet (the proposed endpoints in apps/business/src/api/ext) is listed on each test as
 // `api-miss` annotations, so the run says what still runs on mocks; a page error, a blank page or a
 // response that fails its contract fails the test.
 
