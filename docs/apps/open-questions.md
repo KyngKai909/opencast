@@ -140,3 +140,19 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A108 | Stop on the phone remote for a TV app: it closes the phone's remote, and the TV keeps playing (Cast's Stop ends it on the TV) | tv 06.3 | The TV app is the TV's own; it keeps playing |
 | A109 | "Who on the Wi-Fi can change the channel" isn't about Wi-Fi once phones come through the relay | tv-update 04 | Wording kept; it means phones on the account or paired with a code |
 | A110 | On the TV app, a phone's chip shows beside the key hints for five minutes after its last command | tv 02.1 | "Playing from {name}" before the key hints; the Back hint stays |
+| A111 | The station bug's channel number is drawn at 78 to 80% white, which can't hold 4.5:1 on a station colour near the rule's limit (REEL #9A5412: 4.32:1) | style guide; site S.01; tv 02.1 | Treated as incidental text (part of the picture, and the readout beside it says the same at full contrast); axe excludes it only on the site's per-station tuner check |
+| A112 | An unlit tally on a picture (ink at 70%) is 3.13:1 on CIVC's colour | tv, site | Only seen during the single switch-on flicker; anywhere a tally stays unlit on a picture would fail |
+| A113 | The desk board's slot numbers: 80% white in the frame | desk 01.1 | Full white (--on-station): 80% failed on REEL |
+| A114 | Two master control axe exclusions: the Monitor's "Preview, next up" picture (a 9px business line at 85% opacity, 4.04:1) and the faded title card on a program that can't be offered | control C.1, market | Excluded as picture content and an inactive, hidden card; fixing them means restyling |
+| A115 | A spot the business pauses itself: the contracts have waiting_for_you, the API answers paused_budget | biz-spots | The client reads paused_budget with budget left as waiting_for_you; the API should send waiting_for_you (platform) |
+| A116 | A spot that passes review shows "Code: None" on the real API | biz-spots 02.1 | The API should assign the offer code when a spot is listed (P4, platform) |
+| A117 | Playback addresses are relative (/hls/<id>/index.m3u8): with the apps and the API on different hosts, the player loads them from the app's origin | every player | The API should send full URLs, or the clients resolve them against VITE_API_BASE (platform + apps) |
+| A118 | With no stream (no playout worker), the player stays "tuning" forever | viewer, tv | Should give up after a while and say so (player) |
+| A119 | The relay's state reports the picture's station, null until the first frame | tv 06.1 | Report the station being tuned instead |
+| A120 | React Query retries a 404 three times | every app | 404s shouldn't retry |
+| A121 | The web station page: every row's bell is named "Remind me", and the page has no h1 or h2 | station-pages 01.1 | Not flagged by WCAG rules, but poor for screen readers: name each bell for its program, add a heading |
+| A122 | Master control's Settings pages have no h1 ("Settings" is an h2) | station-settings | As built; not flagged |
+| A123 | The phone's Sponsorships and Made for you have no way to start one, and an approved order has no "Set a rate and budget" link on the phone | biz sponsorships, orders (phone) | As drawn; reached by their addresses |
+| A124 | Crate stays "setting_up" after its sign-on time on the real API, so the pipeline and the board disagree | desk 02.1, 01.1 | The playout worker (not in the test harness) should move it to on air |
+| A125 | Held earnings on the real API: creator is the person's name, and the summary says "Held across 0 stations" while listing two | desk 07.1 | API fix (platform) |
+| A126 | TV first launch says "No market is open near this TV's connection" even when no lookup is configured | tv 05.3 | Say "Your market: {default}" when there's no lookup (new copy) |
