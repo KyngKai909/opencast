@@ -64,7 +64,7 @@ beforeAll(async () => {
   const redlands = { studioLatitude: 34.0556, studioLongitude: -117.1825, homeCity: "Redlands" };
   beatId = (await stationFixture(h, { callSign: "BEAT", name: "Inland Beat", ownerId: kai.id, marketId, tenths: 121, signedOn: true })).id;
   civcId = (await stationFixture(h, { callSign: "CIVC", name: "Civic", marketId, tenths: 71, signedOn: true })).id;
-  niteId = (await stationFixture(h, { callSign: "NITE", name: "Nite", marketId, tenths: 883, band: "radio", signedOn: true })).id;
+  niteId = (await stationFixture(h, { callSign: "NITE", name: "Nite", marketId, tenths: 884, band: "radio", signedOn: true })).id;
   studioId = (await stationFixture(h, { kind: "studio", name: "Opencast Studio" })).id;
   await h.db.update(schema.stations).set({ ...redlands, category: "Music" }).where(eq(schema.stations.id, beatId));
   await h.db.update(schema.stations).set({ ...redlands, category: "Public affairs" }).where(eq(schema.stations.id, civcId));

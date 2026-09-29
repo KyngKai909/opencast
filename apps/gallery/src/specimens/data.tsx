@@ -354,7 +354,7 @@ export const data = specimens([
                 { value: "71%", caption: "Of tonight's station hours are local programming" },
                 { value: "2", caption: "Claimable stations on air, waiting to be claimed" },
                 { value: "4", caption: "Creators who said yes, not set up yet" },
-                { value: "1", caption: "Station with dead air coming, HALL 90.7" }
+                { value: "1", caption: "Station with dead air coming, HALL 90.8" }
               ]}
             />
           </W>
@@ -735,7 +735,7 @@ export const data = specimens([
           <W w={704}>
             <StepRail
               variant="list"
-              label="Claiming CRAT 101.9"
+              label="Claiming CRAT 102.0"
               steps={[
                 { label: "Sign in", detail: "As Marcus Reyes", state: "done" },
                 { label: "Show it's you", detail: "Connect the SoundCloud account your mixes come from", state: "current", action: <Button variant="primary" size="sm">Connect SoundCloud</Button> },

@@ -19,7 +19,7 @@ export function SectionTop({ title, sub, end, first, as: H = "h2" }: { title: Re
   );
 }
 
-/** "From HALL 90.7" with the maker's kind after it. A catalog maker links to the catalog. */
+/** "From HALL 90.8" with the maker's kind after it. A catalog maker links to the catalog. */
 export function MakerLine({ offer, named, swatch, kind = true, base }: { offer: Offer; named?: boolean; swatch?: boolean; kind?: boolean; base?: string }) {
   const words = `From ${makerName(offer.maker)}${named && offer.makerKind === "station" ? `, ${offer.maker.name}` : ""}`;
   return (

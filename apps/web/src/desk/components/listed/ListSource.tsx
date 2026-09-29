@@ -21,7 +21,7 @@ export function ListSource({ market, onClose }: { market: Market; onClose: () =>
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!f.name.trim()) errs.name = "Say whose stream it is.";
-    if (!/^\d{1,3}\.\d$/.test(f.channel.trim())) errs.channel = f.band === "tv" ? "A channel like 9.4." : "A frequency like 89.1.";
+    if (!/^\d{1,3}\.\d$/.test(f.channel.trim())) errs.channel = f.band === "tv" ? "A channel like 9.4." : "A frequency like 89.2.";
     const cs = callSignProblem(f.callSign);
     if (cs) errs.callSign = cs;
     if (!/^https?:\/\/\S+\.\S+/.test(f.streamUrl.trim())) errs.streamUrl = "Paste the link to their stream.";
@@ -76,7 +76,7 @@ export function ListSource({ market, onClose }: { market: Market; onClose: () =>
           <Segmented label="Band" value={f.band} onChange={(v) => set("band")(v)} options={[{ value: "tv", label: "TV band" }, { value: "radio", label: "Radio band" }]} />
         </div>
         <div className="nd-form__pair">
-          <Field label="Channel" mono value={f.channel} placeholder={f.band === "tv" ? "9.4" : "89.1"} onChange={(e) => set("channel")(e.target.value)} error={errors.channel} />
+          <Field label="Channel" mono value={f.channel} placeholder={f.band === "tv" ? "9.4" : "89.2"} onChange={(e) => set("channel")(e.target.value)} error={errors.channel} />
           <Field label="Call sign" mono maxLength={5} value={f.callSign} onChange={(e) => set("callSign")(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} error={errors.callSign} />
         </div>
         <Field label="Stream" type="url" placeholder="https://" value={f.streamUrl} onChange={(e) => set("streamUrl")(e.target.value)} error={errors.streamUrl} />

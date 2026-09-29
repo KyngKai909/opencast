@@ -14,8 +14,8 @@ describe("held earnings", () => {
     const tz = "America/Los_Angeles";
     expect(heldFigures(h)).toEqual({ total: "$227.00", heldAcross: "Held across 2 stations", invitations: 2, moved: "$0.00", period: "3 years" });
     expect(h.stations.map((s) => [stationTitle(s), stationDetail(s, tz, NOW), statusOf(s, tz).text])).toEqual([
-      ["101.9 CRAT, for Marcus Reyes", "On air since August 12, with permission", "Claim link sent"],
-      ["91.9 FLDR, for Mojave Field Recordings", "On air since September 20, under CC BY 4.0", "Invited Sept 24"],
+      ["102.0 CRAT, for Marcus Reyes", "On air since August 12, with permission", "Claim link sent"],
+      ["92.0 FLDR, for Mojave Field Recordings", "On air since September 20, under CC BY 4.0", "Invited Sept 24"],
       ["33.1 LUPE, for Lupe Ortiz", "Signs on Monday", "Not on air yet"]
     ]);
     expect(shortAddress(h.contractAddress!)).toBe("0x5ee2…a41d");

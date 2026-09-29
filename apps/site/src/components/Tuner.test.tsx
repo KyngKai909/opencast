@@ -28,7 +28,7 @@ describe("Tuner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Channel down" }));
     fireEvent.click(screen.getByRole("button", { name: "Channel down" }));
     act(() => void vi.advanceTimersByTime(140));
-    expect(readout()).toContain("101.9CRAT");
+    expect(readout()).toContain("102.0CRAT");
   });
 
   it("changes channel with the arrow keys, but not from a field", () => {
@@ -65,12 +65,12 @@ describe("Tuner", () => {
 
   it("shows the radio frequency and the Radio band tag, and no bug, on radio", () => {
     render(<Tuner />);
-    for (const key of ["8", "8", "3", "Enter"]) fireEvent.keyDown(document, { key });
+    for (const key of ["8", "8", "4", "Enter"]) fireEvent.keyDown(document, { key });
     act(() => void vi.advanceTimersByTime(140));
-    expect(document.querySelector(".st-pic__radio")!.textContent).toBe("88.3");
+    expect(document.querySelector(".st-pic__radio")!.textContent).toBe("88.4");
     expect(screen.getByText("Radio band")).toBeTruthy();
     expect(document.querySelector(".oc-bug")).toBeNull();
-    expect(readout()).toContain("88.3NITENight Desk");
+    expect(readout()).toContain("88.4NITENight Desk");
   });
 
   it("says when a number has no station, and stays on the channel", () => {

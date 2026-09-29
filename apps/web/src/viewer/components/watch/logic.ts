@@ -92,7 +92,7 @@ function channelKey(ch: string | null): number {
   return (a ?? 0) * 100 + (b ?? 0);
 }
 
-/** "Down wraps to 104.3, up is 90.7": where the buttons go, and whether they wrap at the band's ends. */
+/** "Down wraps to 104.4, up is 90.8": where the buttons go, and whether they wrap at the band's ends. */
 export function bandHint(channels: DialRowX[], currentId: string | null): string | null {
   const cur = channels.find((c) => c.station.id === currentId);
   if (!cur) return null;

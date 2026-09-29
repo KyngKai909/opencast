@@ -17,10 +17,10 @@ export const STATIONS: StationIdent[] = [
   ident(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", "station", "Fontana"),
   ident(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", "station", "Riverside"),
   ident(31, "PREP", "31.1", "Inland Preps", "#1F5E8C", "tv", "station", "Rialto"),
-  ident(883, "NITE", "88.3", "Night Desk", "#33507A", "radio", "station", "Riverside"),
-  ident(907, "HALL", "90.7", "Study Hall", "#56508A", "radio"),
-  ident(1019, "CRAT", "101.9", "Crate", "#7E2F35", "radio", "claimable"),
-  ident(1043, "VOZE", "104.3", "La Voz", "#1D6A70", "radio", "station", "San Bernardino"),
+  ident(883, "NITE", "88.4", "Night Desk", "#33507A", "radio", "station", "Riverside"),
+  ident(907, "HALL", "90.8", "Study Hall", "#56508A", "radio"),
+  ident(1019, "CRAT", "102.0", "Crate", "#7E2F35", "radio", "claimable"),
+  ident(1043, "VOZE", "104.4", "La Voz", "#1D6A70", "radio", "station", "San Bernardino"),
   // A studio: a station with no channel (market 04.1).
   { ...ident(5001, null, null, "Inland Sound Lab", "#7E2F35", null, "studio"), handle: "inland-sound-lab" }
 ];

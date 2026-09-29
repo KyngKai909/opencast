@@ -3,7 +3,7 @@ import { cx } from "../lib/cx";
 import { stationStyle } from "./time";
 
 export interface BandStation {
-  /** 88.3 */
+  /** 88.4 */
   frequency: number;
   callSign: string;
   colour: string;

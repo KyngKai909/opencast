@@ -86,8 +86,8 @@ const METHOD_OPTIONS = [
   { value: "account", title: "Your Clear business account", helper: "Instant, once connected. Connect it here", end: "No fee" }
 ];
 const PRESET_OPTIONS = [
-  { value: "3", title: "Replace key 3, NITE 88.3", helper: "NITE moves to More presets" },
-  { value: "6", title: "Replace key 6, HALL 90.7", helper: "HALL moves to More presets" },
+  { value: "3", title: "Replace key 3, NITE 88.4", helper: "NITE moves to More presets" },
+  { value: "6", title: "Replace key 6, HALL 90.8", helper: "HALL moves to More presets" },
   { value: "none", title: "No key", helper: "Save it to More presets" }
 ];
 
@@ -276,7 +276,7 @@ function SheetLive() {
           onChange={setFill}
           options={[
             { value: "repeat", title: "Repeat from your library", helper: `Late Crate 12 to 15, until ${clock(SAT(26))}` },
-            { value: "carry", title: "Carry Slow Hours", helper: "From HALL 90.7, barter, runs all night" },
+            { value: "carry", title: "Carry Slow Hours", helper: "From HALL 90.8, barter, runs all night" },
             { value: "off", title: `Sign off at ${clock(SAT(23, 40))}`, helper: `Back at ${clock(SAT(30))}` }
           ]}
         />
@@ -992,7 +992,7 @@ export const primitives = specimens([
               start="repeat"
               options={[
                 { value: "repeat", title: "Repeat from your library", helper: `Late Crate 12 to 15, until ${clock(SAT(26))}` },
-                { value: "carry", title: "Carry Slow Hours", helper: "From HALL 90.7, barter, runs all night" },
+                { value: "carry", title: "Carry Slow Hours", helper: "From HALL 90.8, barter, runs all night" },
                 { value: "off", title: `Sign off at ${clock(SAT(23, 40))}`, helper: `Back at ${clock(SAT(30))}` }
               ]}
             />
@@ -1062,7 +1062,7 @@ export const primitives = specimens([
           <div style={{ width: "100%" }}>
             <Notice
               swatch="#33507A"
-              channel="88.3"
+              channel="88.4"
               title="NITE wants to carry Late Crate"
               detail={`Weeknights at ${clock(SAT(25))}, on barter terms. Asked 2 hours ago`}
               action={<Button size="sm">Review</Button>}

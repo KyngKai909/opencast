@@ -2655,7 +2655,7 @@
     },
     "gallery": {
       "path": "/radio-panel",
-      "selector": ".gal-state[data-state='NITE 88.3, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel"
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel"
     }
   },
   {
@@ -2666,7 +2666,7 @@
     },
     "gallery": {
       "path": "/radio-panel",
-      "selector": ".gal-state[data-state='NITE 88.3, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__f"
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__f"
     }
   },
   {
@@ -2677,7 +2677,7 @@
     },
     "gallery": {
       "path": "/radio-panel",
-      "selector": ".gal-state[data-state='NITE 88.3, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__cs"
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__cs"
     }
   },
   {
@@ -2688,7 +2688,7 @@
     },
     "gallery": {
       "path": "/radio-panel",
-      "selector": ".gal-state[data-state='NITE 88.3, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__nm"
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__nm"
     }
   },
   {
@@ -2699,7 +2699,7 @@
     },
     "gallery": {
       "path": "/radio-panel",
-      "selector": ".gal-state[data-state='NITE 88.3, playing'] .gal-panel[data-theme='{ground}'] .oc-tally"
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-tally"
     },
     "ignore": [
       "justify-content"

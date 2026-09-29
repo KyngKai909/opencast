@@ -17,7 +17,7 @@ export const Millis = z.number().int().nonnegative();
 export const Band = z.enum(["tv", "radio"]);
 export type Band = z.infer<typeof Band>;
 
-/** As shown on the dial: `12.1`, `88.3`. */
+/** As shown on the dial: `12.1`, `88.4`. Radio is `88.2` to `107.8` in even tenths (the API checks the band). */
 export const ChannelNumber = z.string().regex(/^\d{1,3}\.\d$/);
 
 export const CallSign = z.string().regex(/^[A-Z]{3,5}$/, "Three to five capital letters");

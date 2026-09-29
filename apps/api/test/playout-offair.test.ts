@@ -29,7 +29,7 @@ beforeAll(async () => {
   h.clock.set("2026-10-02T05:59:52.000Z");
   const m = await market(h);
   const owner = await h.signIn("Nite");
-  stationId = (await stationFixture(h, { callSign: "NITE", name: "Night Radio", ownerId: owner.id, marketId: m.id, tenths: 881, band: "radio", signedOn: true })).id;
+  stationId = (await stationFixture(h, { callSign: "NITE", name: "Night Radio", ownerId: owner.id, marketId: m.id, tenths: 882, band: "radio", signedOn: true })).id;
   await owner
     .put(`/v1/stations/${stationId}/break-rule`, { mode: "after_every_program", everyMinutes: null, lengthMs: 120_000, spotMsPerHour: 180_000, sameSpotPerHour: 2, fillOrder: ["SPT", "UND", "BMP", "SID"], openTimeTo: "station_id_and_bumpers", blockedCategories: [] })
     .expect(200);

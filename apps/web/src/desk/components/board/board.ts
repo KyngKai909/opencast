@@ -52,7 +52,7 @@ export function marketLine(c: Coverage): string {
   return `${what[0]!.toUpperCase()}${what.slice(1)}.${waitlist}`;
 }
 
-/** "HALL 90.7" */
+/** "HALL 90.8" */
 export function callAndChannel(s: Pick<StationIdent, "callSign" | "channel" | "name">): string {
   return [s.callSign ?? s.name, s.channel].filter(Boolean).join(" ");
 }
@@ -68,7 +68,7 @@ export function statCaptions(c: Coverage) {
   };
 }
 
-/** A slot's number as the board writes it: "33", "9.1–3" (subchannels), "88.3" (radio: major is tenths). */
+/** A slot's number as the board writes it: "33", "9.1–3" (subchannels), "88.4" (radio: major is tenths). */
 export function slotNumber(slot: Pick<BoardSlot, "major" | "stations">, band: "tv" | "radio"): string {
   if (band === "radio") return (slot.major / 10).toFixed(1);
   const minors = slot.stations.map((s) => Number(s.channel?.split(".")[1] ?? 1)).sort((a, b) => a - b);
@@ -76,12 +76,12 @@ export function slotNumber(slot: Pick<BoardSlot, "major" | "stations">, band: "t
   return String(slot.major);
 }
 
-/** The slot's address in `?ch=`: "33" on TV, "88.3" on radio. */
+/** The slot's address in `?ch=`: "33" on TV, "88.4" on radio. */
 export function slotKey(slot: Pick<BoardSlot, "major">, band: "tv" | "radio"): string {
   return band === "radio" ? (slot.major / 10).toFixed(1) : String(slot.major);
 }
 
-/** Which band a `?ch=` value is on: radio frequencies have a tenth and run 88.1 to 107.9. */
+/** Which band a `?ch=` value is on: radio frequencies have a tenth and run 88.2 to 107.8. */
 export function bandOfKey(key: string): "tv" | "radio" {
   return key.includes(".") ? "radio" : "tv";
 }

@@ -56,7 +56,7 @@ export const PLATFORM_LABELS: Record<Creator["sourcePlatform"], string> = {
 export interface Ctx {
   now: Date;
   timeZone: string;
-  /** Channels the waitlist holds in this market ("95.5" → "GOSP"). */
+  /** Channels the waitlist holds in this market ("95.6" → "GOSP"). */
   held: ReadonlyMap<string, string>;
 }
 
@@ -70,14 +70,14 @@ export function waitingForSetup(c: Creator): boolean {
   return (c.stage === "said_yes" || c.stage === "already_licensed") && !c.station;
 }
 
-/** The proposed channel the waitlist holds, if any ("95.5"). */
+/** The proposed channel the waitlist holds, if any ("95.6"). */
 export function heldProposal(c: Creator, held: ReadonlyMap<string, string>): string | null {
   if (c.station) return null;
   const options = c.proposedOptions?.channels ?? (c.proposed ? [c.proposed.channel] : []);
   return options.find((ch) => held.has(ch)) ?? null;
 }
 
-/** The Station column: "33.1 LUPE", "38.1 or 45.1", "Radio band", "95.5, held", or nothing. */
+/** The Station column: "33.1 LUPE", "38.1 or 45.1", "Radio band", "95.6, held", or nothing. */
 export function stationCell(c: Creator, held: ReadonlyMap<string, string>): string {
   if (c.station?.channel) return `${c.station.channel}${c.station.callSign ? ` ${c.station.callSign}` : ""}`;
   if (c.stage === "declined" || c.stage === "no_answer") return "";

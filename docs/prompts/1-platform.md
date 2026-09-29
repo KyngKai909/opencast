@@ -22,7 +22,7 @@ The words matter because they become table names, routes and UI copy:
 | Word | Meaning |
 |---|---|
 | Station | Who broadcasts. Has a call sign (3 to 5 capital letters, unique platform-wide), a market, a band and a channel number. |
-| Channel | A station's place on the dial: TV band `2.1` to `69.9`, radio band `88.1` to `107.9` in odd tenths. Unique per market. Subchannels (`12.2`) are for 24/7 carriage. |
+| Channel | A station's place on the dial: TV band `2.1` to `69.9`, radio band `88.2` to `107.8` in even tenths (changed 2026-09-29: even tenths, so no number matches a real US FM station). Unique per market. Subchannels (`12.2`) are for 24/7 carriage. |
 | Market | A local area, such as Inland Empire. Decides dial order. |
 | Program log | What airs, in order, with exact start times. Replaces the playlist queue. |
 | Log codes | `PGM` program, `SPT` spot, `UND` underwriting, `BMP` bumper, `SID` station ID. These map to today's `AssetInsertionCategory` plus station ID. |

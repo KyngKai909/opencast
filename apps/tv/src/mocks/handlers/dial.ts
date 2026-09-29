@@ -65,7 +65,7 @@ export const dialHandlers = [
     const takenTv = new Set(inMarket(slug, "tv").map((s) => s.ident.channel!.split(".")[0]));
     const openTv = Array.from({ length: 68 }, (_, i) => String(i + 2)).filter((c) => !takenTv.has(c));
     const takenRadio = new Set(inMarket(slug, "radio").map((s) => s.ident.channel!));
-    const openRadio = Array.from({ length: 100 }, (_, i) => (88.1 + i * 0.2).toFixed(1)).filter((c) => !takenRadio.has(c));
+    const openRadio = Array.from({ length: 99 }, (_, i) => ((882 + i * 2) / 10).toFixed(1)).filter((c) => !takenRadio.has(c));
 
     return reply(DialX, { market, band, rows, nearby, carriedWidely, comingUpLive, openChannels: { tv: openTv, radio: openRadio } });
   })

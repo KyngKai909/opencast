@@ -2,7 +2,7 @@
 // sign-in only: signed out, the sign-in page; signed in but not on the Opencast team, NotForYou;
 // otherwise the desk.
 //
-//   /desk/markets/:marketSlug/board              01.1 the market board (?ch=33 selects a slot, ?ch=91.9 on radio)
+//   /desk/markets/:marketSlug/board              01.1 the market board (?ch=33 selects a slot, ?ch=92.0 on radio)
 //   /desk/markets/:marketSlug/pipeline           02.1 the creator pipeline (?stage=said_yes filters, ?add=1 opens Add a creator)
 //   /desk/markets/:marketSlug/pipeline/:id/ask   03.1 asking permission
 //   /desk/markets/:marketSlug/pipeline/:id/setup 04.1 setting up a claimable station

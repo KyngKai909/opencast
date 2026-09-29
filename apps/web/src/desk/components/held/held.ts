@@ -24,7 +24,7 @@ export function heldFigures(h: HeldEarnings) {
   };
 }
 
-/** "101.9 CRAT, for Marcus Reyes" */
+/** "102.0 CRAT, for Marcus Reyes" */
 export function stationTitle(s: HeldStation): string {
   return `${s.station.channel ?? ""} ${s.station.callSign ?? s.station.name}, for ${s.creator}`.trim();
 }

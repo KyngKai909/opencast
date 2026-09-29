@@ -56,11 +56,11 @@ export function seedStations(): DbStation[] {
     st(109, IE.id, "station", "tv", "31.1", "PREP", "Prep Sports Weekly", "#1F5E8C", {}, "Riverside"),
     st(110, IE.id, "claimable", "tv", "33.1", "LUPE", "Tía Lupe’s Kitchen", "#A3402A", { public: false, firstSignedOnAt: null, escrowId: 33, signOnAt: LUPE_SIGN_ON }, "Fontana"),
     st(111, IE.id, "catalog", "tv", "60.1", "OCAT", "Opencast Classics", "#1F3A5F"),
-    st(112, IE.id, "station", "radio", "88.3", "NITE", "Night Shift Radio", "#33507A", {}, "San Bernardino"),
-    st(113, IE.id, "station", "radio", "90.7", "HALL", "Hall Radio", "#56508A", {}, "Riverside"),
-    st(114, IE.id, "claimable", "radio", "91.9", "FLDR", "Mojave Field Recordings", "#3D6547", { firstSignedOnAt: "2026-09-20T13:00:00.000Z", escrowId: 91 }, "Joshua Tree"),
-    st(115, IE.id, "claimable", "radio", "101.9", "CRAT", "Marcus Reyes", "#5B3F8C", { firstSignedOnAt: "2026-08-12T13:00:00.000Z", escrowId: 101 }, "San Bernardino"),
-    st(116, IE.id, "station", "radio", "104.3", "VOZE", "Voz del Inland", "#1D6A70", {}, "Ontario"),
+    st(112, IE.id, "station", "radio", "88.4", "NITE", "Night Shift Radio", "#33507A", {}, "San Bernardino"),
+    st(113, IE.id, "station", "radio", "90.8", "HALL", "Hall Radio", "#56508A", {}, "Riverside"),
+    st(114, IE.id, "claimable", "radio", "92.0", "FLDR", "Mojave Field Recordings", "#3D6547", { firstSignedOnAt: "2026-09-20T13:00:00.000Z", escrowId: 91 }, "Joshua Tree"),
+    st(115, IE.id, "claimable", "radio", "102.0", "CRAT", "Marcus Reyes", "#5B3F8C", { firstSignedOnAt: "2026-08-12T13:00:00.000Z", escrowId: 101 }, "San Bernardino"),
+    st(116, IE.id, "station", "radio", "104.4", "VOZE", "Voz del Inland", "#1D6A70", {}, "Ontario"),
     st(117, HD.id, "station", "tv", "14.1", "MOJV", "Mojave Community TV", "#7A4B1F", {}, "Victorville")
   ];
 }
@@ -79,7 +79,7 @@ export interface DbReservation {
 // The waitlist's reserved call signs: 26 in the Inland Empire ("26 people on the waitlist here"),
 // four holding a channel, and a few in High Desert.
 const IE_SIGNS = ["TACO", "SKAT", "HOOP", "GOSP", "BRUN", "CHLO", "DUNE", "EAST", "FARM", "GRIT", "HOME", "INKY", "JOLT", "LOCO", "MESA", "NOPL", "OPAL", "PALM", "QUIL", "ROSA", "SOLA", "TRUK", "UNDR", "VALE", "YARD", "ZINE"];
-const HELD: Record<string, { band: "tv" | "radio"; channel: string }> = { TACO: { band: "tv", channel: "41.1" }, SKAT: { band: "tv", channel: "44.1" }, HOOP: { band: "tv", channel: "52.1" }, GOSP: { band: "radio", channel: "95.5" } };
+const HELD: Record<string, { band: "tv" | "radio"; channel: string }> = { TACO: { band: "tv", channel: "41.1" }, SKAT: { band: "tv", channel: "44.1" }, HOOP: { band: "tv", channel: "52.1" }, GOSP: { band: "radio", channel: "95.6" } };
 
 export function seedReservations(): DbReservation[] {
   const ie = IE_SIGNS.map((cs, i) => ({
@@ -92,6 +92,6 @@ export function seedReservations(): DbReservation[] {
     heldUntil: HELD[cs] ? "2027-03-31T07:00:00.000Z" : null,
     createdAt: new Date(Date.UTC(2026, 7, 1 + i, 17)).toISOString()
   }));
-  const hd = ["DUST", "JOSH", "RIMS"].map((cs, i) => ({ id: U(3100 + i), callSign: cs, email: null, marketId: HD.id, band: i === 0 ? ("radio" as const) : null, channel: i === 0 ? "92.3" : null, heldUntil: i === 0 ? "2027-03-31T07:00:00.000Z" : null, createdAt: new Date(Date.UTC(2026, 8, 3 + i, 17)).toISOString() }));
+  const hd = ["DUST", "JOSH", "RIMS"].map((cs, i) => ({ id: U(3100 + i), callSign: cs, email: null, marketId: HD.id, band: i === 0 ? ("radio" as const) : null, channel: i === 0 ? "92.4" : null, heldUntil: i === 0 ? "2027-03-31T07:00:00.000Z" : null, createdAt: new Date(Date.UTC(2026, 8, 3 + i, 17)).toISOString() }));
   return [...ie, ...hd];
 }

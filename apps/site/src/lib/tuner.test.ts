@@ -10,7 +10,7 @@ describe("the tuner's dial", () => {
   });
 
   it("marks the radio band and what's live", () => {
-    expect(SAMPLE_DIAL.filter((s) => s.radio).map((s) => s.channel)).toEqual(["88.3", "101.9"]);
+    expect(SAMPLE_DIAL.filter((s) => s.radio).map((s) => s.channel)).toEqual(["88.4", "102.0"]);
     expect(SAMPLE_DIAL.filter((s) => s.live).map((s) => s.callSign)).toEqual(["CIVC", "CRAT"]);
   });
 
@@ -42,15 +42,26 @@ describe("numbers tune", () => {
   });
 
   it("reads three or four digits as a radio frequency", () => {
-    expect(at("883")).toBe("NITE");
-    expect(readEntry("883").filled).toBe("");
-    expect(at("1019")).toBe("CRAT");
+    expect(at("884")).toBe("NITE");
+    expect(readEntry("884").filled).toBe("");
+    expect(at("1020")).toBe("CRAT");
+  });
+
+  it("never tunes a real FM number: an odd radio tenth has no station, and nothing is filled in", () => {
+    for (const typed of ["883", "991", "1019", "99.1"]) {
+      expect(readEntry(typed)).toMatchObject({ filled: "", match: null });
+      expect(noStation(readEntry(typed))).toBe(`No station on ${typed}`);
+    }
   });
 
   it("takes the dot", () => {
-    expect(at("88.3")).toBe("NITE");
+    expect(at("88.4")).toBe("NITE");
     expect(at("24.")).toBe("REEL");
     expect(readEntry("24.").filled).toBe("1");
+    // On the radio band a dot fills the major's first even tenth.
+    expect(readEntry("88.").filled).toBe("2");
+    expect(at("88.")).toBeNull();
+    expect(readEntry("102.")).toMatchObject({ filled: "0", match: 7 });
     expect(at("12.2")).toBeNull();
   });
 

@@ -12,11 +12,15 @@ export function isValidCallSign(value: string): boolean {
 
 /**
  * A channel number as it appears on the dial: TV `2.1` to `69.9`, radio
- * `88.1` to `107.9` in odd tenths. Stored in tenths so it compares exactly.
+ * `88.2` to `107.8` in even tenths. Stored in tenths so it compares exactly.
+ *
+ * Real US FM stations are only on odd tenths (88.1 to 107.9), so the radio band
+ * keeps to even ones and no Opencast number can match a real station (changed
+ * 2026-09-29). TV is Opencast's own network band and may match broadcast numbers.
  */
 export interface ChannelNumber {
   band: Band;
-  /** The number times ten: `12.2` is 122, `88.1` is 881. */
+  /** The number times ten: `12.2` is 122, `88.2` is 882. */
   tenths: number;
 }
 
@@ -38,7 +42,18 @@ export function isValidChannelNumber({ band, tenths }: ChannelNumber): boolean {
     // Every TV channel has a subchannel digit: 12.1 is the main channel, 12.2 a subchannel.
     return tenths >= 21 && tenths <= 699 && tenths % 10 !== 0;
   }
-  return tenths >= 881 && tenths <= 1079 && tenths % 2 === 1;
+  return tenths >= RADIO_BAND_MIN_TENTHS && tenths <= RADIO_BAND_MAX_TENTHS && tenths % 2 === 0;
+}
+
+/** The radio band's ends, in tenths: 88.2 and 107.8. Every even tenth between is a frequency. */
+export const RADIO_BAND_MIN_TENTHS = 882;
+export const RADIO_BAND_MAX_TENTHS = 1078;
+
+/** Every frequency on the radio band, in tenths, low to high: 882, 884 … 1078 (99 of them). */
+export function radioBandTenths(): number[] {
+  const out: number[] = [];
+  for (let t = RADIO_BAND_MIN_TENTHS; t <= RADIO_BAND_MAX_TENTHS; t += 2) out.push(t);
+  return out;
 }
 
 export function formatChannelNumber({ tenths }: ChannelNumber): string {

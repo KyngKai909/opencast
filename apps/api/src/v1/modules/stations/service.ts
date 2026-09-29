@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, type Band } from "@opencast/domain";
+import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
@@ -384,7 +384,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async search(q, marketId) {
       const text = q.trim();
       let tuneTo: StationProfile | null = null;
-      // Numbers tune: "12.1", "12" or "88.3".
+      // Numbers tune: "12.1", "12" or "88.4". An odd radio tenth ("99.1") is never a station here.
       const numeric = /^(\d{1,3})(?:\.(\d))?$/.exec(text);
       if (numeric) {
         const candidates: Array<{ band: Band; tenths: number }> = [];
@@ -655,7 +655,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
           channels.push({ channel: `${major}.1`, state: majorTaken ? "taken" : majorHeld ? "held" : "open" });
         }
       } else {
-        for (let tenths = 881; tenths <= 1079; tenths += 2) {
+        for (const tenths of radioBandTenths()) {
           channels.push({ channel: formatChannelNumber({ band, tenths }), state: takenSet.has(tenths) ? "taken" : heldSet.has(tenths) ? "held" : "open" });
         }
       }
@@ -664,7 +664,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
 
     async chooseChannel(stationId, input) {
       const number = parseChannelNumber(input.band, input.channel);
-      if (!number) throw badRequest(input.band === "tv" ? "TV channels run from 2.1 to 69.9." : "Radio runs from 88.1 to 107.9, in odd tenths.", { channel: "Out of range" });
+      if (!number) throw badRequest(input.band === "tv" ? "TV channels run from 2.1 to 69.9." : "Radio runs from 88.2 to 107.8, in even tenths.", { channel: "Out of range" });
       if (isSubchannel(number)) throw badRequest("A station gets X.1. Subchannels are for stations you carry around the clock.", { channel: "Use X.1" });
       if (!(await services.network.marketsByIds([input.marketId])).size) throw badRequest("That market doesn't exist.");
       const [station] = await db.select().from(S).where(eq(S.id, stationId));

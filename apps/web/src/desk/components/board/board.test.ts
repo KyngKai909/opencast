@@ -20,11 +20,11 @@ const boards = (slug = "inland-empire") => {
 };
 
 describe("coverage", () => {
-  it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.7", () => {
+  it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.8", () => {
     const c = coverage(...boards());
     expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 3, catalog: 1, claimable: 3 });
-    expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.7"]);
-    expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.7");
+    expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.8"]);
+    expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.8");
     expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 3 listed city streams and the catalog station. 26 people on the waitlist here.");
   });
 
@@ -49,7 +49,7 @@ describe("slots", () => {
     const [tv, radio] = boards();
     expect(slotNumber(tv.slots.find((s) => s.major === 9)!, "tv")).toBe("9.1–3");
     expect(slotNumber(tv.slots.find((s) => s.major === 33)!, "tv")).toBe("33");
-    expect(slotNumber(radio.slots.find((s) => s.major === 883)!, "radio")).toBe("88.3");
+    expect(slotNumber(radio.slots.find((s) => s.major === 884)!, "radio")).toBe("88.4");
     expect(slotLabel(tv.slots.find((s) => s.major === 41)!, "tv")).toBe("Channel 41, TACO, Held for the waitlist");
   });
 });

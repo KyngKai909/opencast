@@ -4,7 +4,7 @@
 // `tsx --conditions=source`; never in production.
 //
 // It creates the database, migrates it with the repo's migrations (packages/db/scripts/migrate.ts)
-// and seeds it (packages/db/scripts/seed.ts for the markets, then seed.ts here), listens, and drops
+// and seeds it (packages/db/scripts/seed.ts --markets-only for the markets, then seed.ts here), listens, and drops
 // the database when it's stopped (SIGTERM or SIGINT) or when the process that started it goes away.
 //
 // Environment (global-setup.ts sets it):
@@ -111,14 +111,16 @@ async function dropDatabase() {
   await fs.rm(storageRoot, { recursive: true, force: true }).catch(() => undefined);
 }
 
-function script(file: string) {
-  const r = spawnSync(path.join(root, "node_modules/.bin/tsx"), [file], { cwd: path.join(root, "packages/db"), env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: "utf8" });
+function script(file: string, ...args: string[]) {
+  const r = spawnSync(path.join(root, "node_modules/.bin/tsx"), [file, ...args], { cwd: path.join(root, "packages/db"), env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`${file} failed:\n${r.stdout}\n${r.stderr}`);
   process.stdout.write(`[e2e-api] ${r.stdout.trim()}\n`);
 }
 try {
   script("scripts/migrate.ts");
-  script("scripts/seed.ts");
+  // The markets only: Opencast's network stations (RETRO, LOFI, BEAT) stay out, since the
+  // fixtures here have their own BEAT (Inland Beat, 12.1), as the mocks do.
+  script("scripts/seed.ts", "--markets-only");
 } catch (e) {
   await dropDatabase();
   throw e;

@@ -15,7 +15,7 @@ export interface NoticeProps {
   icon?: IconName | null;
   /** A station's or business's colour, as a small square before the words. */
   swatch?: string;
-  /** A channel number after the swatch, in mono ("88.3"). */
+  /** A channel number after the swatch, in mono ("88.4"). */
   channel?: string;
   /** The bold first words. In a bar with no detail it runs into the rest of the line. */
   title?: ReactNode;

@@ -58,8 +58,8 @@ export default function Board() {
       <SlotLegend stationColour={stationColour} />
       <SecTop title="TV band" sub="2 to 69, main channels" first />
       {tv.data && <BoardMap band="tv" slots={tv.data.slots} columns={17} selected={band === "tv" ? selected : null} onSelect={select} label="TV band, channels 2 to 69" />}
-      <SecTop title="Radio band" sub="88.1 to 107.9" />
-      {radio.data && <BoardMap band="radio" slots={radio.data.slots} columns={20} selected={band === "radio" ? selected : null} onSelect={select} label="Radio band, 88.1 to 107.9" />}
+      <SecTop title="Radio band" sub="88.2 to 107.8" />
+      {radio.data && <BoardMap band="radio" slots={radio.data.slots} columns={20} selected={band === "radio" ? selected : null} onSelect={select} label="Radio band, 88.2 to 107.8" />}
       {slot && band ? <SlotDetail slot={slot} band={band} marketSlug={market.slug} timeZone={tz} creator={creatorOf(slot.creatorId, slot.stations[0]?.id)} /> : <SlotHint />}
     </>
   );

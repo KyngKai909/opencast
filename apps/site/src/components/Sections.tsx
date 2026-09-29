@@ -57,7 +57,7 @@ export function DialSection() {
           <h4>Opencast</h4>
           <div className="st-vrow"><span className="oc-mono">7.1</span>Your town hall, live</div>
           <div className="st-vrow"><span className="oc-mono">12.1</span>A local beat show, then cartoons from 1928</div>
-          <div className="st-vrow"><span className="oc-mono">88.3</span>Radio dramas until 6:00 am</div>
+          <div className="st-vrow"><span className="oc-mono">88.4</span>Radio dramas until 6:00 am</div>
         </div>
         <div className="st-versus__feed">
           <h4>A feed</h4>
@@ -139,7 +139,7 @@ export function StationsSection() {
 export function ProducersSection({ onListPrograms }: { onListPrograms(): void }) {
   const rows: ReadonlyArray<[string, string, string, string, string]> = [
     ["Sat 8:00 pm", "12.1", "Late Crate, on BEAT", "Made here", "Maker"],
-    ["Nightly 3:00 am", "90.7", "Late Crate, on HALL", "Carried on barter terms", "Carrier"],
+    ["Nightly 3:00 am", "90.8", "Late Crate, on HALL", "Carried on barter terms", "Carrier"],
     ["Sun 11:00 pm", "18.1", "Late Crate, on SAZN", "Carried on barter terms", "Carrier"]
   ];
   return (
@@ -228,7 +228,7 @@ export const LINEUP: ReadonlyArray<{ channel: string; callSign: string; category
   { channel: "12.1", callSign: "BEAT", category: "Music", description: "Local producers, live sets and beat showcases", colour: "#8C3B7A" },
   { channel: "18.1", callSign: "SAZN", category: "Food", description: "Kitchens and cooks from around the region", colour: "#A3402A" },
   { channel: "24.1", callSign: "REEL", category: "Classic", description: "Cartoons, newsreels and films from the public domain", colour: "#9A5412" },
-  { channel: "88.3", callSign: "NITE", category: "Radio band", description: "Old-time radio dramas, all night", colour: "#33507A" }
+  { channel: "88.4", callSign: "NITE", category: "Radio band", description: "Old-time radio dramas, all night", colour: "#33507A" }
 ];
 
 /** S.08. The call sign column goes under 600px. */

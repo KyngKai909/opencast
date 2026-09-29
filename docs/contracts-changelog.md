@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: the radio band on even tenths
+
+No shape changes (the schemas never checked the tenth: `ChannelNumber` is still `/^\d{1,3}\.\d$/`); behaviour only, and migration 0022. The radio band is now 88.2 to 107.8 in even tenths, so no Opencast number matches a real US FM station (those are all on odd tenths). TV is unchanged.
+
+- `chooseChannel`, the desk's creator proposals and set-up, listed sources and waitlist channel holds refuse a radio number on an odd tenth (400, "Radio runs from 88.2 to 107.8, in even tenths." on `chooseChannel`); 88.2, 100.0 and 107.8 are accepted where 88.1 and 107.9 were.
+- `availableChannels?band=radio` lists the 99 even tenths (88.2 … 107.8; before, 100 odd ones); `getBoard`'s radio `slots[].major` runs 882 … 1078.
+- `search` never tunes to an odd radio tenth ("99.1" has no `tuneTo`).
+- Migration 0022 moves every radio channel and waitlist hold on an odd tenth up one tenth (99.1 to 99.2) when that's free in its market, else to the nearest free even tenth; released ones and the desk's proposals move up one tenth. Nothing is deleted. The seed's LOFI is on 99.2, and a third network station, BEAT (radio 94.2), is added.
+
 ## 2026-09-29: the segment rule, readiness by item, and what failed (G12, G13, G14)
 
 From master control's requests after prepare once, then assemble. Additive: new exports, new optional fields; no migration. One count changes meaning (G13).

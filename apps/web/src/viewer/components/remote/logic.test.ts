@@ -37,8 +37,8 @@ describe("the keypad", () => {
     expect(keypadLine(e, 2)?.rest).toBe(", Saturday Reel. Tuning in 2 seconds");
     expect(keypadLine(e, 0)?.rest).toBe(", Saturday Reel");
   });
-  it("reads radio frequencies: 8, 8, 3 tunes 88.3", () => {
-    expect(keypadChannel(keypadEntry(type([8, 8, 3]), DIAL))).toBe("88.3");
+  it("reads radio frequencies: 8, 8, 4 tunes 88.4", () => {
+    expect(keypadChannel(keypadEntry(type([8, 8, 4]), DIAL))).toBe("88.4");
   });
   it("says a number with no station, and names the nearest two", () => {
     const e = keypadEntry(type([1, 3]), DIAL);

@@ -4,7 +4,7 @@ import { airingsText, breakPointsText, captionsText, carrierRows, dealLines, for
 
 const MIN = 60_000;
 const st = (callSign: string, channel: string, market: string, o: Partial<StationIdent> = {}): StationIdent => ({ id: `id-${callSign}`, kind: "station", callSign, handle: callSign.toLowerCase(), name: `${callSign} name`, colour: "#33507A", band: "tv", channel, marketSlug: market, homeCity: null, ...o });
-const HALL = st("HALL", "90.7", "inland-empire", { name: "Study Hall", band: "radio" });
+const HALL = st("HALL", "90.8", "inland-empire", { name: "Study Hall", band: "radio" });
 const BEAT = st("BEAT", "12.1", "inland-empire", { name: "Inland Beat" });
 
 function offer(o: Partial<Offer> = {}): Offer {
@@ -90,7 +90,7 @@ describe("the market's words", () => {
     const LA = (n: number) => st(`LA${"ABC"[n]}`, `3${n}.1`, "los-angeles");
     const rows = carrierRows(
       [
-        { station: st("DUST", "96.1", "high-desert"), since: "2026-08-01T00:00:00Z", slots: [{ weekday: 6, time: "01:00" }, { weekday: 0, time: "01:00" }] },
+        { station: st("DUST", "96.2", "high-desert"), since: "2026-08-01T00:00:00Z", slots: [{ weekday: 6, time: "01:00" }, { weekday: 0, time: "01:00" }] },
         { station: BEAT, since: "2026-08-17T19:00:00Z", slots: [{ weekday: 1, time: "22:30" }] },
         { station: LA(0), since: "2026-08-01T00:00:00Z" },
         { station: LA(1), since: "2026-08-01T00:00:00Z" },
@@ -101,7 +101,7 @@ describe("the market's words", () => {
     );
     expect(rows.map((r) => [r.title, r.detail, r.you])).toEqual([
       ["BEAT 12.1", "Mondays at 10:30 pm, since August", true],
-      ["DUST 96.1, High Desert", "Weekends at 1:00 am", false],
+      ["DUST 96.2, High Desert", "Weekends at 1:00 am", false],
       ["3 stations in Los Angeles", null, false]
     ]);
   });

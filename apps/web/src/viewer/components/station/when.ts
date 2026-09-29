@@ -112,7 +112,7 @@ export function monthYear(date: string): string {
   return `${MONTHS[m! - 1]} ${y}`;
 }
 
-/** Channel order: 7.1 before 12.1 before 88.3. */
+/** Channel order: 7.1 before 12.1 before 88.4. */
 export function channelValue(channel: string | null | undefined): number {
   if (!channel) return Number.MAX_SAFE_INTEGER;
   const [a, b] = channel.split(".").map(Number);

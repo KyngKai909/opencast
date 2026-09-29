@@ -9,7 +9,7 @@ function setup() {
   const remove = vi.fn();
   render(
     <Menu
-      label="More for NITE 88.3"
+      label="More for NITE 88.4"
       items={[
         { label: "Give it a key", onSelect: give },
         { label: "Move", onSelect: () => {}, disabled: true },
@@ -17,7 +17,7 @@ function setup() {
       ]}
     />
   );
-  return { give, remove, button: screen.getByRole("button", { name: "More for NITE 88.3" }) };
+  return { give, remove, button: screen.getByRole("button", { name: "More for NITE 88.4" }) };
 }
 
 describe("Menu", () => {

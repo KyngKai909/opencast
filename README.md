@@ -21,8 +21,10 @@ claimable station's earnings until its creator claims them.
 
 ## What the system is
 
-A **station** has a call sign, a channel number in its market (`BEAT 12.1`, `LOFI 99.1`), a library
-and a **program log**: the timed schedule of what airs. The worker turns every log into a live
+A **station** has a call sign, a channel number in its market (`BEAT 12.1`, `LOFI 99.2`), a library
+and a **program log**: the timed schedule of what airs. TV numbers run from 2.1 to 69.9, with
+subchannels; the radio band from 88.2 to 107.8 in even tenths, so no number is a real FM station's
+(those are all on odd tenths). The worker turns every log into a live
 channel, around the clock. Viewers never pick a video; they tune to a number and get whatever is
 on.
 
@@ -143,7 +145,7 @@ npm install
 cp .env.example .env
 npm run db:up        # Postgres on :54329, Redis on :63799
 npm run db:migrate
-npm run db:seed      # markets (the Inland Empire's ZIP codes) and Opencast's network stations
+npm run db:seed      # markets (the Inland Empire's ZIP codes) and Opencast's network stations (RETRO 4.1, LOFI 99.2, BEAT 94.2)
 npm run dev
 ```
 

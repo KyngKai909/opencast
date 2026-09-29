@@ -250,7 +250,7 @@ export const shells = specimens([
             market={MARKET_IE}
             user={KAI}
             onSearch={() => {}}
-            player={<PlayerBar title="Radio dramas from the 1940s" station="NITE 88.3, The Hollow Door, part 2" card="88.3" colour="#33507A" playing radio onTogglePlay={() => {}} />}
+            player={<PlayerBar title="Radio dramas from the 1940s" station="NITE 88.4, The Hollow Door, part 2" card="88.4" colour="#33507A" playing radio onTogglePlay={() => {}} />}
           >
             <Filler title="Radio" lede="Inland Empire, 4 stations" rows={4} />
           </ViewerWebShell>
@@ -277,7 +277,7 @@ export const shells = specimens([
       {
         label: "Radio",
         render: () => (
-          <PlayerBar title="Radio dramas from the 1940s" station="NITE 88.3, The Hollow Door, part 2" card="88.3" colour="#33507A" playing radio onTogglePlay={() => {}} />
+          <PlayerBar title="Radio dramas from the 1940s" station="NITE 88.4, The Hollow Door, part 2" card="88.4" colour="#33507A" playing radio onTogglePlay={() => {}} />
         )
       },
       { label: "Pause and play (press it)", render: () => <PlayerDemo /> }

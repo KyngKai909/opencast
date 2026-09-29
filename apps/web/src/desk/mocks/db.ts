@@ -262,7 +262,7 @@ export function boardView(market: Market, band: "tv" | "radio"): MarketBoard {
   const d = getDb();
   const onBand = d.stations.filter((s) => s.marketId === market.id && s.ident.band === band && s.ident.channel);
   const holds = d.reservations.filter((r) => r.marketId === market.id && r.band === band && r.channel);
-  const majors = band === "tv" ? Array.from({ length: 68 }, (_, i) => i + 2) : Array.from({ length: 100 }, (_, i) => 881 + i * 2);
+  const majors = band === "tv" ? Array.from({ length: 68 }, (_, i) => i + 2) : Array.from({ length: 99 }, (_, i) => 882 + i * 2);
   const slots = majors.map((major) => {
     const here = onBand
       .filter((s) => (band === "tv" ? Math.floor(tenthsOf(s.ident.channel!) / 10) === major : tenthsOf(s.ident.channel!) === major))
