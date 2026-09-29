@@ -21,6 +21,8 @@ export interface AuthConfig {
 export interface VerifiedToken {
   privyDid: string;
   sessionId: string | null;
+  /** When Privy issued the token (its `iat`), for "sign out everywhere". */
+  issuedAt: Date | null;
 }
 
 export interface LinkedAccount {
@@ -53,7 +55,11 @@ export function privyVerifier(config: AuthConfig): TokenVerifier {
       if (typeof payload.sub !== "string" || !payload.sub.startsWith("did:privy:")) {
         throw new Error("Token has no Privy user");
       }
-      return { privyDid: payload.sub, sessionId: typeof payload.sid === "string" ? payload.sid : null };
+      return {
+        privyDid: payload.sub,
+        sessionId: typeof payload.sid === "string" ? payload.sid : null,
+        issuedAt: typeof payload.iat === "number" ? new Date(payload.iat * 1000) : null
+      };
     },
     async linkedAccounts(privyDid) {
       if (!config.privyAppSecret) {

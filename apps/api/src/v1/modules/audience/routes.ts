@@ -4,8 +4,11 @@ import type { RouteRegistrar } from "../../http.js";
 import { HEARTBEAT_MS } from "./service.js";
 
 export function audienceRoutes(r: RouteRegistrar, { services }: ModuleContext) {
-  r.handle(api.heartbeat, async ({ body }) => {
+  r.handle(api.heartbeat, async ({ body, user }) => {
+    // The tuned-in session stays anonymous: the person (if signed in) only feeds their own watch
+    // history (A2), kept by accounts while their setting is on, never linked to the session.
     await services.audience.heartbeat(body);
+    if (user && body.playing) await services.accounts.recordWatching(user.id, body.stationId);
     return { ok: true as const, nextInMs: HEARTBEAT_MS };
   });
   r.handle(api.getAudience, async ({ user, params, query }) => {

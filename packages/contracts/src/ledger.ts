@@ -81,7 +81,14 @@ export const Pledge = z.object({
   startedAt: Timestamp,
   nextChargeOn: DateOnly.nullable(),
   endsAfter: DateOnly.nullable(),
-  receipts: z.object({ count: z.number().int(), totalMicros: Micros })
+  receipts: z.object({
+    count: z.number().int(),
+    totalMicros: Micros,
+    /** E1 (added 2026-09-28): each payment, newest first. `url` is a document when the provider has one. */
+    items: z.array(z.object({ id: Id, on: DateOnly, amountMicros: Micros, url: z.string().nullable() })).optional()
+  }),
+  /** E1 (added 2026-09-28): the card it's charged to ("Visa ending 4242"), once the provider says. Null before. */
+  card: z.object({ label: z.string(), expired: z.boolean(), expiresOn: DateOnly.nullable().optional() }).nullable().optional()
 });
 
 const BusinessParams = z.object({ businessId: Id });
@@ -263,10 +270,22 @@ export const ledgerApi = {
     method: "PATCH",
     path: "/me/pledges/:pledgeId",
     auth: "user",
-    summary: "Change the amount or on-air credit, or stop (it ends after the current month)",
+    summary:
+      "Change the amount or on-air credit, or stop (it ends after the current month). `cadence` (added 2026-09-28, E1): a monthly pledge set to `once` isn't charged again (it ends after this month, like stop); set back to `monthly` before then, it carries on. A one-time pledge can't become monthly (422 `new_pledge_needed`: pledge again, monthly).",
     params: z.object({ pledgeId: Id }),
-    body: z.object({ amountMicros: Micros.min(1_000_000), creditOnAir: z.boolean(), stop: z.literal(true) }).partial(),
+    body: z.object({ amountMicros: Micros.min(1_000_000), creditOnAir: z.boolean(), stop: z.literal(true), cadence: z.enum(["monthly", "once"]) }).partial(),
     response: Pledge
+  }),
+  /** E1 (added 2026-09-28). */
+  pledgeCardSession: endpoint({
+    method: "POST",
+    path: "/me/pledges/:pledgeId/card-session",
+    auth: "user",
+    summary:
+      "E1: a page to change the card on a monthly pledge (Stripe's), which comes back to `returnTo` (a path in the app; default the pledge's station). 422 `no_card_to_change` for a one-time or ended pledge.",
+    params: z.object({ pledgeId: Id }),
+    body: z.object({ returnTo: z.string().regex(/^\/[^/]/).optional() }).optional(),
+    response: z.object({ url: z.string() })
   })
 };
 

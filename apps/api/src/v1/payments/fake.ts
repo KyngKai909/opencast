@@ -14,6 +14,11 @@ export interface FakeMirror {
   applied: Set<string>;
 }
 
+/** A test card that works for three more years. */
+export function fakeCard(label: string, now: Date) {
+  return { label, expiresOn: new Date(Date.UTC(now.getUTCFullYear() + 3, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10) };
+}
+
 export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeMirror } {
   let n = 0;
   const ref = (prefix: string) => `${prefix}_fake_${++n}`;
@@ -54,9 +59,14 @@ export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeM
       return { providerRef: ref("po") };
     },
     async startPledge({ amountMicros }) {
-      return { providerRef: ref("pl"), checkoutUrl: null, paidNow: true, feeMicros: stripeCardFeeMicros(amountMicros) };
+      return { providerRef: ref("pl"), checkoutUrl: null, paidNow: true, feeMicros: stripeCardFeeMicros(amountMicros), card: fakeCard("Visa ending 4242", clock.now()) };
     },
     async endPledge() {},
+    async resumePledge() {},
+    async pledgeCardSession({ returnUrl }) {
+      // Stripe's page would take a new card; the fake takes one at once and comes straight back.
+      return { url: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}card=updated`, card: fakeCard("Mastercard ending 4444", clock.now()) };
+    },
 
     custody: ownAccountsCustody,
 

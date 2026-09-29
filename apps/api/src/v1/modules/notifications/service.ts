@@ -25,7 +25,11 @@ type Kind =
   | "rights_claim"
   | "invite"
   | "weekly_summary"
-  | "code_used";
+  | "code_used"
+  | "preset_live"
+  | "station_news"
+  | "signed_on_off"
+  | "spot_added";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -56,7 +60,13 @@ export const ALWAYS_ON: Kind[] = ["dead_air_warning", "low_balance", "rights_cla
 
 /** What's on unless someone turns it off. Business viewers start with only the weekly summary. */
 const DEFAULTS: Record<Scope["kind"], Prefs> = {
-  viewer: { reminder: { push: true, email: true }, switch_over: { push: true, email: false } },
+  // Nothing about programs you didn't ask about: a preset going live and station news are off until turned on.
+  viewer: {
+    reminder: { push: true, email: true },
+    switch_over: { push: true, email: false },
+    preset_live: { push: false, email: false },
+    station_news: { push: false, email: false }
+  },
   station: {
     dead_air_warning: { push: true, email: true },
     signal_lost: { push: true, email: false },
@@ -67,7 +77,8 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     sponsorship_request: { push: true, email: true },
     order_update: { push: true, email: true },
     rights_claim: { push: true, email: true },
-    weekly_summary: { push: false, email: true }
+    weekly_summary: { push: false, email: true },
+    signed_on_off: { push: true, email: false }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -75,9 +86,22 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     sponsorship_answered: { push: true, email: true },
     order_update: { push: true, email: true },
     weekly_summary: { push: false, email: true },
-    code_used: { push: false, email: false }
+    code_used: { push: false, email: false },
+    spot_added: { push: true, email: false }
   }
 };
+
+const DEFAULT_QUIET = { from: "22:00", to: "08:00" };
+const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** Whether a time falls in a quiet-hours window (which may run past midnight), in the time zone. */
+export function inQuietHours(at: Date, timezone: string, window: { from: string; to: string } = DEFAULT_QUIET): boolean {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(at);
+  const now = Number(parts.find((p) => p.type === "hour")?.value ?? 0) * 60 + Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const from = minutesOf(window.from);
+  const to = minutesOf(window.to);
+  return from <= to ? now >= from && now < to : now >= from || now < to;
+}
 
 export interface NotificationsService {
   notify(userIds: string[], notice: NoticeInput): Promise<void>;
@@ -85,6 +109,8 @@ export interface NotificationsService {
   markRead(userId: string, input: { ids?: string[]; all?: boolean }): Promise<void>;
   prefs(userId: string, scope: Scope): Promise<{ prefs: Prefs; alwaysOn: Kind[] }>;
   setPrefs(userId: string, scope: Scope, prefs: Prefs): Promise<{ prefs: Prefs; alwaysOn: Kind[] }>;
+  /** A3: the account's notices and their delivery records go. */
+  forgetUser(userId: string): Promise<void>;
 }
 
 export function createNotificationsService(ctx: ModuleContext): NotificationsService {
@@ -119,7 +145,13 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
         const always = ALWAYS_ON.includes(notice.kind);
         const channel = prefs[notice.kind] ?? { push: false, email: false };
         const deliver = { title: notice.title, body: notice.body, link: notice.link ?? null };
-        if (always || channel.push) {
+        // O2: quiet hours (on unless turned off) hold back pushes about the person's own viewing; the notice still lands in the app.
+        let quiet = false;
+        if (notice.scope.kind === "viewer" && !always && channel.push) {
+          const { timing, timezone } = await services.accounts.notificationTiming(userId);
+          if (timing.quietHours !== false) quiet = inQuietHours(deps.clock.now(), timezone, { from: timing.quietFrom ?? DEFAULT_QUIET.from, to: timing.quietTo ?? DEFAULT_QUIET.to });
+        }
+        if (always || (channel.push && !quiet)) {
           await deps.notifier.push(userId, deliver).then(
             () => db.insert(schema.deliveries).values({ noticeId: row.id, channel: "push", sentAt: deps.clock.now() }),
             (error) => db.insert(schema.deliveries).values({ noticeId: row.id, channel: "push", error: String(error) })
@@ -169,6 +201,12 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       return { prefs: await prefsFor(userId, scope), alwaysOn: ALWAYS_ON };
     },
 
+    async forgetUser(userId) {
+      const mine = db.select({ id: N.id }).from(N).where(eq(N.userId, userId));
+      await db.delete(schema.deliveries).where(inArray(schema.deliveries.noticeId, mine));
+      await db.delete(N).where(eq(N.userId, userId));
+    },
+
     async setPrefs(userId, scope, prefs) {
       // Always-on kinds stay on whatever is sent.
       const cleaned = Object.fromEntries(Object.entries(prefs).filter(([kind]) => !ALWAYS_ON.includes(kind as Kind)));
@@ -216,6 +254,42 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       link: `/stations/${e.stationId}/as-run`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: `dead-air-filled:${e.stationId}:${e.gapStartsAt}`
+    });
+  });
+
+  // O1: the station team hears when it signs on or off.
+  deps.bus.on("station.signed_on", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "signed_on_off",
+      title: `${await name(e.stationId)} signed on`,
+      body: e.first ? "It's on the air for the first time." : "It's back on the air.",
+      link: `/stations/${e.stationId}`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: `signed-on:${e.stationId}:${deps.clock.now().toISOString().slice(0, 16)}`
+    });
+  });
+
+  deps.bus.on("station.signed_off", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "signed_on_off",
+      title: `${await name(e.stationId)} signed off`,
+      body: e.permanently ? "It's off the air for good." : "It's off the air until it signs on again.",
+      link: `/stations/${e.stationId}`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: `signed-off:${e.stationId}:${deps.clock.now().toISOString().slice(0, 16)}`
+    });
+  });
+
+  // O1: a business hears when a station adds its spot.
+  deps.bus.on("spot.added_to_rotation", async (e) => {
+    const spot = await services.spots.spotSummary(e.spotId);
+    await service.notify(await businessTeam(e.businessId), {
+      kind: "spot_added",
+      title: `${await name(e.stationId)} added ${spot.title}`,
+      body: e.backup ? "It's in their backup rotation: it airs when their main spots can't." : "It's in their rotation: it airs in their breaks from now.",
+      link: `/spots/${e.spotId}`,
+      scope: { kind: "business", id: e.businessId },
+      dedupeKey: `spot-added:${e.spotId}:${e.stationId}:${e.backup ? "backup" : "main"}`
     });
   });
 

@@ -99,6 +99,24 @@ export function accountsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return accounts.team({ kind: "business", id: params.businessId });
   });
 
+  // A1, A2, A3, A6 (added 2026-09-28)
+  r.handle(api.signOutEverywhere, async ({ user }) => {
+    await accounts.signOutEverywhere(user.id);
+    return { ok: true as const };
+  });
+  r.handle(api.getWatchHistory, ({ user }) => accounts.watchHistory(user.id));
+  r.handle(api.clearWatchHistory, async ({ user }) => {
+    await accounts.clearWatchHistory(user.id);
+    return { ok: true as const };
+  });
+  r.handle(api.exportData, ({ user }) => accounts.exportData(user.id));
+  r.handle(api.downloadData, ({ user }) => accounts.downloadData(user.id));
+  r.handle(api.deleteAccount, async ({ user }) => {
+    await accounts.deleteAccount(user.id);
+    return { ok: true as const };
+  });
+  r.handle(api.listOpencastTeam, () => accounts.opencastTeam());
+
   r.handle(api.resendInvite, ({ user, params }) => accounts.resendInvite(user, params.inviteId));
   r.handle(api.acceptInvite, async ({ user, params }) => {
     await accounts.acceptInvite(user, params.inviteId);

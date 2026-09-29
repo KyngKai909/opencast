@@ -241,7 +241,11 @@ export const pledges = ledger.table("pledges", {
   creditOnAir: boolean("credit_on_air").notNull().default(false),
   stripeRef: text("stripe_ref"),
   startedAt: at("started_at").notNull().defaultNow(),
-  endsAfter: date("ends_after")
+  endsAfter: date("ends_after"),
+  /** The card it's charged to, as the provider names it ("Visa ending 4242"), once known (E1). */
+  cardLabel: text("card_label"),
+  /** The last day the card works (the end of its expiry month). */
+  cardExpiresOn: date("card_expires_on")
 });
 
 /**

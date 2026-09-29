@@ -137,6 +137,16 @@ export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fa
       await stripe?.endSubscription(ref);
     },
 
+    async resumePledge(ref) {
+      if (!stripe) return fallbackCard.resumePledge(ref);
+      await stripe.resumeSubscription(ref);
+    },
+
+    async pledgeCardSession(input) {
+      if (!stripe) return fallbackCard.pledgeCardSession(input);
+      return stripe.cardSession(input);
+    },
+
     custody: ownAccountsCustody,
 
     async applyMove(move: ProviderMove, accounts) {

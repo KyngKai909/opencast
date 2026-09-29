@@ -45,6 +45,8 @@ export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Paym
 
     startPledge: (input) => stripe.pledge(input),
     endPledge: (ref) => stripe.endSubscription(ref),
+    resumePledge: (ref) => stripe.resumeSubscription(ref),
+    pledgeCardSession: (input) => stripe.cardSession(input),
 
     // Everything on Opencast's side sits in one Stripe balance: nothing moves between wallets.
     custody: (account: LedgerAccount) => (account.kind === "external" ? null : (chainCustody(account) ?? "platform")),

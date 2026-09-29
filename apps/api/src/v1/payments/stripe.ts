@@ -3,7 +3,7 @@
 // and refunds for advertisers' withdrawals.
 
 import Stripe from "stripe";
-import { fromCents, stripeCardFeeMicros, toCents, type AccountDirectory, type Owner, type PaymentEvent } from "./types.js";
+import { cardFrom, fromCents, stripeCardFeeMicros, toCents, type AccountDirectory, type Owner, type PaymentEvent, type PledgeCard } from "./types.js";
 
 export interface StripeConfig {
   secretKey: string;
@@ -106,6 +106,39 @@ export class StripeCards {
     if (ref.startsWith("sub_")) await this.stripe.subscriptions.update(ref, { cancel_at_period_end: true });
   }
 
+  async resumeSubscription(ref: string) {
+    if (ref.startsWith("sub_")) await this.stripe.subscriptions.update(ref, { cancel_at_period_end: false });
+  }
+
+  /**
+   * E1: Checkout in setup mode for the subscription's customer. When it completes, the webhook
+   * makes the new card the subscription's default and reports it (`pledge_card`).
+   */
+  async cardSession(input: { pledgeId: string; providerRef: string; returnUrl: string }): Promise<{ url: string }> {
+    if (!input.providerRef.startsWith("sub_")) throw new Error("This pledge's subscription hasn't started yet.");
+    const subscription = await this.stripe.subscriptions.retrieve(input.providerRef);
+    const customer = typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+    const metadata = { pledgeId: input.pledgeId, subscription: input.providerRef };
+    const session = await this.stripe.checkout.sessions.create({
+      mode: "setup",
+      currency: "usd",
+      customer,
+      metadata,
+      setup_intent_data: { metadata },
+      success_url: `${input.returnUrl}${input.returnUrl.includes("?") ? "&" : "?"}card=updated`,
+      cancel_url: input.returnUrl
+    });
+    if (!session.url) throw new Error("Stripe didn't return a page for the card.");
+    return { url: session.url };
+  }
+
+  /** The card behind a payment method, if it is one. */
+  private async cardOf(paymentMethod: string | Stripe.PaymentMethod | null | undefined): Promise<PledgeCard | null> {
+    if (!paymentMethod) return null;
+    const pm = typeof paymentMethod === "string" ? await this.stripe.paymentMethods.retrieve(paymentMethod) : paymentMethod;
+    return pm.card ? cardFrom(pm.card) : null;
+  }
+
   // ---- Stripe-only: Connect Express, transfers, refunds ----------------------------
 
   async connectAccount(owner: Owner & { type: "station" }, accounts: AccountDirectory, returnUrl: string) {
@@ -172,8 +205,30 @@ export class StripeCards {
       case "checkout.session.completed": {
         const session = event.data.object;
         const pledgeId = session.metadata?.pledgeId;
-        if (!pledgeId || session.mode !== "payment" || session.payment_status !== "paid") return null;
-        return { kind: "pledge_paid", pledgeId, amountMicros: fromCents(session.amount_total ?? 0), feeMicros: stripeCardFeeMicros(fromCents(session.amount_total ?? 0)), providerRef: session.id };
+        if (!pledgeId) return null;
+        // E1: a new card for a monthly pledge. It becomes the subscription's default.
+        if (session.mode === "setup") {
+          const subscription = session.metadata?.subscription;
+          const intentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent?.id;
+          if (!subscription || !intentId) return null;
+          const intent = await this.stripe.setupIntents.retrieve(intentId);
+          const pm = typeof intent.payment_method === "string" ? intent.payment_method : intent.payment_method?.id;
+          if (!pm) return null;
+          await this.stripe.subscriptions.update(subscription, { default_payment_method: pm });
+          const card = await this.cardOf(pm);
+          return card ? { kind: "pledge_card", pledgeId, card } : null;
+        }
+        // A monthly pledge's subscription: from now on it's known by its subscription (to stop it, or change its card).
+        if (session.mode === "subscription") {
+          const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+          if (!subscriptionId) return null;
+          const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+          return { kind: "pledge_started", pledgeId, providerRef: subscriptionId, card: await this.cardOf(subscription.default_payment_method).catch(() => null) };
+        }
+        if (session.mode !== "payment" || session.payment_status !== "paid") return null;
+        const intentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
+        const card = intentId ? await this.stripe.paymentIntents.retrieve(intentId).then((i) => this.cardOf(i.payment_method)).catch(() => null) : null;
+        return { kind: "pledge_paid", pledgeId, amountMicros: fromCents(session.amount_total ?? 0), feeMicros: stripeCardFeeMicros(fromCents(session.amount_total ?? 0)), providerRef: session.id, card };
       }
       case "invoice.paid": {
         const invoice = event.data.object;

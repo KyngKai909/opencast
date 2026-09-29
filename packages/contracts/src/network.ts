@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Band, CallSign, ChannelNumber, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
+import { Band, CallSign, ChannelNumber, Colour, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CreatorStage } from "./states.js";
 
 export const SlotState = z.enum(["station", "claimable", "listed", "catalog", "held", "open"]);
@@ -23,7 +23,11 @@ export const MarketBoard = z.object({
       state: SlotState,
       stations: z.array(StationIdent),
       heldFor: CallSign.nullable(),
-      status: z.string().nullable()
+      status: z.string().nullable(),
+      /** N7 (added 2026-09-28): when a station that isn't on air yet signs on. */
+      signOnAt: Timestamp.nullable().optional(),
+      /** N7: a claimable station's creator. */
+      creatorId: Id.nullable().optional()
     })
   ),
   stats: z.object({
@@ -31,9 +35,34 @@ export const MarketBoard = z.object({
     claimableOnAir: z.number().int(),
     saidYesNotSetUp: z.number().int(),
     deadAirComing: z.array(StationIdent),
-    waitlistHere: z.number().int()
+    waitlistHere: z.number().int(),
+    /** N7 (added 2026-09-28): the same for both bands together. */
+    market: z
+      .object({ localShareOfTonightPercent: z.number().nullable(), claimableOnAir: z.number().int(), deadAirComing: z.array(StationIdent) })
+      .optional()
   })
 });
+
+/** N5 (added 2026-09-28): a claimable station's setup, read back. */
+export const CreatorSetup = z.object({
+  recipeId: Id,
+  band: Band,
+  channel: ChannelNumber,
+  callSign: z.string(),
+  name: z.string(),
+  colour: Colour.nullable(),
+  operator: z.object({ id: Id, name: z.string() }).nullable(),
+  /** When it signed on, or is set to. */
+  signOnAt: Timestamp.nullable(),
+  /** Items prepared for air so far, of the works the yes or the licence covers. */
+  importDone: z.number().int(),
+  importTotal: z.number().int(),
+  /** The station's ID in the escrow contract. */
+  escrowStationId: z.number().int().nullable()
+});
+export type CreatorSetup = z.infer<typeof CreatorSetup>;
+
+export const Pronoun = z.enum(["she", "he", "they"]);
 
 export const Creator = z.object({
   id: Id,
@@ -50,7 +79,24 @@ export const Creator = z.object({
   doNotAsk: z.boolean(),
   station: StationIdent.nullable(),
   works: z.number().int(),
-  worksDurationMs: Millis
+  worksDurationMs: Millis,
+  // ---- Added 2026-09-28 (N1, N3, N5, N9, N12) ----
+  /** N1: every channel proposed ("38.1 or 45.1"); no channels is the band only ("Radio band"). */
+  proposedOptions: z.object({ band: Band, channels: z.array(ChannelNumber) }).nullable().optional(),
+  /** N3: the pipeline's dates. */
+  askedAt: Timestamp.nullable().optional(),
+  remindedAt: Timestamp.nullable().optional(),
+  /** When they said yes, or no. */
+  answeredAt: Timestamp.nullable().optional(),
+  claimInviteSentAt: Timestamp.nullable().optional(),
+  claimLinkSentAt: Timestamp.nullable().optional(),
+  claimedAt: Timestamp.nullable().optional(),
+  /** N9: the licence an already-licensed creator's works carry ("CC BY 4.0"). */
+  licenceName: z.string().nullable().optional(),
+  /** N12: how the desk refers to them ("Her videos"). Absent: "their". */
+  pronoun: z.enum(["she", "he", "they"]).optional(),
+  /** N5: the claimable station's setup, read back once it exists. */
+  setup: CreatorSetup.nullable().optional()
 });
 
 export const CreatorWork = z.object({
@@ -59,6 +105,8 @@ export const CreatorWork = z.object({
   durationMs: Millis.nullable(),
   sourceUrl: z.string(),
   groupLabel: z.string().nullable(),
+  /** N4 (added 2026-09-28): what one is called ("film", "video"), for "6 films". */
+  noun: z.string().nullable().optional(),
   leftOutReason: z.string().nullable(),
   covered: z.enum(["permission", "licence", "none"]),
   licence: z.object({ licence: z.string(), url: z.string(), attribution: z.string(), allowsCarriage: z.boolean() }).nullable()
@@ -66,26 +114,87 @@ export const CreatorWork = z.object({
 
 /** The creator's permission page. No account needed. */
 export const PermissionPage = z.object({
-  creator: z.object({ displayName: z.string(), personName: z.string().nullable() }),
+  creator: z.object({
+    displayName: z.string(),
+    personName: z.string().nullable(),
+    /** N4 (added 2026-09-28): where their work is ("from your Vimeo"). */
+    sourcePlatform: z.enum(["youtube", "vimeo", "internet_archive", "instagram", "facebook", "soundcloud", "bandcamp", "other"]).optional()
+  }),
   proposed: z.object({ band: Band, channel: ChannelNumber }).nullable(),
   note: z.string().nullable(),
-  works: z.array(z.object({ id: Id, title: z.string(), durationMs: Millis.nullable(), included: z.boolean(), leftOutReason: z.string().nullable() })),
+  works: z.array(
+    z.object({
+      id: Id,
+      title: z.string(),
+      durationMs: Millis.nullable(),
+      included: z.boolean(),
+      leftOutReason: z.string().nullable(),
+      /** N4 (added 2026-09-28). */
+      groupLabel: z.string().nullable().optional(),
+      noun: z.string().nullable().optional()
+    })
+  ),
   /** A schedule built from titles and lengths only. */
   schedulePreview: z.array(z.object({ time: z.string(), title: z.string(), source: z.enum(["creator", "catalog", "carried", "repeats"]) })),
   answer: z.object({ answer: z.enum(["yes", "no"]), answeredAt: Timestamp, works: z.number().int() }).nullable(),
   /** After a yes: stop, or claim now. */
   station: StationIdent.nullable(),
-  claimable: z.boolean()
+  claimable: z.boolean(),
+  // ---- Added 2026-09-28 (N4, B8) ----
+  /** N4: a line the desk wrote for the works ("6 skate films and 7 park session edits"). Null: the app words it from the works. */
+  summary: z.object({ included: z.string(), leftOut: z.string().nullable() }).nullable().optional(),
+  /** The market's name, for "on the Inland Empire dial". */
+  marketName: z.string().optional(),
+  /** B8: stopped from the link. */
+  stoppedAt: Timestamp.nullable().optional(),
+  /** B8: a claim started from the link (or on the station), and where it's got to. */
+  claim: z
+    .object({ handoverId: Id, status: z.enum(["verifying", "approved", "waiting_period", "completed", "cancelled"]), startedAt: Timestamp })
+    .nullable()
+    .optional()
 });
+
+/**
+ * A recipe's break rule, typed (N6, added 2026-09-28). `Recipe.breakRule` keeps its record type;
+ * this is how to read it. Any other keys are kept. `saveRecipe` refuses a rule whose four known
+ * keys have the wrong type (400).
+ */
+export const RecipeBreakRule = z
+  .object({
+    everyMinutes: z.number().int().positive().optional(),
+    lengthMs: z.number().int().positive().optional(),
+    fillFrom: z.enum(["market", "house"]).optional(),
+    blockedCategories: z.array(z.string()).optional()
+  })
+  .loose();
 
 export const Recipe = z.object({
   id: Id,
   name: z.string(),
   category: z.string(),
   band: Band,
-  blocks: z.array(z.object({ start: z.string(), end: z.string(), source: z.enum(["creator", "catalog", "carried", "repeats", "overnight"]) })),
+  blocks: z.array(
+    z.object({
+      start: z.string(),
+      end: z.string(),
+      source: z.enum(["creator", "catalog", "carried", "repeats", "overnight"]),
+      // N6 (added 2026-09-28): what the desk draws and the permission message says.
+      /** The day bar's words ("Lupe's kitchen"); `{creator}` is the creator's short name. */
+      label: z.string().optional(),
+      /** What the message's schedule calls it ("Classic films from the catalog"). */
+      listing: z.string().optional(),
+      /** The block's colour on the day bar (catalog blocks). */
+      colour: Colour.optional(),
+      /** A carried program in the block. */
+      carried: z.object({ station: StationIdent, programTitle: z.string(), schedule: z.string(), about: z.string() }).optional()
+    })
+  ),
   maxAiringsPerWorkPerWeek: z.number().int(),
-  breakRule: z.record(z.string(), z.unknown())
+  breakRule: z.record(z.string(), z.unknown()),
+  /** N6: "at night", when the creator's work airs ("Their films at night"). */
+  when: z.string().optional(),
+  /** N6: "Classic films and overnight programming". */
+  catalogAbout: z.string().optional()
 });
 
 export const HeldEarnings = z.object({
@@ -99,12 +208,29 @@ export const HeldEarnings = z.object({
       rightsBasis: z.enum(["permission", "licence"]),
       heldMicros: Micros,
       owedNotYetDepositedMicros: Micros,
-      status: z.enum(["not_on_air_yet", "on_air", "invited", "claim_link_sent", "claim_pending", "claimed", "stopped"])
+      status: z.enum(["not_on_air_yet", "on_air", "invited", "claim_link_sent", "claim_pending", "claimed", "stopped"]),
+      // ---- Added 2026-09-28 (N3, N9, A125) ----
+      invitedAt: Timestamp.nullable().optional(),
+      claimLinkSentAt: Timestamp.nullable().optional(),
+      /** When it signs on, while it isn't on air yet. */
+      signOnAt: Timestamp.nullable().optional(),
+      /** "CC BY 4.0", for a station on licensed works. */
+      licenceName: z.string().nullable().optional(),
+      /** A125: the creator in the pipeline, and their own name ("Crate"), beside `creator` (the person's name when known, as drawn: "for Marcus Reyes"). */
+      creatorId: Id.optional(),
+      creatorName: z.string().optional()
     })
   ),
   totalHeldMicros: Micros,
   /** Always $0.00: nothing held for a creator ever moves to Opencast. */
-  everMovedToOpencastMicros: Micros
+  everMovedToOpencastMicros: Micros,
+  // ---- Added 2026-09-28 (N9, A125) ----
+  /** A125: rows holding any money (held or owed), for "Held across 2 stations". Always counted from `stations`. */
+  stationsHoldingMoney: z.number().int().optional(),
+  /** N9: how long money waits before it can go to the creator fund. */
+  unclaimedPeriodDays: z.number().int().positive().optional(),
+  /** N9: where the contract lives, for the explorer link. Null without a chain, or one with no public explorer. */
+  chain: z.object({ name: z.string(), explorerUrl: z.url() }).nullable().optional()
 });
 
 export const ListedSource = z.object({
@@ -162,7 +288,11 @@ export const networkApi = {
       description: z.string().max(200).optional(),
       sourcePlatform: Creator.shape.sourcePlatform,
       sourceUrl: z.url(),
-      contactEmail: z.email().optional()
+      contactEmail: z.email().optional(),
+      /** N12 (added 2026-09-28). */
+      pronoun: Pronoun.optional(),
+      /** N1 (added 2026-09-28): channels proposed, or a band only. */
+      proposedOptions: z.object({ band: Band, channels: z.array(ChannelNumber).max(6) }).optional()
     }),
     response: Creator,
     status: 201
@@ -180,7 +310,11 @@ export const networkApi = {
         nextAction: z.string().nullable(),
         nextActionDue: z.iso.date().nullable(),
         contactEmail: z.email().nullable(),
-        personName: z.string().nullable()
+        personName: z.string().nullable(),
+        /** N12 (added 2026-09-28). */
+        pronoun: Pronoun.nullable(),
+        /** N1 (added 2026-09-28): replaces `proposed` (its first channel becomes `proposed`). */
+        proposedOptions: z.object({ band: Band, channels: z.array(ChannelNumber).max(6) }).nullable()
       })
       .partial(),
     response: Creator
@@ -192,7 +326,9 @@ export const networkApi = {
     auth: "admin",
     summary: "Catalogue works from titles and lengths. Nothing is copied yet.",
     params: CreatorParams,
-    body: z.array(z.object({ title: z.string().min(1), durationMs: Millis.nullable(), sourceUrl: z.url(), groupLabel: z.string().optional(), leftOutReason: z.string().optional() })),
+    body: z.array(
+      z.object({ title: z.string().min(1), durationMs: Millis.nullable(), sourceUrl: z.url(), groupLabel: z.string().optional(), leftOutReason: z.string().optional(), noun: z.string().max(40).optional() })
+    ),
     response: z.array(CreatorWork)
   }),
   recordLicence: endpoint({
@@ -218,7 +354,13 @@ export const networkApi = {
       sentVia: z.array(z.string()).min(1),
       note: z.string().max(2000).optional(),
       proposed: z.object({ band: Band, channel: ChannelNumber }).optional(),
-      recipeId: Id.optional()
+      recipeId: Id.optional(),
+      /**
+       * B7 (added 2026-09-28): the ticked works. Only these are covered by a yes; the others are left
+       * out (keeping their reason, or "Left out when asking"), and ticking one again brings it back.
+       * Absent: every work not already left out. 400 if one isn't the creator's, or the list is empty.
+       */
+      workIds: z.array(Id).min(1).optional()
     }),
     response: z.object({ requestId: Id, link: z.string(), preview: PermissionPage }),
     status: 201
@@ -237,8 +379,55 @@ export const networkApi = {
     auth: "public",
     summary: "Yes, go ahead / No thanks. Recorded against the link with the exact list of works; a copy is emailed.",
     params: z.object({ token: z.string().min(16) }),
-    body: z.object({ answer: z.enum(["yes", "no"]), copyTo: z.email().optional() }),
+    body: z.object({
+      answer: z.enum(["yes", "no"]),
+      copyTo: z.email().optional(),
+      /** N4 (added 2026-09-28): the version of the page's wording they read, recorded with the answer. */
+      wordingVersion: z.string().max(40).optional()
+    }),
     response: PermissionPage
+  }),
+  /** B8 (added 2026-09-28). */
+  stopFromLink: endpoint({
+    method: "POST",
+    path: "/permission/:token/stop",
+    auth: "public",
+    summary:
+      "B8: stop from the permission link, any time after a yes. Nothing the yes covered airs again: a station set up from it signs off, and its held money goes to the creator by the stop path once they're verified (a stop handover the desk checks). 422 `nothing_to_stop` without a yes; stopping twice is the same page.",
+    params: z.object({ token: z.string().min(16) }),
+    response: PermissionPage
+  }),
+  claimFromLink: endpoint({
+    method: "POST",
+    path: "/permission/:token/claim",
+    auth: "user",
+    summary:
+      "B8: claim from the permission link, signed in, before or after the station exists. Before, the claim waits and joins the station when the desk sets it up. 422 `nothing_to_claim` without a yes, or after a stop; 422 `in_progress` while a claim is open.",
+    params: z.object({ token: z.string().min(16) }),
+    response: PermissionPage
+  }),
+  /** N2 (added 2026-09-28). */
+  remindCreator: endpoint({
+    method: "POST",
+    path: "/admin/creators/:creatorId/reminders",
+    auth: "admin",
+    summary:
+      "N2: send the one reminder about the open permission request (to the contact email, with the same link). Next action becomes No answer, due in 7 days. 422 `not_asked` unless they're Asked; 422 `reminded` after the one reminder.",
+    params: CreatorParams,
+    response: Creator,
+    status: 201
+  }),
+  /** N3 (added 2026-09-28). */
+  sendClaimInvite: endpoint({
+    method: "POST",
+    path: "/admin/creators/:creatorId/claim-invites",
+    auth: "admin",
+    summary:
+      "N3: tell a claimable station's creator it's theirs to claim: `invite` (the station is on air, claim when you like) or `link` (the claim link itself: their permission page's Claim). Held earnings then say Invited or Claim link sent. 422 `no_station` before the station is set up; 422 `no_contact` without a contact email.",
+    params: CreatorParams,
+    body: z.object({ kind: z.enum(["invite", "link"]) }),
+    response: Creator,
+    status: 201
   }),
   listRecipes: endpoint({ method: "GET", path: "/admin/recipes", auth: "admin", summary: "Station recipes", response: z.array(Recipe) }),
   saveRecipe: endpoint({

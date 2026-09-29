@@ -71,11 +71,28 @@ export interface ClearWalletRail {
 export const walletDestination = (address: string) => `wallet:${address}`;
 export const destinationWallet = (ref: string | null) => (ref?.startsWith("wallet:") ? ref.slice("wallet:".length) : null);
 
+/** The card a pledge is charged to (E1): "Visa ending 4242", usable until `expiresOn` (YYYY-MM-DD). */
+export interface PledgeCard {
+  label: string;
+  expiresOn: string | null;
+}
+
+/** "Visa ending 4242", good to the last day of its expiry month. */
+export function cardFrom(card: { brand: string; last4: string; exp_month?: number | null; exp_year?: number | null }): PledgeCard {
+  const brand = card.brand === "amex" ? "American Express" : card.brand.charAt(0).toUpperCase() + card.brand.slice(1);
+  const expiresOn = card.exp_month && card.exp_year ? new Date(Date.UTC(card.exp_year, card.exp_month, 0)).toISOString().slice(0, 10) : null;
+  return { label: `${brand} ending ${card.last4}`, expiresOn };
+}
+
 /** What a provider tells us happened (from a webhook). */
 export type PaymentEvent =
   | { kind: "deposit_arrived"; depositId: string }
   | { kind: "deposit_failed"; depositId: string; reason: string }
-  | { kind: "pledge_paid"; pledgeId: string; amountMicros: number; feeMicros: number; providerRef: string }
+  | { kind: "pledge_paid"; pledgeId: string; amountMicros: number; feeMicros: number; providerRef: string; card?: PledgeCard | null }
+  /** A monthly pledge's subscription started: from now on it's known by `providerRef` (Stripe's `sub_…`). */
+  | { kind: "pledge_started"; pledgeId: string; providerRef: string; card: PledgeCard | null }
+  /** The card on a pledge changed (E1). */
+  | { kind: "pledge_card"; pledgeId: string; card: PledgeCard }
   | { kind: "pledge_ended"; pledgeId: string }
   | { kind: "payout_confirmed" | "payout_failed"; payoutRef: string }
   | { kind: "account_ready"; owner: Owner };
@@ -97,9 +114,19 @@ export interface Payments {
     checkoutUrl: string | null;
     paidNow: boolean;
     feeMicros: number;
+    /** The card, when it's known at once (the fake). Otherwise it comes with the provider's event. */
+    card?: PledgeCard | null;
   }>;
   /** Stops a monthly pledge at the provider (the current month stays paid). */
   endPledge(providerRef: string): Promise<void>;
+  /** Undoes endPledge before the month is out: it carries on monthly. */
+  resumePledge(providerRef: string): Promise<void>;
+  /**
+   * E1: a page (the provider's) to change the card on a monthly pledge, which returns to
+   * `returnUrl`. The provider reports the new card by webhook (`pledge_card`); the fake changes it
+   * at once and returns it.
+   */
+  pledgeCardSession(input: { pledgeId: string; providerRef: string; returnUrl: string }): Promise<{ url: string; card?: PledgeCard | null }>;
 
   /** Which wallet a ledger account's money sits in; null when the provider or the chain moves it itself. */
   custody(account: LedgerAccount, holdAdvertiserId: string | null): Wallet | null;

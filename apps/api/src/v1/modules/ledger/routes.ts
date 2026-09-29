@@ -77,4 +77,5 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.pledge, ({ user, params, body }) => ledger.pledge(user.id, params.stationId, body));
   r.handle(api.listMyPledges, ({ user }) => ledger.pledges(user.id));
   r.handle(api.updatePledge, ({ user, params, body }) => ledger.updatePledge(user.id, params.pledgeId, body));
+  r.handle(api.pledgeCardSession, ({ user, params, body }) => ledger.pledgeCardSession(user.id, params.pledgeId, body?.returnTo));
 }

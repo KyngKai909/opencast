@@ -20,20 +20,20 @@ These change what the API accepts, or add something no fixture can stand in for.
 | B4 | **Listed airings can be reminded.** `Airing` has `logEntryId` but no `listedAiringId`, which `addReminder` needs for a listed stream | Remind me on city meetings (RDLS) in home, the guide and search | home 01.1, 05.1; station-pages 03.1; tv 03.2 (4) | No | 3 |
 | B5 | **Check a code before redeeming.** `redeemCode` validates and counts in one call. Add a dry run (`confirm: false` or `/redeem/check`), returning when and where the offer was saved and its text | Calling it to show the check would count the use | biz-results 05.1; biz-settings 05.1 (2) | No | 5 |
 | B6 | **Answer a claim with a file.** `answerClaim` takes `attachmentUrl`, but nothing uploads the attachment | "Attach the permission" | rights 03.1 (1) | UI only | 4 |
-| B7 | **Ticked works, and a preview before sending.** `askPermission` has no `workIds`, and nothing edits a work after `addWorks`. Its schedule preview exists only in the response, after sending. Add `workIds` and a `dryRun` or preview endpoint | The desk ticks works and previews the message before it goes out, and "only ticked works are covered by the yes" | desk 03.1 (1) | No | 7 |
-| B8 | **Stop from the permission link, and Claim now before there's a station.** `answerPermission` refuses a second answer, and `startHandover` needs a user and a `stationId` | 06.2: "This link works to stop it at any time"; "Claim it now and skip the team-run part" | desk 06.2 (1) | No | 7 |
+| B7 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `askPermission` body `workIds`; only the ticked works are covered, the rest left out with their reason. No dry run (the desk previews on its side). **Ticked works, and a preview before sending.** `askPermission` has no `workIds`, and nothing edits a work after `addWorks`. Its schedule preview exists only in the response, after sending. Add `workIds` and a `dryRun` or preview endpoint | The desk ticks works and previews the message before it goes out, and "only ticked works are covered by the yes" | desk 03.1 (1) | No | 7 |
+| B8 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user), `PermissionPage.stoppedAt` and `claim`. A claim before the station exists joins it at setup. **Stop from the permission link, and Claim now before there's a station.** `answerPermission` refuses a second answer, and `startHandover` needs a user and a `stationId` | 06.2: "This link works to stop it at any time"; "Claim it now and skip the team-run part" | desk 06.2 (1) | No | 7 |
 | B9 | **No K or W prefix on call signs.** `CallSign` is `/^[A-Z]{3,5}$/` in contracts and domain | The style guide's dial rules. `KBEA` passes `checkCallSign` and `join` today | site S.10; control A.1; desk 04.1 (3) | Client pre-check | 1 |
 
 ## accounts
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| A1 | **Sign out everywhere** (Settings, Account) | you 05.1 | UI only | 3 |
-| A2 | **Watch history and last channel**: store (when `keepWatchHistory`), read the last channel, clear. The heartbeat carries no user, by design | you 05.1; tv 02.1 ("It opens tuned in") | Device-local for one device | 3 |
-| A3 | **Your data**: download (export) and delete the account | you 05.1 | UI only | 3 |
+| A1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /me/sign-out-everywhere`: tokens issued before, and sessions seen before, answer 401 `signed_out`; TVs and their phones are signed out. **Sign out everywhere** (Settings, Account) | you 05.1 | UI only | 3 |
+| A2 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `GET /me/watch-history` (`lastChannel`, 30 days) and `DELETE /me/watch-history`; the heartbeat is `optional` and keeps history only when sent signed in and `keepWatchHistory` isn't off. The tuned-in session stays anonymous. **Watch history and last channel**: store (when `keepWatchHistory`), read the last channel, clear. The heartbeat carries no user, by design | you 05.1; tv 02.1 ("It opens tuned in") | Device-local for one device | 3 |
+| A3 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /me/export` (emails a link), `GET /me/export` (the JSON), `DELETE /me` (at once; 409 `owns_station` / `owns_business`; pledges stop after this month). **Your data**: download (export) and delete the account | you 05.1 | UI only | 3 |
 | A4 | **Host blocks readable, and invites that carry them.** `setHosts` is write-only, and `inviteToStation` can't name blocks. Add a GET (or `blocks` on `TeamMember`), and `programIds` on host invites | station-settings 03.1, 03.2; every host-scoped screen | Yes | 4 |
 | A5 | **Station switcher status**: on air and needs attention ("Dead air in 40 min") per membership in `Me` | station-settings 04.1, 05.2 | Fan-out per station | 4 |
-| A6 | **Opencast team list** for `setUpClaimable.operatorUserId` ("Run by Dee A.") | desk 04.1 | Yes | 7 |
+| A6 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `GET /admin/team` → `[{ id, name, email }]`. **Opencast team list** for `setUpClaimable.operatorUserId` ("Run by Dee A.") | desk 04.1 | Yes | 7 |
 | A7 | **Done 2026-09-28** (monorepo): typed as `ViewerSettings.tv` (`TvSettings`), the same six fields, all optional. Quiet hours not typed (O2). **`ViewerSettings` sections are strict**: nested `watching`, `market` and the rest strip unknown keys. Type the TV-only rows (channel-up direction, banner seconds, number-entry wait, include radio band, picture quality, audio evening-out) and quiet hours, or make the sections `.loose()`. Until then the TV keeps them under a top-level `settings.tv` key, which the top-level `.loose()` keeps: `{ channelUp, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut }` | tv-update 04.1; you 06.3 | Top-level keys | 3 |
 | A8 | (minor) `TeamMember.role` is `z.string()`; make it `StationRole` or `BusinessRole` | station-settings 03.1 | n/a | 4 |
 | A9 | **A first sign-in marker** (`Me.createdAt`, or a `firstSignIn` flag on the session) so sign-in knows when to ask the two first-time questions (keep what's on this device, the display name). Until it lands, the viewer asks when the device holds presets or reminders, or the account has no name | you 01.3 | Yes | 3 |
@@ -138,7 +138,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| E1 | **Pledges**: the card on file and changing it; receipts (list and documents); changing monthly or once | you 04.1, 02.1 | UI only | 3 |
+| E1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Pledge.card`, `Pledge.receipts.items`, `cadence` on `updatePledge`, `POST /me/pledges/:pledgeId/card-session`. Receipt documents (`url`) are null for now. **Pledges**: the card on file and changing it; receipts (list and documents); changing monthly or once | you 04.1, 02.1 | UI only | 3 |
 | E2 | **Station earnings detail**: sponsor names, the airings and breaks held tonight, the next payout amount | earnings 02.1 | Derived | 4 |
 | E3 | **Statement structure**: line groups, per-thousand fields (rate, airings, average tuned in), paid-on date and destination, in progress or final, closing split into available and held | earnings 03.1; biz-results 04.1 | Detail strings | 4 |
 | E4 | **Receipts for a business**: prepayment, expense or statement, with a PDF each | biz-settings 03.1 | Yes | 5 |
@@ -167,18 +167,18 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| N1 | **Several proposed channels, or a band only** ("38.1 or 45.1", "Radio band") | desk 02.1, 03.1 | Yes | 7 |
-| N2 | **The reminder** (one, then `no_answer`) | desk 02.1 | UI only | 7 |
-| N3 | **Pipeline dates**: said yes, claim invite sent, claim link sent, claimed, said no, sign-on time; and a claim-invite endpoint (`heldEarnings` never produces `invited` or `claim_link_sent`) | desk 02.1, 07.1 | Yes | 7 |
-| N4 | **Permission page**: the source platform, grouped work counts, a copy emailed by default, the wording version recorded with the answer | desk 06.1, 06.2 | Yes | 7 |
-| N5 | **A claimable station's setup, read back**: recipe, operator, sign-on time, import progress; drafts prepared before the yes | desk 04.1 | Client draft | 7 |
-| N6 | **Recipe detail**: carried programs in blocks, labels, a typed `breakRule` | desk 04.1 | Parse client-side | 7 |
-| N7 | **Board stats for the whole market** (both bands), and structured slot status | desk 01.1 | Yes | 7 |
+| N1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.proposedOptions`, accepted by `addCreator` and `updateCreator`. **Several proposed channels, or a band only** ("38.1 or 45.1", "Radio band") | desk 02.1, 03.1 | Yes | 7 |
+| N2 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `POST /admin/creators/:creatorId/reminders`. **The reminder** (one, then `no_answer`) | desk 02.1 | UI only | 7 |
+| N3 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): the pipeline's dates on `Creator`, held earnings' `invitedAt`, `claimLinkSentAt`, `signOnAt`, and `POST /admin/creators/:creatorId/claim-invites` (`invite` or `link`). **Pipeline dates**: said yes, claim invite sent, claim link sent, claimed, said no, sign-on time; and a claim-invite endpoint (`heldEarnings` never produces `invited` or `claim_link_sent`) | desk 02.1, 07.1 | Yes | 7 |
+| N4 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `sourcePlatform`, `groupLabel`, `noun`, `marketName` on the page; `CreatorWork.noun`; `wordingVersion` recorded. `summary` is null (the app words it). **Permission page**: the source platform, grouped work counts, a copy emailed by default, the wording version recorded with the answer | desk 06.1, 06.2 | Yes | 7 |
+| N5 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.setup` (recipe, operator, sign-on, import progress, escrow id). Drafts before the yes stay on the device. **A claimable station's setup, read back**: recipe, operator, sign-on time, import progress; drafts prepared before the yes | desk 04.1 | Client draft | 7 |
+| N6 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): block `label`, `listing`, `colour`, `carried`; `Recipe.when`, `catalogAbout`; `RecipeBreakRule` (the typed reading; `breakRule` keeps its type). **Recipe detail**: carried programs in blocks, labels, a typed `breakRule` | desk 04.1 | Parse client-side | 7 |
+| N7 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `MarketBoard.stats.market`, `slots[].signOnAt`, `creatorId`. **Board stats for the whole market** (both bands), and structured slot status | desk 01.1 | Yes | 7 |
 | N8 | **A listed source without a channel** yet | desk 05.1 | Yes | 7 |
-| N9 | **Held earnings**: unclaimed period and date, licence name, pending handovers (so `approveHandover` is reachable), chain | desk 07.1 | Config | 7 |
+| N9 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `HeldEarnings.unclaimedPeriodDays`, `chain`, `stations[].licenceName`, and the invite dates. Pending handovers show as `claim_pending` (A125: `creatorId`, `creatorName`, `stationsHoldingMoney` too). **Held earnings**: unclaimed period and date, licence name, pending handovers (so `approveHandover` is reachable), chain | desk 07.1 | Config | 7 |
 | N10 | **The creator's claim page**: said-yes date, days on air, presets, held amount, source platform to connect, and a GET for the handover's status after starting | rights 05.1 | Yes | 4 |
 | N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
-| N12 | **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
+| N12 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.pronoun`, accepted by `addCreator` and `updateCreator`. **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
 
 Phase 7 built against these as optional extensions in `apps/web/src/desk/api/ext.ts` and `apps/web/src/viewer/components/permission/api.ts`, filled by the mocks:
 - N1 `Creator.proposedOptions: { band, channels[] }` (empty channels: band only).
@@ -190,15 +190,15 @@ Phase 7 built against these as optional extensions in `apps/web/src/desk/api/ext
 - N7 `MarketBoard.stats.market: { localShareOfTonightPercent, claimableOnAir, deadAirComing }`; `slots[].signOnAt`, `creatorId`.
 - N9 `HeldEarnings.unclaimedPeriodDays`, `chain: { name, explorerUrl }`, `stations[].licenceName`.
 - A6 `GET /admin/team` (admin) → `[{ id, name, email }]`.
-- B7 `askPermission` body `workIds` (the ticked works). Still blocking: the real API covers every work without a left-out reason.
-- B8 `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user) → `PermissionPage` with `stoppedAt` and `claim: { handoverId, status, startedAt }`. Still blocking.
+- B7 `askPermission` body `workIds` (the ticked works). Done 2026-09-28.
+- B8 `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user) → `PermissionPage` with `stoppedAt` and `claim: { handoverId, status, startedAt }`. Done 2026-09-28.
 
 ## notifications
 
 | # | Request | Frames | Mock | Phase |
 |---|---|---|---|---|
-| O1 | **New kinds**: a preset goes live, station news, signed on or off (station team), a station added your spot (business) | you 06.3; station-settings 05.1; biz-settings 04.1 | Yes | 3 |
-| O2 | **Preference detail**: lead time, email timing, quiet hours window (on by default, honoured by the sender) | you 06.3 | Yes | 3 |
+| O1 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `NoticeKind` gains `preset_live`, `station_news`, `signed_on_off`, `spot_added`; the last two are sent. **New kinds**: a preset goes live, station news, signed on or off (station team), a station added your spot (business) | you 06.3; station-settings 05.1; biz-settings 04.1 | Yes | 3 |
+| O2 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `ViewerSettings.notifications` (`emailWhen`, `leadMinutes`, `quietHours`, `quietFrom`, `quietTo`); quiet hours and lead time are honoured, the evening-before email isn't built yet. **Preference detail**: lead time, email timing, quiet hours window (on by default, honoured by the sender) | you 06.3 | Yes | 3 |
 | O3 | **Push registration**: web push subscriptions, and APNs and FCM tokens | every push frame | UI only | 3 |
 
 ## waitlist

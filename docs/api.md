@@ -2,9 +2,9 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-211 endpoints in 14 modules.
+223 endpoints in 14 modules.
 
-## accounts (26)
+## accounts (33)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -34,6 +34,13 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `removeBusinessMember` | DELETE | `/businesses/:businessId/team/:userId` | signed in | Remove a member (owner only) |
 | `resendInvite` | POST | `/invites/:inviteId/resend` | signed in | Send an invite again and extend it a week |
 | `acceptInvite` | POST | `/invites/:inviteId/accept` | signed in | Join the team the invite is for |
+| `signOutEverywhere` | POST | `/me/sign-out-everywhere` | signed in | A1: sign out every phone, computer and TV. Every Privy token issued before now, and every later token of a session seen before now, answers 401 `signed_out`; TVs signed in to the account are signed out and their phones dropped. This device signs out too. |
+| `getWatchHistory` | GET | `/me/watch-history` | signed in, or a TV signed in | A2: the last channel and the last 30 days of watching (empty while keepWatchHistory is off) |
+| `clearWatchHistory` | DELETE | `/me/watch-history` | signed in, or a TV signed in | A2: clear watch history and the last channel |
+| `exportData` | POST | `/me/export` | signed in | A3: email a link to download everything the account holds (the link opens the app, which calls downloadData). 409 `no_email` without an email. |
+| `downloadData` | GET | `/me/export` | signed in | A3: everything the account holds, as JSON (save it as a file) |
+| `deleteAccount` | DELETE | `/me` | signed in | A3: delete the account now (no grace period). Presets, reminders, watch history, notices and TVs go; pledges stop after this month; team places are left. 409 `owns_station` or `owns_business` while the person owns one: hand it over (or close it) first. |
+| `listOpencastTeam` | GET | `/admin/team` | Opencast admin | A6: the Opencast team (admins), who can run a claimable station |
 
 ## stations (26)
 
@@ -178,7 +185,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
 
-## ledger (19)
+## ledger (20)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -200,13 +207,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `moveToBank` | POST | `/stations/:stationId/payouts` | signed in | Move earnings to the bank now (owner only) |
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |
 | `listMyPledges` | GET | `/me/pledges` | signed in, or a TV signed in | My pledges |
-| `updatePledge` | PATCH | `/me/pledges/:pledgeId` | signed in | Change the amount or on-air credit, or stop (it ends after the current month) |
+| `updatePledge` | PATCH | `/me/pledges/:pledgeId` | signed in | Change the amount or on-air credit, or stop (it ends after the current month). `cadence` (added 2026-09-28, E1): a monthly pledge set to `once` isn't charged again (it ends after this month, like stop); set back to `monthly` before then, it carries on. A one-time pledge can't become monthly (422 `new_pledge_needed`: pledge again, monthly). |
+| `pledgeCardSession` | POST | `/me/pledges/:pledgeId/card-session` | signed in | E1: a page to change the card on a monthly pledge (Stripe's), which comes back to `returnTo` (a path in the app; default the pledge's station). 422 `no_card_to_change` for a one-time or ended pledge. |
 
 ## audience (2)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
-| `heartbeat` | POST | `/heartbeat` | anyone | Players send this every 30 seconds while tuned in |
+| `heartbeat` | POST | `/heartbeat` | anyone (personal if signed in), or a TV signed in | Players send this every 30 seconds while tuned in |
 | `getAudience` | GET | `/stations/:stationId/audience` | signed in | The station's own numbers (never shown to viewers) |
 
 ## trust (5)
@@ -238,7 +246,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `holdChannel` | POST | `/admin/reservations/:reservationId/channel` | Opencast admin | Hold a channel number for a reservation; no other station can take it |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
-## network (20)
+## network (24)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -253,6 +261,10 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `askPermission` | POST | `/admin/creators/:creatorId/permission-requests` | Opencast admin | Send a permission request with a preview of the station's schedule built from titles |
 | `getPermissionPage` | GET | `/permission/:token` | anyone | The creator's permission page |
 | `answerPermission` | POST | `/permission/:token/answer` | anyone | Yes, go ahead / No thanks. Recorded against the link with the exact list of works; a copy is emailed. |
+| `stopFromLink` | POST | `/permission/:token/stop` | anyone | B8: stop from the permission link, any time after a yes. Nothing the yes covered airs again: a station set up from it signs off, and its held money goes to the creator by the stop path once they're verified (a stop handover the desk checks). 422 `nothing_to_stop` without a yes; stopping twice is the same page. |
+| `claimFromLink` | POST | `/permission/:token/claim` | signed in | B8: claim from the permission link, signed in, before or after the station exists. Before, the claim waits and joins the station when the desk sets it up. 422 `nothing_to_claim` without a yes, or after a stop; 422 `in_progress` while a claim is open. |
+| `remindCreator` | POST | `/admin/creators/:creatorId/reminders` | Opencast admin | N2: send the one reminder about the open permission request (to the contact email, with the same link). Next action becomes No answer, due in 7 days. 422 `not_asked` unless they're Asked; 422 `reminded` after the one reminder. |
+| `sendClaimInvite` | POST | `/admin/creators/:creatorId/claim-invites` | Opencast admin | N3: tell a claimable station's creator it's theirs to claim: `invite` (the station is on air, claim when you like) or `link` (the claim link itself: their permission page's Claim). Held earnings then say Invited or Claim link sent. 422 `no_station` before the station is set up; 422 `no_contact` without a contact email. |
 | `listRecipes` | GET | `/admin/recipes` | Opencast admin | Station recipes |
 | `saveRecipe` | POST | `/admin/recipes` | Opencast admin | Add a recipe |
 | `setUpClaimable` | POST | `/admin/creators/:creatorId/station` | Opencast admin | Set up a claimable station from a recipe: channel, call sign, and the rights record attached |

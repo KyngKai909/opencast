@@ -115,6 +115,16 @@ export const creators = network.table("creators", {
   /** "Said no Sept 2. Don't ask again." */
   doNotAsk: boolean("do_not_ask").notNull().default(false),
   stationId: uuid("station_id").references(() => stations.id),
+  /** How the desk's lines refer to them ("Her videos"). Null: "their". */
+  pronoun: text("pronoun", { enum: ["she", "he", "they"] }),
+  /** Every channel proposed ("38.1 or 45.1"), in tenths, on `proposedBand`. Empty with a band: the band only. */
+  proposedChannels: integer("proposed_channels").array(),
+  /** The claimable station's setup, read back: the recipe it was made from and who runs it. */
+  recipeId: uuid("recipe_id").references(() => recipes.id),
+  operatorUserId: uuid("operator_user_id").references(() => users.id),
+  /** "On air with credit. Claim invite sent Sept 24", then the claim link itself. */
+  claimInviteSentAt: at("claim_invite_sent_at"),
+  claimLinkSentAt: at("claim_link_sent_at"),
   createdAt: createdAt()
 });
 
@@ -128,6 +138,8 @@ export const creatorWorks = network.table("creator_works", {
   durationMs: millis("duration_ms"),
   sourceUrl: text("source_url").notNull(),
   groupLabel: text("group_label"),
+  /** What one of these is called ("film", "video", "recording"), for "6 films". */
+  noun: text("noun"),
   /** Works left out of an ask ("Likely someone else's rights"). */
   leftOutReason: text("left_out_reason"),
   createdAt: createdAt()
@@ -145,7 +157,12 @@ export const permissionRequests = network.table("permission_requests", {
   proposedBand: band("proposed_band"),
   proposedTenths: integer("proposed_tenths"),
   sentBy: uuid("sent_by").references(() => users.id),
-  sentAt: at("sent_at").notNull().defaultNow()
+  sentAt: at("sent_at").notNull().defaultNow(),
+  /** The works ticked when asking (B7): only these are covered by a yes. Null: every work not left out. */
+  workIds: jsonb("work_ids").$type<string[]>(),
+  /** The creator stopped it from the link (B8): nothing it covered airs again. */
+  stoppedAt: at("stopped_at"),
+  stoppedFromIp: text("stopped_from_ip")
 });
 
 /** The yes or no, recorded against the link with the exact list of works. Never edited. */
@@ -159,7 +176,9 @@ export const permissionRecords = network.table("permission_records", {
   answeredAt: at("answered_at").notNull().defaultNow(),
   answeredFromIp: text("answered_from_ip"),
   copySentAt: at("copy_sent_at"),
-  copySentTo: text("copy_sent_to")
+  copySentTo: text("copy_sent_to"),
+  /** Which wording of the permission page they answered (N4). */
+  wordingVersion: text("wording_version")
 });
 
 export const permissionRecordWorks = network.table(
@@ -212,6 +231,10 @@ export const recipes = network.table("recipes", {
   blocks: jsonb("blocks").notNull(),
   maxAiringsPerWorkPerWeek: integer("max_airings_per_work_per_week").notNull().default(3),
   breakRule: jsonb("break_rule").notNull(),
+  /** "at night": when the creator's work airs, for "Their films at night" (N6). */
+  whenText: text("when_text"),
+  /** "Classic films and overnight programming". */
+  catalogAbout: text("catalog_about"),
   createdAt: createdAt()
 });
 
@@ -251,11 +274,14 @@ export const listedAirings = network.table("listed_airings", {
 });
 
 /** Claiming (or stopping) a claimable station. The escrow contract enforces the money side. */
-export const handovers = network.table("handovers", {
+export const handovers = network.table(
+  "handovers",
+  {
   id: id(),
-  stationId: uuid("station_id")
-    .notNull()
-    .references(() => stations.id),
+  /** Null for a claim started from the permission link before the station exists (B8); set when it's set up. */
+  stationId: uuid("station_id").references(() => stations.id),
+  /** The permission request whose link started it (B8). */
+  requestId: uuid("request_id").references(() => permissionRequests.id),
   creatorId: uuid("creator_id")
     .notNull()
     .references(() => creators.id),
@@ -271,4 +297,6 @@ export const handovers = network.table("handovers", {
   cancelReason: text("cancel_reason"),
   completedAt: at("completed_at"),
   createdAt: createdAt()
-});
+  },
+  (t) => [check("handover_has_station_or_link", sql`${t.stationId} is not null or ${t.requestId} is not null`)]
+);

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, integer, jsonb, primaryKey, smallint, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, jsonb, primaryKey, smallint, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id } from "./columns.js";
 import { accounts } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -19,8 +19,57 @@ export const users = accounts.table("users", {
   /** The eight settings sections (watching, notifications, appearance, privacy, …). */
   settings: jsonb("settings").notNull().default({}),
   createdAt: createdAt(),
-  lastSeenAt: at("last_seen_at")
+  lastSeenAt: at("last_seen_at"),
+  /**
+   * "Sign out everywhere" (A1). Privy's sessions can't be ended from here, so Privy tokens issued
+   * before this (by the token's `iat`) are refused, as are sessions seen before it (below).
+   */
+  signedOutAt: at("signed_out_at"),
+  /**
+   * The account was deleted (A3): the row stays as an empty tombstone, because the ledger and the
+   * records others hold point at it. Tokens issued before this are refused; signing in again later
+   * starts a new, empty account.
+   */
+  deletedAt: at("deleted_at")
 });
+
+/**
+ * Privy sessions (the token's `sid`) this API has seen, so "sign out everywhere" can refuse a
+ * session's later tokens too (Privy refreshes a session's token with a new `iat`).
+ */
+export const signInSessions = accounts.table(
+  "sign_in_sessions",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    sid: text("sid").notNull(),
+    firstSeenAt: at("first_seen_at").notNull().defaultNow(),
+    endedAt: at("ended_at")
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.sid] })]
+);
+
+/**
+ * What a signed-in person watched (A2), from their tuned-in heartbeats, only while their
+ * `privacy.keepWatchHistory` setting is on. Never linked to the anonymous audience sessions.
+ * Kept 30 days. One row per stretch of watching one station.
+ */
+export const watchHistory = accounts.table(
+  "watch_history",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    startedAt: at("started_at").notNull(),
+    lastAt: at("last_at").notNull()
+  },
+  (t) => [index("watch_history_user").on(t.userId, t.lastAt)]
+);
 
 /** How someone signs in. A wallet identity is how migrated station owners are matched. */
 export const identities = accounts.table(
