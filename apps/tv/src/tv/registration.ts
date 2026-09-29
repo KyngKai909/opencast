@@ -5,9 +5,11 @@
 import { tvApi, type RegisteredTv, type TvPlatform } from "@opencast/contracts";
 import { call } from "../api/client";
 import { deviceKind } from "../components/settings/about";
+import { nativeInfo } from "../native/plugin";
+import { platformFromNative, type NativeTvInfo } from "../native/platform";
 import { getDevice, isMemoryOnly, setDevice } from "./device";
 
-/** The platform to register as, from what the About section says this TV is. */
+/** The platform to register as in a browser, from what the About section says this TV is. */
 export function platformFor(ua: string): TvPlatform {
   switch (deviceKind(ua)) {
     case "Fire TV":
@@ -33,12 +35,13 @@ let pending: Promise<boolean> | null = null;
  * Resolves true once the TV has a device token, false where TV mode never registers; rejects when
  * the API can't be reached (callers try again later).
  */
-export function ensureRegistered(register: Register = viaApi, ua = typeof navigator === "undefined" ? "" : navigator.userAgent): Promise<boolean> {
+export function ensureRegistered(register: Register = viaApi, ua = typeof navigator === "undefined" ? "" : navigator.userAgent, native: NativeTvInfo | null = nativeInfo()): Promise<boolean> {
   if (isMemoryOnly()) return Promise.resolve(false);
   if (getDevice().deviceToken) return Promise.resolve(true);
   pending ??= (async () => {
     try {
-      const r = await register(platformFor(ua));
+      // The Android TV and Fire TV app knows what it's on (Amazon's feature, Google TV's home screen).
+      const r = await register(native ? platformFromNative(native) : platformFor(ua));
       setDevice({ tvId: r.tvId, deviceToken: r.deviceToken });
       return true;
     } finally {

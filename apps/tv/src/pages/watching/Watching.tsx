@@ -24,6 +24,7 @@ import { Stopped } from "../../components/watching/Stopped";
 import { watchCommand } from "../../components/watching/watchCommands";
 import { useSavePreset } from "../../components/watching/useSavePreset";
 import { useNow } from "../../lib/clock";
+import { isAndroidApp, OpencastTv } from "../../native/plugin";
 import { useCommandLayer } from "../../tv/commands";
 import { useMarketSlug, useSignedIn } from "../../tv/data";
 import { getDevice } from "../../tv/device";
@@ -35,6 +36,8 @@ const handled = new Set<string>();
 
 export default function Watching() {
   const mode = useTvMode();
+  // The Android TV and Fire TV app: Back with nothing to go back to leaves for the TV's home.
+  const nativeApp = mode === "tv" && isAndroidApp();
   const [s, engine] = usePlayer();
   const navigate = useNavigate();
   const now = useNow(1000);
@@ -93,12 +96,16 @@ export default function Watching() {
         typing: !!s.entry,
         airShown: showAir,
         currentId: s.currentId,
-        flip: source?.input === "remote" && getDevice().settings.channelUp === "down_the_dial"
+        flip: source?.input === "remote" && getDevice().settings.channelUp === "down_the_dial",
+        exitable: nativeApp && source?.input === "remote" && !engine.getState().lastId
       });
       if (!act) return false;
       switch (act.do) {
         case "moreTime":
           engine.sleep(30);
+          break;
+        case "exit":
+          void OpencastTv.exitToHome();
           break;
         case "restart":
           window.location.reload();
@@ -128,7 +135,7 @@ export default function Watching() {
       }
       return true;
     },
-    { active: !!s.sleep?.fading || s.status === "stopped" || !!card || showAir || !!s.currentId, keys: showAir ? "overlay" : undefined }
+    { active: nativeApp || !!s.sleep?.fading || s.status === "stopped" || !!card || showAir || !!s.currentId, keys: showAir ? "overlay" : undefined }
   );
 
   if (s.status === "stopped") return mode === "tv" ? <Stopped /> : null;

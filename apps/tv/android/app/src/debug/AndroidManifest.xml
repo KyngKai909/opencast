@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: http to the dev server (TV_DEV_SERVER in capacitor.config.ts). Release keeps cleartext off. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/dev_server_cleartext" />
+</manifest>

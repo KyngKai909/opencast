@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Opencast</string>
+    <string name="title_activity_main">Opencast</string>
+    <string name="package_name">org.useopencast.tv</string>
+    <string name="custom_url_scheme">org.useopencast.tv</string>
+</resources>

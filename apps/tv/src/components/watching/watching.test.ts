@@ -212,6 +212,17 @@ describe("the watching screen's commands", () => {
     expect(watchCommand({ type: "digit", digit: 2 }, air)).toBeNull();
   });
 
+  it("Android TV app: the remote's Back with no last channel leaves for the TV's home, unless a card or a number is up", () => {
+    const leaving = { ...base, exitable: true };
+    expect(watchCommand({ type: "last" }, leaving)).toEqual({ do: "exit" });
+    // Off air takes the arrows, so Back arrives as back.
+    expect(watchCommand({ type: "back" }, { ...leaving, airShown: true })).toEqual({ do: "exit" });
+    expect(watchCommand({ type: "back" }, { ...leaving, card: true })).toEqual({ do: "wave" });
+    expect(watchCommand({ type: "last" }, { ...leaving, typing: true })).toBeNull();
+    // With a last channel (or in a browser, or from a phone) Back is the last channel, as before.
+    expect(watchCommand({ type: "last" }, base)).toBeNull();
+  });
+
   it("a phone's + saves what's on", () => {
     expect(watchCommand({ type: "savePreset", key: 5 }, base)).toEqual({ do: "savePreset", key: 5 });
     expect(watchCommand({ type: "savePreset", key: 5 }, { ...base, currentId: null })).toBeNull();

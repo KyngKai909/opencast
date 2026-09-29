@@ -1,5 +1,7 @@
 // TV mode as an app: the Android TV and Fire TV app (Phase 8), TV browsers. The remote's keys
-// (keyboard arrows stand in on a computer) through the "tv" keyboard profile.
+// (keyboard arrows stand in on a computer) through the "tv" keyboard profile. In the Android app,
+// MainActivity sends the TV's own keys into the page as the same KeyboardEvents (native/keys.ts),
+// and the app says what kind of TV it is before the TV registers (native/platform.ts).
 //
 // Phones drive the TV app through the API's relay (tv/relay.ts), a second input beside the keys.
 // On first launch it registers itself (tv/registration.ts).
@@ -15,6 +17,8 @@ import "@opencast/player/styles.css";
 import { tvApi } from "@opencast/contracts";
 import { bridgeInput, keyboardInput, type InputAdapter } from "@opencast/player";
 import { send } from "./api/client";
+import { AndroidTv, startNativeKeys } from "./native/AndroidTv";
+import { isAndroidApp, loadNativeInfo } from "./native/plugin";
 import { tvRoutes } from "./routes";
 import { getDevice, setDevice, useMemoryOnly } from "./tv/device";
 import { setPhones } from "./tv/phones";
@@ -31,6 +35,7 @@ if (mirror) {
   setDevice({ welcomed: true, marketSlug: params.get("market"), lastStationId: params.get("station") });
 }
 const device = params.get("device")?.slice(0, 60) || null;
+const androidApp = !mirror && isAndroidApp();
 
 // The TV app's relay: open while it runs (never on the mirror, whose phone is the bridge).
 const relay = mirror
@@ -58,12 +63,18 @@ async function boot() {
     const { startMocks } = await import("./mocks/browser");
     await startMocks();
   }
+  if (androidApp) {
+    startNativeKeys();
+    // Fire TV, Google TV or Android TV, from the app, before the TV registers as one.
+    await loadNativeInfo();
+  }
   // First launch: the TV registers itself (again later if the API can't be reached now).
   if (!mirror) void ensureRegistered().catch(() => undefined);
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <TvApp mode={mirror ? "mirror" : "tv"} inputs={inputs} routes={tvRoutes}>
         {relay && <RelayStateToPhones relay={relay} />}
+        {androidApp && <AndroidTv />}
       </TvApp>
     </StrictMode>
   );

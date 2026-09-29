@@ -1,4 +1,7 @@
-// About this TV: what kind of TV this is, from what the browser says about itself.
+// About this TV: what kind of TV this is. The Android TV and Fire TV app knows (the native side
+// reports it: native/platform.ts); in a browser it's a guess from what the browser says about itself.
+
+import { nativeKind, type NativeTvInfo } from "../../native/platform";
 
 /** "Fire TV", "Google TV", "Android TV", "TV browser" (LG, Samsung and the like) or "Web browser". */
 export function deviceKind(ua: string): string {
@@ -10,7 +13,8 @@ export function deviceKind(ua: string): string {
 }
 
 /** The Opencast app (the Capacitor build, Phase 8) or TV mode in a browser. */
-export function deviceLine(ua: string, isApp: boolean): string {
+export function deviceLine(ua: string, isApp: boolean, native: NativeTvInfo | null = null): string {
+  if (native) return `Opencast app on ${nativeKind(native)}`;
   const kind = deviceKind(ua);
   if (!isApp) return kind;
   return kind === "Web browser" || kind === "TV browser" ? "Opencast app" : `Opencast app on ${kind}`;

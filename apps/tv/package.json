@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:mock": "vite --mode mock",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:android": "tsc -p tsconfig.json && vite build --mode production && cap sync android",
+    "android:art": "node scripts/android-art.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

@@ -16,6 +16,7 @@ import { CAPTION_PREVIEW_PX, channelUpHelp, ends, isSection, labelOf, OPTIONS, S
 import { PhoneRows } from "../../components/settings/PhoneRows";
 import { TvRow } from "../../components/settings/TvRow";
 import { useAccountSettingsSync, useTvSettings } from "../../components/settings/useTvSettings";
+import { isAndroidApp, nativeInfo } from "../../native/plugin";
 import { useCommandLayer } from "../../tv/commands";
 import { useDial, useMe } from "../../tv/data";
 import { useDevice } from "../../tv/device";
@@ -254,12 +255,13 @@ function AccountRows({ focusRow }: Pick<RowsProps, "focusRow">) {
 function AboutRows({ focusRow }: Pick<RowsProps, "focusRow">) {
   const tv = useDial("tv");
   const navigate = useNavigate();
-  const isApp = typeof window !== "undefined" && "Capacitor" in window;
+  // Capacitor's core sets window.Capacitor in a browser too: ask it whether this is the app.
+  const isApp = isAndroidApp();
   return (
     <>
       <TvRow title="Version" control={{ type: "value", label: version }} />
       <TvRow fk="tvs-row-market" title="Your market" control={{ type: "value", label: tv.data?.market.name ?? "" }} onFocus={focusRow("tvs-row-market", "action")} onSelect={() => navigate("/market", { state: { from: "/settings/about" } })} />
-      <TvRow title="This TV" control={{ type: "value", label: deviceLine(navigator.userAgent, isApp) }} />
+      <TvRow title="This TV" control={{ type: "value", label: deviceLine(navigator.userAgent, isApp, nativeInfo()) }} />
     </>
   );
 }

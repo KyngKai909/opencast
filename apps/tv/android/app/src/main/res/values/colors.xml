@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV mode's ground (packages/ui tokens.css, data-ground="tv"). -->
+    <color name="tv_ground">#0F1830</color>
+</resources>
