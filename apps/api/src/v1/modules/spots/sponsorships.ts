@@ -5,10 +5,11 @@
 import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { checkCreditText } from "@opencast/domain";
-import type { Sponsorship, SponsorshipSetting } from "@opencast/contracts";
+import type { SponsorTarget, Sponsorship, SponsorshipSetting } from "@opencast/contracts";
 import { miles } from "../network/service.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, notFound, refused } from "../../errors.js";
+import { clockTime, localWeekday } from "../../lib/time.js";
 
 export interface SponsorshipsPart {
   offerSponsorship(businessId: string, input: { stationId: string; programId: string | null; monthlyMicros: number; creditText: string; startsOn: string }): Promise<Sponsorship>;
@@ -25,7 +26,13 @@ export interface SponsorshipsPart {
   creditsFor(stationId: string): Promise<Array<{ business: string; creditText: string; programId: string | null }>>;
   /** Holds each approved sponsorship's month at its start, pays last month to the station, lapses the unfunded. */
   rollSponsorships(): Promise<{ held: number; paid: number; lapsed: number }>;
+  /** P16: what a business can sponsor near it: stations and their own programs, with the minimum and the room. */
+  sponsorTargets(businessId: string): Promise<{ near: string | null; targets: SponsorTarget[] }>;
 }
+
+/** P16: how near a station has to be to a business's place to be offered (its service area's radius, if larger). */
+const SPONSOR_NEAR_MILES = 25;
+const WEEKDAYS = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
 
 const SS = schema.sponsorships;
 const SM = schema.sponsorshipMonths;
@@ -42,12 +49,16 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
 
   async function views(rows: Array<typeof SS.$inferSelect>): Promise<Sponsorship[]> {
     if (!rows.length) return [];
-    const [names, idents, titles, months] = await Promise.all([
+    const programIds = [...new Set(rows.map((r) => r.programId).filter((v): v is string => Boolean(v)))];
+    const [names, idents, titles, months, programs] = await Promise.all([
       services.spots.businessNames(rows.map((r) => r.advertiserId)),
       services.stations.idents(rows.map((r) => r.stationId)),
-      services.library.titles({ itemIds: [], programIds: rows.map((r) => r.programId).filter((v): v is string => Boolean(v)) }),
-      db.select().from(SM).where(inArray(SM.sponsorshipId, rows.map((r) => r.id)))
+      services.library.titles({ itemIds: [], programIds }),
+      db.select().from(SM).where(inArray(SM.sponsorshipId, rows.map((r) => r.id))),
+      services.library.programsByIds(programIds)
     ]);
+    // L1: each program's format in words ("Weekly, live").
+    const formats = new Map(await Promise.all(programIds.map(async (id) => [id, formatWords(await services.library.format(id), programs.get(id)?.live ?? false)] as const)));
     const thisMonth = monthOf(deps.clock.now());
     return rows.flatMap((r) => {
       const station = idents.get(r.stationId);
@@ -67,7 +78,8 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
           declineReason: r.declineReason,
           startsOn: r.startsOn,
           renewsOn: r.status === "approved" ? nextMonth(thisMonth) : null,
-          createdAt: r.createdAt.toISOString()
+          createdAt: r.createdAt.toISOString(),
+          programFormat: r.programId ? (formats.get(r.programId) ?? null) : null
         }
       ];
     });
@@ -283,6 +295,75 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
         .orderBy(asc(SS.createdAt));
       const names = await services.spots.businessNames(rows.map((r) => r.sponsorship.advertiserId));
       return rows.map((r) => ({ business: names.get(r.sponsorship.advertiserId) ?? "", creditText: r.sponsorship.creditText, programId: r.sponsorship.programId }));
+    },
+
+    async sponsorTargets(businessId) {
+      const business = await services.spots.business(businessId);
+      const online = business.customersWhere === "online";
+      const markets = online ? business.marketIds : (await services.network.allMarkets()).map((m) => m.id);
+      const candidates = (await services.stations.inMarkets(markets)).filter((s) => s.kind !== "studio" && s.kind !== "listed" && s.status !== "signed_off");
+      // Near: in its markets (online), or within 25 miles of one of its places (or its service area).
+      const near = candidates.filter((s) => {
+        if (online) return true;
+        if (!s.location) return false;
+        return business.locations.some((l) => miles({ lat: l.latitude, lng: l.longitude }, s.location!) <= Math.max(SPONSOR_NEAR_MILES, l.radiusMiles ?? 0));
+      });
+      const targets: SponsorTarget[] = [];
+      for (const station of near) {
+        const [settings, programs, active, credits] = await Promise.all([
+          db.select().from(SET).where(eq(SET.stationId, station.id)),
+          services.library.programsForStation(station.id),
+          db.select({ programId: SS.programId }).from(SS).where(and(eq(SS.stationId, station.id), inArray(SS.status, ["requested", "approved"]))),
+          services.ledger.memberCredits(station.id)
+        ]);
+        const whole = settings.find((x) => x.programId === null);
+        const name = station.ident.callSign ?? station.ident.name;
+        const membersCredit = credits.members > 0 ? `members of ${station.ident.name}` : null;
+        const count = (programId: string | null) => active.filter((a) => a.programId === programId).length;
+        // A station "takes sponsors" unless it closed itself; with no setting there's no minimum and no limit.
+        const room = (max: number | null, programId: string | null) => max === null || count(programId) < max;
+        if (!whole?.closed && room(whole?.maxSponsors ?? null, null)) {
+          targets.push({
+            station: station.ident,
+            program: null,
+            schedule: "Credited in every break, 24 hours",
+            programFormat: null,
+            minMonthlyMicros: whole?.minMonthlyMicros ?? 0,
+            maxSponsors: whole?.maxSponsors ?? null,
+            sponsors: count(null),
+            membersCredit,
+            where: `In every one of ${name}'s breaks`
+          });
+        }
+        const tz = await services.stations.timezoneOf(station.id);
+        for (const program of programs) {
+          const setting = settings.find((x) => x.programId === program.id);
+          // Carried programs are the maker's to sponsor; closed or full ones aren't offered.
+          if (setting?.closed || !room(setting?.maxSponsors ?? null, program.id)) continue;
+          const format = await services.library.format(program.id);
+          const words = formatWords(format, program.live);
+          const [next] = await services.log.upcomingForProgram(program.id, 1);
+          const at = next && next.stationId === station.id ? new Date(next.startsAt) : null;
+          const schedule = at
+            ? format.cadence === "nightly"
+              ? `Nightly at ${clockTime(at, tz)}`
+              : `${WEEKDAYS[localWeekday(at, tz)]} at ${clockTime(at, tz)}${program.live ? ", live" : ""}`
+            : words;
+          targets.push({
+            station: station.ident,
+            program: { id: program.id, title: program.title },
+            schedule,
+            programFormat: words,
+            minMonthlyMicros: setting?.minMonthlyMicros ?? whole?.minMonthlyMicros ?? 0,
+            maxSponsors: setting?.maxSponsors ?? null,
+            sponsors: count(program.id),
+            membersCredit,
+            where: `In ${name}'s breaks during the program`
+          });
+        }
+      }
+      const place = business.locations[0];
+      return { near: online ? null : (place?.city ?? null), targets };
     },
 
     async rollSponsorships() {

@@ -70,6 +70,7 @@ Every write takes an idempotency key and must be safe to repeat with it. Bridge 
 4. **Opencast's own settlement wallet** able to call the escrow contract's `depositBatch`. It needs an allowance to the escrow and gas on Base. Today the chain job uses its own key (`SETTLEMENT_PRIVATE_KEY`).
 5. **Global-wallet provider access** in Clear's own Privy dashboard, with Opencast's app allowed as a requester, and a decision on read-only or full access for Opencast.
 6. **`accountAddress` and `sendToWallet`**: a business account's address on chain, and sending USDC from an account to a linked Clear wallet.
+7. **Clear Pay's payment events** (added 2026-09-29, P20): a business can connect Clear Pay (`POST /v1/businesses/:businessId/connections/clear_pay`, the token Clear's own connect flow gives), but nothing counts its uses yet. Opencast needs a signed event when a customer pays with an offer's code (the code, the business's Clear Pay account, a customer reference that's stable per customer, and when), sent to an address Opencast gives, like the checkout webhooks (`/v1/webhooks/checkout/:hookToken`). Each counts as a `clear_pay` use (`spots.countUse`).
 
 ## Configuration
 

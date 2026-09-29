@@ -276,7 +276,7 @@ export const contentRefs = broadcast.table(
     cid: text("cid")
       .notNull()
       .references(() => contents.cid),
-    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment"] }).notNull(),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo"] }).notNull(),
     ownerId: uuid("owner_id").notNull(),
     createdAt: createdAt()
   },

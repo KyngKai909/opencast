@@ -85,6 +85,10 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | What moves up when a live block ends early (G3) | `log.endEarly` | the programs right after it, in order, until a gap, a live block, a carried program or a program whose breaks already hold spots; what's left becomes a gap the dead-air fill takes |
 | How far ahead the switcher warns of dead air (A5) | `accounts.stationStatus` | six hours, on-air stations only |
 | Who may upload a claim's attachment, and what (B6) | `trust.attach` | owner or operator (as answering); PDF, images or text, 20 MB |
+| The offer on a code Opencast adds (P4, A116) | `spots.uploadSpotFile`, `spots.review` | the spot's title: nothing is promised until the business names an offer |
+| How near a station has to be for a business to sponsor it (P16) | `spots.sponsorTargets` | 25 miles from one of its places (or its service area's radius, if larger); online businesses: their markets |
+| Closing a business with an order being made (P21) | `spots.closeBusiness` | refused (409 `order_in_progress`) until it's approved, or cancelled after its delivery date |
+| The Redeem tool's default (P12) | `Business.redeemOn` | on, except for online businesses |
 
 ## Built with a stand-in, to replace
 
@@ -101,6 +105,10 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Live source quality and output bitrate (S14, G2) | Always null | The worker's feeds and muxer reporting resolution and bitrate |
 | Captions (L7) | Tracks are uploaded or edited (WebVTT, SRT converted); nothing generates them, and they aren't in the playout output | Speech-to-text, and a subtitle rendition in the HLS (X2) |
 | A spot's still colour on the market (P23) | Picked from eight colours by the business's id | A colour the business chooses, or a frame of the spot |
+| Why an airing ran short (P15) | "The break was cut short" for every short airing | The as-run recording why (a live program ran over, a break cut) |
+| Clear Pay uses (P20) | Clear Pay connects (a token is kept) but counts nothing | Clear's payment events, once Clear defines them (docs/clear-integration.md) |
+| Checkout webhook secrets (P20) | Kept in `spots.connections.secret` as given | Encrypted at rest, or the provider's OAuth app with one app secret |
+| Upload check boxes (P1) | Only the code's box; title-safe problems are checked in review | Frame analysis finding text outside title safe, with its box |
 
 ## Storage
 

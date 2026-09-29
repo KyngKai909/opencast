@@ -11,7 +11,7 @@ export interface Events {
   /** A file due within the hour isn't in the worker cache (or wasn't, at air). */
   "station.file_not_ready": { stationId: string; itemId: string; title: string; airsAt: string; missedAtAir: boolean };
   "station.signed_off": { stationId: string; permanently: boolean };
-  "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance"; stationIds: string[] };
+  "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance" | "by_hand"; stationIds: string[] };
   "spot.resumed": { spotId: string; businessId: string; stationIds: string[] };
   /** A station put a spot in its rotation (or backup rotation) that wasn't there. */
   "spot.added_to_rotation": { spotId: string; businessId: string; stationId: string; backup: boolean };

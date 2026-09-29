@@ -325,14 +325,17 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     // Daily-cap pauses tell no one; they resume by themselves at midnight.
     if (e.reason === "daily_cap") return;
     const spot = await services.spots.spotSummary(e.spotId);
-    await service.notify(await businessTeam(e.businessId), {
-      kind: "spot_paused",
-      title: `${spot.title} is paused`,
-      body: e.reason === "budget_spent" ? "Its budget is spent. Raise it to put it back in the market." : "Your balance ran low. Add money to put it back in the market.",
-      link: `/spots/${e.spotId}`,
-      scope: { kind: "business", id: e.businessId }
-    });
-    const why = e.reason === "budget_spent" ? "its budget is spent" : "the business's balance ran low";
+    // A spot the business paused itself (A115): it knows; the stations are told.
+    if (e.reason !== "by_hand") {
+      await service.notify(await businessTeam(e.businessId), {
+        kind: "spot_paused",
+        title: `${spot.title} is paused`,
+        body: e.reason === "budget_spent" ? "Its budget is spent. Raise it to put it back in the market." : "Your balance ran low. Add money to put it back in the market.",
+        link: `/spots/${e.spotId}`,
+        scope: { kind: "business", id: e.businessId }
+      });
+    }
+    const why = e.reason === "budget_spent" ? "its budget is spent" : e.reason === "by_hand" ? "the business paused it" : "the business's balance ran low";
     for (const stationId of e.stationIds) {
       const [perDayMs, backup] = await Promise.all([services.spots.recentAirTimePerDay(e.spotId, stationId), services.spots.rotationFor(stationId, "backup")]);
       const minutes = Math.round(perDayMs / 60_000);

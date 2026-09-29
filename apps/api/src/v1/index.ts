@@ -2,7 +2,7 @@ import express from "express";
 // The v1 API: one router per module, mounted at /v1. Modules own their tables and
 // call each other through `services`.
 
-import { webhookHandler } from "./webhooks.js";
+import { checkoutWebhookHandler, webhookHandler } from "./webhooks.js";
 import type { Router } from "express";
 import type { Deps, ModuleContext, Services } from "./context.js";
 import { errorHandler, RouteRegistrar } from "./http.js";
@@ -55,6 +55,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
 
   const router = express.Router();
   // Webhooks first: they need the raw body, before anything reads it as JSON.
+  router.post("/webhooks/checkout/:hookToken", ...checkoutWebhookHandler(deps, services));
   router.post("/webhooks/:provider", ...webhookHandler(deps, services));
   router.use(express.json({ limit: "2mb" }));
   const registrar = new RouteRegistrar(router, deps, services);

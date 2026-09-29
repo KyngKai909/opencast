@@ -36,7 +36,11 @@ export const Business = z.object({
   einLast4: z.string().nullable(),
   createdAt: Timestamp,
   /** P25 (added 2026-09-29): the name in tight places ("Orange Street"): its own, else the name. */
-  shortName: z.string().optional()
+  shortName: z.string().optional(),
+  /** P11 (added 2026-09-29): the square drawn until a logo is uploaded: initials and a colour. */
+  logoMark: z.object({ initials: z.string(), colour: z.string() }).optional(),
+  /** P12 (added 2026-09-29): the Redeem tool is on (the default, except for online businesses). */
+  redeemOn: z.boolean().optional()
 });
 export type Business = z.infer<typeof Business>;
 
@@ -51,6 +55,25 @@ const LocationInput = z.object({
 });
 
 // Spots -----------------------------------------------------------------------
+
+/**
+ * P1, P4 (added 2026-09-29): the keys an upload check's `detail` carries, beside whatever else the
+ * check recorded. `note`: the line under the check ("Exactly a :30 spot"). `box`: where on the frame
+ * (fractions of its width and height): the problem (safe_area, once frames are analysed) or where
+ * the code and QR sit (code). `text`: words found there. `fromMs`/`toMs`: the part of the spot it
+ * covers (the code shows for the last :10). `placement`: the code's corner.
+ */
+export const CodePlacement = z.enum(["bottom_left", "bottom_right", "top_left", "top_right"]);
+export const UploadCheckDetail = z
+  .object({
+    note: z.string().optional(),
+    box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(),
+    text: z.string().optional(),
+    fromMs: Millis.optional(),
+    toMs: Millis.optional(),
+    placement: CodePlacement.optional()
+  })
+  .loose();
 
 export const UploadCheck = z.object({
   check: z.enum(["length", "picture", "safe_area", "captions", "loudness", "code"]),
@@ -67,8 +90,41 @@ export const Targeting = z.object({
   marketIds: z.array(Id),
   stationCategories: z.array(z.string()),
   dayparts: z.array(z.enum(["mornings", "afternoons", "evenings", "late_night"])),
-  excludedStationIds: z.array(Id)
+  excludedStationIds: z.array(Id),
+  /** P8 (added 2026-09-29): the bands it airs on; missing or empty is both. A radio station out of it reads "Radio band, not chosen". */
+  bands: z.array(z.enum(["tv", "radio"])).optional()
 });
+
+/** P23 (added 2026-09-29): the still a spot shows in lists: a captured frame, or its colour and words. */
+export const SpotStill = z.object({
+  /** A proof frame from its latest airing, once it has aired. */
+  stillUrl: z.string().nullable(),
+  colour: z.string(),
+  /** The short line on the thumbnail: the title. */
+  label: z.string(),
+  /** Its title card, when known (not read from the file yet: null). */
+  headline: z.string().nullable(),
+  /** Its on-screen offer, if it has a code. */
+  line: z.string().nullable()
+});
+
+/**
+ * P6 (added 2026-09-29): the business's side of a pause. `by_you`: the business paused it (it's
+ * `waiting_for_you`). `lastHold`: the last money held for it before the pause. `held`: airings
+ * placed before the pause, which still air (`airedAt` once the last of them has). `stations`: each
+ * station that had it in its rotation, what it put in its place (from its as-run log since the
+ * pause), and whether it was told when the spot came back.
+ */
+export const SpotPauseStory = z.object({
+  reason: z.enum(["budget_spent", "balance", "by_you"]),
+  pausedAt: Timestamp,
+  lastHold: z.object({ amountMicros: Micros, station: StationIdent }).nullable(),
+  held: z.object({ airings: z.number().int(), airedAt: Timestamp.nullable() }),
+  stations: z.array(z.object({ station: StationIdent, filledWith: z.enum(["backup_rotation", "another_spot", "station_id"]), toldWhenBack: z.boolean() }))
+});
+
+/** P6 (added 2026-09-29): when and why it came back, and the stations told (none has it in rotation until it adds it again). */
+export const SpotBackStory = z.object({ backAt: Timestamp, reason: z.enum(["raised_budget", "added_money", "resumed"]), told: z.array(StationIdent) });
 
 export const Spot = z.object({
   id: Id,
@@ -90,7 +146,23 @@ export const Spot = z.object({
   startsOn: DateOnly.nullable(),
   endsOn: DateOnly.nullable(),
   targeting: Targeting,
-  code: z.object({ code: z.string(), offer: z.string(), windowDays: z.number().int() }).nullable(),
+  code: z
+    .object({
+      code: z.string(),
+      offer: z.string(),
+      windowDays: z.number().int(),
+      // ---- P4 (added 2026-09-29) ----
+      /** Who chose the letters: Opencast, unless the business typed its own. */
+      pickedBy: z.enum(["opencast", "business"]).optional(),
+      /** Each customer's first use counts; a second is refused. */
+      oncePerCustomer: z.boolean().optional(),
+      /** How long an offer saved to a phone keeps (the offer's window). */
+      savedForDays: z.number().int().optional(),
+      /** Where the code and QR sit, and for how long at the end of the spot. */
+      placement: CodePlacement.optional(),
+      showsForLastMs: Millis.optional()
+    })
+    .nullable(),
   file: z
     .object({
       url: z.string(),
@@ -102,7 +174,18 @@ export const Spot = z.object({
     })
     .nullable(),
   productionOrderId: Id.nullable(),
-  createdAt: Timestamp
+  createdAt: Timestamp,
+  // ---- Added 2026-09-29 (the business app's requests) ----
+  /** P23. */
+  still: SpotStill.optional(),
+  /** P5: the stations with it in their rotation (not the backup rotation). */
+  inRotationStations: z.array(StationIdent).optional(),
+  /** P6: while it's paused for its budget, its balance or by the business (not a daily cap). */
+  pause: SpotPauseStory.nullable().optional(),
+  /** P6: after it came back from one of those. */
+  back: SpotBackStory.nullable().optional(),
+  /** P7: what it has spent a day lately (the last 7 days, or since it was listed); null before anything was held for it. */
+  pacePerDayMicros: Micros.nullable().optional()
 });
 export type Spot = z.infer<typeof Spot>;
 
@@ -222,9 +305,13 @@ export const CreditCheck = z.object({
       text: z.string(),
       start: z.number().int(),
       end: z.number().int(),
-      suggestion: z.string()
+      suggestion: z.string(),
+      /** P17 (added 2026-09-29): the words the flag is about, for its title ("the best"). */
+      quote: z.string().optional()
     })
-  )
+  ),
+  /** P17 (added 2026-09-29): the part that passes, "who you are and where": the text without the flagged words. Null when nothing's left. */
+  who: z.string().nullable().optional()
 });
 
 export const Sponsorship = z.object({
@@ -244,7 +331,9 @@ export const Sponsorship = z.object({
    * (or null, online), miles from the station's studio to its nearest place, and what else it
    * sponsors ("Council Watch on CIVC"). On the station's list only.
    */
-  profile: z.object({ category: z.string(), city: z.string().nullable(), miles: z.number().nullable(), elsewhere: z.array(z.string()) }).optional()
+  profile: z.object({ category: z.string(), city: z.string().nullable(), miles: z.number().nullable(), elsewhere: z.array(z.string()) }).optional(),
+  /** L1 (added 2026-09-29): the program's format in words ("Weekly, live"); null for a whole station. */
+  programFormat: z.string().nullable().optional()
 });
 
 export const SponsorshipSetting = z.object({
@@ -300,7 +389,11 @@ export const ProductionOrder = z.object({
       url: z.string(),
       /** A low-bitrate HLS preview while the order is open (added in 2026-09). */
       previewUrl: z.string().nullable().optional(),
-      createdAt: Timestamp
+      createdAt: Timestamp,
+      /** P19 (added 2026-09-29): its length; left out when it couldn't be read (or was delivered before this). */
+      durationMs: Millis.optional(),
+      /** P19 (added 2026-09-29): the spot checks it passed on delivery: "length", "picture", "loudness". */
+      checksPassed: z.array(z.string()).optional()
     })
   ),
   notes: z.array(OrderNote),
@@ -312,7 +405,13 @@ export const ProductionOrder = z.object({
   /** P24 (added 2026-09-29): the maker asked to be told when the spot is listed (`tellMeWhenListed`). */
   makerToldWhenListed: z.boolean().optional(),
   /** P24 (added 2026-09-29): the rate its spot is listed at; null until it's listed. */
-  listedRate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }).nullable().optional()
+  listedRate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }).nullable().optional(),
+  // ---- P19 (added 2026-09-29) ----
+  /** When the maker last quoted (null for quotes made before this). */
+  quotedAt: Timestamp.nullable().optional(),
+  approvedAt: Timestamp.nullable().optional(),
+  /** What came back to the balance from its hold (cancelled after the delivery date, refunded or split after review). */
+  refundedMicros: Micros.optional()
 });
 
 // Codes and results --------------------------------------------------------------
@@ -333,11 +432,41 @@ export const ResultsAiring = z.object({
   /** "262 × $8.00 ÷ 1,000 = $2.10". */
   working: z.string(),
   proofFrameUrl: z.string().nullable(),
-  scansNextHour: z.number().int()
+  scansNextHour: z.number().int(),
+  // ---- P15 (added 2026-09-29) ----
+  /** Why it aired short ("The break was cut short"); null when it aired in full. */
+  shortReason: z.string().nullable().optional(),
+  /** When its proof frame was captured. */
+  proofCapturedAt: Timestamp.nullable().optional()
+});
+
+/** P13 (added 2026-09-29): one code's scans, saves and uses in the period, and how the uses were counted. */
+export const ResultsCode = z.object({
+  code: z.string(),
+  spotId: Id,
+  spotTitle: z.string(),
+  offer: z.string(),
+  windowDays: z.number().int(),
+  oncePerCustomer: z.boolean(),
+  savedForDays: z.number().int(),
+  scans: z.number().int(),
+  saves: z.number().int(),
+  uses: z.number().int(),
+  /** Uses by where they were counted; null where that counter isn't connected (and nothing came from it). */
+  usesBy: z.object({ clearPay: z.number().int().nullable(), marked: z.number().int(), online: z.number().int().nullable() }),
+  /** The station most saves came from. */
+  savedMostFrom: StationIdent.nullable()
 });
 
 export const Results = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/),
+  // ---- P14 (added 2026-09-29) ----
+  period: z.enum(["week", "month", "all"]).optional(),
+  /** The first and last day covered so far (the market's dates). */
+  from: DateOnly.optional(),
+  to: DateOnly.optional(),
+  /** P13 (added 2026-09-29). */
+  codes: z.array(ResultsCode).optional(),
   totals: z.object({
     airings: z.number().int(),
     /** Labelled "People tuned in, added up across airings" — never reach or unique viewers. */
@@ -349,11 +478,91 @@ export const Results = z.object({
     customers: z.number().int()
   }),
   byStation: z.array(
-    z.object({ station: StationIdent, airings: z.number().int(), averageTunedIn: z.number(), spentMicros: Micros, customers: z.number().int() })
+    z.object({
+      station: StationIdent,
+      airings: z.number().int(),
+      averageTunedIn: z.number(),
+      spentMicros: Micros,
+      customers: z.number().int(),
+      /** S1 (added 2026-09-29): the station's category ("Music"). */
+      category: z.string().nullable().optional()
+    })
   ),
   byDaypart: z.array(z.object({ daypart: z.string(), airings: z.number().int(), customers: z.number().int() })),
   bySpot: z.array(z.object({ spotId: Id, title: z.string(), airings: z.number().int(), spentMicros: Micros, customers: z.number().int() })),
   airings: z.array(ResultsAiring)
+});
+
+// ---- Added 2026-09-29: the business app's requests ----
+
+/** P16: one thing a business can sponsor near it. */
+export const SponsorTarget = z.object({
+  station: StationIdent,
+  /** null: the whole station. */
+  program: z.object({ id: Id, title: z.string() }).nullable(),
+  /** "Saturdays at 9:00 pm", "Credited in every break, 24 hours", or the program's format. */
+  schedule: z.string(),
+  programFormat: z.string().nullable(),
+  minMonthlyMicros: Micros,
+  /** null: the station set no limit. */
+  maxSponsors: z.number().int().min(0).nullable(),
+  /** Sponsors it has now (requested or approved). */
+  sponsors: z.number().int().min(0),
+  /** The members' credit read after the sponsors ("members of Inland Beat"), or null. */
+  membersCredit: z.string().nullable(),
+  /** "In BEAT's breaks during the program". */
+  where: z.string()
+});
+
+/** P9: how many of a market's stations can carry a category, and which don't. */
+export const CategoryReach = z.object({
+  category: z.string(),
+  marketName: z.string(),
+  reached: z.number().int(),
+  total: z.number().int(),
+  /** Call signs (or names) of the stations that block it. */
+  blockedBy: z.array(z.string()),
+  /** Categories some stations in the market block, for the line under the bar. */
+  sometimesBlocked: z.array(z.string())
+});
+
+/** P10: an address or a city, as `LocationInput` needs it. Nothing is stored. */
+export const Place = z.object({
+  /** Null when only a city was found (a service area). */
+  streetAddress: z.string().nullable(),
+  city: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  /** The market it's in (within 150 miles of a market's centre), if any. */
+  marketId: Id.nullable()
+});
+
+/** P20: what the business is connected to. The Clear account itself is the person's (Connect Clear). */
+export const Connections = z.object({
+  clearPay: z.object({ connected: z.boolean(), connectedAt: Timestamp.nullable().optional() }),
+  checkout: z.object({
+    connected: z.boolean(),
+    provider: z.enum(["shopify", "stripe", "square"]).nullable(),
+    connectedAt: Timestamp.nullable().optional(),
+    /** Where the checkout sends its order webhooks (paste it into the provider's webhook settings). Owner only; null for others. */
+    webhookUrl: z.string().nullable().optional()
+  })
+});
+
+const RedeemResult = z.object({
+  valid: z.boolean(),
+  firstUse: z.boolean(),
+  countsAsCustomer: z.boolean(),
+  savedFrom: StationIdent.nullable(),
+  message: z.string(),
+  // ---- B5, P12 (added 2026-09-29) ----
+  code: z.string().optional(),
+  offer: z.string().nullable().optional(),
+  /** When this customer saved the offer, if they did. */
+  savedAt: Timestamp.nullable().optional(),
+  spotTitle: z.string().nullable().optional(),
+  /** Codes marked used at the counter today (the business's market day). */
+  redeemedToday: z.number().int().optional()
 });
 
 const BusinessParams = z.object({ businessId: Id });
@@ -401,7 +610,9 @@ export const spotsApi = {
         legalName: z.string().nullable(),
         ein: z.string().regex(/^\d{2}-?\d{7}$/).nullable(),
         /** P25 (added 2026-09-29): null goes back to the name. */
-        shortName: z.string().min(1).max(24).nullable()
+        shortName: z.string().min(1).max(24).nullable(),
+        /** P12 (added 2026-09-29): turn the Redeem tool on or off. */
+        redeemOn: z.boolean()
       })
       .partial(),
     response: Business
@@ -470,7 +681,8 @@ export const spotsApi = {
     method: "POST",
     path: "/spots/:spotId/file",
     auth: "user",
-    summary: "Upload the spot. Checked on arrival: exact length, picture, title safe, captions, loudness, code.",
+    summary:
+      "Upload the spot. Checked on arrival: exact length, picture, title safe, captions, loudness, code. A spot without a code gets one here (added 2026-09-29, P4): Opencast's letters, the title as the offer until the business names one.",
     params: SpotParams,
     multipart: true,
     body: z.object({ scaleToFit: z.coerce.boolean().default(false) }),
@@ -636,9 +848,20 @@ export const spotsApi = {
     method: "GET",
     path: "/makers",
     auth: "user",
-    summary: "Stations that take orders, and Opencast Studio",
-    query: z.object({ marketId: Id.optional() }),
-    response: z.array(z.object({ station: StationIdent, turnaround: z.string().nullable(), fromMicros: Micros.nullable(), samples: z.number().int() }))
+    summary: "Stations that take orders, and Opencast Studio. `businessId` (added 2026-09-29, P18) adds each maker's history with that business.",
+    query: z.object({ marketId: Id.optional(), businessId: Id.optional() }),
+    response: z.array(
+      z.object({
+        station: StationIdent,
+        turnaround: z.string().nullable(),
+        fromMicros: Micros.nullable(),
+        samples: z.number().int(),
+        /** P18 (added 2026-09-29): what it made for the business ("Made your Fall menu spot"), with `businessId`. */
+        history: z.string().nullable().optional(),
+        /** P18 (added 2026-09-29): what it's good at: its category, or "Any category" for Opencast Studio. */
+        specialty: z.string().nullable().optional()
+      })
+    )
   }),
   orderSpot: endpoint({
     method: "POST",
@@ -772,24 +995,19 @@ export const spotsApi = {
     method: "POST",
     path: "/businesses/:businessId/redeem",
     auth: "user",
-    summary: "Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use.",
+    summary: "Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use. 409 `redeem_off` while the Redeem tool is off (added 2026-09-29).",
     params: BusinessParams,
     body: z.object({ code: z.string(), customerRef: z.string().max(120).optional() }),
-    response: z.object({
-      valid: z.boolean(),
-      firstUse: z.boolean(),
-      countsAsCustomer: z.boolean(),
-      savedFrom: StationIdent.nullable(),
-      message: z.string()
-    })
+    response: RedeemResult
   }),
   getResults: endpoint({
     method: "GET",
     path: "/businesses/:businessId/results",
     auth: "user",
-    summary: "Every airing from the as-run log with proof, tuned in and cost; codes and customers",
+    summary:
+      "Every airing from the as-run log with proof, tuned in and cost; codes and customers. `period` (added 2026-09-29, P14): a `week` (the Sunday `week`, default this one), the `month`, or `all` time.",
     params: BusinessParams,
-    query: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/) }),
+    query: z.object({ month: z.string().regex(/^\d{4}-\d{2}$/), period: z.enum(["week", "month", "all"]).default("month"), week: DateOnly.optional() }),
     response: Results
   }),
   stationCustomers: endpoint({
@@ -818,6 +1036,118 @@ export const spotsApi = {
     auth: "public",
     summary: "S17: every spot category, in one list: what a business is, what markets filter by, and (`blockable`) what a station can block",
     response: z.array(z.object({ name: z.string(), blockable: z.boolean() }))
+  }),
+
+  // ---- Added 2026-09-29: the business app's requests ----
+
+  updateLocation: endpoint({
+    method: "PATCH",
+    path: "/businesses/:businessId/locations/:locationId",
+    auth: "user",
+    summary: "P26: change a location or service area in place (owner, manager); it keeps its place in the list. A location has no radius.",
+    params: z.object({ businessId: Id, locationId: Id }),
+    body: z
+      .object({
+        kind: z.enum(["location", "service_area"]),
+        label: z.string().max(80).nullable(),
+        streetAddress: z.string().max(200).nullable(),
+        city: z.string().min(1).max(80),
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        radiusMiles: z.number().positive().max(200).nullable()
+      })
+      .partial(),
+    response: Business
+  }),
+  uploadLogo: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/logo",
+    auth: "user",
+    summary: "P11: upload the logo (owner, manager): a square PNG or JPEG, at least 256 pixels. Stored at 512 pixels. 422 `logo_size`, `not_an_image`.",
+    params: BusinessParams,
+    multipart: true,
+    body: z.object({}),
+    response: Business
+  }),
+  closeBusiness: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/close",
+    auth: "user",
+    summary:
+      "P21: close the account (owner only; type its name). Spots end (out of every rotation), sponsorships stop renewing, unanswered orders are cancelled. Held money pays for what's already scheduled; the available balance goes back to the default bank or Clear account now, and what's left after the held airings follows. 409 `order_in_progress` while an order is being made or reviewed; 409 `no_source` when there's money to send back and no bank or Clear account to send it to.",
+    params: BusinessParams,
+    body: z.object({ confirmName: z.string() }),
+    response: z.object({ closedAt: Timestamp, returnedMicros: Micros, heldMicros: Micros })
+  }),
+  getConnections: endpoint({
+    method: "GET",
+    path: "/businesses/:businessId/connections",
+    auth: "user",
+    summary: "P20: Clear Pay and an online checkout",
+    params: BusinessParams,
+    response: Connections
+  }),
+  connect: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/connections/:kind",
+    auth: "user",
+    summary:
+      "P20: connect Clear Pay or an online checkout (owner only). For a checkout, `token` is the webhook signing secret the provider shows (Shopify's app secret, Stripe's `whsec_…`, Square's signature key); the answer's `webhookUrl` is where the provider sends order events, and each promotion code used counts as a use. Connecting another checkout replaces the one before.",
+    params: z.object({ businessId: Id, kind: z.enum(["clear_pay", "checkout"]) }),
+    body: z.object({ token: z.string().min(1).max(500), provider: z.enum(["shopify", "stripe", "square"]).optional() }),
+    response: Connections
+  }),
+  disconnect: endpoint({
+    method: "DELETE",
+    path: "/businesses/:businessId/connections/:kind",
+    auth: "user",
+    summary: "P20: disconnect Clear Pay or the checkout (owner only). Uses already counted stay counted.",
+    params: z.object({ businessId: Id, kind: z.enum(["clear_pay", "checkout"]) }),
+    response: Connections
+  }),
+  redeemCheck: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/redeem/check",
+    auth: "user",
+    summary: "B5: check a code at the counter without counting the use (owner, manager): valid, first use for this customer, when and where the offer was saved, its text",
+    params: BusinessParams,
+    body: z.object({ code: z.string(), customerRef: z.string().max(120).optional() }),
+    response: RedeemResult
+  }),
+  redeemToday: endpoint({
+    method: "GET",
+    path: "/businesses/:businessId/redeem/today",
+    auth: "user",
+    summary: "P12: the Redeem tool: on or off, codes marked used today, and whether Clear Pay counts uses by itself (owner, manager)",
+    params: BusinessParams,
+    response: z.object({ on: z.boolean(), redeemedToday: z.number().int(), clearPay: z.boolean() })
+  }),
+  listSponsorTargets: endpoint({
+    method: "GET",
+    path: "/businesses/:businessId/sponsor-targets",
+    auth: "user",
+    summary:
+      "P16: the stations near the business (its markets; within 25 miles of a place, or its service area) and their own programs that take sponsors, with the minimum and the room. Closed ones and full ones are left out.",
+    params: BusinessParams,
+    response: z.object({ near: z.string().nullable(), targets: z.array(SponsorTarget) })
+  }),
+  getCategoryReach: endpoint({
+    method: "GET",
+    path: "/markets/:marketId/category-reach",
+    auth: "user",
+    summary: "P9: how many of a market's stations on the air can carry a spot category, and which block it",
+    params: z.object({ marketId: Id }),
+    query: z.object({ category: z.string().min(1).max(80) }),
+    response: CategoryReach
+  }),
+  lookupPlace: endpoint({
+    method: "GET",
+    path: "/places/lookup",
+    auth: "user",
+    summary:
+      "P10: an address or a city to coordinates and a market, through the server's place lookup (PLACES_URL). Nothing is stored. 404 `not_found` when nothing matches; 503 `not_available` when no lookup is set up.",
+    query: z.object({ q: z.string().min(2).max(200) }),
+    response: Place
   })
 };
 
@@ -869,3 +1199,12 @@ export type OrderNote = z.infer<typeof OrderNote>;
 export type ProductionOrder = z.infer<typeof ProductionOrder>;
 export type ResultsAiring = z.infer<typeof ResultsAiring>;
 export type Results = z.infer<typeof Results>;
+export type ResultsCode = z.infer<typeof ResultsCode>;
+export type SpotStill = z.infer<typeof SpotStill>;
+export type SpotPauseStory = z.infer<typeof SpotPauseStory>;
+export type SpotBackStory = z.infer<typeof SpotBackStory>;
+export type SponsorTarget = z.infer<typeof SponsorTarget>;
+export type CategoryReach = z.infer<typeof CategoryReach>;
+export type Place = z.infer<typeof Place>;
+export type Connections = z.infer<typeof Connections>;
+export type UploadCheckDetail = z.infer<typeof UploadCheckDetail>;

@@ -21,6 +21,10 @@ export interface JobResults {
   pool: { micros: number; stations: number; fundMicros: number } | null;
   dailyCapsResumed: number;
   sponsorships: { held: number; paid: number; lapsed: number } | null;
+  /** A124: scheduled sign-ons that came due (a claimable station goes on air at its sign-on). */
+  signOns: { signedOn: number; notReady: number } | null;
+  /** P21: closed businesses whose leftover balance was sent back. */
+  closedSwept: number;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -40,6 +44,10 @@ export function createJobs(deps: Deps, services: Services) {
       });
       await services.accounts.markReminderNotified(reminder.id);
     }
+    const signOns = await services.playout.runDueSignOns().catch((error) => {
+      console.error("[jobs] scheduled sign-ons failed", error);
+      return null;
+    });
     const onAir = await services.playout.onAirStations();
     await services.log.checkDeadAir(onAir);
     const claimsExpired = await services.trust.expireOverdue();
@@ -65,6 +73,7 @@ export function createJobs(deps: Deps, services: Services) {
     let escrowDeposit: JobResults["escrowDeposit"] = null;
     let payouts: JobResults["payouts"] = null;
     let pledgesRenewed = 0;
+    let closedSwept = 0;
     let pool: JobResults["pool"] = null;
     if (lastDay && day !== lastDay) {
       dailyCapsResumed = await services.spots.resumeDailyCaps();
@@ -87,6 +96,11 @@ export function createJobs(deps: Deps, services: Services) {
         });
       }
       pledgesRenewed = await services.ledger.renewPledges();
+      // P21: what's left of a closed business's balance, once its held airings have aired, goes back.
+      closedSwept = await services.ledger.sweepClosedBusinesses().catch((error) => {
+        console.error("[jobs] closed businesses failed", error);
+        return 0;
+      });
     }
     lastDay = day;
 
@@ -105,7 +119,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept };
   }
 
   let timer: NodeJS.Timeout | undefined;

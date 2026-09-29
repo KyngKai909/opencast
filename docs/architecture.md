@@ -18,6 +18,7 @@ apps/api/src/v1/
   http.ts         mounts contract endpoints: validates params, query and body, and the response
   auth.ts         Privy access tokens (ES256 JWT) checked against the app's key or JWKS
   geo.ts          the market from a connection: the client's address and the pluggable lookup (GEOIP_URL)
+  places.ts       a business's address or city to coordinates: the pluggable lookup (PLACES_URL)
   relay.ts        the TV remote's message bus: in-process, or Redis pub/sub
   context.ts      Deps (db, clock, bus, auth, media, payments, notifier) and Services
   events.ts       in-process events, handled after the request (mostly notifications)

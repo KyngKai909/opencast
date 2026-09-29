@@ -22,7 +22,12 @@ export const Balance = z.object({
   pacePerDayMicros: Micros,
   runwayDays: z.number().int().nullable(),
   pendingDeposits: z.array(z.object({ id: Id, amountMicros: Micros, expectedAt: Timestamp.nullable(), method: z.string() })),
-  fundingSources: z.array(FundingSource)
+  fundingSources: z.array(FundingSource),
+  /**
+   * E7 (added 2026-09-29): the business's balance account, to send USDC to from inside Clear (when
+   * Clear shares the person's account read-only). Null where Clear funding isn't available.
+   */
+  depositAddress: z.string().nullable().optional()
 });
 
 export const Movement = z.object({
@@ -49,7 +54,12 @@ export const Statement = z.object({
       amountMicros: Micros,
       notSetYet: z.boolean().default(false),
       // ---- E3 (added 2026-09-29) ----
-      group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other"]).optional(),
+      /** Station statements use the first seven; business statements (2026-09-29) use `balance` and `spent`. */
+      group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other", "balance", "spent"]).optional(),
+      /** Business statements (added 2026-09-29): what the line is. `spot_station` lines are one spot on one station. */
+      kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station"]).optional(),
+      /** Shown, not added in (money returned from holds, fees paid on top). */
+      includedAbove: z.boolean().optional(),
       /** How many airings the line is for (spot lines). */
       airings: z.number().int().optional(),
       /** The rate, when every airing on the line had the same one. Not sent yet. */
@@ -64,7 +74,29 @@ export const Statement = z.object({
   // ---- E3 (added 2026-09-29) ----
   /** When the payout for the period was sent, and where ("Chase ending 2231"); null until it is. */
   paidOn: DateOnly.nullable().optional(),
-  destination: z.string().nullable().optional()
+  destination: z.string().nullable().optional(),
+  // ---- E3, business statements (added 2026-09-29) ----
+  /** This month, so far; the final statement is issued after the month ends (`finalOn`). */
+  inProgress: z.boolean().optional(),
+  /** The last day it covers so far. */
+  asOf: DateOnly.optional(),
+  finalOn: DateOnly.nullable().optional(),
+  /** The closing figure, split. Business statements count the balance and what's held together. */
+  closingAvailableMicros: Micros.optional(),
+  closingHeldMicros: Micros.optional()
+});
+
+/** E4 (added 2026-09-29): a receipt for the books. Money added is a prepayment; sponsorships and orders are expenses; the monthly statement covers airings. */
+export const Receipt = z.object({
+  id: Id,
+  kind: z.enum(["prepayment", "expense", "statement"]),
+  /** "Money added", "Sponsorship", "Production order", "September statement". */
+  title: z.string(),
+  detail: z.string().nullable(),
+  amountMicros: Micros,
+  at: Timestamp,
+  /** A PDF, at a link that works without signing in (it's signed for this business). */
+  pdfUrl: z.string()
 });
 
 export const StationEarnings = z.object({
@@ -168,7 +200,17 @@ export const ledgerApi = {
     summary: "The fee in dollars before paying (card: Stripe's fee at cost; bank and Clear: none), and roughly how many airings",
     params: BusinessParams,
     body: z.object({ amountMicros: Micros.positive(), method: z.enum(["clear_bank", "card", "clear_account"]) }),
-    response: z.object({ amountMicros: Micros, feeMicros: Micros, arrives: z.string(), roughAirings: z.number().int().nullable() })
+    response: z.object({
+      amountMicros: Micros,
+      feeMicros: Micros,
+      arrives: z.string(),
+      roughAirings: z.number().int().nullable(),
+      /** E6 (added 2026-09-29): what `roughAirings` is worked out on: the rate, and for per-thousand rates the station. Null without a listed or paused spot. */
+      basis: z
+        .object({ rateKind: z.enum(["per_thousand", "per_airing"]), rateMicros: Micros, station: StationIdent.nullable() })
+        .nullable()
+        .optional()
+    })
   }),
   addMoney: endpoint({
     method: "POST",
@@ -316,6 +358,32 @@ export const ledgerApi = {
     response: Pledge
   }),
   /** E1 (added 2026-09-28). */
+  // ---- E4, E5 (added 2026-09-29) ----
+  listReceipts: endpoint({
+    method: "GET",
+    path: "/businesses/:businessId/receipts",
+    auth: "user",
+    summary: "E4: every receipt and monthly statement, newest first, each with a PDF (the business's team)",
+    params: BusinessParams,
+    response: z.array(Receipt)
+  }),
+  removeFundingSource: endpoint({
+    method: "DELETE",
+    path: "/businesses/:businessId/funding-sources/:sourceId",
+    auth: "user",
+    summary: "E5: remove a funding source (owner only). The default can't be removed (409 `default_source`: make another the default first), nor one with a deposit on its way (409 `deposit_pending`).",
+    params: z.object({ businessId: Id, sourceId: Id }),
+    response: z.array(FundingSource)
+  }),
+  makeDefaultFundingSource: endpoint({
+    method: "POST",
+    path: "/businesses/:businessId/funding-sources/:sourceId/default",
+    auth: "user",
+    summary: "E5: make a funding source the default (owner only): auto top-up and closing the account use it",
+    params: z.object({ businessId: Id, sourceId: Id }),
+    response: z.array(FundingSource)
+  }),
+
   pledgeCardSession: endpoint({
     method: "POST",
     path: "/me/pledges/:pledgeId/card-session",
@@ -335,3 +403,4 @@ export type Movement = z.infer<typeof Movement>;
 export type Statement = z.infer<typeof Statement>;
 export type StationEarnings = z.infer<typeof StationEarnings>;
 export type Pledge = z.infer<typeof Pledge>;
+export type Receipt = z.infer<typeof Receipt>;

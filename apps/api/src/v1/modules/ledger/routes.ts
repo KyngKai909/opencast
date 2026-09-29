@@ -8,7 +8,37 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
 
   r.handle(api.getBalance, async ({ user, params }) => {
     await accounts.requireBusiness(user, params.businessId, [...everyone]);
-    return ledger.balance(params.businessId);
+    const [balance, depositAddress] = await Promise.all([ledger.balance(params.businessId), ledger.depositAddress(params.businessId)]);
+    // E7: where to send USDC from inside Clear.
+    return { ...balance, depositAddress };
+  });
+  // ---- E4, E5 (added 2026-09-29) ----
+  r.handle(api.listReceipts, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    return ledger.receipts(params.businessId);
+  });
+  r.handle(api.removeFundingSource, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return ledger.removeFundingSource(params.businessId, params.sourceId);
+  });
+  r.handle(api.makeDefaultFundingSource, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return ledger.makeDefaultFundingSource(params.businessId, params.sourceId);
+  });
+  // E4: a receipt's PDF, at a signed link (the app opens it without the sign-in header). Not a contract endpoint: it answers a PDF.
+  r.router.get("/receipts/:businessId/:receiptId/pdf", async (req, res, next) => {
+    try {
+      const found = /^[0-9a-f-]{36}$/i.test(req.params.businessId) && /^[0-9a-f-]{36}$/i.test(req.params.receiptId)
+        ? await ledger.receiptPdf(req.params.businessId, req.params.receiptId, String(req.query.sig ?? ""))
+        : null;
+      if (!found) {
+        res.status(404).json({ error: { code: "not_found", message: "That receipt wasn't found." } });
+        return;
+      }
+      res.set({ "content-type": "application/pdf", "content-disposition": `inline; filename="${found.filename}"`, "cache-control": "private, no-store" }).send(found.pdf);
+    } catch (error) {
+      next(error);
+    }
   });
   r.handle(api.listMovements, async ({ user, params, query }) => {
     await accounts.requireBusiness(user, params.businessId, [...everyone]);

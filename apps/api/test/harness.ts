@@ -68,7 +68,17 @@ export interface User {
 }
 
 export async function createHarness(
-  options: { realTime?: boolean; payments?: (clock: { now(): Date }) => Deps["payments"]; chain?: Deps["chain"]; geo?: Deps["geo"]; relay?: Deps["relay"]; sseHeartbeatMs?: number } = {}
+  options: {
+    realTime?: boolean;
+    payments?: (clock: { now(): Date }) => Deps["payments"];
+    chain?: Deps["chain"];
+    geo?: Deps["geo"];
+    places?: Deps["places"];
+    relay?: Deps["relay"];
+    sseHeartbeatMs?: number;
+    /** The API's public origin (A117): paths it serves come back as full URLs. */
+    publicBase?: string;
+  } = {}
 ): Promise<Harness> {
   const database = await freshDatabase();
   const { publicKey, privateKey } = await generateKeyPair("ES256", { extractable: true });
@@ -105,7 +115,7 @@ export async function createHarness(
   const deps: Deps = {
     db: database.db,
     media: ffmpegPipeline(storageRoot),
-    storage: { objects: localObjectStore(path.join(storageRoot, "objects")), ipfs: fakeIpfs() },
+    storage: { objects: localObjectStore(path.join(storageRoot, "objects"), `${options.publicBase ?? ""}/objects`), ipfs: fakeIpfs() },
     chain: options.chain ?? null,
     payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
@@ -117,6 +127,7 @@ export async function createHarness(
     auth: verifier,
     clear,
     geo: options.geo ?? noGeoLookup,
+    places: options.places,
     relay: options.relay ?? memoryRelayBus(),
     config: {
       storageRoot,
@@ -125,7 +136,8 @@ export async function createHarness(
       // Base Sepolia's test USDC: only its address is used here, nothing is sent.
       usdc: { chainId: 84532, address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
       production: false,
-      sseHeartbeatMs: options.sseHeartbeatMs
+      sseHeartbeatMs: options.sseHeartbeatMs,
+      publicBase: options.publicBase ?? null
     }
   };
   const { router, services } = createV1(deps);

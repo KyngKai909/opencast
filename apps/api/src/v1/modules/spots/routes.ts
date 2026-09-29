@@ -122,7 +122,14 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   });
 
   // Sponsorships
-  r.handle(api.checkCredit, ({ body }) => checkCreditText(body.text));
+  r.handle(api.checkCredit, ({ body }) => {
+    const check = checkCreditText(body.text);
+    // P17: the part that passes ("who you are and where"), and the words each flag is about.
+    let who = body.text;
+    for (const flag of [...check.flags].sort((a, b) => b.start - a.start)) who = who.slice(0, flag.start) + who.slice(flag.end);
+    who = who.replace(/\s+([,.;:!?])/g, "$1").replace(/\s{2,}/g, " ").replace(/^[\s,.;:–-]+|[\s,;:–-]+$/g, "").trim();
+    return { ...check, flags: check.flags.map((f) => ({ ...f, quote: f.text })), who: who || null };
+  });
   r.handle(api.offerSponsorship, async ({ user, params, body }) => {
     await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.offerSponsorship(params.businessId, body);
@@ -151,7 +158,11 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   });
 
   // Production orders
-  r.handle(api.listMakers, () => spots.makers());
+  r.handle(api.listMakers, async ({ user, query }) => {
+    // P18: a maker's history with a business is for that business's team.
+    if (query.businessId) await accounts.requireBusiness(user, query.businessId, [...everyone]);
+    return spots.makers(query.businessId);
+  });
   r.handle(api.orderSpot, async ({ user, params, body }) => {
     await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.orderSpot(params.businessId, body);
@@ -232,8 +243,49 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   });
   r.handle(api.getResults, async ({ user, params, query }) => {
     await accounts.requireBusiness(user, params.businessId, [...everyone]);
-    return spots.results(params.businessId, query.month);
+    return spots.results(params.businessId, query.month, { period: query.period, month: query.month, week: query.week });
   });
+  // ---- Added 2026-09-29: the business app's requests ----
+
+  r.handle(api.updateLocation, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.updateLocation(params.businessId, params.locationId, body);
+  });
+  r.handle(api.uploadLogo, async ({ user, params, file }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.uploadLogo(params.businessId, file);
+  });
+  r.handle(api.closeBusiness, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.closeBusiness(params.businessId, body.confirmName);
+  });
+  r.handle(api.getConnections, async ({ user, params }) => {
+    const role = await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    return spots.connections(params.businessId, role === "owner");
+  });
+  r.handle(api.connect, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.connect(params.businessId, user.id, params.kind, body);
+  });
+  r.handle(api.disconnect, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.disconnect(params.businessId, params.kind);
+  });
+  r.handle(api.redeemCheck, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.checkCode(params.businessId, body);
+  });
+  r.handle(api.redeemToday, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.redeemToday(params.businessId);
+  });
+  r.handle(api.listSponsorTargets, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.sponsorTargets(params.businessId);
+  });
+  r.handle(api.getCategoryReach, ({ params, query }) => spots.categoryReach(params.marketId, query.category));
+  r.handle(api.lookupPlace, ({ query }) => spots.lookupPlace(query.q));
+
   r.handle(api.stationCustomers, async ({ user, params, query }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return spots.stationCustomers(params.stationId, query.month);

@@ -284,12 +284,12 @@ export const noIpfs: IpfsPublisher = {
 };
 
 /** The store from the environment: R2 when its keys are set, local disk otherwise. */
-export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string): Storage {
+export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string, publicBase: string | null = null): Storage {
   const endpoint = env.R2_ENDPOINT?.trim() || (env.R2_ACCOUNT_ID ? `https://${env.R2_ACCOUNT_ID.trim()}.r2.cloudflarestorage.com` : "");
   const r2 = endpoint && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET;
   const objects = r2
     ? s3ObjectStore({ endpoint, accessKeyId: env.R2_ACCESS_KEY_ID!.trim(), secretAccessKey: env.R2_SECRET_ACCESS_KEY!.trim(), bucket: env.R2_BUCKET!.trim(), publicBase: env.R2_PUBLIC_BASE?.trim() || undefined, presignSeconds: Number(env.R2_PRESIGN_TTL_SEC) || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === "true", createBucket: env.S3_CREATE_BUCKET === "true", storageClasses: env.S3_STORAGE_CLASSES !== "false" })
-    : localObjectStore(path.join(storageRoot, "objects"));
+    : localObjectStore(path.join(storageRoot, "objects"), `${publicBase ?? ""}/objects`);
   const ipfs = env.PINATA_JWT ? pinataPublisher({ jwt: env.PINATA_JWT, uploadUrl: env.PINATA_UPLOAD_URL || undefined, gatewayBase: env.PINATA_GATEWAY_BASE || undefined }) : noIpfs;
   return { objects, ipfs };
 }

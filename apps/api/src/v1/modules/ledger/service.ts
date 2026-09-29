@@ -13,6 +13,7 @@ import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { stripeCardFeeMicros, walletDestination, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
 import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
+import { createBusinessMoney, type BusinessMoney } from "./business.js";
 
 type AccountKind = (typeof schema.accountKind.enumValues)[number];
 type EntryKind = (typeof schema.entryKind.enumValues)[number];
@@ -55,7 +56,7 @@ export interface RevenueConfig {
   unclaimedPeriodDays: number;
 }
 
-export interface LedgerService {
+export interface LedgerService extends BusinessMoney {
   account(db: Executor, kind: AccountKind, owner?: { advertiserId?: string; stationId?: string; userId?: string; label?: string }): Promise<string>;
   post(db: Executor, kind: EntryKind, lines: Line[], source?: Source): Promise<string | null>;
   config(at?: Date): Promise<RevenueConfig>;
@@ -81,7 +82,10 @@ export interface LedgerService {
   movements(businessId: string, filter: { filter: "all" | "money" | "airings"; before?: string; limit: number }): Promise<MovementView[]>;
   /** `clear_account` with token "linked" adds the caller's linked Clear wallet (withdrawals can go to it). */
   addFundingSource(businessId: string, input: { kind: FundingKind; token: string; makeDefault: boolean }, byUserId?: string): Promise<BalanceView["fundingSources"]>;
-  quoteDeposit(businessId: string, input: { amountMicros: number; method: FundingKind }): Promise<{ amountMicros: number; feeMicros: number; arrives: string; roughAirings: number | null }>;
+  quoteDeposit(
+    businessId: string,
+    input: { amountMicros: number; method: FundingKind }
+  ): Promise<{ amountMicros: number; feeMicros: number; arrives: string; roughAirings: number | null; basis: { rateKind: "per_thousand" | "per_airing"; rateMicros: number; station: import("@opencast/contracts").StationIdent | null } | null }>;
   addMoney(businessId: string, input: { amountMicros: number; fundingSourceId: string }): Promise<{ depositId: string; status: "pending" | "arrived"; balance: BalanceView }>;
   /** Funding from the caller's linked Clear wallet (full access): where to send it. 409 when the link is read-only or missing. */
   quoteClearTransfer(businessId: string, userId: string, amountMicros: number): Promise<ClearTransferQuote>;
@@ -174,12 +178,26 @@ export interface StatementView {
   periodEnd: string;
   openingMicros: number;
   closingMicros: number;
-  lines: Array<{ label: string; detail: string | null; amountMicros: number; notSetYet: boolean; group?: StatementGroup; airings?: number }>;
+  lines: Array<{
+    label: string;
+    detail: string | null;
+    amountMicros: number;
+    notSetYet: boolean;
+    group?: StatementGroup | "balance" | "spent";
+    airings?: number;
+    kind?: "added" | "aired" | "returned" | "fees" | "sponsorship" | "order" | "withdrawn" | "refund" | "spot_station";
+    includedAbove?: boolean;
+  }>;
   issuedAt: string;
   csvUrl: string;
   pdfUrl: string | null;
   paidOn?: string | null;
   destination?: string | null;
+  inProgress?: boolean;
+  asOf?: string;
+  finalOn?: string | null;
+  closingAvailableMicros?: number;
+  closingHeldMicros?: number;
 }
 
 type StatementGroup = "spots" | "sponsors_pledges" | "carriage" | "shared" | "card_fees" | "production" | "other";
@@ -439,7 +457,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     });
   }
 
-  const service: LedgerService = {
+  const service = {
     async account(tx, kind, owner = {}) {
       const values = { kind, advertiserId: owner.advertiserId ?? null, stationId: owner.stationId ?? null, userId: owner.userId ?? null, label: owner.label ?? null };
       await tx.insert(L).values(values).onConflictDoNothing();
@@ -825,12 +843,15 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
 
     async quoteDeposit(businessId, input) {
       const feeMicros = deps.payments.depositFeeMicros(input.method, input.amountMicros);
-      const spots = await services.spots.typicalAiringCost(businessId);
+      const [spots, basis] = await Promise.all([services.spots.typicalAiringCost(businessId), services.spots.airingCostBasis(businessId)]);
+      // E6: what "roughly N airings" is worked out on.
+      const station = basis?.stationId ? ((await services.stations.idents([basis.stationId])).get(basis.stationId) ?? null) : null;
       return {
         amountMicros: input.amountMicros,
         feeMicros,
         arrives: deps.payments.arrives(input.method),
-        roughAirings: spots ? Math.floor(input.amountMicros / spots) : null
+        roughAirings: spots ? Math.floor(input.amountMicros / spots) : null,
+        basis: basis ? { rateKind: basis.rateKind, rateMicros: basis.rateMicros, station } : null
       };
     },
 
@@ -1015,6 +1036,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async statements(owner) {
+      // E3: a business's statements are shaped as it reads them.
+      if (owner.businessId) return businessMoney.businessStatements(owner.businessId);
       const accountIds = owner.businessId
         ? [await service.account(db, "advertiser_available", { advertiserId: owner.businessId })]
         : owner.stationId
@@ -1593,8 +1616,17 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async statementCsv(statementId) {
-      const [statement] = await db.select().from(schema.statements).where(eq(schema.statements.id, statementId));
-      if (!statement) throw notFound("That statement");
+      const [stored] = await db.select().from(schema.statements).where(eq(schema.statements.id, statementId));
+      // A business's statement for this month, so far: its id is the business's balance account.
+      const [current] = stored ? [] : await db.select().from(L).where(and(eq(L.id, statementId), eq(L.kind, "advertiser_available")));
+      if (!stored && !current) throw notFound("That statement");
+      const now = deps.clock.now();
+      const statement = stored ?? {
+        accountId: current.id,
+        period: "month" as const,
+        periodStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10),
+        periodEnd: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+      };
       const [account] = await db.select().from(L).where(eq(L.id, statement.accountId));
       const start = new Date(`${statement.periodStart}T00:00:00Z`);
       const end = new Date(new Date(`${statement.periodEnd}T00:00:00Z`).getTime() + DAY);
@@ -1724,7 +1756,10 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       const names = await services.accounts.displayNames(rows.filter((r) => r.creditOnAir).map((r) => r.userId));
       return { members: members.size, named: [...names.values()].filter((n): n is string => Boolean(n)) };
     }
-  };
+  } as LedgerService;
+
+  const businessMoney = createBusinessMoney({ deps, services }, service);
+  Object.assign(service, businessMoney);
 
   async function firstActivity(businessId: string): Promise<Date> {
     return (await services.spots.moneySettings(businessId))?.createdAt ?? deps.clock.now();

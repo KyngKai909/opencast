@@ -38,6 +38,9 @@ HLS: the worker writes each station's HLS to its own disk and serves it at `http
 | `APP_ORIGIN` | ✓ | ✓ | the viewer's URL (links in notices, Stripe return URLs) |
 | `WEB_ORIGIN` | ✓ | | every app's origin, comma-separated (CORS) |
 | `GEOIP_URL` | ✓ | | optional: an ip-to-postal lookup with `{ip}` in it (answering a ZIP as text, or JSON with a ZIP and/or coordinates), for `GET /markets/by-connection` (a TV's first launch). Unset: that endpoint answers no market and the open markets. Addresses are never stored or logged |
+| `PLACES_URL`, `PLACES_USER_AGENT` | ✓ | | optional (added 2026-09-29, P10): a geocoding lookup with `{q}` in it, for `GET /places/lookup` (a business's address or city). Nominatim's, Mapbox's and Google's answers are read, or plain `{ latitude, longitude, city, streetAddress }`. Unset: that endpoint answers 503 `not_available` and businesses choose Online. What's typed is never stored or logged |
+| `API_PUBLIC_URL` | ✓ | ✓ | the API's public origin (added 2026-09-29, A117), e.g. `https://api.<domain>`: paths it serves itself (`/objects/…` on local storage, receipt PDFs, checkout webhook addresses) are sent as full URLs, so apps on other hosts load them. Unset: Railway's `RAILWAY_PUBLIC_DOMAIN`, else paths as before |
+| `HLS_PUBLIC_URL` | ✓ | | optional (A117): the worker's public origin, for a station's own HLS (`/hls/<stationId>/index.m3u8`) when it has no Livepeer output. Unset: the API's origin |
 | `TRUST_PROXY_HOPS` | ✓ | | how many proxies add `X-Forwarded-For` entries before the API (default 1, Railway's edge): the client's address is that many entries from the end |
 | `STORAGE_ROOT` | `/tmp/opencast` | `/data/storage` | the API only keeps temporary files; the worker's HLS and proof frames live on its volume |
 | `WORKER_CACHE_DIR`, `WORKER_CACHE_GB` | | ✓ | `/data/cache`; 4.5 on staging, 99.5 in production |

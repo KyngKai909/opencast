@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { AccountExport, ClearLink, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -71,6 +71,8 @@ export interface AccountsService {
   /** The wallet a user signed in with or linked (Privy), if any: where the escrow can pay them. */
   walletOf(userId: string): Promise<string | null>;
   businessMemberIds(businessId: string, roles?: BusinessRole[]): Promise<string[]>;
+  /** P21: a closed business: everyone on its team loses access, and its open invites expire. */
+  closeBusinessAccess(businessId: string): Promise<void>;
 
   /** The person's linked Clear wallet, or null. `access` is full only while Clear still grants full access. */
   clearLink(userId: string): Promise<ClearLinkView | null>;
@@ -708,6 +710,16 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         .from(schema.advertiserMemberships)
         .where(eq(schema.advertiserMemberships.advertiserId, businessId));
       return rows.filter((r) => !roles || roles.includes(r.role)).map((r) => r.userId);
+    },
+
+    async closeBusinessAccess(businessId) {
+      await db.transaction(async (tx) => {
+        await tx.delete(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.advertiserId, businessId));
+        await tx
+          .update(schema.invites)
+          .set({ expiresAt: deps.clock.now() })
+          .where(and(eq(schema.invites.advertiserId, businessId), isNull(schema.invites.acceptedAt), gt(schema.invites.expiresAt, deps.clock.now())));
+      });
     },
 
     async signOutEverywhere(userId) {

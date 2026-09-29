@@ -18,7 +18,8 @@ const AUTO_APPROVE_DAYS = 7;
 const DAY = 86_400_000;
 
 export interface OrdersPart {
-  makers(): Promise<Array<{ station: import("@opencast/contracts").StationIdent; turnaround: string | null; fromMicros: number | null; samples: number }>>;
+  /** With `businessId` (P18), each maker's history with that business. */
+  makers(businessId?: string): Promise<Array<{ station: import("@opencast/contracts").StationIdent; turnaround: string | null; fromMicros: number | null; samples: number; history?: string | null; specialty?: string | null }>>;
   orderSpot(businessId: string, input: { makerStationId: string; title: string; lengthSec: 15 | 30 | 60; about: string; mustSay?: string; neededBy: string }): Promise<ProductionOrder>;
   businessOrders(businessId: string): Promise<ProductionOrder[]>;
   makerOrders(stationId: string): Promise<ProductionOrder[]>;
@@ -77,7 +78,10 @@ export function createOrders(
         ? db.select({ id: schema.spotsTable.id, listedAt: schema.spotsTable.listedAt, rateKind: schema.spotsTable.rateKind, rateMicros: schema.spotsTable.rateMicros }).from(schema.spotsTable).where(inArray(schema.spotsTable.id, spotIds))
         : Promise.resolve([])
     ]);
-    const authors = await services.accounts.displayNames(notes.map((n) => n.authorId));
+    const [authors, returned] = await Promise.all([
+      services.accounts.displayNames(notes.map((n) => n.authorId)),
+      services.ledger.releasedFromHolds(rows.map((r) => r.holdId).filter((v): v is string => Boolean(v)))
+    ]);
     const content = services.library.content;
     const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: f.role === "delivery" ? await content.previewUrl(f.contentId) : null }] as const)));
     return rows.flatMap((r) => {
@@ -98,7 +102,18 @@ export function createOrders(
           quote: r.quoteMicros !== null && r.deliverBy ? { priceMicros: r.quoteMicros, deliverBy: r.deliverBy, roundsIncluded: r.roundsIncluded ?? 0, voicedBy: r.voicedBy } : null,
           roundsUsed: new Set(mine.filter((n) => !n.makersMistake).map((n) => n.round)).size,
           briefFiles: files.filter((f) => f.orderId === r.id && f.role === "brief").map((f) => ({ id: f.id, url: urls.get(f.id)?.url ?? "", filename: f.filename })),
-          deliveries: files.filter((f) => f.orderId === r.id && f.role === "delivery").map((f) => ({ id: f.id, version: f.version ?? 1, url: urls.get(f.id)?.url ?? "", previewUrl: urls.get(f.id)?.previewUrl ?? null, createdAt: f.createdAt.toISOString() })),
+          deliveries: files
+            .filter((f) => f.orderId === r.id && f.role === "delivery")
+            .map((f) => ({
+              id: f.id,
+              version: f.version ?? 1,
+              url: urls.get(f.id)?.url ?? "",
+              previewUrl: urls.get(f.id)?.previewUrl ?? null,
+              createdAt: f.createdAt.toISOString(),
+              // P19: left out when it wasn't measured (deliveries from before).
+              ...(f.durationMs !== null ? { durationMs: f.durationMs } : {}),
+              checksPassed: f.checksPassed ?? []
+            })),
           notes: mine.map((n) => ({ id: n.id, timecodeMs: n.timecodeMs, author: authors.get(n.authorId) ?? null, body: n.body, makersMistake: n.makersMistake, round: n.round, createdAt: n.createdAt.toISOString() })),
           deliveredAt: r.deliveredAt?.toISOString() ?? null,
           autoApproveAt: r.autoApproveAt?.toISOString() ?? null,
@@ -109,7 +124,11 @@ export function createOrders(
           listedRate: (() => {
             const spot = r.spotId ? listed.find((x) => x.id === r.spotId) : undefined;
             return spot?.listedAt ? { kind: spot.rateKind, micros: spot.rateMicros } : null;
-          })()
+          })(),
+          // P19
+          quotedAt: r.quotedAt?.toISOString() ?? null,
+          approvedAt: r.approvedAt?.toISOString() ?? null,
+          refundedMicros: r.holdId ? (returned.get(r.holdId) ?? 0) : 0
         }
       ];
     });
@@ -118,12 +137,15 @@ export function createOrders(
   const emit = (r: typeof O.$inferSelect) => deps.bus.emit("order.updated", { orderId: r.id, businessId: r.advertiserId, makerStationId: r.makerStationId, state: r.status });
 
   /** Stores an order's file by content ID and records it on the order. */
-  async function keep(orderId: string, file: UploadedFile, role: "brief" | "delivery", version: number | null) {
+  async function keep(orderId: string, file: UploadedFile, role: "brief" | "delivery", version: number | null, checked?: { durationMs: number | null; checksPassed: string[] }) {
     const content = services.library.content;
     // Briefs are read once or twice: Infrequent Access. A delivery may become the spot that airs.
     const stored = await content.store(file.path, { storageClass: role === "brief" ? "infrequent" : "standard", contentType: file.mimeType || undefined });
     return db.transaction(async (tx) => {
-      const [saved] = await tx.insert(F).values({ orderId, role, version, contentId: stored.cid, filename: file.originalName }).returning();
+      const [saved] = await tx
+        .insert(F)
+        .values({ orderId, role, version, contentId: stored.cid, filename: file.originalName, durationMs: checked?.durationMs ?? null, checksPassed: checked?.checksPassed ?? null })
+        .returning();
       await content.addRef(tx, stored.cid, "order_file", saved.id);
       return saved;
     });
@@ -171,17 +193,26 @@ export function createOrders(
   }
 
   const part: OrdersPart = {
-    async makers() {
+    async makers(businessId) {
       const makers = await services.stations.makers();
       const counts = makers.length
-        ? await db.select({ makerStationId: O.makerStationId, id: O.id }).from(O).where(and(inArray(O.makerStationId, makers.map((m) => m.profile.id)), eq(O.status, "approved")))
+        ? await db
+            .select({ makerStationId: O.makerStationId, id: O.id, advertiserId: O.advertiserId, title: O.title, approvedAt: O.approvedAt })
+            .from(O)
+            .where(and(inArray(O.makerStationId, makers.map((m) => m.profile.id)), eq(O.status, "approved")))
         : [];
-      return makers.map((m) => ({
-        station: m.profile.ident,
-        turnaround: m.turnaround,
-        fromMicros: m.fromMicros,
-        samples: counts.filter((c) => c.makerStationId === m.profile.id).length
-      }));
+      return makers.map((m) => {
+        // P18: what it made for this business, the latest first.
+        const made = businessId ? counts.filter((c) => c.makerStationId === m.profile.id && c.advertiserId === businessId).sort((a, b) => (b.approvedAt?.getTime() ?? 0) - (a.approvedAt?.getTime() ?? 0)) : [];
+        return {
+          station: m.profile.ident,
+          turnaround: m.turnaround,
+          fromMicros: m.fromMicros,
+          samples: counts.filter((c) => c.makerStationId === m.profile.id).length,
+          ...(businessId ? { history: made.length ? `Made your ${made[0].title} spot${made.length > 1 ? ` and ${made.length - 1} more` : ""}` : null } : {}),
+          specialty: m.profile.kind === "studio" && !m.profile.category ? "Any category" : m.profile.category
+        };
+      });
     },
 
     async orderSpot(businessId, input) {
@@ -228,7 +259,7 @@ export function createOrders(
         .set(
           input.action === "pass"
             ? { status: "passed" }
-            : { status: "quoted", quoteMicros: input.priceMicros, deliverBy: input.deliverBy, roundsIncluded: input.roundsIncluded, voicedBy: input.voicedBy }
+            : { status: "quoted", quoteMicros: input.priceMicros, deliverBy: input.deliverBy, roundsIncluded: input.roundsIncluded, voicedBy: input.voicedBy, quotedAt: deps.clock.now() }
         )
         .where(eq(O.id, orderId))
         .returning();
@@ -261,7 +292,15 @@ export function createOrders(
       if (!["accepted", "changes_requested"].includes(found.status)) throw refused("not_in_the_making", "That order isn't waiting for a delivery.");
       const versions = await db.select().from(F).where(and(eq(F.orderId, orderId), eq(F.role, "delivery")));
       const now = deps.clock.now();
-      const saved = await keep(orderId, file, "delivery", versions.length + 1);
+      // P19: the delivery's length and the spot checks it passes (as a spot's upload is checked).
+      const probe = await deps.media.probe(file.path).catch(() => null);
+      const loudness = probe?.durationMs ? await deps.media.loudness(file.path).catch(() => null) : null;
+      const checksPassed = [
+        ...(probe?.durationMs && Math.abs(probe.durationMs - found.lengthSec * 1000) <= 100 ? ["length"] : []),
+        ...(probe?.mediaKind !== "audio" && probe?.width && probe.height && probe.width / probe.height > 1.7 ? ["picture"] : []),
+        ...(loudness !== null && Math.abs(loudness + 24) <= 2 ? ["loudness"] : [])
+      ];
+      const saved = await keep(orderId, file, "delivery", versions.length + 1, { durationMs: probe?.durationMs ?? null, checksPassed });
       await services.library.content.needPreview([saved.contentId!], "order", orderId);
       const [updated] = await db
         .update(O)

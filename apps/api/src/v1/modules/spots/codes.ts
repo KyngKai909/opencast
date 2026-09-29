@@ -3,20 +3,43 @@
 // after an airing. Stations see customers from their own airings only.
 // Results for businesses come from the as-run log, never the planned log.
 
-import { and, desc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Results, StationIdent } from "@opencast/contracts";
+import type { Results, ResultsCode, StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
-import { notFound } from "../../errors.js";
+import { conflict, notFound } from "../../errors.js";
+import { localDate, localDay } from "../../lib/time.js";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
 
+export interface RedeemAnswer {
+  valid: boolean;
+  firstUse: boolean;
+  countsAsCustomer: boolean;
+  savedFrom: StationIdent | null;
+  message: string;
+  code: string;
+  offer: string | null;
+  savedAt: string | null;
+  spotTitle: string | null;
+  redeemedToday: number;
+}
+
+export type ResultsPeriod = { period: "week" | "month" | "all"; month: string; week?: string };
+
 export interface CodesPart {
   scan(code: string, input: { stationId?: string; airingId?: string }): Promise<{ business: string; offer: string }>;
   saveOffer(code: string, input: { stationId?: string; customerRef?: string }): Promise<{ savedUntil: string; savedFrom: StationIdent | null }>;
-  redeem(businessId: string, userId: string, input: { code: string; customerRef?: string }): Promise<{ valid: boolean; firstUse: boolean; countsAsCustomer: boolean; savedFrom: StationIdent | null; message: string }>;
-  results(businessId: string, month: string): Promise<Results>;
+  redeem(businessId: string, userId: string, input: { code: string; customerRef?: string }): Promise<RedeemAnswer>;
+  /** B5: the same check as `redeem`, counting nothing. */
+  checkCode(businessId: string, input: { code: string; customerRef?: string }): Promise<RedeemAnswer>;
+  /** P12: the Redeem tool's switch, codes marked used today, and whether Clear Pay counts by itself. */
+  redeemToday(businessId: string): Promise<{ on: boolean; redeemedToday: number; clearPay: boolean }>;
+  /** Results for a month (the contract's), or (P14) a week or all time. */
+  results(businessId: string, month: string, period?: ResultsPeriod): Promise<Results>;
+  /** P20: a use counted by a connected checkout or Clear Pay (a webhook). False when the code isn't the business's. */
+  countUse(businessId: string, input: { code: string; source: "clear_pay" | "shopify" | "stripe" | "square"; customerRef: string | null; at: Date }): Promise<boolean>;
   customersByStation(stationId: string, month: string): Promise<Map<string, number>>;
   stationCustomers(stationId: string, month: string): Promise<Array<{ spotId: string; business: string; customers: number }>>;
 }
@@ -79,6 +102,159 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
     });
   }
 
+  /** The business's market day (its first market's time zone, or Los Angeles). */
+  async function timezoneOf(businessId: string) {
+    const [market] = await db.select().from(schema.advertiserMarkets).where(eq(schema.advertiserMarkets.advertiserId, businessId)).limit(1);
+    return market ? ((await services.network.marketsByIds([market.marketId])).get(market.marketId)?.timezone ?? "America/Los_Angeles") : "America/Los_Angeles";
+  }
+
+  async function redeemOn(businessId: string) {
+    const [row] = await db.select({ redeemOn: schema.advertisers.redeemOn, where: schema.advertisers.customersWhere }).from(schema.advertisers).where(eq(schema.advertisers.id, businessId));
+    return row ? (row.redeemOn ?? row.where !== "online") : false;
+  }
+
+  async function connected(businessId: string, kind: "clear_pay" | "checkout") {
+    const [row] = await db
+      .select({ id: schema.connections.id })
+      .from(schema.connections)
+      .where(and(eq(schema.connections.advertiserId, businessId), eq(schema.connections.kind, kind), isNull(schema.connections.disconnectedAt)))
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async function markedToday(businessId: string) {
+    const tz = await timezoneOf(businessId);
+    const { from } = localDay(localDate(deps.clock.now(), tz), tz);
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(EV)
+      .innerJoin(C, eq(C.id, EV.codeId))
+      .innerJoin(SP, eq(SP.id, C.spotId))
+      .where(and(eq(SP.advertiserId, businessId), eq(EV.kind, "use"), eq(EV.source, "marked_used"), gte(EV.occurredAt, from)));
+    return row.n;
+  }
+
+  /** B5 and the counter: checks a code for this business, and (with `markedBy`) counts the use. */
+  async function answer(businessId: string, input: { code: string; customerRef?: string }, markedBy: string | null): Promise<RedeemAnswer> {
+    const typed = input.code.trim().toUpperCase();
+    const rows = await db
+      .select({ code: C, spot: SP })
+      .from(C)
+      .innerJoin(SP, eq(SP.id, C.spotId))
+      .where(and(eq(C.code, typed), eq(SP.advertiserId, businessId)));
+    const found = rows[0];
+    const base = { code: typed, offer: null, savedAt: null, spotTitle: null, savedFrom: null, firstUse: false, countsAsCustomer: false };
+    if (!found) return { ...base, valid: false, message: `${typed} isn't one of your codes. Check it with the customer.`, redeemedToday: await markedToday(businessId) };
+    const now = deps.clock.now();
+    // An ended spot's offer keeps for its window after it ended.
+    if (found.spot.status === "ended" && found.spot.endedAt && now.getTime() > found.spot.endedAt.getTime() + found.code.windowDays * DAY) {
+      return { ...base, offer: found.code.offer, spotTitle: found.spot.title, valid: false, message: `${typed} has ended.`, redeemedToday: await markedToday(businessId) };
+    }
+    const priorUses = input.customerRef
+      ? await db.select().from(EV).where(and(eq(EV.codeId, found.code.id), eq(EV.kind, "use"), eq(EV.customerRef, input.customerRef)))
+      : [];
+    const firstUse = priorUses.length === 0;
+    // A customer only within the offer's window after an airing.
+    const recent = await airedAirings([found.spot.id], new Date(now.getTime() - found.code.windowDays * DAY), now);
+    const [saved] = input.customerRef
+      ? await db.select().from(EV).where(and(eq(EV.codeId, found.code.id), eq(EV.kind, "save"), eq(EV.customerRef, input.customerRef))).orderBy(desc(EV.occurredAt)).limit(1)
+      : [];
+    const latest = recent.sort((a, b) => b.run.startedAt.getTime() - a.run.startedAt.getTime())[0];
+    const stationId = saved?.stationId ?? latest?.airing.stationId ?? null;
+    const countsAsCustomer = firstUse && recent.length > 0;
+    if (markedBy) {
+      await db.insert(EV).values({
+        codeId: found.code.id,
+        kind: "use",
+        source: "marked_used",
+        airingId: saved?.airingId ?? latest?.airing.id ?? null,
+        stationId,
+        customerRef: input.customerRef ?? null,
+        countsAsCustomer,
+        markedBy,
+        occurredAt: now
+      });
+      deps.bus.emit("code.used", { businessId, spotId: found.spot.id, code: found.code.code });
+    }
+    const savedFrom = stationId ? ((await services.stations.idents([stationId])).get(stationId) ?? null) : null;
+    return {
+      valid: true,
+      firstUse,
+      countsAsCustomer,
+      savedFrom,
+      message: !firstUse ? "Already used by this customer." : countsAsCustomer ? "First use. It counts as a customer." : `First use, but not within ${found.code.windowDays} days of an airing.`,
+      code: found.code.code,
+      offer: found.code.offer,
+      savedAt: saved?.occurredAt.toISOString() ?? null,
+      spotTitle: found.spot.title,
+      redeemedToday: await markedToday(businessId)
+    };
+  }
+
+  /** P14: the dates a results request covers (UTC days, as months always were). */
+  async function rangeOf(period: ResultsPeriod, spots: Array<typeof SP.$inferSelect>): Promise<{ from: Date; to: Date; shownFrom?: Date }> {
+    if (period.period === "month") return monthRange(period.month);
+    if (period.period === "week") {
+      const today = deps.clock.now().toISOString().slice(0, 10);
+      const day = period.week ?? today;
+      const start = new Date(`${day}T00:00:00Z`);
+      start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+      return { from: start, to: new Date(start.getTime() + 7 * DAY) };
+    }
+    // All time: everything so far, shown from the first airing (or, before one, the first spot).
+    const first = spots.reduce<Date | null>((min, s) => (!min || s.createdAt < min ? s.createdAt : min), null);
+    return { from: new Date(0), to: new Date(deps.clock.now().getTime() + 1), shownFrom: first ?? deps.clock.now() };
+  }
+
+  /** P13: each code's scans, saves and uses in the period, and how the uses were counted. */
+  async function codeFunnels(
+    businessId: string,
+    spots: Array<typeof SP.$inferSelect>,
+    events: Array<{ event: typeof EV.$inferSelect; spotId: string }>,
+    from: Date
+  ): Promise<ResultsCode[]> {
+    if (!spots.length) return [];
+    const codes = await db.select().from(C).where(inArray(C.spotId, spots.map((s) => s.id)));
+    if (!codes.length) return [];
+    const [clearPay, checkout] = await Promise.all([connected(businessId, "clear_pay"), connected(businessId, "checkout")]);
+    const saveStations = new Map<string, Map<string, number>>();
+    for (const e of events) {
+      if (e.event.kind !== "save" || !e.event.stationId) continue;
+      const counts = saveStations.get(e.event.codeId) ?? new Map<string, number>();
+      counts.set(e.event.stationId, (counts.get(e.event.stationId) ?? 0) + 1);
+      saveStations.set(e.event.codeId, counts);
+    }
+    const topStations = new Map([...saveStations].map(([codeId, counts]) => [codeId, [...counts].sort((a, b) => b[1] - a[1])[0][0]]));
+    const idents = await services.stations.idents([...topStations.values()]);
+    void from;
+    return codes.map((c) => {
+      const spot = spots.find((s) => s.id === c.spotId)!;
+      const mine = events.filter((e) => e.event.codeId === c.id);
+      const uses = mine.filter((e) => e.event.kind === "use");
+      const clearPayUses = uses.filter((e) => e.event.source === "clear_pay").length;
+      const onlineUses = uses.filter((e) => ["shopify", "stripe", "square"].includes(e.event.source)).length;
+      const top = topStations.get(c.id);
+      return {
+        code: c.code,
+        spotId: c.spotId,
+        spotTitle: spot.title,
+        offer: c.offer,
+        windowDays: c.windowDays,
+        oncePerCustomer: true,
+        savedForDays: c.windowDays,
+        scans: mine.filter((e) => e.event.kind === "scan").length,
+        saves: mine.filter((e) => e.event.kind === "save").length,
+        uses: uses.length,
+        usesBy: {
+          clearPay: clearPay || clearPayUses ? clearPayUses : null,
+          marked: uses.filter((e) => e.event.source === "marked_used").length,
+          online: checkout || onlineUses ? onlineUses : null
+        },
+        savedMostFrom: top ? (idents.get(top) ?? null) : null
+      };
+    });
+  }
+
   const part: CodesPart = {
     async scan(code, input) {
       const found = await findCode(code);
@@ -106,51 +282,51 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
     },
 
     async redeem(businessId, userId, input) {
+      if (!(await redeemOn(businessId))) throw conflict("redeem_off", "Redeem is off for this business. Turn it on in Settings.");
+      return answer(businessId, input, userId);
+    },
+
+    async checkCode(businessId, input) {
+      return answer(businessId, input, null);
+    },
+
+    async redeemToday(businessId) {
+      const [on, today, clearPay] = await Promise.all([redeemOn(businessId), markedToday(businessId), connected(businessId, "clear_pay")]);
+      return { on, redeemedToday: today, clearPay };
+    },
+
+    async countUse(businessId, input) {
       const rows = await db
         .select({ code: C, spot: SP })
         .from(C)
         .innerJoin(SP, eq(SP.id, C.spotId))
-        .where(and(eq(C.code, input.code.toUpperCase()), eq(SP.advertiserId, businessId)));
+        .where(and(eq(C.code, input.code.trim().toUpperCase()), eq(SP.advertiserId, businessId)));
       const found = rows[0];
-      if (!found) return { valid: false, firstUse: false, countsAsCustomer: false, savedFrom: null, message: "That isn't one of your codes." };
-      const now = deps.clock.now();
-      const priorUses = input.customerRef
-        ? await db.select().from(EV).where(and(eq(EV.codeId, found.code.id), eq(EV.kind, "use"), eq(EV.customerRef, input.customerRef)))
-        : [];
-      const firstUse = priorUses.length === 0;
-      // A customer only within the offer's window after an airing.
-      const recent = await airedAirings([found.spot.id], new Date(now.getTime() - found.code.windowDays * DAY), now);
+      if (!found) return false;
+      const prior = input.customerRef ? await db.select({ id: EV.id }).from(EV).where(and(eq(EV.codeId, found.code.id), eq(EV.kind, "use"), eq(EV.customerRef, input.customerRef))).limit(1) : [];
+      const recent = await airedAirings([found.spot.id], new Date(input.at.getTime() - found.code.windowDays * DAY), input.at);
       const [saved] = input.customerRef
         ? await db.select().from(EV).where(and(eq(EV.codeId, found.code.id), eq(EV.kind, "save"), eq(EV.customerRef, input.customerRef))).orderBy(desc(EV.occurredAt)).limit(1)
         : [];
       const latest = recent.sort((a, b) => b.run.startedAt.getTime() - a.run.startedAt.getTime())[0];
-      const stationId = saved?.stationId ?? latest?.airing.stationId ?? null;
-      const countsAsCustomer = firstUse && recent.length > 0;
       await db.insert(EV).values({
         codeId: found.code.id,
         kind: "use",
-        source: "marked_used",
+        source: input.source,
         airingId: saved?.airingId ?? latest?.airing.id ?? null,
-        stationId,
-        customerRef: input.customerRef ?? null,
-        countsAsCustomer,
-        markedBy: userId,
-        occurredAt: now
+        stationId: saved?.stationId ?? latest?.airing.stationId ?? null,
+        customerRef: input.customerRef,
+        // Only a customer's first use, within the offer's window after an airing.
+        countsAsCustomer: prior.length === 0 && recent.length > 0,
+        occurredAt: input.at
       });
       deps.bus.emit("code.used", { businessId, spotId: found.spot.id, code: found.code.code });
-      const savedFrom = stationId ? ((await services.stations.idents([stationId])).get(stationId) ?? null) : null;
-      return {
-        valid: true,
-        firstUse,
-        countsAsCustomer,
-        savedFrom,
-        message: !firstUse ? "Already used by this customer." : countsAsCustomer ? "First use. It counts as a customer." : `First use, but not within ${found.code.windowDays} days of an airing.`
-      };
+      return true;
     },
 
-    async results(businessId, month) {
-      const { from, to } = monthRange(month);
+    async results(businessId, month, period = { period: "month", month }) {
       const spots = await db.select().from(SP).where(eq(SP.advertiserId, businessId));
+      const { from, to, shownFrom } = await rangeOf(period, spots);
       const spotIds = spots.map((s) => s.id);
       const aired = await airedAirings(spotIds, from, to);
       const [costs, idents, contexts, events] = await Promise.all([
@@ -192,6 +368,9 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
           costMicros: cost,
           working,
           proofFrameUrl: run.proofFrameUrl,
+          // P15: why it ran short, and when the proof frame was captured.
+          shortReason: partial ? "The break was cut short" : null,
+          proofCapturedAt: run.proofFrameAt?.toISOString() ?? null,
           scansNextHour: events.filter(
             (e) =>
               e.event.kind === "scan" &&
@@ -223,9 +402,15 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
         row.airings++;
         byDaypart.set(key, row);
       }
-      const stationIdents = await services.stations.idents([...byStation.keys()]);
+      const [stationIdents, profiles] = await Promise.all([services.stations.idents([...byStation.keys()]), services.stations.profiles([...byStation.keys()])]);
+      const codes = await codeFunnels(businessId, spots, events, from);
+      const today = new Date(Math.min(to.getTime() - 1, deps.clock.now().getTime()));
       return {
         month,
+        period: period.period,
+        from: (period.period === "all" && airings.length ? new Date(airings[0].startedAt) : (shownFrom ?? from)).toISOString().slice(0, 10),
+        to: (today < from ? from : today).toISOString().slice(0, 10),
+        codes,
         totals: {
           airings: airings.length,
           // People tuned in, added up across airings: never reach or unique viewers.
@@ -238,7 +423,9 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
         },
         byStation: [...byStation].flatMap(([id, r]) => {
           const station = stationIdents.get(id);
-          return station ? [{ station, airings: r.airings, averageTunedIn: r.airings ? Math.round(r.tunedIn / r.airings) : 0, spentMicros: r.spent, customers: r.customers }] : [];
+          return station
+            ? [{ station, airings: r.airings, averageTunedIn: r.airings ? Math.round(r.tunedIn / r.airings) : 0, spentMicros: r.spent, customers: r.customers, category: profiles.get(id)?.category ?? null }]
+            : [];
         }),
         byDaypart: [...byDaypart].map(([daypart, r]) => ({ daypart, airings: r.airings, customers: r.customers })),
         bySpot: spots

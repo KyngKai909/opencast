@@ -21,6 +21,7 @@ import type { WaitlistService } from "./modules/waitlist/service.js";
 import type { NetworkService } from "./modules/network/service.js";
 import type { TvService } from "./modules/tv/service.js";
 import type { GeoLookup } from "./geo.js";
+import type { PlaceLookup } from "./places.js";
 import type { RelayBus } from "./relay.js";
 import type { RouteRegistrar } from "./http.js";
 
@@ -53,6 +54,8 @@ export interface Deps {
   payments: Payments;
   /** Where a request comes from (GEOIP_URL), for the market from the connection. Addresses are never stored. */
   geo: GeoLookup;
+  /** Addresses and cities to coordinates (PLACES_URL), for a business's locations. Nothing typed is stored. Optional: none without it. */
+  places?: PlaceLookup;
   /** The TV remote's message bus: in-process, or Redis pub/sub when REDIS_URL is set. */
   relay: RelayBus;
   config: {
@@ -67,6 +70,14 @@ export interface Deps {
     production: boolean;
     /** Event streams' heartbeat (25 s). Tests shorten it. */
     sseHeartbeatMs?: number;
+    /**
+     * The API's own public origin (API_PUBLIC_URL, e.g. `https://api.opencast.tv`), added 2026-09-29
+     * (A117): paths the API serves itself (`/hls/…`, `/objects/…`, receipt PDFs) are sent as full
+     * URLs, so apps on another host can load them. Unset: sent as paths, as before.
+     */
+    publicBase?: string | null;
+    /** Where the worker serves each station's own HLS (HLS_PUBLIC_URL), when it isn't the API's origin. */
+    hlsBase?: string | null;
   };
 }
 

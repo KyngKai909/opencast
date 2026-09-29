@@ -11,6 +11,7 @@ import { paymentsFromEnv } from "./payments/index.js";
 import { storageFromEnv } from "./storage.js";
 import { chainFromEnv } from "./chain/index.js";
 import { geoFromEnv } from "./geo.js";
+import { placesFromEnv } from "./places.js";
 import { relayFromEnv } from "./relay.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
@@ -29,12 +30,13 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const clock = { now: () => new Date() };
   const appOrigin = env.APP_ORIGIN ?? "http://localhost:5174";
   const chain = chainFromEnv(env);
+  const publicBase = publicBaseFromEnv(env);
   return {
     db,
     bus: new EventBus(),
     clock,
     media: ffmpegPipeline(storageRoot),
-    storage: storageFromEnv(env, storageRoot),
+    storage: storageFromEnv(env, storageRoot, publicBase),
     chain,
     notifier: {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
@@ -48,15 +50,26 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     }),
     clear: clearLookupFromEnv(env),
     geo: geoFromEnv(env),
+    places: placesFromEnv(env),
     relay: relayFromEnv(env),
     config: {
       storageRoot,
       appOrigin,
       escrowContractAddress: chain?.escrow ?? (env.ESCROW_CONTRACT_ADDRESS || null),
       usdc: env.CHAIN_ID && env.USDC_ADDRESS ? { chainId: Number(env.CHAIN_ID), address: env.USDC_ADDRESS } : null,
-      production: env.NODE_ENV === "production"
+      production: env.NODE_ENV === "production",
+      publicBase,
+      hlsBase: env.HLS_PUBLIC_URL?.trim().replace(/\/+$/, "") || null
     }
   };
+}
+
+/** A117: the API's public origin: API_PUBLIC_URL (or PUBLIC_BASE_URL), else Railway's public domain. */
+export function publicBaseFromEnv(env: NodeJS.ProcessEnv): string | null {
+  const configured = (env.API_PUBLIC_URL ?? env.PUBLIC_BASE_URL)?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  const railway = env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  return railway ? `https://${railway}` : null;
 }
 
 /** The API server's v1. The jobs tick belongs to the worker now; JOBS=on runs it here instead. */

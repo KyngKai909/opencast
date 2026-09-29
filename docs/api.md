@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-243 endpoints in 14 modules.
+257 endpoints in 14 modules.
 
 ## accounts (34)
 
@@ -148,7 +148,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `placeInLog` | POST | `/carriage/agreements/:agreementId/place` | signed in | Put the agreed slots on the carrier's log: next unaired episode, in order, replacing what's there |
 | `withdrawRequest` | POST | `/carriage/requests/:requestId/withdraw` | signed in | C4: withdraw a request the maker hasn't answered (the carrier's owner or operator). 409 `decided` once it's approved or declined. |
 
-## spots (50)
+## spots (61)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -161,7 +161,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `createSpot` | POST | `/businesses/:businessId/spots` | signed in | Start a spot (a draft) with its rate, budget and targeting |
 | `getSpot` | GET | `/spots/:spotId` | signed in | One spot |
 | `updateSpot` | PATCH | `/spots/:spotId` | signed in | Change the rate, budget, dates, targeting or code. Raising the budget uses money already available. |
-| `uploadSpotFile` | POST | `/spots/:spotId/file` | signed in | Upload the spot. Checked on arrival: exact length, picture, title safe, captions, loudness, code. |
+| `uploadSpotFile` | POST | `/spots/:spotId/file` | signed in | Upload the spot. Checked on arrival: exact length, picture, title safe, captions, loudness, code. A spot without a code gets one here (added 2026-09-29, P4): Opencast's letters, the title as the offer until the business names one. |
 | `matchStations` | POST | `/spots/:spotId/matches` | signed in | Which stations would see it, with the reason any nearby station is left out, and an estimated cost per airing |
 | `submitSpot` | POST | `/spots/:spotId/submit` | signed in | Send for review (category and content), before any station can see it |
 | `pauseSpot` | POST | `/spots/:spotId/pause` | signed in | Pause. Airings already held still air. |
@@ -181,7 +181,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `decideSponsorship` | POST | `/sponsorships/:sponsorshipId/decision` | signed in | Approve, or decline with a reason from the short list |
 | `endSponsorship` | POST | `/sponsorships/:sponsorshipId/end` | signed in | Stop renewing; it ends with its paid month |
 | `setSponsorshipSettings` | PUT | `/stations/:stationId/sponsorship-settings` | signed in | Minimum a month and most sponsors for the station and each program; closed programs can't be sponsored |
-| `listMakers` | GET | `/makers` | signed in | Stations that take orders, and Opencast Studio |
+| `listMakers` | GET | `/makers` | signed in | Stations that take orders, and Opencast Studio. `businessId` (added 2026-09-29, P18) adds each maker's history with that business. |
 | `orderSpot` | POST | `/businesses/:businessId/orders` | signed in | Send a brief to a maker |
 | `listBusinessOrders` | GET | `/businesses/:businessId/orders` | signed in | A business's orders |
 | `listMakerOrders` | GET | `/stations/:stationId/orders` | signed in | Orders sent to this maker |
@@ -197,13 +197,24 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `resolveOrderDispute` | POST | `/admin/orders/:orderId/resolve` | Opencast admin | Opencast's review of a disputed order: pay the maker, refund the business, or split (added 2026-09) |
 | `scanCode` | POST | `/c/:code/scan` | anyone | Count a QR scan (from the page the QR opens) |
 | `saveOffer` | POST | `/c/:code/save` | anyone (personal if signed in) | Save the offer to a phone |
-| `redeemCode` | POST | `/businesses/:businessId/redeem` | signed in | Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use. |
-| `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers |
+| `redeemCode` | POST | `/businesses/:businessId/redeem` | signed in | Mark a code used at the counter (owner, manager). Checks it's valid and the customer's first use. 409 `redeem_off` while the Redeem tool is off (added 2026-09-29). |
+| `getResults` | GET | `/businesses/:businessId/results` | signed in | Every airing from the as-run log with proof, tuned in and cost; codes and customers. `period` (added 2026-09-29, P14): a `week` (the Sunday `week`, default this one), the `month`, or `all` time. |
 | `stationCustomers` | GET | `/stations/:stationId/customers` | signed in | Customers from airings on this station only, per spot |
 | `tellMeWhenListed` | POST | `/orders/:orderId/tell-me-when-listed` | signed in | P24: the maker asks to be told when the business lists the spot it made (the maker's owner or operator). Told once, when it's listed; at once if it already is. |
 | `listSpotCategories` | GET | `/spot-categories` | anyone | S17: every spot category, in one list: what a business is, what markets filter by, and (`blockable`) what a station can block |
+| `updateLocation` | PATCH | `/businesses/:businessId/locations/:locationId` | signed in | P26: change a location or service area in place (owner, manager); it keeps its place in the list. A location has no radius. |
+| `uploadLogo` | POST | `/businesses/:businessId/logo` | signed in | P11: upload the logo (owner, manager): a square PNG or JPEG, at least 256 pixels. Stored at 512 pixels. 422 `logo_size`, `not_an_image`. |
+| `closeBusiness` | POST | `/businesses/:businessId/close` | signed in | P21: close the account (owner only; type its name). Spots end (out of every rotation), sponsorships stop renewing, unanswered orders are cancelled. Held money pays for what's already scheduled; the available balance goes back to the default bank or Clear account now, and what's left after the held airings follows. 409 `order_in_progress` while an order is being made or reviewed; 409 `no_source` when there's money to send back and no bank or Clear account to send it to. |
+| `getConnections` | GET | `/businesses/:businessId/connections` | signed in | P20: Clear Pay and an online checkout |
+| `connect` | POST | `/businesses/:businessId/connections/:kind` | signed in | P20: connect Clear Pay or an online checkout (owner only). For a checkout, `token` is the webhook signing secret the provider shows (Shopify's app secret, Stripe's `whsec_…`, Square's signature key); the answer's `webhookUrl` is where the provider sends order events, and each promotion code used counts as a use. Connecting another checkout replaces the one before. |
+| `disconnect` | DELETE | `/businesses/:businessId/connections/:kind` | signed in | P20: disconnect Clear Pay or the checkout (owner only). Uses already counted stay counted. |
+| `redeemCheck` | POST | `/businesses/:businessId/redeem/check` | signed in | B5: check a code at the counter without counting the use (owner, manager): valid, first use for this customer, when and where the offer was saved, its text |
+| `redeemToday` | GET | `/businesses/:businessId/redeem/today` | signed in | P12: the Redeem tool: on or off, codes marked used today, and whether Clear Pay counts uses by itself (owner, manager) |
+| `listSponsorTargets` | GET | `/businesses/:businessId/sponsor-targets` | signed in | P16: the stations near the business (its markets; within 25 miles of a place, or its service area) and their own programs that take sponsors, with the minimum and the room. Closed ones and full ones are left out. |
+| `getCategoryReach` | GET | `/markets/:marketId/category-reach` | signed in | P9: how many of a market's stations on the air can carry a spot category, and which block it |
+| `lookupPlace` | GET | `/places/lookup` | signed in | P10: an address or a city to coordinates and a market, through the server's place lookup (PLACES_URL). Nothing is stored. 404 `not_found` when nothing matches; 503 `not_available` when no lookup is set up. |
 
-## ledger (20)
+## ledger (23)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -226,6 +237,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `pledge` | POST | `/stations/:stationId/pledges` | signed in | Pledge monthly or once, by card. Credit me on air uses the display name. |
 | `listMyPledges` | GET | `/me/pledges` | signed in, or a TV signed in | My pledges |
 | `updatePledge` | PATCH | `/me/pledges/:pledgeId` | signed in | Change the amount or on-air credit, or stop (it ends after the current month). `cadence` (added 2026-09-28, E1): a monthly pledge set to `once` isn't charged again (it ends after this month, like stop); set back to `monthly` before then, it carries on. A one-time pledge can't become monthly (422 `new_pledge_needed`: pledge again, monthly). |
+| `listReceipts` | GET | `/businesses/:businessId/receipts` | signed in | E4: every receipt and monthly statement, newest first, each with a PDF (the business's team) |
+| `removeFundingSource` | DELETE | `/businesses/:businessId/funding-sources/:sourceId` | signed in | E5: remove a funding source (owner only). The default can't be removed (409 `default_source`: make another the default first), nor one with a deposit on its way (409 `deposit_pending`). |
+| `makeDefaultFundingSource` | POST | `/businesses/:businessId/funding-sources/:sourceId/default` | signed in | E5: make a funding source the default (owner only): auto top-up and closing the account use it |
 | `pledgeCardSession` | POST | `/me/pledges/:pledgeId/card-session` | signed in | E1: a page to change the card on a monthly pledge (Stripe's), which comes back to `returnTo` (a path in the app; default the pledge's station). 422 `no_card_to_change` for a one-time or ended pledge. |
 
 ## audience (2)

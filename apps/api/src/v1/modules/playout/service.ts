@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
@@ -6,6 +6,7 @@ import { forbidden, refused } from "../../errors.js";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { breakCue, decoratePlaylist } from "./engine/scte35.js";
+import { publicUrl } from "../../lib/url.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output";
@@ -60,6 +61,12 @@ export interface PlayoutService {
   stationsThatAired(from: Date, to: Date): Promise<string[]>;
   /** A planned sign-on ("Signs on Monday, 6:00 am"). */
   scheduleSignOn(stationId: string, at: Date): Promise<void>;
+  /**
+   * A124: signs on stations whose scheduled sign-on is due (a claimable station set up with a
+   * sign-on time), through the same checks as signing on by hand. One that isn't ready isn't
+   * tried again; the desk sees it still setting up.
+   */
+  runDueSignOns(): Promise<{ signedOn: number; notReady: number }>;
   nextSignOn(stationIds: string[]): Promise<Map<string, Date>>;
   /** Cancels a station's scheduled sign-ons (a creator stopped it before it signed on). */
   cancelSignOns(stationId: string): Promise<void>;
@@ -116,7 +123,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           const out = outputs.get(id);
           const onAir = byId.get(id)?.onAir ?? false;
           const standingBy = onAir && (byId.get(id)?.standingBy ?? false);
-          return [id, { onAir, playbackUrl: onAir ? (out?.enabled && out.playbackUrl ? out.playbackUrl : `/hls/${id}/index.m3u8`) : null, standingBy }];
+          return [id, { onAir, playbackUrl: onAir ? (out?.enabled && out.playbackUrl ? out.playbackUrl : publicUrl(deps, `/hls/${id}/index.m3u8`)) : null, standingBy }];
         })
       );
     },
@@ -339,6 +346,37 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
 
     async scheduleSignOn(stationId, at) {
       await db.insert(schema.schedules).values({ stationId, startAt: at, enabled: true });
+    },
+
+    async runDueSignOns() {
+      const now = deps.clock.now();
+      const due = await db
+        .select()
+        .from(schema.schedules)
+        .where(and(eq(schema.schedules.enabled, true), isNull(schema.schedules.startedAt), lte(schema.schedules.startAt, now), gte(schema.schedules.startAt, new Date(now.getTime() - 7 * 86_400_000))))
+        .orderBy(asc(schema.schedules.startAt));
+      let signedOn = 0;
+      let notReady = 0;
+      for (const schedule of due) {
+        // Taken first, so two workers never sign the same station on twice.
+        const [mine] = await db
+          .update(schema.schedules)
+          .set({ startedAt: now })
+          .where(and(eq(schema.schedules.id, schedule.id), isNull(schema.schedules.startedAt)))
+          .returning();
+        if (!mine) continue;
+        const [state] = await db.select().from(P).where(eq(P.stationId, schedule.stationId));
+        if (state?.onAir) continue;
+        try {
+          await service.signOn(schedule.stationId);
+          signedOn++;
+        } catch (error) {
+          notReady++;
+          await db.update(schema.schedules).set({ enabled: false, endedAt: now }).where(eq(schema.schedules.id, schedule.id));
+          console.warn(`[playout] scheduled sign-on for ${schedule.stationId} didn't happen: ${(error as Error).message}`);
+        }
+      }
+      return { signedOn, notReady };
     },
 
     async nextSignOn(stationIds) {

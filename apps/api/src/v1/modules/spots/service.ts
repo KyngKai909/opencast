@@ -3,7 +3,7 @@
 // settling what aired. Sponsorships, production orders and codes are in their own files.
 
 import path from "node:path";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { oneDayOfBudgetMicros } from "@opencast/domain";
 import type { Business, MarketSpot, Spot, SpotState, TargetMatch } from "@opencast/contracts";
@@ -15,19 +15,36 @@ import { localDate, localDay } from "../../lib/time.js";
 
 /** P23: a business's colour for its still while there's no picture: one of these, by its id. All hold 4.5:1 on white. */
 const STILL_COLOURS = ["#9A5412", "#33507A", "#2F6B3F", "#7A3366", "#5B4A99", "#8A3B2E", "#1F6570", "#6B5A1E"];
-function colourFor(id: string): string {
+export function colourFor(id: string): string {
   let hash = 0;
   for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   return STILL_COLOURS[hash % STILL_COLOURS.length];
 }
+
+/** P11: a business's initials for its logo mark ("Orange Street Coffee" is OSC). */
+export function initialsOf(name: string): string {
+  const words = name.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w));
+  const letters = (words.length > 1 ? words.slice(0, 3).map((w) => w.replace(/[^A-Za-z0-9]/g, "")[0] ?? "") : [name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2)]).join("");
+  return letters.toUpperCase() || "?";
+}
+
+/** P4: where a spot's code and QR sit (inside title safe, bottom left) and for how long at its end. */
+export const CODE_PLACEMENT = { placement: "bottom_left" as const, box: { x: 0.1, y: 0.72, w: 0.2, h: 0.18 }, lastMs: 10_000 };
 import { createSponsorships, type SponsorshipsPart } from "./sponsorships.js";
 import { createOrders, type OrdersPart } from "./orders.js";
 import { createCodes, type CodesPart } from "./codes.js";
+import { createBusinessPart, type BusinessPart } from "./business.js";
 
 type Targeting = Spot["targeting"];
 
-export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart {
+export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart, BusinessPart {
   businessNames(ids: string[]): Promise<Map<string, string>>;
+  /** E4: signs a business's receipt links (made on first use). */
+  receiptsKey(businessId: string): Promise<string>;
+  /** E4: what a receipt names, open or closed. */
+  businessForBooks(businessId: string): Promise<{ name: string; legalName: string | null; einLast4: string | null }>;
+  /** E6: what an airings estimate is based on: the rate of a listed or paused spot, and for per-thousand the station it last aired on. */
+  airingCostBasis(businessId: string): Promise<{ rateKind: "per_thousand" | "per_airing"; rateMicros: number; stationId: string | null } | null>;
   filledMsByBreak(breakIds: string[]): Promise<Map<string, number>>;
   spotSummary(spotId: string): Promise<{ title: string; business: string }>;
   /** Pauses a business's spots it can no longer cover a day of, and resumes ones it now can. */
@@ -111,6 +128,7 @@ export type BusinessPatch = {
   legalName: string | null;
   ein: string | null;
   shortName: string | null;
+  redeemOn: boolean;
 };
 
 export interface LocationInput {
@@ -132,7 +150,8 @@ export interface SpotInput {
   startsOn: string | null;
   endsOn: string | null;
   targeting: Partial<Targeting>;
-  code: { code: string; offer: string; windowDays: number } | null;
+  /** P4: without `code`, Opencast picks the letters. */
+  code: { code?: string; offer: string; windowDays: number } | null;
 }
 
 export interface BreakAiring {
@@ -207,7 +226,11 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       legalName: row.legalName,
       einLast4: row.einLast4,
       createdAt: row.createdAt.toISOString(),
-      shortName: row.shortName ?? row.name
+      shortName: row.shortName ?? row.name,
+      // P11: the square drawn until a logo is uploaded.
+      logoMark: { initials: initialsOf(row.shortName ?? row.name), colour: colourFor(row.id) },
+      // P12: on unless the business turned it off; online businesses start with it off.
+      redeemOn: row.redeemOn ?? row.customersWhere !== "online"
     };
   }
 
@@ -219,9 +242,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           marketIds: [],
           stationCategories: row.stationCategories,
           dayparts: row.dayparts as Targeting["dayparts"],
-          excludedStationIds: row.excludedStationIds
+          excludedStationIds: row.excludedStationIds,
+          bands: row.bands ?? []
         }
-      : { ...EMPTY_TARGETING };
+      : { ...EMPTY_TARGETING, bands: [] };
   }
 
   async function rotationMembership(spotIds: string[]) {
@@ -239,7 +263,14 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
   function stateOf(row: typeof SP.$inferSelect, inRotation: number): SpotState {
     switch (row.status) {
       case "paused":
-        return row.pauseReason === "daily_cap" ? "paused_daily_cap" : row.pauseReason === "budget_spent" ? "paused_budget" : "paused_balance";
+        // A115: a spot the business paused itself waits for it.
+        return row.pauseReason === "daily_cap"
+          ? "paused_daily_cap"
+          : row.pauseReason === "budget_spent"
+            ? "paused_budget"
+            : row.pauseReason === "by_hand"
+              ? "waiting_for_you"
+              : "paused_balance";
       case "listed":
         return inRotation > 0 ? "in_rotation" : "listed";
       default:
@@ -265,7 +296,15 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       db.select().from(schema.advertiserMarkets).where(inArray(schema.advertiserMarkets.advertiserId, rows.map((r) => r.advertiserId)))
     ]);
     const checks = files.length ? await db.select().from(schema.uploadChecks).where(inArray(schema.uploadChecks.spotFileId, files.map((f) => f.id))) : [];
-    const spend = await services.ledger.spotSpend(ids, await dayStartFor(rows[0].advertiserId));
+    const now = deps.clock.now();
+    const [spend, week, stories, lastAired] = await Promise.all([
+      services.ledger.spotSpend(ids, await dayStartFor(rows[0].advertiserId)),
+      // P7: spent over the last 7 days (held and settled), for the pace.
+      services.ledger.spotSpend(ids, new Date(now.getTime() - 7 * 86_400_000)),
+      businessStories(rows),
+      latestProofFrames(ids)
+    ]);
+    const stationIdents = await services.stations.idents([...new Set([...rotation.values()].flatMap((set) => [...set]))]);
     const content = services.library.content;
     const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: await content.previewUrl(f.contentId) }] as const)));
     return rows.map((r) => {
@@ -274,6 +313,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const inRotationOn = rotation.get(r.id)?.size ?? 0;
       const t = targetingOf(targeting.find((x) => x.spotId === r.id));
       t.marketIds = markets.filter((m) => m.advertiserId === r.advertiserId).map((m) => m.marketId);
+      const used = spend.get(r.id)?.used ?? 0;
+      const days = r.listedAt ? Math.min(7, Math.max(1, Math.ceil((now.getTime() - r.listedAt.getTime()) / 86_400_000))) : 7;
+      const story = stories.get(r.id);
       return {
         id: r.id,
         businessId: r.advertiserId,
@@ -292,7 +334,18 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         startsOn: r.startsOn,
         endsOn: r.endsOn,
         targeting: t,
-        code: code ? { code: code.code, offer: code.offer, windowDays: code.windowDays } : null,
+        code: code
+          ? {
+              code: code.code,
+              offer: code.offer,
+              windowDays: code.windowDays,
+              pickedBy: code.pickedBy,
+              oncePerCustomer: true,
+              savedForDays: code.windowDays,
+              placement: CODE_PLACEMENT.placement,
+              showsForLastMs: CODE_PLACEMENT.lastMs
+            }
+          : null,
         file: file
           ? {
               url: urls.get(file.id)?.url ?? "",
@@ -310,9 +363,116 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
             }
           : null,
         productionOrderId: r.productionOrderId,
-        createdAt: r.createdAt.toISOString()
+        createdAt: r.createdAt.toISOString(),
+        still: { stillUrl: lastAired.get(r.id) ?? null, colour: colourFor(r.advertiserId), label: r.title, headline: null, line: code?.offer ?? null },
+        inRotationStations: [...(rotation.get(r.id) ?? [])].flatMap((id) => {
+          const ident = stationIdents.get(id);
+          return ident ? [ident] : [];
+        }),
+        pause: story?.pause ?? null,
+        back: story?.back ?? null,
+        pacePerDayMicros: used > 0 ? Math.round((week.get(r.id)?.usedToday ?? 0) / days) : null
       };
     });
+  }
+
+  /** P23: each spot's latest proof frame, from the as-run log of its airings. */
+  async function latestProofFrames(spotIds: string[]) {
+    const result = new Map<string, string>();
+    if (!spotIds.length) return result;
+    const latest = await db
+      .selectDistinctOn([AI.spotId], { id: AI.id, spotId: AI.spotId })
+      .from(AI)
+      .where(and(inArray(AI.spotId, spotIds), lt(AI.scheduledAt, deps.clock.now())))
+      .orderBy(AI.spotId, desc(AI.scheduledAt));
+    const runs = await services.playout.asRunForAirings(latest.map((a) => a.id));
+    for (const a of latest) {
+      const url = runs.get(a.id)?.proofFrameUrl;
+      if (url) result.set(a.spotId, url);
+    }
+    return result;
+  }
+
+  /**
+   * P6: the business's side of a pause (while paused for its budget, its balance or by hand) and
+   * of the comeback after one.
+   */
+  async function businessStories(rows: Array<typeof SP.$inferSelect>) {
+    const result = new Map<string, { pause: NonNullable<Spot["pause"]> | null; back: NonNullable<Spot["back"]> | null }>();
+    const now = deps.clock.now();
+    for (const row of rows) {
+      const paused = row.status === "paused" && row.pauseReason !== "daily_cap" && row.pausedAt;
+      const back = row.status === "listed" && row.resumedAt && row.resumeReason && row.resumeReason !== "midnight";
+      if (!paused && !back) continue;
+      const pausedAt = paused ? row.pausedAt! : row.lastPausedAt;
+      if (back && !pausedAt) {
+        result.set(row.id, { pause: null, back: { backAt: row.resumedAt!.toISOString(), reason: backReason(row.resumeReason!), told: [] } });
+        continue;
+      }
+      // Who had it in their rotation when it paused (and, once back, who was told).
+      const had = await db
+        .select({ stationId: schema.rotations.stationId, removedAt: schema.rotationSpots.removedAt })
+        .from(schema.rotationSpots)
+        .innerJoin(schema.rotations, eq(schema.rotations.id, schema.rotationSpots.rotationId))
+        .where(
+          and(
+            eq(schema.rotationSpots.spotId, row.id),
+            eq(schema.rotations.kind, "main"),
+            lte(schema.rotationSpots.addedAt, pausedAt!),
+            or(isNull(schema.rotationSpots.removedAt), gte(schema.rotationSpots.removedAt, pausedAt!))
+          )
+        );
+      const stationIds = [...new Set(had.map((h) => h.stationId))];
+      const told = new Set(back ? had.filter((h) => h.removedAt && h.removedAt.getTime() === row.resumedAt!.getTime()).map((h) => h.stationId) : []);
+      const idents = await services.stations.idents(stationIds);
+      if (back) {
+        result.set(row.id, {
+          pause: null,
+          back: { backAt: row.resumedAt!.toISOString(), reason: backReason(row.resumeReason!), told: stationIds.filter((id) => told.has(id)).flatMap((id) => (idents.get(id) ? [idents.get(id)!] : [])) }
+        });
+        continue;
+      }
+      const at = row.pausedAt!;
+      // The last money held before the pause, and the held airings that still air.
+      const [lastHold] = await db.select().from(AI).where(and(eq(AI.spotId, row.id), lte(AI.createdAt, at))).orderBy(desc(AI.createdAt)).limit(1);
+      const held = await db.select().from(AI).where(and(eq(AI.spotId, row.id), lte(AI.createdAt, at), gte(AI.scheduledAt, at)));
+      const [amounts, runs] = await Promise.all([
+        services.ledger.holdAmounts(lastHold ? [lastHold.holdId] : []),
+        services.playout.asRunForAirings(held.map((a) => a.id))
+      ]);
+      const lastStation = lastHold ? (await services.stations.idents([lastHold.stationId])).get(lastHold.stationId) : undefined;
+      const allAired = held.length > 0 && held.every((a) => runs.has(a.id));
+      const stations = [];
+      for (const stationId of stationIds) {
+        const ident = idents.get(stationId);
+        if (!ident) continue;
+        // What the station aired in its place since: its backup rotation, another spot, or station ID and bumpers.
+        const aired = await services.playout.asRun(stationId, at, now);
+        const others = aired.filter((a) => a.airingId && !held.some((h) => h.id === a.airingId));
+        const filledWith = others.some((a) => a.reason === "backup_rotation") ? ("backup_rotation" as const) : others.some((a) => a.reason === "rotation") ? ("another_spot" as const) : ("station_id" as const);
+        stations.push({ station: ident, filledWith, toldWhenBack: false });
+      }
+      result.set(row.id, {
+        pause: {
+          reason: row.pauseReason === "by_hand" ? "by_you" : row.pauseReason === "budget_spent" ? "budget_spent" : "balance",
+          pausedAt: at.toISOString(),
+          lastHold: lastHold && lastStation ? { amountMicros: amounts.get(lastHold.holdId) ?? 0, station: lastStation } : null,
+          held: { airings: held.length, airedAt: allAired ? new Date(Math.max(...held.map((a) => runs.get(a.id)!.endedAt.getTime()))).toISOString() : null },
+          stations
+        },
+        back: null
+      });
+    }
+    return result;
+  }
+
+  /** A spot's targeting, with its business's markets (what matching needs, without the rest of the view). */
+  async function targetingFor(row: typeof SP.$inferSelect): Promise<Targeting> {
+    const [[t], markets] = await Promise.all([
+      db.select().from(schema.targeting).where(eq(schema.targeting.spotId, row.id)),
+      db.select().from(schema.advertiserMarkets).where(eq(schema.advertiserMarkets.advertiserId, row.advertiserId))
+    ]);
+    return { ...targetingOf(t), marketIds: markets.map((m) => m.marketId) };
   }
 
   async function saveTargeting(tx: Executor, spotId: string, t: Partial<Targeting>) {
@@ -322,18 +482,36 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       locationIds: t.locationIds ?? [],
       stationCategories: t.stationCategories ?? [],
       dayparts: t.dayparts ?? [],
-      excludedStationIds: t.excludedStationIds ?? []
+      excludedStationIds: t.excludedStationIds ?? [],
+      bands: t.bands?.length ? [...new Set(t.bands)] : null
     };
     await tx.insert(schema.targeting).values(values).onConflictDoUpdate({ target: schema.targeting.spotId, set: values });
   }
 
+  /**
+   * P4: the letters Opencast picks for a spot's code: the business's first word and a number,
+   * unused by any other code ("ORANGE10", "ORANGE11").
+   */
+  async function pickCode(tx: Executor, businessId: string): Promise<string> {
+    const [business] = await tx.select({ name: AD.name, shortName: AD.shortName }).from(AD).where(eq(AD.id, businessId));
+    const word = (business?.shortName ?? business?.name ?? "").split(/\s+/)[0] ?? "";
+    const base = word.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12) || "SPOT";
+    const taken = new Set((await tx.select({ code: schema.codes.code }).from(schema.codes).where(sql`${schema.codes.code} like ${`${base}%`}`)).map((c) => c.code));
+    for (let n = 10; ; n++) if (!taken.has(`${base}${n}`)) return `${base}${n}`;
+  }
+
   async function saveCode(tx: Executor, spotId: string, code: SpotInput["code"]) {
+    const [current] = await tx.select().from(schema.codes).where(eq(schema.codes.spotId, spotId));
     await tx.delete(schema.codes).where(and(eq(schema.codes.spotId, spotId), sql`not exists (select 1 from spots.code_events e where e.code_id = ${schema.codes.id})`));
     if (!code) return;
+    const [spot] = await tx.select({ advertiserId: SP.advertiserId }).from(SP).where(eq(SP.id, spotId));
+    // Letters the business typed are its own; without them the spot keeps Opencast's, or gets new ones.
+    const letters = code.code ?? current?.code ?? (await pickCode(tx, spot.advertiserId));
+    const pickedBy = code.code && code.code !== current?.code ? "business" : (current?.pickedBy ?? (code.code ? "business" : "opencast"));
     await tx
       .insert(schema.codes)
-      .values({ spotId, code: code.code, offer: code.offer, windowDays: code.windowDays })
-      .onConflictDoUpdate({ target: schema.codes.spotId, set: { code: code.code, offer: code.offer, windowDays: code.windowDays } });
+      .values({ spotId, code: letters, offer: code.offer, windowDays: code.windowDays, pickedBy })
+      .onConflictDoUpdate({ target: schema.codes.spotId, set: { code: letters, offer: code.offer, windowDays: code.windowDays, pickedBy } });
   }
 
   /** Which stations a spot's targeting reaches, with the reason any nearby one is left out. */
@@ -368,6 +546,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (targeting.excludedStationIds.includes(station.id)) {
         included = false;
         reason = "not chosen";
+      } else if (targeting.bands?.length && station.ident.band && !targeting.bands.includes(station.ident.band)) {
+        // P8: "Radio band, not chosen".
+        included = false;
+        reason = `${station.ident.band === "radio" ? "Radio" : "TV"} band, not chosen`;
       } else if (targeting.stationCategories.length && (!station.category || !targeting.stationCategories.includes(station.category))) {
         included = false;
         reason = reason ?? "not chosen";
@@ -406,7 +588,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     await db.update(SP).set(patch).where(eq(SP.id, spotId));
   }
 
-  async function pauseFor(row: typeof SP.$inferSelect, reason: "daily_cap" | "budget_spent" | "balance") {
+  async function pauseFor(row: typeof SP.$inferSelect, reason: "daily_cap" | "budget_spent" | "balance" | "by_hand") {
     if (row.status !== "listed") return;
     const now = deps.clock.now();
     // P6: the story is kept past the resume.
@@ -490,13 +672,15 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         return row.id;
       }
     }),
-    codes: createCodes(ctx)
+    codes: createCodes(ctx),
+    business: createBusinessPart(ctx)
   };
 
   const service: SpotsService = {
     ...parts.sponsorships,
     ...parts.orders,
     ...parts.codes,
+    ...parts.business,
 
     async businessNames(ids) {
       const unique = [...new Set(ids)];
@@ -514,6 +698,31 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         .where(inArray(AI.breakId, breakIds))
         .groupBy(AI.breakId);
       return new Map(rows.map((r) => [r.breakId, r.ms]));
+    },
+
+    async receiptsKey(businessId) {
+      const [row] = await db.select({ key: AD.receiptsKey }).from(AD).where(eq(AD.id, businessId));
+      if (!row) throw notFound("That business");
+      if (row.key) return row.key;
+      const key = (await import("node:crypto")).randomBytes(24).toString("base64url");
+      await db.update(AD).set({ receiptsKey: key }).where(and(eq(AD.id, businessId), isNull(AD.receiptsKey)));
+      const [again] = await db.select({ key: AD.receiptsKey }).from(AD).where(eq(AD.id, businessId));
+      return again.key!;
+    },
+
+    async businessForBooks(businessId) {
+      const [row] = await db.select({ name: AD.name, legalName: AD.legalName, einLast4: AD.einLast4 }).from(AD).where(eq(AD.id, businessId));
+      if (!row) throw notFound("That business");
+      return row;
+    },
+
+    async airingCostBasis(businessId) {
+      const rows = await db.select().from(SP).where(and(eq(SP.advertiserId, businessId), inArray(SP.status, ["listed", "paused"]))).orderBy(asc(SP.createdAt));
+      if (!rows.length) return null;
+      const flat = rows.filter((r) => r.rateKind === "per_airing");
+      if (flat.length) return { rateKind: "per_airing", rateMicros: Math.round(flat.reduce((a, r) => a + r.rateMicros, 0) / flat.length), stationId: null };
+      const [last] = await db.select({ stationId: AI.stationId }).from(AI).where(eq(AI.spotId, rows[0].id)).orderBy(desc(AI.scheduledAt)).limit(1);
+      return { rateKind: "per_thousand", rateMicros: rows[0].rateMicros, stationId: last?.stationId ?? null };
     },
 
     async spotSummary(spotId) {
@@ -609,7 +818,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       await businessRow(businessId);
       await db.transaction(async (tx) => {
         const patch: Partial<typeof AD.$inferInsert> = {};
-        for (const key of ["name", "category", "about", "website", "logoUrl", "customersWhere", "warnDays", "receiptsEmail", "legalName", "shortName"] as const) {
+        for (const key of ["name", "category", "about", "website", "logoUrl", "customersWhere", "warnDays", "receiptsEmail", "legalName", "shortName", "redeemOn"] as const) {
           if (input[key] !== undefined) (patch as Record<string, unknown>)[key] = input[key];
         }
         if (input.autoTopUp) {
@@ -723,22 +932,65 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       // Stored by content ID: the same spot uploaded twice is stored once.
       const stored = await services.library.content.store(prepared.file, { storageClass: "standard" });
       await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(copy, { force: true })]);
+      // P4: every spot gets its own code as it's checked: Opencast's letters, and its title as the
+      // offer until the business names one (nothing is promised for it).
+      if (!(await db.select({ id: schema.codes.id }).from(schema.codes).where(eq(schema.codes.spotId, spotId))).length) {
+        await db.transaction((tx) => saveCode(tx, spotId, { offer: row.title.slice(0, 80), windowDays: 7 }));
+      }
       const code = (await db.select().from(schema.codes).where(eq(schema.codes.spotId, spotId)))[0];
 
       // The checks on arrival.
       const lengthOff = Math.abs(durationMs - row.lengthSec * 1000);
+      // P1: each check's detail carries its second line (`note`), and the code's box and timing (P4).
+      const pictureResult = probe.mediaKind === "audio" ? "for_you" : probe.width === 1920 && probe.height === 1080 ? "fine" : probe.width && probe.height && probe.width / probe.height > 1.7 ? "fixed" : "for_you";
+      const loudnessResult = loudness === null ? "pending" : Math.abs(loudness + 24) <= 2 ? "fine" : "fixed";
       const checks: Array<{ check: "length" | "picture" | "safe_area" | "captions" | "loudness" | "code"; result: "fine" | "fixed" | "for_you" | "pending"; detail: Record<string, unknown> }> = [
-        { check: "length", result: lengthOff <= 100 ? "fine" : "for_you", detail: { durationMs: probe.durationMs, expectedSec: row.lengthSec } },
+        {
+          check: "length",
+          result: lengthOff <= 100 ? "fine" : "for_you",
+          detail: { durationMs: probe.durationMs, expectedSec: row.lengthSec, note: lengthOff <= 100 ? `Exactly a :${row.lengthSec} spot` : `It has to be exactly :${row.lengthSec}. Upload a new cut` }
+        },
         {
           check: "picture",
-          result: probe.mediaKind === "audio" ? "for_you" : probe.width === 1920 && probe.height === 1080 ? "fine" : probe.width && probe.height && probe.width / probe.height > 1.7 ? "fixed" : "for_you",
-          detail: { width: probe.width, height: probe.height }
+          result: pictureResult,
+          detail: {
+            width: probe.width,
+            height: probe.height,
+            note: pictureResult === "fine" ? "Airs full screen on TV and web" : pictureResult === "fixed" ? "Scaled to 1920 by 1080 to air full screen" : "A spot needs a widescreen picture"
+          }
         },
         // Where text falls against title safe needs a reviewer's eye until frame analysis is built.
-        { check: "safe_area", result: scaleToFit ? "fixed" : "pending", detail: { scaledToFit: scaleToFit } },
-        { check: "captions", result: "pending", detail: {} },
-        { check: "loudness", result: loudness === null ? "pending" : Math.abs(loudness + 24) <= 2 ? "fine" : "fixed", detail: { measuredLufs: loudness, targetLufs: -24 } },
-        ...(code ? [{ check: "code" as const, result: "fine" as const, detail: { code: code.code, placement: "bottom left, for the last :10" } }] : [])
+        {
+          check: "safe_area",
+          result: scaleToFit ? "fixed" : "pending",
+          detail: { scaledToFit: scaleToFit, note: scaleToFit ? "The whole spot is slightly smaller, so everything is inside title safe" : "Checked in review, before any station sees it" }
+        },
+        { check: "captions", result: "pending", detail: { note: "Made in review from the voiceover" } },
+        {
+          check: "loudness",
+          result: loudnessResult,
+          detail: {
+            measuredLufs: loudness,
+            targetLufs: -24,
+            note: loudnessResult === "fine" ? "Already at broadcast level" : loudnessResult === "fixed" ? "Brought to broadcast level so it won't jump out" : "Measured in review"
+          }
+        },
+        ...(code
+          ? [
+              {
+                check: "code" as const,
+                result: "fine" as const,
+                detail: {
+                  code: code.code,
+                  note: "With a QR, bottom left, for the last :10",
+                  placement: CODE_PLACEMENT.placement,
+                  box: CODE_PLACEMENT.box,
+                  fromMs: Math.max(0, row.lengthSec * 1000 - CODE_PLACEMENT.lastMs),
+                  toMs: row.lengthSec * 1000
+                }
+              }
+            ]
+          : [])
       ];
       await db.transaction(async (tx) => {
         const [{ version }] = await tx.select({ version: sql<number>`coalesce(max(${schema.spotFiles.version}), 0)::int` }).from(schema.spotFiles).where(eq(schema.spotFiles.spotId, spotId));
@@ -755,7 +1007,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
     async matches(spotId, targeting) {
       const row = await spotRow(spotId);
-      const current = (await spotViews([row]))[0].targeting;
+      const current = await targetingFor(row);
       const found = await match(row, { ...current, ...targeting });
       return found.map(({ stationId: _stationId, ...m }) => m);
     },
@@ -779,8 +1031,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     async pause(spotId) {
       const row = await spotRow(spotId);
       if (row.status !== "listed") throw refused("not_listed", "Only a spot in the market can be paused.");
-      // A manual pause reads like a spent budget: it waits for the business.
-      await pauseFor(row, "budget_spent");
+      // A115: paused by hand, it waits for the business ("Waiting for you").
+      await pauseFor(row, "by_hand");
       return service.spot(spotId);
     },
 
@@ -816,8 +1068,14 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (decision === "send_back") {
         await setStatus(spotId, { status: "draft" });
       } else {
-        // The database refuses this unless the balance covers a day of its budget.
-        await setStatus(spotId, { status: "listed", listedAt: deps.clock.now() });
+        await db.transaction(async (tx) => {
+          // The database refuses this unless the balance covers a day of its budget.
+          await tx.update(SP).set({ status: "listed", listedAt: deps.clock.now() }).where(eq(SP.id, spotId));
+          // A116: every listed spot has its own code. One without gets Opencast's letters, and its
+          // title as the offer until the business names one (nothing is promised for it).
+          const [code] = await tx.select({ id: schema.codes.id }).from(schema.codes).where(eq(schema.codes.spotId, spotId));
+          if (!code) await saveCode(tx, spotId, { offer: row.title.slice(0, 80), windowDays: 7 });
+        });
         await services.spots.notifyMakerListed(spotId);
       }
       await services.library.content.dropPreview("review", spotId);
@@ -839,7 +1097,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const customers = await service.customersByStation(stationId, month);
       const stories = await pauseStories(stationId, listed);
       for (const row of listed) {
-        const matched = (await match(row, (await spotViews([row]))[0].targeting)).find((m) => m.stationId === stationId);
+        const matched = (await match(row, await targetingFor(row))).find((m) => m.stationId === stationId);
         if (!matched?.included) continue;
         if (row.status === "paused" && !inMain.has(row.id) && !inBackup.has(row.id)) continue;
         if (filter.category && row.category !== filter.category) continue;
@@ -916,7 +1174,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           .update(schema.rotationSpots)
           .set({ removedAt: deps.clock.now() })
           .where(and(eq(schema.rotationSpots.rotationId, rotation.id), isNull(schema.rotationSpots.removedAt)));
-        if (spotIds.length) await tx.insert(schema.rotationSpots).values(spotIds.map((spotId, position) => ({ rotationId: rotation.id, spotId, position })));
+        if (spotIds.length) await tx.insert(schema.rotationSpots).values(spotIds.map((spotId, position) => ({ rotationId: rotation.id, spotId, position, addedAt: deps.clock.now() })));
       });
       // The business hears about spots newly added (O1).
       const added = spotIds.filter((id) => !already.has(id));
@@ -1069,7 +1327,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           });
           const [airing] = await tx
             .insert(AI)
-            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros, carriageAgreementId: carriageAgreementId ?? null })
+            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros, carriageAgreementId: carriageAgreementId ?? null, createdAt: deps.clock.now() })
             .returning({ id: AI.id });
           return airing.id;
         })
@@ -1132,6 +1390,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 }
 
 const fmt = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
+const backReason = (reason: "raised_budget" | "added_money" | "by_hand" | "midnight") => (reason === "raised_budget" || reason === "added_money" ? reason : "resumed");
 
 function checkLabel(check: string, result: string, detail: Record<string, unknown> | null): string {
   switch (check) {
@@ -1146,7 +1405,8 @@ function checkLabel(check: string, result: string, detail: Record<string, unknow
     case "loudness":
       return result === "fine" ? "Loudness is at broadcast level" : "Loudness levelled";
     case "code":
-      return `Code ${detail?.code} added, with a QR, ${detail?.placement}`;
+      // Details stored before P4 carried the placement in words.
+      return typeof detail?.placement === "string" && detail.placement.includes(" ") ? `Code ${detail?.code} added, with a QR, ${detail.placement}` : `Code ${detail?.code} added`;
     default:
       return check;
   }

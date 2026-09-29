@@ -45,6 +45,10 @@ export const advertisers = spots.table("advertisers", {
   isHouse: boolean("is_house").notNull().default(false),
   /** P25 (added 2026-09-29): the name in tight places ("Orange Street"). Null: the name. */
   shortName: text("short_name"),
+  /** P12 (added 2026-09-29): the Redeem tool. Null: the default (on, except for online businesses). */
+  redeemOn: boolean("redeem_on"),
+  /** E4 (added 2026-09-29): signs the business's receipt and statement PDF links. Made on first use. */
+  receiptsKey: text("receipts_key"),
   closedAt: at("closed_at"),
   createdAt: createdAt()
 });
@@ -97,10 +101,11 @@ export const spotsTable = spots.table(
     category: text("category").notNull(),
     status: spotStatus("status").notNull().default("draft"),
     /** Why it's paused: the daily cap resumes by itself at midnight; the others need the business. */
-    pauseReason: text("pause_reason", { enum: ["daily_cap", "budget_spent", "balance"] }),
+    /** `by_hand` (added 2026-09-29, A115): the business paused it; it waits for the business. */
+    pauseReason: text("pause_reason", { enum: ["daily_cap", "budget_spent", "balance", "by_hand"] }),
     pausedAt: at("paused_at"),
     /** P6 (added 2026-09-29): the last pause and the resume after it, kept once it's back (the pause story). */
-    lastPauseReason: text("last_pause_reason", { enum: ["daily_cap", "budget_spent", "balance"] }),
+    lastPauseReason: text("last_pause_reason", { enum: ["daily_cap", "budget_spent", "balance", "by_hand"] }),
     lastPausedAt: at("last_paused_at"),
     resumedAt: at("resumed_at"),
     resumeReason: text("resume_reason", { enum: ["raised_budget", "added_money", "by_hand", "midnight"] }),
@@ -171,7 +176,9 @@ export const targeting = spots.table("targeting", {
   locationIds: jsonb("location_ids").$type<string[]>().notNull().default([]),
   stationCategories: jsonb("station_categories").$type<string[]>().notNull().default([]),
   dayparts: jsonb("dayparts").$type<string[]>().notNull().default([]),
-  excludedStationIds: jsonb("excluded_station_ids").$type<string[]>().notNull().default([])
+  excludedStationIds: jsonb("excluded_station_ids").$type<string[]>().notNull().default([]),
+  /** P8 (added 2026-09-29): the bands it can air on ("tv", "radio"). Null: both. */
+  bands: jsonb("bands").$type<Array<"tv" | "radio">>()
 });
 
 /** One code per spot, with its QR, rendered for the last :10. */
@@ -185,6 +192,8 @@ export const codes = spots.table("codes", {
   offer: text("offer").notNull(),
   /** A use counts as a customer only within this many days after an airing. */
   windowDays: smallint("window_days").notNull().default(7),
+  /** P4 (added 2026-09-29): who chose the code's letters. Opencast picks them unless the business typed its own. */
+  pickedBy: text("picked_by", { enum: ["opencast", "business"] }).notNull().default("business"),
   createdAt: createdAt()
 });
 
@@ -371,6 +380,8 @@ export const productionOrders = spots.table("production_orders", {
   tellMakerWhenListed: boolean("tell_maker_when_listed").notNull().default(false),
   /** P24 (added 2026-09-29): the maker asked to be told when the spot is listed. */
   makerAskedListedAt: at("maker_asked_listed_at"),
+  /** P19 (added 2026-09-29): when the maker last quoted. */
+  quotedAt: at("quoted_at"),
   createdAt: createdAt()
 });
 
@@ -385,6 +396,9 @@ export const orderFiles = spots.table("order_files", {
   /** Before content IDs: a disk path or URL. */
   location: text("location"),
   filename: text("filename"),
+  /** P19 (added 2026-09-29): a delivery's length and the spot checks it passed ("length", "picture", "loudness"). */
+  durationMs: millis("duration_ms"),
+  checksPassed: jsonb("checks_passed").$type<string[]>(),
   createdAt: createdAt()
 }, (t) => [check("order_file_has_content", sql`${t.contentId} is not null or ${t.location} is not null`)]);
 
@@ -404,3 +418,42 @@ export const orderNotes = spots.table("order_notes", {
   round: smallint("round").notNull(),
   createdAt: createdAt()
 });
+
+/**
+ * P20 (added 2026-09-29): what a business is connected to for counting code uses: Clear Pay (in
+ * person) and one online checkout (Shopify, Stripe or Square promotion codes, counted by webhook).
+ * `secret` is the webhook signing secret the provider gave the business; `hookToken` names the
+ * connection in its webhook address. A disconnected row is kept (its uses stay counted).
+ */
+export const connections = spots.table(
+  "connections",
+  {
+    id: id(),
+    advertiserId: uuid("advertiser_id")
+      .notNull()
+      .references(() => advertisers.id),
+    kind: text("kind", { enum: ["clear_pay", "checkout"] }).notNull(),
+    provider: text("provider", { enum: ["clear", "shopify", "stripe", "square"] }).notNull(),
+    secret: text("secret").notNull(),
+    hookToken: text("hook_token").notNull().unique(),
+    connectedBy: uuid("connected_by").references(() => users.id),
+    connectedAt: at("connected_at").notNull().defaultNow(),
+    disconnectedAt: at("disconnected_at"),
+    /** The last webhook that counted something. */
+    lastEventAt: at("last_event_at")
+  },
+  (t) => [index("connections_advertiser").on(t.advertiserId, t.kind)]
+);
+
+/** P20: provider events already counted, so a retried webhook counts once. */
+export const connectionEvents = spots.table(
+  "connection_events",
+  {
+    connectionId: uuid("connection_id")
+      .notNull()
+      .references(() => connections.id),
+    eventRef: text("event_ref").notNull(),
+    receivedAt: at("received_at").notNull().defaultNow()
+  },
+  (t) => [primaryKey({ columns: [t.connectionId, t.eventRef] })]
+);

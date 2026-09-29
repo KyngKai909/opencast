@@ -120,6 +120,14 @@ const WAITING_PERIOD_MS = 72 * 3_600_000;
 export function createDesk({ deps, services }: ModuleContext): DeskPart {
   const { db } = deps;
 
+  // A124: a claimable station's first sign-on puts its creator on air in the pipeline.
+  deps.bus.on("station.signed_on", async (e) => {
+    await db
+      .update(CR)
+      .set({ stage: "on_air", nextAction: "Claim invite", nextActionDue: null })
+      .where(and(eq(CR.stationId, e.stationId), eq(CR.stage, "setting_up")));
+  });
+
   const channelOf = (band: Band | null, tenths: number | null | undefined) => (band && tenths ? formatChannelNumber({ band, tenths }) : null);
 
   async function creatorViews(rows: Array<typeof CR.$inferSelect>): Promise<Creator[]> {
@@ -192,9 +200,10 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         sourcePlatform: r.sourcePlatform,
         sourceUrl: r.sourceUrl,
         contactEmail: r.contactEmail,
-        stage: r.stage,
+        // A124: a station set up for them that has signed on is on air (rows from before the sign-on was recorded).
+        stage: r.stage === "setting_up" && profile?.public ? "on_air" : r.stage,
         proposed: r.proposedBand && channels[0] ? { band: r.proposedBand, channel: channels[0] } : null,
-        nextAction: r.nextAction,
+        nextAction: r.stage === "setting_up" && profile?.public && r.nextAction === "Sign on" ? "Claim invite" : r.nextAction,
         nextActionDue: r.nextActionDue,
         doNotAsk: r.doNotAsk,
         station: r.stationId ? (idents.get(r.stationId) ?? null) : null,
