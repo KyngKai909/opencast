@@ -108,7 +108,8 @@ function usePrivyClear(): ClearState {
 }
 
 // Chosen once, at start: hooks must be called the same way on every render.
-const useImpl = config.mock ? useMockClear : config.privyAppId && config.clearProviderAppId ? usePrivyClear : useNoClear;
+// The real-API runs' test sign-in has no Privy underneath: Connect Clear isn't set up there.
+const useImpl = import.meta.env.DEV && import.meta.env.VITE_DEV_TOKEN_AUTH === "true" ? useNoClear : config.mock ? useMockClear : config.privyAppId && config.clearProviderAppId ? usePrivyClear : useNoClear;
 
 export function useClear(): ClearState {
   return useImpl();

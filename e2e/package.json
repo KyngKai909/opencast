@@ -6,6 +6,8 @@
   "scripts": {
     "test": "playwright test",
     "test:real": "playwright test -c playwright.real.config.ts",
+    "real:up": "tsx real/up.ts",
+    "real:down": "tsx real/down.ts",
     "report": "playwright show-report"
   },
   "devDependencies": {

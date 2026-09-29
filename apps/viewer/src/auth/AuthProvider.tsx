@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQueryClient } from "@tanstack/react-query";
 import { setTokenSource } from "../api/client";
 import { config } from "../config";
+import { useDevTokenAuth } from "./devTokenAuth";
 import { useMockAuth } from "./mockAuth";
 import { PrivyRoot, usePrivyAuth } from "./privyAuth";
 import type { AuthAdapter, SignInReason } from "./types";
@@ -17,7 +18,10 @@ function useNoAuth(): AuthAdapter {
 }
 
 // Chosen once, at start: hooks must be called the same way on every render.
-const useAdapter = config.mock ? useMockAuth : config.privyAppId ? usePrivyAuth : useNoAuth;
+// The real-API runs' test sign-in (devTokenAuth.ts) comes first, in the dev server only: the env
+// itself, so a production build drops it.
+const devToken = import.meta.env.DEV && import.meta.env.VITE_DEV_TOKEN_AUTH === "true";
+const useAdapter = devToken ? useDevTokenAuth : config.mock ? useMockAuth : config.privyAppId ? usePrivyAuth : useNoAuth;
 
 interface AuthState extends AuthAdapter {
   /** Sign-in is open, and why. */
@@ -93,7 +97,7 @@ function AuthState({ children }: { children: ReactNode }) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  if (!config.mock && config.privyAppId)
+  if (!devToken && !config.mock && config.privyAppId)
     return (
       <PrivyRoot appId={config.privyAppId}>
         <AuthState>{children}</AuthState>
