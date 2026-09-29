@@ -19,7 +19,7 @@
 // Rows are written a few seconds ahead; a cued break, an early end or a skip cuts the timeline at
 // the next segment boundary and writes it again from there.
 
-import { and, asc, desc, eq, gt, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNull, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { dateRangeTag, HLS_CLASS, HlsLogCode } from "@opencast/contracts";
 import type { ModuleContext } from "../../../context.js";
@@ -115,6 +115,8 @@ export class ChannelAssembler {
   private signalLost = new Set<string>();
   private pending: "now" | "future" | null = null;
   private finishing = new Set<string>();
+  /** Rows whose as-run couldn't be written, and when: tried again a minute later, never ahead of newer rows. */
+  private failed = new Map<string, number>();
   private current: string | null | undefined = undefined;
   private reported = new Set<string>();
   /** Something that didn't air, told once the row airing in its place is published. */
@@ -634,10 +636,12 @@ export class ChannelAssembler {
 
   /** Items whose last segment has been published: their as-run entries (a spot's proof frame first). */
   private async finish(now: number) {
+    for (const [id, at] of this.failed) if (now - at > 60_000) this.failed.delete(id);
+    const waiting = [...this.failed.keys()];
     const done = await this.db
       .select()
       .from(CI)
-      .where(and(eq(CI.stationId, this.stationId), isNull(CI.asRunId), eq(CI.open, false), ne(CI.kind, "end"), lte(CI.endsAt, new Date(now)), gt(CI.segments, 0)))
+      .where(and(eq(CI.stationId, this.stationId), isNull(CI.asRunId), eq(CI.open, false), ne(CI.kind, "end"), lte(CI.endsAt, new Date(now)), gt(CI.segments, 0), waiting.length ? notInArray(CI.id, waiting) : undefined))
       .orderBy(asc(CI.seq))
       .limit(20);
     for (const row of done) {
@@ -645,8 +649,11 @@ export class ChannelAssembler {
       this.finishing.add(row.id);
       try {
         await this.record(row);
+        this.failed.delete(row.id);
       } catch (error) {
-        this.log(`as-run for ${row.label} failed: ${(error as Error).message}`);
+        this.failed.set(row.id, now);
+        const reason = (error as Error & { cause?: Error }).cause?.message ?? (error as Error).message;
+        this.log(`as-run for ${row.label} failed: ${reason.split("\n")[0].slice(0, 200)}`);
       } finally {
         this.finishing.delete(row.id);
       }
@@ -662,6 +669,10 @@ export class ChannelAssembler {
       const r = this.options.preparer.ladder.v720;
       proof = await proofFrame(this.ctx, { stationId: this.stationId, airingId: row.airingId, preparedKey: row.preparedKey, rendition: r.name, width: r.width, height: r.height, segment: row.firstSegment + Math.floor(row.segments / 2), bug, scratchDir: this.options.scratchDir });
     }
+    // What aired is recorded even if its log entry or break was taken off the log since it was
+    // written (it aired all the same); the references that are gone are left empty.
+    const logEntryId = row.logEntryId && (await services.log.entrySpan(row.logEntryId)) ? row.logEntryId : null;
+    const breakId = row.breakId && (await services.log.breakContexts([row.breakId])).has(row.breakId) ? row.breakId : null;
     const asRun = await this.db.transaction(async (tx) => {
       const [claimed] = await tx.select({ asRunId: CI.asRunId }).from(CI).where(eq(CI.id, row.id)).for("update");
       if (!claimed || claimed.asRunId) return null;
@@ -672,8 +683,8 @@ export class ChannelAssembler {
           code: row.code as "PGM",
           startedAt: row.startsAt,
           endedAt: row.endsAt,
-          logEntryId: row.logEntryId,
-          breakId: row.breakId,
+          logEntryId,
+          breakId,
           assetId: row.assetId,
           programId: row.programId,
           airingId: row.airingId,

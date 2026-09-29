@@ -140,11 +140,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     for (const stationId of stationIds) {
       for (const a of await services.catalog.activeAgreements(stationId)) if (a.carrierStationId === stationId && a.term !== "cash") producers.set(a.makerStationId, band(stationId));
     }
-    for (const s of await services.spots.upcomingSpotContent([...new Set([...stationIds, ...producers.keys()])], now, to)) {
-      const b = bands.get(s.stationId) ?? producers.get(s.stationId) ?? "tv";
-      wants.push({ contentId: s.contentId, mediaKind: "video", band: b, durationMs: s.durationMs, neededAt: s.airsAt ?? now });
-      if (producers.has(s.stationId) && producers.get(s.stationId) !== b) wants.push({ contentId: s.contentId, mediaKind: "video", band: producers.get(s.stationId)!, durationMs: s.durationMs, neededAt: s.airsAt ?? now });
-    }
+    wants.push(...(await spotWants([...new Set([...stationIds, ...producers.keys()])], now, to, producers)));
     await preparer.want(wants);
     await preparer.refresh(wants.map((w) => refKey(w)).filter((k): k is string => Boolean(k)));
     const keys = new Map<string, boolean>();
@@ -161,6 +157,29 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       waiting: keys.size - ready,
       firstNotReady: notReady ? { stationId: notReady.stationId, title: notReady.title, airsAt: notReady.neededAt!.toISOString() } : null
     };
+  }
+
+  /** Spots placed in the window (money held) and spots in rotation, for these stations. */
+  async function spotWants(stationIds: string[], from: Date, to: Date, producers = new Map<string, Band>()): Promise<WantRef[]> {
+    const wants: WantRef[] = [];
+    for (const s of await services.spots.upcomingSpotContent(stationIds, from, to)) {
+      const b = bands.get(s.stationId) ?? producers.get(s.stationId) ?? "tv";
+      wants.push({ contentId: s.contentId, mediaKind: "video", band: b, durationMs: s.durationMs, neededAt: s.airsAt ?? from });
+      if (producers.has(s.stationId) && producers.get(s.stationId) !== b) wants.push({ contentId: s.contentId, mediaKind: "video", band: producers.get(s.stationId)!, durationMs: s.durationMs, neededAt: s.airsAt ?? from });
+    }
+    return wants;
+  }
+
+  /**
+   * Spots just placed in a station's breaks: prepared before they air. (The hourly readiness check
+   * would find them too, but a break is filled only 20 minutes ahead: a held airing mustn't wait
+   * for it and air the station ID instead.)
+   */
+  async function queuePlaced(stationId: string) {
+    const now = deps.clock.now();
+    await bandOf([stationId]);
+    const placed = (await spotWants([stationId], now, new Date(now.getTime() + FILL_AHEAD_MS + 60_000))).filter((w) => w.neededAt && w.neededAt.getTime() > now.getTime());
+    await preparer.want(placed);
   }
 
   /** Anything on the log within the hour that isn't prepared: the station and Network desk are told. */
@@ -226,6 +245,9 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       log
     });
     assemblers.set(stationId, assembler);
+    // A station that just went on air: its station IDs, bumpers and rotations are checked (and
+    // queued) on this tick, not at the next hourly readiness check.
+    lastSweep = 0;
     await assembler.start();
   }
 
@@ -239,7 +261,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         const now = deps.clock.now();
         const [live] = (await services.log.entries(command.stationId, now, new Date(now.getTime() + 1))).filter((e) => e.kind === "live" && e.startsAt <= now && e.endsAt > now);
         const slot = await services.log.cueBreak(command.stationId, now, rule.lengthMs, live?.id ?? null);
-        await filler.fillOne(command.stationId, slot, await services.stations.timezoneOf(command.stationId), (await services.spots.creditsFor(command.stationId)).length > 0);
+        const filled = await filler.fillOne(command.stationId, slot, await services.stations.timezoneOf(command.stationId), (await services.spots.creditsFor(command.stationId)).length > 0);
+        if (filled.placed.length) await queuePlaced(command.stationId);
         // Back to live after it: the run sheet splits the live block around the break.
         assembler.replan(true);
       }
@@ -365,7 +388,10 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         if (now - (lastFill.get(stationId) ?? 0) >= FILL_EVERY_MS) {
           lastFill.set(stationId, now);
           const results = await filler.fillAhead(stationId, deps.clock.now(), FILL_AHEAD_MS);
-          if (results.some((r) => r.placed.length)) assemblers.get(stationId)?.replan();
+          if (results.some((r) => r.placed.length)) {
+            await queuePlaced(stationId).catch((error) => log(`[prepare] queueing placed spots failed: ${(error as Error).message}`));
+            assemblers.get(stationId)?.replan();
+          }
         }
         await assemblers
           .get(stationId)

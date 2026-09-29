@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
-import type { ModuleContext } from "../../context.js";
+import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
@@ -166,6 +166,33 @@ export function createLogService(ctx: ModuleContext): LogService {
   const { deps, services } = ctx;
   const { db } = deps;
   const templates = createTemplateOps(ctx);
+
+  /**
+   * Before entries come off the log (removed, an item pulled, a carried slot replacing them): the
+   * breaks stored for them go too, except breaks with spots held in them, which stay without the
+   * entry, as a stale break with airings does (those airings are paid for; any that don't air are
+   * released). Before 2026-09-29 the break's reference made removing the entry fail.
+   */
+  async function releaseBreaks(ex: Executor, entryIds: string[]) {
+    if (!entryIds.length) return;
+    const stored = await ex.select({ id: B.id }).from(B).where(inArray(B.logEntryId, entryIds));
+    if (!stored.length) return;
+    const filled = await services.spots.filledMsByBreak(stored.map((b) => b.id));
+    const empty = stored.filter((b) => !filled.get(b.id)).map((b) => b.id);
+    const held = stored.filter((b) => filled.get(b.id)).map((b) => b.id);
+    if (empty.length) await ex.delete(B).where(inArray(B.id, empty));
+    if (held.length) await ex.update(B).set({ logEntryId: null }).where(inArray(B.id, held));
+  }
+
+  /**
+   * The log changed where playout has already read it (it plans a quarter of an hour ahead): a
+   * station on air reads it again now, or the edit airs only once that plan runs out. Before
+   * 2026-09-29 only the off air hours told it.
+   */
+  async function changedNear(stationId: string, times: Date[]) {
+    const now = deps.clock.now().getTime();
+    if (times.some((t) => t.getTime() < now + 30 * 60_000)) await services.playout.replan(stationId);
+  }
 
   async function load(stationIds: string[], from: Date, to: Date) {
     if (!stationIds.length) return [] as Row[];
@@ -867,10 +894,11 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async pullItem(itemId) {
       const now = deps.clock.now();
-      const pulled = await db
-        .delete(E)
-        .where(and(eq(E.assetId, itemId), gt(E.startsAt, now)))
-        .returning({ stationId: E.stationId });
+      const pulled = await db.transaction(async (tx) => {
+        const rows = await tx.select({ id: E.id }).from(E).where(and(eq(E.assetId, itemId), gt(E.startsAt, now)));
+        await releaseBreaks(tx, rows.map((r) => r.id));
+        return rows.length ? tx.delete(E).where(inArray(E.id, rows.map((r) => r.id))).returning({ stationId: E.stationId }) : [];
+      });
       const counts = new Map<string, number>();
       for (const p of pulled) counts.set(p.stationId, (counts.get(p.stationId) ?? 0) + 1);
       return [...counts].map(([stationId, entries]) => ({ stationId, entries }));
@@ -1002,6 +1030,8 @@ export function createLogService(ctx: ModuleContext): LogService {
         }
         await db.transaction(async (tx) => {
           if (replaceExisting) {
+            const replacing = await tx.select({ id: E.id }).from(E).where(and(eq(E.stationId, carrierStationId), lt(E.startsAt, endsAt), gt(E.endsAt, start)));
+            await releaseBreaks(tx, replacing.map((r) => r.id));
             const removed = await tx
               .delete(E)
               .where(and(eq(E.stationId, carrierStationId), lt(E.startsAt, endsAt), gt(E.endsAt, start)))
@@ -1075,6 +1105,7 @@ export function createLogService(ctx: ModuleContext): LogService {
         .returning();
       // Adding to a date a day template made makes that date an exception.
       await templates.markEdited(stationId, [row.startsAt]);
+      await changedNear(stationId, [row.startsAt]);
       return toEntry(row, await context([row]));
     },
 
@@ -1112,16 +1143,22 @@ export function createLogService(ctx: ModuleContext): LogService {
         .where(eq(E.id, entryId))
         .returning();
       await templates.markEdited(stationId, [current.templateDate ?? current.startsAt, row.startsAt]);
+      await changedNear(stationId, [current.startsAt, row.startsAt]);
       return toEntry(row, await context([row]));
     },
 
     async remove(stationId, entryId) {
-      const removed = await db
-        .delete(E)
-        .where(and(eq(E.id, entryId), eq(E.stationId, stationId)))
-        .returning({ startsAt: E.startsAt, templateDate: E.templateDate });
+      const removed = await db.transaction(async (tx) => {
+        const [mine] = await tx.select({ id: E.id }).from(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId)));
+        if (mine) await releaseBreaks(tx, [mine.id]);
+        return tx
+          .delete(E)
+          .where(and(eq(E.id, entryId), eq(E.stationId, stationId)))
+          .returning({ startsAt: E.startsAt, templateDate: E.templateDate });
+      });
       if (!removed.length) throw notFound("That log entry");
       await templates.markEdited(stationId, [removed[0].templateDate ?? removed[0].startsAt]);
+      await changedNear(stationId, [removed[0].startsAt]);
     },
 
     async repeatDay(stationId, input) {

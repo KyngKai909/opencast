@@ -2,6 +2,18 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: fixes from the Phase 5 evening (playout)
+
+Found running a station's evening end to end against a real Livepeer stream (docs/phase-5-demo.md). No contract shape changes and no migration; behaviour only.
+
+- `removeEntry` (and pulling an item, and a carried slot replacing entries) no longer fails with a 422 once the break after the entry has been stored (it is stored up to 20 minutes ahead). The entry's empty breaks go with it; a break with spots already held stays, without the entry (as a stale break with airings always has: an airing that doesn't air is released).
+- Adding, changing or removing a log entry that starts within 30 minutes tells a station on air to read its log again (a `replan` command). Before, playout kept its quarter-hour plan and the edit aired only once that ran out.
+- The as-run log (`getAsRun`'s `AsRunRow` is unchanged) records an item even when its log entry or break was taken off the log after the item was written to the channel; the stored references (`as_run.log_entry_id`, `break_id`, already nullable) are left empty. Before, such an item was never recorded, and held up every as-run row after it.
+- Spots placed in a break are queued for preparation as they're placed, and a station that goes on air is checked for readiness on the next tick (its station IDs, bumpers and rotations), not at the next hourly check. Before, a station signed on mid-hour aired the station ID slate in place of its held spots.
+- Livepeer streams for live sources are created with the TV ladder's video renditions (1080p 5 Mbps, 720p 2.8 Mbps, 480p 1.4 Mbps, 360p 800 kbps, 30 fps, a keyframe every 4 s), so a live block's renditions match the prepared ones. Livepeer makes no audio-only rendition: the channel's `a128` playlist reads the 360p rendition during a live block (its CODECS in the master still say audio only).
+- Reading a live source: a playback address that redirects is followed (segment addresses are relative to the node it lands on); Livepeer's "Stream open failed" answer before the encoder connects no longer sticks for the whole block; the master is read again until every rendition is listed, and again after the source reconnects (a new session, new addresses). A source counts as lost after 3 of its segments with nothing new (at least 8 s; before, 8 s, which Livepeer's 4-second segments sometimes exceed).
+- Translators: every segment is relayed in one TS layout (picture on PID 0x100, sound on 0x101). Livepeer's segments carry the sound on 0x100 and the picture on a PID per rendition, so a relay froze on the last prepared frame for the whole live block. The composited picture is fitted to the relay's size first. A session's end and last byte count are written before the worker exits.
+
 ## 2026-09-29: prepare once, then assemble (playout, Phase 5)
 
 The worker no longer encodes channels. Every item is prepared once (FFmpeg on the worker: TV 1080p, 720p, 480p, 360p and AAC 128k audio-only; radio band AAC 128k and 64k; 4-second segments, aligned keyframes, loudness levelled to -24 LUFS, 10 ms edge fades) into object storage under its content ID, and each channel's playlists are assembled from those segments (and Livepeer's during live blocks) with the tags in `hls.ts`. Additive: new optional fields, one enum widened in a response only, and new playlist URLs. Migration 0020 adds four tables only (`prepared_items`, `prepared_renditions`, `channel_items`, `translator_sessions`; see docs/schema.md).

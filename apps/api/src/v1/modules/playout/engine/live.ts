@@ -9,8 +9,14 @@
 
 import type { Ladder, RenditionName } from "./ladder.js";
 
-/** No new segment for this long and the source counts as lost. */
+/**
+ * No new segment for this long and the source counts as lost: at least 8 s, and three of the
+ * source's segments (Livepeer's 4-second segments arrive a few seconds apart, sometimes 8 or more).
+ */
 export const SIGNAL_GAP_MS = 8_000;
+const SIGNAL_GAP_SEGMENTS = 3;
+/** How often an incomplete master playlist (renditions still to come) is read again. */
+export const MASTER_AGAIN_MS = 5_000;
 
 export interface LiveSegment {
   seq: number;
@@ -83,6 +89,11 @@ export function mapVariants(variants: Variant[], renditions: RenditionName[], la
 
 export class LiveHlsSource {
   private map: Map<RenditionName, string> | null = null;
+  /** Every video rendition has a variant of its own size (else the master is read again). */
+  private complete = false;
+  private mapAt = 0;
+  /** The length of the source's latest segment. */
+  private segmentMs = 0;
   private segments = new Map<number, LiveSegment>();
   private newest = -1;
   private lastNewAt = 0;
@@ -96,10 +107,11 @@ export class LiveHlsSource {
     private now: () => number
   ) {}
 
-  private async text(url: string): Promise<string | null> {
+  /** A playlist's text, and the address it came from after redirects (its URIs are relative to that). */
+  private async text(url: string): Promise<{ text: string; url: string } | null> {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(4_000), headers: { "cache-control": "no-cache" } });
-      return response.ok ? await response.text() : null;
+      return response.ok ? { text: await response.text(), url: response.url || url } : null;
     } catch {
       return null;
     }
@@ -115,43 +127,70 @@ export class LiveHlsSource {
   }
 
   private async read() {
-    if (!this.map) {
+    // Livepeer lists its transcoded renditions only once they're made, the source's first: until
+    // every video rendition has one of its own size, the master is read again every few seconds.
+    if (!this.map || (!this.complete && this.now() - this.mapAt >= MASTER_AGAIN_MS)) {
       const master = await this.text(this.url);
-      if (master === null) return;
-      const variants = parseMaster(master, this.url);
-      const map = variants ? mapVariants(variants, this.renditions, this.ladder) : new Map(this.renditions.map((r) => [r, this.url] as const));
-      if (!map.size) return;
-      this.map = map;
+      // Before the source connects Livepeer answers a playlist with no media in it ("#EXT-X-ERROR:
+      // Stream open failed"): not a map to keep, or the block would read it for good.
+      const usable = master !== null && (/^#EXT-X-STREAM-INF/m.test(master.text) || /^#EXTINF/m.test(master.text));
+      if (master === null || !usable) {
+        if (!this.map) return;
+      } else {
+        const variants = parseMaster(master.text, master.url);
+        const map = variants ? mapVariants(variants, this.renditions, this.ladder) : new Map(this.renditions.map((r) => [r, master.url] as const));
+        if (!map.size && !this.map) return;
+        if (map.size) {
+          this.map = map;
+          this.mapAt = this.now();
+          this.complete = !variants || this.renditions.every((name) => this.ladder[name].kind !== "video" || variants.some((v) => !v.audioOnly && v.height === this.ladder[name].height));
+        }
+      }
     }
-    const urls = [...new Set(this.map.values())];
+    const map = this.map!;
+    const urls = [...new Set(map.values())];
     const lists = new Map<string, Array<{ seq: number; durationMs: number; uri: string }>>();
     for (const url of urls) {
-      const text = await this.text(url);
-      if (text !== null) lists.set(url, parseMedia(text, url));
+      const got = await this.text(url);
+      if (got !== null) lists.set(url, parseMedia(got.text, got.url));
     }
-    if (lists.size !== urls.length) return;
-    const reference = lists.get([...this.map.values()][0])!;
+    if (lists.size !== urls.length) return this.forgetIfLost();
+    const reference = lists.get([...map.values()][0])!;
     let grew = false;
     for (const seg of reference) {
       if (seg.seq <= this.newest) continue;
       const uris: LiveSegment["uris"] = {};
-      for (const [name, url] of this.map) {
+      for (const [name, url] of map) {
         const found = lists.get(url)!.find((s) => s.seq === seg.seq);
         if (found) uris[name] = found.uri;
       }
       // Only segments every rendition has (renditions line up by media sequence).
-      if (Object.keys(uris).length !== this.map.size) continue;
+      if (Object.keys(uris).length !== map.size) continue;
       this.segments.set(seg.seq, { seq: seg.seq, durationMs: seg.durationMs, uris });
+      this.segmentMs = seg.durationMs;
       this.newest = seg.seq;
       grew = true;
     }
     if (grew) this.lastNewAt = this.now();
+    else this.forgetIfLost();
     for (const seq of this.segments.keys()) if (seq < this.newest - 30) this.segments.delete(seq);
+  }
+
+  /**
+   * A source that stopped sending comes back as a new session, at new addresses (Livepeer's
+   * renditions carry a session token): while it's lost, the master is read again.
+   */
+  private forgetIfLost() {
+    if (!this.map || this.connected() || this.now() - this.mapAt < MASTER_AGAIN_MS) return;
+    this.map = null;
+    // Its media sequence starts again too.
+    this.newest = -1;
+    this.segments.clear();
   }
 
   /** A new segment within the last few seconds. */
   connected(): boolean {
-    return this.lastNewAt > 0 && this.now() - this.lastNewAt < SIGNAL_GAP_MS;
+    return this.lastNewAt > 0 && this.now() - this.lastNewAt < Math.max(SIGNAL_GAP_MS, SIGNAL_GAP_SEGMENTS * this.segmentMs);
   }
 
   /** Segments after `seq`, in order; with no `seq`, the newest one (the live edge). */

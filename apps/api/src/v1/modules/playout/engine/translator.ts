@@ -61,6 +61,8 @@ export class TranslatorRelay {
   private lastSaved = 0;
   private waitingForRun: number | null = null;
   private lastOpen = 0;
+  /** The session's closing write, once FFmpeg has exited. */
+  private ending?: Promise<void>;
 
   constructor(
     private ctx: ModuleContext,
@@ -114,7 +116,8 @@ export class TranslatorRelay {
       const bug = await this.options.slates.bug(look, look.bug.opacity);
       args = [
         ...common, "-loop", "1", "-i", bug,
-        "-filter_complex", `[1:v]scale=${r.width}:${r.height},format=rgba[b];[0:v][b]overlay=0:0:shortest=1,format=yuv420p[out]`,
+        // The picture fitted to the relay's size first: a live block's source may arrive at another size.
+        "-filter_complex", `[0:v]scale=w=${r.width}:h=${r.height}:force_original_aspect_ratio=decrease,pad=${r.width}:${r.height}:(ow-iw)/2:(oh-ih)/2,setsar=1[m];[1:v]scale=${r.width}:${r.height},format=rgba[b];[m][b]overlay=0:0:shortest=1,format=yuv420p[out]`,
         "-map", "[out]", "-map", "0:a", "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${r.videoKbps}k`, "-maxrate", `${Math.round(r.videoKbps * 1.1)}k`, "-bufsize", `${r.videoKbps * 2}k`, "-g", "60", "-r", "30",
         "-c:a", "copy", "-bsf:a", "aac_adtstoasc", ...out
       ];
@@ -141,7 +144,7 @@ export class TranslatorRelay {
     child.on("close", (code) => {
       if (this.child === child) this.child = undefined;
       if (code && !this.stopped) this.log(`ffmpeg exited ${code}: ${lastError}`);
-      void this.save(true, code ? lastError : null);
+      this.ending = this.save(true, code ? lastError : null);
     });
     const [session] = await this.ctx.deps.db
       .insert(TS)
@@ -165,7 +168,7 @@ export class TranslatorRelay {
 
   private async close() {
     const child = this.child;
-    if (!child) return;
+    if (!child) return this.ending;
     await new Promise<void>((resolve) => {
       if (child.exitCode !== null || child.signalCode !== null) return resolve();
       const kill = setTimeout(() => child.kill("SIGKILL"), 5_000);
@@ -175,6 +178,9 @@ export class TranslatorRelay {
       });
       child.stdin?.end();
     });
+    // The session's end (and its last bytes) is written before this returns: a worker shutting
+    // down exits right after.
+    await this.ending;
     await this.save(true);
   }
 

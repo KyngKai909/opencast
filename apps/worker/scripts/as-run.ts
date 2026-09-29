@@ -24,7 +24,7 @@ const length = (a: Date, b: Date) => {
 console.log(`As-run, ${rows.length} rows\n`);
 console.log("Aired        Code  Runs   Why              What");
 for (const r of rows) {
-  const what = (r.assetId && titles.items.get(r.assetId)) || (r.programId && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.code === "UND" ? "Thank-you credit" : r.code === "OPEN" ? "Station ID slate" : r.reason === "live" ? "Live" : "");
+  const what = (r.assetId && titles.items.get(r.assetId)) || (r.programId && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.code === "UND" ? "Thank-you credit" : r.code === "OPEN" ? (r.reason === "slate" ? "Sign-off slate" : "Station ID slate") : r.reason === "live" ? "Live" : "");
   const money = costs.has(r.id) ? `  $${(costs.get(r.id)! / 1e6).toFixed(2)}${r.carriageAgreementId ? " (barter: paid to the producer)" : ""}` : "";
   console.log(`${time(r.startedAt).padEnd(12)} ${r.code.padEnd(5)} ${length(r.startedAt, r.endedAt).padEnd(6)} ${r.reason.padEnd(16)} ${what}${money}${r.proofFrameUrl ? "  [proof frame]" : ""}`);
 }
