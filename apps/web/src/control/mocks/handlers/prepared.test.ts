@@ -60,9 +60,23 @@ describe("preparation for air", () => {
     expect(status.body.output.livepeerEnabled).toBe(false);
     const r = status.body.readiness;
     expect(r.items).toBeGreaterThan(1);
-    // Late Crate, ep. 15 airs twice in the next 48 hours (10:00 pm and the 3:30 am repeat): both count.
-    expect(r.items - r.ready).toBe(2);
-    expect(r.firstNotReady).toMatchObject({ itemId: item("Late Crate, ep. 15").id, title: "Late Crate, ep. 15", airsAt: at("22:00"), status: "preparing" });
+    // Late Crate, ep. 15 airs twice in the next 48 hours (10:00 pm and the 3:30 am repeat): it counts once (G13).
+    expect(r.items - r.ready).toBe(1);
+    expect(r).toMatchObject({ failed: 0, preparing: 1 });
+    const entry = getDb().log.find((e) => e.itemId === item("Late Crate, ep. 15").id && e.startsAt === at("22:00"))!;
+    expect(r.firstNotReady).toMatchObject({ itemId: item("Late Crate, ep. 15").id, title: "Late Crate, ep. 15", airsAt: at("22:00"), status: "preparing", entryId: entry.id });
+  });
+
+  it("tells an item that couldn't be prepared from one on its way (G14)", async () => {
+    const broken = item("Late Crate, ep. 14");
+    broken.status = "failed";
+    const r = (await api(`/stations/${beat()}/playout`)).body.readiness;
+    expect(r).toMatchObject({ failed: 1, preparing: 1 });
+    const checks = await api(`/stations/${beat()}/sign-on/checks`);
+    const c = checks.body.checks.find((x: { key: string }) => x.key === "items_prepared");
+    expect(c.preparation).toMatchObject({ failed: 1, preparing: 1, firstFailed: { itemId: broken.id, title: "Late Crate, ep. 14" } });
+    expect(c.preparation.ready + 2).toBe(c.preparation.items);
+    expect(c.detail).toMatch(/\. 1 couldn't be prepared \(its file needs replacing\) and 1 is being prepared; anything not ready at air time airs station ID and bumpers$/);
   });
 
   it("the sign-on checks say how many of the next 24 hours' items are prepared, never blocking", async () => {
@@ -70,6 +84,7 @@ describe("preparation for air", () => {
     const c = checks.body.checks.find((x: { key: string }) => x.key === "items_prepared");
     expect(c).toMatchObject({ label: "Items prepared for air", passed: false, blocking: false });
     expect(c.detail).toMatch(/^\d+ of \d+ in the next 24 hours\. The rest are being prepared/);
+    expect(c.preparation).toMatchObject({ failed: 0, preparing: 1, firstFailed: null });
   });
 
   it("a library item's history says where its preparation stands", async () => {

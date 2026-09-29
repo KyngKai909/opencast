@@ -4,7 +4,8 @@
 // sign-on check `items_prepared` (the next 24) and a library item's history read it here.
 //
 // An item is prepared once its file is ready and its rights are confirmed, and something airs it
-// (the log, or a break). Tonight BEAT's Late Crate, ep. 15 (10:00 pm) is still being prepared
+// (the log, or a break). Readiness counts items, not log entries (G13), and tells an item that
+// couldn't be prepared from one on its way (G14). Tonight BEAT's Late Crate, ep. 15 (10:00 pm) is still being prepared
 // until 9:30 pm on the mock clock, so the Monitor has something to name.
 
 import type { LibraryItem } from "@opencast/contracts";
@@ -61,26 +62,58 @@ function logItems(stationId: string, from: number, to: number) {
     });
 }
 
-/** PlayoutStatus.readiness: the next 48 hours, how many are ready, and the first that isn't. */
+/**
+ * By item, as the API counts (G13): an item airing twice counts once, and its earliest airing is
+ * the one named. Failed (the file needs replacing) told apart from on its way (G14).
+ */
+function byItem(rows: ReturnType<typeof logItems>) {
+  const first = new Map<string, (typeof rows)[number]>();
+  for (const r of [...rows].sort((a, b) => a.entry.startsAt.localeCompare(b.entry.startsAt))) if (!first.has(r.entry.itemId!)) first.set(r.entry.itemId!, r);
+  const items = [...first.values()];
+  const notReady = items.filter((r) => r.status !== "ready");
+  const failed = notReady.filter((r) => r.status === "failed");
+  return { items, notReady, failed, ready: items.length - notReady.length, preparing: notReady.length - failed.length };
+}
+
+/** PlayoutStatus.readiness: the next 48 hours' items, how many are ready, failed or on their way, and the first that isn't ready. */
 export function readinessOf(stationId: string, t: number) {
-  const rows = logItems(stationId, t, t + 48 * HOUR);
-  const notReady = rows.filter((r) => r.status !== "ready").sort((a, b) => a.entry.startsAt.localeCompare(b.entry.startsAt))[0];
+  const s = byItem(logItems(stationId, t, t + 48 * HOUR));
+  const f = s.notReady[0];
   return {
-    items: rows.length,
-    ready: rows.filter((r) => r.status === "ready").length,
-    firstNotReady: notReady ? { itemId: notReady.entry.itemId!, title: notReady.title, airsAt: notReady.entry.startsAt, status: notReady.status as Exclude<PreparationStatus, "ready"> } : null
+    items: s.items.length,
+    ready: s.ready,
+    failed: s.failed.length,
+    preparing: s.preparing,
+    firstNotReady: f ? { itemId: f.entry.itemId!, title: f.title, airsAt: f.entry.startsAt, status: f.status as Exclude<PreparationStatus, "ready">, entryId: f.entry.id } : null
   };
 }
 
-/** The sign-on check `items_prepared` (never blocking): the next 24 hours, in the API's words. */
+/** The rest of the check's detail, in the API's words (G14). */
+function preparedTail(failed: number, preparing: number): string {
+  const fallback = "anything not ready at air time airs station ID and bumpers";
+  if (!failed && !preparing) return "";
+  if (!failed) return `. The rest are being prepared; ${fallback}`;
+  const broken = `${failed} couldn't be prepared (${failed === 1 ? "its file needs" : "their files need"} replacing)`;
+  return preparing ? `. ${broken} and ${preparing} ${preparing === 1 ? "is" : "are"} being prepared; ${fallback}` : `. ${broken}; ${fallback}`;
+}
+
+/** The sign-on check `items_prepared` (never blocking): the next 24 hours' items, in the API's words, with `preparation` (G14). */
 export function itemsPreparedCheck(stationId: string, t: number) {
-  const rows = logItems(stationId, t, t + 24 * HOUR);
-  const ready = rows.filter((r) => r.status === "ready").length;
+  const s = byItem(logItems(stationId, t, t + 24 * HOUR));
+  const n = s.items.length;
+  const f = s.failed[0];
   return {
     key: "items_prepared" as const,
     label: "Items prepared for air",
-    passed: ready === rows.length,
+    passed: s.ready === n,
     blocking: false,
-    detail: rows.length ? `${ready} of ${rows.length} in the next 24 hours${ready < rows.length ? ". The rest are being prepared; anything not ready at air time airs station ID and bumpers" : ""}` : null
+    detail: n ? `${s.ready} of ${n} in the next 24 hours${preparedTail(s.failed.length, s.preparing)}` : null,
+    preparation: {
+      items: n,
+      ready: s.ready,
+      failed: s.failed.length,
+      preparing: s.preparing,
+      firstFailed: f ? { itemId: f.entry.itemId!, title: f.title, airsAt: f.entry.startsAt, entryId: f.entry.id } : null
+    }
   };
 }

@@ -19,6 +19,7 @@ let engine: Engine;
 let spotId: string;
 let programCid: string;
 let brokenId: string;
+let brokenEntryId: string;
 const fake = fakeTranscoder();
 const logs: string[] = [];
 const $ = (d: number) => Math.round(d * 1_000_000);
@@ -72,7 +73,7 @@ beforeAll(async () => {
   const broken = await itemFixture(h, beat.id, { title: "Borrowed Tape", durationMs: 20_000, location: await dummyFile() });
   brokenId = broken.id;
   fake.fail.add((await h.services.library.currentContent([broken.id])).get(broken.id)!);
-  await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:40:00.000Z", endsAt: "2026-10-02T03:41:00.000Z", itemId: broken.id }).expect(201);
+  brokenEntryId = (await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:40:00.000Z", endsAt: "2026-10-02T03:41:00.000Z", itemId: broken.id }).expect(201)).body.id;
   await h.db.insert(schema.playoutState).values({ stationId: beat.id, onAir: true });
 
   engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, translators: false, log: (l) => logs.push(l) });
@@ -97,6 +98,16 @@ describe("preparing what's on the log", () => {
     expect(renditions.map((r) => [r.rendition, r.segmentMs])).toContainEqual(["v720", [4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000]]);
     // Stored under the content ID.
     expect(await h.deps.storage.objects.has(`prepared/${programCid}/v720/seg_00008.ts`)).toBe(true);
+  });
+
+  it("counts items for the Monitor, not log entries (G13): the program on twice counts once", async () => {
+    const now = h.clock.now();
+    const entries = (await h.services.log.entries(beat.id, now, new Date(now.getTime() + 48 * 3_600_000))).filter((e) => e.kind === "program" && e.assetId);
+    const items = new Set(entries.map((e) => e.assetId));
+    expect(entries.length).toBeGreaterThan(items.size);
+    const status = await kai.get(`/v1/stations/${beat.id}/playout`).expect(200);
+    expect(status.body.readiness.items).toBe(items.size);
+    expect(status.body.readiness.ready + status.body.readiness.failed + status.body.readiness.preparing).toBe(items.size);
   });
 });
 
@@ -203,9 +214,15 @@ describe("the readiness check", () => {
     const warned = await h.db.select().from(schema.notices).where(eq(schema.notices.kind, "file_not_ready"));
     expect(warned.some((n) => /Borrowed Tape isn't ready for/.test(n.title))).toBe(true);
     const status = await kai.get(`/v1/stations/${beat.id}/playout`).expect(200);
-    expect(status.body.readiness.firstNotReady).toMatchObject({ itemId: brokenId, title: "Borrowed Tape", status: "failed" });
+    // G13: the airing's log entry, to link to; G14: failed told apart from on its way.
+    expect(status.body.readiness.firstNotReady).toMatchObject({ itemId: brokenId, title: "Borrowed Tape", status: "failed", entryId: brokenEntryId, airsAt: "2026-10-02T03:40:00.000Z" });
+    expect(status.body.readiness.failed).toBe(1);
     const checks = await kai.get(`/v1/stations/${beat.id}/sign-on/checks`).expect(200);
-    expect(checks.body.checks.find((c: { key: string }) => c.key === "items_prepared")).toMatchObject({ passed: false, blocking: false });
+    const prepared = checks.body.checks.find((c: { key: string }) => c.key === "items_prepared");
+    expect(prepared).toMatchObject({ passed: false, blocking: false });
+    expect(prepared.preparation).toMatchObject({ failed: 1, firstFailed: { itemId: brokenId, title: "Borrowed Tape", entryId: brokenEntryId, airsAt: "2026-10-02T03:40:00.000Z" } });
+    expect(prepared.preparation.ready + prepared.preparation.failed + prepared.preparation.preparing).toBe(prepared.preparation.items);
+    expect(prepared.detail).toMatch(/1 couldn't be prepared \(its file needs replacing\)/);
 
     // At air: station ID and bumpers in its place, and the station is told it didn't air.
     h.clock.set("2026-10-02T03:39:30.000Z");

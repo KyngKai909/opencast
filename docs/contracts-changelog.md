@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: the segment rule, readiness by item, and what failed (G12, G13, G14)
+
+From master control's requests after prepare once, then assemble. Additive: new exports, new optional fields; no migration. One count changes meaning (G13).
+
+- **G12, the 4-second rule** (`segments.ts`, exported from the package root): `SEGMENT_MS` (4000); `snapToSegment(ms)` (the nearest boundary, a tie later: what the log's endpoints do with a time), `nextSegment(ms)` (at or after: where a cued break starts), `endEarlyAt(ms, startsAt)` (the nearest boundary after a live block's start: `endEarly`), and `snapTime`, `onSegment`, `snapLength` (whole segments, at least one: a template entry's slot), `snapSpan` (a span's start and end, never shorter than a segment). Plain functions, no schemas. The API's `apps/api/src/v1/lib/segments.ts` and `packages/ui`'s `lib/segments.ts` now re-export these (their exports are unchanged), so the API and the apps share one rule.
+- **G13, readiness counts items** (`PlayoutStatus.readiness`, `getStatus`): `items` and `ready` count items on the next 48 hours of the log, each once however often it airs (before, each log entry counted: an item airing twice counted twice). `firstNotReady` is the earliest airing of an item that isn't prepared and gains `entryId` (optional), that airing's log entry, so the Monitor can link to it on the log; `airsAt` was already there.
+- **G14, failed told apart from on its way**: `PlayoutStatus.readiness` gains `failed` (couldn't be prepared: the file needs replacing) and `preparing` (queued, being prepared, or not asked for yet: nothing to do), both optional; `failed + preparing = items - ready`. `SignOnCheck` gains `preparation` (optional, on `items_prepared` only): `{ items, ready, failed, preparing, firstFailed: { itemId, title, airsAt, entryId } | null }` over the next 24 hours, counted by item as G13. The check's detail says what failed: "11 of 12 in the next 24 hours. 1 couldn't be prepared (its file needs replacing); anything not ready at air time airs station ID and bumpers", or "… 1 couldn't be prepared (its file needs replacing) and 2 are being prepared; …"; with nothing failed it reads as before ("The rest are being prepared; …"). No retry endpoint: an item fails after three attempts, so the fix is replacing its file (`replaceFile`, L6), which prepares it again.
+
 ## 2026-09-29: fixes from the Phase 5 evening (playout)
 
 Found running a station's evening end to end against a real Livepeer stream (docs/phase-5-demo.md). No contract shape changes and no migration; behaviour only.

@@ -9,7 +9,7 @@ import { clockTime } from "../../lib/time.js";
 import { objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
 import { renderMaster, renderMedia, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
-import { logReadiness } from "./engine/readiness.js";
+import { logReadiness, summariseReadiness } from "./engine/readiness.js";
 import { refKey } from "./engine/prepare.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared";
@@ -21,6 +21,8 @@ export interface SignOnCheck {
   blocking: boolean;
   detail: string | null;
   watchUrl?: string | null;
+  /** G14: on `items_prepared` only. */
+  preparation?: { items: number; ready: number; failed: number; preparing: number; firstFailed: { itemId: string; title: string; airsAt: string; entryId: string } | null } | null;
 }
 
 export interface PlayoutStatusView {
@@ -34,7 +36,14 @@ export interface PlayoutStatusView {
   /** Planned off air time on now, or the next within 24 hours. */
   offAir?: (OffAirSpanView & { now: boolean }) | null;
   /** Added 2026-09-29: whether what's on the log in the next 48 hours is prepared for air. */
-  readiness?: { items: number; ready: number; firstNotReady: { itemId: string; title: string; airsAt: string; status: "queued" | "preparing" | "failed" | "not_asked" } | null } | null;
+  /** G13: counts items, not entries; `firstNotReady.entryId` is its log entry. G14: `failed` and `preparing`. */
+  readiness?: {
+    items: number;
+    ready: number;
+    failed?: number;
+    preparing?: number;
+    firstNotReady: { itemId: string; title: string; airsAt: string; status: "queued" | "preparing" | "failed" | "not_asked"; entryId?: string } | null;
+  } | null;
 }
 
 export interface AsRunView {
@@ -98,6 +107,18 @@ export interface PlayoutService {
 }
 
 const HOUR = 3_600_000;
+
+/**
+ * The rest of the `items_prepared` detail after "N of M in the next 24 hours" (G14): what failed
+ * (the file needs replacing) told apart from what's on its way.
+ */
+export function preparedTail(failed: number, preparing: number): string {
+  const fallback = "anything not ready at air time airs station ID and bumpers";
+  if (!failed && !preparing) return "";
+  if (!failed) return `. The rest are being prepared; ${fallback}`;
+  const broken = `${failed} couldn't be prepared (${failed === 1 ? "its file needs" : "their files need"} replacing)`;
+  return preparing ? `. ${broken} and ${preparing} ${preparing === 1 ? "is" : "are"} being prepared; ${fallback}` : `. ${broken}; ${fallback}`;
+}
 
 export function createPlayoutService({ deps, services }: ModuleContext): PlayoutService {
   const { db } = deps;
@@ -201,7 +222,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const hourly = rule.mode !== "none" || sidEntries.length > 0 ? longest <= HOUR : false;
 
       const liveEntries = entries.filter((e) => e.kind === "live");
-      const preparedCount = prepared.filter((p) => p.ready).length;
+      // By item, not by entry (G13); failed told apart from on its way (G14).
+      const prep = summariseReadiness(prepared);
       const checks: SignOnCheck[] = [
         { key: "call_sign_chosen", label: "Call sign chosen", passed: identity.callSign, blocking: true, detail: null },
         { key: "channel_chosen", label: "Channel chosen", passed: identity.channel, blocking: true, detail: null },
@@ -253,9 +275,16 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         {
           key: "items_prepared",
           label: "Items prepared for air",
-          passed: preparedCount === prepared.length,
+          passed: prep.ready === prep.items,
           blocking: false,
-          detail: prepared.length ? `${preparedCount} of ${prepared.length} in the next 24 hours${preparedCount < prepared.length ? ". The rest are being prepared; anything not ready at air time airs station ID and bumpers" : ""}` : null
+          detail: prep.items ? `${prep.ready} of ${prep.items} in the next 24 hours${preparedTail(prep.failed, prep.preparing)}` : null,
+          preparation: {
+            items: prep.items,
+            ready: prep.ready,
+            failed: prep.failed,
+            preparing: prep.preparing,
+            firstFailed: prep.firstFailed ? { itemId: prep.firstFailed.itemId, title: prep.firstFailed.title, airsAt: prep.firstFailed.airsAt.toISOString(), entryId: prep.firstFailed.entryId } : null
+          }
         }
       ];
       // Planned off air time isn't a gap; say so, so nobody wonders.
@@ -334,13 +363,18 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR)),
         bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR)))
       ]);
-      const notReady = prepared.filter((p) => !p.ready).sort((a, b) => a.airsAt.getTime() - b.airsAt.getTime())[0];
+      const summary = summariseReadiness(prepared);
+      const notReady = summary.firstNotReady;
       const plannedOff = offAir[0] ? { ...offAir[0], now: Date.parse(offAir[0].startsAt) <= now.getTime() } : null;
       return {
         readiness: {
-          items: prepared.length,
-          ready: prepared.filter((p) => p.ready).length,
-          firstNotReady: notReady ? { itemId: notReady.itemId, title: notReady.title, airsAt: notReady.airsAt.toISOString(), status: (notReady.status as "queued" | "preparing" | "failed" | null) ?? "not_asked" } : null
+          items: summary.items,
+          ready: summary.ready,
+          failed: summary.failed,
+          preparing: summary.preparing,
+          firstNotReady: notReady
+            ? { itemId: notReady.itemId, title: notReady.title, airsAt: notReady.airsAt.toISOString(), status: (notReady.status as "queued" | "preparing" | "failed" | null) ?? "not_asked", entryId: notReady.entryId }
+            : null
         },
         offAir: plannedOff,
         onAirSince: since.get(stationId)?.toISOString() ?? null,

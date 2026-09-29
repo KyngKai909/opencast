@@ -415,6 +415,11 @@ const WEEK: ScheduleItem[] = [
   { id: "w6", start: at(23), title: "Slow Hours", subtitle: "Carried from HALL 90.7" },
   { id: "w7", start: at(24), end: at(26), title: "Late Crate, eps. 12 to 15", subtitle: "Overnight repeat" }
 ];
+/** The station page's week with planned off air: nothing to be reminded of, so no bell. */
+const WEEK_OFF_AIR: ScheduleItem[] = [
+  ...WEEK,
+  { id: "w8", start: at(26), end: at(30), title: "Off air", subtitle: <>Signs on at <span className="oc-mono">6:00 am</span></>, remindable: false }
+];
 
 /* ---------- Specimens ---------- */
 
@@ -1030,7 +1035,7 @@ export const broadcast = specimens([
       { file: PAGES, anchor: "station", frames: ["01.1"] },
       { file: PAGES, anchor: "phone", frames: ["05.1"] }
     ],
-    notes: "A station's schedule. Past rows fade, the program on now has the tally edge, and on the station page later rows offer a reminder.",
+    notes: "A station's schedule. Past rows fade, the program on now has the tally edge, and on the station page later rows offer a reminder, except planned off air (`remindable: false`).",
     stacked: true,
     states: [
       {
@@ -1046,6 +1051,14 @@ export const broadcast = specimens([
         render: () => (
           <W w={852}>
             <ScheduleList items={WEEK} now={NOW} variant="week" onRemind={() => undefined} timeZone={TZ} />
+          </W>
+        )
+      },
+      {
+        label: "Week: off air, no bell",
+        render: () => (
+          <W w={852}>
+            <ScheduleList items={WEEK_OFF_AIR} now={NOW} variant="week" onRemind={() => undefined} timeZone={TZ} />
           </W>
         )
       },

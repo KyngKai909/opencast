@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
+import * as contracts from "@opencast/contracts";
 import { SEGMENT_MS, endEarlyAt, nextSegment, onSegment, snapLength, snapSpan, snapTime, snapToSegment } from "./segments";
 
 const T = (iso: string) => Date.parse(iso);
 
 describe("segment boundaries", () => {
+  it("are the contracts' rule, shared with the API (G12)", () => {
+    expect(SEGMENT_MS).toBe(contracts.SEGMENT_MS);
+    expect([snapToSegment, nextSegment, snapTime, onSegment, snapLength, snapSpan, endEarlyAt]).toEqual([
+      contracts.snapToSegment,
+      contracts.nextSegment,
+      contracts.snapTime,
+      contracts.onSegment,
+      contracts.snapLength,
+      contracts.snapSpan,
+      contracts.endEarlyAt
+    ]);
+  });
+
   it("are 4 seconds, counted from the epoch, so every whole minute is one", () => {
     expect(SEGMENT_MS).toBe(4000);
     expect(onSegment("2026-09-27T03:42:00.000Z")).toBe(true);
@@ -17,6 +31,9 @@ describe("segment boundaries", () => {
     expect(snapTime("2026-09-27T03:28:31.999Z")).toBe("2026-09-27T03:28:32.000Z");
     expect(snapTime("2026-09-27T03:28:00.000Z")).toBe("2026-09-27T03:28:00.000Z");
     expect(snapToSegment(T("2026-09-27T03:28:01.999Z"))).toBe(T("2026-09-27T03:28:00.000Z"));
+    // A Date or epoch milliseconds, as well as an ISO string.
+    expect(snapTime(new Date("2026-09-27T03:28:29.000Z"))).toBe("2026-09-27T03:28:28.000Z");
+    expect(onSegment(T("2026-09-27T03:28:28.000Z"))).toBe(true);
   });
 
   it("the next boundary is at or after the time (a cued break)", () => {
@@ -43,5 +60,8 @@ describe("segment boundaries", () => {
     expect(endEarlyAt(T("2026-09-27T04:30:05.000Z"), start)).toBe(T("2026-09-27T04:30:04.000Z"));
     // A second in: the nearest boundary is the start itself, so the next one.
     expect(endEarlyAt(T("2026-09-27T04:01:01.000Z"), start)).toBe(T("2026-09-27T04:01:04.000Z"));
+    // The start as the API has it (a Date) or as the log answers it (ISO).
+    expect(endEarlyAt(T("2026-09-27T04:01:01.000Z"), new Date(start))).toBe(T("2026-09-27T04:01:04.000Z"));
+    expect(endEarlyAt(T("2026-09-27T04:30:05.000Z"), "2026-09-27T04:01:00.000Z")).toBe(T("2026-09-27T04:30:04.000Z"));
   });
 });

@@ -39,4 +39,13 @@ describe("ScheduleList", () => {
     fireEvent.click(bells[0]);
     expect(onRemind).toHaveBeenCalledWith(ITEMS[3]);
   });
+  it("leaves the bell off a row that isn't remindable, keeping its place", () => {
+    const items = [...ITEMS, { id: "f", start: at(26), end: at(30), title: "Off air", remindable: false }];
+    const { container, getAllByLabelText } = render(<ScheduleList items={items} now={at(20, 42)} variant="week" onRemind={() => undefined} timeZone={TZ} />);
+    expect(getAllByLabelText("Remind me")).toHaveLength(2);
+    const off = [...container.querySelectorAll(".oc-sch2")].find((r) => r.textContent?.includes("Off air"))!;
+    expect(off.querySelector("button")).toBeNull();
+    // The empty cell keeps the row's grid.
+    expect(off.children).toHaveLength(3);
+  });
 });

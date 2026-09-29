@@ -8,7 +8,7 @@
 // rounded to the nearest (never refused), and a cued break starts at the next one.
 
 import { http } from "msw";
-import { logApi, playoutApi, type BreakSlot, type LogEntry } from "@opencast/contracts";
+import { logApi, playoutApi, type BreakSlot, type LogEntry, type SignOnCheck } from "@opencast/contracts";
 import { clock, nextSegment, snapTime, stationColourPasses } from "@opencast/ui";
 import { buildRundown, currentIndex, type RundownRow } from "../../components/onair/rundown";
 import { addDays, broadcastDay, isoDate, timeOn } from "../../components/onair/time";
@@ -163,7 +163,7 @@ export function signOnChecks(st: DbStation) {
   const entries = stationLog(id, from, to);
   const breaks = stationBreaks(id, from, to);
   const lib = getDb().library.items.filter((i) => i.stationId === id);
-  const checks: Array<{ key: "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared"; label: string; passed: boolean; blocking: boolean; detail: string | null; watchUrl?: string | null }> = [];
+  const checks: SignOnCheck[] = [];
 
   if (!st.ident.callSign) checks.push({ key: "call_sign_chosen", label: "Choose a call sign", passed: false, blocking: true, detail: "Three to five capital letters, on the Your station step" });
   if (!st.ident.channel) checks.push({ key: "channel_chosen", label: "Choose a channel", passed: false, blocking: true, detail: "On the Your station step" });
@@ -203,9 +203,10 @@ export function signOnChecks(st: DbStation) {
   const unconfirmed = items.find((i) => !i.rights);
   checks.push({ key: "rights_confirmed", label: "Rights confirmed for everything in the log", passed: !unconfirmed, blocking: true, detail: unconfirmed ? `${unconfirmed.title} needs its rights confirmed` : `${confirmed} of ${items.length} items` });
 
-  // The test signal.
+  // The output, in the API's words: the channel is assembled from prepared items, nothing to set up.
+  // (The API's watchUrl is null until the channel has aired; the mock streams play from the start.)
   const url = MOCK_STREAMS.includes(slug(st)) ? `/mock-hls/${slug(st)}/master.m3u8` : null;
-  checks.push({ key: "output", label: "Test signal received", passed: true, blocking: false, detail: TEST_SIGNAL.detail, watchUrl: url });
+  checks.push({ key: "output", label: "Output ready", passed: true, blocking: false, detail: "Assembled from prepared items", watchUrl: url });
 
   // Live blocks without a source: a slate airs in their place (a warning).
   for (const e of entries.filter((x) => x.kind === "live")) {

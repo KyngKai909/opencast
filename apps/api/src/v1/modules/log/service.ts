@@ -4,7 +4,7 @@ import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
-import { nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
+import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
@@ -639,9 +639,8 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async endEarly(stationId, entryId) {
       const row = await service.liveEntry(stationId, entryId);
-      // At the nearest segment boundary, where the stream can change item.
-      const clock = deps.clock.now().getTime();
-      const at = new Date(snapToSegment(clock) > row.startsAt.getTime() ? snapToSegment(clock) : nextSegment(clock));
+      // At the nearest segment boundary after its start, where the stream can change item (the shared rule, G12).
+      const at = new Date(endEarlyAt(deps.clock.now().getTime(), row.startsAt));
       if (row.endedEarlyAt) throw new HttpError(409, "ended", "It has already ended.");
       if (!(row.startsAt <= at && at < row.endsAt)) throw new HttpError(409, "not_on_air", "It can end early only while it's on air.");
       const shift = row.endsAt.getTime() - at.getTime();

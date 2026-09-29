@@ -47,3 +47,38 @@ export async function logReadiness(ctx: ModuleContext, stationId: string, band: 
     return { entryId: e.id, itemId: e.assetId!, title: items.get(e.assetId!)?.title ?? "An item", airsAt: e.startsAt, key, ready: Boolean(key && ready.has(key)), status: key ? (status.get(key) ?? null) : null };
   });
 }
+
+export interface ReadinessSummary {
+  /** Items on the log, each counted once however often it airs (G13). */
+  items: number;
+  ready: number;
+  /** Couldn't be prepared: the file needs replacing (G14). */
+  failed: number;
+  /** Queued, being prepared, or not asked for yet: on their way, nothing to do (G14). */
+  preparing: number;
+  /** The earliest airing of an item that isn't prepared. */
+  firstNotReady: LogItemReadiness | null;
+  /** The earliest airing of an item that couldn't be prepared. */
+  firstFailed: LogItemReadiness | null;
+}
+
+/**
+ * The log's readiness by item, not by entry (G13): an item airing twice counts once, and its
+ * earliest airing is the one named. Whether an item is ready is the same for each of its entries
+ * (one prepared key per item and band).
+ */
+export function summariseReadiness(rows: LogItemReadiness[]): ReadinessSummary {
+  const byItem = new Map<string, LogItemReadiness>();
+  for (const r of [...rows].sort((a, b) => a.airsAt.getTime() - b.airsAt.getTime())) if (!byItem.has(r.itemId)) byItem.set(r.itemId, r);
+  const items = [...byItem.values()];
+  const notReady = items.filter((r) => !r.ready);
+  const failed = notReady.filter((r) => r.status === "failed");
+  return {
+    items: items.length,
+    ready: items.length - notReady.length,
+    failed: failed.length,
+    preparing: notReady.length - failed.length,
+    firstNotReady: notReady[0] ?? null,
+    firstFailed: failed[0] ?? null
+  };
+}

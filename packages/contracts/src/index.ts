@@ -38,6 +38,7 @@ export * from "./waitlist.js";
 export * from "./network.js";
 export * from "./tv.js";
 export * from "./hls.js";
+export * from "./segments.js";
 
 export const API_PREFIX = "/v1";
 

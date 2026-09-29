@@ -2,7 +2,7 @@
 // tally above the ink Sign on button, so signing on is the tally lighting in the same place.
 // The first sign-on fixes the call sign and channel, then master control opens the Monitor.
 // Planned off air in the next 24 hours shows as a line of its own (`off_air_hours`), never a warning.
-// Items prepared for air (`items_prepared`) never blocks.
+// Items prepared for air (`items_prepared`) never blocks; "Go to library" shows only when one failed (G14).
 
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -12,6 +12,7 @@ import { Button, Checks, ControlTitle, Modal, Notice, Tally, clock, type Check }
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { LOG_READS, useLog, useSignOnChecks } from "../../components/onair/data";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
+import { preparedFixHref } from "../../components/onair/readiness";
 import { isInformational, signOnSummary } from "../../components/onair/signOn";
 import { STATION_TZ, now } from "../../../lib/clock";
 import { Quiet } from "../common";
@@ -43,11 +44,11 @@ export default function SetupSignOn() {
   const ident = [st.callSign, st.channel].filter(Boolean).join(" ");
   const list = checks.data?.checks ?? [];
 
-  const fix = (key: string, watchUrl?: string | null): Check["action"] => {
-    switch (key) {
+  const fix = (c: (typeof list)[number]): Check["action"] => {
+    switch (c.key) {
       case "output":
-        return watchUrl ? (
-          <Button variant="text" size="sm" onClick={() => setWatching(watchUrl)}>
+        return c.watchUrl ? (
+          <Button variant="text" size="sm" onClick={() => setWatching(c.watchUrl!)}>
             Watch it
           </Button>
         ) : null;
@@ -63,17 +64,24 @@ export default function SetupSignOn() {
         return <Button size="sm" href={controlPath(`/setup/${stationId}/station`)}>Choose</Button>;
       case "listings_complete":
         return <Button size="sm" href={controlPath(`/${slug}/listings`)}>Write it</Button>;
+      case "items_prepared": {
+        // G14: only when an item couldn't be prepared (its file needs replacing); nothing to do while
+        // items are still being prepared.
+        const href = preparedFixHref(c, controlPath(`/${slug}`));
+        return href ? <Button size="sm" href={href}>Go to library</Button> : null;
+      }
       default:
         return null;
     }
   };
   // Off air hours planned (G9) only informs: it's fine as it is, with nothing to fix. So does
   // "Items prepared for air" while everything is; while something isn't, it's a warning with the
-  // API's detail and no fix (preparation runs by itself; sign-on isn't held for it).
+  // API's detail, and a fix only when an item couldn't be prepared (G14: "Go to library", to replace
+  // its file). Items still being prepared need nothing (sign-on isn't held for them).
   const items: Check[] = list.map((c) =>
     isInformational(c)
       ? { state: "fine", title: c.label, detail: c.detail ?? undefined }
-      : { state: c.passed ? "fine" : "attention", title: c.label, detail: c.detail ?? undefined, action: c.passed && c.key !== "output" ? undefined : fix(c.key, c.watchUrl) }
+      : { state: c.passed ? "fine" : "attention", title: c.label, detail: c.detail ?? undefined, action: c.passed && c.key !== "output" ? undefined : fix(c) }
   );
 
   // What goes out first: the program on at sign-on, or the next one.

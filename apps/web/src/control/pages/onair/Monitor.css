@@ -12,6 +12,7 @@
 .cc-mon__h--split { display: flex; justify-content: space-between; align-items: baseline; }
 .cc-mon__h--split span { font: 500 12.5px var(--font-text); color: var(--ink-50); }
 .cc-mon__offer { color: inherit; font-weight: 600; text-decoration: none; }
+.cc-mon__ready { color: inherit; text-underline-offset: 2px; }
 .cc-mon__offer:hover { text-decoration: underline; }
 .cc-mon__offer:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: var(--r-sign); }
 .cc-mon__market .oc-health__row { font-family: var(--font-text); }

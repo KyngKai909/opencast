@@ -2,11 +2,11 @@
 // assemble), so the log's times are on them: programs, live blocks, off air and breaks start and
 // end on a 4-second boundary of the wall clock. The log editor snaps; the API rounds what it's
 // sent to the nearest boundary (existing times are accepted and rounded, never refused).
+//
+// The rule lives in `@opencast/contracts` (G12), shared with the apps; re-exported here so the
+// API's callers keep importing it from this file.
 
-export const SEGMENT_MS = 4_000;
+import { snapToSegment } from "@opencast/contracts";
 
-/** The nearest segment boundary. */
-export const snapToSegment = (ms: number) => Math.round(ms / SEGMENT_MS) * SEGMENT_MS;
-/** The next segment boundary at or after `ms`. */
-export const nextSegment = (ms: number) => Math.ceil(ms / SEGMENT_MS) * SEGMENT_MS;
+export { SEGMENT_MS, endEarlyAt, nextSegment, snapToSegment } from "@opencast/contracts";
 export const snapDate = (d: Date) => new Date(snapToSegment(d.getTime()));

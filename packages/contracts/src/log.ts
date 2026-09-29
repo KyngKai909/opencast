@@ -530,7 +530,7 @@ export const logApi = {
 export const SignOnCheck = z.object({
   /**
    * `off_air_hours` (added 2026-09-29): informational, never blocking; there when off air time is planned in the next 24 hours.
-   * `items_prepared` (added 2026-09-29, prepare once): never blocking; how many items on the next 24 hours of the log are prepared for air.
+   * `items_prepared` (added 2026-09-29, prepare once): never blocking; how many items on the next 24 hours of the log are prepared for air (with `preparation`, G14).
    */
   key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours", "items_prepared"]),
   label: z.string(),
@@ -539,7 +539,24 @@ export const SignOnCheck = z.object({
   blocking: z.boolean(),
   detail: z.string().nullable(),
   /** G6 (added 2026-09-29): where to watch what this check is about (the output's playback, once there is one). */
-  watchUrl: z.string().nullable().optional()
+  watchUrl: z.string().nullable().optional(),
+  /**
+   * G14 (added 2026-09-29): on `items_prepared` only. The items on the next 24 hours of the log
+   * (each counted once, however often it airs), how many are prepared, how many couldn't be
+   * (`failed`: the file needs replacing, so there's something to fix), and how many are still on
+   * their way (`preparing`: queued, being prepared, or not asked for yet; nothing to do). `firstFailed`
+   * is the earliest-airing item that couldn't be prepared, for a link to it in the library.
+   */
+  preparation: z
+    .object({
+      items: z.number().int(),
+      ready: z.number().int(),
+      failed: z.number().int(),
+      preparing: z.number().int(),
+      firstFailed: z.object({ itemId: Id, title: z.string(), airsAt: Timestamp, entryId: Id }).nullable()
+    })
+    .nullable()
+    .optional()
 });
 
 export const PlayoutStatus = z.object({
@@ -582,12 +599,31 @@ export const PlayoutStatus = z.object({
    * many are prepared in every rendition the station's band airs, and the first that isn't
    * (`status`: queued, being prepared, failed, or not asked for yet). Anything not ready at air
    * time airs station ID and bumpers instead, and the station is told an hour before.
+   *
+   * G13 (2026-09-29): `items` and `ready` count items, not log entries: an item airing twice counts
+   * once (before, each entry counted). `firstNotReady` is the earliest airing of an item that isn't
+   * prepared, with `entryId`, its log entry, so the Monitor can link to it on the log.
+   * G14 (2026-09-29): `failed` (couldn't be prepared: the file needs replacing) and `preparing`
+   * (queued, being prepared, or not asked for yet) split `items - ready`.
    */
   readiness: z
     .object({
       items: z.number().int(),
       ready: z.number().int(),
-      firstNotReady: z.object({ itemId: Id, title: z.string(), airsAt: Timestamp, status: z.enum(["queued", "preparing", "failed", "not_asked"]) }).nullable()
+      /** G14 (added 2026-09-29). */
+      failed: z.number().int().optional(),
+      /** G14 (added 2026-09-29). */
+      preparing: z.number().int().optional(),
+      firstNotReady: z
+        .object({
+          itemId: Id,
+          title: z.string(),
+          airsAt: Timestamp,
+          status: z.enum(["queued", "preparing", "failed", "not_asked"]),
+          /** G13 (added 2026-09-29): the log entry of that airing. */
+          entryId: Id.optional()
+        })
+        .nullable()
     })
     .nullable()
     .optional()
