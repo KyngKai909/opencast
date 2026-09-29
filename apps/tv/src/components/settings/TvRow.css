@@ -1,0 +1,30 @@
+/* A TV settings row (opencast-tv-update .trow, .tgl). Ten-foot sizes as drawn. */
+.tvs-row {
+  display: flex; align-items: center; gap: 24px;
+  min-height: 92px; padding: 0 28px;
+  border-radius: var(--r-control); border-bottom: 1px solid var(--hair);
+  outline: none; cursor: default;
+}
+.tvs-row[role="button"], .tvs-row[role="switch"] { cursor: pointer; }
+/* The one focus ring: 4px of signal around the raised row, as drawn (.trow.f). */
+.tvs-row--focus { background: var(--raised); box-shadow: 0 0 0 4px var(--signal); border-bottom-color: transparent; }
+.tvs-row__words { min-width: 0; }
+/* Whole-pixel line heights (as drawn, rounded): spatial navigation measures rows in whole
+   pixels, and a fractional row overlaps the next by one, which hides it from ▼. */
+.tvs-row__title { display: block; font: 600 30px/35px var(--font-text); color: var(--ink); }
+.tvs-row__help { display: block; margin-top: 4px; font-size: 22px; line-height: 31px; color: var(--ink-70); }
+.tvs-row__val {
+  margin-left: auto; flex: none;
+  display: flex; align-items: center; gap: 14px;
+  font: 600 28px var(--font-text); color: var(--ink-70);
+}
+.tvs-row--focus .tvs-row__val { color: var(--ink); }
+.tvs-row__arr { font-size: 26px; color: var(--ink-50); }
+/* At the end of its options, the arrow that goes no further fades. */
+.tvs-row__arr--end { opacity: .3; }
+
+/* The switch (.tgl): signal when on, hairline grey when off. */
+.tvs-switch { margin-left: auto; flex: none; width: 74px; height: 40px; border-radius: 20px; background: var(--signal-fill); position: relative; }
+.tvs-switch::after { content: ""; position: absolute; top: 5px; right: 5px; width: 30px; height: 30px; border-radius: 50%; background: var(--ground); }
+.tvs-switch--off { background: var(--hair); }
+.tvs-switch--off::after { right: auto; left: 5px; background: var(--ink-50); }

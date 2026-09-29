@@ -27,7 +27,8 @@ const inputs = (where: () => "picture" | "overlay"): InputAdapter[] =>
   mirror ? [bridgeInput({ origins: [window.location.origin], device: () => device })] : [keyboardInput({ profile: "tv", context: where })];
 
 async function boot() {
-  if (config.mock) {
+  // Checked on the env itself so the production build drops the mock chunk entirely.
+  if (import.meta.env.VITE_MOCK === "true") {
     const { startMocks } = await import("./mocks/browser");
     await startMocks();
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { commandForKey } from "./keyboard";
+import { commandForKey, HOLD_MS, keyboardInput } from "./keyboard";
 import { castInput, parseCastCommand, CAST_NAMESPACE } from "./cast";
 import { bridgeInput } from "./bridge";
 
@@ -22,6 +22,72 @@ describe("the TV remote", () => {
   it("knows the TVs' channel keys by name and by code", () => {
     expect(commandForKey(key("ChannelDown"), "tv")).toEqual({ type: "channel", dir: "down" });
     expect(commandForKey(key("Unidentified", 427), "tv")).toEqual({ type: "channel", dir: "up" });
+  });
+});
+
+describe("holding OK and Back on the TV remote", () => {
+  function remote(where: "picture" | "overlay" = "overlay") {
+    const target = new EventTarget();
+    const dispatch = vi.fn();
+    const stop = keyboardInput({ profile: "tv", context: () => where, target: target as never }).start(dispatch);
+    const down = (key: string, repeat = false) => target.dispatchEvent(new KeyboardEvent("keydown", { key, repeat, cancelable: true }));
+    const up = (key: string) => target.dispatchEvent(new KeyboardEvent("keyup", { key, cancelable: true }));
+    return { dispatch, down, up, stop, target };
+  }
+
+  it("a press of OK acts when it's let go", () => {
+    vi.useFakeTimers();
+    const r = remote();
+    r.down("Enter");
+    expect(r.dispatch).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(100);
+    r.up("Enter");
+    expect(r.dispatch).toHaveBeenCalledTimes(1);
+    expect(r.dispatch.mock.calls[0]).toEqual([{ type: "select" }, { input: "remote" }]);
+    vi.useRealTimers();
+  });
+
+  it("holding OK sends OK with hold once, and nothing when it's let go; key repeats don't add presses", () => {
+    vi.useFakeTimers();
+    const r = remote();
+    r.down("Enter");
+    r.down("Enter", true);
+    vi.advanceTimersByTime(HOLD_MS);
+    r.down("Enter", true);
+    r.up("Enter");
+    expect(r.dispatch.mock.calls.map((c) => c[0])).toEqual([{ type: "select", hold: true }]);
+    vi.useRealTimers();
+  });
+
+  it("holding Back opens the menu rail, on the picture and in overlays; a press is still Back", () => {
+    vi.useFakeTimers();
+    const pic = remote("picture");
+    pic.down("Escape");
+    pic.up("Escape");
+    pic.down("Backspace");
+    vi.advanceTimersByTime(HOLD_MS + 10);
+    pic.up("Backspace");
+    expect(pic.dispatch.mock.calls.map((c) => c[0])).toEqual([{ type: "last" }, { type: "menu" }]);
+    const menu = remote("overlay");
+    menu.down("GoBack");
+    vi.advanceTimersByTime(HOLD_MS);
+    expect(menu.dispatch.mock.calls.map((c) => c[0])).toEqual([{ type: "menu" }]);
+    vi.useRealTimers();
+  });
+
+  it("arrows and numbers still act at once; stopping or leaving the page drops a half-held key", () => {
+    vi.useFakeTimers();
+    const r = remote();
+    r.down("ArrowDown");
+    r.down("7");
+    expect(r.dispatch.mock.calls.map((c) => c[0])).toEqual([{ type: "focus", dir: "down" }, { type: "digit", digit: 7 }]);
+    r.down("Enter");
+    r.target.dispatchEvent(new Event("blur"));
+    vi.advanceTimersByTime(HOLD_MS * 2);
+    r.up("Enter");
+    expect(r.dispatch).toHaveBeenCalledTimes(2);
+    r.stop();
+    vi.useRealTimers();
   });
 });
 

@@ -13,6 +13,8 @@ export interface CastContextLike {
   removeCustomMessageListener?(namespace: string, listener: (event: { senderId: string; data: unknown }) => void): void;
   sendCustomMessage(namespace: string, senderId: string | undefined, message: unknown): void;
   getSenders?(): Array<{ id: string; userAgent?: string }>;
+  /** Ends the Cast session (CAF's CastReceiverContext.stop): the TV goes back to its own screen. */
+  stop?(): void;
 }
 
 const KINDS = new Set(["channel", "digit", "dot", "tune", "preset", "savePreset", "last", "info", "guide", "presets", "menu", "back", "select", "focus", "pause", "play", "togglePlay", "backToLive", "sleep"]);

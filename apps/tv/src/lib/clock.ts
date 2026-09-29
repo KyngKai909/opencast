@@ -5,7 +5,19 @@ import { useEffect, useState } from "react";
 import { config } from "../config";
 
 const started = Date.now();
-const pinned = config.mock && config.mockClock ? Date.parse(config.mockClock) : null;
+
+/**
+ * Mock mode only: `?clock=<ISO time>` in the address starts the clock there instead, to open a
+ * frame drawn at another moment (the sleep timer is 11:52 pm: `?clock=2026-09-27T06:52:00Z`).
+ * Read once, when the app loads.
+ */
+function fromAddress(): number | null {
+  if (!config.mock || typeof window === "undefined") return null;
+  const t = Date.parse(new URLSearchParams(window.location.search).get("clock") ?? "");
+  return Number.isNaN(t) ? null : t;
+}
+
+const pinned = config.mock ? (fromAddress() ?? (config.mockClock ? Date.parse(config.mockClock) : null)) : null;
 
 export function now(): Date {
   return pinned === null ? new Date() : new Date(pinned + (Date.now() - started));

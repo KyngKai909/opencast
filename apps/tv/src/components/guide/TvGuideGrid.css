@@ -1,0 +1,39 @@
+/* The guide grid at ten feet (opencast-tv.css .gg). Sizes are the reference's, except:
+   rows are 83px, not 92px, so the sixth row ends inside title safe (the frame's ends at 1075px);
+   the now line's time is 21px, not 20px (nothing under 21px). */
+.tvg-grid {
+  --oc-guide-stc: 260px;
+  --tvg-row: 83px;
+  position: relative;
+}
+.tvg-grid__head, .tvg-grid__row { display: grid; grid-template-columns: var(--oc-guide-stc) repeat(24, 1fr); }
+.tvg-grid__head { font: 500 24px var(--font-mono); color: var(--ink-50); border-bottom: 2px solid var(--line); }
+.tvg-grid__head div { grid-column: span 6; padding: 0 0 10px 14px; }
+.tvg-grid__head div:first-child { grid-column: 1; }
+.tvg-grid__row { height: var(--tvg-row); border-bottom: 1px solid var(--hair); }
+.tvg-grid__st { display: flex; align-items: center; gap: 18px; padding-right: 14px; min-width: 0; }
+.tvg-grid__ch { font-size: 28px; font-weight: 500; color: var(--ink-70); width: 70px; flex: none; }
+.tvg-grid--wide .tvg-grid__ch { width: 88px; }
+.tvg-grid__cs { font-size: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tvg-cell {
+  margin: 4px; padding: 8px 16px; border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  display: flex; flex-direction: column; justify-content: center; min-width: 0;
+  cursor: default; outline: none;
+}
+.tvg-cell b { font-weight: 600; font-size: 26px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tvg-cell small { font-size: 21px; line-height: 1.25; color: var(--ink-50); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tvg-cell--now { background: var(--raised); }
+.tvg-cell--off b { color: var(--ink-50); font-weight: 500; }
+.tvg-live { color: var(--live); font-weight: 600; font-size: inherit; }
+/* The one ring, drawn tight on a cell (the reference's .f), on the raised ground. */
+.tvg-cell.tv-focus { outline: none; box-shadow: 0 0 0 5px var(--signal); background: var(--raised); }
+
+/* The now line (the reference's .gg-now): 3px, its time above the head row. */
+.tvg-grid .tvg-now { width: 3px; z-index: 2; }
+.tvg-grid .tvg-now span { top: -2px; transform: translate(-50%, -100%); font: 500 21px var(--font-mono); padding: 2px 8px; border-radius: 3px; }
+
+/* Loading: quiet blocks where the cells will be. */
+.tvg-grid__ph { margin: 4px; border-radius: var(--r-control); background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.tvg-grid__ph--st { display: block; margin: 0; width: 180px; height: 30px; }

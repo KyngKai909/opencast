@@ -74,6 +74,18 @@ export interface EngineOptions {
 const THIRTY_MINUTES = 30 * 60 * 1000;
 const SLEEP_FADE_MS = 60 * 1000;
 
+/** Caption type as a share of the picture's width, per caption size (the player's --oc-cue). */
+export const CAPTION_SCALE: Record<CaptionSize, number> = { small: 0.034, medium: 0.042, large: 0.054 };
+
+/**
+ * The caption line, counted from the bottom (negative), whose cue sits above the bottom
+ * `liftPercent` of the picture: one caption line is the type size × 1.3 line height.
+ */
+export function captionLineFor(liftPercent: number, scale: number, aspect: number): number {
+  const linePercent = scale * aspect * 1.3 * 100;
+  return -(Math.ceil(liftPercent / linePercent) + 1);
+}
+
 export class PlayerEngine {
   private state: PlayerState;
   private listeners = new Set<() => void>();
@@ -194,7 +206,8 @@ export class PlayerEngine {
     if (!c) return;
     this.clearEntry();
     if (source?.who) this.patch({ changedBy: source.who });
-    if (stationId === this.state.currentId && !this.state.pendingId) {
+    // After stop() (the sleep timer), the same station tunes again from scratch.
+    if (stationId === this.state.currentId && !this.state.pendingId && this.state.status !== "stopped") {
       this.showBanner();
       return;
     }
@@ -408,7 +421,28 @@ export class PlayerEngine {
     if (d) this.applyCaptions(d);
   }
 
+  private captionLift: number | null = null;
+
+  /**
+   * Lift the captions clear of whatever covers the bottom `percent` of the picture (the TV's
+   * banner, the presets strip), or null for the stream's own place.
+   */
+  setCaptionLift(percent: number | null) {
+    this.captionLift = percent;
+    const d = this.active();
+    if (d) d.setCueLine(this.cueLine(d));
+  }
+
+  /** The caption line (from the bottom) that clears the lift, at the caption size in use. */
+  private cueLine(d: Deck): number | null {
+    if (this.captionLift === null) return null;
+    const v = d.video;
+    const aspect = v.clientWidth && v.clientHeight ? v.clientWidth / v.clientHeight : 16 / 9;
+    return captionLineFor(this.captionLift, CAPTION_SCALE[this.state.captionSize], aspect);
+  }
+
   private applyCaptions(d: Deck) {
+    d.setCueLine(this.cueLine(d));
     const { captions, muted, mutedByBrowser } = this.state;
     d.setCaptions(captions === "on" || (captions === "muted_only" && (muted || mutedByBrowser)));
   }

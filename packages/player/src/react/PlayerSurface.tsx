@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Slate, Tag, cx } from "@opencast/ui";
 import type { Hint } from "../input/types";
+import { CAPTION_SCALE } from "../engine/PlayerEngine";
 import { usePlayer, usePlayerDock } from "./context";
 import { Banner } from "./Banner";
 import { NumberPanel } from "./NumberPanel";
@@ -12,6 +13,8 @@ export interface PlayerSurfaceProps {
   timeZone?: string;
   /** The hint row on the banner (TV): from the input adapter in use. */
   hints?: Hint[];
+  /** TV: the hint row's "Back, Last channel" (off once the key hints have hidden themselves after a week of use). */
+  lastChannelHint?: boolean;
   /** The time to show (the banner's clock and progress). Defaults to the device's clock. */
   clock?: () => Date;
   className?: string;
@@ -29,7 +32,7 @@ function useClock(clock: () => Date, ms = 1000): Date {
 }
 
 /** The picture and everything drawn over it. Needs a PlayerProvider above it. */
-export function PlayerSurface({ size = "web", timeZone, hints, clock = deviceClock, className }: PlayerSurfaceProps) {
+export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, clock = deviceClock, className }: PlayerSurfaceProps) {
   const [s, engine] = usePlayer();
   const stage = useRef<HTMLDivElement>(null);
   const now = useClock(clock);
@@ -55,7 +58,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, clock = deviceClo
   const isRadio = current?.station.band === "radio";
   const onAirHere = s.status === "playing" && !!current?.onAir && s.pendingId === null;
   const levelsFor = useCallback((bars: number) => engine.audioLevels(bars), [engine]);
-  const captionSize = { small: 0.034, medium: 0.042, large: 0.054 }[s.captionSize];
+  const captionSize = CAPTION_SCALE[s.captionSize];
 
   return (
     <div
@@ -116,7 +119,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, clock = deviceClo
           now={now}
           timeZone={timeZone}
           hints={hints}
-          backTo={last && size === "tv" ? `Last channel, ${[last.station.callSign, last.station.channel].filter(Boolean).join(" ")}` : null}
+          backTo={last && size === "tv" && lastChannelHint ? `Last channel, ${[last.station.callSign, last.station.channel].filter(Boolean).join(" ")}` : null}
           onAirHere={onAirHere && bannerFor.station.id === s.currentId}
         />
       )}

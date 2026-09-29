@@ -17,7 +17,8 @@ export type Command =
   | { type: "presets" }
   | { type: "menu" }
   | { type: "back" }
-  | { type: "select" }
+  /** OK. `hold`: OK held down (the TV remote's long press), e.g. to replace a full preset slot; screens that don't take holds treat it as OK. */
+  | { type: "select"; hold?: boolean }
   | { type: "focus"; dir: "up" | "down" | "left" | "right" }
   | { type: "pause" }
   | { type: "play" }

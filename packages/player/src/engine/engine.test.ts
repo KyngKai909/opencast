@@ -202,6 +202,12 @@ describe("sleep timer", () => {
     expect(engine.getState().sleep?.fading).toBe(true);
     await flush(60_000);
     expect(engine.getState().status).toBe("stopped");
+    // Watching again tunes the same station from scratch.
+    const again = engine.tune(CIVC.station.id);
+    await flush(10);
+    await again;
+    expect(engine.getState().status).toBe("playing");
+    expect(engine.getState().currentId).toBe(CIVC.station.id);
   });
   it("any press during the fade cancels it", async () => {
     const t = engine.tune(CIVC.station.id);
@@ -237,3 +243,14 @@ describe("the heartbeat", () => {
 });
 
 void byId;
+
+describe("captions above the banner", () => {
+  it("counts enough caption lines up from the bottom to clear the lift, at each size", async () => {
+    const { captionLineFor, CAPTION_SCALE } = await import("./PlayerEngine");
+    // Medium at 16:9: a line is about 9.7% of the height; clearing 36% takes line -5.
+    expect(captionLineFor(36, CAPTION_SCALE.medium, 16 / 9)).toBe(-5);
+    expect(captionLineFor(45, CAPTION_SCALE.medium, 16 / 9)).toBe(-6);
+    expect(captionLineFor(36, CAPTION_SCALE.large, 16 / 9)).toBe(-4);
+    expect(captionLineFor(36, CAPTION_SCALE.small, 16 / 9)).toBe(-6);
+  });
+});

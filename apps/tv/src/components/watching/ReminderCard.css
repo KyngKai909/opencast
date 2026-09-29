@@ -1,0 +1,17 @@
+/* The card: a .tv-panel at the top left of the title-safe area (the number entry has the top right).
+   Not drawn in the reference: sizes from the number panel (.numpad) and the banner's type. */
+.tvw-remind {
+  position: absolute; top: 0; left: 0; max-width: 820px;
+  padding: 26px 36px; border-radius: var(--r-screen);
+  background: color-mix(in srgb, var(--screen) 94%, transparent); box-shadow: 0 0 0 1px var(--line);
+  color: var(--ink);
+}
+.tvw-remind p { margin: 0; }
+.tvw-remind__what { font: 600 32px/1.25 var(--font-text); }
+.tvw-remind__ok { margin-top: 14px !important; font-size: 24px; color: var(--ink-70); display: flex; align-items: center; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .tvw-remind { animation: tvw-remind-in .3s ease-out; }
+  @keyframes tvw-remind-in { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+}
+/* The key at ten feet: 21px, not the reference's 20 (nothing under 21px at 1080p). */
+.tvw-remind .oc-kbd--tv { font-size: 21px; margin-right: 12px; }

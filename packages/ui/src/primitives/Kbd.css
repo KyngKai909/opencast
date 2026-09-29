@@ -11,5 +11,6 @@
   display: inline-grid; place-items: center;
   min-width: 44px; height: 40px; padding: 0 10px;
   border-width: 2px; border-radius: var(--oc-kbd-tv-radius);
-  font: 600 20px var(--font-text); color: var(--ink);
+  /* 21px, not the reference's 20: nothing under 21px at 1080p (the TV file's own rule; A69). */
+  font: 600 21px var(--font-text); color: var(--ink);
 }

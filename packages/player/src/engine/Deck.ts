@@ -60,6 +60,8 @@ export class Deck {
       this.watchFrame();
     });
     this.video = v;
+    // Captions arrive cue by cue on a live stream: each new one takes the current lift.
+    v.textTracks?.addEventListener?.("addtrack", (e) => (e as TrackEvent).track?.addEventListener("cuechange", this.applyCueLine));
     o.host.appendChild(v);
     this.handle = o.driver.attach(v, o.url, (message) => {
       this.error = message;
@@ -159,6 +161,35 @@ export class Deck {
   setCaptions(on: boolean) {
     this.handle.setCaptions(on);
   }
+
+  private cueLine: number | null = null;
+
+  /**
+   * Which caption line the cues sit on, counted up from the bottom (-1 is the bottom line), or
+   * null for the stream's own placement. The TV lifts them above the banner while it's up.
+   * (Line numbers, not percentages: Chromium ignores lineAlign, so a percentage can only place a
+   * cue's top edge.)
+   */
+  setCueLine(line: number | null) {
+    this.cueLine = line;
+    this.applyCueLine();
+  }
+
+  private applyCueLine = () => {
+    const tracks = this.video.textTracks;
+    if (!tracks || typeof VTTCue === "undefined") return;
+    // Every cue still to come, not just the ones showing: a cue is laid out as it becomes active,
+    // so the line has to be set before then (hls.js adds cues ahead, from the buffered segments).
+    const now = this.video.currentTime;
+    for (const t of Array.from(tracks)) {
+      for (const c of Array.from(t.cues ?? [])) {
+        if (c.endTime < now) continue;
+        if (!(c instanceof VTTCue)) continue;
+        c.snapToLines = true;
+        c.line = this.cueLine ?? "auto";
+      }
+    }
+  };
 
   /** Seconds behind the live edge, or null when not known. */
   behindLive(): number | null {

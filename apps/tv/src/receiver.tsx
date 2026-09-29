@@ -27,17 +27,27 @@ function safe(s: string): unknown {
   }
 }
 
-/** Tells every phone what's on, whenever it changes. */
-function StateToPhones({ cast }: { cast: ReturnType<typeof castInput> }) {
+type PhoneState = { stationId: string | null; paused: boolean; changedBy: string | null; sleepEndsAt: number | null };
+/** What's on now, as last told to the phones: a phone that just spoke gets it at once. */
+let latest: PhoneState | null = null;
+
+/** Tells every phone what's on, whenever it changes; ends the session when the sleep timer does. */
+function StateToPhones({ cast, end }: { cast: ReturnType<typeof castInput>; end: () => void }) {
   const [s] = usePlayer();
   useEffect(() => {
-    cast.broadcast({ stationId: s.currentId, paused: s.status === "paused", changedBy: session.changedBy, sleepEndsAt: s.sleep?.endsAt ?? null });
+    latest = { stationId: s.currentId, paused: s.status === "paused", changedBy: session.changedBy, sleepEndsAt: s.sleep?.endsAt ?? null };
+    cast.broadcast(latest);
   }, [cast, s.currentId, s.status, s.sleep?.endsAt]);
+  useEffect(() => {
+    // The sleep timer stopped Opencast: casting, the stream ends (the TV goes back to its own screen).
+    if (s.status === "stopped") end();
+  }, [s.status, end]);
   return null;
 }
 
 async function boot() {
-  if (config.mock) {
+  // Checked on the env itself so the production build drops the mock chunk entirely.
+  if (import.meta.env.VITE_MOCK === "true") {
     const { startMocks } = await import("./mocks/browser");
     await startMocks();
   }
@@ -54,6 +64,8 @@ async function boot() {
       if (typeof m.marketSlug === "string") setDevice({ marketSlug: m.marketSlug });
     }
     if (m && typeof m.from === "string") session.changedBy = m.from.slice(0, 60);
+    // A phone that just connected (or just spoke) hears what's on without waiting for a change.
+    setTimeout(() => latest && cast.broadcast({ ...latest, changedBy: session.changedBy }), 0);
   });
 
   const cast = castInput({ context, othersCanChange: () => session.othersCanChange, castingFrom: () => session.changedBy ?? session.from });
@@ -62,7 +74,7 @@ async function boot() {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <TvApp mode="cast" inputs={inputs} routes={tvRoutes}>
-        <StateToPhones cast={cast} />
+        <StateToPhones cast={cast} end={() => context.stop?.()} />
       </TvApp>
     </StrictMode>
   );

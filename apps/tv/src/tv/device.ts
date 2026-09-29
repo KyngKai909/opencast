@@ -18,6 +18,8 @@ export interface TvSettings {
   /** Picture and sound. */
   quality: "auto" | "data_saver" | "best";
   eveningOut: boolean;
+  /** Remote and phones: while a phone plays to this TV, any phone on the Wi-Fi can change the channel. */
+  othersOnWifiCanChange: boolean;
 }
 
 export interface TvDevice {
@@ -42,7 +44,8 @@ export const DEFAULT_SETTINGS: TvSettings = {
   includeRadioBand: false,
   startOn: "last_channel",
   quality: "auto",
-  eveningOut: true
+  eveningOut: true,
+  othersOnWifiCanChange: true
 };
 
 const EMPTY: TvDevice = { token: null, signedInAs: null, welcomed: false, lastStationId: null, marketSlug: null, presets: {}, settings: DEFAULT_SETTINGS };
@@ -72,7 +75,10 @@ export function getDevice(): TvDevice {
   return state;
 }
 
-export function setDevice(patch: Partial<TvDevice> | ((d: TvDevice) => Partial<TvDevice>)) {
+/** A change to the device: settings merge into the current ones. */
+export type DevicePatch = Omit<Partial<TvDevice>, "settings"> & { settings?: Partial<TvSettings> };
+
+export function setDevice(patch: DevicePatch | ((d: TvDevice) => DevicePatch)) {
   const p = typeof patch === "function" ? patch(state) : patch;
   state = { ...state, ...p, settings: { ...state.settings, ...(p.settings ?? {}) } };
   if (persist) {

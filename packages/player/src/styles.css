@@ -71,7 +71,11 @@
 }
 .oc-banner__hints > span { display: inline-flex; align-items: center; gap: calc(12 * var(--u)); }
 .oc-banner__end { margin-left: auto; }
-.oc-banner__chip b { color: var(--pic-ink); font-weight: 600; margin-right: calc(14 * var(--u)); }
+/* Casting and mirroring (tv 06.1 .castchip): where the controls are, with where to change channel at the end. */
+.oc-banner__chip { color: var(--pic-ink-70); }
+.oc-banner__chip .oc-i { width: calc(30 * var(--u)); height: calc(24 * var(--u)); min-width: 16px; min-height: 13px; }
+/* "Live from Redlands City Hall": Live in the live colour (tv 06.1). */
+.oc-banner__live { color: var(--live); font-weight: 600; }
 /* On TV the tags are the ten-foot size (.tv .tag). */
 .oc-banner--tv .oc-tag { height: 36px; padding: 0 14px; font-size: 22px; border-width: 1.5px; }
 .oc-banner--tv .oc-tag__dot { width: 10px; height: 10px; }
@@ -113,6 +117,14 @@
 }
 .oc-player__unmute { cursor: pointer; }
 .oc-player__sleep { display: flex; gap: 14px; align-items: center; top: auto; bottom: 8%; transform: translateX(-50%); }
+/* TV: ten-foot sizes for paused and the sleep fade's notice (nothing under 21px at 1080p). */
+.oc-player--tv .oc-player__paused { left: calc(96 * var(--u)); top: calc(54 * var(--u)); gap: calc(20 * var(--u)); }
+.oc-player--tv .oc-player__paused .oc-tag { height: calc(36 * var(--u)); padding: 0 calc(14 * var(--u)); font-size: calc(22 * var(--u)); border-width: 1.5px; }
+.oc-player--tv .oc-player__sleep {
+  bottom: calc(54 * var(--u)); gap: calc(28 * var(--u)); padding: calc(26 * var(--u)) calc(26 * var(--u)) calc(26 * var(--u)) calc(36 * var(--u));
+  border-radius: var(--r-screen); font: 600 calc(28 * var(--u)) var(--font-text);
+}
+.oc-player--tv .oc-player__sleep .oc-btn, .oc-player--tv .oc-player__paused .oc-btn { height: calc(78 * var(--u)); padding: 0 calc(28 * var(--u)); font-size: calc(30 * var(--u)); }
 @media (prefers-reduced-motion: no-preference) {
   :root:not([data-motion="reduce"]) .oc-banner, :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
   @keyframes oc-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

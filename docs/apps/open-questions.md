@@ -96,3 +96,14 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A64 | A spot the business pauses itself | biz-spots (undrawn) | "Pause it" on the spot page: state `waiting_for_you`; stations are told and fill its time. Bringing it back lists it again; stations add it back themselves |
 | A65 | After a balance top-up, does an in-rotation spot go straight back into rotations? | biz-spots 05 (station side) | No: it's back in the market, stations get "It's back" and add it themselves (never re-added automatically) |
 | A66 | Leaving out named stations, choosing which location a spot targets, editing captions, the code's placement | biz-spots 03.1, 02.1 | Not drawn and no endpoints: the first location is used; P3 and P4 stay open |
+| A67 | The number-entry wait: 1.5 s (tv 02 note), 2 s (the settings frame's default) or 1 s (the phone keypad) | tv 02.2; tv-update 04.1; tv 06.4 | 2 seconds by default; the setting offers 1, 1.5, 2 and 3. The keypad's "Tuning in 1 second" is its countdown |
+| A68 | Where the sleep timer and pledge live: the menu rail has exactly seven items in 04.1 | tv 04.1, 05.4; tv-update 05 | Sleep timer is a rail item after Presets (the later file wins); pledge opens from About (a station's info) |
+| A69 | Type under 21px at 1080p in the reference CSS (the tally 18px, the guide's now-line time and the sleep list's clock times 20px) | tv intro; tv 03.1; tv-update 05.1 | 21px minimum, as the intro rule says |
+| A70 | Menu on a basic remote: "Home" can't be caught by an app on Android TV or Fire TV | tv 01 | The Menu key, and a long press on Back |
+| A71 | Which station off air suggests | tv 05.2 | The nearest on-air station in dial order that isn't a listed city stream, looking up the dial first |
+| A72 | Stand by: the TV's colour-bars layout or the stand-by slate the worker already airs | tv 05.2 | The TV's layout only when the dial says the block is waiting for its signal (S13); otherwise the stream's own slate, nothing drawn over it |
+| A73 | Listed city streams (RDLS) on a TV and a Chromecast: the city's own player can't be driven by a D-pad and a receiver can't play it through CAF | tv 02, 06.1 | Kept on the dial, playing the city's player as the player draws it, for now |
+| A74 | The hint row hiding after a week of use | tv 02 | Device-local; the "Playing from…" and "Mirrored from…" chips never hide |
+| A75 | The name in the casting chip: iOS no longer gives apps the phone's name | tv 06.1; tv-update 01.1 | Built from the account's first name ("Kai's phone"); signed out, "Playing from a phone" |
+| A76 | Settings while casting | tv-update 04 | They come from the phone; the receiver has no Settings |
+| A77 | Watch on's labels: "Chromecast"/"AirPlay" with one "Play on" button (06.2) or "Cast", "Mirror", "Open the app" (update 02 note) | tv 06.2; tv-update 02 | The note's labels, from a table of target kinds, so a Roku or Apple TV app row is one entry |

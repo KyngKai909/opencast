@@ -1,0 +1,13 @@
+/* opencast-tv.css .tv-btn: stacked block buttons in the TV's dialogs and panels. */
+.tvg-btn {
+  display: flex; align-items: center; gap: 16px; width: 100%;
+  height: 78px; padding: 0 28px; margin-top: 14px;
+  border-radius: var(--r-control); border: 2px solid var(--line);
+  background: transparent; color: var(--ink);
+  font: 600 30px var(--font-text); text-align: start; cursor: pointer;
+}
+.tvg-btn small { margin-left: auto; font-size: 22px; font-weight: 500; color: var(--ink-50); white-space: nowrap; }
+.tvg-btn--primary { background: var(--signal-fill); color: var(--on-signal); border-color: var(--signal-fill); }
+.tvg-btn--primary small { color: var(--on-signal); opacity: .75; }
+.tvg-btn.tv-focus:not(.tvg-btn--primary) { background: var(--raised); }
+.tvg-btn[aria-busy="true"] { cursor: progress; }

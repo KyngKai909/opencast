@@ -1,0 +1,21 @@
+/* tv 05.4: the side panel (.tv-panel.pledge-panel) at the right of the title-safe area. */
+.tvw-pledge {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 620px; padding: 44px;
+  display: flex; flex-direction: column;
+  border-radius: var(--r-screen); background: color-mix(in srgb, var(--screen) 94%, transparent); box-shadow: 0 0 0 1px var(--line);
+  color: var(--ink);
+}
+.tvw-pledge h3 { margin: 0 0 14px; font: 800 50px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.tvw-pledge p { font-size: 27px; color: var(--ink-70); margin: 0 0 30px; }
+.tvw-pledge__qr { width: 300px; height: 300px; padding: 22px; border-radius: 12px; background: var(--on-tally); box-sizing: border-box; }
+.tvw-pledge__url { font: 500 26px var(--font-mono); margin-top: 24px; }
+.tvw-pledge__wait { height: 300px; }
+.tvw-pledge__foot { margin-top: auto; display: flex; flex-direction: column; }
+
+/* The picture moves to the left of the panel, still playing: scaled to the 1156px left of it
+   (the panel starts at 1204px, less a 48px gap), full height centred. */
+.oc-tv-shell__picture { transform-origin: 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .oc-tv-shell__picture { transition: transform .3s ease; }
+}
+:root.tvw-squeeze .oc-tv-shell__picture { transform: translate(0, 215px) scale(.6021); }

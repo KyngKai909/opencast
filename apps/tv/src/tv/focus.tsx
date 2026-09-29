@@ -39,13 +39,16 @@ export { FocusContext };
  * A focusable control. `onSelect` is what OK does. Focus shows as the ring (`.tv-focus`, set by
  * the caller from `focused`), and the DOM node is focused too, for screen readers.
  */
-export function useTvFocusable<E extends HTMLElement = HTMLDivElement>(o: { focusKey?: string; onSelect?: () => void; onFocus?: () => void; focusable?: boolean; trackChildren?: boolean; saveLastFocusedChild?: boolean; isFocusBoundary?: boolean; autoFocus?: boolean } = {}) {
+export function useTvFocusable<E extends HTMLElement = HTMLDivElement>(o: { focusKey?: string; onSelect?: () => void; onFocus?: () => void; focusable?: boolean; trackChildren?: boolean; saveLastFocusedChild?: boolean; isFocusBoundary?: boolean; autoFocus?: boolean; autoRestoreFocus?: boolean; preferredChildFocusKey?: string } = {}) {
   const config: UseFocusableConfig<object> = {
     focusKey: o.focusKey,
     focusable: o.focusable ?? true,
     trackChildren: o.trackChildren,
     saveLastFocusedChild: o.saveLastFocusedChild,
     isFocusBoundary: o.isFocusBoundary,
+    // false: when this control goes away, don't pull focus back to its parent (a new focus is coming).
+    autoRestoreFocus: o.autoRestoreFocus,
+    preferredChildFocusKey: o.preferredChildFocusKey,
     onFocus: o.onFocus ? () => o.onFocus?.() : undefined
   };
   const f = useFocusable<object, E>(config);

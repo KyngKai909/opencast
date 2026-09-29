@@ -1,0 +1,10 @@
+/* tv .tv-btn, and its focus (.f; .tv-btn.primary.f). */
+.tvw-btn {
+  display: flex; align-items: center; gap: 16px; height: 78px; padding: 0 28px;
+  border-radius: var(--r-control); border: 2px solid var(--line);
+  font: 600 30px var(--font-text); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.tvw-btn small { margin-left: auto; font-size: 22px; font-weight: 500; color: var(--ink-50); }
+.tvw-btn--primary { background: var(--signal-fill); color: var(--on-signal); border-color: var(--signal-fill); }
+.tvw-btn.tv-focus { outline: none; box-shadow: 0 0 0 5px var(--signal); background: var(--raised); }
+.tvw-btn--primary.tv-focus { background: var(--signal-fill); box-shadow: 0 0 0 5px var(--ground), 0 0 0 10px var(--signal); }

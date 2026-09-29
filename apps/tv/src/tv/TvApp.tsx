@@ -10,6 +10,8 @@ import { audienceApi } from "@opencast/contracts";
 import { PlayerProvider, PlayerSurface, startHeartbeat, startInputs, usePlayer, type Command, type CommandSource, type EngineOptions, type InputAdapter } from "@opencast/player";
 import { GroundProvider, TvShell } from "@opencast/ui";
 import { call, setTokenSource } from "../api/client";
+import { useAccountSettingsSync } from "../components/settings/useTvSettings";
+import { keyHintsHidden, readFirstUse, visibleHints } from "../components/watching/hintRow";
 import { now, MARKET_TZ } from "../lib/clock";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
@@ -99,16 +101,19 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   const device = useDevice();
   const channels = useChannels();
   const { presets } = usePresets();
+  // A signed-in TV picks up settings changed on the account (another TV, the phone) as it starts.
+  useAccountSettingsSync();
 
   ui.current = {
     path: () => path.current,
     go: (to, o) => navigate(to, { replace: o?.replace }),
     close: () => {
-      const inOverlay = path.current !== "/";
-      if (!inOverlay) return;
-      // Nested overlays (guide options) go back to their parent; others to the picture.
-      const parent = path.current.split("/").slice(0, -1).join("/");
-      navigate(parent && parent !== path.current && /^\/(guide|settings)/.test(parent) ? parent : "/", { replace: true });
+      const p = path.current;
+      if (p === "/") return;
+      // The guide's options go back to the guide; settings and the market back to the menu they
+      // opened from; everything else to the picture.
+      const to = p.startsWith("/guide/") ? "/guide" : p.startsWith("/settings") || p === "/market" ? "/menu" : "/";
+      navigate(to, { replace: true });
     }
   };
 
@@ -157,10 +162,17 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
 export function TvLayout() {
   const loc = useLocation();
   const adapters = useInputs();
-  usePlayer(); // re-render as the player changes: a new phone casting changes the chip
-  const hints = loc.pathname === "/" ? adapters.flatMap((a) => a.hints?.() ?? []) : [];
+  // Re-render as the player changes: a new phone casting changes the chip.
+  const [ps, engine] = usePlayer();
+  // Captions move up above the banner and the presets strip (a two-line banner covers the bottom 44%).
+  const lift = (!!ps.banner && !ps.entry && loc.pathname === "/") || loc.pathname === "/presets";
+  useEffect(() => engine.setCaptionLift(lift ? 45 : null), [engine, lift]);
+  const mode = useTvMode();
+  // After a week on this TV the key hints hide; the casting and mirroring chips never do.
+  const hidden = mode === "tv" && keyHintsHidden(readFirstUse(), now().getTime());
+  const hints = loc.pathname === "/" ? visibleHints(adapters.flatMap((a) => a.hints?.() ?? []), hidden) : [];
   return (
-    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} />}>
+    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} />}>
       <Outlet />
     </TvShell>
   );

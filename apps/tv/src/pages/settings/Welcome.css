@@ -1,0 +1,30 @@
+/* First launch (opencast-tv .setup): full screen on the TV ground, words on the left, the QR on
+   the right. Sizes as drawn. The overlay box is the title-safe area, so it reaches back out. */
+.tvs-welcome {
+  position: absolute; inset: -54px -96px;
+  background: var(--ground);
+  padding: 96px 180px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 120px; align-items: center;
+}
+.tvs-welcome__logo {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 60px;
+  font: 800 44px var(--font-display); font-stretch: var(--wide); letter-spacing: -.02em; color: var(--ink);
+}
+.tvs-welcome .tvs-welcome__title { margin: 0 0 20px; font: 800 84px/1 var(--font-display); font-stretch: var(--wide); letter-spacing: -.04em; color: var(--ink); }
+.tvs-welcome__how { margin: 0 0 30px; max-width: 30ch; font-size: 30px; color: var(--ink-70); }
+.tvs-welcome__url { font-family: var(--font-mono); color: var(--ink); }
+.tvs-welcome__code { font: 500 72px var(--font-mono); letter-spacing: .06em; color: var(--ink); line-height: 1.4; }
+/* While the code is on its way: its place, quietly held. */
+.tvs-welcome__code--loading { width: 340px; border-radius: var(--r-control); background: var(--raised); }
+.tvs-welcome__error { margin: 0; min-height: 101px; max-width: 30ch; font-size: 30px; color: var(--ink); }
+.tvs-welcome__watch {
+  display: flex; align-items: center; width: 640px; height: 78px; margin-top: 44px; padding: 0 28px;
+  border: 2px solid var(--signal-fill); border-radius: var(--r-control);
+  background: var(--signal-fill); color: var(--on-signal);
+  font: 600 30px var(--font-text); cursor: pointer; outline: none;
+}
+/* The one focus ring on the primary button: ground, then signal (.tv-btn.primary.f). */
+.tvs-welcome__watch--focus { box-shadow: 0 0 0 5px var(--ground), 0 0 0 10px var(--signal); }
+.tvs-welcome__market { margin: 18px 0 0; max-width: 30ch; font-size: 24px; color: var(--ink-70); }
+.tvs-welcome__qr { justify-self: center; width: 420px; height: 420px; border-radius: 12px; overflow: hidden; }
+.tvs-welcome__qr-wait { width: 100%; height: 100%; background: var(--raised); }

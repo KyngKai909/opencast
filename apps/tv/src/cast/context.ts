@@ -74,6 +74,10 @@ export function mockCastContext(): CastContextLike & { senders: Map<string, stri
     removeCustomMessageListener(ns, l) {
       listeners.get(ns)?.delete(l);
     },
+    stop() {
+      // The stand-in's session end: phones hear it the way a Cast sender sees SESSION_ENDED.
+      channel.postMessage({ to: "sender", senderId: null, namespace: CAST_NAMESPACE, data: { type: "session-ended" } } satisfies MockCastMessage);
+    },
     sendCustomMessage(ns, senderId, message) {
       channel.postMessage({ to: "sender", senderId: senderId ?? null, namespace: ns, data: message } satisfies MockCastMessage);
     },

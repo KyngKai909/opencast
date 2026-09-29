@@ -1,4 +1,5 @@
-import { ProgressBar, Tag, Tally, Kbd, clock, cx } from "@opencast/ui";
+import type { ReactNode } from "react";
+import { Icon, ProgressBar, Tag, Tally, Kbd, clock, cx } from "@opencast/ui";
 import type { Channel } from "../types";
 import type { Hint } from "../input/types";
 
@@ -28,7 +29,9 @@ function ident(c: Channel) {
 export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, onAirHere }: BannerProps) {
   const air = c.now;
   const next = c.next;
-  const source = air?.carriedFrom ? `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}` : air?.live ? "Live" : null;
+  const source: ReactNode = air?.carriedFrom ? `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}` : air?.live ? (size === "tv" ? <LiveFrom note={(air as { note?: string | null }).note} /> : "Live") : null;
+  // Casting or mirroring, the hint row says where the controls are, and Back isn't a key there.
+  const chip = hints.some((h) => h.kind === "chip");
   return (
     <div className={cx("oc-banner", `oc-banner--${size}`)} role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
       <div className="oc-banner__id">
@@ -52,7 +55,7 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
         <span className="oc-banner__clock oc-mono">{clock(now, { timeZone })}</span>
         <Tally state={onAirHere ? "lit" : "unlit"} size={size === "tv" ? "tv" : "sm"} on="picture" flicker={false} />
       </div>
-      {(hints.length > 0 || backTo) && (
+      {(hints.length > 0 || (backTo && !chip)) && (
         <div className="oc-banner__hints">
           {hints.map((h, i) =>
             h.kind === "key" ? (
@@ -62,12 +65,17 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
               </span>
             ) : (
               <span key={i} className="oc-banner__chip">
-                <b>{h.label}</b>
-                {h.detail && <span>{h.detail}</span>}
+                <Icon name={h.label.startsWith("Mirrored") ? "phone" : "cast"} size={size === "tv" ? 30 : 18} />
+                {h.label}
               </span>
             )
           )}
-          {backTo && (
+          {hints.map((h, i) => h.kind === "chip" && h.detail && (
+            <span key={`d${i}`} className="oc-banner__end">
+              {h.detail}
+            </span>
+          ))}
+          {backTo && !chip && (
             <span className="oc-banner__end">
               <Kbd size={size === "tv" ? "tv" : "app"}>Back</Kbd>
               {backTo}
@@ -76,5 +84,16 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
         </div>
       )}
     </div>
+  );
+}
+
+/** TV (06.1): "Live" in the live colour, then where from, when the airing's note says (S4: "Live from Redlands City Hall"). */
+function LiveFrom({ note }: { note?: string | null }) {
+  const rest = note && /^live\b/i.test(note) ? note.slice(4) : "";
+  return (
+    <>
+      <span className="oc-banner__live">Live</span>
+      {rest}
+    </>
   );
 }

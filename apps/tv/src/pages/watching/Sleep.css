@@ -1,0 +1,15 @@
+/* tv-update 05.1: a .tv-panel.dlg 1180px wide, centred on the canvas, over the picture. */
+.tvw-sleep {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 1180px; padding: 40px 44px;
+  border-radius: var(--r-screen); background: color-mix(in srgb, var(--screen) 94%, transparent); box-shadow: 0 0 0 1px var(--line);
+  color: var(--ink);
+}
+.tvw-sleep__when { font: 500 24px var(--font-mono); color: var(--ink-70); }
+.tvw-sleep h3 { margin: 6px 0 26px; font: 800 52px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.tvw-sleep__opts { display: grid; grid-template-columns: 1.9fr repeat(4, 1fr); gap: 14px; }
+.tvw-sleep__opts[data-count="4"] { grid-template-columns: repeat(4, 1fr); }
+.tvw-sleep__opts .tvw-btn { margin-top: 14px; justify-content: center; height: 110px; font-size: 30px; flex-direction: column; gap: 6px; padding: 0 18px; }
+/* The clock times at 21px, not the reference's 20 (nothing under 21px at 1080p). */
+.tvw-sleep__opts .tvw-btn small { margin: 0; font-size: 21px; }
+.tvw-sleep__opts .tvw-btn.tv-focus { box-shadow: 0 0 0 5px var(--ground), 0 0 0 10px var(--signal); border-color: var(--signal); }
+.tvw-sleep__foot { font-size: 22px; color: var(--ink-70); margin: 26px 0 0; }

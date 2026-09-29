@@ -1,0 +1,23 @@
+/* Choosing a market (not drawn): in the menu rail's place and shape (opencast-tv .mrail, .mi),
+   over the dimmed picture, which keeps playing. The overlay box is the title-safe area. */
+.tvs-market { position: absolute; inset: -54px -96px; background: color-mix(in srgb, var(--oc-tv-black) 55%, transparent); }
+.tvs-market__rail {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 640px;
+  padding: 54px 48px 54px 96px; display: flex; flex-direction: column;
+  background: color-mix(in srgb, var(--screen) 97%, transparent); box-shadow: 1px 0 0 var(--line);
+}
+.tvs-market .tvs-market__title { margin: 0 0 36px; font: 800 52px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; color: var(--ink); }
+.tvs-market__item {
+  display: flex; align-items: center; gap: 18px; height: 76px; padding: 0 22px; margin-bottom: 6px;
+  border-radius: var(--r-control); font: 600 32px var(--font-text); color: var(--ink-70);
+  outline: none; cursor: pointer;
+}
+.tvs-market__item small { margin-left: auto; font-size: 24px; font-weight: 500; color: var(--ink-50); }
+/* The market this TV is in (as the settings rail marks its section). */
+.tvs-market__item--on { background: var(--raised); color: var(--ink); }
+/* The one focus ring (.f). */
+.tvs-market__item--focus { background: var(--raised); color: var(--ink); box-shadow: 0 0 0 5px var(--signal); }
+.tvs-market__wait { height: 76px; margin-bottom: 6px; border-radius: var(--r-control); background: var(--raised); opacity: .5; }
+.tvs-market__note { margin: 12px 22px; font-size: 24px; color: var(--ink-70); }
+.tvs-market__note--error { color: var(--live); }
+.tvs-market__foot { margin: auto 0 0; font-size: 22px; color: var(--ink-50); }

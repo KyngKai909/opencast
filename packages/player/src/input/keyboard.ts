@@ -1,7 +1,9 @@
 // Keys, for two places:
 // - "tv": a TV's remote (Android TV, Google TV, Fire TV, TV browsers). On the picture, ▲ ▼ change
 //   channel, ◀ opens presets, ▶ the guide, OK the banner (OK again the guide), numbers tune.
-//   In the guide and menus, the arrows move focus.
+//   In the guide and menus, the arrows move focus. OK and Back act when they're let go, so they
+//   can be held: hold OK is OK with `hold` (replace a full preset slot), hold Back opens the menu
+//   rail (a basic remote has no Menu key, and Home never reaches apps).
 // - "web": the viewer app on a computer. Digits 1 to 6 tune presets from anywhere; arrows change
 //   channel on the tuned-in page (enable the adapter there); "/" belongs to search, not here.
 // Keys typed into a text field are never taken.
@@ -74,21 +76,66 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
   return mapped ?? null;
 }
 
+/** How long OK or Back is held before it counts as a hold (Android TV's long press). */
+export const HOLD_MS = 500;
+
+/** TV: what holding the key sends instead, for the keys that can be held (OK, Back). */
+export function holdFor(cmd: Command): Command | null {
+  if (cmd.type === "select") return { type: "select", hold: true };
+  if (cmd.type === "back" || cmd.type === "last") return { type: "menu" };
+  return null;
+}
+
 export function keyboardInput(o: KeyboardOptions): InputAdapter {
   return {
     name: o.profile === "tv" ? "remote" : "keyboard",
     start(dispatch: Dispatch) {
       const target = o.target ?? window;
+      const source = { input: o.profile === "tv" ? "remote" : "keyboard" };
+      // The key being held (OK or Back): it acts when let go, or as a hold after HOLD_MS.
+      let held: { key: string; press: Command; timer: ReturnType<typeof setTimeout>; fired: boolean } | null = null;
+      const letGo = () => {
+        if (held) clearTimeout(held.timer);
+        held = null;
+      };
       const onKey = (e: Event) => {
         const k = e as KeyboardEvent;
         if (k.defaultPrevented || k.altKey || k.ctrlKey || k.metaKey || typing(k)) return;
         const cmd = commandForKey(k, o.profile, o.context?.() ?? "picture");
         if (!cmd) return;
         k.preventDefault();
-        dispatch(cmd, { input: o.profile === "tv" ? "remote" : "keyboard" });
+        const hold = o.profile === "tv" ? holdFor(cmd) : null;
+        if (hold) {
+          // Key repeat while it's held down: the hold timer is already running.
+          if (k.repeat || held?.key === k.key) return;
+          letGo();
+          const h = { key: k.key, press: cmd, fired: false, timer: setTimeout(() => {
+            h.fired = true;
+            dispatch(hold, source);
+          }, HOLD_MS) };
+          held = h;
+          return;
+        }
+        dispatch(cmd, source);
+      };
+      const onUp = (e: Event) => {
+        const k = e as KeyboardEvent;
+        if (!held || k.key !== held.key) return;
+        const { press, fired } = held;
+        letGo();
+        k.preventDefault();
+        if (!fired) dispatch(press, source);
       };
       target.addEventListener("keydown", onKey);
-      return () => target.removeEventListener("keydown", onKey);
+      target.addEventListener("keyup", onUp);
+      // Focus leaving the page mid-press: no key-up will come, so nothing is sent.
+      target.addEventListener("blur", letGo);
+      return () => {
+        letGo();
+        target.removeEventListener("keydown", onKey);
+        target.removeEventListener("keyup", onUp);
+        target.removeEventListener("blur", letGo);
+      };
     },
     hints(): Hint[] {
       if (o.profile !== "tv") return [];
