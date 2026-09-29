@@ -1,28 +1,22 @@
 // First visit (viewer/opencast-home.html 08.1): "Where are you tuning in from?" Full screen on the
 // phone, a modal over the dial on the web. It opens on the first visit (no market on this device
 // or the account) and from the market button (?modal=market). Choosing keeps the market on this
-// device, and on the account when signed in. The location is used once, on the device, and isn't
-// stored or sent: the nearest market is worked out from the markets' centres (contract request S10).
+// device, and on the account when signed in. The location is used once, to ask the API for the
+// market around it (S10, markets.by-location), and isn't stored.
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { accountsApi, stationsApi } from "@opencast/contracts";
+import { useQueryClient } from "@tanstack/react-query";
+import { accountsApi, stationsApi, type Market } from "@opencast/contracts";
 import { Button, ChoiceList, Field, Lockup, Modal } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { keyFor } from "../../../api/hooks";
-import { MarketPlacesX, type MarketPlaceX } from "../../api/ext/home";
 import { useAuth } from "../../../auth/AuthProvider";
-import { useMarketSlug, useMe } from "../../data/viewer";
+import { useMarkets, useMarketSlug, useMe } from "../../data/viewer";
 import { setDevice } from "../../device/store";
 import { useIsPhone } from "../../layout/shell";
-import { nearestMarket, stationsText } from "../home/logic";
+import { stationsText } from "../home/logic";
 import "./MarketPicker.css";
-
-/** Markets with their centres (for "Use my location"). Its own query: the shared one drops the centres. */
-function useMarketPlaces() {
-  return useQuery({ queryKey: ["market-places"], queryFn: () => call(stationsApi.listMarkets, {}, MarketPlacesX), staleTime: 3600e3 });
-}
 
 function locate(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
@@ -38,7 +32,7 @@ export default function MarketPicker() {
   const qc = useQueryClient();
   const slug = useMarketSlug();
   const [params, setParams] = useSearchParams();
-  const markets = useMarketPlaces();
+  const markets = useMarkets();
   const [zip, setZip] = useState("");
   const [zipError, setZipError] = useState<string | null>(null);
   const [locError, setLocError] = useState<string | null>(null);
@@ -70,7 +64,7 @@ export default function MarketPicker() {
     });
   };
 
-  const choose = async (m: Pick<MarketPlaceX, "id" | "slug" | "open">) => {
+  const choose = async (m: Pick<Market, "id" | "slug" | "open">) => {
     if (!m.open) return;
     setError(null);
     setDevice({ marketSlug: m.slug });
@@ -110,23 +104,24 @@ export default function MarketPicker() {
 
   const onLocation = async () => {
     setLocError(null);
-    // Without the markets' centres (S10, not in the API yet) a location can't be matched: say so,
-    // and don't ask the browser for a location that couldn't be used.
-    if (markets.data && !markets.data.some((m) => m.centre)) {
-      setLocError("Your location can't be matched to a market yet. Enter a ZIP code or pick a market instead.");
-      return;
-    }
     setBusy("location");
+    let pos: GeolocationPosition;
     try {
-      const pos = await locate();
-      setBusy(null);
-      const near = nearestMarket({ lat: pos.coords.latitude, lng: pos.coords.longitude }, markets.data ?? []);
-      if (near) return void choose(near.market);
-      setLocError("There's no market near you yet. Pick the nearest one below, or enter a ZIP code.");
+      pos = await locate();
     } catch (err) {
       setBusy(null);
       const denied = (err as GeolocationPositionError)?.code === 1;
       setLocError(denied ? "Location is off for this site. Enter a ZIP code or pick a market instead." : "Your location couldn't be found. Enter a ZIP code or pick a market instead.");
+      return;
+    }
+    try {
+      const r = await call(stationsApi.marketForLocation, { query: { lat: pos.coords.latitude, lng: pos.coords.longitude } });
+      setBusy(null);
+      if (r.market?.open) return void choose(r.market);
+      setLocError("There's no market near you yet. Pick the nearest one below, or enter a ZIP code.");
+    } catch (err) {
+      setBusy(null);
+      setLocError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
     }
   };
 

@@ -13,6 +13,8 @@ import { KAI, type MockPerson } from "../../mocks/people";
 export interface DbPreset { stationId: string; key: number | null; position: number }
 export interface DbReminder { id: string; airingId: string; switchMeOver: boolean; createdAt: string }
 export interface DbPledge { id: string; stationId: string; cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean; startedAt: string; endsAfter: string | null; card: string }
+/** A stretch of watching one station, from signed-in heartbeats (A2). */
+export interface DbWatch { stationId: string; startedAt: string; endedAt: string }
 export interface DbTv { id: string; name: string; kind: "tv_app" | "chromecast" | "airplay"; platform: TvPlatform | null; signedIn: boolean; lastUsedAt: string | null; online: boolean; castingNow: boolean }
 
 /** A person's viewer profile: their name, market and settings (Me), by person id (src/mocks/people.ts). */
@@ -37,9 +39,11 @@ export interface Db {
   prefs: Record<string, { push: boolean; email: boolean }>;
   /** When "Sign out everywhere" was last pressed (A1). */
   signedOutEverywhereAt: string | null;
+  /** Watch history (A2), newest first, kept while keepWatchHistory isn't off. */
+  watchHistory: DbWatch[];
 }
 
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 /** Den TV, TV mode's tvId in the mock relay (apps/tv's mock device). */
 export const DEN_TV_ID = "00000000-0000-4000-8000-0000000c0001";
 const KEY = "oc-mock-db";
@@ -96,7 +100,8 @@ export function seed(): Db {
     ],
     // You 06.3: reminders on this phone, not by email; presets going live on; station news off.
     prefs: { reminder: { push: true, email: false }, switch_over: { push: true, email: false }, preset_live: { push: true, email: false }, station_news: { push: false, email: false } },
-    signedOutEverywhereAt: null
+    signedOutEverywhereAt: null,
+    watchHistory: []
   };
 }
 

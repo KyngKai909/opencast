@@ -4,10 +4,8 @@ import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { accountsApi, ledgerApi, stationsApi, tvApi, type Reminder } from "@opencast/contracts";
 import { useToast } from "@opencast/ui";
-import { z } from "zod";
 import { call } from "../../../api/client";
 import { keyFor, useApi } from "../../../api/hooks";
-import { PledgesX } from "../../api/ext/you";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useMe } from "../../data/viewer";
 import { getCached, setCached } from "./cache";
@@ -20,7 +18,7 @@ export function useReminders() {
 
 export function usePledges() {
   const auth = useAuth();
-  return useApi(ledgerApi.listMyPledges, {}, { schema: PledgesX, enabled: auth.signedIn });
+  return useApi(ledgerApi.listMyPledges, {}, { enabled: auth.signedIn });
 }
 
 export function useTvs() {

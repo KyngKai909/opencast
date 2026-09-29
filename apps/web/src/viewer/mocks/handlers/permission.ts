@@ -5,17 +5,16 @@
 //
 //   /permission/desert-skate-films-2026-0926   06.1, unanswered
 //   /permission/desert-skate-films-said-yes    06.2, said yes September 27 at 10:15 am
-//   /permission/tia-lupes-kitchen-2026-0922    said yes, and the station is set up (33.1 LUPE), so Claim now reaches startHandover
+//   /permission/tia-lupes-kitchen-2026-0922    said yes, and the station is set up (33.1 LUPE)
 //
 // Answers, stops and claims are kept in localStorage ("oc-mock-permission"). Anything else is 404.
 
 import { http, type HttpHandler } from "msw";
-import { networkApi, type StationIdent } from "@opencast/contracts";
-import { claimFromLink, PermissionPageX, stopFromLink } from "../../components/permission/api";
+import { networkApi, type PermissionPage, type StationIdent } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { fail, needsUser, path, reply } from "../respond";
 
-type Page = PermissionPageX;
+type Page = PermissionPage;
 const KEY = "oc-mock-permission";
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
@@ -183,7 +182,7 @@ const tokenOf = (params: Record<string, unknown>) => String(params.token ?? "");
 export const permissionHandlers: HttpHandler[] = [
   http.get(path(networkApi.getPermissionPage), ({ params }) => {
     const page = pageFor(tokenOf(params));
-    return page ? reply(PermissionPageX, page) : fail(404, "not_found", "That page wasn't found.");
+    return page ? reply(networkApi.getPermissionPage.response, page) : fail(404, "not_found", "That page wasn't found.");
   }),
 
   http.post(path(networkApi.answerPermission), async ({ request, params }) => {
@@ -195,27 +194,28 @@ export const permissionHandlers: HttpHandler[] = [
     if (body?.answer !== "yes" && body?.answer !== "no") return fail(400, "invalid", "Answer yes or no.");
     const answer = body.answer;
     update(token, (s) => (s.answer = { answer, answeredAt: now().toISOString(), works: answer === "yes" ? page.works.filter((w) => w.included).length : 0 }));
-    return reply(PermissionPageX, pageFor(token)!);
+    return reply(networkApi.getPermissionPage.response, pageFor(token)!);
   }),
 
-  http.post(path(stopFromLink), ({ params }) => {
+  http.post(path(networkApi.stopFromLink), ({ params }) => {
     const token = tokenOf(params);
     const page = pageFor(token);
     if (!page) return fail(404, "not_found", "That page wasn't found.");
     if (page.answer?.answer !== "yes") return fail(422, "nothing_to_stop", "There's nothing to stop: you haven't said yes.");
     update(token, (s) => (s.stoppedAt = now().toISOString()));
-    return reply(PermissionPageX, pageFor(token)!);
+    return reply(networkApi.getPermissionPage.response, pageFor(token)!);
   }),
 
-  http.post(path(claimFromLink), ({ request, params }) => {
+  http.post(path(networkApi.claimFromLink), ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const token = tokenOf(params);
     const page = pageFor(token);
     if (!page) return fail(404, "not_found", "That page wasn't found.");
     if (page.answer?.answer !== "yes" || page.stoppedAt) return fail(422, "nothing_to_claim", "There's no station to claim from this link.");
+    if (page.claim && page.claim.status !== "cancelled") return page.claim.status === "completed" ? fail(422, "nothing_to_claim", "This station has been claimed already.") : fail(422, "in_progress", "A claim for this station is already in progress.");
     update(token, (s) => (s.claim = { handoverId: U(880_000 + (Date.now() % 1000)), status: "verifying", startedAt: now().toISOString() }));
-    return reply(PermissionPageX, pageFor(token)!);
+    return reply(networkApi.getPermissionPage.response, pageFor(token)!);
   }),
 
   // Claim now once the station exists: the ordinary handover (auth: user).

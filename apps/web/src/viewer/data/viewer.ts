@@ -25,6 +25,22 @@ export function useMe() {
   return useApi(accountsApi.getMe, {}, { enabled: auth.signedIn });
 }
 
+/** The account's watch history and last channel (A2), signed in. */
+export function useWatchHistory() {
+  const auth = useAuth();
+  return useApi(accountsApi.getWatchHistory, {}, { enabled: auth.signedIn, staleTime: 60_000 });
+}
+
+/**
+ * The last channel: the account's (A2: kept from any of its phones, computers and TVs while
+ * watch history is on), else the one tuned on this device.
+ */
+export function useLastChannelId(): string | null {
+  const device = useDevice();
+  const history = useWatchHistory();
+  return history.data?.lastChannel?.station.id ?? device.lastStationId;
+}
+
 /** The market the dial is for: the account's, or the one chosen on this device. Null: first visit. */
 export function useMarketSlug(): string | null {
   const me = useMe();

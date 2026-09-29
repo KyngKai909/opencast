@@ -53,7 +53,7 @@ These change what the API accepts, or add something no fixture can stand in for.
 | S9 | **Station counts per market** on `listMarkets` | home 08.1 | Yes | 3 |
 | S10 | **Done 2026-09-28** (monorepo): `GET /markets/by-connection` and `GET /markets/by-location?lat=&lng=`, both `MarketLookup` (`nearby[].miles` is nullable). **Market from where you are**: from coordinates ("Use my location") and from the request's IP (TV first launch), neither stored | home 08.1; tv 05.3 | Fixture market | 3 |
 
-S10 interim (Phase 3): the viewer computes "Use my location" on the device from a market centre (`lat`, `lng` on `listMarkets`, proposed in `apps/web/src/viewer/api/ext/home.ts`): the nearest open market within 150 miles. The coordinates are never sent. A server-side lookup by IP is still needed for the TV's first launch.
+S10 in the viewer (since 2026-09-29): "Use my location" asks `marketForLocation` with the device's coordinates (not stored); the interim market centres (`api/ext/home.ts`) are gone. The TV's first launch has `marketForConnection`.
 
 | S11 | **Open channels for signed-out viewers**: a thin market's "Any channel from 2 to 69 is open except 5" (`availableChannels` is `user`) | home 08.2 | Yes | 3 |
 | S12 | **One airing by id, public**: for share links that tune in or offer a reminder | home 07.1 | Yes | 3 |
@@ -180,18 +180,7 @@ S10 interim (Phase 3): the viewer computes "Use my location" on the device from 
 | N11 | **Moving the catalog station** to a free channel (channels are fixed after sign-on) | desk 05.1 | Decision first | 7 |
 | N12 | **Done 2026-09-28** (monorepo; see docs/contracts-changelog.md): `Creator.pronoun`, accepted by `addCreator` and `updateCreator`. **The creator's pronoun** (`Creator.pronoun`: she, he, they), for "Her videos", "Suggested from her name. She can't change it after claiming". Without it the desk says "their" | desk 04.1 | Yes | 7 |
 
-Phase 7 built against these as optional extensions in `apps/web/src/desk/api/ext.ts` and `apps/web/src/viewer/components/permission/api.ts`, filled by the mocks:
-- N1 `Creator.proposedOptions: { band, channels[] }` (empty channels: band only).
-- N2 `POST /admin/creators/:creatorId/reminders` (admin) → `Creator` with `remindedAt`; a second reminder is refused; after it the desk offers "No answer" (`updateCreator { stage: "no_answer" }`).
-- N3 `Creator.askedAt`, `remindedAt`, `answeredAt`, `claimInviteSentAt`, `claimLinkSentAt`, `claimedAt`; `HeldEarnings.stations[].invitedAt`, `claimLinkSentAt`, `signOnAt`.
-- N4 `PermissionPage.creator.sourcePlatform`, `works[].groupLabel` and `noun`, `summary: { included, leftOut }` ("6 skate films and 7 park session edits", "the shoe sponsor edit"), `marketName`; `CreatorWork.noun`; `answerPermission` body `wordingVersion` (sent now, ignored until it lands).
-- N5 `Creator.setup: { recipeId, band, channel, callSign, name, colour, operator, signOnAt, importDone, importTotal, escrowStationId }`. The draft before the yes is kept on the device (`oc-desk-draft-<creatorId>`) until the API keeps drafts.
-- N6 `Recipe.blocks[].label`, `listing`, `colour`, `carried: { station, programTitle, schedule, about }`; `Recipe.when`, `catalogAbout`; `breakRule` read as `{ everyMinutes, lengthMs, fillFrom, blockedCategories }`.
-- N7 `MarketBoard.stats.market: { localShareOfTonightPercent, claimableOnAir, deadAirComing }`; `slots[].signOnAt`, `creatorId`.
-- N9 `HeldEarnings.unclaimedPeriodDays`, `chain: { name, explorerUrl }`, `stations[].licenceName`.
-- A6 `GET /admin/team` (admin) → `[{ id, name, email }]`.
-- B7 `askPermission` body `workIds` (the ticked works). Done 2026-09-28.
-- B8 `POST /permission/:token/stop` (public) and `POST /permission/:token/claim` (user) → `PermissionPage` with `stoppedAt` and `claim: { handoverId, status, startedAt }`. Done 2026-09-28.
+Phase 7 built against these as optional extensions (`apps/web/src/desk/api/ext.ts`, `apps/web/src/viewer/components/permission/api.ts`). All of them landed on 2026-09-28 (N1 to N7, N9, N12, A6, A125, B7, B8), and since 2026-09-29 the desk and the permission page read the contracts' own (`Creator`, `Recipe` with `RecipeBreakRule`, `MarketBoard`, `HeldEarnings`, `PermissionPage`, `listOpencastTeam`, `remindCreator`, `sendClaimInvite`, `stopFromLink`, `claimFromLink`); both ext files are gone. N8, N10 and N11 are still open.
 
 ## notifications
 
@@ -224,8 +213,7 @@ Every proposed field is an optional extension of a contract schema in `apps/web/
 - **S8**: `madePossibleBy[] {kind: "members" | "underwriter", text}`.
 - **L1**: `typicalLengthMs` on the program. **L2**: `carriers {total, outsideMarket, outside[] {station, market}}`. **L3**: `whereToWatch[] {station, slot, now, next}`, with a `market` query on `getProgram`. **L4**: on each episode `aired`, `lastAiring`, `onNow`, `nextAiring`, `description`, and `airedCount` on the program.
 - **B2**: `listTvs`, `signOutTv`, `approveTvCode`; `Tv {kind, platform, signedIn, lastUsedAt, castingNow}`. Only the casting device really knows "Casting now".
-- **E1**: `card {label, expired}` on a pledge, `receipts.items`, `cadence` on `updatePledge` (switching a monthly pledge to once ends it after this month), and a card-session endpoint for Change.
-- **O1**: kinds `preset_live` and `station_news`. **O2 / A7**: quiet hours and email timing in `settings.notifications`.
+- **E1**, **O1**, **O2**, **A1**, **A2**, **A3**: landed 2026-09-28; since 2026-09-29 the viewer uses the contracts' own (`Pledge.card`, `receipts.items`, `updatePledge` `cadence`, `pledgeCardSession`; `NoticeKind`; `ViewerSettings.notifications`; `signOutEverywhere`, `getWatchHistory` for the last channel, `clearWatchHistory`, `exportData` and `downloadData` at `/settings/data?download=1`, `deleteAccount`), and `api/ext/you.ts` is gone. The heartbeat goes with the person's token when signed in.
 
 ## How master control carries them (Phase 4)
 
@@ -238,7 +226,7 @@ As in the viewer: every proposed field is an optional extension of a contract sc
 - **C1** fit slots on offers (`fit[]`, `?forStation`). **C2** `maker`, `makerKind`, `gap` on browse, and `offeredAt`. **C3** `breakMsPerHour`, `cashPlusBarter`, `barterFill`. **C4** `agreementId` and `repeatSlots` on requests. **C5** an episode's first airing and captions. **C6** slots on carriers and agreements, with `offerId`. **C7** carrier profile. **C8** `defaultTerm`. **C9** underwriter.
 - **P6** `pause` and `back` on a market spot. **P17** the members' credit. **P22** sponsor profile. **P23** spot preview (url, still). **P24** `POST /orders/:id/tell-me-when-listed`, `makerToldWhenListed`, `listedRate`.
 - **E2** sponsors listed on earnings, `held.tonightBreaks`, `nextPayout.amountMicros`. **E3** per line `group`, `airings`, `rate`, `averageTunedIn`; `paidOn` and `destination` on statements. **U1** `byProgram[]` on the audience.
-- **T1** `takedowns[].airings[]`, `term`, `carrierNotice`. **B6** `POST /claims/:id/attachments`. **N10** `GET /claim/:token` with the handover's status. **O1** the `signed_on_off` notification key.
+- **T1** `takedowns[].airings[]`, `term`, `carrierNotice`. **B6** `POST /claims/:id/attachments`. **N10** `GET /claim/:token` with the handover's status. (**O1** `signed_on_off` landed; master control uses the contract's `NoticeKind`.)
 
 Landed 2026-09-29 (see docs/contracts-changelog.md): A4, A5, G1, G2, G3, G5, G7, L1, L5, L6, L7, S15, S17, C1 to C9, P6, P17, P22 to P25, E2, U1, U3, B6, N10 as proposed (a few with extra fields); G6, S14, B3 and E3 in part. Still proposed only: T1, T4, S16, the members' co-sponsors (P17) and C1's `weak_slot`.
 

@@ -6,11 +6,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ledgerApi, stationsApi } from "@opencast/contracts";
+import { ledgerApi, stationsApi, type Pledge } from "@opencast/contracts";
 import { AmountPicker, Button, Modal, Segmented, Sheet, StationBand, Toggle, money, useToast, type AmountChoice } from "@opencast/ui";
 import { call } from "../../../api/client";
 import { keyFor, useApi } from "../../../api/hooks";
-import { pledgesApiX, type PledgeX } from "../../api/ext/you";
 import { useMe } from "../../data/viewer";
 import { useIsPhone } from "../../layout/shell";
 import { MARKET_TZ, now } from "../../../lib/clock";
@@ -28,7 +27,7 @@ export function parseAmount(text: string): number | null {
 }
 
 /** The month a stopped pledge ends after: this month, in the market's zone. */
-export function endsAfterMonth(p: Pick<PledgeX, "endsAfter">, at: Date): string {
+export function endsAfterMonth(p: Pick<Pledge, "endsAfter">, at: Date): string {
   return p.endsAfter ? monthLabel(`${p.endsAfter}T12:00:00Z`, MARKET_TZ) : monthLabel(at, MARKET_TZ);
 }
 
@@ -44,7 +43,7 @@ export function PledgeModal({ pledgeId }: { pledgeId: string }) {
   return p.cadence === "once" ? <ReceiptView p={p} onClose={close} /> : <ManageView key={p.id} p={p} onClose={close} />;
 }
 
-function Frame({ p, lede, onClose, footer, children }: { p: PledgeX; lede: [string, string]; onClose: () => void; footer?: React.ReactNode; children: React.ReactNode }) {
+function Frame({ p, lede, onClose, footer, children }: { p: Pledge; lede: [string, string]; onClose: () => void; footer?: React.ReactNode; children: React.ReactNode }) {
   const phone = useIsPhone();
   const band = <StationBand channel={p.station.channel ?? ""} callSign={p.station.callSign ?? p.station.name} colour={p.station.colour ?? "#33507A"} name={lede[0]} place={lede[1]} onClose={phone ? undefined : onClose} />;
   if (phone)
@@ -60,7 +59,7 @@ function Frame({ p, lede, onClose, footer, children }: { p: PledgeX; lede: [stri
   );
 }
 
-function Receipts({ p }: { p: PledgeX }) {
+function Receipts({ p }: { p: Pledge }) {
   const [open, setOpen] = useState(false);
   const items = p.receipts.items ?? [];
   return (
@@ -98,14 +97,14 @@ function Receipts({ p }: { p: PledgeX }) {
   );
 }
 
-function CardRow({ p }: { p: PledgeX }) {
+function CardRow({ p }: { p: Pledge }) {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   if (!p.card) return null;
   const change = async () => {
     setError(null);
     try {
-      const { url } = await call(pledgesApiX.cardSession, { params: { pledgeId: p.id } });
+      const { url } = await call(ledgerApi.pledgeCardSession, { params: { pledgeId: p.id } });
       if (url.startsWith("/")) navigate(url);
       else window.location.assign(url);
     } catch (e) {
@@ -126,7 +125,7 @@ function CardRow({ p }: { p: PledgeX }) {
   );
 }
 
-function ManageView({ p, onClose }: { p: PledgeX; onClose: () => void }) {
+function ManageView({ p, onClose }: { p: Pledge; onClose: () => void }) {
   const me = useMe();
   const qc = useQueryClient();
   const toast = useToast();
@@ -154,7 +153,7 @@ function ManageView({ p, onClose }: { p: PledgeX; onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await call(pledgesApiX.updatePledge, { params: { pledgeId: p.id }, body: { amountMicros: micros, creditOnAir: credit, ...(cadence === "once" ? { cadence } : {}) } });
+      await call(ledgerApi.updatePledge, { params: { pledgeId: p.id }, body: { amountMicros: micros, creditOnAir: credit, ...(cadence === "once" ? { cadence } : {}) } });
       refresh();
       onClose();
       toast.show({ message: `Your pledge to ${p.station.name} is saved` });
@@ -169,7 +168,7 @@ function ManageView({ p, onClose }: { p: PledgeX; onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await call(pledgesApiX.updatePledge, { params: { pledgeId: p.id }, body: { stop: true } });
+      await call(ledgerApi.updatePledge, { params: { pledgeId: p.id }, body: { stop: true } });
       refresh();
       onClose();
     } catch (e) {
@@ -278,7 +277,7 @@ function ManageView({ p, onClose }: { p: PledgeX; onClose: () => void }) {
   );
 }
 
-function ReceiptView({ p, onClose }: { p: PledgeX; onClose: () => void }) {
+function ReceiptView({ p, onClose }: { p: Pledge; onClose: () => void }) {
   const page = useApi(stationsApi.getStation, { params: { stationRef: p.station.id } });
   const deductible = page.data?.pledgesTaxDeductible;
   const taxes =

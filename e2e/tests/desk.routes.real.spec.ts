@@ -1,8 +1,9 @@
 // Every Network desk route against the real API (playwright.real.config.ts), as Dee (an Opencast
 // admin), and the gates: signed out, and signed in off the team. Each page has its heading, says
 // no error, throws nothing, and every answer matches its contract (the client says so in the
-// console when one doesn't). The only calls the API refuses are the proposed endpoints it doesn't
-// mount (api/ext.ts, by request id), recorded on the test; the page leaves out what needs them.
+// console when one doesn't). The API refuses nothing: every endpoint the desk calls is in the
+// contracts (its proposed ones all landed on 2026-09-28). A proposed endpoint added later goes in
+// PROPOSED, by request id, and is recorded on the test.
 // Routes from apps/web/src/desk/routes.tsx (the Opencast app's /desk).
 
 import type { Page } from "@playwright/test";
@@ -10,11 +11,8 @@ import { expect, seed, signIn, signOut, test } from "../lib/real";
 
 const IE = "/desk/markets/inland-empire";
 
-/** Proposed endpoints the API doesn't mount yet (docs/contract-requests.md), by request id. */
-const PROPOSED: Array<[id: string, method: string, path: RegExp]> = [
-  ["A6", "GET", /^\/v1\/admin\/team$/],
-  ["N2", "POST", /^\/v1\/admin\/creators\/[^/]+\/reminders$/]
-];
+/** Proposed endpoints the API doesn't mount yet (docs/contract-requests.md), by request id. None now. */
+const PROPOSED: Array<[id: string, method: string, path: RegExp]> = [];
 
 interface Visit {
   name: string;

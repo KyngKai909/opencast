@@ -1,20 +1,14 @@
 // Every viewer route and overlay against the real API (playwright.real.config.ts), as Sam (the
 // seeded viewer) and signed out: each answer matches its contract (the client parses every
-// response and says so in the console when one doesn't), and the only calls the API refuses are
-// the proposed endpoints it doesn't have yet (api/ext/you.ts, by request id), on screens that say
-// so in words instead of breaking.
+// response and says so in the console when one doesn't), and the API refuses nothing it isn't
+// meant to. The account's endpoints (A1, A2, A3, E1) are in the contracts now; a proposed endpoint
+// added later goes in PROPOSED, by request id.
 
 import type { Page } from "@playwright/test";
 import { api, expect, seed, signIn, test } from "../lib/real";
 
-/** Proposed endpoints the API doesn't mount yet (docs/contract-requests.md), by request id. */
-const PROPOSED: Array<[id: string, method: string, path: RegExp]> = [
-  ["A1", "POST", /^\/v1\/me\/sign-out-everywhere$/],
-  ["A2", "DELETE", /^\/v1\/me\/watch-history$/],
-  ["A3", "POST", /^\/v1\/me\/export$/],
-  ["A3", "DELETE", /^\/v1\/me$/],
-  ["E1", "POST", /^\/v1\/me\/pledges\/[^/]+\/card-session$/]
-];
+/** Proposed endpoints the API doesn't mount yet (docs/contract-requests.md), by request id. None now. */
+const PROPOSED: Array<[id: string, method: string, path: RegExp]> = [];
 
 interface Visit {
   name: string;

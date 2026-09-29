@@ -4,11 +4,10 @@
 
 import { lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { CreatorStage, networkApi } from "@opencast/contracts";
+import { type Creator, CreatorStage, networkApi } from "@opencast/contracts";
 import { Button, ControlTitle, Lines, Table, useToast, type Column } from "@opencast/ui";
 import { call } from "../../api/client";
 import { useApi, useApiMutation } from "../../api/hooks";
-import { CreatorsX, MarketBoardX, remindCreator, type CreatorX } from "../api/ext";
 import { AddCreator } from "../components/pipeline/AddCreator";
 import { StageStrip } from "../components/pipeline/StageStrip";
 import { StageTag } from "../components/pipeline/StageTag";
@@ -27,11 +26,11 @@ export default function Pipeline() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { schema: CreatorsX, enabled: !!market });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
   // The waitlist's holds, for "95.5, held" and "Waitlist holds 95.5; pick another".
-  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { schema: MarketBoardX, enabled: !!market });
-  const radio = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "radio" } }, { schema: MarketBoardX, enabled: !!market });
-  const remind = useApiMutation(remindCreator, { invalidates: [networkApi.listCreators] });
+  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { enabled: !!market });
+  const radio = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "radio" } }, { enabled: !!market });
+  const remind = useApiMutation(networkApi.remindCreator, { invalidates: [networkApi.listCreators] });
   const update = useApiMutation(networkApi.updateCreator, { invalidates: [networkApi.listCreators, networkApi.getBoard] });
 
   if (loading || creators.isLoading) return <Quiet />;
@@ -48,7 +47,7 @@ export default function Pipeline() {
   const rows = pipelineOrder(stage ? all.filter((c) => c.stage === stage) : all, ctx);
   const base = deskPath(`/markets/${market.slug}/pipeline`);
 
-  const act = async (c: CreatorX) => {
+  const act = async (c: Creator) => {
     const a = actionFor(c, ctx);
     if (!a) return;
     try {
@@ -70,7 +69,7 @@ export default function Pipeline() {
     }
   };
 
-  const columns: Column<CreatorX>[] = [
+  const columns: Column<Creator>[] = [
     { key: "creator", header: "Creator", width: "minmax(0,1.2fr)", cell: (c) => <Lines title={c.displayName} detail={c.description} /> },
     { key: "platform", header: "Their work lives on", width: "150px", cell: (c) => PLATFORM_LABELS[c.sourcePlatform] },
     { key: "stage", header: "Stage", width: "130px", cell: (c) => <StageTag stage={c.stage} /> },

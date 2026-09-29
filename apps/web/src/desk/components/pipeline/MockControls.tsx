@@ -7,9 +7,9 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@opencast/ui";
 import { currentToken } from "../../../api/client";
-import type { CreatorX } from "../../api/ext";
 import { config } from "../../../config";
 import "./MockControls.css";
+import type { Creator } from "@opencast/contracts";
 
 async function mockCall(path: string, body?: unknown): Promise<{ link?: string }> {
   const token = await currentToken();
@@ -24,11 +24,11 @@ async function mockCall(path: string, body?: unknown): Promise<{ link?: string }
 }
 
 interface Row {
-  creator: CreatorX;
+  creator: Creator;
   actions: Array<{ label: string; run: () => Promise<unknown> }>;
 }
 
-export default function MockControls({ creators, onChanged }: { creators: CreatorX[]; marketSlug: string; onChanged: () => void }) {
+export default function MockControls({ creators, onChanged }: { creators: Creator[]; marketSlug: string; onChanged: () => void }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -2,21 +2,22 @@
 // from here. Opening a slot with subchannels lists them (9.1, 9.2, 9.3).
 
 import { Button, clock, KeyValueList, type KeyValueRow } from "@opencast/ui";
-import type { CreatorX, SlotX } from "../../api/ext";
 import { now } from "../../../lib/clock";
 import { dayMonth, dayWord } from "../../lib/dates";
 import { slotNumber } from "./board";
 import "./SlotDetail.css";
 import { controlPath } from "../../../areas";
 import { deskPath } from "../../../areas";
+import type { Creator } from "@opencast/contracts";
+import type { BoardSlot } from "../../api/types";
 
 export interface SlotDetailProps {
-  slot: SlotX;
+  slot: BoardSlot;
   band: "tv" | "radio";
   marketSlug: string;
   timeZone: string;
   /** The claimable station's creator, from the pipeline (N7's creatorId, or by station). */
-  creator: CreatorX | undefined;
+  creator: Creator | undefined;
 }
 
 export function controlHref(callSign: string | null | undefined): string {

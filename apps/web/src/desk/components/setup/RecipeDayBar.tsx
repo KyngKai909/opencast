@@ -4,12 +4,12 @@
 // a list of times.
 
 import type { CSSProperties } from "react";
-import type { RecipeX } from "../../api/ext";
 import { blockLabel, clockOfMinutes, daySegments } from "./recipe";
 import "./RecipeDayBar.css";
+import type { Recipe } from "@opencast/contracts";
 
 export interface RecipeDayBarProps {
-  recipe: RecipeX;
+  recipe: Recipe;
   /** The creator's short name, for "Lupe's kitchen". */
   creatorShort: string;
   /** The station's colour, for the creator's own blocks. */

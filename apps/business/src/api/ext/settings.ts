@@ -141,8 +141,3 @@ export const settingsExtApi = {
     response: z.array(FundingSource)
   })
 };
-
-// ---- notifications ----
-
-/** O1: "A station added your spot" has no NoticeKind yet; its preference is kept under this key. */
-export const SPOT_ADDED = "spot_added";

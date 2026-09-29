@@ -3,8 +3,7 @@
 // The API sorts by nextActionDue then newest (inventory: can't be built as drawn, 6), which sinks
 // new yeses, so the desk sorts here.
 
-import { CREATOR_STAGE_LABELS, type CreatorStage } from "@opencast/contracts";
-import type { CreatorX } from "../../api/ext";
+import { type Creator, CREATOR_STAGE_LABELS, type CreatorStage } from "@opencast/contracts";
 import { dayMonth, dayWord, localDate } from "../../lib/dates";
 import { clock } from "@opencast/ui";
 
@@ -20,7 +19,7 @@ export const STRIP: ReadonlyArray<{ stage: CreatorStage; label: string }> = [
   { stage: "claimed", label: CREATOR_STAGE_LABELS.claimed.desk }
 ];
 
-export function stageCounts(creators: ReadonlyArray<Pick<CreatorX, "stage">>): Record<CreatorStage, number> {
+export function stageCounts(creators: ReadonlyArray<Pick<Creator, "stage">>): Record<CreatorStage, number> {
   const counts = { found: 0, already_licensed: 0, asked: 0, said_yes: 0, setting_up: 0, on_air: 0, claimed: 0, declined: 0, no_answer: 0 } as Record<CreatorStage, number>;
   for (const c of creators) counts[c.stage] += 1;
   return counts;
@@ -43,7 +42,7 @@ export const STAGE_LOOK: Record<CreatorStage, StageLook> = {
   no_answer: "no"
 };
 
-export const PLATFORM_LABELS: Record<CreatorX["sourcePlatform"], string> = {
+export const PLATFORM_LABELS: Record<Creator["sourcePlatform"], string> = {
   youtube: "YouTube",
   vimeo: "Vimeo",
   internet_archive: "Internet Archive",
@@ -62,24 +61,24 @@ export interface Ctx {
 }
 
 /** A reminder is due (or overdue): asked, not reminded yet, due today or earlier. */
-export function reminderDue(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): boolean {
+export function reminderDue(c: Creator, ctx: Pick<Ctx, "now" | "timeZone">): boolean {
   return c.stage === "asked" && !!c.nextActionDue && c.nextActionDue <= localDate(ctx.now, ctx.timeZone);
 }
 
 /** A new yes: said yes (or already licensed) with no station yet. */
-export function waitingForSetup(c: CreatorX): boolean {
+export function waitingForSetup(c: Creator): boolean {
   return (c.stage === "said_yes" || c.stage === "already_licensed") && !c.station;
 }
 
 /** The proposed channel the waitlist holds, if any ("95.5"). */
-export function heldProposal(c: CreatorX, held: ReadonlyMap<string, string>): string | null {
+export function heldProposal(c: Creator, held: ReadonlyMap<string, string>): string | null {
   if (c.station) return null;
   const options = c.proposedOptions?.channels ?? (c.proposed ? [c.proposed.channel] : []);
   return options.find((ch) => held.has(ch)) ?? null;
 }
 
 /** The Station column: "33.1 LUPE", "38.1 or 45.1", "Radio band", "95.5, held", or nothing. */
-export function stationCell(c: CreatorX, held: ReadonlyMap<string, string>): string {
+export function stationCell(c: Creator, held: ReadonlyMap<string, string>): string {
   if (c.station?.channel) return `${c.station.channel}${c.station.callSign ? ` ${c.station.callSign}` : ""}`;
   if (c.stage === "declined" || c.stage === "no_answer") return "";
   const heldCh = heldProposal(c, held);
@@ -91,7 +90,7 @@ export function stationCell(c: CreatorX, held: ReadonlyMap<string, string>): str
 }
 
 /** The Next column: what happens next, and whether it's due now (standby, bold). */
-export function nextLine(c: CreatorX, ctx: Ctx): { text: string; due: boolean } {
+export function nextLine(c: Creator, ctx: Ctx): { text: string; due: boolean } {
   const short = (ts: string) => dayMonth(ts, ctx.timeZone, { short: true });
   const signOn = c.setup?.signOnAt ?? null;
   switch (c.stage) {
@@ -142,7 +141,7 @@ function capital(s: string) {
 export type ActionKind = "ask" | "remind" | "no-answer" | "set-up" | "open-setup" | "open-station";
 
 /** The row's button, or null when there's nothing to do (claimed, declined, no answer). */
-export function actionFor(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): { kind: ActionKind; label: string } | null {
+export function actionFor(c: Creator, ctx: Pick<Ctx, "now" | "timeZone">): { kind: ActionKind; label: string } | null {
   switch (c.stage) {
     case "found":
       return c.doNotAsk ? null : { kind: "ask", label: "Ask" };
@@ -163,14 +162,14 @@ export function actionFor(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): { ki
 }
 
 /** Rows that need someone today: an ask to send, a reminder due, a yes to set up. The rail's count. */
-export function needsAction(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): boolean {
+export function needsAction(c: Creator, ctx: Pick<Ctx, "now" | "timeZone">): boolean {
   const a = actionFor(c, ctx);
   return !!a && (a.kind === "ask" || a.kind === "remind" || a.kind === "no-answer" || a.kind === "set-up");
 }
 
 const FINISHED: ReadonlySet<CreatorStage> = new Set(["claimed", "declined", "no_answer"]);
 
-function rank(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): number {
+function rank(c: Creator, ctx: Pick<Ctx, "now" | "timeZone">): number {
   if (FINISHED.has(c.stage)) return 3;
   if (reminderDue(c, ctx)) return 0;
   if (waitingForSetup(c)) return 1;
@@ -181,8 +180,8 @@ function rank(c: CreatorX, ctx: Pick<Ctx, "now" | "timeZone">): number {
  * The pipeline's order: overdue and due follow-ups first (oldest due first), then new yeses (newest
  * yes first), then everything else by the next action's date, then finished rows (latest first).
  */
-export function pipelineOrder<C extends CreatorX>(creators: readonly C[], ctx: Pick<Ctx, "now" | "timeZone">): C[] {
-  const when = (c: CreatorX) => c.claimedAt ?? c.answeredAt ?? c.askedAt ?? "";
+export function pipelineOrder<C extends Creator>(creators: readonly C[], ctx: Pick<Ctx, "now" | "timeZone">): C[] {
+  const when = (c: Creator) => c.claimedAt ?? c.answeredAt ?? c.askedAt ?? "";
   return creators
     .map((c, i) => ({ c, i, r: rank(c, ctx) }))
     .sort((a, b) => {

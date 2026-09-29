@@ -1,11 +1,14 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { MiniPlayer, PlayerBar, ViewerPhoneShell, ViewerWebShell, type MenuItem, type ViewerSection, type ViewerTab } from "@opencast/ui";
 import type { Me } from "@opencast/contracts";
 import { CONTROL, DESK } from "../../areas";
 import { usePlayer } from "@opencast/player";
 import { useAuth } from "../../auth/AuthProvider";
-import { useMarkets, useMarketSlug, useMe } from "../data/viewer";
+import { useChannels, useMarkets, useMarketSlug, useMe, useWatchHistory } from "../data/viewer";
+import { useDevice } from "../device/store";
+import { useSavedSettings } from "./SettingsSync";
+import { stationSlug } from "../components/watch/logic";
 import { useNowPlaying } from "../player/PlayerRoot";
 import { useIsPhone, useShellState } from "./shell";
 import MarketPicker from "../components/overlays/MarketPicker";
@@ -76,6 +79,37 @@ function usePresetKeys() {
   }, [engine]);
 }
 
+/** Once per visit: "Start on" is read when the app opens, not on every visit to the dial. */
+let startChecked = false;
+
+/**
+ * "Start on: Last channel" (Settings, Watching): the app opened at the dial tunes the last
+ * channel instead, the account's (A2's watch history) or this device's.
+ */
+function useStartOnLastChannel() {
+  const loc = useLocation();
+  const navigate = useNavigate();
+  const auth = useAuth();
+  const settings = useSavedSettings();
+  const history = useWatchHistory();
+  const device = useDevice();
+  const channels = useChannels();
+  const openedAtDial = useRef(loc.pathname === "/" && !loc.search);
+  const atDial = loc.pathname === "/" && !loc.search;
+  useEffect(() => {
+    if (startChecked || !auth.ready) return;
+    if (!openedAtDial.current || !atDial) return void (startChecked = true);
+    if (!settings) return; // the account's, still loading
+    if (settings.watching?.startOn !== "last_channel") return void (startChecked = true);
+    if (auth.signedIn && history.isLoading) return;
+    const id = history.data?.lastChannel?.station.id ?? device.lastStationId;
+    if (id && !channels.length) return; // the dial, still loading
+    startChecked = true;
+    const row = id ? channels.find((c) => c.station.id === id) : undefined;
+    if (row) navigate(`/watch/${stationSlug(row.station)}`, { replace: true });
+  }, [auth.ready, auth.signedIn, atDial, settings, history.isLoading, history.data, device.lastStationId, channels, navigate]);
+}
+
 /**
  * The avatar's menu, for people who also work in the app's other areas (one session): "Master
  * control" with a station role, "Network desk" on the Opencast team. Everyone else's avatar goes
@@ -109,6 +143,7 @@ export function AppLayout() {
   const np = useNowPlaying();
   usePresetKeys();
   useInAppLinks();
+  useStartOnLastChannel();
 
   const marketName = markets.data?.find((m) => m.slug === slug)?.name ?? "Choose a market";
   const menu = useAreasMenu(me.data);

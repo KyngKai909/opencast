@@ -10,7 +10,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { setTokenSource } from "../api/client";
+import { useToast } from "@opencast/ui";
+import { setSessionEndedHandler, setTokenSource, type SessionEnd } from "../api/client";
 import { config } from "../config";
 import { useDevTokenAuth } from "./devTokenAuth";
 import { useMockAuth } from "./mockAuth";
@@ -52,6 +53,12 @@ export interface AuthState extends AuthAdapter {
 
 const Ctx = createContext<AuthState | null>(null);
 
+/** What each area says when the API has ended the sign-in (A1, A3). New copy: docs/apps/new-copy.md. */
+export const SESSION_ENDED: Record<SessionEnd, string> = {
+  signed_out: "You were signed out everywhere. Sign in again to use your presets, reminders and pledges.",
+  account_deleted: "This account was deleted, so you're signed out. Signing in again starts a new one."
+};
+
 function AuthState({ children }: { children: ReactNode }) {
   const adapter = useAdapter();
   const qc = useQueryClient();
@@ -62,6 +69,24 @@ function AuthState({ children }: { children: ReactNode }) {
   // During render, not in an effect: the pages' first queries start in their own effects, which
   // run before this provider's, and would go out without the token.
   setTokenSource(adapter.getToken);
+
+  // The API says this sign-in has ended (signed out everywhere, or the account deleted): sign out
+  // of this device too, once, and say why.
+  const toast = useToast();
+  const signOutRef = useRef(adapter.signOut);
+  signOutRef.current = adapter.signOut;
+  const ending = useRef(false);
+  useEffect(() => {
+    setSessionEndedHandler((why) => {
+      if (ending.current) return;
+      ending.current = true;
+      void signOutRef.current().finally(() => {
+        ending.current = false;
+        toast.show({ message: SESSION_ENDED[why] });
+      });
+    });
+    return () => setSessionEndedHandler(() => {});
+  }, [toast]);
 
   // Signing in, out, or as someone else changes every answer. Signing out or switching person
   // starts the cache again, so nobody sees the last person's data: reset, not clear, because

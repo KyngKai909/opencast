@@ -132,8 +132,17 @@ test("set up a claimable station from a recipe", async ({ page, context }) => {
   await expect(page.getByRole("heading", { level: 1, name: "DSF 38.1", exact: true })).toBeVisible();
   await expect(page.getByText("On air, waiting to be claimed")).toBeVisible();
   await expect(page.getByText("On air since")).toBeVisible();
+  await expect(page.getByText("Desert Skate Films hasn't been invited to claim it yet")).toBeVisible();
   await settled(page);
   await checkA11y(page, "desk setup, on air");
+
+  // Invite them to claim it (N3): the claim row says when, and held earnings say Invited.
+  await page.getByRole("button", { name: "Invite to claim" }).click();
+  await expect(page.getByText("Claim invite sent to Desert Skate Films.")).toBeVisible();
+  await expect(page.getByText(/^Claim invite sent \w+ \d+$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Invite to claim" })).toHaveCount(0);
+  await page.getByRole("link", { name: /^Held earnings/ }).first().click();
+  await expect(page.getByRole("row", { name: /DSF/ })).toContainText(/Invited \w+ \d+/);
 });
 
 test("Add a creator: found, with nothing to ask about until their works are catalogued", async ({ page }) => {

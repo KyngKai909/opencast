@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, DialRowX } from "../../api/ext";
-import { carriedWhere, chipOptions, dayLabel, filterRows, isThin, nearestMarket, openChannelsText, pickHero, placeName, radioDetail, soFarText, thinRows, upStationLine } from "./logic";
+import { carriedWhere, chipOptions, dayLabel, filterRows, isThin, milesApart, openChannelsText, pickHero, placeName, radioDetail, soFarText, thinRows, upStationLine } from "./logic";
 
 const TZ = "America/Los_Angeles";
 let n = 0;
@@ -97,27 +97,13 @@ describe("thin markets", () => {
   });
 });
 
-describe("the nearest market from where you are", () => {
-  const markets = [
-    { slug: "inland-empire", open: true, centre: { lat: 34.0556, lng: -117.1825 } },
-    { slug: "los-angeles", open: true, centre: { lat: 34.0522, lng: -118.2437 } },
-    { slug: "high-desert", open: true, centre: { lat: 34.5362, lng: -117.2928 } },
-    { slug: "closed", open: false, centre: { lat: 34.54, lng: -117.29 } },
-    { slug: "no-centre", open: true }
-  ];
-  it("picks the closest open market", () => {
-    expect(nearestMarket({ lat: 34.05, lng: -117.2 }, markets)?.market.slug).toBe("inland-empire"); // Redlands
-    expect(nearestMarket({ lat: 34.0, lng: -118.3 }, markets)?.market.slug).toBe("los-angeles");
-    expect(nearestMarket({ lat: 34.54, lng: -117.29 }, markets)?.market.slug).toBe("high-desert"); // Victorville, not the closed market on top of it
-  });
-  it("gives the distance in miles", () => {
-    const r = nearestMarket({ lat: 34.5362, lng: -117.2928 }, markets.slice(0, 1))!;
-    expect(Math.round(r.miles)).toBeGreaterThan(30);
-    expect(Math.round(r.miles)).toBeLessThan(40);
-  });
-  it("finds none farther than 150 miles, or when no market has a centre", () => {
-    expect(nearestMarket({ lat: 40.7, lng: -74 }, markets)).toBeNull(); // New York
-    expect(nearestMarket({ lat: 34.05, lng: -117.2 }, [{ open: true }])).toBeNull();
+describe("miles between two points", () => {
+  it("is as the crow flies", () => {
+    const ie = { lat: 34.0556, lng: -117.1825 };
+    const hd = { lat: 34.5362, lng: -117.2928 };
+    expect(Math.round(milesApart(ie, hd))).toBeGreaterThan(30);
+    expect(Math.round(milesApart(ie, hd))).toBeLessThan(40);
+    expect(milesApart(ie, ie)).toBe(0);
   });
 });
 

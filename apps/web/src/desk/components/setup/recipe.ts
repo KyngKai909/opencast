@@ -1,9 +1,9 @@
+import { type CreatorWork, type Recipe, RecipeBreakRule } from "@opencast/contracts";
+import type { BreakRule, RecipeBlock } from "../../api/types";
 // A recipe's day, as the setup page draws it: 24 hours from 6 am, the hours each source fills,
 // the break rule in words, and tonight's schedule built from titles and lengths only (the message
 // preview in Ask: no files are copied before the yes).
 
-import type { BreakRuleX, CreatorWorkX, RecipeBlockX, RecipeX } from "../../api/ext";
-import { BreakRuleX as BreakRuleSchema } from "../../api/ext";
 
 /** Minutes after midnight for "HH:MM"; "24:00" and "00:00" as an end both mean midnight. */
 export function minutesOf(hhmm: string): number {
@@ -12,7 +12,7 @@ export function minutesOf(hhmm: string): number {
 }
 
 /** A block's length in minutes, wrapping past midnight ("22:00" to "02:00" is 240). */
-export function blockMinutes(b: Pick<RecipeBlockX, "start" | "end">): number {
+export function blockMinutes(b: Pick<RecipeBlock, "start" | "end">): number {
   const s = minutesOf(b.start);
   let e = minutesOf(b.end);
   if (e <= s) e += 24 * 60;
@@ -20,14 +20,14 @@ export function blockMinutes(b: Pick<RecipeBlockX, "start" | "end">): number {
 }
 
 export interface DaySegment {
-  block: RecipeBlockX;
+  block: RecipeBlock;
   /** Minutes after the day bar's start (6 am). */
   from: number;
   minutes: number;
 }
 
 /** The recipe's blocks in order from `startHour` (6 am on the frame's bar). */
-export function daySegments(recipe: Pick<RecipeX, "blocks">, startHour = 6): DaySegment[] {
+export function daySegments(recipe: Pick<Recipe, "blocks">, startHour = 6): DaySegment[] {
   const origin = startHour * 60;
   return recipe.blocks
     .map((block) => ({ block, from: (minutesOf(block.start) - origin + 24 * 60) % (24 * 60), minutes: blockMinutes(block) }))
@@ -43,7 +43,7 @@ export interface HoursBySource {
   total: number;
 }
 
-export function hoursBySource(recipe: Pick<RecipeX, "blocks">): HoursBySource {
+export function hoursBySource(recipe: Pick<Recipe, "blocks">): HoursBySource {
   const h = { creator: 0, carried: 0, catalog: 0, total: 0 };
   for (const b of recipe.blocks) {
     const hours = blockMinutes(b) / 60;
@@ -61,13 +61,13 @@ export function hoursText(h: number): string {
 }
 
 /** The break rule, parsed from the contract's loose record (N6). */
-export function breakRuleOf(recipe: Pick<RecipeX, "breakRule">): BreakRuleX {
-  const r = BreakRuleSchema.safeParse(recipe.breakRule);
+export function breakRuleOf(recipe: Pick<Recipe, "breakRule">): BreakRule {
+  const r = RecipeBreakRule.safeParse(recipe.breakRule);
   return r.success ? r.data : {};
 }
 
 /** "Every 30 min, 2:00, spots from the market, never alcohol". */
-export function breakLine(rule: BreakRuleX): string {
+export function breakLine(rule: BreakRule): string {
   const parts: string[] = [];
   if (rule.everyMinutes) parts.push(`Every ${rule.everyMinutes} min`);
   if (rule.lengthMs) {
@@ -80,7 +80,7 @@ export function breakLine(rule: BreakRuleX): string {
 }
 
 /** A block's words on the day bar. `{creator}` is the creator's short name ("Lupe"). */
-export function blockLabel(b: RecipeBlockX, creatorShort: string): string {
+export function blockLabel(b: RecipeBlock, creatorShort: string): string {
   const fallback = { creator: creatorShort, repeats: `${creatorShort}, repeats`, catalog: "Catalog", overnight: "Catalog, overnight", carried: b.carried?.station.callSign ?? "Carried" }[b.source];
   return (b.label ?? fallback).replaceAll("{creator}", creatorShort);
 }
@@ -97,7 +97,7 @@ export interface PreviewRow {
  * first creator block), the included works in order by their lengths, then the next block as one
  * line. Titles and lengths only.
  */
-export function tonightSchedule(recipe: Pick<RecipeX, "blocks">, works: ReadonlyArray<Pick<CreatorWorkX, "title" | "durationMs">>, limit = 3): PreviewRow[] {
+export function tonightSchedule(recipe: Pick<Recipe, "blocks">, works: ReadonlyArray<Pick<CreatorWork, "title" | "durationMs">>, limit = 3): PreviewRow[] {
   const ordered = [...recipe.blocks].sort((a, b) => minutesOf(a.start) - minutesOf(b.start));
   const creatorBlocks = ordered.filter((b) => b.source === "creator");
   const first = creatorBlocks.find((b) => minutesOf(b.start) >= 18 * 60) ?? creatorBlocks[0];

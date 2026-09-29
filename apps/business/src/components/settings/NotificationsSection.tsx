@@ -3,12 +3,11 @@
 // Everyone sets their own, viewers included (they start with only the weekly summary).
 
 import { useState } from "react";
-import { notificationsApi, spotsApi, type NotificationPrefs } from "@opencast/contracts";
+import { notificationsApi, spotsApi, type NoticeKind, type NotificationPrefs } from "@opencast/contracts";
 import { Toggle, ToggleLock } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
 import { keyFor, useApi, useApiMutation } from "../../api/hooks";
-import { SPOT_ADDED } from "../../api/ext/settings";
 import type { BusinessState } from "../../business/BusinessContext";
 import { Quiet } from "../../pages/common";
 import { warnLine } from "./format";
@@ -16,7 +15,7 @@ import "./common.css";
 import "./NotifyConnections.css";
 
 interface Pref {
-  key: string;
+  key: NoticeKind;
   title: string;
   detail?: string;
 }
@@ -33,7 +32,7 @@ export function notificationGroups(warnDays: number[]): { title: string; rows: P
     {
       title: "Stations",
       rows: [
-        { key: SPOT_ADDED, title: "A station added your spot" },
+        { key: "spot_added", title: "A station added your spot" },
         { key: "sponsorship_answered", title: "Sponsorship answered" },
         { key: "order_update", title: "Production order updates", detail: "Quotes and deliveries" }
       ]

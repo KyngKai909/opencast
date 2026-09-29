@@ -5,11 +5,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { networkApi } from "@opencast/contracts";
+import { type Creator, networkApi } from "@opencast/contracts";
 import { Button, ControlTitle, Field, KeyValueList, Notice, TextAreaField } from "@opencast/ui";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { CreatorsX, CreatorWorksX, RecipesX, type CreatorX } from "../api/ext";
 import { MessagePreview } from "../components/ask/MessagePreview";
 import { WorkList } from "../components/ask/WorkList";
 import { interleave, mainNoun, pickRecipe } from "../components/ask/works";
@@ -24,13 +23,13 @@ import "./Ask.css";
 import { deskPath } from "../../areas";
 
 /** "Vimeo message and hello@desertskate.example". */
-export function sendTo(c: Pick<CreatorX, "sourcePlatform" | "contactEmail">): { label: string; via: string[] } {
+export function sendTo(c: Pick<Creator, "sourcePlatform" | "contactEmail">): { label: string; via: string[] } {
   const platform = `${PLATFORM_LABELS[c.sourcePlatform]} message`;
   return c.contactEmail ? { label: `${platform} and ${c.contactEmail}`, via: [platform, c.contactEmail] } : { label: platform, via: [platform] };
 }
 
 /** "A TV band station, 38.1 or 45.1"; "A radio band station". */
-export function stationLine(c: Pick<CreatorX, "proposedOptions" | "proposed">): { band: "tv" | "radio"; text: string; channel: string | null } {
+export function stationLine(c: Pick<Creator, "proposedOptions" | "proposed">): { band: "tv" | "radio"; text: string; channel: string | null } {
   const o = c.proposedOptions ?? (c.proposed ? { band: c.proposed.band, channels: [c.proposed.channel] } : { band: "tv" as const, channels: [] });
   const band = o.band === "radio" ? "radio band" : "TV band";
   return { band: o.band, text: o.channels.length ? `A ${band} station, ${o.channels.join(" or ")}` : `A ${band} station`, channel: o.channels[0] ?? null };
@@ -40,9 +39,9 @@ export default function Ask() {
   const { creatorId = "" } = useParams();
   const { market, loading } = useMarket();
   const qc = useQueryClient();
-  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { schema: CreatorsX, enabled: !!market });
-  const works = useApi(networkApi.listWorks, { params: { creatorId } }, { schema: CreatorWorksX });
-  const recipes = useApi(networkApi.listRecipes, {}, { schema: RecipesX });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
+  const works = useApi(networkApi.listWorks, { params: { creatorId } });
+  const recipes = useApi(networkApi.listRecipes, {});
   const creator = creators.data?.find((c) => c.id === creatorId);
   const [note, setNote] = useState("");
   const [included, setIncluded] = useState<Set<string> | null>(null);

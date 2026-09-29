@@ -7,8 +7,7 @@
 // station puts it on the board, signing it on moves the creator to On air, a claim takes it off
 // held earnings.
 
-import type { Market, MarketBoard, PermissionPage, StationIdent } from "@opencast/contracts";
-import type { CreatorWorkX, CreatorX, HeldEarningsX, MarketBoardX, RecipeX } from "../api/ext";
+import type { Creator, CreatorWork, HeldEarnings, Market, MarketBoard, PermissionPage, Recipe, StationIdent } from "@opencast/contracts";
 import { now } from "../../lib/clock";
 import { seedCreators, seedRequests, seedWorks, type DbCreator, type DbRequest, type DbWork } from "./fixtures/creators";
 import { ESCROW, seedBalances, type DbBalance } from "./fixtures/held";
@@ -36,7 +35,7 @@ export interface Db {
   creators: DbCreator[];
   works: DbWork[];
   requests: DbRequest[];
-  recipes: RecipeX[];
+  recipes: Recipe[];
   listed: DbListed[];
   balances: Record<string, DbBalance>;
   handovers: DbHandover[];
@@ -203,14 +202,14 @@ export function callSignTaken(callSign: string): boolean {
 
 // ---- Views: the contracts' shapes ----
 
-export function workView(w: DbWork): CreatorWorkX {
+export function workView(w: DbWork): CreatorWork {
   const yes = yesOf(w.creatorId);
   const { creatorId: _c, ...rest } = w;
   const covered = yes?.answer?.workIds.includes(w.id) ? "permission" : w.licence?.allowsCarriage ? "licence" : "none";
   return { ...rest, covered };
 }
 
-export function creatorView(c: DbCreator): CreatorX {
+export function creatorView(c: DbCreator): Creator {
   const station = stationById(c.stationId);
   const included = worksOf(c.id).filter((w) => !w.leftOutReason);
   const first = c.proposedOptions?.channels[0];
@@ -259,7 +258,7 @@ export function creatorView(c: DbCreator): CreatorX {
 }
 
 /** One band of a market's board, with the market-wide stats (N7) and each slot's sign-on (N7). */
-export function boardView(market: Market, band: "tv" | "radio"): MarketBoardX {
+export function boardView(market: Market, band: "tv" | "radio"): MarketBoard {
   const d = getDb();
   const onBand = d.stations.filter((s) => s.marketId === market.id && s.ident.band === band && s.ident.channel);
   const holds = d.reservations.filter((r) => r.marketId === market.id && r.band === band && r.channel);
@@ -312,7 +311,7 @@ export function boardView(market: Market, band: "tv" | "radio"): MarketBoardX {
   };
 }
 
-export function heldView(): HeldEarningsX {
+export function heldView(): HeldEarnings {
   const d = getDb();
   const stations = d.creators.flatMap((c) => {
     const s = stationById(c.stationId);
@@ -336,6 +335,8 @@ export function heldView(): HeldEarningsX {
       {
         station: s.ident,
         creator: c.personName ?? c.displayName,
+        creatorId: c.id,
+        creatorName: c.displayName,
         escrowStationId: s.escrowId ?? 0,
         onAirSince: s.public ? s.firstSignedOnAt : null,
         rightsBasis: c.licenceName ? ("licence" as const) : ("permission" as const),
@@ -356,6 +357,7 @@ export function heldView(): HeldEarningsX {
     stations,
     totalHeldMicros: stations.reduce((s, x) => s + x.heldMicros + x.owedNotYetDepositedMicros, 0),
     everMovedToOpencastMicros: 0,
+    stationsHoldingMoney: stations.filter((x) => x.heldMicros + x.owedNotYetDepositedMicros > 0).length,
     unclaimedPeriodDays: ESCROW.unclaimedPeriodDays,
     chain: ESCROW.chain
   };

@@ -1,10 +1,9 @@
 // The signed-in person: me, presets, reminders, pledges, TVs (B2, tvApi), notification settings,
-// and the proposed endpoints in api/ext/you.ts (E1, A1, A2, A3).
+// and the account's data endpoints (E1, A1, A2, A3), from the contracts.
 
 import { http } from "msw";
-import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi, Tv, tvApi } from "@opencast/contracts";
+import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi, Tv, tvApi, type Pledge } from "@opencast/contracts";
 import { now } from "../../lib/clock";
-import { accountApiX, PledgesX, PledgeX, pledgesApiX } from "../../api/ext/you";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { AIRINGS, airingById } from "../fixtures/schedule";
@@ -51,7 +50,7 @@ function reminderView(r: { id: string; airingId: string; switchMeOver: boolean; 
   };
 }
 
-export function pledgeView(p: DbPledge): PledgeX {
+export function pledgeView(p: DbPledge): Pledge {
   const items = receiptsFor(p, now());
   return {
     id: p.id,
@@ -201,7 +200,7 @@ export const meHandlers = [
   }),
 
   // ---------- Pledges ----------
-  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(PledgesX, getDb().pledges.map(pledgeView))),
+  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(ledgerApi.listMyPledges.response, getDb().pledges.map(pledgeView))),
 
   http.post(path(ledgerApi.pledge), async ({ request, params }) => {
     const denied = needsUser(request);
@@ -218,7 +217,7 @@ export const meHandlers = [
     return reply(ledgerApi.pledge.response, { pledge: pledgeView(p), checkoutUrl: null }, 201);
   }),
 
-  http.patch(path(pledgesApiX.updatePledge), async ({ request, params }) => {
+  http.patch(path(ledgerApi.updatePledge), async ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const p = getDb().pledges.find((x) => x.id === params.pledgeId);
@@ -233,15 +232,15 @@ export const meHandlers = [
     // Stopping: it ends after the current month.
     if (body.stop) p.endsAfter = endOfThisMonth(now());
     saveDb();
-    return reply(PledgeX, pledgeView(p));
+    return reply(ledgerApi.updatePledge.response, pledgeView(p));
   }),
 
-  http.post(path(pledgesApiX.cardSession), ({ request, params }) => {
+  http.post(path(ledgerApi.pledgeCardSession), ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     if (!getDb().pledges.some((x) => x.id === params.pledgeId)) return fail(404, "not_found", "That pledge wasn't found.");
     // A real one is Stripe's page, which comes back here. The mock comes straight back.
-    return reply(pledgesApiX.cardSession.response, { url: `/you/pledges/${params.pledgeId}` });
+    return reply(ledgerApi.pledgeCardSession.response, { url: `/you/pledges/${params.pledgeId}` });
   }),
 
   // ---------- TVs (B2) ----------
@@ -272,30 +271,30 @@ export const meHandlers = [
   }),
 
   // ---------- Account (A1, A2, A3) ----------
-  http.post(path(accountApiX.signOutEverywhere), ({ request }) => {
+  http.post(path(accountsApi.signOutEverywhere), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const db = getDb();
     db.signedOutEverywhereAt = now().toISOString();
     db.tvs = db.tvs.filter((t) => t.kind !== "tv_app");
     saveDb();
-    return reply(accountApiX.signOutEverywhere.response, { ok: true });
+    return reply(accountsApi.signOutEverywhere.response, { ok: true });
   }),
 
-  http.delete(path(accountApiX.clearWatchHistory), ({ request }) => needsUser(request) ?? reply(accountApiX.clearWatchHistory.response, { ok: true })),
+  http.delete(path(accountsApi.clearWatchHistory), ({ request }) => needsUser(request) ?? reply(accountsApi.clearWatchHistory.response, { ok: true })),
 
-  http.post(path(accountApiX.exportData), ({ request }) => {
+  http.post(path(accountsApi.exportData), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    return reply(accountApiX.exportData.response, { email: getDb().me.email, readyBy: new Date(now().getTime() + 86400e3).toISOString() });
+    return reply(accountsApi.exportData.response, { email: getDb().me.email, readyBy: new Date(now().getTime() + 86400e3).toISOString() });
   }),
 
-  http.delete(path(accountApiX.deleteAccount), ({ request }) => {
+  http.delete(path(accountsApi.deleteAccount), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     // The mock starts over, as if a new person signed in next.
     resetDb();
-    return reply(accountApiX.deleteAccount.response, { ok: true });
+    return reply(accountsApi.deleteAccount.response, { ok: true });
   }),
 
   // ---------- Run a station ----------

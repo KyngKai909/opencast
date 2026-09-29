@@ -6,7 +6,6 @@ import { useSearchParams, useNavigate } from "react-router";
 import { networkApi } from "@opencast/contracts";
 import { ControlTitle, Segmented, StatRow } from "@opencast/ui";
 import { useApi } from "../../api/hooks";
-import { CreatorsX, MarketBoardX } from "../api/ext";
 import { BoardMap } from "../components/board/BoardMap";
 import { bandOfKey, coverage, marketLine, slotKey, statCaptions } from "../components/board/board";
 import { SlotDetail, SlotHint } from "../components/board/SlotDetail";
@@ -21,9 +20,9 @@ export default function Board() {
   const { slug, market, markets, loading } = useMarket();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const tv = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "tv" } }, { schema: MarketBoardX, enabled: !!market });
-  const radio = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "radio" } }, { schema: MarketBoardX, enabled: !!market });
-  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { schema: CreatorsX, enabled: !!market });
+  const tv = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "tv" } }, { enabled: !!market });
+  const radio = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "radio" } }, { enabled: !!market });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
 
   if (loading || (market && (tv.isLoading || radio.isLoading))) return <Quiet />;
   if (!market) return <NotFound />;

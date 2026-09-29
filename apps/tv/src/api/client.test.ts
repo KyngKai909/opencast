@@ -21,11 +21,16 @@ describe("which token each endpoint gets", () => {
     expect(tokenFor(accountsApi.getMe, { device: "tvd_device", session: null })).toBeNull();
   });
 
+  it("sends the TV session with the heartbeat, so a signed-in TV keeps watch history (A2); none signed out", () => {
+    expect(audienceApi.heartbeat.tvSession).toBe(true);
+    expect(tokenFor(audienceApi.heartbeat, both)).toBe("tvs_session");
+    expect(tokenFor(audienceApi.heartbeat, { device: "tvd_device", session: null })).toBeNull();
+  });
+
   it("sends nothing to public endpoints, or to a user endpoint a TV session can't use", () => {
     expect(tokenFor(tvApi.registerTv, both)).toBeNull();
     expect(tokenFor(tvApi.pollTvCode, both)).toBeNull();
     expect(tokenFor(stationsApi.getDial, both)).toBeNull();
-    expect(tokenFor(audienceApi.heartbeat, both)).toBeNull();
     expect(tokenFor(tvApi.listTvs, both)).toBeNull();
   });
 });

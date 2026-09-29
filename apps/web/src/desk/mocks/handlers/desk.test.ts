@@ -5,8 +5,8 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { HttpHandler } from "msw";
-import { MarketBoardX, CreatorsX, HeldEarningsX } from "../../api/ext";
 import { apiFor } from "../testApi";
+import { HeldEarnings, MarketBoard, networkApi } from "@opencast/contracts";
 
 const NOW = new Date("2026-09-27T03:42:12Z");
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -34,7 +34,7 @@ beforeEach(() => {
   db.resetDb();
 });
 
-const creator = async (id: string) => CreatorsX.parse((await api("GET", "/admin/creators", { query: { marketId: IE } })).json).find((c) => c.id === id)!;
+const creator = async (id: string) => networkApi.listCreators.response.parse((await api("GET", "/admin/creators", { query: { marketId: IE } })).json).find((c) => c.id === id)!;
 
 describe("the admin gate", () => {
   it("answers 401 signed out and 403 for someone not on the team", async () => {
@@ -55,8 +55,8 @@ describe("the admin gate", () => {
 
 describe("the board", () => {
   it("is the frame's Inland Empire: the slots, the holds and the stats", async () => {
-    const tv = MarketBoardX.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "tv" } })).json);
-    const radio = MarketBoardX.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "radio" } })).json);
+    const tv = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "tv" } })).json);
+    const radio = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "radio" } })).json);
     expect(tv.slots).toHaveLength(68);
     expect(radio.slots).toHaveLength(100);
     const slot = (b: typeof tv, major: number) => b.slots.find((s) => s.major === major)!;
@@ -71,7 +71,7 @@ describe("the board", () => {
   });
 
   it("has nothing on Los Angeles yet", async () => {
-    const tv = MarketBoardX.parse((await api("GET", "/admin/markets/los-angeles/board")).json);
+    const tv = MarketBoard.parse((await api("GET", "/admin/markets/los-angeles/board")).json);
     expect(tv.slots.every((s) => s.state === "open")).toBe(true);
     expect(tv.stats.localShareOfTonightPercent).toBeNull();
   });
@@ -113,19 +113,19 @@ describe("a creator, found to claimed", () => {
     expect((await api("POST", `/admin/creators/${SKATE}/station`, { body })).json.error.code).toBe("no_permission");
     const setUp = await creator(SKATE);
     expect(setUp).toMatchObject({ stage: "setting_up", setup: { callSign: "DSF", importTotal: 13, operator: { name: "Dee A." } } });
-    const tv = MarketBoardX.parse((await api("GET", "/admin/markets/inland-empire/board")).json);
+    const tv = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board")).json);
     expect(tv.slots.find((s) => s.major === 38)).toMatchObject({ state: "claimable", status: "Signs on" });
     // On air, not claimed: the sign-on time comes.
     vi.setSystemTime(new Date("2026-09-28T13:00:05Z"));
     expect((await creator(SKATE)).stage).toBe("on_air");
-    const held = HeldEarningsX.parse((await api("GET", "/admin/held-earnings")).json);
+    const held = HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json);
     expect(held.stations.find((s) => s.station.callSign === "DSF")).toMatchObject({ status: "on_air", onAirSince: "2026-09-28T13:00:00.000Z" });
     // Claimed (mock mode's other side: the claim, then the verifiers and 72 hours).
     await api("POST", `/__mock/desk/creators/${SKATE}/claim`, { body: {} });
-    expect(HeldEarningsX.parse((await api("GET", "/admin/held-earnings")).json).stations.find((s) => s.station.callSign === "DSF")!.status).toBe("claim_pending");
+    expect(HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json).stations.find((s) => s.station.callSign === "DSF")!.status).toBe("claim_pending");
     await api("POST", `/__mock/desk/creators/${SKATE}/claim-complete`, { body: {} });
     expect((await creator(SKATE)).stage).toBe("claimed");
-    expect(HeldEarningsX.parse((await api("GET", "/admin/held-earnings")).json).stations.some((s) => s.station.callSign === "DSF")).toBe(false);
+    expect(HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json).stations.some((s) => s.station.callSign === "DSF")).toBe(false);
   });
 
   it("never asks after a no", async () => {
@@ -171,7 +171,7 @@ describe("listed sources and held earnings", () => {
   });
 
   it("holds $227.00 across CRAT and FLDR, and never moves any to Opencast", async () => {
-    const h = HeldEarningsX.parse((await api("GET", "/admin/held-earnings")).json);
+    const h = HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json);
     expect(h.totalHeldMicros).toBe(227_000_000);
     expect(h.everMovedToOpencastMicros).toBe(0);
     expect(h.stations.map((s) => [s.station.callSign, s.escrowStationId, s.status])).toEqual([
@@ -179,5 +179,22 @@ describe("listed sources and held earnings", () => {
       ["FLDR", 91, "invited"],
       ["LUPE", 33, "not_on_air_yet"]
     ]);
+  });
+
+  it("counts the rows holding money, and names each row's creator (A125)", async () => {
+    const h = HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json);
+    expect(h.stationsHoldingMoney).toBe(2);
+    expect(h.stations.find((s) => s.station.callSign === "CRAT")).toMatchObject({ creator: "Marcus Reyes", creatorName: expect.any(String), creatorId: expect.any(String) });
+  });
+
+  it("sends a claim invite, then the claim link, once the station exists (N3)", async () => {
+    expect((await api("POST", `/admin/creators/${SKATE}/claim-invites`, { body: { kind: "invite" } })).json.error.code).toBe("no_station");
+    const invited = await api("POST", `/admin/creators/${LUPE}/claim-invites`, { body: { kind: "invite" } });
+    expect(invited.status).toBe(201);
+    expect(invited.json.claimInviteSentAt).toBe(NOW.toISOString());
+    const linked = await api("POST", `/admin/creators/${LUPE}/claim-invites`, { body: { kind: "link" } });
+    expect(linked.json.claimLinkSentAt).toBe(NOW.toISOString());
+    const h = HeldEarnings.parse((await api("GET", "/admin/held-earnings")).json);
+    expect(h.stations.find((s) => s.station.callSign === "LUPE")).toMatchObject({ invitedAt: NOW.toISOString(), claimLinkSentAt: NOW.toISOString() });
   });
 });

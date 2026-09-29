@@ -4,8 +4,7 @@
 // Setting up when the station is made; the frame's "Said yes" is inventory item 5). Their works,
 // and the permission requests already out.
 
-import type { CreatorStage } from "@opencast/contracts";
-import type { CreatorWorkX } from "../../api/ext";
+import type { CreatorStage, CreatorWork } from "@opencast/contracts";
 import { U } from "./ids";
 import { HD, IE } from "./markets";
 import { DEE } from "./people";
@@ -40,7 +39,7 @@ export interface DbCreator {
   setup: { recipeId: string; operatorId: string; importTotal: number; setupAt: string; importDone?: number; /** A new setup's import runs on with the clock; the seed's stay as drawn. */ running?: boolean } | null;
 }
 
-export interface DbWork extends Omit<CreatorWorkX, "covered"> {
+export interface DbWork extends Omit<CreatorWork, "covered"> {
   creatorId: string;
 }
 

@@ -1,11 +1,11 @@
 // The pipeline's rules on the frame's creators (network-desk 02.1): the strip's counts, each row's
 // Station and Next words, its button, and the order.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CreatorX } from "../../api/ext";
 import { actionFor, needsAction, nextLine, pipelineOrder, stageCounts, stationCell, STRIP, type Ctx } from "./stages";
+import type { Creator } from "@opencast/contracts";
 
 const NOW = new Date("2026-09-27T03:42:12Z");
-let all: CreatorX[];
+let all: Creator[];
 const held = new Map([["95.5", "GOSP"], ["41.1", "TACO"]]);
 const ctx: Ctx = { now: NOW, timeZone: "America/Los_Angeles", held };
 const by = (name: string) => all.find((c) => c.displayName === name)!;

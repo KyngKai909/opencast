@@ -1,7 +1,6 @@
 // The board: markets, each band's slots and stats, the waitlist's reservations and call signs.
 import { http, type HttpHandler } from "msw";
 import { networkApi, stationsApi, waitlistApi } from "@opencast/contracts";
-import { MarketBoardX } from "../../api/ext";
 import { advance, boardView, callSignTaken, getDb, marketBySlug } from "../db";
 import { fail, needsAdmin, path, reply } from "../respond";
 
@@ -15,7 +14,7 @@ export const boardHandlers: HttpHandler[] = [
     if (!market) return fail(404, "not_found", "That market wasn't found.");
     advance();
     const band = new URL(request.url).searchParams.get("band") === "radio" ? "radio" : "tv";
-    return reply(MarketBoardX, boardView(market, band));
+    return reply(networkApi.getBoard.response, boardView(market, band));
   }),
 
   http.get(path(waitlistApi.listReservations), ({ request }) => {

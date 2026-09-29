@@ -8,7 +8,6 @@ import { Outlet, useLocation } from "react-router";
 import { accountsApi, networkApi, waitlistApi } from "@opencast/contracts";
 import { DeskShell, money, type DeskPage, type ShellItems } from "@opencast/ui";
 import { useApi } from "../../api/hooks";
-import { CreatorsX, HeldEarningsX } from "../api/ext";
 import { initialsOf } from "../auth/gate";
 import { useInAppLinks } from "./links";
 import { rememberMarket, useMarket } from "./market";
@@ -47,9 +46,9 @@ export function DeskLayout() {
     if (market) rememberMarket(market.slug);
   }, [market]);
   const me = useApi(accountsApi.getMe);
-  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { schema: CreatorsX, enabled: !!market });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
   const listed = useApi(networkApi.listListedSources, { query: { marketId: market?.id } }, { enabled: !!market });
-  const held = useApi(networkApi.heldEarnings, {}, { schema: HeldEarningsX });
+  const held = useApi(networkApi.heldEarnings, {});
   const reserved = useApi(waitlistApi.listReservations, { query: { marketId: market?.id } }, { enabled: !!market });
 
   const yeses = creators.data?.filter((c) => c.stage === "said_yes" && !c.station).length;
