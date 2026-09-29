@@ -2,9 +2,10 @@
 // The rule (decided): the nearest on-air, non-listed station in dial order, looking up the dial
 // first, on the same band; the other band only if this one has nothing on.
 
-import type { DialRowWatchingX } from "../../api/ext/watching";
+import type { DialRowX } from "../../api/ext";
 
-export type Row = Pick<DialRowWatchingX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowWatchingX["signal"] };
+/** S13's `signal` is on the contract's dial row now. */
+export type Row = Pick<DialRowX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowX["signal"] };
 
 /** "REEL 24.1", kept on one line (a no-break space). */
 export function identText(s: Pick<Row["station"], "callSign" | "channel" | "name">): string {

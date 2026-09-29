@@ -2,8 +2,7 @@
 
 import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
-import { DialX, type DialRowX } from "../../api/ext";
-import { MarketPlacesX } from "../../api/ext/home";
+import { DialX, MarketsX, type DialRowX } from "../../api/ext";
 import { now } from "../../lib/clock";
 import { AIRINGS, PROGRAMS } from "../fixtures/schedule";
 import { MARKETS, STATIONS, ZIPS, inMarket, playbackFor, stationByRef, type MockStation } from "../fixtures/stations";
@@ -21,8 +20,7 @@ function dialRow(s: MockStation, t: Date): DialRowX {
 }
 
 export const dialHandlers = [
-  // With each market's centre (contract request S10, interim), so "Use my location" picks on the device.
-  http.get(path(stationsApi.listMarkets), () => reply(MarketPlacesX, MARKETS.map(({ lat, lng, ...m }) => ({ ...m, centre: { lat, lng } })))),
+  http.get(path(stationsApi.listMarkets), () => reply(MarketsX, MARKETS.map(({ lat: _lat, lng: _lng, ...m }) => m))),
 
   http.get(path(stationsApi.marketForZip), ({ params }) => {
     const slug = ZIPS[String(params.zip)];

@@ -1,4 +1,5 @@
-// What this TV remembers, on the device: its sign-in (a TV session from the code sign-in), the
+// What this TV remembers, on the device: who it is (registerTv's tvId and device token), its
+// sign-in (a TV session from the code sign-in), the
 // last channel ("Start on: last channel"), whether first launch has been seen, presets and
 // settings while signed out, and the TV-only settings (banner seconds, number wait…).
 // A Cast receiver has no reliable storage: the same store runs in memory there.
@@ -23,7 +24,11 @@ export interface TvSettings {
 }
 
 export interface TvDevice {
-  /** The TV session's token, once a phone approved the code (proposed B2). */
+  /** This TV, from registerTv on first launch (B2). Never set on a Cast receiver or an iPhone's second screen. */
+  tvId: string | null;
+  /** The TV's own token (`device` endpoints), shown once by registerTv. */
+  deviceToken: string | null;
+  /** The TV session's token, once a phone approved the code (B2): `tvSession` endpoints, and `device` ones too. */
   token: string | null;
   /** Who's signed in, for "Signed in as Kai M." before the API answers. */
   signedInAs: string | null;
@@ -48,7 +53,7 @@ export const DEFAULT_SETTINGS: TvSettings = {
   othersOnWifiCanChange: true
 };
 
-const EMPTY: TvDevice = { token: null, signedInAs: null, welcomed: false, lastStationId: null, marketSlug: null, presets: {}, settings: DEFAULT_SETTINGS };
+const EMPTY: TvDevice = { tvId: null, deviceToken: null, token: null, signedInAs: null, welcomed: false, lastStationId: null, marketSlug: null, presets: {}, settings: DEFAULT_SETTINGS };
 const KEY = "oc-tv-device";
 
 let persist = true;
@@ -69,6 +74,11 @@ function read(): TvDevice {
 export function useMemoryOnly() {
   persist = false;
   state = { ...EMPTY, welcomed: true };
+}
+
+/** Whether this is a receiver or a second screen (nothing kept, never registered). */
+export function isMemoryOnly(): boolean {
+  return !persist;
 }
 
 export function getDevice(): TvDevice {

@@ -1,8 +1,9 @@
 // One row of TV settings (tv-update 04.1 .trow): a title, a line under it, and its value on the
-// right. The focused row shows ◀ value ▶ when it has options; a switch shows as a switch. Rows
-// with nothing to change aren't focusable (they're read, not chosen).
+// right. The focused row shows ◀ value ▶ when it has options; a switch shows as a switch; an
+// action ("Remove") shows only while its row is focused. Rows with nothing to change aren't
+// focusable (they're read, not chosen). A focused row below the pane's edge scrolls into view.
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { cx } from "@opencast/ui";
 import { useTvFocusable } from "../../tv/focus";
 import "./TvRow.css";
@@ -11,6 +12,8 @@ export type RowControl =
   | { type: "step"; label: string; first: boolean; last: boolean }
   | { type: "switch"; checked: boolean }
   | { type: "value"; label: string }
+  /** What OK does, said only while the row is focused ("Remove"); `idle` shows otherwise. */
+  | { type: "action"; label: string; idle?: string }
   | { type: "none" };
 
 export interface TvRowProps {
@@ -28,7 +31,10 @@ export interface TvRowProps {
 export function TvRow({ fk, title, help, extra, control, onSelect, onFocus }: TvRowProps) {
   const f = useTvFocusable({ focusKey: fk, focusable: !!fk, onSelect, onFocus });
   const on = !!fk && f.focused;
-  const valueText = control.type === "step" || control.type === "value" ? control.label : control.type === "switch" ? (control.checked ? "On" : "Off") : undefined;
+  useEffect(() => {
+    if (on) f.ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [on, f.ref]);
+  const valueText = control.type === "step" || control.type === "value" || control.type === "action" ? control.label : control.type === "switch" ? (control.checked ? "On" : "Off") : undefined;
   return (
     <div
       ref={f.ref}
@@ -60,6 +66,7 @@ export function TvRow({ fk, title, help, extra, control, onSelect, onFocus }: Tv
         </span>
       )}
       {control.type === "value" && <span className="tvs-row__val">{control.label}</span>}
+      {control.type === "action" && (on || control.idle) && <span className="tvs-row__val">{on ? control.label : control.idle}</span>}
       {control.type === "switch" && <span className={cx("tvs-switch", !control.checked && "tvs-switch--off")} aria-hidden="true" />}
     </div>
   );

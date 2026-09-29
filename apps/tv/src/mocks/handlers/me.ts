@@ -1,10 +1,10 @@
-// The signed-in person: me, presets, reminders, pledges, TVs, notification settings, and the
-// proposed endpoints in api/ext/you.ts (B2, E1, A1, A2, A3).
+// The signed-in person: me, presets, reminders, pledges, TVs (B2, tvApi), notification settings,
+// and the proposed endpoints in api/ext/you.ts (E1, A1, A2, A3).
 
 import { http } from "msw";
-import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi } from "@opencast/contracts";
+import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi, Tv, tvApi } from "@opencast/contracts";
 import { now } from "../../lib/clock";
-import { accountApiX, PledgesX, PledgeX, pledgesApiX, Tv, tvsApi } from "../../api/ext/you";
+import { accountApiX, PledgesX, PledgeX, pledgesApiX } from "../../api/ext/you";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { AIRINGS, airingById } from "../fixtures/schedule";
@@ -245,9 +245,9 @@ export const meHandlers = [
   }),
 
   // ---------- TVs (B2) ----------
-  http.get(path(tvsApi.listTvs), ({ request }) => needsUser(request) ?? reply(z.array(Tv), tvsView())),
+  http.get(path(tvApi.listTvs), ({ request }) => needsUser(request) ?? reply(z.array(Tv), tvsView())),
 
-  http.delete(path(tvsApi.signOutTv), ({ request, params }) => {
+  http.delete(path(tvApi.signOutTv), ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const db = getDb();
@@ -258,17 +258,17 @@ export const meHandlers = [
     return reply(z.array(Tv), tvsView());
   }),
 
-  http.post(path(tvsApi.approveTvCode), ({ request, params }) => {
+  http.post(path(tvApi.approveTvCode), ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    const code = String(params.code).toUpperCase();
+    const code = String(params.code).toUpperCase().replace(/[^A-Z0-9]/g, "");
     // The mock takes any six letters or digits except 000000.
-    if (!/^[A-Z0-9]{6}$/.test(code) || code === "000000") return fail(404, "not_found", "That code didn't work. Check the code on the TV and try again.");
+    if (!/^[A-Z0-9]{6}$/.test(code) || code === "000000") return fail(404, "code_not_found", "That code isn't right, or it's run out. Check the code on the TV.");
     const db = getDb();
-    const tv = { id: uid(70000 + db.tvs.length + Math.floor(Math.random() * 9000)), name: "TV", kind: "tv_app" as const, platform: "Android TV", signedIn: true, lastUsedAt: now().toISOString(), castingNow: false };
+    const tv = { id: uid(70000 + db.tvs.length + Math.floor(Math.random() * 9000)), name: "Android TV", kind: "tv_app" as const, platform: "android_tv" as const, signedIn: true, lastUsedAt: now().toISOString(), online: false, castingNow: false };
     db.tvs.push(tv);
     saveDb();
-    return reply(Tv, tv, 201);
+    return reply(Tv, tv);
   }),
 
   // ---------- Account (A1, A2, A3) ----------

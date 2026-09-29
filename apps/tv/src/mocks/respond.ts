@@ -8,6 +8,9 @@ import { MOCK_TOKEN } from "../auth/mockToken";
 
 export { MOCK_TOKEN };
 
+/** This TV's device token in mock mode (registerTv's answer). The TV session is MOCK_TOKEN. */
+export const MOCK_DEVICE_TOKEN = "mock-tv-device-token";
+
 /** The MSW path for an endpoint (Express-style params are MSW's too). */
 export function path(e: EndpointDef): string {
   return `*/v1${e.path}`;
@@ -29,4 +32,10 @@ export function fail(status: number, code: string, message: string) {
 /** Null when the request carries the mock sign-in; otherwise the 401 to return. */
 export function needsUser(request: Request) {
   return request.headers.get("authorization") === `Bearer ${MOCK_TOKEN}` ? null : fail(401, "unauthorized", "Sign in to do that.");
+}
+
+/** A `device` endpoint: the TV's device token or its TV session. Null when it has one; otherwise the 401. */
+export function needsDevice(request: Request) {
+  const auth = request.headers.get("authorization");
+  return auth === `Bearer ${MOCK_DEVICE_TOKEN}` || auth === `Bearer ${MOCK_TOKEN}` ? null : fail(401, "unauthorized", "This is for the TV app.");
 }

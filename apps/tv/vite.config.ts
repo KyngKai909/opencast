@@ -12,6 +12,10 @@ const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
  * hidden iframe instead: messages posted from the viewer's origin go onto the channel, and the
  * channel's messages for phones go back to it. Served by the dev server in mock mode only; it's
  * never a file, so no build has it.
+ *
+ * The same bridge carries the relay mock (src/mocks/handlers/remote.ts): `relay-tv` messages from
+ * the viewer go onto the channel for the TV app, and `relay-phone` ones come back, to the phone
+ * that last spoke or, before it has, to the viewer's origin (postMessage only delivers there).
  */
 function mockCastBridge(viewerOrigins: string[]): string {
   return `<!doctype html><meta charset="utf-8"><title>Mock Cast bridge</title><script>
@@ -21,13 +25,18 @@ let phone = null;
 window.addEventListener("message", (e) => {
   if (e.source !== window.parent || !allowed.includes(e.origin)) return;
   const m = e.data;
-  if (!m || typeof m !== "object" || m.to !== "receiver" || typeof m.senderId !== "string") return;
+  if (!m || typeof m !== "object") return;
+  const cast = m.to === "receiver" && typeof m.senderId === "string";
+  const relay = m.to === "relay-tv" && typeof m.phoneId === "string";
+  if (!cast && !relay) return;
   phone = e.origin;
   channel.postMessage(m);
 });
 channel.onmessage = (e) => {
   const m = e.data;
-  if (phone && m && m.to === "sender") window.parent.postMessage(m, phone);
+  if (!m) return;
+  if (phone && m.to === "sender") window.parent.postMessage(m, phone);
+  if (m.to === "relay-phone") for (const origin of phone ? [phone] : allowed) window.parent.postMessage(m, origin);
 };
 </script>`;
 }

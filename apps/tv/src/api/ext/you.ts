@@ -1,48 +1,12 @@
-// Fields and endpoints the You area needs that the contracts don't have yet: TVs on the account
-// (B2), the card and receipts on a pledge and changing monthly or once (E1), signing out
-// everywhere (A1), watch history (A2), your data (A3), notification kinds and timing (O1, O2).
+// Fields and endpoints the You area needs that the contracts don't have yet: the card and receipts
+// on a pledge and changing monthly or once (E1), signing out everywhere (A1), watch history (A2),
+// your data (A3), notification kinds and timing (O1, O2). (TVs on the account, B2, are in the
+// contracts now: tvApi.)
 // Each names its request in docs/contract-requests.md. The mocks answer them; against the real
 // API they 404 until the request lands, and the screens say so in the API's words.
 
 import { endpoint, Id, Ok, Pledge, Timestamp } from "@opencast/contracts";
 import { z } from "zod";
-
-// ---------- B2: TVs on the account ----------
-
-/** A TV that's watched with this account: the Opencast app (signed in), or a cast target (only remembered). */
-export const Tv = z.object({
-  id: Id,
-  name: z.string(),
-  /** tv_app: the Opencast app on a TV, signed in. chromecast and airplay: cast targets, remembered only for the list. */
-  kind: z.enum(["tv_app", "chromecast", "airplay"]),
-  /** For the app: "Fire TV", "Android TV", "Google TV". */
-  platform: z.string().nullable(),
-  signedIn: z.boolean(),
-  lastUsedAt: Timestamp.nullable(),
-  /** Known to the phone that's casting, not the account: the mock says so for the list. */
-  castingNow: z.boolean()
-});
-export type Tv = z.infer<typeof Tv>;
-
-export const tvsApi = {
-  listTvs: endpoint({ method: "GET", path: "/me/tvs", auth: "user", summary: "B2: TVs signed in to the account, and cast targets", response: z.array(Tv) }),
-  signOutTv: endpoint({
-    method: "DELETE",
-    path: "/me/tvs/:tvId",
-    auth: "user",
-    summary: "B2: sign a TV out (or forget a cast target)",
-    params: z.object({ tvId: Id }),
-    response: z.array(Tv)
-  }),
-  approveTvCode: endpoint({
-    method: "POST",
-    path: "/tv/codes/:code/approve",
-    auth: "user",
-    summary: "B2: sign in the TV showing this code",
-    params: z.object({ code: z.string() }),
-    response: Tv
-  })
-};
 
 // ---------- E1: pledges ----------
 

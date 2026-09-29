@@ -1,24 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
-import type { TvCode, TvCodeStatus } from "../../api/ext/signIn";
+import type { TvCode, TvCodeStatus } from "@opencast/contracts";
 import { afterPoll, enterAt, formatCode, pollDelayMs, RETRY_MS, useTvCode } from "./codeFlow";
 
 const T0 = Date.parse("2026-09-27T03:42:00Z");
-const code = (c = "K7Q4MP", ttlS = 600): TvCode => ({ code: c, qrUrl: `http://localhost:5174/tv?code=${c}`, expiresAt: new Date(T0 + ttlS * 1000).toISOString(), pollToken: `poll-${c}`, pollSeconds: 2 });
+// The contract's shape (B2): enterAt and pollSeconds always come.
+const code = (c = "K7Q4MP", ttlS = 600): TvCode => ({ code: c, qrUrl: `http://localhost:5174/tv?code=${c}`, enterAt: "localhost:5174/tv", expiresAt: new Date(T0 + ttlS * 1000).toISOString(), pollToken: `poll-${c}`, pollSeconds: 2 });
 
 describe("the code on screen", () => {
   it("reads in two groups of three", () => {
     expect(formatCode("K7Q4MP")).toBe("K7Q 4MP");
     expect(formatCode("k7q 4mp")).toBe("K7Q 4MP");
   });
-  it("names where to type it: the server's words, or where the QR goes", () => {
-    expect(enterAt({ ...code(), enterAt: "useopencast.org/tv" })).toBe("useopencast.org/tv");
-    expect(enterAt({ ...code(), qrUrl: "https://useopencast.org/tv?code=K7Q4MP" })).toBe("useopencast.org/tv");
+  it("names where to type it, in the server's words", () => {
+    expect(enterAt({ ...code(), enterAt: "app.useopencast.org/tv" })).toBe("app.useopencast.org/tv");
   });
-  it("asks as often as the server says, 2 seconds otherwise, never under one", () => {
+  it("asks as often as the server says, never more than once a second", () => {
     expect(pollDelayMs(code())).toBe(2000);
-    expect(pollDelayMs({ ...code(), pollSeconds: undefined })).toBe(2000);
-    expect(pollDelayMs({ ...code(), pollSeconds: 0.2 })).toBe(1000);
+    expect(pollDelayMs({ pollSeconds: 3 })).toBe(3000);
+    expect(pollDelayMs({ pollSeconds: 0.2 })).toBe(1000);
   });
 });
 

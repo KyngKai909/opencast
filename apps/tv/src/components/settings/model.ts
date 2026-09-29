@@ -1,8 +1,7 @@
 // TV settings as rules, apart from the screen: the five sections, each row's options in order,
 // stepping with ◀ ▶, and where each value is kept (this TV, and the account when signed in).
 
-import type { ViewerSettings } from "@opencast/contracts";
-import { TvAccountSettings } from "../../api/ext/signIn";
+import { TvSettings as AccountTvSettings, type ViewerSettings } from "@opencast/contracts";
 import type { TvSettings } from "../../tv/device";
 
 /** The device's settings, plus the one this area keeps beside them (asked for in tv/device.ts). */
@@ -111,17 +110,22 @@ export function fromAccount(s: ViewerSettings | undefined): Partial<TvSettingsX>
   if (s.watching?.captions) out.captions = s.watching.captions;
   if (s.watching?.captionSize) out.captionSize = s.watching.captionSize;
   if (typeof s.tvs?.othersOnWifiCanChange === "boolean") out.othersOnWifiCanChange = s.tvs.othersOnWifiCanChange;
-  const tv = TvAccountSettings.safeParse((s as Record<string, unknown>).tv ?? {});
+  // A7: the TV-only rows, typed in the contract; a section with a value outside them is ignored.
+  const tv = AccountTvSettings.safeParse(s.tv ?? {});
   if (tv.success) for (const [k, v] of Object.entries(tv.data)) if (v !== undefined) (out as Record<string, unknown>)[k] = v;
   return out;
 }
 
-/** A change on this TV, as the account's settings patch (updateMe merges sections). */
-export function toAccount(patch: Partial<TvSettingsX>): ViewerSettings {
+/**
+ * A change on this TV, as the account's settings patch. updateMe replaces each section it's given
+ * whole (it merges only the top level), so every section touched carries the account's other
+ * values in it too (`current`, the account's settings as last read).
+ */
+export function toAccount(patch: Partial<TvSettingsX>, current?: ViewerSettings): ViewerSettings {
   const out: Record<string, Record<string, unknown>> = {};
-  const put = (section: string, key: string, v: unknown) => {
+  const put = (section: "watching" | "tvs" | "tv", key: string, v: unknown) => {
     if (v === undefined) return;
-    (out[section] ??= {})[key] = v;
+    (out[section] ??= { ...((current?.[section] as Record<string, unknown> | undefined) ?? {}) })[key] = v;
   };
   put("watching", "captions", patch.captions);
   put("watching", "captionSize", patch.captionSize);

@@ -2,7 +2,8 @@
 // - an off-air station's `now` is its off-air block (kind "off_air", ending when it signs on
 //   again: the next 6:00 am in the market, or its next airing if that's sooner), as the contract
 //   allows, so "CIVC 7.1 signs on again at 6:00 am" has a time to say;
-// - `signal` (proposed S13): "standby" for a live block waiting for its signal.
+// - `signal` (S13): "standby" for a live block waiting for its signal, "ok" otherwise on air,
+//   absent when the station isn't on air.
 // Mock-only switches in the TV's address, read once at start:
 //   ?offAir=CIVC   that station is signed off now (tv 05.2 at the reference moment)
 //   ?standby=CIVC  that station is on air but waiting for its signal (the stand-by variant)
@@ -10,8 +11,7 @@
 
 import { getResponse, http, HttpResponse } from "msw";
 import { stationsApi } from "@opencast/contracts";
-import type { DialRowWatchingX, DialWatchingX } from "../../api/ext/watching";
-import { DialWatchingX as DialSchema } from "../../api/ext/watching";
+import { DialX as DialSchema, type DialRowX, type DialX } from "../../api/ext";
 import { now } from "../../lib/clock";
 import { path, reply } from "../respond";
 import { dialHandlers } from "./dial";
@@ -42,10 +42,12 @@ function readSwitches(): Switches {
 const switches = readSwitches();
 
 /** One row as the watching screen gets it. */
-export function patchRow(r: DialRowWatchingX, t: Date, sw: Switches): DialRowWatchingX {
+export function patchRow(r: DialRowX, t: Date, sw: Switches): DialRowX {
   const cs = (r.station.callSign ?? "").toUpperCase();
-  let row: DialRowWatchingX = { ...r, signal: "ok" };
+  let row: DialRowX = { ...r, signal: "ok" };
   if (sw.offAir.includes(cs)) row = { ...row, onAir: false, playback: null, now: null };
+  // The contract leaves `signal` out when the station isn't on air.
+  if (!row.onAir) delete row.signal;
   if (!row.onAir && (!row.now || row.now.kind !== "off_air")) {
     const six = nextSixAm(t);
     const back = row.next && row.next.startsAt < six ? row.next.startsAt : six;
@@ -55,7 +57,7 @@ export function patchRow(r: DialRowWatchingX, t: Date, sw: Switches): DialRowWat
   return row;
 }
 
-export function patchDial(d: DialWatchingX, t: Date, sw: Switches): DialWatchingX {
+export function patchDial(d: DialX, t: Date, sw: Switches): DialX {
   return { ...d, rows: d.rows.map((r) => patchRow(r, t, sw)) };
 }
 

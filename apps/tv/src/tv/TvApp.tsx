@@ -5,11 +5,11 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import { BrowserRouter, MemoryRouter, Outlet, useLocation, useNavigate } from "react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { audienceApi } from "@opencast/contracts";
 import { PlayerProvider, PlayerSurface, startHeartbeat, startInputs, usePlayer, type Command, type CommandSource, type EngineOptions, type InputAdapter } from "@opencast/player";
 import { GroundProvider, TvShell } from "@opencast/ui";
-import { call, setTokenSource } from "../api/client";
+import { call, setAuthHandlers, setTokenSource } from "../api/client";
 import { useAccountSettingsSync } from "../components/settings/useTvSettings";
 import { keyHintsHidden, readFirstUse, visibleHints } from "../components/watching/hintRow";
 import { now, MARKET_TZ } from "../lib/clock";
@@ -17,6 +17,10 @@ import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
 import { getDevice, setDevice, useDevice } from "./device";
 import { startFocus } from "./focus";
+import { queryClient } from "./queryClient";
+import { registerAgain } from "./registration";
+import { noteSource } from "./remoteState";
+import { signOutLocally } from "./session";
 import "./tv.css";
 
 export type TvMode = "tv" | "cast" | "mirror";
@@ -30,10 +34,16 @@ export interface TvAppProps {
   children?: ReactNode;
 }
 
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } } });
-
-// The TV session's token (the code sign-in); read on every call, so signing in takes effect at once.
-setTokenSource(async () => getDevice().token);
+// The TV's tokens (registerTv's, and the code sign-in's session); read on every call, so signing
+// in takes effect at once. The client picks one per endpoint.
+setTokenSource(() => ({ device: getDevice().deviceToken, session: getDevice().token }));
+setAuthHandlers({
+  // The account signed this TV out from "Your TVs" while the relay wasn't listening.
+  onSessionEnded: () => {
+    if (getDevice().token) signOutLocally();
+  },
+  onDeviceUnknown: () => registerAgain()
+});
 
 /** The inputs in use, for the hint row ("▲▼ Channels…", "Playing from Kai's phone"). */
 const InputsContext = createContext<InputAdapter[]>([]);
@@ -125,6 +135,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     () =>
       startInputs(adapters, (c, s) => {
         if (!ui.current) return;
+        noteSource(s);
         const flip = c.type === "channel" && s?.input === "remote" && getDevice().settings.channelUp === "down_the_dial";
         dispatch(flip ? { type: "channel", dir: c.dir === "up" ? "down" : "up" } : c, s, ui.current, engine);
       }),
@@ -141,7 +152,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   useEffect(() => engine.setChannels(channels), [engine, channels]);
   useEffect(() => engine.setPresets(Object.fromEntries(presets.map((p) => [p.key, p.stationId]))), [engine, presets]);
   useEffect(() => engine.setCaptions(device.settings.captions, device.settings.captionSize), [engine, device.settings.captions, device.settings.captionSize]);
-  useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), mode === "cast" ? "cast" : mode === "mirror" ? "phone" : "tv_app"), [engine, mode]);
+  useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), mode === "cast" ? "cast" : mode === "mirror" ? "mirror" : "tv_app"), [engine, mode]);
 
   // First tune: the last channel on this TV, or the first station on the dial.
   const started = useRef(false);

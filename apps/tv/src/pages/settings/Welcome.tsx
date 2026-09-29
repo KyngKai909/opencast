@@ -10,13 +10,14 @@
 import { useCallback, useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { accountsApi } from "@opencast/contracts";
+import { accountsApi, stationsApi, tvApi } from "@opencast/contracts";
 import { cx, Mark } from "@opencast/ui";
 import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { MarketByConnection, marketsApiX, tvCodesApi } from "../../api/ext/signIn";
 import { QrCode } from "../../components/common/QrCode";
 import { enterAt, formatCode, useTvCode } from "../../components/settings/codeFlow";
+import { viewerAddress } from "../../components/settings/pairing";
+import { config } from "../../config";
 import { marketLine } from "../../components/settings/market";
 import { fromAccount } from "../../components/settings/model";
 import { now } from "../../lib/clock";
@@ -24,6 +25,7 @@ import { useCommandLayer } from "../../tv/commands";
 import { useDial } from "../../tv/data";
 import { getDevice, setDevice, useDevice, type TvSettings } from "../../tv/device";
 import { useTvFocusable } from "../../tv/focus";
+import { ensureRegistered } from "../../tv/registration";
 import { useTvMode } from "../../tv/TvApp";
 import "./Welcome.css";
 
@@ -59,8 +61,12 @@ function WelcomeScreen({ from, then }: { from: string | null; then: string | nul
   }, [from, navigate]);
 
   const code = useTvCode({
-    create: () => call(tvCodesApi.createCode),
-    poll: (pollToken) => call(tvCodesApi.pollCode, { params: { pollToken } }),
+    // A code is the TV's (device auth): registered first, if first launch hasn't finished that yet.
+    create: async () => {
+      await ensureRegistered();
+      return call(tvApi.createTvCode);
+    },
+    poll: (pollToken) => call(tvApi.pollTvCode, { params: { pollToken } }),
     now: () => now().getTime(),
     onApproved: (token, signedInAs) => {
       void signIn(token, signedInAs).then(() => qc.invalidateQueries());
@@ -70,7 +76,7 @@ function WelcomeScreen({ from, then }: { from: string | null; then: string | nul
   });
 
   // The market: guessed from the connection until someone chooses one (and kept on this TV).
-  const guess = useApi(marketsApiX.byConnection, {}, { schema: MarketByConnection, enabled: !device.marketSlug, staleTime: Infinity, retry: 0 });
+  const guess = useApi(stationsApi.marketForConnection, {}, { enabled: !device.marketSlug, staleTime: Infinity, retry: 0 });
   const guessed = guess.data?.market ?? null;
   useEffect(() => {
     if (guessed && !getDevice().marketSlug) setDevice({ marketSlug: guessed.slug });
@@ -103,7 +109,7 @@ function WelcomeScreen({ from, then }: { from: string | null; then: string | nul
         <h2 className="tvs-welcome__title">Sign in on your phone.</h2>
         <p className="tvs-welcome__how">
           {code.kind === "waiting" && code.renewed ? "That code ran out, so here's a new one. Scan it, or go to " : "Scan the code, or go to "}
-          <span className="tvs-welcome__url">{waiting ? enterAt(waiting) : "useopencast.org/tv"}</span> and enter:
+          <span className="tvs-welcome__url">{waiting ? enterAt(waiting) : viewerAddress(config.viewerUrl)}</span> and enter:
         </p>
         {code.kind === "error" ? (
           <p className="tvs-welcome__error" role="alert">

@@ -52,6 +52,15 @@ describe("where TV settings are kept", () => {
     expect(toAccount({})).toEqual({});
   });
 
+  it("sends each section it touches whole, with the account's other values (updateMe replaces sections)", () => {
+    const current = { watching: { captions: "on", startOn: "dial", mutedPreviews: true }, tvs: { lockScreenRemote: true, othersOnWifiCanChange: true }, tv: { channelUp: "down_the_dial", quality: "best" } } as const;
+    expect(toAccount({ captions: "off", bannerSeconds: 8 }, current)).toEqual({
+      watching: { captions: "off", startOn: "dial", mutedPreviews: true },
+      tv: { channelUp: "down_the_dial", quality: "best", bannerSeconds: 8 }
+    });
+    expect(toAccount({ othersOnWifiCanChange: false }, current)).toEqual({ tvs: { lockScreenRemote: true, othersOnWifiCanChange: false } });
+  });
+
   it("reads the account back, ignoring what isn't a TV setting or isn't valid", () => {
     const s = { watching: { captions: "muted_only", captionSize: "small", mutedPreviews: true }, tvs: { othersOnWifiCanChange: false }, tv: { channelUp: "down_the_dial", numberWaitSeconds: 1.5 } } as const;
     expect(fromAccount(s as never)).toEqual({ captions: "muted_only", captionSize: "small", othersOnWifiCanChange: false, channelUp: "down_the_dial", numberWaitSeconds: 1.5 });

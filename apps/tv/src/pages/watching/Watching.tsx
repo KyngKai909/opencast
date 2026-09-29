@@ -12,7 +12,7 @@ import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { accountsApi, stationsApi, type Reminder } from "@opencast/contracts";
 import { usePlayer, type Command, type CommandSource } from "@opencast/player";
-import { DialWatchingX } from "../../api/ext/watching";
+import { DialX } from "../../api/ext";
 import { useApi } from "../../api/hooks";
 import { AirScreen } from "../../components/watching/AirScreen";
 import { bandsInMemory, useRememberBand } from "../../components/watching/bands";
@@ -52,7 +52,7 @@ export default function Watching() {
   // Stand by (S13) comes with the dial's rows; the player's own copy of the dial doesn't carry it.
   const slug = useMarketSlug();
   const band = current?.station.band === "radio" ? "radio" : "tv";
-  const dial = useApi(stationsApi.getDial, { params: { marketSlug: slug }, query: { band } }, { schema: DialWatchingX, refetchInterval: 60_000 });
+  const dial = useApi(stationsApi.getDial, { params: { marketSlug: slug }, query: { band } }, { schema: DialX, refetchInterval: 60_000 });
   const rows: Row[] = useMemo(() => {
     const signal = new Map((dial.data?.rows ?? []).map((r) => [r.station.id, r.signal]));
     return s.channels.map((c) => ({ ...c, signal: signal.get(c.station.id) }));

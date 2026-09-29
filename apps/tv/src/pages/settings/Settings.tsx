@@ -8,20 +8,19 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { cx } from "@opencast/ui";
 import { version } from "../../../package.json";
-import { call } from "../../api/client";
-import { tvCodesApi } from "../../api/ext/signIn";
 import { deviceLine } from "../../components/settings/about";
 import { settingsCommand, type RowKind, type Zone } from "../../components/settings/keys";
 import { CAPTION_PREVIEW_PX, channelUpHelp, ends, isSection, labelOf, OPTIONS, SECTIONS, step, type SectionId, type StepKey, type TvSettingsX } from "../../components/settings/model";
+import { PhoneRows } from "../../components/settings/PhoneRows";
 import { TvRow } from "../../components/settings/TvRow";
 import { useAccountSettingsSync, useTvSettings } from "../../components/settings/useTvSettings";
 import { useCommandLayer } from "../../tv/commands";
 import { useDial, useMe } from "../../tv/data";
-import { setDevice, useDevice } from "../../tv/device";
+import { useDevice } from "../../tv/device";
 import { FocusContext, focusKey, useTvFocusable } from "../../tv/focus";
+import { signOutThisTv } from "../../tv/session";
 import { useTvMode } from "../../tv/TvApp";
 import "./Settings.css";
 
@@ -193,6 +192,7 @@ function SectionRows({ section, steppers, focusRow }: RowsProps) {
           {stepRow("othersOnWifiCanChange", "Who on the Wi-Fi can change the channel", { help: "While a phone is playing to this TV", fallback: true })}
           <TvRow title="Open the menu" help="On a remote without a Menu key, hold Back" control={{ type: "value", label: "Menu" }} />
           {err}
+          <PhoneRows focusRow={focusRow} />
         </>
       );
     case "picture":
@@ -221,16 +221,13 @@ function ChannelUpRow({ dir, render }: { dir: TvSettingsX["channelUp"]; render: 
 function AccountRows({ focusRow }: Pick<RowsProps, "focusRow">) {
   const device = useDevice();
   const me = useMe();
-  const qc = useQueryClient();
   const navigate = useNavigate();
   const signedIn = !!device.token;
   const name = me.data?.displayName ?? device.signedInAs;
 
   const signOut = async () => {
     // Signed out on this TV whatever the server says: the session ending there is the API's part.
-    await call(tvCodesApi.signOutThisTv).catch(() => undefined);
-    setDevice({ token: null, signedInAs: null });
-    qc.removeQueries({ predicate: (q) => String(q.queryKey[1] ?? "").startsWith("/me") });
+    await signOutThisTv();
     setTimeout(() => focusKey("tvs-row-signin"), 0);
   };
 

@@ -3,7 +3,7 @@
 // to the picture. Run out: a new code, said so. The rules are here; useTvCode runs them.
 
 import { useEffect, useRef, useState } from "react";
-import type { TvCode, TvCodeStatus } from "../../api/ext/signIn";
+import type { TvCode, TvCodeStatus } from "@opencast/contracts";
 
 export type CodeState =
   | { kind: "loading" }
@@ -24,20 +24,14 @@ export function afterPoll(status: TvCodeStatus | null, code: TvCode, nowMs: numb
   return { next: "poll" };
 }
 
-/** How long to wait before asking again: what the server asks for, 2 seconds otherwise, never under one. */
-export function pollDelayMs(code: TvCode): number {
-  return Math.max(1, code.pollSeconds ?? 2) * 1000;
+/** How long to wait before asking again: what the server asks for (3 seconds), never under one. */
+export function pollDelayMs(code: Pick<TvCode, "pollSeconds">): number {
+  return Math.max(1, code.pollSeconds) * 1000;
 }
 
-/** "useopencast.org/tv": the address to type, from the server, or from where the QR goes. */
-export function enterAt(code: TvCode): string {
-  if (code.enterAt) return code.enterAt;
-  try {
-    const u = new URL(code.qrUrl);
-    return `${u.host}${u.pathname}`;
-  } catch {
-    return code.qrUrl;
-  }
+/** "app.useopencast.org/tv": the address to type, as the server gives it. */
+export function enterAt(code: Pick<TvCode, "enterAt">): string {
+  return code.enterAt;
 }
 
 export const RETRY_MS = 10_000;

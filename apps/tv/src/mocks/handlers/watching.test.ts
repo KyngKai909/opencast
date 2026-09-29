@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { DialRowWatchingX } from "../../api/ext/watching";
+import type { DialRowX } from "../../api/ext";
 import { nextSixAm, patchRow } from "./watching";
 
 const t = new Date("2026-09-27T03:42:00Z"); // 8:42 pm Pacific
 
-function row(callSign: string, o: Partial<DialRowWatchingX> = {}): DialRowWatchingX {
+function row(callSign: string, o: Partial<DialRowX> = {}): DialRowX {
   return {
     station: { id: callSign, kind: "station", callSign, handle: callSign.toLowerCase(), name: callSign, colour: null, band: "tv", channel: "7.1", marketSlug: "inland-empire", homeCity: null },
     onAir: true,
@@ -12,7 +12,7 @@ function row(callSign: string, o: Partial<DialRowWatchingX> = {}): DialRowWatchi
     next: { logEntryId: null, title: "Planning Commission", episodeTitle: null, code: "PGM", kind: "program", startsAt: "2026-09-27T04:30:00Z", endsAt: "2026-09-27T06:00:00Z", live: false, carriedFrom: null, programId: null },
     playback: { kind: "hls", url: "/x.m3u8" },
     ...o
-  } as DialRowWatchingX;
+  } as DialRowX;
 }
 
 const none = { offAir: [], standby: [] };
@@ -40,6 +40,8 @@ describe("the watching screen's mock dial", () => {
   it("takes a station off the air, or puts it on stand by, from the address's switches", () => {
     const offAir = patchRow(row("CIVC"), t, { offAir: ["CIVC"], standby: [] });
     expect(offAir).toMatchObject({ onAir: false, playback: null, now: { kind: "off_air" } });
+    // S13: no signal at all when the station isn't on air.
+    expect("signal" in offAir).toBe(false);
     expect(patchRow(row("CIVC"), t, { offAir: [], standby: ["CIVC"] }).signal).toBe("standby");
     expect(patchRow(row("BEAT"), t, { offAir: ["CIVC"], standby: ["CIVC"] }).signal).toBe("ok");
   });

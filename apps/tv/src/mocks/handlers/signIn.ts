@@ -1,4 +1,5 @@
-// Mock endpoints for TV sign-in by code (B2) and the market from the connection (S10).
+// Mock endpoints for the TV's registration and sign-in by code (B2), and the market from the
+// connection (S10), in the contracts' shapes. This TV registers as MOCK_TV_ID ("Den TV").
 //
 // The phone that approves a code is the viewer, on another origin, so its approval can't reach
 // this mock. Instead, in mock mode only (this module is loaded only by `npm run dev:mock`):
@@ -8,13 +9,13 @@
 //   ?noMarket                     the connection matches no open market
 
 import { http, type HttpHandler } from "msw";
-import { Ok } from "@opencast/contracts";
-import { MarketByConnection, marketsApiX, TvCode, TvCodeStatus, tvCodesApi } from "../../api/ext/signIn";
+import { MarketLookup, Ok, RegisteredTv, stationsApi, TvCode, TvCodeStatus, tvApi } from "@opencast/contracts";
+import { viewerAddress } from "../../components/settings/pairing";
 import { config } from "../../config";
 import { now } from "../../lib/clock";
-import { getDb } from "../db";
+import { getDb, MOCK_TV_ID } from "../db";
 import { MARKETS } from "../fixtures/stations";
-import { fail, MOCK_TOKEN, needsUser, path, reply } from "../respond";
+import { fail, MOCK_DEVICE_TOKEN, MOCK_TOKEN, needsDevice, path, reply } from "../respond";
 import { marketOf, milesBetween } from "../view";
 
 interface MockCode {
@@ -23,6 +24,8 @@ interface MockCode {
   /** On the mock clock. */
   expiresAt: number;
   approved: boolean;
+  /** The session was handed over (once): later asks say expired. */
+  handedOver?: boolean;
   /** On the wall clock: ?approveCode's moment. */
   approveAt: number | null;
 }
@@ -42,6 +45,7 @@ export function makeCode(taken: (c: string) => boolean, random = Math.random): s
 
 /** Where a mock code stands at these moments. */
 export function statusOf(c: MockCode, mockNow: number, wallNow: number): TvCodeStatus {
+  if (c.handedOver) return { status: "expired" };
   if (c.approved || (c.approveAt !== null && wallNow >= c.approveAt)) return { status: "approved", token: MOCK_TOKEN, signedInAs: getDb().me.displayName };
   if (mockNow >= c.expiresAt) return { status: "expired" };
   return { status: "pending" };
@@ -75,8 +79,19 @@ export function approveAll(): number {
 
 if (MOCK && typeof window !== "undefined") (window as unknown as { __ocApproveTvCode?: () => number }).__ocApproveTvCode = approveAll;
 
+/** Called when the TV signs itself out (the relay mock tells account phones). */
+let onSignOut: () => void = () => undefined;
+export function whenTvSignsOut(fn: () => void) {
+  onSignOut = fn;
+}
+
 export const signInHandlers: HttpHandler[] = [
-  http.post(path(tvCodesApi.createCode), () => {
+  // Every registration is this TV: the mock has one.
+  http.post(path(tvApi.registerTv), () => reply(RegisteredTv, { tvId: MOCK_TV_ID, deviceToken: MOCK_DEVICE_TOKEN }, 201)),
+
+  http.post(path(tvApi.createTvCode), ({ request }) => {
+    const denied = needsDevice(request);
+    if (denied) return denied;
     const ttl = switches.ttlS || 10 * 60;
     const t = now().getTime();
     // A code is never shown twice, so a renewed one is visibly new.
@@ -84,24 +99,35 @@ export const signInHandlers: HttpHandler[] = [
     const pollToken = `poll-${code}-${Math.random().toString(36).slice(2, 10)}`;
     const c: MockCode = { code, pollToken, expiresAt: t + ttl * 1000, approved: false, approveAt: switches.approveInS !== null ? Date.now() + switches.approveInS * 1000 : null };
     codes.set(pollToken, c);
-    return reply(TvCode, { code, qrUrl: `${config.viewerUrl}/tv?code=${code}`, expiresAt: new Date(c.expiresAt).toISOString(), pollToken, enterAt: "useopencast.org/tv", pollSeconds: 2 }, 201);
+    return reply(TvCode, { code, qrUrl: `${config.viewerUrl}/tv?code=${code}`, enterAt: viewerAddress(config.viewerUrl), expiresAt: new Date(c.expiresAt).toISOString(), pollToken, pollSeconds: 3 }, 201);
   }),
 
-  http.get(path(tvCodesApi.pollCode), ({ params }) => {
+  http.get(path(tvApi.pollTvCode), ({ params }) => {
     const c = codes.get(String(params.pollToken));
     if (!c) return fail(404, "not_found", "That code wasn't found. The TV will show a new one.");
-    return reply(TvCodeStatus, statusOf(c, now().getTime(), Date.now()));
+    const status = statusOf(c, now().getTime(), Date.now());
+    // The session is handed over once: the next ask says expired.
+    if (status.status === "approved") c.handedOver = true;
+    return reply(TvCodeStatus, status);
   }),
 
-  http.delete(path(tvCodesApi.signOutThisTv), ({ request }) => needsUser(request) ?? reply(Ok, { ok: true })),
+  http.delete(path(tvApi.signOutThisTv), ({ request }) => {
+    const denied = needsDevice(request);
+    if (denied) return denied;
+    onSignOut();
+    return reply(Ok, { ok: true });
+  }),
 
-  // The Inland Empire, as the frame says; ?noMarket for a connection outside every open market.
-  http.get(path(marketsApiX.byConnection), () => {
+  // The Inland Empire, as the frame says; ?noMarket for a connection outside every open market
+  // (then the open markets, with no miles: where the TV is isn't known).
+  http.get(path(stationsApi.marketForConnection), () => {
     const slug = switches.noMarket ? null : "inland-empire";
-    const nearby = MARKETS.filter((m) => m.slug !== slug && m.open)
-      .map((m) => ({ market: marketOf(m.slug)!, miles: slug ? milesBetween(slug, m.slug) : 40 }))
-      .sort((a, b) => a.miles - b.miles)
-      .slice(0, 2);
-    return reply(MarketByConnection, { market: slug ? marketOf(slug)! : null, nearby });
+    const nearby = slug
+      ? MARKETS.filter((m) => m.slug !== slug && m.open)
+          .map((m) => ({ market: marketOf(m.slug)!, miles: milesBetween(slug, m.slug) }))
+          .sort((a, b) => a.miles - b.miles)
+          .slice(0, 2)
+      : MARKETS.filter((m) => m.open).map((m) => ({ market: marketOf(m.slug)!, miles: null }));
+    return reply(MarketLookup, { market: slug ? marketOf(slug)! : null, nearby });
   })
 ];

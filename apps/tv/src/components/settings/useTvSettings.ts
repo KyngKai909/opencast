@@ -5,8 +5,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { accountsApi } from "@opencast/contracts";
+import { accountsApi, type Me } from "@opencast/contracts";
 import { call } from "../../api/client";
+import { keyFor } from "../../api/hooks";
 import { useMe } from "../../tv/data";
 import { getDevice, setDevice, useDevice, type TvSettings } from "../../tv/device";
 import { changed, fromAccount, toAccount, type TvSettingsX } from "./model";
@@ -34,7 +35,9 @@ export function useTvSettings() {
     queued.current = {};
     if (!Object.keys(patch).length) return;
     try {
-      await call(accountsApi.updateMe, { body: { settings: toAccount(patch) } });
+      // The account's other values in each section go along (updateMe replaces sections whole).
+      const me = qc.getQueryData<Me>([...keyFor(accountsApi.getMe), 0]);
+      await call(accountsApi.updateMe, { body: { settings: toAccount(patch, me?.settings) } });
       setError(null);
     } catch (e) {
       setError((e as Error).message);
