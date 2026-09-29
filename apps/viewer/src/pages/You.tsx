@@ -6,15 +6,15 @@
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, Button, Icon, useToast } from "@opencast/ui";
-import { z } from "zod";
+import { tvApi, type Tv } from "@opencast/contracts";
 import { call } from "../api/client";
-import { Tv, tvsApi } from "../api/ext/you";
 import { useAuth } from "../auth/AuthProvider";
 import { useMe, usePresets } from "../data/viewer";
 import { useDevice } from "../device/store";
 import { useIsPhone, useShellOptions } from "../layout/shell";
 import { useNow } from "../lib/clock";
 import { useTune } from "../player/PlayerRoot";
+import { useCastSession } from "../cast/session";
 import { setCached } from "../components/you/cache";
 import { PledgeModal } from "../components/you/PledgeModal";
 import { PresetTiles } from "../components/you/PresetTiles";
@@ -49,6 +49,8 @@ function useYou() {
   const reminders = useReminders();
   const pledges = usePledges();
   const tvs = useTvs();
+  const session = useCastSession();
+  const castingTo = session.status === "casting" || session.status === "mirroring" ? session.target : null;
   const mine = useMyStation();
   const open = useOpenChannels(me.data?.market?.slug ?? null);
   const removeReminder = useRemoveReminder();
@@ -60,8 +62,8 @@ function useYou() {
 
   const signOutTv = async (tv: Tv) => {
     try {
-      const list = await call(tvsApi.signOutTv, { params: { tvId: tv.id } }, z.array(Tv));
-      setCached(qc, tvsApi.listTvs, {}, list);
+      const list = await call(tvApi.signOutTv, { params: { tvId: tv.id } });
+      setCached(qc, tvApi.listTvs, {}, list);
       toast.show({ message: `${tv.name} is signed out` });
     } catch (e) {
       toast.show({ message: (e as Error).message });
@@ -72,7 +74,7 @@ function useYou() {
     show: () => setParams((p) => (p.set("modal", "tv-code"), p)),
     close: () => setParams((p) => (p.delete("modal"), p), { replace: true })
   };
-  return { me, presets, reminders, pledges, tvs, mine, open, removeReminder, tune, now, signOutTv, tvCode };
+  return { me, presets, reminders, pledges, tvs, castingTo, mine, open, removeReminder, tune, now, signOutTv, tvCode };
 }
 
 function Placeholder({ rows = 2 }: { rows?: number }) {
@@ -161,7 +163,7 @@ function YouWeb() {
         ) : (
           <div className="vw-you__tvs">
             {y.tvs.error && <ErrorLine error={y.tvs.error} />}
-            <TvRows tvs={y.tvs.data ?? []} now={y.now} form="web" onSignOut={(tv) => void y.signOutTv(tv)} onAdd={y.tvCode.show} />
+            <TvRows tvs={y.tvs.data ?? []} castingTo={y.castingTo} now={y.now} form="web" onSignOut={(tv) => void y.signOutTv(tv)} onAdd={y.tvCode.show} />
           </div>
         )}
       </section>
@@ -214,7 +216,7 @@ function YouPhone() {
 
       <h2 className="vw-y-psec">Your TVs</h2>
       <div className="vw-you-p__list">
-        {y.tvs.isLoading ? <Placeholder rows={1} /> : <TvRows tvs={y.tvs.data ?? []} now={y.now} form="phone" onAdd={y.tvCode.show} />}
+        {y.tvs.isLoading ? <Placeholder rows={1} /> : <TvRows tvs={y.tvs.data ?? []} castingTo={y.castingTo} now={y.now} form="phone" onSignOut={(tv) => void y.signOutTv(tv)} onAdd={y.tvCode.show} />}
         {y.tvs.error && <ErrorLine error={y.tvs.error} />}
       </div>
 

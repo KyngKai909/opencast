@@ -1,12 +1,12 @@
 // "Add a TV: Enter a code" (you 02.1; the TV side is tv 05.3): the code the Opencast app shows on
-// the TV signs that TV in to this account (proposed B2). ?modal=tv-code over You.
+// the TV signs that TV in to this account (B2). ?modal=tv-code over You.
 
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Modal, Sheet, useToast } from "@opencast/ui";
 import { call } from "../../api/client";
 import { keyFor } from "../../api/hooks";
-import { tvsApi } from "../../api/ext/you";
+import { tvApi } from "@opencast/contracts";
 import { useIsPhone } from "../../layout/shell";
 
 export function TvCodeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -27,8 +27,8 @@ export function TvCodeDialog({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(true);
     setError(null);
     try {
-      await call(tvsApi.approveTvCode, { params: { code: c } });
-      void qc.invalidateQueries({ queryKey: keyFor(tvsApi.listTvs).slice(0, 2) });
+      await call(tvApi.approveTvCode, { params: { code: c } });
+      void qc.invalidateQueries({ queryKey: keyFor(tvApi.listTvs).slice(0, 2) });
       setCode("");
       onClose();
       toast.show({ message: "The TV is signed in" });

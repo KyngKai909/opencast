@@ -1,6 +1,7 @@
 // Casting and mirroring from the phone (tv 06.2 to 06.4; tv-update 02): one sender interface with
-// two implementations (Google's Cast Web Sender in Chrome, and dev:mock's stand-in that reaches
-// TV mode's receiver.html through a bridge page), and a seam for Phase 8's mirroring plugin.
+// three implementations (Google's Cast Web Sender in Chrome, dev:mock's stand-in that reaches TV
+// mode's receiver.html through a bridge page, and the API's relay for the Opencast TV app, B2),
+// and a seam for Phase 8's mirroring plugin.
 
 /** Where a TV can be reached. Each kind is one row of the table in targets.ts. */
 export type TargetKind = "chromecast" | "airplay" | "tv_app";
@@ -16,6 +17,12 @@ export interface CastTarget {
    * target stands for "a TV Chrome will ask about", and takes the TV's name once connected.
    */
   picker?: boolean;
+  /** TV apps: the relay stream is open on the TV now (listTvs). Unknown (undefined) for a TV paired by code. */
+  online?: boolean;
+  /** TV apps: reached with this phone's pairing (a code from the TV), not the account. */
+  paired?: boolean;
+  /** TV apps: "Fire TV". */
+  platformLabel?: string | null;
 }
 
 /** What the receiver tells every phone (apps/tv receiver.tsx `StateToPhones`). */
@@ -49,7 +56,7 @@ export interface SessionIntro {
 
 /** One way of reaching a Cast receiver. */
 export interface CastSender {
-  readonly kind: "mock" | "google";
+  readonly kind: "mock" | "google" | "relay";
   /** The TVs it can offer now. */
   targets(): Promise<CastTarget[]>;
   /** Starts a session with a TV (by name, or Chrome's picker) and introduces this phone. Resolves with the TV as connected. */
@@ -58,8 +65,8 @@ export interface CastSender {
   send(command: RemoteCommand): void;
   /** The receiver's state as it arrives. */
   onState(listener: (state: ReceiverState) => void): () => void;
-  /** The session ended from the other side (the TV stopped, the receiver went away). */
-  onEnded(listener: () => void): () => void;
+  /** The session ended from the other side (the TV stopped, the receiver went away), with words for the person if there are any. */
+  onEnded(listener: (message?: string) => void): () => void;
   /** Ends this phone's session. */
   disconnect(): void;
   /** The TV this phone is connected to, if any. */

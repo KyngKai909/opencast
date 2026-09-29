@@ -1,10 +1,10 @@
-// The signed-in person: me, presets, reminders, pledges, TVs, notification settings, and the
-// proposed endpoints in api/ext/you.ts (B2, E1, A1, A2, A3).
+// The signed-in person: me, presets, reminders, pledges, notification settings, and the proposed
+// endpoints in api/ext/you.ts (E1, A1, A2, A3). TVs and the remote relay are in tvs.ts.
 
 import { http } from "msw";
 import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi } from "@opencast/contracts";
 import { now } from "../../lib/clock";
-import { accountApiX, PledgesX, PledgeX, pledgesApiX, Tv, tvsApi } from "../../api/ext/you";
+import { accountApiX, PledgesX, PledgeX, pledgesApiX } from "../../api/ext/you";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { AIRINGS, airingById } from "../fixtures/schedule";
@@ -12,7 +12,6 @@ import { STATIONS, stationById, stationByRef, uid } from "../fixtures/stations";
 import { channelsFor, nextChargeFor, receiptsFor } from "../fixtures/you";
 import { fail, needsUser, path, reply } from "../respond";
 import { marketOf } from "../view";
-import { z } from "zod";
 
 const ident = (id: string) => stationById(id)!.ident;
 
@@ -70,10 +69,6 @@ export function pledgeView(p: DbPledge): PledgeX {
 /** The last day of the month a stopped pledge was last charged in: it ends after that month. */
 export function endOfThisMonth(t: Date): string {
   return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
-}
-
-function tvsView() {
-  return getDb().tvs.map((t) => Tv.parse(t));
 }
 
 export const meHandlers = [
@@ -242,33 +237,6 @@ export const meHandlers = [
     if (!getDb().pledges.some((x) => x.id === params.pledgeId)) return fail(404, "not_found", "That pledge wasn't found.");
     // A real one is Stripe's page, which comes back here. The mock comes straight back.
     return reply(pledgesApiX.cardSession.response, { url: `/you/pledges/${params.pledgeId}` });
-  }),
-
-  // ---------- TVs (B2) ----------
-  http.get(path(tvsApi.listTvs), ({ request }) => needsUser(request) ?? reply(z.array(Tv), tvsView())),
-
-  http.delete(path(tvsApi.signOutTv), ({ request, params }) => {
-    const denied = needsUser(request);
-    if (denied) return denied;
-    const db = getDb();
-    const tv = db.tvs.find((t) => t.id === params.tvId);
-    if (!tv) return fail(404, "not_found", "That TV wasn't found.");
-    db.tvs = db.tvs.filter((t) => t.id !== tv.id);
-    saveDb();
-    return reply(z.array(Tv), tvsView());
-  }),
-
-  http.post(path(tvsApi.approveTvCode), ({ request, params }) => {
-    const denied = needsUser(request);
-    if (denied) return denied;
-    const code = String(params.code).toUpperCase();
-    // The mock takes any six letters or digits except 000000.
-    if (!/^[A-Z0-9]{6}$/.test(code) || code === "000000") return fail(404, "not_found", "That code didn't work. Check the code on the TV and try again.");
-    const db = getDb();
-    const tv = { id: uid(70000 + db.tvs.length + Math.floor(Math.random() * 9000)), name: "TV", kind: "tv_app" as const, platform: "Android TV", signedIn: true, lastUsedAt: now().toISOString(), castingNow: false };
-    db.tvs.push(tv);
-    saveDb();
-    return reply(Tv, tv, 201);
   }),
 
   // ---------- Account (A1, A2, A3) ----------

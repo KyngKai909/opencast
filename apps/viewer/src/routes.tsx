@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Remote, { MirrorGuidePage } from "./pages/Remote";
 import TvCode from "./pages/TvCode";
+import Permission from "./pages/Permission";
 import { CastSync } from "./cast/CastSync";
 
 /**
@@ -25,6 +26,8 @@ import { CastSync } from "./cast/CastSync";
 export function AppRoutes() {
   return (
     <Routes>
+      {/* The creator's permission page: public, outside the phone shell (network-desk 06). */}
+      <Route path="permission/:token" element={<Permission />} />
       <Route
         element={
           <>

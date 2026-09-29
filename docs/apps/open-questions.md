@@ -136,3 +136,7 @@ Added at each STOP as the build finds them. The detail and frame references are 
 | A104 | The call sign SK8 (a digit) on the board | desk 01.1 | SKAT in the mocks (open-decisions) |
 | A105 | "Open in master control" for an admin who isn't a member of that station (inventory 14) | desk 01.1, 04.1, 05.1 | A link to master control's station page in a new tab; master control decides what an admin sees |
 | A106 | Rail pages no frame draws: Catalog, Rights claims, Catalog sponsors, Reserved call signs, Settings | desk rail | Reserved call signs lists the waitlist's reservations (its endpoint exists); Settings has the ground and signing out; the other three say they aren't designed yet |
+| A107 | The cast button now shows in every browser (the relay reaches TV apps from anywhere), and Watch on's subtitle still says "TVs on this Wi-Fi" | tv 06.2 | Shown everywhere; the subtitle wording to revisit when a TV app on the account isn't on the same Wi-Fi |
+| A108 | Stop on the phone remote for a TV app: it closes the phone's remote, and the TV keeps playing (Cast's Stop ends it on the TV) | tv 06.3 | The TV app is the TV's own; it keeps playing |
+| A109 | "Who on the Wi-Fi can change the channel" isn't about Wi-Fi once phones come through the relay | tv-update 04 | Wording kept; it means phones on the account or paired with a code |
+| A110 | On the TV app, a phone's chip shows beside the key hints for five minutes after its last command | tv 02.1 | "Playing from {name}" before the key hints; the Back hint stays |

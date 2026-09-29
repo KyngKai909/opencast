@@ -4,7 +4,7 @@
 
 import { useSyncExternalStore } from "react";
 import { getMirroring, type MirrorStatus } from "./mirroring";
-import { getSender } from "./sender";
+import { senderFor } from "./sender";
 import type { CastSender, CastTarget, ReceiverState, RemoteCommand, SessionIntro } from "./types";
 
 export type CastSession =
@@ -69,7 +69,7 @@ export function shouldRetune(first: ReceiverState, asked: string | null, me: str
 
 /** Starts casting to a TV, playing the station the phone has on. */
 export async function startCast(target: CastTarget, intro: SessionIntro, start: { stationId: string; channel: string } | null): Promise<boolean> {
-  const sender = await getSender();
+  const sender = await senderFor(target);
   if (!sender) {
     set({ status: "idle", error: "Casting isn't available here." });
     return false;
@@ -99,9 +99,9 @@ export async function startCast(target: CastTarget, intro: SessionIntro, start: 
   // Listening before connecting, so the answer to the introduction isn't missed.
   unsubs.push(
     sender.onState(onState),
-    sender.onEnded(() => {
+    sender.onEnded((message) => {
       cleanup();
-      set(IDLE);
+      set(message ? { status: "idle", error: message } : IDLE);
     })
   );
   try {

@@ -4,13 +4,20 @@
 //  - the phone's own sound is off while a TV plays;
 //  - mirroring: when the external display connects the phone switches to the remote by itself,
 //    and after a lock it shows "Mirroring stopped" (tv-update 02); the screen is kept awake;
-//  - dev:mock mirroring: the phone's player stands in for TV mode on the external display.
+//  - dev:mock mirroring: the phone's player stands in for TV mode on the external display;
+//  - a Chromecast cast to or an AirPlay TV mirrored to is remembered for Your TVs (signed in).
 
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { usePlayer, type Command } from "@opencast/player";
+import { useQueryClient } from "@tanstack/react-query";
+import { tvApi } from "@opencast/contracts";
+import { call } from "../api/client";
+import { keyFor } from "../api/hooks";
+import { useAuth } from "../auth/AuthProvider";
+import { rememberCastTarget } from "./remember";
 import { getMirroring } from "./mirroring";
-import { applyMirrorStatus, getCastSession, sendToTv, setMirrorReceiver, useCastSession } from "./session";
+import { applyMirrorStatus, getCastSession, sendToTv, setMirrorReceiver, useCastSession, type CastSession } from "./session";
 import type { RemoteCommand } from "./types";
 
 /** A remote command as the stand-in player takes it. */
@@ -86,6 +93,18 @@ export function CastSync() {
       off();
     };
   }, [engine, navigate]);
+
+  // A cast that started or mirroring that connected: Your TVs remembers the TV (signed in only).
+  const auth = useAuth();
+  const qc = useQueryClient();
+  const before = useRef<CastSession>(session);
+  useEffect(() => {
+    const prev = before.current;
+    before.current = session;
+    void rememberCastTarget(prev, session, auth.signedIn, (body) => call(tvApi.recordCastTarget, { body })).then(
+      (t) => t && void qc.invalidateQueries({ queryKey: keyFor(tvApi.listTvs).slice(0, 2) })
+    );
+  }, [session, auth.signedIn, qc]);
 
   // dev:mock mirroring: the stand-in's state is the TV's.
   const mirroring = session.status === "mirroring";

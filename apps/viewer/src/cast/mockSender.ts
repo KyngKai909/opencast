@@ -18,8 +18,8 @@ export interface BridgeTransport {
   close(): void;
 }
 
-/** The bridge page in a hidden iframe. Only messages from the TV's origin, from that iframe, count. */
-export function iframeTransport(tvUrl: string): BridgeTransport {
+/** The bridge page in a hidden iframe, carrying any message. Only messages from the TV's origin, from that iframe, count. */
+export function bridgeFrame(tvUrl: string): { ready(): Promise<void>; post(message: unknown): void; listen(listener: (message: unknown) => void): () => void; close(): void } {
   const origin = new URL(tvUrl).origin;
   const frame = document.createElement("iframe");
   frame.src = `${origin}/mock-cast-bridge.html`;
@@ -43,8 +43,7 @@ export function iframeTransport(tvUrl: string): BridgeTransport {
     listen(listener) {
       const on = (e: MessageEvent) => {
         if (e.origin !== origin || e.source !== frame.contentWindow) return;
-        const m = e.data as MockCastMessage | null;
-        if (m && typeof m === "object" && m.to === "sender") listener(m);
+        if (e.data && typeof e.data === "object") listener(e.data);
       };
       window.addEventListener("message", on);
       return () => window.removeEventListener("message", on);
@@ -52,6 +51,20 @@ export function iframeTransport(tvUrl: string): BridgeTransport {
     close() {
       frame.remove();
     }
+  };
+}
+
+/** The bridge page for the mock Cast channel. */
+export function iframeTransport(tvUrl: string): BridgeTransport {
+  const frame = bridgeFrame(tvUrl);
+  return {
+    ready: frame.ready,
+    post: frame.post,
+    listen: (listener) =>
+      frame.listen((m) => {
+        if ((m as MockCastMessage).to === "sender") listener(m as MockCastMessage);
+      }),
+    close: frame.close
   };
 }
 

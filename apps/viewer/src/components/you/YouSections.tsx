@@ -4,7 +4,10 @@
 import { useNavigate } from "react-router";
 import type { Reminder } from "@opencast/contracts";
 import { Button, Icon, IconButton, Tag, clock, money } from "@opencast/ui";
-import type { PledgeX, Tv } from "../../api/ext/you";
+import type { Tv } from "@opencast/contracts";
+import type { PledgeX } from "../../api/ext/you";
+import { platformLabel } from "../../cast/targets";
+import type { CastTarget } from "../../cast/types";
 import { config } from "../../config";
 import { MARKET_TZ } from "../../lib/clock";
 import { dayLabel, identText, lastUsedLabel, monthlyTotal, openChannelsLine, pledgeAmount, pledgeLine } from "./youRules";
@@ -104,35 +107,67 @@ export function PledgeRows({ pledges, displayName, form }: { pledges: PledgeX[];
 
 // ---------- Your TVs ----------
 
+/** The row's second line: the TV app's platform and whether it's on now; a cast target's kind and when it was last used. */
 export function tvLine(tv: Tv, now: Date): string {
-  if (tv.kind === "tv_app") return `Opencast app${tv.platform ? ` on ${tv.platform}` : ""}${tv.signedIn ? ", signed in" : ""}`;
+  if (tv.kind === "tv_app") {
+    const platform = platformLabel(tv.platform);
+    return `Opencast app${platform ? ` on ${platform}` : ""}${tv.online ? ", on now" : tv.signedIn ? ", signed in" : ""}`;
+  }
   const kind = tv.kind === "chromecast" ? "Chromecast" : "AirPlay";
   return tv.lastUsedAt ? `${kind}. Last used ${lastUsedLabel(tv.lastUsedAt, now, MARKET_TZ)}` : kind;
 }
 
-export function TvRows({ tvs, now, form, onSignOut, onAdd }: { tvs: Tv[]; now: Date; form: Form; onSignOut?: (tv: Tv) => void; onAdd?: () => void }) {
+/**
+ * Whether this TV is being watched from here now. The server knows it for TV apps (a phone on the
+ * account is on its remote); a Chromecast or AirPlay TV only this phone's session can say.
+ */
+export function castingNow(tv: Tv, castingTo: CastTarget | null): boolean {
+  if (tv.castingNow) return true;
+  if (!castingTo || castingTo.kind !== tv.kind) return false;
+  return tv.kind === "tv_app" ? castingTo.id === tv.id : castingTo.name.toLowerCase() === tv.name.toLowerCase();
+}
+
+export function TvRows({
+  tvs,
+  castingTo = null,
+  now,
+  form,
+  onSignOut,
+  onAdd
+}: {
+  tvs: Tv[];
+  castingTo?: CastTarget | null;
+  now: Date;
+  form: Form;
+  onSignOut?: (tv: Tv) => void;
+  onAdd?: () => void;
+}) {
   return (
     <>
-      {tvs.map((tv) => (
+      {tvs.map((tv) => {
+        const casting = castingNow(tv, castingTo);
+        const canSignOut = tv.kind === "tv_app" && tv.signedIn && !!onSignOut;
+        return (
         <div key={tv.id} className={`vw-y-dev vw-y-dev--${form}`}>
           <span className="vw-y-dev__ic" aria-hidden="true">
             <Icon name={tv.kind === "tv_app" ? "tv" : "cast"} size={20} />
           </span>
           <div className="vw-y-dev__w">
             <b>{tv.name}</b>
-            <small>{form === "phone" && tv.castingNow ? "Casting now" : tvLine(tv, now)}</small>
+            <small>{form === "phone" && casting ? "Casting now" : tvLine(tv, now)}</small>
           </div>
-          {form === "web" && tv.castingNow ? (
+          {form === "web" && casting ? (
             <Tag>Casting now</Tag>
-          ) : form === "web" && tv.kind === "tv_app" && tv.signedIn && onSignOut ? (
-            <Button size="sm" onClick={() => onSignOut(tv)} aria-label={`Sign out ${tv.name}`}>
+          ) : canSignOut ? (
+            <Button size="sm" onClick={() => onSignOut?.(tv)} aria-label={`Sign out ${tv.name}`}>
               Sign out
             </Button>
           ) : (
             <span />
           )}
         </div>
-      ))}
+        );
+      })}
       {onAdd && (
         <div className={`vw-y-dev vw-y-dev--${form}`}>
           <span className="vw-y-dev__ic" aria-hidden="true">

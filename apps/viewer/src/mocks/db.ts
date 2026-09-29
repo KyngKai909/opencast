@@ -2,7 +2,7 @@
 // Kept in localStorage so a reload keeps what you did; "Reset mock data" in the console:
 // localStorage.removeItem("oc-mock-db"). Seeded from the You file's frames (viewer/opencast-you.html).
 
-import type { ViewerSettings } from "@opencast/contracts";
+import type { TvPlatform, ViewerSettings } from "@opencast/contracts";
 import { now } from "../lib/clock";
 import { AIRINGS } from "./fixtures/schedule";
 import { stationByRef, uid } from "./fixtures/stations";
@@ -10,7 +10,7 @@ import { stationByRef, uid } from "./fixtures/stations";
 export interface DbPreset { stationId: string; key: number | null; position: number }
 export interface DbReminder { id: string; airingId: string; switchMeOver: boolean; createdAt: string }
 export interface DbPledge { id: string; stationId: string; cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean; startedAt: string; endsAfter: string | null; card: string }
-export interface DbTv { id: string; name: string; kind: "tv_app" | "chromecast" | "airplay"; platform: string | null; signedIn: boolean; lastUsedAt: string | null; castingNow: boolean }
+export interface DbTv { id: string; name: string; kind: "tv_app" | "chromecast" | "airplay"; platform: TvPlatform | null; signedIn: boolean; lastUsedAt: string | null; online: boolean; castingNow: boolean }
 
 export interface Db {
   /** Bumped when the seed changes shape, so an old saved mock is replaced. */
@@ -33,7 +33,9 @@ export interface Db {
   signedOutEverywhereAt: string | null;
 }
 
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
+/** Den TV, TV mode's tvId in the mock relay (apps/tv's mock device). */
+export const DEN_TV_ID = "00000000-0000-4000-8000-0000000c0001";
 const KEY = "oc-mock-db";
 const id = (s: string) => stationByRef(s)!.ident.id;
 const airing = (station: string, title: string) => AIRINGS.find((a) => a.stationId === id(station) && a.title.startsWith(title))!.id;
@@ -80,11 +82,13 @@ export function seed(): Db {
       { id: uid(601), stationId: id("BEAT"), cadence: "monthly", amountMicros: 10_000_000, creditOnAir: true, startedAt: "2026-06-14T19:00:00Z", endsAfter: null, card: "Visa ending 4417" },
       { id: uid(602), stationId: id("CIVC"), cadence: "once", amountMicros: 25_000_000, creditOnAir: false, startedAt: "2026-08-14T19:00:00Z", endsAfter: null, card: "Visa ending 4417" }
     ],
-    // You 02.1: Your TVs.
+    // You 02.1: Your TVs. Den TV is the Opencast app on a Fire TV, on now: TV mode (VITE_TV_URL)
+    // answers for it over the mock relay. The server can't know a cast target is casting (B2): the
+    // frame's "Casting now" on Living room TV comes from this phone's own session.
     tvs: [
-      { id: uid(701), name: "Living room TV", kind: "chromecast", platform: null, signedIn: false, lastUsedAt: t.toISOString(), castingNow: true },
-      { id: uid(702), name: "Den TV", kind: "tv_app", platform: "Fire TV", signedIn: true, lastUsedAt: daysAgo(2), castingNow: false },
-      { id: uid(703), name: "Bedroom TV", kind: "airplay", platform: null, signedIn: false, lastUsedAt: daysAgo(4), castingNow: false }
+      { id: uid(701), name: "Living room TV", kind: "chromecast", platform: null, signedIn: false, lastUsedAt: t.toISOString(), online: false, castingNow: false },
+      { id: DEN_TV_ID, name: "Den TV", kind: "tv_app", platform: "fire_tv", signedIn: true, lastUsedAt: daysAgo(2), online: true, castingNow: false },
+      { id: uid(703), name: "Bedroom TV", kind: "airplay", platform: null, signedIn: false, lastUsedAt: daysAgo(4), online: false, castingNow: false }
     ],
     // You 06.3: reminders on this phone, not by email; presets going live on; station news off.
     prefs: { reminder: { push: true, email: false }, switch_over: { push: true, email: false }, preset_live: { push: true, email: false }, station_news: { push: false, email: false } },

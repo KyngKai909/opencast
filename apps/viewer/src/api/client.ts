@@ -15,6 +15,9 @@ export function setTokenSource(t: Token) {
   getToken = t;
 }
 
+/** The current access token, for requests `call` can't make (the remote relay's event streams). */
+export const accessToken: Token = () => getToken();
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,

@@ -2,12 +2,12 @@
 
 import { useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { accountsApi, ledgerApi, stationsApi, type Reminder } from "@opencast/contracts";
+import { accountsApi, ledgerApi, stationsApi, tvApi, type Reminder } from "@opencast/contracts";
 import { useToast } from "@opencast/ui";
 import { z } from "zod";
 import { call } from "../../api/client";
 import { keyFor, useApi } from "../../api/hooks";
-import { PledgesX, Tv, tvsApi } from "../../api/ext/you";
+import { PledgesX } from "../../api/ext/you";
 import { useAuth } from "../../auth/AuthProvider";
 import { useMe } from "../../data/viewer";
 import { getCached, setCached } from "./cache";
@@ -23,10 +23,9 @@ export function usePledges() {
   return useApi(ledgerApi.listMyPledges, {}, { schema: PledgesX, enabled: auth.signedIn });
 }
 
-const TvList = z.array(Tv);
 export function useTvs() {
   const auth = useAuth();
-  return useApi(tvsApi.listTvs, {}, { schema: TvList, enabled: auth.signedIn });
+  return useApi(tvApi.listTvs, {}, { enabled: auth.signedIn });
 }
 
 /** How many channels are open on each band of the person's market (for "Run a station"). */

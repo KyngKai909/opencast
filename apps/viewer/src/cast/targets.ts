@@ -3,6 +3,8 @@
 // Opencast app open the app. A new kind (a Roku's FAST packaging, an Apple TV app) is one entry.
 
 import type { IconName } from "@opencast/ui";
+import type { Tv, TvPlatform } from "@opencast/contracts";
+import type { Pairing } from "./pairings";
 import type { CastTarget, TargetKind } from "./types";
 
 export type TargetAction = "cast" | "mirror" | "open_app";
@@ -19,21 +21,65 @@ export interface TargetKindRow {
 export const TARGET_KINDS: Record<TargetKind, TargetKindRow> = {
   chromecast: { kindLine: "Chromecast", action: "cast", verb: "Cast", icon: "tv" },
   airplay: { kindLine: "AirPlay", action: "mirror", verb: "Mirror", icon: "tv" },
-  // Through Cast Connect (the Android TV app registered as the receiver), so casting opens the installed app.
+  // The Opencast app on the TV, signed in to the account (B2's listTvs) or paired by a code from the
+  // TV: driven through the API's relay (relay.ts), so it works from any browser.
   tv_app: { kindLine: "Opencast app", action: "open_app", verb: "Open the app", icon: "tv" }
 };
 
-/** The order rows appear in: as found, but a TV with the app first, since it's better than casting. */
-export function orderTargets(targets: CastTarget[]): CastTarget[] {
-  const rank: Record<TargetKind, number> = { tv_app: 0, chromecast: 1, airplay: 1 };
-  return targets.map((t, i) => ({ t, i })).sort((a, b) => rank[a.t.kind] - rank[b.t.kind] || a.i - b.i).map((x) => x.t);
+/** The apps' names for a TV app's platform (the contract sends the enum). */
+export const PLATFORM_LABELS: Record<TvPlatform, string> = {
+  android_tv: "Android TV",
+  fire_tv: "Fire TV",
+  google_tv: "Google TV",
+  tv_browser: "TV browser",
+  web: "Web"
+};
+
+export function platformLabel(platform: TvPlatform | null | undefined): string | null {
+  return platform ? PLATFORM_LABELS[platform] : null;
 }
 
-/** Drops a second row for the same TV (a Chromecast remembered as a cast target and found again). */
+/** A TV app that isn't connected to the relay now. */
+export function offlineLine(tvName: string): string {
+  return `${tvName} isn't on. Open Opencast on the TV and try again.`;
+}
+
+/** The account's TV apps that a phone can drive (signed in), as "Watch on" rows. */
+export function tvAppTargets(tvs: readonly Tv[]): CastTarget[] {
+  return tvs.filter((t) => t.kind === "tv_app" && t.signedIn).map((t) => ({ id: t.id, name: t.name, kind: "tv_app" as const, online: t.online, platformLabel: platformLabel(t.platform) }));
+}
+
+/** TVs this phone paired with by code. Whether they're on isn't known until connecting. */
+export function pairedTargets(pairings: readonly Pairing[]): CastTarget[] {
+  return pairings.map((p) => ({ id: p.tvId, name: p.tvName, kind: "tv_app" as const, paired: true }));
+}
+
+/** A row's second line in "Watch on": the kind, with the TV app's platform, or that it isn't on. */
+export function targetLine(t: CastTarget): string {
+  if (t.kind === "tv_app") {
+    if (t.online === false) return "Opencast app, not on now";
+    return t.platformLabel ? `Opencast app on ${t.platformLabel}` : TARGET_KINDS.tv_app.kindLine;
+  }
+  return TARGET_KINDS[t.kind].kindLine;
+}
+
+/**
+ * The order rows appear in: as found, but a TV with the app first, since it's better than casting;
+ * a TV app that isn't on goes last, since it can't be used until it is.
+ */
+export function orderTargets(targets: CastTarget[]): CastTarget[] {
+  const rank = (t: CastTarget) => (t.kind === "tv_app" ? (t.online === false ? 2 : 0) : 1);
+  return targets.map((t, i) => ({ t, i })).sort((a, b) => rank(a.t) - rank(b.t) || a.i - b.i).map((x) => x.t);
+}
+
+/**
+ * Drops a second row for the same TV: a Chromecast remembered as a cast target and found again, or a
+ * TV app that's both on the account and paired by code (the account's row wins, coming first).
+ */
 export function uniqueTargets(targets: CastTarget[]): CastTarget[] {
   const seen = new Set<string>();
   return targets.filter((t) => {
-    const k = `${t.kind}:${t.name.toLowerCase()}`;
+    const k = t.kind === "tv_app" ? `tv_app:${t.id}` : `${t.kind}:${t.name.toLowerCase()}`;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;

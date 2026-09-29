@@ -1,6 +1,7 @@
 // "Watch on" (tv 06.2): the cast button's sheet over the tuned-in page, `?sheet=watch-on`. The TVs
-// on the Wi-Fi, each going the way that works best there (the target-kind table in cast/targets.ts),
-// "This phone", and a word that the installed TV app beats casting.
+// on the Wi-Fi and the account's TVs with the Opencast app, each going the way that works best there
+// (the target-kind table in cast/targets.ts), "This phone", a word that the installed TV app beats
+// casting, and "Use a code from the TV" to pair with a TV app this phone can't reach otherwise.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -8,10 +9,11 @@ import { Button, ChoiceList, Icon, Sheet, useToast } from "@opencast/ui";
 import { usePlayer } from "@opencast/player";
 import { getMirroring } from "../../cast/mirroring";
 import { clearCastError, startCast, stopCasting, useCastSession } from "../../cast/session";
-import { TARGET_KINDS, primaryLabel, type Choice } from "../../cast/targets";
+import { TARGET_KINDS, offlineLine, primaryLabel, targetLine, type Choice } from "../../cast/targets";
 import type { CastTarget } from "../../cast/types";
 import { mirrorGuideHidden, useCastIntro, useWatchOnTargets } from "../../cast/useCast";
 import { useOverlayParams } from "../watch/overlay";
+import { PairTvSheet } from "./PairTv";
 import "./WatchOnSheet.css";
 
 const PHONE = "this-phone";
@@ -29,7 +31,9 @@ export function WatchOnSheet() {
 
 function WatchOn({ onClose }: { onClose: () => void }) {
   const session = useCastSession();
-  const { targets, loading } = useWatchOnTargets(true);
+  const { targets, loading, refresh } = useWatchOnTargets(true);
+  const [pairing, setPairing] = useState(false);
+  const [offline, setOffline] = useState<string | null>(null);
   const intro = useCastIntro();
   const [s] = usePlayer();
   const navigate = useNavigate();
@@ -52,6 +56,15 @@ function WatchOn({ onClose }: { onClose: () => void }) {
   useEffect(() => () => clearCastError(), []);
 
   const playing = s.channels.find((c) => c.station.id === (s.pendingId ?? s.currentId));
+  const startFrom = playing?.station.channel ? { stationId: playing.station.id, channel: playing.station.channel } : null;
+  const chosenOffline = choice?.kind === "tv" && choice.target.online === false;
+
+  const connect = async (t: CastTarget) => {
+    setBusy(true);
+    const ok = await startCast(t, intro, startFrom);
+    setBusy(false);
+    if (ok) navigate("/remote", { replace: true });
+  };
 
   const go = async () => {
     if (!choice) return;
@@ -69,17 +82,36 @@ function WatchOn({ onClose }: { onClose: () => void }) {
       toast.show({ message: `Turn on Screen Mirroring and choose ${t.name}.` });
       return onClose();
     }
-    setBusy(true);
-    const ok = await startCast(t, intro, playing?.station.channel ? { stationId: playing.station.id, channel: playing.station.channel } : null);
-    setBusy(false);
-    if (ok) navigate("/remote", { replace: true });
+    if (t.online === false) {
+      // It may have come on since the list loaded: ask the account again before saying it isn't.
+      setBusy(true);
+      const now = (await refresh()).find((x) => x.id === t.id);
+      setBusy(false);
+      if (!now || now.online === false) return setOffline(offlineLine(t.name));
+      return connect(now);
+    }
+    await connect(t);
   };
+
+  if (pairing)
+    return (
+      <PairTvSheet
+        phoneName={intro.from}
+        onBack={() => setPairing(false)}
+        onClose={onClose}
+        onPaired={async (p) => {
+          await connect({ id: p.tvId, name: p.tvName, kind: "tv_app", paired: true });
+          // Didn't connect: back to the list, which says why (and has the TV now).
+          setPairing(false);
+        }}
+      />
+    );
 
   const options = [
     ...rows.map((t) => ({
       value: t.id,
       title: t.name,
-      helper: TARGET_KINDS[t.kind].kindLine,
+      helper: targetLine(t),
       end: (
         <span className="vw-wo__ic">
           <Icon name={TARGET_KINDS[t.kind].icon} />
@@ -121,15 +153,28 @@ function WatchOn({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           {!rows.length && <p className="vw-wo__none">No TVs found on this Wi-Fi.</p>}
-          <ChoiceList label="Watch on" options={options} value={value} onChange={setChosen} className="vw-wo__list" />
+          <ChoiceList
+            label="Watch on"
+            options={options}
+            value={value}
+            onChange={(v) => {
+              setChosen(v);
+              setOffline(null);
+            }}
+            className="vw-wo__list"
+          />
         </>
       )}
-      {error && (
+      {(error || offline) && (
         <p className="vw-wo__error" role="alert">
-          {error}
+          {error ?? offline}
         </p>
       )}
+      {chosenOffline && !offline && !error && <p className="vw-wo__note">{offlineLine(choice.target.name)}</p>}
       <p className="vw-wo__note">Got Opencast installed on the TV? It's faster than casting and has its own remote controls.</p>
+      <Button variant="text" size="sm" className="vw-wo__how" onClick={() => setPairing(true)}>
+        Use a code from the TV
+      </Button>
       {choice?.kind === "tv" && TARGET_KINDS[choice.target.kind].action === "mirror" && mirrorGuideHidden() && (
         <Button variant="text" size="sm" className="vw-wo__how" onClick={() => navigate(mirrorGuideHref(choice.target.name), { replace: true })}>
           How to turn on Screen Mirroring

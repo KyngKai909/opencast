@@ -426,3 +426,14 @@ The frames' words are used as drawn. Below is what they don't have. Mock-only pa
 | Claim now | sign-in "To claim your station", "Claim it and go back"; "Your claim has started"; "We check it's you, then the station is yours to run from master control"; "Open master control" |
 | Bad link | "This link doesn't work."; "It may be mistyped, or replaced by a newer one. Write to us and we'll send it again." |
 | Errors | "That didn't go through. Try again."; the API's "This has been answered. Write to us to change it." |
+
+### apps/viewer: TV apps, the relay and pairing (Phase 7)
+
+| Where | Words |
+|---|---|
+| Watch on | "Den TV isn't on. Open Opencast on the TV and try again."; rows "Opencast app on Fire TV", "Opencast app, not on now" |
+| Pairing | "Use a code from the TV", "On the TV, open Settings, then Remote and phones. Enter the 4-digit code it shows.", "Pair this phone", "Pairing", "Back to Watch on", "The code on the TV has four numbers." |
+| The TV ending it | "Den TV unpaired this phone. Use a code from the TV to pair again.", "Den TV was signed out.", "Couldn't reach the TV. Check the connection and try again." |
+| /tv | "Enter the code the TV shows: six letters and numbers, or four numbers.", "Four numbers from the TV's Remote and phones make this phone its remote.", "This phone is paired with {TV}, but the remote didn't open. Try Watch on." |
+| Your TVs | ", on now" |
+| TV, Remote and phones | "Pair a phone" / "For a guest's phone. Phones signed in to your account don't need a code" / "Show a code", "Hide the code"; "On the phone, go to {host}/tv and enter:", "Changes in N minutes", "Changes in 1 minute", "Changes in under a minute"; "Phones that can change the channel"; "Signed in to your account", "Paired with a code", ", connected now", "Remove"; "No phones yet", "Phones signed in to your account appear here once they connect", "Pair a phone to use it as a remote" |

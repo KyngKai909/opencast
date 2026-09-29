@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockSender, type BridgeTransport } from "./mockSender";
+import { createRelaySender, type RelayHandlers, type RelayLink } from "./relay";
 import { CAST_NAMESPACE, type MockCastMessage } from "./messages";
 import type { CastTarget } from "./types";
 
@@ -77,8 +78,18 @@ describe("dev:mock's Cast sender", () => {
 // ---------- The session ----------
 
 const bridge = fakeBridge();
+/** The relay's stream for the TV app, played by the test. */
+const relay: { on: RelayHandlers | null; sent: unknown[]; link: RelayLink } = {
+  on: null,
+  sent: [],
+  link: {
+    open: async (_tvId, _auth, on) => ((relay.on = on), () => (relay.on = null)),
+    send: async (_tvId, _auth, command) => void relay.sent.push(command)
+  }
+};
 vi.mock("./sender", () => ({
   getSender: async () => createMockSender(() => bridge.transport, [LIVING]),
+  senderFor: async (t: CastTarget) => (t.kind === "tv_app" ? createRelaySender(relay.link) : createMockSender(() => bridge.transport, [LIVING])),
   castOffered: () => true
 }));
 vi.mock("./mirroring", async (orig) => ({ ...(await orig<typeof import("./mirroring")>()), getMirroring: async () => null }));
@@ -159,6 +170,20 @@ describe("the casting session", () => {
     s.sendToTv({ type: "channel", dir: "up" });
     bridge.receiver(null, { type: "state", stationId: "sazn", paused: false, changedBy: "Kai's phone", sleepEndsAt: null });
     expect(tunes()).toBe(1);
+  });
+
+  it("drives the TV app over the relay the same way, and says why when the relay ends it", async () => {
+    const s = await import("./session");
+    const den: CastTarget = { id: "00000000-0000-4000-8000-0000000c0001", name: "Den TV", kind: "tv_app", online: true };
+    await s.startCast(den, INTRO, { stationId: "civc", channel: "7.1" });
+    expect(s.getCastSession()).toMatchObject({ status: "casting", target: den, me: "Kai's phone" });
+    relay.on!.event({ event: "state", data: { stationId: "beat", paused: false, changedBy: "Den TV", sleepEndsAt: null } });
+    expect(relay.sent).toEqual([{ type: "tune", channel: "7.1" }]);
+    expect(s.receiverOf(s.getCastSession())?.stationId).toBe("beat");
+    s.sendToTv({ type: "channel", dir: "up" });
+    expect(relay.sent[1]).toEqual({ type: "channel", dir: "up" });
+    relay.on!.event({ event: "ended", data: { reason: "signed_out" } });
+    expect(s.getCastSession()).toEqual({ status: "idle", error: "Den TV was signed out." });
   });
 
   it("follows the mirroring plugin: connected, locked, stopped", async () => {

@@ -1,20 +1,27 @@
 // What "Watch on" and the remote need from the session: this phone's introduction (its name, the
-// market, whether other phones may change the channel), the TVs to offer, and the one-time
-// mirroring guide's "shown once" flag.
+// market, whether other phones may change the channel), the TVs to offer (the account's TV apps,
+// TVs paired by code, Chromecasts, AirPlay TVs), and the one-time mirroring guide's "shown once" flag.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { tvApi, type Tv } from "@opencast/contracts";
+import { useApi } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
 import { useMarketSlug, useMe } from "../data/viewer";
 import { useSavedSettings } from "../layout/SettingsSync";
 import { SIGNED_OUT_NAME, phoneName } from "./messages";
-import { getMirroring, mirroringOffered } from "./mirroring";
-import { castOffered, getSender } from "./sender";
-import { orderTargets, uniqueTargets } from "./targets";
+import { getMirroring } from "./mirroring";
+import { loadPairings } from "./pairings";
+import { getSender } from "./sender";
+import { orderTargets, pairedTargets, tvAppTargets, uniqueTargets } from "./targets";
 import type { CastTarget, SessionIntro } from "./types";
 
-/** Whether "Watch on" has anything to offer in this build and browser (the cast button hides otherwise). */
+/**
+ * Whether "Watch on" has anything to offer in this build and browser (the cast button hides
+ * otherwise). The relay to the Opencast TV app works from any browser, and a code from the TV pairs
+ * a phone that isn't signed in, so it always has.
+ */
 export function watchOnOffered(): boolean {
-  return castOffered() || mirroringOffered();
+  return true;
 }
 
 export function useCastIntro(): SessionIntro {
@@ -30,27 +37,45 @@ export function useCastIntro(): SessionIntro {
   };
 }
 
-/** Chromecasts the sender finds, and AirPlay TVs this phone has mirrored to. Loaded while the sheet is open. */
-export async function findTargets(): Promise<CastTarget[]> {
+/** Chromecasts the sender finds, and AirPlay TVs this phone has mirrored to. */
+async function discover(): Promise<CastTarget[]> {
   const [sender, mirroring] = await Promise.all([getSender(), getMirroring()]);
   const cast = sender ? await sender.targets().catch(() => []) : [];
   const airplay: CastTarget[] = (mirroring?.knownTvs() ?? []).map((name) => ({ id: `airplay:${name}`, name, kind: "airplay" }));
-  // TVs with the Opencast app (tv_app) join here once the account's TV registry (B2) or Cast Connect says which TVs have it.
-  return orderTargets(uniqueTargets([...cast, ...airplay]));
+  return [...cast, ...airplay];
 }
 
-export function useWatchOnTargets(open: boolean): { targets: CastTarget[]; loading: boolean } {
-  const [state, setState] = useState<{ targets: CastTarget[]; loading: boolean }>({ targets: [], loading: true });
+/** Every row "Watch on" offers: the account's TV apps (listTvs), TVs paired by code, then what the senders find; in order. */
+export function combineTargets(accountTvs: readonly Tv[], found: CastTarget[], pairings = loadPairings()): CastTarget[] {
+  return orderTargets(uniqueTargets([...tvAppTargets(accountTvs), ...pairedTargets(pairings), ...found]));
+}
+
+/** The TVs to offer now, given the account's TVs if they're known. */
+export async function findTargets(accountTvs: readonly Tv[] = []): Promise<CastTarget[]> {
+  return combineTargets(accountTvs, await discover());
+}
+
+/** Loaded while the sheet is open. `refresh` asks the account again (whether a TV app is on now). */
+export function useWatchOnTargets(open: boolean): { targets: CastTarget[]; loading: boolean; refresh: () => Promise<CastTarget[]> } {
+  const auth = useAuth();
+  const account = useApi(tvApi.listTvs, {}, { enabled: open && auth.signedIn, refetchOnMount: "always" });
+  const [found, setFound] = useState<{ targets: CastTarget[]; loading: boolean }>({ targets: [], loading: true });
   useEffect(() => {
     if (!open) return;
     let gone = false;
-    setState((s) => ({ ...s, loading: true }));
-    void findTargets().then((targets) => !gone && setState({ targets, loading: false }));
+    setFound((s) => ({ ...s, loading: true }));
+    void discover().then((targets) => !gone && setFound({ targets, loading: false }));
     return () => {
       gone = true;
     };
   }, [open]);
-  return state;
+  const tvs = auth.signedIn ? account.data : undefined;
+  const targets = useMemo(() => combineTargets(tvs ?? [], found.targets), [tvs, found.targets]);
+  const refresh = async () => {
+    const r = auth.signedIn ? await account.refetch() : null;
+    return combineTargets(r?.data ?? [], found.targets);
+  };
+  return { targets, loading: found.loading || (auth.signedIn && account.isLoading), refresh };
 }
 
 // ---------- The one-time mirroring guide ----------
