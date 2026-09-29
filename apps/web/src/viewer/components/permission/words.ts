@@ -1,7 +1,7 @@
 // What the permission page says, worked out from the page's facts: the works in a line, what the
 // creator makes, when their work airs, and which state the page is in.
 
-import type { PermissionPageX } from "./api";
+import type { PermissionPage } from "@opencast/contracts";
 
 export const PLATFORMS: Record<string, string> = {
   youtube: "YouTube",
@@ -18,7 +18,7 @@ export function plural(noun: string, n = 2): string {
   return /(s|x|ch|sh)$/.test(noun) ? `${noun}es` : `${noun}s`;
 }
 
-type Works = PermissionPageX["works"];
+type Works = PermissionPage["works"];
 
 /** What they mostly make: the noun with the most hours among the included works ("films"). */
 export function mainNoun(works: Works): string {
@@ -28,7 +28,7 @@ export function mainNoun(works: Works): string {
 }
 
 /** "6 skate films and 7 park session edits"; the page's own summary (N4) when it has one. */
-export function worksLine(page: Pick<PermissionPageX, "works" | "summary">): { included: string; leftOut: string | null } {
+export function worksLine(page: Pick<PermissionPage, "works" | "summary">): { included: string; leftOut: string | null } {
   if (page.summary) return page.summary;
   // By group ("6 full-length skate films"); works with no group by what they are ("10 videos").
   const groups: Array<{ key: string; label: string; one: string; n: number }> = [];
@@ -46,7 +46,7 @@ export function worksLine(page: Pick<PermissionPageX, "works" | "summary">): { i
 }
 
 /** "in the evenings" when most of their preview airs from 5 pm; "through the day" otherwise. */
-export function whenLine(page: Pick<PermissionPageX, "schedulePreview">): string {
+export function whenLine(page: Pick<PermissionPage, "schedulePreview">): string {
   const theirs = page.schedulePreview.filter((r) => r.source === "creator");
   if (!theirs.length) return "in the evenings";
   const late = theirs.filter((r) => Number(r.time.split(":")[0]) >= 17).length;
@@ -55,7 +55,7 @@ export function whenLine(page: Pick<PermissionPageX, "schedulePreview">): string
 
 export type PageState = "unanswered" | "yes" | "no" | "stopped" | "claiming";
 
-export function pageState(page: Pick<PermissionPageX, "answer" | "stoppedAt" | "claim">): PageState {
+export function pageState(page: Pick<PermissionPage, "answer" | "stoppedAt" | "claim">): PageState {
   if (page.stoppedAt) return "stopped";
   if (!page.answer) return "unanswered";
   if (page.answer.answer === "no") return "no";

@@ -4,8 +4,7 @@
 import { useNavigate } from "react-router";
 import type { Reminder } from "@opencast/contracts";
 import { Button, Icon, IconButton, Tag, clock, money } from "@opencast/ui";
-import type { Tv } from "@opencast/contracts";
-import type { PledgeX } from "../../api/ext/you";
+import type { Pledge, Tv } from "@opencast/contracts";
 import { platformLabel } from "../../cast/targets";
 import type { CastTarget } from "../../cast/types";
 import { MARKET_TZ } from "../../../lib/clock";
@@ -53,12 +52,12 @@ export function comingUp(n: number): string {
 
 // ---------- Supporting ----------
 
-export function supportingSub(pledges: PledgeX[]): string | null {
+export function supportingSub(pledges: Pledge[]): string | null {
   const total = monthlyTotal(pledges);
   return total > 0 ? `${money(total)} a month` : null;
 }
 
-function Swatch({ p, size }: { p: PledgeX; size: number }) {
+function Swatch({ p, size }: { p: Pledge; size: number }) {
   return (
     <span className="vw-y-pl__sw" style={{ background: p.station.colour ?? "var(--ink-50)", width: size, height: size }} aria-hidden="true">
       {p.station.callSign}
@@ -66,9 +65,9 @@ function Swatch({ p, size }: { p: PledgeX; size: number }) {
   );
 }
 
-export function PledgeRows({ pledges, displayName, form }: { pledges: PledgeX[]; displayName: string | null; form: Form }) {
+export function PledgeRows({ pledges, displayName, form }: { pledges: Pledge[]; displayName: string | null; form: Form }) {
   const navigate = useNavigate();
-  const open = (p: PledgeX) => navigate(`/you/pledges/${p.id}`);
+  const open = (p: Pledge) => navigate(`/you/pledges/${p.id}`);
   return (
     <>
       {pledges.map((p) => {

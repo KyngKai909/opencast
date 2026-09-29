@@ -4,8 +4,7 @@
 // 6 pm, catalog films, repeats, the catalog overnight. The block labels, colours and the carried
 // program are proposed fields (N6).
 
-import type { StationIdent } from "@opencast/contracts";
-import type { RecipeX } from "../../api/ext";
+import type { Recipe, StationIdent } from "@opencast/contracts";
 import { U } from "./ids";
 import { STATION_IDS } from "./stations";
 
@@ -17,7 +16,7 @@ const RUST = "#9A5412";
 
 export const RECIPE_IDS = { cooking: U(501), films: U(502), music: U(503), community: U(504) };
 
-export function seedRecipes(): RecipeX[] {
+export function seedRecipes(): Recipe[] {
   return [
     {
       id: RECIPE_IDS.cooking,

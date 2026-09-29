@@ -1,10 +1,10 @@
-// The signed-in person: me, presets, reminders, pledges, notification settings, and the proposed
-// endpoints in api/ext/you.ts (E1, A1, A2, A3). TVs and the remote relay are in tvs.ts.
+// The signed-in person: me, presets, reminders, pledges (with E1's card, receipts, cadence and card
+// page), notification settings, and the account's data (A1 sign out everywhere, A2 watch history,
+// A3 export and delete). TVs and the remote relay are in tvs.ts.
 
 import { http } from "msw";
-import { accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi } from "@opencast/contracts";
+import { AccountExport, accountsApi, audienceApi, ledgerApi, notificationsApi, stationsApi, WatchHistory, type Pledge } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
-import { accountApiX, PledgesX, PledgeX, pledgesApiX } from "../../api/ext/you";
 import { lowestFreeKey, normalise, placePreset, removePresetFrom, type KeyedPreset } from "../../components/you/presetRules";
 import { getDb, profileOf, resetDb, saveDb, type DbPledge, type DbPreset } from "../db";
 import { meHandler, meView } from "../../../mocks/me";
@@ -36,7 +36,7 @@ function reminderView(r: { id: string; airingId: string; switchMeOver: boolean; 
   };
 }
 
-export function pledgeView(p: DbPledge): PledgeX {
+export function pledgeView(p: DbPledge): Pledge {
   const items = receiptsFor(p, now());
   return {
     id: p.id,
@@ -47,8 +47,45 @@ export function pledgeView(p: DbPledge): PledgeX {
     startedAt: p.startedAt,
     nextChargeOn: nextChargeFor(p, now()),
     endsAfter: p.endsAfter,
-    card: { label: p.card, expired: false },
+    card: { label: p.card, expired: false, expiresOn: "2028-04-30" },
     receipts: { count: items.length, totalMicros: items.reduce((s, r) => s + r.amountMicros, 0), items }
+  };
+}
+
+/** A heartbeat extends the stretch it continues, or starts a new one. */
+export function recordWatching(stationId: string, at: Date) {
+  const db = getDb();
+  const t = at.toISOString();
+  const last = db.watchHistory[0];
+  if (last && last.stationId === stationId && at.getTime() - new Date(last.endedAt).getTime() <= 90_000) last.endedAt = t;
+  else db.watchHistory.unshift({ stationId, startedAt: t, endedAt: t });
+  const cutoff = new Date(at.getTime() - 30 * 86400e3).toISOString();
+  db.watchHistory = db.watchHistory.filter((w) => w.endedAt >= cutoff);
+  saveDb();
+}
+
+function historyView(p: Parameters<typeof profileOf>[0]) {
+  const keep = profileOf(p).settings.privacy?.keepWatchHistory !== false;
+  const items = keep ? getDb().watchHistory.filter((w) => stationById(w.stationId)).map((w) => ({ station: ident(w.stationId), startedAt: w.startedAt, endedAt: w.endedAt })) : [];
+  return { keep, lastChannel: items[0] ? { station: items[0].station, at: items[0].endedAt } : null, items };
+}
+
+function exportView(p: Parameters<typeof meView>[0]) {
+  const me = meView(p);
+  const db = getDb();
+  return {
+    exportedAt: now().toISOString(),
+    account: { id: me.id, displayName: me.displayName, email: me.email, market: me.market, createdAt: "2026-06-01T19:00:00.000Z", settings: me.settings },
+    identities: me.identities,
+    memberships: me.memberships,
+    presets: presetsView(),
+    reminders: db.reminders.map(reminderView),
+    watchHistory: historyView(p).items,
+    pledges: db.pledges.map(pledgeView),
+    notificationPrefs: [{ scope: "viewer" as const, scopeId: null, prefs: db.prefs }],
+    notices: [],
+    tvs: db.tvs,
+    clear: me.clear ?? null
   };
 }
 
@@ -72,6 +109,8 @@ export const meHandlers = [
       const cur = me.settings as Record<string, Record<string, unknown> | undefined>;
       for (const [k, v] of Object.entries(body.settings)) cur[k] = typeof v === "object" && v ? { ...(cur[k] ?? {}), ...(v as object) } : (v as never);
     }
+    // Turning watch history off stops keeping it and clears what was kept (A2).
+    if ((body.settings?.privacy as { keepWatchHistory?: boolean } | undefined)?.keepWatchHistory === false) getDb().watchHistory = [];
     saveDb();
     return reply(accountsApi.updateMe.response, meView(p));
   }),
@@ -183,7 +222,7 @@ export const meHandlers = [
   }),
 
   // ---------- Pledges ----------
-  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(PledgesX, getDb().pledges.map(pledgeView))),
+  http.get(path(ledgerApi.listMyPledges), ({ request }) => needsUser(request) ?? reply(ledgerApi.listMyPledges.response, getDb().pledges.map(pledgeView))),
 
   http.post(path(ledgerApi.pledge), async ({ request, params }) => {
     const denied = needsUser(request);
@@ -200,13 +239,15 @@ export const meHandlers = [
     return reply(ledgerApi.pledge.response, { pledge: pledgeView(p), checkoutUrl: null }, 201);
   }),
 
-  http.patch(path(pledgesApiX.updatePledge), async ({ request, params }) => {
+  http.patch(path(ledgerApi.updatePledge), async ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const p = getDb().pledges.find((x) => x.id === params.pledgeId);
     if (!p) return fail(404, "not_found", "That pledge wasn't found.");
     const body = (await request.json()) as { amountMicros?: number; creditOnAir?: boolean; cadence?: "monthly" | "once"; stop?: true };
     if (body.amountMicros !== undefined && body.amountMicros < 1_000_000) return fail(400, "bad_request", "Pledges start at $1.00.");
+    if (body.cadence === "monthly" && p.cadence === "once") return fail(422, "new_pledge_needed", "A one-time pledge can't become monthly. Pledge again, monthly.");
+    if (body.cadence && p.endsAfter && p.endsAfter < now().toISOString().slice(0, 10)) return fail(422, "pledge_ended", "This pledge has ended. Pledge again to start it.");
     if (body.amountMicros !== undefined) p.amountMicros = body.amountMicros;
     if (body.creditOnAir !== undefined) p.creditOnAir = body.creditOnAir;
     // Monthly to once: it isn't charged again, like stopping (E1).
@@ -215,42 +256,66 @@ export const meHandlers = [
     // Stopping: it ends after the current month.
     if (body.stop) p.endsAfter = endOfThisMonth(now());
     saveDb();
-    return reply(PledgeX, pledgeView(p));
+    return reply(ledgerApi.updatePledge.response, pledgeView(p));
   }),
 
-  http.post(path(pledgesApiX.cardSession), ({ request, params }) => {
+  http.post(path(ledgerApi.pledgeCardSession), async ({ request, params }) => {
     const denied = needsUser(request);
     if (denied) return denied;
-    if (!getDb().pledges.some((x) => x.id === params.pledgeId)) return fail(404, "not_found", "That pledge wasn't found.");
-    // A real one is Stripe's page, which comes back here. The mock comes straight back.
-    return reply(pledgesApiX.cardSession.response, { url: `/you/pledges/${params.pledgeId}` });
+    const p = getDb().pledges.find((x) => x.id === params.pledgeId);
+    if (!p) return fail(404, "not_found", "That pledge wasn't found.");
+    if (p.cadence === "once" || p.endsAfter) return fail(422, "no_card_to_change", p.cadence === "once" ? "A one-time pledge has nothing more to charge." : "This pledge isn't charged again.");
+    const body = ((await request.json().catch(() => null)) ?? {}) as { returnTo?: string };
+    // A real one is Stripe's page, which comes back to returnTo with ?card=updated. The mock comes straight back.
+    return reply(ledgerApi.pledgeCardSession.response, { url: `${body.returnTo ?? `/you/pledges/${params.pledgeId}`}?card=updated` });
   }),
 
   // ---------- Account (A1, A2, A3) ----------
-  http.post(path(accountApiX.signOutEverywhere), ({ request }) => {
+  http.post(path(accountsApi.signOutEverywhere), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
     const db = getDb();
     db.signedOutEverywhereAt = now().toISOString();
     db.tvs = db.tvs.filter((t) => t.kind !== "tv_app");
     saveDb();
-    return reply(accountApiX.signOutEverywhere.response, { ok: true });
+    return reply(accountsApi.signOutEverywhere.response, { ok: true });
   }),
 
-  http.delete(path(accountApiX.clearWatchHistory), ({ request }) => needsUser(request) ?? reply(accountApiX.clearWatchHistory.response, { ok: true })),
-
-  http.post(path(accountApiX.exportData), ({ request }) => {
-    const denied = needsUser(request);
-    if (denied) return denied;
-    return reply(accountApiX.exportData.response, { email: personOf(request)!.email, readyBy: new Date(now().getTime() + 86400e3).toISOString() });
+  http.get(path(accountsApi.getWatchHistory), ({ request }) => {
+    const p = personOf(request);
+    if (!p) return fail(401, "unauthorized", "Sign in to do that.");
+    return reply(WatchHistory, historyView(p));
   }),
 
-  http.delete(path(accountApiX.deleteAccount), ({ request }) => {
+  http.delete(path(accountsApi.clearWatchHistory), ({ request }) => {
     const denied = needsUser(request);
     if (denied) return denied;
+    getDb().watchHistory = [];
+    saveDb();
+    return reply(accountsApi.clearWatchHistory.response, { ok: true });
+  }),
+
+  http.post(path(accountsApi.exportData), ({ request }) => {
+    const denied = needsUser(request);
+    if (denied) return denied;
+    // The link goes to /settings/data?download=1; the file is made when it's opened, so it's ready now.
+    return reply(accountsApi.exportData.response, { email: personOf(request)!.email, readyBy: now().toISOString() });
+  }),
+
+  http.get(path(accountsApi.downloadData), ({ request }) => {
+    const p = personOf(request);
+    if (!p) return fail(401, "unauthorized", "Sign in to do that.");
+    return reply(AccountExport, exportView(p));
+  }),
+
+  http.delete(path(accountsApi.deleteAccount), ({ request }) => {
+    const p = personOf(request);
+    if (!p) return fail(401, "unauthorized", "Sign in to do that.");
+    // An owner hands the station over first (A3's 409).
+    if (meView(p).memberships.some((m) => m.kind === "station" && m.role === "owner")) return fail(409, "owns_station", "You own a station. Make someone on its team the owner first, then delete your account.");
     // The mock starts over, as if a new person signed in next.
     resetDb();
-    return reply(accountApiX.deleteAccount.response, { ok: true });
+    return reply(accountsApi.deleteAccount.response, { ok: true });
   }),
 
   // ---------- Run a station ----------
@@ -276,5 +341,11 @@ export const meHandlers = [
   }),
 
   // ---------- Tuned in ----------
-  http.post(path(audienceApi.heartbeat), () => reply(audienceApi.heartbeat.response, { ok: true, nextInMs: 30_000 }))
+  // Signed in (and keeping history), it's also the person's watch history (A2). The tuned-in count stays anonymous.
+  http.post(path(audienceApi.heartbeat), async ({ request }) => {
+    const p = personOf(request);
+    const body = (await request.json().catch(() => null)) as { stationId?: string; playing?: boolean } | null;
+    if (p && body?.stationId && body.playing && profileOf(p).settings.privacy?.keepWatchHistory !== false) recordWatching(body.stationId, now());
+    return reply(audienceApi.heartbeat.response, { ok: true, nextInMs: 30_000 });
+  })
 ];

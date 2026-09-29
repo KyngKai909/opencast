@@ -445,3 +445,17 @@ The frames' words are used as drawn. Below is what they don't have. Mock-only pa
 - The avatar's menu on the web viewer, for people with a station role or on the Opencast team: **You** (their page, where the avatar went before), then **Master control** and **Network desk** as they apply. Everyone else's avatar still goes straight to You, with no menu.
 - The browser tab's title while master control is open: **Master control · Opencast** (master control's own title before), and **Network desk** on the desk.
 
+
+### apps/web: the account's data, pledge cards, timing, claim invites (contracts of 2026-09-28)
+
+Words for what the API answers now (A1, A2, A3, O2, N3, N5). The API's own messages are shown as they come for the rest (`no_email`, `no_card_to_change`, `new_pledge_needed`, `pledge_ended`, `no_contact`, `no_station`, `in_progress`, `nothing_to_claim`).
+
+| Where | Words |
+|---|---|
+| Any area, the API ended the sign-in (401 `signed_out`) | toast "You were signed out everywhere. Sign in again to use your presets, reminders and pledges." |
+| Any area, the account was deleted elsewhere (401 `account_deleted`) | toast "This account was deleted, so you're signed out. Signing in again starts a new one." |
+| Settings, Your data, Download | toast "We emailed a link to {email}. Open it to download the file."; the link (`/settings/data?download=1`) signed out: sign-in "To download your data", "Download and go back"; done: "Your data is downloaded" |
+| Settings, Your data, Delete refused (409) | `owns_station`: "You own {BEAT 12.1}. Make someone on its team the owner in master control first, then delete your account."; `owns_business`: "You own a business on Opencast. Write to us to hand it over first, then delete your account." |
+| Settings, Notifications | "How early": "At the start", "{N} minutes before", "An hour before", "{N} hours before"; Quiet hours: "Nothing between {10:00 pm} and {8:00 am}" from the account's window |
+| Desk, a set-up station's Claim row | "Claim"; "{Crate} hasn't been invited to claim it yet", "Claim invite sent {Sept 24}", "Claim link sent {Sept 20}"; buttons "Invite to claim" (on air, not invited yet), "Send the claim link", "Send the link again"; toasts "Claim invite sent to {name}.", "Claim link sent to {name}." |
+| Desk, a station set up before setups were kept (N5 null) | "It was set up before its recipe was kept, so its recipe, sign-on time and import aren't shown here." |

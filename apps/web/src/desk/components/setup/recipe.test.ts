@@ -2,9 +2,9 @@
 import { describe, expect, it } from "vitest";
 import { seedRecipes } from "../../mocks/fixtures/recipes";
 import { seedWorks } from "../../mocks/fixtures/creators";
-import type { CreatorWorkX } from "../../api/ext";
 import { interleave } from "../ask/works";
 import { blockLabel, breakLine, breakRuleOf, clockOfMinutes, daySegments, hoursBySource, tonightSchedule } from "./recipe";
+import type { CreatorWork } from "@opencast/contracts";
 
 const [cooking, films] = seedRecipes();
 
@@ -31,7 +31,7 @@ describe("tonight, if they say yes", () => {
   it("is the frame's: a film, a park session, then the catalog", () => {
     const works = seedWorks()
       .filter((w) => w.creatorId === "00000000-0000-4000-8000-000000000202" && !w.leftOutReason)
-      .map((w) => ({ ...w, covered: "none" }) as CreatorWorkX);
+      .map((w) => ({ ...w, covered: "none" }) as CreatorWork);
     const rows = tonightSchedule(films!, interleave(works));
     expect(rows.map((r) => `${clockOfMinutes(r.at)} ${r.title}`)).toEqual(["7:00 pm Joshua Tree, full film", "8:10 pm Park sessions: Palm Springs", "8:30 pm Classic films from the catalog"]);
   });

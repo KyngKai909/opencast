@@ -2,8 +2,8 @@
 
 import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
-import { DialX, type DialRowX } from "../../api/ext";
-import { MarketPlacesX } from "../../api/ext/home";
+import { DialX, MarketsX, type DialRowX } from "../../api/ext";
+import { milesApart } from "../../components/home/logic";
 import { now } from "../../../lib/clock";
 import { AIRINGS, PROGRAMS } from "../fixtures/schedule";
 import { MARKETS, STATIONS, ZIPS, inMarket, playbackFor, stationByRef, type MockStation } from "../fixtures/stations";
@@ -21,8 +21,19 @@ function dialRow(s: MockStation, t: Date): DialRowX {
 }
 
 export const dialHandlers = [
-  // With each market's centre (contract request S10, interim), so "Use my location" picks on the device.
-  http.get(path(stationsApi.listMarkets), () => reply(MarketPlacesX, MARKETS.map(({ lat, lng, ...m }) => ({ ...m, centre: { lat, lng } })))),
+  http.get(path(stationsApi.listMarkets), () => reply(MarketsX, MARKETS.map(({ lat: _lat, lng: _lng, ...m }) => m))),
+
+  // S10, "Use my location": the nearest market within 50 miles of its centre (open or not), and the
+  // others within 60 miles, nearest first; nothing that close, the open markets by distance.
+  http.get(path(stationsApi.marketForLocation), ({ request }) => {
+    const q = new URL(request.url).searchParams;
+    const here = { lat: Number(q.get("lat")), lng: Number(q.get("lng")) };
+    if (!Number.isFinite(here.lat) || !Number.isFinite(here.lng)) return fail(400, "bad_request", "Send lat and lng.");
+    const by = MARKETS.map((m) => ({ slug: m.slug, open: m.open, miles: Math.round(milesApart(here, { lat: m.lat, lng: m.lng })) })).sort((a, b) => a.miles - b.miles);
+    const near = by[0] && by[0].miles <= 50 ? by[0] : null;
+    const nearby = (near ? by.slice(1).filter((m) => m.miles <= 60) : by.filter((m) => m.open)).map((m) => ({ market: marketOf(m.slug)!, miles: m.miles }));
+    return reply(stationsApi.marketForLocation.response, { market: near ? marketOf(near.slug)! : null, nearby });
+  }),
 
   http.get(path(stationsApi.marketForZip), ({ params }) => {
     const slug = ZIPS[String(params.zip)];

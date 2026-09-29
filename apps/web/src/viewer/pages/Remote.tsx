@@ -13,8 +13,7 @@ import { receiverOf, sendToTv, startCast, stopCasting, useCastSession } from "..
 import { TARGET_KINDS } from "../cast/targets";
 import type { RemoteCommand } from "../cast/types";
 import { findTargets, hideMirrorGuide, useCastIntro } from "../cast/useCast";
-import { useChannels, useMarketSlug, usePresets, useViewerActions } from "../data/viewer";
-import { getDevice } from "../device/store";
+import { useChannels, useLastChannelId, useMarketSlug, usePresets, useViewerActions } from "../data/viewer";
 import { useIsPhone, useShellOptions } from "../layout/shell";
 import { MARKET_TZ, useNow } from "../../lib/clock";
 import { useNowPlaying } from "../player/PlayerRoot";
@@ -134,6 +133,7 @@ function useConnectFromLink() {
   const session = useCastSession();
   const intro = useCastIntro();
   const channels = useChannels();
+  const lastId = useLastChannelId();
   const np = useNowPlaying();
   const navigate = useNavigate();
   const tv = params.get("tv");
@@ -148,11 +148,10 @@ function useConnectFromLink() {
       if (!t) return;
       if (TARGET_KINDS[t.kind].action === "mirror") return navigate(mirrorGuideHref(t.name), { replace: true });
       // What the phone has on, or its last channel, or the first on the dial.
-      const last = getDevice().lastStationId;
-      const start = np.row ?? channels.find((c) => c.station.id === last) ?? inChannelOrder(channels)[0];
+      const start = np.row ?? channels.find((c) => c.station.id === lastId) ?? inChannelOrder(channels)[0];
       void startCast(t, intro, start?.station.channel ? { stationId: start.station.id, channel: start.station.channel } : null);
     });
-  }, [tv, channels, session.status, intro, np.row, close, navigate]);
+  }, [tv, channels, lastId, session.status, intro, np.row, close, navigate]);
 }
 
 /** The battery line while mirroring, from the plugin's readings. */

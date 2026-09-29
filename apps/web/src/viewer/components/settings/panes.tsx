@@ -3,14 +3,14 @@
 // ("The eight sections", "Privacy says what's kept"), with their copy listed as new.
 // Each change saves at once: to the account when signed in, to this device when signed out.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { Button, Field, Segmented, Toggle, useGround, useToast, type GroundChoice } from "@opencast/ui";
-import { accountsApi } from "@opencast/contracts";
+import { accountsApi, type Me, type NotificationTiming } from "@opencast/contracts";
 import { useQueryClient } from "@tanstack/react-query";
-import { call } from "../../../api/client";
+import { ApiError, call, endingSessionHere } from "../../../api/client";
+import { keyFor } from "../../../api/hooks";
 import { setCached } from "../you/cache";
-import { accountApiX, type NotificationTiming } from "../../api/ext/you";
 import { useAuth } from "../../../auth/AuthProvider";
 import { useMarkets, useMarketSlug } from "../../data/viewer";
 import { setDevice, useDevice } from "../../device/store";
@@ -86,8 +86,10 @@ function AccountPane({ phone }: { phone: boolean }) {
   const everywhere = async () => {
     setError(null);
     try {
-      await call(accountApiX.signOutEverywhere);
-      await signOut();
+      await endingSessionHere(async () => {
+        await call(accountsApi.signOutEverywhere);
+        await signOut();
+      });
       toast.show({ message: "Signed out everywhere" });
     } catch (e) {
       setError((e as Error).message);
@@ -260,11 +262,29 @@ function usePushBlocked(): [boolean, () => Promise<void>] {
   return [blocked, ask];
 }
 
+/** "At the start", or "10 minutes before" (O2's leadMinutes). */
+export function leadLine(minutes: number | undefined): string {
+  if (!minutes) return "At the start";
+  if (minutes % 60 === 0) return minutes === 60 ? "An hour before" : `${minutes / 60} hours before`;
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"} before`;
+}
+
+/** "22:00" to "10:00 pm". */
+function clockOf(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number) as [number, number];
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+}
+
+/** Quiet hours' window: 10:00 pm to 8:00 am unless the account says otherwise (O2). */
+export function quietLine(t: Pick<NotificationTiming, "quietFrom" | "quietTo">): string {
+  return `Nothing between ${clockOf(t.quietFrom ?? "22:00")} and ${clockOf(t.quietTo ?? "08:00")}`;
+}
+
 function NotificationsPane({ phone }: { phone: boolean }) {
   const { prefs, set, error } = useNotificationPrefs();
   const { settings, save, error: saveError } = useSettings();
   const [blocked, askPush] = usePushBlocked();
-  const timing = ((settings as Record<string, unknown>).notifications ?? {}) as NotificationTiming;
+  const timing: NotificationTiming = settings.notifications ?? {};
   const on = (kind: string, ch: "push" | "email") => prefs[kind]?.[ch] ?? false;
   const push = (kind: string) => async (v: boolean) => {
     if (v) await askPush();
@@ -278,10 +298,10 @@ function NotificationsPane({ phone }: { phone: boolean }) {
       <SettingGroup>Reminders</SettingGroup>
       <SettingRow title={phone ? "On this phone" : "In this browser"} help="A notification when it starts" control={toggle(on("reminder", "push"), push("reminder"))} />
       <SettingRow title="By email" help="The evening before" control={toggle(on("reminder", "email"), (v) => void set("reminder", { email: v }))} />
-      <SettingRow title="How early" value="At the start" />
+      <SettingRow title="How early" value={leadLine(timing.leadMinutes)} />
       <SettingGroup>Your presets</SettingGroup>
       <SettingRow title="When a preset goes live" help="For live programs only, not scheduled ones" control={toggle(on("preset_live", "push"), push("preset_live"))} />
-      <SettingRow title="Quiet hours" help="Nothing between 10:00 pm and 8:00 am" control={toggle(timing.quietHours ?? true, (v) => void save({ notifications: { quietHours: v } }))} />
+      <SettingRow title="Quiet hours" help={quietLine(timing)} control={toggle(timing.quietHours ?? true, (v) => void save({ notifications: { quietHours: v } }))} />
       <SettingGroup>Stations you support</SettingGroup>
       <SettingRow title="Station news" help="No more than one a month per station" control={toggle(on("station_news", "push") || on("station_news", "email"), (v) => void set("station_news", { push: v, email: v }))} />
       {blocked && <p className="vw-set-note">This browser is blocking notifications from Opencast. Allow them in its settings to get them here.</p>}
@@ -359,14 +379,17 @@ function AppearancePane() {
 function PrivacyPane() {
   const auth = useAuth();
   const toast = useToast();
+  const qc = useQueryClient();
+  const refreshHistory = () => void qc.invalidateQueries({ queryKey: keyFor(accountsApi.getWatchHistory).slice(0, 2) });
   const { settings, save, error } = useSettings();
   const [clearError, setClearError] = useState<string | null>(null);
   const keep = settings.privacy?.keepWatchHistory ?? true;
   const clear = async () => {
     setClearError(null);
     try {
-      if (auth.signedIn) await call(accountApiX.clearWatchHistory);
+      if (auth.signedIn) await call(accountsApi.clearWatchHistory);
       setDevice({ lastStationId: null });
+      refreshHistory();
       toast.show({ message: "Watch history cleared" });
     } catch (e) {
       setClearError((e as Error).message);
@@ -378,7 +401,7 @@ function PrivacyPane() {
       <SettingRow
         title="Keep watch history"
         help={'Kept for 30 days to resume and power "last channel"'}
-        control={({ labelId, helpId }) => <Toggle checked={keep} onChange={(v) => void save({ privacy: { keepWatchHistory: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
+        control={({ labelId, helpId }) => <Toggle checked={keep} onChange={(v) => void save({ privacy: { keepWatchHistory: v } }).then(refreshHistory)} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
       <SettingRow title="Clear watch history" help="Starts fresh, here and on the account" control={() => <Button size="sm" onClick={() => void clear()}>Clear</Button>} />
       <SettingRow title="What stations see" help="Tuned-in counts that stations see are anonymous." />
@@ -389,14 +412,70 @@ function PrivacyPane() {
 
 // ---------- Your data ----------
 
+/** Why the account can't be deleted yet (A3's 409s), in the viewer's words. */
+export function deleteRefusal(e: unknown, me: Pick<Me, "memberships"> | null): string {
+  if (e instanceof ApiError && e.code === "owns_station") {
+    const owned = me?.memberships.find((m) => m.kind === "station" && m.role === "owner");
+    const name = owned?.kind === "station" ? [owned.station.callSign, owned.station.channel].filter(Boolean).join(" ") || owned.station.name : "a station";
+    return `You own ${name}. Make someone on its team the owner in master control first, then delete your account.`;
+  }
+  if (e instanceof ApiError && e.code === "owns_business") return "You own a business on Opencast. Write to us to hand it over first, then delete your account.";
+  return (e as Error).message;
+}
+
+/** Saves the account's data (A3's downloadData) as a file. */
+export function saveAsFile(data: unknown, name: string) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * The emailed link (/settings/data?download=1, A3) opens here: signed in, the file is made and
+ * saved; signed out, sign-in comes first.
+ */
+function useDownloadFromLink(setError: (e: string | null) => void) {
+  const auth = useAuth();
+  const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("download") === "1";
+  const run = async () => {
+    setError(null);
+    try {
+      const data = await call(accountsApi.downloadData);
+      saveAsFile(data, `opencast-data-${data.exportedAt.slice(0, 10)}.json`);
+      toast.show({ message: "Your data is downloaded" });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    if (!asked || !auth.ready) return;
+    setParams((p) => (p.delete("download"), p), { replace: true });
+    auth.requireSignIn({ kind: "general", label: "download your data", finish: "Download and go back" }, () => runRef.current());
+    // Once per link: the parameter is gone after this.
+  }, [asked, auth.ready]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 function DataPane({ phone }: { phone: boolean }) {
   const auth = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const device = useDevice();
+  const { me } = useSettings();
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Why deleting was refused: worded when shown, with the account as it's known by then.
+  const [refusal, setRefusal] = useState<unknown>(null);
   const where = phone ? "phone" : "device";
+  useDownloadFromLink(setError);
 
   if (!auth.signedIn) {
     const n = device.presets.length;
@@ -418,28 +497,35 @@ function DataPane({ phone }: { phone: boolean }) {
             </Button>
           )}
         />
+        <Err error={error} />
       </>
     );
   }
 
+  // The file is made when the emailed link is opened here, signed in (A3).
   const download = async () => {
     setError(null);
+    setRefusal(null);
     try {
-      const r = await call(accountApiX.exportData);
-      toast.show({ message: `We'll email a link to ${r.email} within a day` });
+      const r = await call(accountsApi.exportData);
+      toast.show({ message: `We emailed a link to ${r.email}. Open it to download the file.` });
     } catch (e) {
       setError((e as Error).message);
     }
   };
   const remove = async () => {
     setError(null);
+    setRefusal(null);
     try {
-      await call(accountApiX.deleteAccount);
-      await auth.signOut();
+      await endingSessionHere(async () => {
+        await call(accountsApi.deleteAccount);
+        await auth.signOut();
+      });
       navigate("/");
       toast.show({ message: "Your account is deleted" });
     } catch (e) {
-      setError((e as Error).message);
+      setConfirm(false);
+      setRefusal(e);
     }
   };
 
@@ -466,7 +552,7 @@ function DataPane({ phone }: { phone: boolean }) {
           )
         }
       />
-      <Err error={error} />
+      <Err error={error ?? (refusal ? deleteRefusal(refusal, me) : null)} />
     </>
   );
 }

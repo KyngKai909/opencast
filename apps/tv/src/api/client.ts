@@ -7,7 +7,8 @@
 // - `device` endpoints (the TV's own: codes, the relay, pairing): the device token from
 //   registerTv, or the TV session token (both are accepted; the device token first, since it
 //   outlives a sign-out);
-// - endpoints marked `tvSession` (getMe, presets, reminders…): the TV session token, signed in;
+// - endpoints marked `tvSession` (getMe, presets, reminders…, and the heartbeat, which then keeps
+//   the account's watch history, A2): the TV session token, signed in;
 // - everything else: no token. A TV session is refused (403) by any other `user` endpoint, and
 //   `public` or `optional` ones don't need one.
 

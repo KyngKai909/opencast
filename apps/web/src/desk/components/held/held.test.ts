@@ -21,6 +21,14 @@ describe("held earnings", () => {
     expect(shortAddress(h.contractAddress!)).toBe("0x5ee2…a41d");
   });
 
+  it("takes the API's count of stations holding money when it gives one (A125)", async () => {
+    const db = await import("../../mocks/db");
+    db.resetDb();
+    const h = db.heldView();
+    expect(heldFigures({ ...h, stationsHoldingMoney: 3 }).heldAcross).toBe("Held across 3 stations");
+    expect(heldFigures({ ...h, stationsHoldingMoney: undefined }).heldAcross).toBe("Held across 2 stations");
+  });
+
   it("adds money owed but not deposited yet to the row, so the rows add up to the total", () => {
     expect(rowHeld({ heldMicros: 10_000_000, owedNotYetDepositedMicros: 2_500_000 })).toBe(12_500_000);
   });

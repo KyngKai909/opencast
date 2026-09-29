@@ -1,16 +1,18 @@
 // Held earnings' words (network-desk 07.1): each station's line, its status, and the figures.
 import { money } from "@opencast/ui";
-import type { HeldEarningsX, HeldStationX } from "../../api/ext";
 import { dayMonth, dayWord } from "../../lib/dates";
 import type { StageLook } from "../pipeline/stages";
+import type { HeldEarnings } from "@opencast/contracts";
+import type { HeldStation } from "../../api/types";
 
 /** What a row holds: deposited and owed together, so the rows add up to the total. */
-export function rowHeld(s: Pick<HeldStationX, "heldMicros" | "owedNotYetDepositedMicros">): number {
+export function rowHeld(s: Pick<HeldStation, "heldMicros" | "owedNotYetDepositedMicros">): number {
   return s.heldMicros + s.owedNotYetDepositedMicros;
 }
 
-export function heldFigures(h: HeldEarningsX) {
-  const withMoney = h.stations.filter((s) => rowHeld(s) > 0).length;
+export function heldFigures(h: HeldEarnings) {
+  // A125: the API counts the rows holding money; counted here from the rows when it doesn't say.
+  const withMoney = h.stationsHoldingMoney ?? h.stations.filter((s) => rowHeld(s) > 0).length;
   const invitations = h.stations.filter((s) => s.status === "invited" || s.status === "claim_link_sent").length;
   const years = h.unclaimedPeriodDays ? h.unclaimedPeriodDays / 365 : null;
   return {
@@ -23,12 +25,12 @@ export function heldFigures(h: HeldEarningsX) {
 }
 
 /** "101.9 CRAT, for Marcus Reyes" */
-export function stationTitle(s: HeldStationX): string {
+export function stationTitle(s: HeldStation): string {
   return `${s.station.channel ?? ""} ${s.station.callSign ?? s.station.name}, for ${s.creator}`.trim();
 }
 
 /** "On air since August 12, with permission"; "On air since September 20, under CC BY 4.0"; "Signs on Monday". */
-export function stationDetail(s: HeldStationX, timeZone: string, now: Date): string {
+export function stationDetail(s: HeldStation, timeZone: string, now: Date): string {
   if (s.onAirSince) return `On air since ${dayMonth(s.onAirSince, timeZone)}, ${s.rightsBasis === "licence" ? (s.licenceName ? `under ${s.licenceName}` : "under a licence") : "with permission"}`;
   if (s.signOnAt) {
     const d = dayWord(s.signOnAt, timeZone, now);
@@ -37,7 +39,7 @@ export function stationDetail(s: HeldStationX, timeZone: string, now: Date): str
   return "Not scheduled to sign on yet";
 }
 
-export function statusOf(s: HeldStationX, timeZone: string): { text: string; look: StageLook } {
+export function statusOf(s: HeldStation, timeZone: string): { text: string; look: StageLook } {
   switch (s.status) {
     case "claim_link_sent":
       return { text: "Claim link sent", look: "wait" };

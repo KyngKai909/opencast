@@ -3,10 +3,9 @@
 // catalog station, from the board.
 
 import { useSearchParams } from "react-router";
-import { networkApi, type ListedSource } from "@opencast/contracts";
+import { type ListedSource, networkApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Lines, Table, type Column } from "@opencast/ui";
 import { useApi } from "../../api/hooks";
-import { MarketBoardX } from "../api/ext";
 import { controlHref } from "../components/board/SlotDetail";
 import { ListSource } from "../components/listed/ListSource";
 import { channelText, embeddingCell, listingsCell } from "../components/listed/SourceStatus";
@@ -24,7 +23,7 @@ export default function Listed() {
   const { market, loading } = useMarket();
   const [params, setParams] = useSearchParams();
   const sources = useApi(networkApi.listListedSources, { query: { marketId: market?.id } }, { enabled: !!market });
-  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { schema: MarketBoardX, enabled: !!market });
+  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { enabled: !!market });
   if (loading || sources.isLoading) return <Quiet />;
   if (!market) return <NotFound />;
   if (sources.error) return <ErrorLine error={sources.error} />;

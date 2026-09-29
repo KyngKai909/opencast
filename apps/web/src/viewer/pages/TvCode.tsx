@@ -16,8 +16,7 @@ import { inChannelOrder } from "@opencast/player";
 import { pairWithCode } from "../cast/pairings";
 import { startCast } from "../cast/session";
 import { useCastIntro } from "../cast/useCast";
-import { useChannels } from "../data/viewer";
-import { getDevice } from "../device/store";
+import { useChannels, useLastChannelId } from "../data/viewer";
 import { useNowPlaying } from "../player/PlayerRoot";
 import { useAuth } from "../../auth/AuthProvider";
 import { useIsPhone, useShellOptions } from "../layout/shell";
@@ -56,6 +55,7 @@ export default function TvCodePage() {
   const navigate = useNavigate();
   const intro = useCastIntro();
   const channels = useChannels();
+  const lastId = useLastChannelId();
   const np = useNowPlaying();
   const [code, setCode] = useState(() => codeFromAddress(params.get("code")));
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +71,7 @@ export default function TvCodePage() {
       setBusy(false);
       return setError(r.error);
     }
-    const last = getDevice().lastStationId;
-    const start = np.row ?? channels.find((x) => x.station.id === last) ?? inChannelOrder(channels)[0];
+    const start = np.row ?? channels.find((x) => x.station.id === lastId) ?? inChannelOrder(channels)[0];
     const ok = await startCast({ id: r.pairing.tvId, name: r.pairing.tvName, kind: "tv_app", paired: true }, intro, start?.station.channel ? { stationId: start.station.id, channel: start.station.channel } : null);
     setBusy(false);
     if (ok) navigate("/remote", { replace: true });

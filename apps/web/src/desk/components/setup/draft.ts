@@ -3,7 +3,7 @@
 // the creator's name, who runs it, and when it signs on.
 
 import { stationColourPasses } from "@opencast/ui";
-import type { CreatorX, MarketBoardX } from "../../api/ext";
+import type { Creator, MarketBoard } from "@opencast/contracts";
 
 export interface Draft {
   recipeId: string;
@@ -42,14 +42,14 @@ export function clearDraft(creatorId: string) {
 }
 
 /** The name a call sign is suggested from: the person's first name, else the creator's first word. */
-export function shortName(c: Pick<CreatorX, "personName" | "displayName">): string {
+export function shortName(c: Pick<Creator, "personName" | "displayName">): string {
   const source = c.personName ?? c.displayName;
   const word = source.replace(/^T[ií]a\s+/i, "").split(/\s+/)[0] ?? source;
   return word.replace(/[’'].*$/, "");
 }
 
 /** Call signs to suggest, best first: letters only, 3 to 5, no K or W prefix (B9, checked here until the API does). */
-export function callSignIdeas(c: Pick<CreatorX, "personName" | "displayName">): string[] {
+export function callSignIdeas(c: Pick<Creator, "personName" | "displayName">): string[] {
   const letters = (s: string) => s.normalize("NFD").replace(/[^A-Za-z]/g, "").toUpperCase();
   const first = letters(shortName(c));
   const words = c.displayName.split(/\s+/).map(letters).filter(Boolean);
@@ -71,13 +71,13 @@ export function callSignProblem(s: string): string | null {
 }
 
 /** Open channels on a band's board: TV "33.1" for each open main channel; radio each open frequency. */
-export function openChannels(board: MarketBoardX | undefined): string[] {
+export function openChannels(board: MarketBoard | undefined): string[] {
   if (!board) return [];
   return board.slots.filter((s) => s.state === "open").map((s) => (board.band === "tv" ? `${s.major}.1` : (s.major / 10).toFixed(1)));
 }
 
 /** Who holds a channel on the board: "GOSP" for a waitlist hold, a call sign for a station, or null when it's open. */
-export function holderOf(board: MarketBoardX | undefined, channel: string): { kind: "held" | "station"; who: string } | null {
+export function holderOf(board: MarketBoard | undefined, channel: string): { kind: "held" | "station"; who: string } | null {
   if (!board) return null;
   const t = Math.round(Number(channel) * 10);
   const major = board.band === "tv" ? Math.floor(t / 10) : t;
@@ -88,7 +88,7 @@ export function holderOf(board: MarketBoardX | undefined, channel: string): { ki
 }
 
 /** The first proposed channel that's open, else the nearest open one to it, else the first open one. */
-export function chooseChannel(board: MarketBoardX | undefined, proposed: readonly string[]): string | null {
+export function chooseChannel(board: MarketBoard | undefined, proposed: readonly string[]): string | null {
   const open = openChannels(board);
   const free = proposed.find((ch) => open.includes(ch));
   if (free) return free;
@@ -137,6 +137,6 @@ export function colourFor(seed: string): string {
 }
 
 /** "her", "his", "their"; "She", "He", "They". */
-export function pronouns(p: CreatorX["pronoun"]) {
+export function pronouns(p: Creator["pronoun"]) {
   return p === "she" ? { pos: "her", subj: "She", obj: "her" } : p === "he" ? { pos: "his", subj: "He", obj: "him" } : { pos: "their", subj: "They", obj: "them" };
 }

@@ -5,13 +5,12 @@
 // yes or a licence, a free channel the waitlist doesn't hold, and a free call sign.
 
 import { http, type HttpHandler } from "msw";
-import { networkApi, type StationIdent } from "@opencast/contracts";
+import { Creator, networkApi, type StationIdent } from "@opencast/contracts";
 import { stationColourPasses } from "@opencast/ui";
-import { CreatorsX, CreatorWorksX, CreatorX, RecipesX, remindCreator } from "../../api/ext";
 import { now } from "../../../lib/clock";
 import type { DbCreator } from "../fixtures/creators";
 import { team } from "../fixtures/people";
-import { advance, callSignTaken, channelTakenBy, creatorById, creatorView, getDb, marketById, newId, permissionView, saveDb, worksOf, workView } from "../db";
+import { advance, callSignTaken, channelTakenBy, creatorById, creatorView, getDb, marketById, newId, permissionView, saveDb, stationById, worksOf, workView } from "../db";
 import { bodyOf, fail, needsAdmin, path, reply } from "../respond";
 import { mockToken, permissionLink } from "./permission";
 
@@ -33,7 +32,7 @@ export function channelOnBand(band: "tv" | "radio", channel: string): boolean {
 }
 
 function view(c: DbCreator) {
-  return reply(CreatorX, creatorView(c));
+  return reply(Creator, creatorView(c));
 }
 
 export const creatorHandlers: HttpHandler[] = [
@@ -48,7 +47,7 @@ export const creatorHandlers: HttpHandler[] = [
     const rows = getDb()
       .creators.filter((c) => (!marketId || c.marketId === marketId) && (!stage || c.stage === stage))
       .sort((a, b) => (a.nextActionDue ?? "9999").localeCompare(b.nextActionDue ?? "9999") || b.createdAt.localeCompare(a.createdAt));
-    return reply(CreatorsX, rows.map(creatorView));
+    return reply(networkApi.listCreators.response, rows.map(creatorView));
   }),
 
   http.post(path(networkApi.addCreator), async ({ request }) => {
@@ -89,7 +88,7 @@ export const creatorHandlers: HttpHandler[] = [
     };
     getDb().creators.push(c);
     saveDb();
-    return reply(CreatorX, creatorView(c), 201);
+    return reply(Creator, creatorView(c), 201);
   }),
 
   http.patch(path(networkApi.updateCreator), async ({ request, params }) => {
@@ -125,7 +124,7 @@ export const creatorHandlers: HttpHandler[] = [
     if (p instanceof Response) return p;
     const c = creatorById(String(params.creatorId));
     if (!c) return fail(404, "not_found", "That creator wasn't found.");
-    return reply(CreatorWorksX, worksOf(c.id).map(workView));
+    return reply(networkApi.listWorks.response, worksOf(c.id).map(workView));
   }),
 
   http.post(path(networkApi.askPermission), async ({ request, params }) => {
@@ -161,7 +160,7 @@ export const creatorHandlers: HttpHandler[] = [
     return reply(networkApi.askPermission.response, { requestId: request_.id, link: permissionLink(token), preview: permissionView(request_) }, 201);
   }),
 
-  http.post(path(remindCreator), ({ request, params }) => {
+  http.post(path(networkApi.remindCreator), ({ request, params }) => {
     const p = needsAdmin(request);
     if (p instanceof Response) return p;
     const c = creatorById(String(params.creatorId));
@@ -172,7 +171,24 @@ export const creatorHandlers: HttpHandler[] = [
     c.nextAction = "No answer";
     c.nextActionDue = dateIn(7, marketById(c.marketId)?.timezone);
     saveDb();
-    return reply(CreatorX, creatorView(c), 201);
+    return reply(Creator, creatorView(c), 201);
+  }),
+
+  // N3: invite them to claim (on air), or send the claim link (their permission page's Claim).
+  http.post(path(networkApi.sendClaimInvite), async ({ request, params }) => {
+    const p = needsAdmin(request);
+    if (p instanceof Response) return p;
+    const c = creatorById(String(params.creatorId));
+    if (!c) return fail(404, "not_found", "That creator wasn't found.");
+    const parsed = networkApi.sendClaimInvite.body.safeParse(await bodyOf(request));
+    if (!parsed.success) return fail(400, "invalid", "Say whether it's an invite or the link.");
+    if (!c.stationId || stationById(c.stationId)?.ident.kind !== "claimable") return fail(422, "no_station", "Set up their station first.");
+    if (!c.contactEmail) return fail(422, "no_contact", "Add their email first.");
+    const at = now().toISOString();
+    if (parsed.data.kind === "invite") c.claimInviteSentAt = at;
+    else c.claimLinkSentAt = at;
+    saveDb();
+    return reply(Creator, creatorView(c), 201);
   }),
 
   // The creator's side, answered here too so mock mode can take a creator through the flow.
@@ -203,7 +219,7 @@ export const creatorHandlers: HttpHandler[] = [
   http.get(path(networkApi.listRecipes), ({ request }) => {
     const p = needsAdmin(request);
     if (p instanceof Response) return p;
-    return reply(RecipesX, [...getDb().recipes].sort((a, b) => a.name.localeCompare(b.name)));
+    return reply(networkApi.listRecipes.response, [...getDb().recipes].sort((a, b) => a.name.localeCompare(b.name)));
   }),
 
   http.post(path(networkApi.setUpClaimable), async ({ request, params }) => {

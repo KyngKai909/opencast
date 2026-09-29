@@ -44,15 +44,16 @@ describe("the permission page", () => {
     expect(r.json.stoppedAt).toBe("2026-09-27T03:42:00.000Z");
   });
 
-  it("claims only when signed in: from the link before a station exists, by handover once it does", async () => {
+  it("claims from the link (B8) only when signed in, before or after the station exists, once", async () => {
     expect((await api("POST", "/permission/desert-skate-films-said-yes/claim")).status).toBe(401);
     expect((await api("POST", "/permission/desert-skate-films-said-yes/claim", undefined, true)).json.claim.status).toBe("verifying");
     const lupe = (await api("GET", "/permission/tia-lupes-kitchen-2026-0922")).json;
     expect(lupe.station.callSign).toBe("LUPE");
-    const h = await api("POST", `/stations/${lupe.station.id}/claim`, { kind: "claim", sourceAccountProof: "permission-link:tia-lupes-kitchen-2026-0922" }, true);
-    expect(h.status).toBe(201);
-    expect(h.json.status).toBe("verifying");
-    expect((await api("GET", "/permission/tia-lupes-kitchen-2026-0922")).json.claim.status).toBe("verifying");
+    const c = await api("POST", "/permission/tia-lupes-kitchen-2026-0922/claim", undefined, true);
+    expect(c.json.claim.status).toBe("verifying");
+    const again = await api("POST", "/permission/tia-lupes-kitchen-2026-0922/claim", undefined, true);
+    expect(again.status).toBe(422);
+    expect(again.json.error.code).toBe("in_progress");
   });
 
   it("reads back a link from the desk's mock, and turns away one it doesn't know", async () => {

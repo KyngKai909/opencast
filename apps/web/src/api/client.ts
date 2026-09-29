@@ -22,6 +22,29 @@ export const accessToken: Token = () => getToken();
 /** The same, by the desk's name for it. */
 export const currentToken: Token = accessToken;
 
+/** Why the API ended this sign-in (A1, A3): signed out everywhere, or the account deleted. */
+export type SessionEnd = "signed_out" | "account_deleted";
+let onSessionEnded: (why: SessionEnd) => void = () => {};
+
+/** Sign-in hands the client what to do when the API says the session has ended. */
+export function setSessionEndedHandler(fn: (why: SessionEnd) => void) {
+  onSessionEnded = fn;
+}
+
+let endingHere = false;
+/**
+ * Runs `f` (signing out everywhere, deleting the account: this device ends the session itself)
+ * without treating the 401s that may come before it has signed out as news from elsewhere.
+ */
+export async function endingSessionHere<T>(f: () => Promise<T>): Promise<T> {
+  endingHere = true;
+  try {
+    return await f();
+  } finally {
+    endingHere = false;
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -46,8 +69,9 @@ export async function call<E extends EndpointDef, S extends z.ZodType = E["respo
   for (const [k, v] of Object.entries(args.query ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
   const url = `${config.apiBase}${API_PREFIX}${path}${qs.size ? `?${qs}` : ""}`;
   const headers: Record<string, string> = {};
+  let token: string | null = null;
   if (endpoint.auth !== "public") {
-    const token = await getToken();
+    token = await getToken();
     if (token) headers.authorization = `Bearer ${token}`;
   }
   // Multipart endpoints (an upload): the body's fields plus `file`, as form data.
@@ -69,6 +93,8 @@ export async function call<E extends EndpointDef, S extends z.ZodType = E["respo
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     const e = ErrorResponse.safeParse(json);
+    // Signed out everywhere, or the account deleted: every area signs out of this device too.
+    if (e.success && res.status === 401 && token && !endingHere && (e.data.error.code === "signed_out" || e.data.error.code === "account_deleted")) onSessionEnded(e.data.error.code);
     if (e.success) throw new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields);
     // A 404 without the API's error body is a route the API doesn't mount: a proposed endpoint
     // (each area's api/ext*, docs/contract-requests.md) that hasn't landed. Trying again wouldn't

@@ -2,8 +2,8 @@
 // shows one set for the market. Counts add up across bands; the local share can't be added without
 // hours, so it's the market-wide figure when the API sends one (N7), otherwise the TV band's.
 
-import { SLOT_STATE_LABELS, type StationIdent } from "@opencast/contracts";
-import type { MarketBoardX, SlotX } from "../../api/ext";
+import { type MarketBoard, SLOT_STATE_LABELS, type StationIdent } from "@opencast/contracts";
+import type { BoardSlot } from "../../api/types";
 
 export interface Coverage {
   localSharePercent: number | null;
@@ -19,9 +19,9 @@ export interface Coverage {
   claimable: number;
 }
 
-export function coverage(tv: MarketBoardX | undefined, radio: MarketBoardX | undefined): Coverage {
-  const boards = [tv, radio].filter((b): b is MarketBoardX => !!b);
-  const count = (state: SlotX["state"]) => boards.reduce((n, b) => n + b.slots.filter((s) => s.state === state).reduce((m, s) => m + Math.max(1, s.stations.length), 0), 0);
+export function coverage(tv: MarketBoard | undefined, radio: MarketBoard | undefined): Coverage {
+  const boards = [tv, radio].filter((b): b is MarketBoard => !!b);
+  const count = (state: BoardSlot["state"]) => boards.reduce((n, b) => n + b.slots.filter((s) => s.state === state).reduce((m, s) => m + Math.max(1, s.stations.length), 0), 0);
   const market = tv?.stats.market ?? radio?.stats.market;
   const deadAir = market?.deadAirComing ?? boards.flatMap((b) => b.stats.deadAirComing);
   return {
@@ -69,7 +69,7 @@ export function statCaptions(c: Coverage) {
 }
 
 /** A slot's number as the board writes it: "33", "9.1–3" (subchannels), "88.3" (radio: major is tenths). */
-export function slotNumber(slot: Pick<SlotX, "major" | "stations">, band: "tv" | "radio"): string {
+export function slotNumber(slot: Pick<BoardSlot, "major" | "stations">, band: "tv" | "radio"): string {
   if (band === "radio") return (slot.major / 10).toFixed(1);
   const minors = slot.stations.map((s) => Number(s.channel?.split(".")[1] ?? 1)).sort((a, b) => a - b);
   if (minors.length > 1) return `${slot.major}.${minors[0]}–${minors[minors.length - 1]}`;
@@ -77,7 +77,7 @@ export function slotNumber(slot: Pick<SlotX, "major" | "stations">, band: "tv" |
 }
 
 /** The slot's address in `?ch=`: "33" on TV, "88.3" on radio. */
-export function slotKey(slot: Pick<SlotX, "major">, band: "tv" | "radio"): string {
+export function slotKey(slot: Pick<BoardSlot, "major">, band: "tv" | "radio"): string {
   return band === "radio" ? (slot.major / 10).toFixed(1) : String(slot.major);
 }
 
@@ -87,14 +87,14 @@ export function bandOfKey(key: string): "tv" | "radio" {
 }
 
 /** The call sign on a slot: the station's, or the held one. */
-export function slotCallSign(slot: SlotX): string | null {
+export function slotCallSign(slot: BoardSlot): string | null {
   if (slot.state === "held") return slot.heldFor;
   if (slot.stations.length > 1) return slot.stations[0]!.callSign;
   return slot.stations[0]?.callSign ?? null;
 }
 
 /** A screen reader's words for a slot: "Channel 33, LUPE, Claimable, run by Opencast". */
-export function slotLabel(slot: SlotX, band: "tv" | "radio"): string {
+export function slotLabel(slot: BoardSlot, band: "tv" | "radio"): string {
   const cs = slotCallSign(slot);
   const n = slotNumber(slot, band).replace("–", " to ");
   return [`${band === "radio" ? "" : "Channel "}${n}`, cs, SLOT_STATE_LABELS[slot.state]].filter(Boolean).join(", ");

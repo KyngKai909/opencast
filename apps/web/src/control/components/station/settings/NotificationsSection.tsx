@@ -1,20 +1,19 @@
 // Settings, Notifications (station-settings 05.1): what this person hears about this station.
 // Per person, per station. Dead air coming shows a lock, not a toggle: it can't be turned off.
 
-import { notificationsApi, type NotificationPrefs } from "@opencast/contracts";
+import { notificationsApi, type NoticeKind, type NotificationPrefs } from "@opencast/contracts";
 import { Toggle, ToggleLock } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useApi, useApiMutation, keyFor } from "../../../../api/hooks";
 import { ApiError } from "../../../../api/client";
-import { SIGNED_ON_OFF } from "../../../api/ext/station";
 import type { StationState } from "../../../station/StationContext";
 import { Quiet } from "../../../pages/common";
 import "./common.css";
 import "./NotificationsSection.css";
 
 interface Pref {
-  key: string;
+  key: NoticeKind;
   title: string;
   detail?: string;
   /** Hosts hear only about their own blocks (station-settings 05 note). */
@@ -27,7 +26,7 @@ export const NOTIFICATION_GROUPS: { title: string; rows: Pref[] }[] = [
     rows: [
       { key: "dead_air_warning", title: "Dead air coming", detail: "30 and 12 minutes before a gap. Always on", forHosts: true },
       { key: "signal_lost", title: "Signal lost", detail: "A live source drops for more than a minute", forHosts: true },
-      { key: SIGNED_ON_OFF, title: "Signed on, signed off", detail: "When anyone on the team does it" }
+      { key: "signed_on_off", title: "Signed on, signed off", detail: "When anyone on the team does it" }
     ]
   },
   {

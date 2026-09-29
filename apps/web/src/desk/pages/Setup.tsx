@@ -7,11 +7,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { accountsApi, networkApi, RIGHTS_BASIS_LABELS, waitlistApi } from "@opencast/contracts";
+import { accountsApi, type Creator, type CreatorWork, type MarketBoard, networkApi, type Recipe, RIGHTS_BASIS_LABELS, waitlistApi } from "@opencast/contracts";
 import { Button, clock, ControlTitle, Field, Icon, KeyValueList, Notice, SelectField, useToast, type KeyValueRow } from "@opencast/ui";
 import { call } from "../../api/client";
 import { keyFor, useApi } from "../../api/hooks";
-import { CreatorsX, CreatorWorksX, listTeam, MarketBoardX, RecipesX, type CreatorWorkX, type CreatorX, type RecipeX } from "../api/ext";
 import { mainNoun, pickRecipe, plural } from "../components/ask/works";
 import { PLATFORM_LABELS } from "../components/pipeline/stages";
 import { callSignIdeas, callSignProblem, chooseChannel, clearDraft, colourFor, holderOf, loadDraft, nextMondaySixAm, openChannels, pronouns, saveDraft, shortName, toLocalInput, zonedToUtc, type Draft } from "../components/setup/draft";
@@ -28,7 +27,7 @@ import { deskPath } from "../../areas";
 type Editing = "channel" | "callSign" | "operator" | "signOn" | null;
 
 /** "Said yes September 22. Covers 48 cooking videos on YouTube." */
-export function setupLine(c: CreatorX, covered: number, noun: string, recipe: RecipeX | undefined, timeZone: string): string {
+export function setupLine(c: Creator, covered: number, noun: string, recipe: Recipe | undefined, timeZone: string): string {
   const topic = recipe?.category.split(/\s+/)[0]?.toLowerCase();
   const what = `${covered} ${topic && !noun.startsWith(topic.slice(0, 4)) ? `${topic} ` : ""}${noun}`;
   const platform = PLATFORM_LABELS[c.sourcePlatform];
@@ -53,12 +52,12 @@ function Editable({ label, children, onEdit, disabled }: { label: string; childr
 export default function Setup() {
   const { creatorId = "" } = useParams();
   const { market, loading } = useMarket();
-  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { schema: CreatorsX, enabled: !!market, refetchInterval: (q) => (q.state.data?.some((c) => c.id === creatorId && c.setup && c.setup.importDone < c.setup.importTotal) ? 5000 : false) });
-  const works = useApi(networkApi.listWorks, { params: { creatorId } }, { schema: CreatorWorksX });
-  const recipes = useApi(networkApi.listRecipes, {}, { schema: RecipesX });
-  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { schema: MarketBoardX, enabled: !!market });
-  const radio = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "radio" } }, { schema: MarketBoardX, enabled: !!market });
-  const team = useApi(listTeam, {}, { retry: false });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market, refetchInterval: (q) => (q.state.data?.some((c) => c.id === creatorId && c.setup && c.setup.importDone < c.setup.importTotal) ? 5000 : false) });
+  const works = useApi(networkApi.listWorks, { params: { creatorId } });
+  const recipes = useApi(networkApi.listRecipes, {});
+  const tv = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "tv" } }, { enabled: !!market });
+  const radio = useApi(networkApi.getBoard, { params: { marketSlug: market?.slug ?? "" }, query: { band: "radio" } }, { enabled: !!market });
+  const team = useApi(accountsApi.listOpencastTeam, {}, { retry: false });
   const me = useApi(accountsApi.getMe);
   const creator = creators.data?.find((c) => c.id === creatorId);
 
@@ -98,13 +97,61 @@ export default function Setup() {
 }
 
 /**
- * A station that's set up, read from the creator's record only: the recipe, operator, sign-on time
- * and import progress come with the setup's read-back (N5), which the API doesn't have yet.
+ * The claim, once the station exists (N3): invite them to claim it, or send the claim link itself
+ * (their permission page's Claim). Held earnings then say Invited or Claim link sent.
  */
-function SetUpStation({ creator, base, slot }: { creator: CreatorX; base: string; slot?: MarketBoardX["slots"][number] }) {
+export function claimRow(c: Pick<Creator, "stage" | "displayName" | "claimInviteSentAt" | "claimLinkSentAt">, onAir: boolean, timeZone: string, send: (kind: "invite" | "link") => void, busy: boolean): KeyValueRow | null {
+  if (c.stage === "claimed") return null;
+  const when = (ts: string) => dayMonth(ts, timeZone, { short: true });
+  const detail = c.claimLinkSentAt ? `Claim link sent ${when(c.claimLinkSentAt)}` : c.claimInviteSentAt ? `Claim invite sent ${when(c.claimInviteSentAt)}` : `${c.displayName} hasn't been invited to claim it yet`;
+  return {
+    title: "Claim",
+    detail,
+    actions: (
+      <>
+        {onAir && !c.claimInviteSentAt && !c.claimLinkSentAt && (
+          <Button size="sm" disabled={busy} onClick={() => send("invite")}>
+            Invite to claim
+          </Button>
+        )}
+        <Button size="sm" disabled={busy} onClick={() => send("link")}>
+          {c.claimLinkSentAt ? "Send the link again" : "Send the claim link"}
+        </Button>
+      </>
+    )
+  };
+}
+
+/** Sends a claim invite or the claim link (N3's sendClaimInvite), and says so. */
+function useSendClaim(creator: Creator) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const send = async (kind: "invite" | "link") => {
+    setBusy(true);
+    try {
+      await call(networkApi.sendClaimInvite, { params: { creatorId: creator.id }, body: { kind } });
+      await Promise.all([qc.invalidateQueries({ queryKey: keyFor(networkApi.listCreators).slice(0, 2) }), qc.invalidateQueries({ queryKey: keyFor(networkApi.heldEarnings).slice(0, 2) })]);
+      toast.show({ message: kind === "invite" ? `Claim invite sent to ${creator.displayName}.` : `Claim link sent to ${creator.displayName}.` });
+    } catch (e) {
+      toast.show({ message: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { send: (kind: "invite" | "link") => void send(kind), busy };
+}
+
+/**
+ * A station set up before its setup was kept (N5's `Creator.setup` is null for those): read from
+ * the creator's record only, without its recipe, operator, sign-on time or import progress.
+ */
+function SetUpStation({ creator, base, slot }: { creator: Creator; base: string; slot?: MarketBoard["slots"][number] }) {
   const s = creator.station!;
   // The board says whether it's on air: a slot with a status ("Signs on …", "Setting up") isn't yet.
   const onAir = creator.stage === "on_air" || (!!slot && slot.status === null);
+  const claim = useSendClaim(creator);
+  const claimLine = claimRow(creator, onAir, DEFAULT_TZ, claim.send, claim.busy);
   return (
     <>
       <Crumb href={base} label="Pipeline" here={creator.displayName} />
@@ -115,13 +162,14 @@ function SetUpStation({ creator, base, slot }: { creator: CreatorX; base: string
         items={[
           {
             title: creator.stage === "claimed" ? "Claimed" : onAir ? "On air, waiting to be claimed" : "Set up, signing on",
-            detail: `${!onAir && slot?.status ? `${slot.status}. ` : ""}Its recipe, sign-on time and import can't be read back here yet.`,
+            detail: `${!onAir && slot?.status ? `${slot.status}. ` : ""}It was set up before its recipe was kept, so its recipe, sign-on time and import aren't shown here.`,
             actions: s.callSign ? (
               <Button size="sm" href={controlHref(s.callSign)} target="_blank" rel="noopener">
                 Open in master control
               </Button>
             ) : undefined
-          }
+          },
+          ...(claimLine ? [claimLine] : [])
         ]}
       />
     </>
@@ -129,10 +177,10 @@ function SetUpStation({ creator, base, slot }: { creator: CreatorX; base: string
 }
 
 interface ViewProps {
-  creator: CreatorX;
-  works: CreatorWorkX[];
-  recipes: RecipeX[];
-  boards: { tv?: MarketBoardX; radio?: MarketBoardX };
+  creator: Creator;
+  works: CreatorWork[];
+  recipes: Recipe[];
+  boards: { tv?: MarketBoard; radio?: MarketBoard };
   operators: Array<{ id: string; name: string }>;
   meId: string | null;
   market: { id: string; slug: string; name: string; timezone: string };
@@ -199,7 +247,12 @@ function SetupView({ creator, works, recipes, boards, operators, meId, market }:
   const colour = setup?.colour ?? colourFor(creator.id);
   const operator = setup?.operator ?? operators.find((o) => o.id === draft.operatorId) ?? null;
   const signOnAt = setup?.signOnAt ?? draft.signOnAt;
-  const onAir = !!creator.station && (creator.stage === "on_air" || (creator.stage === "already_licensed" && !!creator.station)) && !!signOnAt && Date.parse(signOnAt) <= now().getTime();
+  // On air: the pipeline says so, or the board does (a slot with no status line; the creator's
+  // stage can trail the station's sign-on), once its sign-on time has passed.
+  const slot = creator.station ? [...(boards.tv?.slots ?? []), ...(boards.radio?.slots ?? [])].find((sl) => sl.stations.some((st) => st.id === creator.station!.id)) : undefined;
+  const onAir = !!creator.station && (creator.stage === "on_air" || creator.stage === "already_licensed" || slot?.status === null) && !!signOnAt && Date.parse(signOnAt) <= now().getTime();
+  const claim = useSendClaim(creator);
+  const claimLine = setup && creator.station ? claimRow(creator, onAir, tz, claim.send, claim.busy) : null;
   const hours = recipe ? hoursBySource(recipe) : null;
   const carried = recipe ? recipe.blocks.filter((b) => b.source === "carried" && b.carried) : [];
   const totalMs = coveredOrIncluded.reduce((s, w) => s + (w.durationMs ?? 0), 0);
@@ -388,7 +441,8 @@ function SetupView({ creator, works, recipes, boards, operators, meId, market }:
                       Open in master control
                     </Button>
                   )
-                }
+                },
+                ...(claimLine ? [claimLine] : [])
               ]}
             />
           ) : (

@@ -6,15 +6,15 @@
 
 import { useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { cx } from "@opencast/ui";
-import type { SlotX } from "../../api/ext";
 import { slotCallSign, slotKey, slotLabel, slotNumber } from "./board";
 import "./BoardMap.css";
+import type { BoardSlot } from "../../api/types";
 
-const LOOK: Record<SlotX["state"], string> = { station: "st", claimable: "cl", listed: "li", catalog: "ho", held: "rs", open: "open" };
+const LOOK: Record<BoardSlot["state"], string> = { station: "st", claimable: "cl", listed: "li", catalog: "ho", held: "rs", open: "open" };
 
 export interface BoardMapProps {
   band: "tv" | "radio";
-  slots: SlotX[];
+  slots: BoardSlot[];
   /** 17 across for TV, 20 for radio, as drawn. */
   columns: number;
   selected: string | null;

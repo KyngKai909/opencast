@@ -2,8 +2,8 @@
 // outside the phone shell (no tabs, no mini player, no player bar), phone-first, never indexed. The
 // token in the address is the only credential. It lists exactly which works, what Opencast would
 // do, where the money goes and how to stop; then "Yes, go ahead" or "No thanks". After a yes: Stop
-// (from the link, B8) and Claim now (sign in, then network.startHandover, or B8 before the station
-// exists). Every word is in components/permission/copy.ts, versioned for the lawyer.
+// (from the link, B8) and Claim now (sign in, then B8's claim from the link, before or after the
+// station exists). Every word is in components/permission/copy.ts, versioned for the lawyer.
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
@@ -14,7 +14,6 @@ import { ApiError, call } from "../../api/client";
 import { keyFor, useApi } from "../../api/hooks";
 import { useAuth } from "../../auth/AuthProvider";
 import SignInModal from "../components/overlays/SignInModal";
-import { claimFromLink, PermissionPageX, stopFromLink } from "../components/permission/api";
 import { PERMISSION_COPY as C, PERMISSION_WORDING_VERSION } from "../components/permission/copy";
 import { mainNoun, pageState, PLATFORMS, whenLine, worksLine } from "../components/permission/words";
 import { MARKET_TZ } from "../../lib/clock";
@@ -50,7 +49,7 @@ export default function Permission() {
   const auth = useAuth();
   const toast = useToast();
   const qc = useQueryClient();
-  const page = useApi(networkApi.getPermissionPage, { params: { token } }, { schema: PermissionPageX, enabled: token.length >= 16, retry: false });
+  const page = useApi(networkApi.getPermissionPage, { params: { token } }, { enabled: token.length >= 16, retry: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
@@ -71,7 +70,7 @@ export default function Permission() {
   };
 
   const answer = (a: "yes" | "no") =>
-    run(() => call(networkApi.answerPermission, { params: { token }, body: { answer: a, wordingVersion: PERMISSION_WORDING_VERSION } }, PermissionPageX));
+    run(() => call(networkApi.answerPermission, { params: { token }, body: { answer: a, wordingVersion: PERMISSION_WORDING_VERSION } }));
 
   // Stop is one tap; the toast holds it for a moment so a slip can be undone (rules: Undo, not a confirmation).
   const stop = () => {
@@ -79,21 +78,12 @@ export default function Permission() {
     toast.show({
       message: C.stopping,
       onUndo: () => setStopping(false),
-      onExpire: () => void run(() => call(stopFromLink, { params: { token } }, PermissionPageX)).finally(() => setStopping(false))
+      onExpire: () => void run(() => call(networkApi.stopFromLink, { params: { token } })).finally(() => setStopping(false))
     });
   };
 
-  const claim = (p: PermissionPageX) =>
-    auth.requireSignIn({ kind: "general", ...C.claimSignIn }, () =>
-      run(async () => {
-        if (p.station) {
-          // The link itself is what proves it's them until source accounts can be connected.
-          await call(networkApi.startHandover, { params: { stationId: p.station.id }, body: { kind: "claim", sourceAccountProof: `permission-link:${token}` } });
-          return;
-        }
-        return call(claimFromLink, { params: { token } }, PermissionPageX);
-      })
-    );
+  // Claim from the link (B8), before or after the station exists: the link is what proves it's them.
+  const claim = () => auth.requireSignIn({ kind: "general", ...C.claimSignIn }, () => run(() => call(networkApi.claimFromLink, { params: { token } })));
 
   if (token.length < 16 || page.error) return <Bad />;
   if (page.isLoading || !page.data) return <main className="vw-perm" aria-busy="true" />;
@@ -162,7 +152,7 @@ export default function Permission() {
                       title: C.claimTitle,
                       detail: C.claim,
                       actions: (
-                        <Button size="sm" disabled={busy} onClick={() => claim(p)}>
+                        <Button size="sm" disabled={busy} onClick={claim}>
                           {C.claimButton}
                         </Button>
                       )

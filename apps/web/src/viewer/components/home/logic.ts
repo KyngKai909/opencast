@@ -139,7 +139,7 @@ export function openChannelsText(marketName: string, openTv: string[] | undefine
   return `${room} ${open.size} channels from ${lo} to ${hi} are open.`;
 }
 
-// ---------- first visit: the nearest market ----------
+// ---------- distances (the mock API's market by location, S10) ----------
 
 export interface Point {
   lat: number;
@@ -154,23 +154,6 @@ export function milesApart(a: Point, b: Point): number {
   const dLng = rad(b.lng - a.lng);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-/** Farther than this from every market, and "Use my location" says there's none near you. */
-export const NEAREST_WITHIN_MILES = 150;
-
-/**
- * The open market nearest to where you are, from each market's centre, worked out on the device so
- * your location isn't sent anywhere. Null when no open market is within 150 miles, or none has a centre.
- */
-export function nearestMarket<M extends { open: boolean; centre?: Point }>(here: Point, markets: M[], within = NEAREST_WITHIN_MILES): { market: M; miles: number } | null {
-  let best: { market: M; miles: number } | null = null;
-  for (const m of markets) {
-    if (!m.open || !m.centre) continue;
-    const miles = milesApart(here, m.centre);
-    if (miles <= within && (!best || miles < best.miles)) best = { market: m, miles };
-  }
-  return best;
 }
 
 // ---------- wording ----------

@@ -1,12 +1,12 @@
 // Which works (network-desk 03.1 .works, .wk): each group or single work with a tick box, its count
 // and length, and "Included" or "Left out". Only ticked works are covered by the yes.
 import { Icon } from "@opencast/ui";
-import type { CreatorWorkX } from "../../api/ext";
 import { groupDetail, groupWorks } from "./works";
 import "./WorkList.css";
+import type { CreatorWork } from "@opencast/contracts";
 
 export interface WorkListProps {
-  works: CreatorWorkX[];
+  works: CreatorWork[];
   included: ReadonlySet<string>;
   onChange: (next: Set<string>) => void;
   disabled?: boolean;

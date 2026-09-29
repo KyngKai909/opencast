@@ -5,7 +5,6 @@
 
 import type { BreakRule, Invite, NotificationPrefs, Translator } from "@opencast/contracts";
 import type { ClaimPageX, ClaimX } from "../../api/ext/station";
-import { SIGNED_ON_OFF } from "../../api/ext/station";
 import { getDb, saveDb } from "../db";
 import { BEAT, CRAT, HALL, stationByRef, uid } from "./stations";
 import { at, MIN, SEC } from "./time";
@@ -76,7 +75,7 @@ export function defaultPrefs(): NotificationPrefs {
   return {
     dead_air_warning: on,
     signal_lost: on,
-    [SIGNED_ON_OFF]: { push: false, email: false },
+    signed_on_off: { push: false, email: false },
     spot_paused: on,
     weekly_summary: { push: true, email: true },
     carriage_request: on,

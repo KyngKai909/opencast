@@ -7,7 +7,6 @@
 
 import type { Business, BusinessLocation, Invite, Movement, NotificationPrefs } from "@opencast/contracts";
 import type { ReceiptX } from "../../api/ext/settings";
-import { SPOT_ADDED } from "../../api/ext/settings";
 import { now } from "../../lib/clock";
 import type { DbMember } from "../db";
 import { CYPRESS_ID, OSC_ID } from "./businesses";
@@ -145,7 +144,7 @@ export function newId(): string {
 // ---- Notifications ----
 
 /** The rows of biz-settings 04.1, and the kind each maps to. */
-export const BUSINESS_KINDS = ["low_balance", "spot_paused", SPOT_ADDED, "sponsorship_answered", "order_update", "weekly_summary", "code_used"] as const;
+export const BUSINESS_KINDS = ["low_balance", "spot_paused", "spot_added", "sponsorship_answered", "order_update", "weekly_summary", "code_used"] as const;
 
 /** Spots about to pause can't be turned off (the one alert that protects what's on air). */
 export const ALWAYS_ON = ["low_balance"] as const;

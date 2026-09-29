@@ -1,15 +1,14 @@
 // Network desk's flow against the real API (playwright.real.config.ts), as Dee (an Opencast
-// admin): the board and pipeline, asking a new creator (B7: the ticked works go as `workIds`,
-// which the API ignores: recorded, not failed), setting up Tía Lupe's Kitchen from a recipe on
-// 33.1 (the seed leaves it free), held earnings, and the one reminder (N2, which the API doesn't
-// mount: the pipeline says so in words). Checked through the API.
+// admin): the board and pipeline, asking a new creator (B7: only the ticked works go, as
+// `workIds`), setting up Tía Lupe's Kitchen from a recipe on 33.1 (the seed leaves it free) and
+// sending her the claim link (N3), held earnings, and the one reminder (N2). Checked through the API.
 
 import type { Page } from "@playwright/test";
 import { api, expect, seed, signIn, test } from "../lib/real";
 
 const IE = "/desk/markets/inland-empire";
 
-type Creator = { id: string; displayName: string; stage: string; station: { callSign: string | null; channel: string | null } | null; nextActionDue: string | null };
+type Creator = { id: string; displayName: string; stage: string; station: { callSign: string | null; channel: string | null } | null; nextActionDue: string | null; remindedAt?: string | null; claimLinkSentAt?: string | null };
 type Slot = { major: number; state: string; stations: Array<{ callSign: string | null }> };
 
 const stage = (page: Page, label: string) => page.getByRole("group", { name: "Stages" }).getByRole("button", { name: label, exact: false });
@@ -47,7 +46,7 @@ test("set up a claimable station from a recipe: Tía Lupe's Kitchen on 33.1", as
   const callSign = (await page.locator(".nd-setup__cs").innerText()).trim();
   expect(callSign).toMatch(/^[A-Z]{3,5}$/);
   await expect(page.getByRole("heading", { level: 1, name: `Set up ${callSign} 33.1`, exact: true })).toBeVisible();
-  // A6 (the team) isn't in the API: Dee, who's signed in, runs it.
+  // Who runs it: the Opencast team (A6); Dee, who's signed in, by default.
   await expect(page.getByText("Dee A.")).toBeVisible();
   await page.getByRole("button", { name: "Schedule sign-on" }).click();
   await expect(page.getByText(new RegExp(`^${callSign} 33\\.1 is set up\\. It signs on `))).toBeVisible();
@@ -56,6 +55,15 @@ test("set up a claimable station from a recipe: Tía Lupe's Kitchen on 33.1", as
   await expect.poll(async () => (await creators()).find((c) => c.id === seed.creators.lupe)?.station).toMatchObject({ callSign, channel: "33.1" });
   const board = await api<{ slots: Slot[] }>(`/admin/markets/inland-empire/board?band=tv`, { as: "dee" });
   expect(board.slots.find((s) => s.major === 33)).toMatchObject({ state: "claimable", stations: [expect.objectContaining({ callSign, channel: "33.1" })] });
+
+  // The claim link (N3): the setup page sends it, and held earnings say so.
+  await page.getByRole("button", { name: "Send the claim link" }).click();
+  await expect(page.getByText("Claim link sent to Tía Lupe's Kitchen.")).toBeVisible();
+  await expect(page.getByText(/^Claim link sent \w+ \d+$/)).toBeVisible();
+  await expect.poll(async () => (await creators()).find((c) => c.id === seed.creators.lupe)?.claimLinkSentAt).toBeTruthy();
+  // Not on air yet, so held earnings still say so; the row keeps when the link went.
+  const heldNow = await api<{ stations: Array<{ station: { callSign: string | null }; claimLinkSentAt?: string | null }> }>("/admin/held-earnings", { as: "dee" });
+  expect(heldNow.stations.find((s) => s.station.callSign === callSign)?.claimLinkSentAt).toBeTruthy();
 
   // The pipeline's row moves on, and the board shows it.
   await page.getByRole("link", { name: "Pipeline" }).first().click();
@@ -67,7 +75,7 @@ test("set up a claimable station from a recipe: Tía Lupe's Kitchen on 33.1", as
   expect(w.mismatched, "responses that don't match their contracts").toEqual([]);
 });
 
-test("ask a new creator: the ticked works go as workIds (B7, which the API ignores)", async ({ page }) => {
+test("ask a new creator: only the ticked works go, as workIds (B7)", async ({ page }) => {
   const w = watch(page);
   const name = `Banning Rodeo Films ${Date.now().toString(36)}`;
   const made = await api<{ id: string }>("/admin/creators", {
@@ -104,15 +112,16 @@ test("ask a new creator: the ticked works go as workIds (B7, which the API ignor
 
   const answer = (await res.json()) as { link: string; preview: { works: Array<{ title: string; included: boolean }>; note: string | null } };
   expect(answer.preview.note).toBe("Could Saturday nights air on the Inland Empire dial?");
-  const left = answer.preview.works.find((x) => x.title === "The bull that wouldn't");
-  if (left?.included) test.info().annotations.push({ type: "still on mocks (B7)", description: "askPermission ignores workIds: the work left out is still included on the permission page" });
+  // Only the ticked works are covered: the one left out says so on the permission page.
+  expect(answer.preview.works.find((x) => x.title === "The bull that wouldn't")?.included).toBe(false);
+  expect(answer.preview.works.filter((x) => x.included)).toHaveLength(2);
   expect((await creators()).find((c) => c.id === made.id)?.stage).toBe("asked");
 
   expect(w.errors, "page errors").toEqual([]);
   expect(w.mismatched, "responses that don't match their contracts").toEqual([]);
 });
 
-test("a reminder that's due: Remind says it isn't available yet (N2), and nothing changes", async ({ page }) => {
+test("a reminder that's due: Remind sends the one reminder (N2), then No answer is next", async ({ page }) => {
   const w = watch(page);
   const name = `Redlands Choir ${Date.now().toString(36)}`;
   const made = await api<{ id: string }>("/admin/creators", {
@@ -128,13 +137,18 @@ test("a reminder that's due: Remind says it isn't available yet (N2), and nothin
 
   await signIn(page, "dee");
   await page.goto(`${IE}/pipeline?stage=asked`);
-  const refused = page.waitForResponse((r) => r.url().endsWith(`/admin/creators/${made.id}/reminders`));
+  const reminded = page.waitForResponse((r) => r.url().endsWith(`/admin/creators/${made.id}/reminders`));
   await page.getByRole("button", { name: `Remind: ${name}` }).click();
-  expect((await refused).status()).toBe(404);
-  test.info().annotations.push({ type: "still on mocks (N2)", description: `POST /v1/admin/creators/:id/reminders answers 404` });
-  await expect(page.getByText("This isn't available yet.")).toBeVisible();
+  expect((await reminded).status()).toBe(201);
+  await expect(page.getByText(`Reminded ${name}. That's their one reminder.`)).toBeVisible();
+  await expect(page.getByRole("row", { name: new RegExp(name) })).toContainText(/Reminded \w+ \d+\. No more after this/);
   await expect(page.getByText("Something went wrong", { exact: false })).toHaveCount(0);
-  expect((await creators()).find((c) => c.id === made.id)?.stage).toBe("asked");
+  const after = (await creators()).find((c) => c.id === made.id);
+  expect(after?.stage).toBe("asked");
+  expect(after?.remindedAt).toBeTruthy();
+  // A second reminder is refused.
+  const again = await api<{ error: { code: string } }>(`/admin/creators/${made.id}/reminders`, { as: "dee", method: "POST", status: 422 });
+  expect(again.error.code).toBe("reminded");
 
   expect(w.errors, "page errors").toEqual([]);
   expect(w.mismatched, "responses that don't match their contracts").toEqual([]);

@@ -117,8 +117,3 @@ export const stationExtApi = {
  * the spot market filters by.
  */
 export const SPOT_CATEGORIES = ["Alcohol", "Gambling", "Cannabis", "Political", "Payday loans", "Vaping"] as const;
-
-// ---- notifications ----
-
-/** O1: "Signed on, signed off" has no NoticeKind yet; its preference is kept under this key. */
-export const SIGNED_ON_OFF = "signed_on_off";

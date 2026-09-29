@@ -4,22 +4,22 @@
 import { networkApi } from "@opencast/contracts";
 import { ControlTitle, KeyValueList, Lines, money, StatRow, Table, type Column } from "@opencast/ui";
 import { useApi } from "../../api/hooks";
-import { HeldEarningsX, type HeldStationX } from "../api/ext";
 import { heldFigures, rowHeld, shortAddress, stationDetail, stationTitle, statusOf } from "../components/held/held";
 import { Stg } from "../components/pipeline/StageTag";
 import { DEFAULT_TZ, now } from "../../lib/clock";
 import { ErrorLine, Quiet, SecTop } from "./common";
 import "./Held.css";
 import "./Board.css";
+import type { HeldStation } from "../api/types";
 
 export default function Held() {
-  const held = useApi(networkApi.heldEarnings, {}, { schema: HeldEarningsX });
+  const held = useApi(networkApi.heldEarnings, {});
   if (held.isLoading) return <Quiet />;
   if (held.error || !held.data) return <ErrorLine error={held.error} />;
   const h = held.data;
   const f = heldFigures(h);
   const tz = DEFAULT_TZ;
-  const columns: Column<HeldStationX>[] = [
+  const columns: Column<HeldStation>[] = [
     { key: "station", header: "Station", cell: (s) => <Lines title={stationTitle(s)} detail={stationDetail(s, tz, now())} /> },
     { key: "escrow", header: "In escrow as", width: "180px", kind: "mono", cell: (s) => `Station #${s.escrowStationId}` },
     { key: "held", header: "Held", width: "160px", kind: "amount", cell: (s) => money(rowHeld(s)) },
