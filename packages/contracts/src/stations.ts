@@ -152,7 +152,9 @@ export const Translator = z.object({
   breakHandling: z.enum(["air_spots", "station_id_slate"]),
   prerecordedLabel: z.boolean(),
   enabled: z.boolean(),
-  status: z.enum(["not_connected", "connected", "relaying"])
+  status: z.enum(["not_connected", "connected", "relaying"]),
+  /** Added 2026-09-29 (X2): captions drawn into the relayed picture. False (off) unless the station chooses it. */
+  burnCaptions: z.boolean().optional()
 });
 
 export const LiveSource = z.object({
@@ -407,7 +409,9 @@ export const stationsApi = {
       rtmpUrl: z.string().regex(/^rtmps?:\/\//),
       streamKey: z.string().min(1),
       breakHandling: z.enum(["air_spots", "station_id_slate"]).default("air_spots"),
-      prerecordedLabel: z.boolean().default(false)
+      prerecordedLabel: z.boolean().default(false),
+      /** Added 2026-09-29 (X2): draw captions into the relayed picture. Off by default. */
+      burnCaptions: z.boolean().optional()
     }),
     response: Translator,
     status: 201
@@ -425,7 +429,9 @@ export const stationsApi = {
         streamKey: z.string().min(1),
         breakHandling: z.enum(["air_spots", "station_id_slate"]),
         prerecordedLabel: z.boolean(),
-        enabled: z.boolean()
+        enabled: z.boolean(),
+        /** Added 2026-09-29 (X2). */
+        burnCaptions: z.boolean()
       })
       .partial(),
     response: Translator

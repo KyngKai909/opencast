@@ -48,7 +48,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.prepared_items",
     "broadcast.prepared_renditions",
     "broadcast.channel_items",
-    "broadcast.translator_sessions"
+    "broadcast.translator_sessions",
+    // Added 2026-09-29 (migration 0021): captions prepared with each item.
+    "broadcast.prepared_captions"
   ],
   catalog: ["catalog.*"],
   spots: ["spots.*"],

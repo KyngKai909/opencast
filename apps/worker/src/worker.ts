@@ -65,8 +65,8 @@ async function tick() {
 
 // Railway gives the worker a PORT; locally it's WORKER_HEALTH_PORT (the dev stack's PORT belongs to the web app).
 const healthPort = Number(process.env.WORKER_HEALTH_PORT ?? (process.env.RAILWAY_ENVIRONMENT ? process.env.PORT : undefined) ?? 8788);
-const PLAYLIST = /^\/hls\/([0-9a-f-]{36})\/([a-z0-9]+\.m3u8)$/;
-const PREPARED = /^\/hls\/(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.ts)$/;
+const PLAYLIST = /^\/hls\/([0-9a-f-]{36})\/([a-z0-9]+\.m3u8|empty\.vtt)$/;
+const PREPARED = /^\/hls\/(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.(?:ts|vtt))$/;
 const LOCAL_OBJECT = /^\/objects\/((?:prepared|proof)\/[\w/.-]+)$/;
 const health = http.createServer((req, res) => {
   const url = (req.url ?? "").split("?")[0];
@@ -89,7 +89,7 @@ const health = http.createServer((req, res) => {
       .playlist(playlist[1], playlist[2])
       .then((found) => {
         if (!found) return void res.writeHead(404, { ...cors, "cache-control": "no-cache" }).end();
-        const headers = { ...cors, "content-type": "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}`, vary: "Accept-Encoding" };
+        const headers = { ...cors, "content-type": found.contentType ?? "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}`, vary: "Accept-Encoding" };
         // A 30-minute window is tens of kilobytes of repetitive lines: gzip takes it to a few.
         if (/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) res.writeHead(200, { ...headers, "content-encoding": "gzip" }).end(gzipSync(found.body));
         else res.writeHead(200, headers).end(found.body);
@@ -105,7 +105,7 @@ const health = http.createServer((req, res) => {
     deps.storage.objects
       .open(key)
       .then((stream) => {
-        res.writeHead(200, { ...cors, "content-type": key.endsWith(".jpg") ? "image/jpeg" : "video/mp2t", "cache-control": "public, max-age=31536000, immutable" });
+        res.writeHead(200, { ...cors, "content-type": key.endsWith(".jpg") ? "image/jpeg" : key.endsWith(".vtt") ? "text/vtt" : "video/mp2t", "cache-control": "public, max-age=31536000, immutable" });
         stream.on("error", () => res.destroy());
         stream.pipe(res);
       })

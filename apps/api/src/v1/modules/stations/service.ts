@@ -115,7 +115,7 @@ export interface StationsService {
   /** Stations that take orders, and studios. */
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key. */
-  relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate" }>>;
+  relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate"; burnCaptions: boolean }>>;
   /** Used by Network desk to set up claimable, listed and catalog stations. */
   createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string }): Promise<string>;
 
@@ -173,6 +173,8 @@ export interface TranslatorInput {
   streamKey: string;
   breakHandling: "air_spots" | "station_id_slate";
   prerecordedLabel: boolean;
+  /** Captions drawn into the relayed picture (added 2026-09-29; off by default). */
+  burnCaptions?: boolean;
 }
 
 export interface TranslatorView {
@@ -185,6 +187,7 @@ export interface TranslatorView {
   prerecordedLabel: boolean;
   enabled: boolean;
   status: "not_connected" | "connected" | "relaying";
+  burnCaptions: boolean;
 }
 
 export interface LiveSourceView {
@@ -305,7 +308,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       breakHandling: row.breakHandling,
       prerecordedLabel: row.prerecordedLabel,
       enabled: row.enabled,
-      status: !row.enabled || !row.streamKey ? "not_connected" : onAir ? "relaying" : "connected"
+      status: !row.enabled || !row.streamKey ? "not_connected" : onAir ? "relaying" : "connected",
+      burnCaptions: row.burnCaptions
     };
   }
 
@@ -551,7 +555,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         .select()
         .from(schema.translators)
         .where(and(eq(schema.translators.stationId, stationId), eq(schema.translators.enabled, true)));
-      return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling }));
+      return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions }));
     },
 
     async createManaged(tx, input) {

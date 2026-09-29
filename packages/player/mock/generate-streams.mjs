@@ -213,14 +213,17 @@ for (const s of MOCK_STATIONS) {
   await encodeItem(s, dir, { item: "OFF", seconds: SLATE_SEGMENTS * SEGMENT, firstSecond: 0, tone: Math.round(s.tone / 2), prefix: "off_", first: 0 });
 
   // One WebVTT file per segment, pinned to the reference rendition's segment's first timestamp.
+  // As the channel's subtitle playlist does (X2), an item without captions (the spot here) keeps
+  // the caption timeline going with empty WebVTT segments.
   const ref = LADDERS[s.band][0].name;
   const captionFor = (i) => {
     const code = ITEMS.find((it) => i >= it.from && i < it.from + it.count)?.code;
-    if (code === "SPT") return `${MOCK_SPOT.title}.`;
+    if (code === "SPT") return null;
     if (code === "SID") return `${s.callSign} ${s.channel}, ${s.name}.`;
     return s.captions[i % s.captions.length];
   };
   const writeVtt = (seg, out, line) => {
+    if (line === null) return fs.writeFileSync(out, "WEBVTT\n");
     const pts = segmentStartPts(seg);
     fs.writeFileSync(out, `WEBVTT\nX-TIMESTAMP-MAP=MPEGTS:${pts},LOCAL:00:00:00.000\n\n${vttTime(0)} --> ${vttTime(SEGMENT)}\n${line}\n`);
   };

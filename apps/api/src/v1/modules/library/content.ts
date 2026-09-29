@@ -18,7 +18,7 @@ const REF = schema.contentRefs;
 const PV = schema.contentPreviews;
 const NEED = schema.contentPreviewNeeds;
 
-export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo";
+export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track";
 export type PreviewReason = "offer" | "review" | "order";
 
 export interface ContentInfo {
@@ -117,6 +117,12 @@ export function createContent({ deps }: ModuleContext) {
       if (!ownerIds.length) return;
       const refs = await db.delete(REF).where(and(eq(REF.owner, owner), inArray(REF.ownerId, ownerIds))).returning({ cid: REF.cid });
       await gc(refs.map((r) => r.cid));
+    },
+
+    /** Drops one reference (a caption track replaced by another); the file goes if nothing else points at it. */
+    async releaseOne(cid: string, owner: ContentOwner, ownerId: string) {
+      await db.delete(REF).where(and(eq(REF.cid, cid), eq(REF.owner, owner), eq(REF.ownerId, ownerId)));
+      await gc([cid]);
     },
 
     /** A rights claim is open: kept, so it can come back, but never aired. */

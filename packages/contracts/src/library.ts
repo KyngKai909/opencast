@@ -212,7 +212,17 @@ export const libraryApi = {
     summary: "Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP.",
     params: StationParams,
     multipart: true,
-    body: ItemFields.partial().extend({ title: z.string().min(1).max(200).optional() }),
+    body: ItemFields.partial().extend({
+      title: z.string().min(1).max(200).optional(),
+      /**
+       * Added 2026-09-29 (X2): a caption file's text (WebVTT, or SRT turned into WebVTT; up to 1 MB),
+       * sent as a form field beside `file`. The item gets it as its caption track, as `putCaptionTrack`
+       * would. 422 `not_captions` when it's neither (nothing is stored).
+       */
+      captions: z.string().min(1).max(1_048_576).optional(),
+      /** Added 2026-09-29 (X2): the caption file's language (BCP 47); else the program's captions language, else "en". */
+      captionLanguage: z.string().min(2).max(35).optional()
+    }),
     response: LibraryItem,
     status: 201
   }),

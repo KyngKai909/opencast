@@ -9,6 +9,11 @@
 //   - after a planned sign-off's slate, `#EXT-X-ENDLIST`; the next run (a new playlist) starts from
 //     the station ID at the back time.
 //
+// On the TV band the master also names a subtitle rendition (X2): `subs.m3u8`, WebVTT on the same
+// timeline (the same media and discontinuity sequences, discontinuities and program date-times),
+// an item's prepared caption segments where it has captions, and an empty WebVTT segment for
+// every segment of anything that hasn't (live blocks carry Livepeer's, if it gives any).
+//
 // The same function serves the API and the worker, so any replica answers the same playlist.
 
 import { bandwidthOf, BAND_RENDITIONS, FPS, REFERENCE, type Band, type Ladder, type RenditionName } from "./ladder.js";
@@ -46,15 +51,30 @@ export function publishedCount(row: Pick<ChannelRow, "startsAt" | "segmentMs" | 
   return n;
 }
 
-export function renderMaster(band: Band, ladder: Ladder): string {
+/** The channel's subtitle playlist, and the group every variant names. */
+export const SUBTITLES = { group: "subs", file: "subs.m3u8", empty: "empty.vtt" } as const;
+
+/**
+ * The master playlist. With `subtitles` (the TV band), a SUBTITLES rendition in that language: not
+ * DEFAULT, so captions stay off until the viewer (or the TV's setting) turns them on; AUTOSELECT,
+ * so a device set to show captions picks it; marked as transcribing dialogue and describing sound.
+ */
+export function renderMaster(band: Band, ladder: Ladder, subtitles?: { language: string; name: string } | null): string {
   const names = BAND_RENDITIONS[band];
   // The reference rendition first: players start there.
   const ordered = [REFERENCE[band], ...names.filter((n) => n !== REFERENCE[band])];
   const lines = ["#EXTM3U", "#EXT-X-VERSION:6", "#EXT-X-INDEPENDENT-SEGMENTS"];
+  if (subtitles) {
+    const name = subtitles.name.replace(/"/g, "'");
+    lines.push(
+      `#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="${SUBTITLES.group}",NAME="${name}",LANGUAGE="${subtitles.language}",DEFAULT=NO,AUTOSELECT=YES,FORCED=NO,CHARACTERISTICS="public.accessibility.transcribes-spoken-dialog,public.accessibility.describes-music-and-sound",URI="${SUBTITLES.file}"`
+    );
+  }
   for (const name of ordered) {
     const r = ladder[name];
     const video = r.kind === "video" ? `,RESOLUTION=${r.width}x${r.height},FRAME-RATE=${FPS.toFixed(3)}` : "";
-    lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidthOf(r)},AVERAGE-BANDWIDTH=${Math.round((r.videoKbps + r.audioKbps) * 1000)},CODECS="${r.codecs}"${video}`, `${name}.m3u8`);
+    const subs = subtitles ? `,SUBTITLES="${SUBTITLES.group}"` : "";
+    lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidthOf(r)},AVERAGE-BANDWIDTH=${Math.round((r.videoKbps + r.audioKbps) * 1000)},CODECS="${r.codecs}"${video}${subs}`, `${name}.m3u8`);
   }
   return lines.join("\n") + "\n";
 }
@@ -126,6 +146,62 @@ export function renderMedia(input: MediaInput): string | null {
       // Between items; never before the window's first segment (the sequence above counts it).
       if (previous && o.row.discontinuity && o.index === 0) lines.push("#EXT-X-DISCONTINUITY");
       lines.push(...o.row.tags);
+      lines.push(`#EXT-X-PROGRAM-DATE-TIME:${new Date(o.at).toISOString()}`);
+      previous = o.row;
+    }
+    lines.push(`#EXTINF:${(o.ms / 1000).toFixed(3)},`, o.uri);
+  }
+  if (ended) lines.push("#EXT-X-ENDLIST");
+  return lines.join("\n") + "\n";
+}
+
+export interface SubtitlesInput {
+  rows: ChannelRow[];
+  now: number;
+  windowMs?: number;
+  /** A row's caption segment URL (its own segment `index`, from its first), or null for none. */
+  uri(row: ChannelRow, index: number): string | null;
+  /** The empty WebVTT segment's URL, for everything without captions. */
+  empty: string;
+}
+
+/**
+ * The rolling subtitle playlist: every segment the reference rendition publishes, with the same
+ * EXTINFs, media and discontinuity sequences, discontinuities and program date-times, so a player
+ * lines the two up; each an item's caption segment, a live block's (Livepeer's, when it has
+ * them), or the empty one. No DATERANGE tags: they're on the media playlists.
+ */
+export function renderSubtitles(input: SubtitlesInput): string | null {
+  const { now } = input;
+  const started = input.rows.filter((r) => r.startsAt.getTime() <= now);
+  if (!started.length) return null;
+  const run = started[started.length - 1].run;
+  const rows = started.filter((r) => r.run === run).sort((a, b) => a.seq - b.seq);
+  const ended = rows.some((r) => r.kind === "end");
+  const edge = ended ? Math.min(now, rows.find((r) => r.kind === "end")!.startsAt.getTime()) : now;
+  const windowStart = edge - (input.windowMs ?? WINDOW_MS);
+  const out: Array<{ row: ChannelRow; index: number; at: number; ms: number; uri: string }> = [];
+  for (const row of rows) {
+    if (row.kind === "end") break;
+    const n = publishedCount(row, edge);
+    let at = row.startsAt.getTime();
+    for (let i = 0; i < n; i++) {
+      const ms = row.segmentMs[i];
+      if (at + ms > windowStart) {
+        const own = row.kind === "live" ? row.liveUris?.subs?.[i] || null : input.uri(row, row.firstSegment + i);
+        out.push({ row, index: i, at, ms, uri: own ?? input.empty });
+      }
+      at += ms;
+    }
+  }
+  if (!out.length) return null;
+  const first = out[0];
+  const target = Math.max(4, ...out.map((o) => Math.round(o.ms / 1000)));
+  const lines = ["#EXTM3U", "#EXT-X-VERSION:6", `#EXT-X-TARGETDURATION:${target}`, `#EXT-X-MEDIA-SEQUENCE:${first.row.seq + first.index}`, `#EXT-X-DISCONTINUITY-SEQUENCE:${first.row.disc}`];
+  let previous: ChannelRow | null = null;
+  for (const o of out) {
+    if (o.row !== previous) {
+      if (previous && o.row.discontinuity && o.index === 0) lines.push("#EXT-X-DISCONTINUITY");
       lines.push(`#EXT-X-PROGRAM-DATE-TIME:${new Date(o.at).toISOString()}`);
       previous = o.row;
     }

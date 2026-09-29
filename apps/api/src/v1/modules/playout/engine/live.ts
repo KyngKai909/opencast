@@ -5,7 +5,9 @@
 // assembler airs the stand-by slate until it's back.
 //
 // Livepeer's live renditions are mapped to the ladder by height (nearest), and the audio-only
-// renditions to an audio-only variant if the source has one, else its smallest.
+// renditions to an audio-only variant if the source has one, else its smallest. If the source's
+// master names a subtitle rendition, its WebVTT segments are passed through too (by media
+// sequence, as `uris.subs`); Livepeer gives none today, so a live block's captions are empty.
 
 import type { Ladder, RenditionName } from "./ladder.js";
 
@@ -21,7 +23,15 @@ export const MASTER_AGAIN_MS = 5_000;
 export interface LiveSegment {
   seq: number;
   durationMs: number;
-  uris: Partial<Record<RenditionName, string>>;
+  /** Each rendition's segment, and `subs`, the source's caption segment when it has one. */
+  uris: Partial<Record<RenditionName | "subs", string>>;
+}
+
+/** The source's subtitle rendition (its first), if its master names one. */
+export function parseSubtitles(text: string, base: string): string | null {
+  const line = text.split(/\r?\n/).find((l) => l.startsWith("#EXT-X-MEDIA:") && /TYPE=SUBTITLES/.test(l));
+  const uri = line ? /URI="([^"]+)"/.exec(line)?.[1] : null;
+  return uri ? new URL(uri, base).toString() : null;
 }
 
 interface Variant {
@@ -89,6 +99,8 @@ export function mapVariants(variants: Variant[], renditions: RenditionName[], la
 
 export class LiveHlsSource {
   private map: Map<RenditionName, string> | null = null;
+  /** The source's subtitle playlist, when its master names one. */
+  private subsUrl: string | null = null;
   /** Every video rendition has a variant of its own size (else the master is read again). */
   private complete = false;
   private mapAt = 0;
@@ -139,6 +151,7 @@ export class LiveHlsSource {
       } else {
         const variants = parseMaster(master.text, master.url);
         const map = variants ? mapVariants(variants, this.renditions, this.ladder) : new Map(this.renditions.map((r) => [r, master.url] as const));
+        this.subsUrl = variants ? parseSubtitles(master.text, master.url) : null;
         if (!map.size && !this.map) return;
         if (map.size) {
           this.map = map;
@@ -155,6 +168,9 @@ export class LiveHlsSource {
       if (got !== null) lists.set(url, parseMedia(got.text, got.url));
     }
     if (lists.size !== urls.length) return this.forgetIfLost();
+    // Captions, if the source has them: never required for a segment to count.
+    const subsText = this.subsUrl ? await this.text(this.subsUrl) : null;
+    const subs = subsText ? parseMedia(subsText.text, subsText.url) : [];
     const reference = lists.get([...map.values()][0])!;
     let grew = false;
     for (const seg of reference) {
@@ -166,6 +182,8 @@ export class LiveHlsSource {
       }
       // Only segments every rendition has (renditions line up by media sequence).
       if (Object.keys(uris).length !== map.size) continue;
+      const caption = subs.find((s) => s.seq === seg.seq);
+      if (caption) uris.subs = caption.uri;
       this.segments.set(seg.seq, { seq: seg.seq, durationMs: seg.durationMs, uris });
       this.segmentMs = seg.durationMs;
       this.newest = seg.seq;

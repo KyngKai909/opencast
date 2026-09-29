@@ -276,7 +276,7 @@ export const contentRefs = broadcast.table(
     cid: text("cid")
       .notNull()
       .references(() => contents.cid),
-    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo"] }).notNull(),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo", "caption_track"] }).notNull(),
     ownerId: uuid("owner_id").notNull(),
     createdAt: createdAt()
   },
@@ -683,6 +683,8 @@ export const translators = broadcast.table("translators", {
     .default("air_spots"),
   prerecordedLabel: boolean("prerecorded_label").notNull().default(false),
   enabled: boolean("enabled").notNull().default(true),
+  /** Added 2026-09-29 (migration 0021): captions drawn into the relayed picture. Off unless the station chooses it. */
+  burnCaptions: boolean("burn_captions").notNull().default(false),
   createdAt: createdAt()
 });
 
@@ -780,6 +782,8 @@ export const captionTracks = broadcast.table(
     language: text("language").notNull(),
     vtt: text("vtt").notNull(),
     source: text("source", { enum: ["uploaded", "edited"] }).notNull(),
+    /** Added 2026-09-29 (migration 0021): the WebVTT's content ID; the text is in object storage under it too. Null until stored. */
+    contentId: text("content_id"),
     updatedBy: uuid("updated_by").references(() => users.id),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
@@ -860,6 +864,33 @@ export const preparedRenditions = broadcast.table(
     preparedAt: at("prepared_at").notNull().defaultNow()
   },
   (t) => [primaryKey({ columns: [t.key, t.rendition] })]
+);
+
+/**
+ * Added 2026-09-29 (migration 0021): a prepared item's captions, segmented once to its 4-second
+ * segments (WebVTT, each with an X-TIMESTAMP-MAP onto the item's own timestamps), in object storage
+ * under `prepared/<key>/<rendition>/` next to its renditions. One row per caption track (by the
+ * WebVTT's content ID): a track uploaded to an item whose file this is, or one embedded in the file
+ * (`embedded`), or generated from speech later (`generated`). Captions never hold up readiness.
+ */
+export const preparedCaptions = broadcast.table(
+  "prepared_captions",
+  {
+    key: text("key")
+      .notNull()
+      .references(() => preparedItems.key),
+    /** The WebVTT's content ID. */
+    contentId: text("content_id").notNull(),
+    /** Its folder under `prepared/<key>/` ("cc" and 12 hex characters of the content ID's hash). */
+    rendition: text("rendition").notNull(),
+    source: text("source", { enum: ["uploaded", "embedded", "generated"] }).notNull(),
+    /** BCP 47, when known. */
+    language: text("language"),
+    segments: integer("segments").notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+    preparedAt: at("prepared_at").notNull().defaultNow()
+  },
+  (t) => [primaryKey({ columns: [t.key, t.contentId] })]
 );
 
 /**

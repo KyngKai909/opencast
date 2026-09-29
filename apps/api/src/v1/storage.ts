@@ -117,7 +117,9 @@ const MIME: Record<string, string> = {
   ".m3u8": "application/vnd.apple.mpegurl",
   ".jpg": "image/jpeg",
   ".png": "image/png",
-  ".pdf": "application/pdf"
+  ".pdf": "application/pdf",
+  ".vtt": "text/vtt",
+  ".srt": "application/x-subrip"
 };
 
 export const contentTypeOf = (file: string) => MIME[path.extname(file).toLowerCase()] ?? "application/octet-stream";

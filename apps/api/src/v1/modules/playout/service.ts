@@ -8,7 +8,9 @@ import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
 import { objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
-import { renderMaster, renderMedia, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
+import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
+import { captionSources } from "./engine/captions.js";
+import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness } from "./engine/readiness.js";
 import { refKey } from "./engine/prepare.js";
 
@@ -63,9 +65,10 @@ export interface PlayoutService {
   /**
    * The channel's playlists (prepare once, then assemble): `master.m3u8` (also `index.m3u8`) and
    * one media playlist per rendition (`v720.m3u8`…), rendered from its assembled timeline. Null
-   * when there's no such playlist (or nothing published yet). `maxAge` is the cache time.
+   * when there's no such playlist (or nothing published yet). `maxAge` is the cache time. On the
+   * TV band, `subs.m3u8` is the subtitle rendition (X2), and `empty.vtt` its empty segment.
    */
-  playlist(stationId: string, file: string): Promise<{ body: string; maxAge: number } | null>;
+  playlist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** Stations that aired anything in a window (from the as-run log). */
@@ -117,8 +120,20 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     return deps.storage.objects.publicUrl?.(path) ?? publicUrl(deps, `/hls/${path}`);
   }
 
-  async function renderPlaylist(stationId: string, file: string): Promise<{ body: string; maxAge: number } | null> {
+  function captionUrl(key: string, rendition: string, index: number) {
+    const path = `${objectKey.prepared(key, rendition)}/seg_${String(index).padStart(5, "0")}.vtt`;
+    return deps.storage.objects.publicUrl?.(path) ?? publicUrl(deps, `/hls/${path}`);
+  }
+
+  /** The subtitle rendition's language: the one most of the station's programs are captioned in, else English. */
+  async function captionLanguage(stationId: string): Promise<string> {
+    return (await services.library.stationCaptionLanguage(stationId)) ?? "en";
+  }
+
+  async function renderPlaylist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null> {
     const band = await bandOf(stationId);
+    // The empty caption segment: the same bytes for every station, kept a long time.
+    if (file === SUBTITLES.empty) return band === "tv" ? { body: EMPTY_VTT, maxAge: 86_400, contentType: "text/vtt" } : null;
     const now = deps.clock.now();
     const C = schema.channelItems;
     const [latest] = await db
@@ -128,9 +143,13 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       .orderBy(desc(C.seq), desc(C.startsAt))
       .limit(1);
     if (!latest) return null;
-    if (file === "master.m3u8" || file === "index.m3u8") return { body: renderMaster(band, ladder), maxAge: 30 };
+    if (file === "master.m3u8" || file === "index.m3u8") {
+      const language = band === "tv" ? await captionLanguage(stationId) : null;
+      return { body: renderMaster(band, ladder, language ? { language, name: languageName(language) } : null), maxAge: 30 };
+    }
     const rendition = file.replace(/\.m3u8$/, "") as RenditionName;
-    if (!BAND_RENDITIONS[band].includes(rendition)) return null;
+    const subtitles = file === SUBTITLES.file && band === "tv";
+    if (!subtitles && !BAND_RENDITIONS[band].includes(rendition)) return null;
     // After a planned sign-off the ended playlist stays as it was until the next run starts.
     const edge = latest.kind === "end" ? latest.startsAt : now;
     const rows = (await db
@@ -140,6 +159,19 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       .orderBy(asc(C.seq), asc(C.startsAt))) as ChannelRow[];
     const [end] = latest.kind === "end" ? [] : await db.select().from(C).where(and(eq(C.stationId, stationId), eq(C.run, latest.run), eq(C.kind, "end"), lte(C.startsAt, now))).limit(1);
     if (end) rows.push(end as ChannelRow);
+    if (subtitles) {
+      const sources = await captionSources(db, (ids) => services.library.captionTrackIds(ids), rows as Array<ChannelRow & { assetId: string | null }>);
+      const body = renderSubtitles({
+        rows,
+        now: now.getTime(),
+        empty: SUBTITLES.empty,
+        uri: (row, index) => {
+          const source = sources.get(row.id);
+          return source && index < source.segments ? captionUrl(source.key, source.rendition, index) : null;
+        }
+      });
+      return body ? { body, maxAge: 1 } : null;
+    }
     const keys = [...new Set(rows.map((r) => r.preparedKey).filter((k): k is string => Boolean(k) && !lengths.has(`${k}/${rendition}`)))];
     if (keys.length) {
       const found = await db

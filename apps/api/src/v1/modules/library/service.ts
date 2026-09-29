@@ -1,13 +1,17 @@
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { and, asc, eq, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { CaptionTrack, ItemHistory, LibraryItem } from "@opencast/contracts";
 import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
+import { toWebVtt, vttContentId } from "../../lib/captions.js";
 import { createContent, type Content } from "./content.js";
+
+export { toWebVtt };
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
 
@@ -93,7 +97,8 @@ export interface LibraryService {
   stationOfItem(itemId: string): Promise<string>;
   stationOfProgram(programId: string): Promise<string>;
   stationOfFolder(folderId: string): Promise<string>;
-  upload(stationId: string, file: UploadedFile, fields: ItemFields): Promise<LibraryItem>;
+  /** With `captions` (WebVTT or SRT text, added 2026-09-29), the item gets its caption track at once. */
+  upload(stationId: string, file: UploadedFile, fields: ItemFields & { captions?: string; captionLanguage?: string }): Promise<LibraryItem>;
   updateItem(itemId: string, fields: Partial<ItemFields>): Promise<LibraryItem>;
   archiveItem(itemId: string): Promise<void>;
   /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
@@ -117,8 +122,16 @@ export interface LibraryService {
   setProgramCaptions(programId: string, captions: { mode: "none" | "generated_live" | "generated" | "uploaded"; language: string | null }): Promise<{ mode: "none" | "generated_live" | "generated" | "uploaded"; language: string | null }>;
   /** L7: an item's caption track. */
   captionTrack(itemId: string): Promise<CaptionTrack>;
-  putCaptionTrack(itemId: string, userId: string, input: { language: string; text: string; source: "uploaded" | "edited" }): Promise<CaptionTrack>;
+  putCaptionTrack(itemId: string, userId: string | null, input: { language: string; text: string; source: "uploaded" | "edited" }): Promise<CaptionTrack>;
   removeCaptionTrack(itemId: string): Promise<void>;
+  /** X2 (playout): the caption tracks of the items whose current file is `contentId`, to prepare with it. */
+  captionTracksForContent(contentId: string): Promise<Array<{ itemId: string; language: string; vtt: string; contentId: string }>>;
+  /** X2 (playout): items whose caption track was put since `since`. */
+  captionTracksChangedSince(since: Date): Promise<string[]>;
+  /** X2 (playout): each item's caption track, by the WebVTT's content ID. */
+  captionTrackIds(itemIds: string[]): Promise<Map<string, string>>;
+  /** X2 (playout): the language most of a station's programs are captioned in, or null. */
+  stationCaptionLanguage(stationId: string): Promise<string | null>;
   /** Waits for uploads and imports started so far (tests, shutdown). */
   settle(): Promise<void>;
 }
@@ -708,6 +721,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     async upload(stationId, file, fields) {
       if (!file) throw badRequest("Choose a file to upload.", { file: "Required" });
       await checkOwnership(stationId, fields);
+      // A caption file sent with it is checked before anything is stored.
+      if (fields.captions !== undefined && !toWebVtt(fields.captions)) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
       const probe = await deps.media.probe(file.path).catch(() => null);
       if (!probe || probe.durationMs === null) throw refused("unreadable_file", "That file can't be read as video or audio.");
       // Keep the upload past the request: multer's temp file is removed when it ends.
@@ -741,6 +756,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         if (fields.breakPointsMs?.length) await setBreakPoints(tx, row.id, fields.breakPointsMs);
         return row;
       });
+      if (fields.captions) {
+        const [program] = item.programId ? await db.select({ language: P.captionsLanguage }).from(P).where(eq(P.id, item.programId)) : [];
+        await service.putCaptionTrack(item.id, null, { language: fields.captionLanguage ?? program?.language ?? "en", text: fields.captions, source: "uploaded" });
+      }
       background(prepareInBackground(item.id, stationId, kept, probe.mediaKind));
       return service.item(item.id);
     },
@@ -996,11 +1015,25 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       await itemRow(itemId);
       const vtt = toWebVtt(input.text);
       if (!vtt) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
-      const values = { assetId: itemId, language: input.language, vtt, source: input.source, updatedBy: userId, updatedAt: deps.clock.now() };
+      // Stored by content ID, like media (the text stays in the row too, for editing). The worker
+      // cuts it into the item's segments when it prepares the item, or within a minute if it has.
+      const { cid } = vttContentId(vtt);
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencast-captions-"));
+      try {
+        const file = path.join(dir, "track.vtt");
+        await fs.writeFile(file, vtt);
+        await content.store(file, { storageClass: "standard", contentType: "text/vtt" });
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+      const [before] = await db.select({ contentId: schema.captionTracks.contentId }).from(schema.captionTracks).where(eq(schema.captionTracks.assetId, itemId));
+      const values = { assetId: itemId, language: input.language, vtt, contentId: cid, source: input.source, updatedBy: userId, updatedAt: deps.clock.now() };
       await db.transaction(async (tx) => {
         await tx.insert(schema.captionTracks).values(values).onConflictDoUpdate({ target: schema.captionTracks.assetId, set: values });
         await tx.update(A).set({ captions: "uploaded" }).where(eq(A.id, itemId));
+        await content.addRef(tx, cid, "caption_track", itemId);
       });
+      if (before?.contentId && before.contentId !== cid) await content.releaseOne(before.contentId, "caption_track", itemId);
       return service.captionTrack(itemId);
     },
 
@@ -1010,6 +1043,50 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         await tx.delete(schema.captionTracks).where(eq(schema.captionTracks.assetId, itemId));
         await tx.update(A).set({ captions: "none" }).where(eq(A.id, itemId));
       });
+      await content.release("caption_track", [itemId]);
+    },
+
+    async captionTracksForContent(contentId) {
+      const files = await db.selectDistinct({ assetId: F.assetId }).from(F).where(eq(F.contentId, contentId));
+      if (!files.length) return [];
+      const current = await service.currentContent(files.map((f) => f.assetId));
+      const ids = files.map((f) => f.assetId).filter((id) => current.get(id) === contentId);
+      if (!ids.length) return [];
+      const rows = await db.select().from(schema.captionTracks).where(inArray(schema.captionTracks.assetId, ids));
+      const out = [];
+      for (const r of rows) {
+        let cid = r.contentId;
+        // Tracks from before content IDs get theirs, so the playlists can find them.
+        if (!cid) {
+          cid = vttContentId(r.vtt).cid;
+          await db.update(schema.captionTracks).set({ contentId: cid }).where(eq(schema.captionTracks.assetId, r.assetId));
+        }
+        out.push({ itemId: r.assetId, language: r.language, vtt: r.vtt, contentId: cid });
+      }
+      return out;
+    },
+
+    async captionTracksChangedSince(since) {
+      const rows = await db.select({ assetId: schema.captionTracks.assetId }).from(schema.captionTracks).where(gt(schema.captionTracks.updatedAt, since));
+      return rows.map((r) => r.assetId);
+    },
+
+    async captionTrackIds(itemIds) {
+      const ids = [...new Set(itemIds)];
+      if (!ids.length) return new Map();
+      const rows = await db.select({ assetId: schema.captionTracks.assetId, contentId: schema.captionTracks.contentId }).from(schema.captionTracks).where(inArray(schema.captionTracks.assetId, ids));
+      return new Map(rows.flatMap((r) => (r.contentId ? [[r.assetId, r.contentId] as [string, string]] : [])));
+    },
+
+    async stationCaptionLanguage(stationId) {
+      const [top] = await db
+        .select({ language: P.captionsLanguage })
+        .from(P)
+        .where(and(eq(P.stationId, stationId), sql`${P.captionsLanguage} is not null`))
+        .groupBy(P.captionsLanguage)
+        .orderBy(sql`count(*) desc`, P.captionsLanguage)
+        .limit(1);
+      return top?.language ?? null;
     },
 
     async settle() {
@@ -1026,19 +1103,3 @@ function audioLayoutOf(channels: number | null): "mono" | "stereo" | "surround" 
   return channels === 1 ? "mono" : channels === 2 ? "stereo" : "surround";
 }
 
-const SRT_TIME = /(\d{2}:\d{2}:\d{2}),(\d{3})/g;
-
-/** L7: WebVTT as it is, or SRT turned into WebVTT; null when it's neither. */
-export function toWebVtt(text: string): string | null {
-  const clean = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").trim();
-  if (/^WEBVTT(\s|$)/.test(clean)) return `${clean}\n`;
-  // SRT: numbered cues with "00:00:01,000 --> 00:00:03,500".
-  if (/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/.test(clean)) {
-    const cues = clean
-      .split(/\n{2,}/)
-      .map((block) => block.split("\n").filter((line, i) => !(i === 0 && /^\d+$/.test(line.trim()))).join("\n"))
-      .map((block) => block.replace(SRT_TIME, "$1.$2"));
-    return `WEBVTT\n\n${cues.join("\n\n")}\n`;
-  }
-  return null;
-}

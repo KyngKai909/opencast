@@ -9,22 +9,30 @@
 //     Opencast's players, so the worker composites it), and on the radio band (sound with the
 //     station ID picture, since the services want video);
 //   - a station that chose "Station ID slate" for breaks gets the prepared station ID slate in
-//     place of every segment in a break.
+//     place of every segment in a break;
+//   - captions are drawn into the picture only if the station chose that for the translator
+//     (`burnCaptions`, off by default; X2): each segment with cues is re-encoded on its own, with
+//     its timestamps kept, before it's relayed. Segments without cues pass as they are.
 //
 // Each session's egress (bytes sent) is recorded in `translator_sessions`: relaying a full channel
 // around the clock is the largest per-station cost.
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { and, asc, eq, gt, lte } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
+import { parseVtt } from "../../../lib/captions.js";
 import { objectKey } from "../../../storage.js";
+import { captionSources, type CaptionSource } from "./captions.js";
 import type { ChannelLook } from "./assemble.js";
 import { REFERENCE, type RenditionName } from "./ladder.js";
 import type { Preparer } from "./prepare.js";
 import { publishedCount } from "./playlist.js";
-import type { Slates } from "./slates.js";
+import { captionPng, type Slates } from "./slates.js";
 import { TsRetimer } from "./tsretime.js";
 
 const CI = schema.channelItems;
@@ -35,6 +43,8 @@ export interface TranslatorTarget {
   rtmpUrl: string;
   streamKey: string;
   breakHandling: "air_spots" | "station_id_slate";
+  /** Draw captions into the picture (X2). Off unless the station chose it. */
+  burnCaptions?: boolean;
 }
 
 export interface TranslatorOptions {
@@ -42,6 +52,49 @@ export interface TranslatorOptions {
   preparer: Preparer;
   slates: Slates;
   log?(line: string): void;
+  /** Scratch space for drawing captions in (the worker's). */
+  scratchDir?: string;
+}
+
+/**
+ * Draws caption cues into one TS segment's picture: each cue a picture laid over the frames it
+ * shows on (`from`/`to` in the segment's own seconds, as its timestamps say). The segment is
+ * re-encoded with its timestamps kept (the relay retimes it with the rest); the sound is copied.
+ * Null when FFmpeg fails (the segment then goes as it was).
+ */
+export async function burnCaptionsIn(segment: Buffer, cues: Array<{ text: string; from: number; to: number }>, size: { width: number; height: number; videoKbps: number }, scratchDir: string): Promise<Buffer | null> {
+  if (!cues.length) return segment;
+  const dir = await fs.mkdtemp(path.join(scratchDir, "burn-"));
+  try {
+    const inputs: string[] = [];
+    const graph: string[] = [];
+    let last = "0:v";
+    for (const [i, cue] of cues.entries()) {
+      const png = path.join(dir, `cue${i}.png`);
+      await captionPng(cue.text, size.width, size.height, png);
+      inputs.push("-loop", "1", "-i", png);
+      graph.push(`[${last}][${i + 1}:v]overlay=0:0:shortest=1:enable='between(t,${cue.from.toFixed(3)},${cue.to.toFixed(3)})'[c${i}]`);
+      last = `c${i}`;
+    }
+    const args = [
+      "-hide_banner", "-loglevel", "error", "-copyts", "-f", "mpegts", "-i", "pipe:0", ...inputs,
+      "-filter_complex", graph.join(";"), "-map", `[${last}]`, "-map", "0:a?",
+      "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${size.videoKbps}k`, "-maxrate", `${Math.round(size.videoKbps * 1.1)}k`, "-bufsize", `${size.videoKbps * 2}k`, "-pix_fmt", "yuv420p",
+      "-c:a", "copy", "-muxdelay", "0", "-muxpreload", "0", "-f", "mpegts", "pipe:1"
+    ];
+    return await new Promise<Buffer | null>((resolve) => {
+      const child = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
+      const out: Buffer[] = [];
+      child.stdout.on("data", (d: Buffer) => out.push(d));
+      child.stderr.on("data", () => undefined);
+      child.stdin.on("error", () => undefined);
+      child.on("error", () => resolve(null));
+      child.on("close", (code) => resolve(code === 0 && out.length ? Buffer.concat(out) : null));
+      child.stdin.end(segment);
+    });
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function bytesOf(stream: Readable): Promise<Buffer> {
@@ -73,7 +126,28 @@ export class TranslatorRelay {
 
   /** A signature of what the relay was started with (a change restarts it). */
   static signature(t: TranslatorTarget) {
-    return `${t.rtmpUrl}|${t.streamKey}|${t.breakHandling}`;
+    return `${t.rtmpUrl}|${t.streamKey}|${t.breakHandling}${t.burnCaptions ? "|captions" : ""}`;
+  }
+
+  /** Each row's captions, looked up once (rows are relayed in order, a few at a time). */
+  private captions = new Map<string, CaptionSource | null>();
+
+  /** The cues showing during a prepared segment, in its own seconds, or none. */
+  private async cuesFor(row: typeof CI.$inferSelect, index: number): Promise<Array<{ text: string; from: number; to: number }>> {
+    if (!this.captions.has(row.id)) {
+      const found = await captionSources(this.ctx.deps.db, (ids) => this.ctx.services.library.captionTrackIds(ids), [row]).catch(() => new Map<string, CaptionSource>());
+      this.captions.set(row.id, found.get(row.id) ?? null);
+      if (this.captions.size > 200) this.captions.delete(this.captions.keys().next().value!);
+    }
+    const source = this.captions.get(row.id);
+    const n = row.firstSegment + index;
+    if (!source || n >= source.segments) return [];
+    const stream = await this.ctx.deps.storage.objects.open?.(`${objectKey.prepared(source.key, source.rendition)}/seg_${String(n).padStart(5, "0")}.vtt`).catch(() => null);
+    if (!stream) return [];
+    const vtt = parseVtt((await bytesOf(stream)).toString("utf8"));
+    const map = vtt.timestampMap ?? { mpegts: 0, localMs: 0 };
+    const at = (ms: number) => (map.mpegts + (ms - map.localMs) * 90) / 90_000;
+    return vtt.cues.map((c) => ({ text: c.text, from: at(c.startMs), to: at(c.endMs) }));
   }
 
   get mode(): "copy" | "composite" {
@@ -151,7 +225,7 @@ export class TranslatorRelay {
       .values({ translatorId: this.target.id, stationId: this.stationId, mode: this.mode, swapsBreaks: this.target.breakHandling === "station_id_slate", startedAt: this.ctx.deps.clock.now() })
       .returning({ id: TS.id });
     this.sessionId = session.id;
-    this.log(`relaying (${this.mode}${this.target.breakHandling === "station_id_slate" ? ", station ID slate in breaks" : ""})`);
+    this.log(`relaying (${this.mode}${this.target.breakHandling === "station_id_slate" ? ", station ID slate in breaks" : ""}${this.target.burnCaptions ? ", captions drawn in" : ""})`);
   }
 
   private async save(ended = false, error: string | null = null) {
@@ -209,7 +283,17 @@ export class TranslatorRelay {
     if (!row.preparedKey) return null;
     const name = `seg_${String(row.firstSegment + index).padStart(5, "0")}.ts`;
     const stream = await this.ctx.deps.storage.objects.open?.(`${objectKey.prepared(row.preparedKey, this.rendition)}/${name}`).catch(() => null);
-    return stream ? { buf: await bytesOf(stream), item: row.id, ms } : null;
+    if (!stream) return null;
+    let buf = await bytesOf(stream);
+    // Captions drawn in, only if the station chose it (and only on the TV band's picture).
+    if (this.target.burnCaptions && this.options.look.band === "tv") {
+      const cues = await this.cuesFor(row, index).catch(() => []);
+      if (cues.length) {
+        const r = this.options.preparer.ladder[this.rendition];
+        buf = (await burnCaptionsIn(buf, cues, { width: r.width, height: r.height, videoKbps: r.videoKbps }, this.options.scratchDir ?? os.tmpdir())) ?? buf;
+      }
+    }
+    return { buf, item: row.id, ms };
   }
 
   private async follow() {

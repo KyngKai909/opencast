@@ -128,11 +128,12 @@ app.use(express.urlencoded({ extended: true }));
 // A channel's playlists (prepare once, then assemble): master.m3u8 and one per rendition, rendered
 // from its assembled timeline, with a short cache. Segments come from object storage.
 app.get("/hls/:stationId/:file", async (req, res, next) => {
-  if (!/^[0-9a-f-]{36}$/.test(req.params.stationId) || !/^[a-z0-9]+\.m3u8$/.test(req.params.file)) return next();
+  // The subtitle rendition's empty segment (empty.vtt) is served here too (X2).
+  if (!/^[0-9a-f-]{36}$/.test(req.params.stationId) || !/^([a-z0-9]+\.m3u8|empty\.vtt)$/.test(req.params.file)) return next();
   try {
     const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file);
     if (playlist === null) return next();
-    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Content-Type", playlist.contentType ?? "application/vnd.apple.mpegurl");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", `public, max-age=${playlist.maxAge}`);
     res.setHeader("Vary", "Accept-Encoding");
@@ -148,10 +149,11 @@ app.get("/hls/:stationId/:file", async (req, res, next) => {
 // Prepared segments when object storage has no public domain (local disk, or R2 without one): passed through.
 app.get("/hls/prepared/:key/:rendition/:file", async (req, res, next) => {
   const { key, rendition, file } = req.params;
-  if (!/^[\w-]+$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !/^seg_\d{5}\.ts$/.test(file) || !v1.deps.storage.objects.open) return next();
+  if (!/^[\w-]+$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !/^seg_\d{5}\.(ts|vtt)$/.test(file) || !v1.deps.storage.objects.open) return next();
   try {
     const stream = await v1.deps.storage.objects.open(`prepared/${key}/${rendition}/${file}`);
-    res.setHeader("Content-Type", "video/mp2t");
+    // Caption segments (X2) are WebVTT.
+    res.setHeader("Content-Type", file.endsWith(".vtt") ? "text/vtt" : "video/mp2t");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     stream.on("error", () => res.destroy());

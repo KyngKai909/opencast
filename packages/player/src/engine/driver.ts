@@ -215,6 +215,11 @@ export class QualityRules {
 
 // ---------- Drivers ----------
 
+/** Shows or hides the video's caption and subtitle tracks (metadata tracks are left alone). */
+function showTextTracks(video: HTMLVideoElement, on: boolean) {
+  for (const t of Array.from(video.textTracks ?? [])) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
+}
+
 /** hls.js, tuned for joining live: start at the sync point three segments from the edge. */
 export function hlsDriver(): MediaDriver {
   return {
@@ -232,6 +237,16 @@ export function hlsDriver(): MediaDriver {
         ...JOIN_CONFIG
       });
       const quality = new QualityRules(hls);
+      // Captions as last asked. The channel's subtitle rendition (X2) is known only once the master
+      // is parsed, and its text track only once hls.js makes it: each time, it's asked again.
+      let captions = false;
+      const applyCaptions = () => {
+        hls.subtitleDisplay = captions;
+        if (captions && hls.subtitleTrack < 0 && hls.subtitleTracks?.length) hls.subtitleTrack = 0;
+        showTextTracks(video, captions);
+      };
+      hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, applyCaptions);
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, () => showTextTracks(video, captions));
       // Before the first segment loads (the autostart runs after MANIFEST_PARSED's listeners).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         // Pictures only: never the TV ladder's audio-only rendition (ABR mustn't drop to it).
@@ -242,6 +257,7 @@ export function hlsDriver(): MediaDriver {
           if (i >= 0) hls.startLevel = i;
         }
         quality.onLevels();
+        applyCaptions();
       });
       hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
         if (options.onPlaylist && data.details?.m3u8) options.onPlaylist(playlistInfo(data.details.m3u8, data.details.url));
@@ -270,9 +286,8 @@ export function hlsDriver(): MediaDriver {
           hls.config.maxMaxBufferLength = Math.max(s, 30);
         },
         setCaptions: (on) => {
-          hls.subtitleDisplay = on;
-          if (on && hls.subtitleTrack < 0 && hls.subtitleTracks.length) hls.subtitleTrack = 0;
-          for (const t of Array.from(video.textTracks)) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
+          captions = on;
+          applyCaptions();
         },
         setQuality: (q) => quality.set(q),
         destroy: () => hls.destroy()
@@ -293,6 +308,11 @@ export function nativeDriver(): MediaDriver {
     attach(video, url, onFatal, options = {}) {
       const onError = () => onFatal(video.error?.message || "media error");
       video.addEventListener("error", onError);
+      // Safari makes the subtitle rendition's text track when it reads the master (X2): it takes
+      // the caption setting as it arrives.
+      let captions = false;
+      const onTrack = () => showTextTracks(video, captions);
+      video.textTracks?.addEventListener?.("addtrack", onTrack);
       video.src = url;
       const stopPolling = options.onPlaylist ? pollPlaylist(url, options.fetch ?? ((u, i) => fetch(u, i)), options.onPlaylist) : () => {};
       return {
@@ -306,11 +326,13 @@ export function nativeDriver(): MediaDriver {
         // Native HLS has no way to choose or cap levels: always auto.
         setQuality: () => {},
         setCaptions: (on) => {
-          for (const t of Array.from(video.textTracks)) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
+          captions = on;
+          showTextTracks(video, on);
         },
         destroy: () => {
           stopPolling();
           video.removeEventListener("error", onError);
+          video.textTracks?.removeEventListener?.("addtrack", onTrack);
           video.removeAttribute("src");
           video.load();
         }

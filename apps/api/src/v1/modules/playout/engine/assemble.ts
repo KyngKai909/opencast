@@ -544,6 +544,8 @@ export class ChannelAssembler {
           if (row.startsAt.getTime() + sum(lengths) >= blockEnd) break;
           lengths.push(s.durationMs);
           for (const r of BAND_RENDITIONS[band]) uris[r] = [...(uris[r] ?? []), s.uris[r]!];
+          // The source's captions, when it has them ("" where a segment has none).
+          if (s.uris.subs || uris.subs) uris.subs = [...(uris.subs ?? new Array<string>(lengths.length - 1).fill("")), s.uris.subs ?? ""];
           live.lastSeq = s.seq;
         }
         const end = row.startsAt.getTime() + sum(lengths);
@@ -566,7 +568,8 @@ export class ChannelAssembler {
       if (this.liveRow) await this.closeLive();
       const id = crypto.randomUUID();
       const lengths = edge.map((s) => s.durationMs);
-      const uris = Object.fromEntries(BAND_RENDITIONS[band].map((r) => [r, edge.map((s) => s.uris[r]!)]));
+      const uris: Record<string, string[]> = Object.fromEntries(BAND_RENDITIONS[band].map((r) => [r, edge.map((s) => s.uris[r]!)]));
+      if (edge.some((s) => s.uris.subs)) uris.subs = edge.map((s) => s.uris.subs ?? "");
       const tags = await this.tagsFor(id, seg, c.at, c.at + sum(lengths), null, "live");
       const row = await this.insertRow({ id, ...this.asRunFields(seg), reason: "live", kind: "live", liveUris: uris, segments: lengths.length, segmentMs: lengths, startsAt: new Date(c.at), endsAt: new Date(c.at + sum(lengths)), tags, open: true });
       this.liveRow = { row, segKey: seg.key, sourceId: liveSourceId, lastSeq: edge[edge.length - 1].seq };

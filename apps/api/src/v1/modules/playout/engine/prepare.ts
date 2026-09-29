@@ -8,8 +8,14 @@
 //
 // Nothing airs from a file any more: the channel's playlists point at these segments (assemble.ts).
 //
-// Captions: nothing in the platform generates captions yet (uploaded tracks are kept as text in
-// the library), so none are made here; see docs/contract-requests.md X2.
+// Captions (docs/contract-requests.md X2) are prepared here too, once, and never hold an item up:
+// a track uploaded to an item whose file this is (the library keeps it by content ID), or one
+// embedded in the file (mov_text and other text tracks, read in the same FFmpeg pass), is cut into
+// the item's 4-second segments (lib/captions.ts), each WebVTT with an X-TIMESTAMP-MAP onto the
+// item's own timestamps, and stored beside the renditions (`prepared/<key>/cc…/`, recorded in
+// `prepared_captions`). A track uploaded after the item was prepared is cut within a minute
+// (`captionsChangedSince`). Captions generated from speech wait on a provider: `CaptionGenerator`
+// is the seam, and the default makes none.
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -20,11 +26,39 @@ import { pipeline } from "node:stream/promises";
 import { and, asc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
+import { captionRendition, languageTag, segmentVtt, vttContentId } from "../../../lib/captions.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
-import { BAND_RENDITIONS, EDGE_FADE_MS, FPS, LADDER, SEGMENT_MS, TARGET_LUFS, type Band, type Ladder, type Rendition, type RenditionName } from "./ladder.js";
+import { BAND_RENDITIONS, EDGE_FADE_MS, FPS, LADDER, REFERENCE, SEGMENT_MS, TARGET_LUFS, type Band, type Ladder, type Rendition, type RenditionName } from "./ladder.js";
 
 const PI = schema.preparedItems;
 const PR = schema.preparedRenditions;
+const PC = schema.preparedCaptions;
+
+/** Where FFmpeg's MPEG-TS muxer starts an item's timestamps (1.4 s at 90 kHz), when a segment can't be read. */
+export const DEFAULT_START_PTS = 126_000;
+/** Subtitle codecs read as text (anything else, DVD or PGS pictures, is left alone). */
+const TEXT_SUBTITLES = new Set(["mov_text", "subrip", "srt", "ass", "ssa", "webvtt", "text"]);
+
+/** A caption track to prepare with an item. */
+export interface CaptionInput {
+  vtt: string;
+  language: string | null;
+  source: "uploaded" | "embedded" | "generated";
+}
+
+/**
+ * Captions generated from speech (X2): the seam, waiting on a provider choice. Given the item's
+ * source file on local disk (its sound), a generator returns a WebVTT track on the item's own
+ * clock, or null. It's asked only when the file has no caption track of its own (embedded or
+ * uploaded); what it returns is prepared like any other track, once.
+ */
+export interface CaptionGenerator {
+  readonly name: string;
+  generate(input: { key: string; file: string; mediaKind: "video" | "audio"; durationMs: number }): Promise<{ vtt: string; language: string | null } | null>;
+}
+
+/** The default: no captions from speech until a provider is chosen. */
+export const noCaptionGenerator: CaptionGenerator = { name: "none", generate: async () => null };
 
 /** What can be prepared: a file by content ID, or (from before content IDs) by its old location. */
 export interface MediaRef {
@@ -61,6 +95,10 @@ export interface TranscodeJob {
 export interface TranscodeResult {
   durationMs: number;
   renditions: Partial<Record<RenditionName, { segmentMs: number[] }>>;
+  /** A text subtitle track found in the file, as WebVTT on the item's clock (X2). */
+  captions?: { vtt: string; language: string | null } | null;
+  /** The item's first MPEG-TS timestamp (90 kHz), where its captions' time zero goes. */
+  startPts?: number | null;
 }
 
 export type Transcoder = (job: TranscodeJob) => Promise<TranscodeResult>;
@@ -82,21 +120,35 @@ export function segmentLengths(playlist: string): number[] {
   return [...playlist.matchAll(/^#EXTINF:([\d.]+)/gm)].map((m) => Math.round(Number(m[1]) * 1000));
 }
 
-async function probe(file: string): Promise<{ durationMs: number | null; hasAudio: boolean; hasVideo: boolean }> {
-  const result = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type,disposition", "-of", "json", file]);
+async function probe(file: string): Promise<{ durationMs: number | null; hasAudio: boolean; hasVideo: boolean; subtitle: { index: number; language: string | null } | null }> {
+  const result = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,disposition:stream_tags=language", "-of", "json", file]);
   try {
-    const json = JSON.parse(result.stdout) as { format?: { duration?: string }; streams?: Array<{ codec_type: string; disposition?: { attached_pic?: number } }> };
+    const json = JSON.parse(result.stdout) as {
+      format?: { duration?: string };
+      streams?: Array<{ codec_type: string; codec_name?: string; disposition?: { attached_pic?: number }; tags?: { language?: string } }>;
+    };
     const streams = json.streams ?? [];
     const duration = Number(json.format?.duration);
+    // The first text subtitle track, by its place among the file's subtitle streams.
+    const subtitles = streams.filter((s) => s.codec_type === "subtitle");
+    const index = subtitles.findIndex((s) => TEXT_SUBTITLES.has(s.codec_name ?? ""));
     return {
       durationMs: Number.isFinite(duration) ? Math.round(duration * 1000) : null,
       hasAudio: streams.some((s) => s.codec_type === "audio"),
       // Cover art on an audio file isn't a picture to air.
-      hasVideo: streams.some((s) => s.codec_type === "video" && !s.disposition?.attached_pic)
+      hasVideo: streams.some((s) => s.codec_type === "video" && !s.disposition?.attached_pic),
+      subtitle: index >= 0 ? { index, language: languageTag(subtitles[index].tags?.language) } : null
     };
   } catch {
-    return { durationMs: null, hasAudio: false, hasVideo: false };
+    return { durationMs: null, hasAudio: false, hasVideo: false, subtitle: null };
   }
+}
+
+/** A TS segment's first timestamp (90 kHz), or null when it can't be read. */
+export async function startPtsOf(segment: string): Promise<number | null> {
+  const result = await run("ffprobe", ["-v", "error", "-show_entries", "format=start_time", "-of", "csv=p=0", segment]);
+  const seconds = Number(result.stdout.trim());
+  return result.code === 0 && result.stdout.trim() && Number.isFinite(seconds) ? Math.round(seconds * 90_000) : null;
 }
 
 /**
@@ -113,6 +165,7 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
     let videoIn: string | null = null;
     let audioIn: string;
     let levelled = true;
+    let subtitle: { index: number; language: string | null } | null = null;
     const wantsVideo = job.renditions.some((r) => r.kind === "video");
     if (src.kind === "slate") {
       durationMs = src.seconds * 1000;
@@ -127,6 +180,7 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
       levelled = false;
     } else {
       const info = await probe(src.path);
+      subtitle = info.subtitle;
       durationMs = info.durationMs ?? job.durationMs ?? 0;
       if (!durationMs) throw new Error("couldn't read the file's length");
       inputs.push("-i", src.path);
@@ -179,6 +233,9 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
         outputs.push("-map", `[a${i}]`, ...audio, "-t", seconds, ...hls);
       }
     }
+    // A text subtitle track in the file comes out as WebVTT in the same pass (X2).
+    const embedded = path.join(job.outDir, "embedded.vtt");
+    if (subtitle) outputs.push("-map", `0:s:${subtitle.index}`, "-c:s", "webvtt", "-t", seconds, "-f", "webvtt", embedded);
     const args = ["-hide_banner", "-loglevel", "error", "-y", ...(options.threads ? ["-threads", String(options.threads)] : []), ...inputs, "-filter_complex", graph.join(";"), ...outputs];
     const result = await run("ffmpeg", args);
     if (result.code !== 0) throw new Error(`ffmpeg exited ${result.code}: ${result.stderr.trim().split("\n").slice(-3).join(" ")}`);
@@ -187,7 +244,9 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
       const playlist = await fs.readFile(path.join(job.outDir, r.name, "index.m3u8"), "utf8");
       renditions[r.name] = { segmentMs: segmentLengths(playlist) };
     }
-    return { durationMs, renditions };
+    const vtt = subtitle ? await fs.readFile(embedded, "utf8").catch(() => null) : null;
+    const first = job.renditions[0] ? await startPtsOf(path.join(job.outDir, job.renditions[0].name, "seg_00000.ts")) : null;
+    return { durationMs, renditions, captions: vtt && /-->/.test(vtt) ? { vtt, language: subtitle!.language } : null, startPts: first };
   };
 }
 
@@ -206,6 +265,8 @@ export interface PreparationStats {
 export interface PreparerOptions {
   ladder?: Ladder;
   transcoder?: Transcoder;
+  /** Captions from speech (X2): none until a provider is chosen. */
+  captionGenerator?: CaptionGenerator;
   /** Preparation scratch space (the worker's only disk need). */
   scratchDir: string;
   concurrency?: number;
@@ -214,8 +275,11 @@ export interface PreparerOptions {
 
 export type Preparer = ReturnType<typeof createPreparer>;
 
-export function createPreparer({ deps }: ModuleContext, options: PreparerOptions) {
+export function createPreparer({ deps, services }: ModuleContext, options: PreparerOptions) {
   const { db } = deps;
+  const generator = options.captionGenerator ?? noCaptionGenerator;
+  /** Each item's first timestamp, once read (for its captions' X-TIMESTAMP-MAP). */
+  const startPts = new Map<string, number>();
   const objects = deps.storage.objects;
   const ladder = options.ladder ?? LADDER;
   const transcode = options.transcoder ?? ffmpegTranscoder();
@@ -279,11 +343,16 @@ export function createPreparer({ deps }: ModuleContext, options: PreparerOptions
       const wanted = row.renditions.filter((r): r is RenditionName => r in ladder && !have.has(r)).map((r) => ladder[r as RenditionName]);
       let durationMs = row.durationMs;
       let bytes = 0;
+      let result: TranscodeResult | null = null;
+      let source: TranscodeJob["source"] | null = null;
       if (wanted.length) {
-        const source: TranscodeJob["source"] =
-          row.kind === "slate" ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)) } : { kind: "file", path: await sourceFile(row, dir) };
+        source = row.kind === "slate" ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)) } : { kind: "file", path: await sourceFile(row, dir) };
         const out = path.join(dir, "out");
-        const result = await transcode({ key, source, mediaKind: row.mediaKind, durationMs: row.durationMs, renditions: wanted, outDir: out });
+        result = await transcode({ key, source, mediaKind: row.mediaKind, durationMs: row.durationMs, renditions: wanted, outDir: out });
+        if (typeof result.startPts === "number") {
+          if (startPts.size > 5_000) startPts.clear();
+          startPts.set(key, result.startPts);
+        }
         durationMs = result.durationMs;
         for (const r of wanted) {
           const made = result.renditions[r.name];
@@ -307,6 +376,12 @@ export function createPreparer({ deps }: ModuleContext, options: PreparerOptions
         .where(eq(PI.key, key));
       markReady(key, wanted.map((r) => r.name));
       if (wanted.length) log(`[prepare] ${key.slice(0, 16)}… ${wanted.map((r) => r.name).join(" ")} in ${(prepMs / 1000).toFixed(1)} s (${((durationMs ?? 0) / 1000).toFixed(0)} s of media)`);
+      // Captions, once the segments they follow exist. They never hold the item up.
+      if (row.kind === "file") {
+        await captionsAfterPrepare(key, row.mediaKind, durationMs ?? 0, result, source?.kind === "file" ? source.path : null).catch((error) =>
+          log(`[prepare] ${key.slice(0, 16)}… captions failed: ${(error as Error).message.slice(0, 200)}`)
+        );
+      }
       for (const listener of listeners) listener(key);
     } catch (error) {
       const message = (error as Error).message.slice(0, 500);
@@ -318,6 +393,97 @@ export function createPreparer({ deps }: ModuleContext, options: PreparerOptions
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
+  }
+
+  /**
+   * The embedded track the transcode found, else one generated from speech (only for an item
+   * prepared for TV with no captions yet, so a band's renditions added later don't ask again);
+   * then every track the item has.
+   */
+  async function captionsAfterPrepare(key: string, mediaKind: "video" | "audio", durationMs: number, result: TranscodeResult | null, file: string | null) {
+    const extra: CaptionInput[] = [];
+    if (result?.captions) extra.push({ ...result.captions, source: "embedded" });
+    else if (result && file && ready.get(key)?.has(REFERENCE.tv)) {
+      const [made] = await db.select({ contentId: PC.contentId }).from(PC).where(eq(PC.key, key)).limit(1);
+      const own = made ? true : (await uploadedTracks(key)).length > 0;
+      const generated = own ? null : await generator.generate({ key, file, mediaKind, durationMs });
+      if (generated) extra.push({ ...generated, source: "generated" });
+    }
+    await prepareCaptions(key, extra);
+  }
+
+  /** Caption tracks uploaded to the items whose current file is this one. */
+  async function uploadedTracks(key: string): Promise<CaptionInput[]> {
+    // Files from before content IDs (`loc-…`) have no uploaded captions prepared with them.
+    if (key.startsWith("loc-") || key.startsWith("slate-")) return [];
+    const tracks = await services.library.captionTracksForContent(key);
+    return tracks.map((t) => ({ vtt: t.vtt, language: t.language, source: "uploaded" as const }));
+  }
+
+  /** The item's first MPEG-TS timestamp: from its transcode, else read from a stored segment. */
+  async function itemStartPts(key: string): Promise<number> {
+    const known = startPts.get(key);
+    if (known !== undefined) return known;
+    const have = ready.get(key) ?? new Set<string>();
+    const rendition = (["v360", "a64", "a128", "v480", "v720", "v1080"] as const).find((r) => have.has(r));
+    let pts: number | null = null;
+    if (rendition) {
+      const dir = await fs.mkdtemp(path.join(options.scratchDir, "pts-"));
+      try {
+        const file = path.join(dir, "seg_00000.ts");
+        await objects.download(`${objectKey.prepared(key, rendition)}/seg_00000.ts`, file);
+        pts = await startPtsOf(file);
+      } catch {
+        // Not readable: FFmpeg's usual start.
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+    startPts.set(key, pts ?? DEFAULT_START_PTS);
+    return pts ?? DEFAULT_START_PTS;
+  }
+
+  /**
+   * Cuts each of the item's caption tracks not prepared yet into its segments (the TV band's, whose
+   * picture they're shown over) and stores them beside its renditions. Nothing to do until the item
+   * is prepared for TV. Returns how many tracks were prepared.
+   */
+  async function prepareCaptions(key: string, extra: CaptionInput[] = []): Promise<number> {
+    if (key.startsWith("slate-")) return 0;
+    const lengths = await preparer.segmentMs(key, REFERENCE.tv);
+    if (!lengths?.length) return 0;
+    const tracks = [...extra, ...(await uploadedTracks(key))];
+    if (!tracks.length) return 0;
+    const done = new Set((await db.select({ contentId: PC.contentId }).from(PC).where(eq(PC.key, key))).map((r) => r.contentId));
+    let made = 0;
+    for (const track of tracks) {
+      const { cid } = vttContentId(track.vtt);
+      if (done.has(cid)) continue;
+      done.add(cid);
+      const segments = segmentVtt(track.vtt, lengths, await itemStartPts(key));
+      const rendition = captionRendition(cid);
+      const dir = await fs.mkdtemp(path.join(options.scratchDir, "cc-"));
+      try {
+        await fs.writeFile(path.join(dir, "track.vtt"), track.vtt);
+        await Promise.all(segments.map((text, i) => fs.writeFile(path.join(dir, `seg_${String(i).padStart(5, "0")}.vtt`), text)));
+        await fs.writeFile(
+          path.join(dir, "index.m3u8"),
+          ["#EXTM3U", "#EXT-X-VERSION:3", `#EXT-X-TARGETDURATION:${Math.max(4, ...lengths.map((ms) => Math.ceil(ms / 1000)))}`, "#EXT-X-PLAYLIST-TYPE:VOD", ...lengths.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, `seg_${String(i).padStart(5, "0")}.vtt`]), "#EXT-X-ENDLIST", ""].join("\n")
+        );
+        let bytes = 0;
+        for (const name of await fs.readdir(dir)) bytes += (await fs.stat(path.join(dir, name))).size;
+        await objects.putDir(objectKey.prepared(key, rendition), dir, "standard");
+        await db
+          .insert(PC)
+          .values({ key, contentId: cid, rendition, source: track.source, language: track.language, segments: segments.length, bytes, preparedAt: deps.clock.now() })
+          .onConflictDoNothing();
+        made++;
+        log(`[prepare] ${key.slice(0, 16)}… captions (${track.source}${track.language ? `, ${track.language}` : ""}) in ${segments.length} segments`);
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
+    }
+    return made;
   }
 
   /** Claims a queued item (another replica may be after it too) and prepares it. */
@@ -444,6 +610,24 @@ export function createPreparer({ deps }: ModuleContext, options: PreparerOptions
       }
       if (!preparer.isReady(key, band)) throw new Error("the slate couldn't be prepared");
       return key;
+    },
+
+    /** Prepares an item's caption tracks now (it must be prepared for TV already). */
+    prepareCaptions,
+
+    /**
+     * Caption tracks uploaded, replaced or backfilled since `since`: cut for the items already
+     * prepared (the rest get theirs when they're prepared). Returns how many tracks were prepared.
+     */
+    async captionsChangedSince(since: Date): Promise<number> {
+      const itemIds = await services.library.captionTracksChangedSince(since);
+      if (!itemIds.length) return 0;
+      const current = await services.library.currentContent(itemIds);
+      const keys = [...new Set(current.values())];
+      await refresh(keys);
+      let made = 0;
+      for (const key of keys) if (ready.get(key)?.has(REFERENCE.tv)) made += await prepareCaptions(key);
+      return made;
     },
 
     /** A rendition's segment lengths (ms), from the database, remembered. */

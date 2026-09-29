@@ -171,3 +171,32 @@ export class Slates {
     );
   }
 }
+
+/**
+ * A caption cue drawn for a translator that draws captions into the picture (X2): the frame
+ * transparent but for the cue at the bottom, inside title safe, in the player's caption style
+ * (white Public Sans on the screen colour at 82%, 4.2% of the width, the player's medium size).
+ * Written to `file` (a relay's scratch space), never cached: cues come and go.
+ */
+export async function captionPng(text: string, width: number, height: number, file: string): Promise<void> {
+  const size = Math.max(6, Math.round(width * 0.042));
+  const lineHeight = Math.round(size * 1.3);
+  const rows = text
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .split("\n")
+    .flatMap((line) => wrap(line.trim(), 36))
+    .filter(Boolean)
+    .slice(-4);
+  const bottom = Math.round(height * 0.95);
+  const boxes = rows.map((row, i) => {
+    const y = bottom - (rows.length - i) * lineHeight;
+    const w = Math.min(width * 0.9, Math.round(row.length * size * 0.56 + size * 0.8));
+    return `<rect x="${Math.round((width - w) / 2)}" y="${y}" width="${Math.round(w)}" height="${lineHeight}" fill="rgb(10,17,36)" fill-opacity="0.82"/>
+      <text x="${width / 2}" y="${y + Math.round(lineHeight * 0.76)}" font-family="${TEXT}" font-size="${size}" fill="#FFFFFF" text-anchor="middle">${esc(row)}</text>`;
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${boxes.join("")}</svg>`;
+  await sharp(Buffer.from(svg), { density: 72 }).resize(width, height).png().toFile(file);
+}

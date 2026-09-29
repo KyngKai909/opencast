@@ -8,7 +8,7 @@ import { fakeFetch, flush, livePlaylist, MASTER } from "../test-helpers";
 type Listener = (event: string, data: unknown) => void;
 const made: FakeHls[] = [];
 class FakeHls {
-  static Events = { MANIFEST_PARSED: "manifestParsed", LEVELS_UPDATED: "levelsUpdated", LEVEL_SWITCHED: "levelSwitched", LEVEL_LOADED: "levelLoaded", ERROR: "hlsError" };
+  static Events = { MANIFEST_PARSED: "manifestParsed", LEVELS_UPDATED: "levelsUpdated", LEVEL_SWITCHED: "levelSwitched", LEVEL_LOADED: "levelLoaded", ERROR: "hlsError", SUBTITLE_TRACKS_UPDATED: "subtitleTracksUpdated", SUBTITLE_TRACK_SWITCH: "subtitleTrackSwitch" };
   static ErrorDetails = { BUFFER_STALLED_ERROR: "bufferStalledError" };
   static ErrorTypes = { NETWORK_ERROR: "networkError", MEDIA_ERROR: "mediaError" };
   static isSupported = () => true;
@@ -28,6 +28,9 @@ class FakeHls {
   manualLevel = -1;
   playingDate: Date | null = null;
   liveSyncPosition = null;
+  subtitleTracks: Array<{ id: number; lang: string; name: string }> = [];
+  subtitleTrack = -1;
+  subtitleDisplay = true;
   constructor(public config: Record<string, unknown>) {
     made.push(this);
   }
@@ -130,5 +133,64 @@ describe("the browser's own HLS", () => {
     h.destroy();
     await flush(10_000);
     expect(f.urls.filter((u) => u.endsWith("hi.m3u8"))).toHaveLength(2);
+  });
+});
+
+/** A video's text track list, as a browser keeps it (jsdom has none): tracks added later fire addtrack. */
+function withTextTracks(video: HTMLVideoElement) {
+  const list = Object.assign(new EventTarget(), { length: 0 }) as EventTarget & { length: number; [i: number]: { kind: string; mode: string } };
+  Object.defineProperty(video, "textTracks", { value: list });
+  return (kind: string) => {
+    const track = { kind, mode: "disabled" };
+    list[list.length] = track;
+    list.length++;
+    list.dispatchEvent(Object.assign(new Event("addtrack"), { track }));
+    return track;
+  };
+}
+
+describe("captions from the channel's subtitle rendition (X2)", () => {
+  it("hls.js: turned on before the master is parsed, the subtitle track is picked once hls.js knows it; off hides it", () => {
+    const video = document.createElement("video");
+    const add = withTextTracks(video);
+    const handle = hlsDriver().attach(video, "/hls/beat/master.m3u8", () => {});
+    const hls = made[0]!;
+    handle.setCaptions(true);
+    // Nothing to pick yet: the master isn't parsed.
+    expect(hls.subtitleTrack).toBe(-1);
+    expect(hls.subtitleDisplay).toBe(true);
+    hls.subtitleTracks = [{ id: 0, lang: "en", name: "English" }];
+    hls.emit(FakeHls.Events.MANIFEST_PARSED, { levels: hls.levels });
+    expect(hls.subtitleTrack).toBe(0);
+    const track = add("subtitles");
+    hls.emit(FakeHls.Events.SUBTITLE_TRACK_SWITCH, { id: 0 });
+    expect(track.mode).toBe("showing");
+    handle.setCaptions(false);
+    expect(hls.subtitleDisplay).toBe(false);
+    expect(track.mode).toBe("hidden");
+  });
+
+  it("hls.js: captions left off never pick a track", () => {
+    const video = document.createElement("video");
+    hlsDriver().attach(video, "/hls/beat/master.m3u8", () => {});
+    const hls = made[0]!;
+    hls.subtitleTracks = [{ id: 0, lang: "en", name: "English" }];
+    hls.emit(FakeHls.Events.SUBTITLE_TRACKS_UPDATED, { subtitleTracks: hls.subtitleTracks });
+    expect(hls.subtitleTrack).toBe(-1);
+    expect(hls.subtitleDisplay).toBe(false);
+  });
+
+  it("Safari: a caption track that arrives after the setting takes it; metadata tracks are left alone", () => {
+    const video = document.createElement("video");
+    const add = withTextTracks(video);
+    const handle = nativeDriver().attach(video, "/hls/beat/master.m3u8", () => {});
+    handle.setCaptions(true);
+    const captions = add("captions");
+    const metadata = add("metadata");
+    expect(captions.mode).toBe("showing");
+    expect(metadata.mode).toBe("disabled");
+    handle.setCaptions(false);
+    expect(captions.mode).toBe("hidden");
+    handle.destroy();
   });
 });

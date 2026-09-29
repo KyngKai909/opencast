@@ -1,7 +1,8 @@
 // The playout engine: prepare once, then assemble (platform prompt, Phase 5). Runs in the worker,
 // under its Redis leader lock. Each tick it:
 //
-//   - prepares what's queued (prepare.ts: FFmpeg, once per content ID, earliest airtime first);
+//   - prepares what's queued (prepare.ts: FFmpeg, once per content ID, earliest airtime first),
+//     captions with it; every half minute cuts caption tracks uploaded since for items prepared;
 //   - every hour checks the next 48 hours of every station's log and queues anything not prepared;
 //     every minute warns the station and the Network desk about anything airing within the hour
 //     that still isn't; every few minutes queues items whose rights were just confirmed;
@@ -21,7 +22,7 @@ import { ChannelAssembler, pruneChannelItems, type ChannelLook } from "./assembl
 import { createFiller } from "./fill.js";
 import { LADDER, scaledLadder, type Band, type Ladder } from "./ladder.js";
 import { createPlanner } from "./plan.js";
-import { createPreparer, ffmpegTranscoder, refKey, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
+import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
 import { TranslatorRelay } from "./translator.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
@@ -37,6 +38,8 @@ const READY_WARN_EVERY_MS = 60_000;
 /** Items whose rights were just confirmed are queued this often. */
 const RIGHTS_EVERY_MS = 5 * 60_000;
 const TRANSLATORS_EVERY_MS = 10_000;
+/** Caption tracks uploaded since are cut this often (X2). */
+const CAPTIONS_EVERY_MS = 30_000;
 const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepeercdn.studio/hls").replace(/\/+$/, "");
 
 export interface EngineOptions {
@@ -53,6 +56,8 @@ export interface EngineOptions {
   prepareConcurrency?: number;
   /** Where a live source's HLS is read (tests point at a local fake); Livepeer's playback by default. */
   liveUrl?: (liveSourceId: string) => Promise<string | null>;
+  /** Captions from speech (X2): none by default, until a provider is chosen. */
+  captionGenerator?: CaptionGenerator;
   /** Translators on (default) or off. */
   translators?: boolean;
   /** How far ahead the channel's rows are written. */
@@ -81,6 +86,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     transcoder: options.transcoder ?? ffmpegTranscoder({ preset: options.preset ?? process.env.PREPARE_PRESET ?? "veryfast" }),
     scratchDir,
     concurrency: options.prepareConcurrency ?? Number(process.env.PREPARE_CONCURRENCY ?? 1),
+    captionGenerator: options.captionGenerator,
     log
   });
   const bands = new Map<string, Band>();
@@ -97,7 +103,9 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let lastRights = 0;
   let lastPrune = 0;
   let lastTranslators = 0;
+  let lastCaptions = 0;
   let rightsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
+  let captionsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
   let readiness: ReadinessSummary = { checkedAt: null, items: 0, ready: 0, waiting: 0, firstNotReady: null };
 
   // A program that just became ready airs from its next segment boundary: plan again.
@@ -318,7 +326,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       }
       for (const target of targets) {
         if (running.has(target.id)) continue;
-        const relay = new TranslatorRelay(ctx, stationId, target, { look, preparer, slates: planner.slates, log });
+        const relay = new TranslatorRelay(ctx, stationId, target, { look, preparer, slates: planner.slates, log, scratchDir });
         relay.start();
         running.set(target.id, { relay, signature: TranslatorRelay.signature(target) });
       }
@@ -363,6 +371,15 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       if (now - lastWarn >= READY_WARN_EVERY_MS) {
         lastWarn = now;
         await warnNotReady().catch((error) => log(`[ready] warning failed: ${(error as Error).message}`));
+      }
+      if (now - lastCaptions >= CAPTIONS_EVERY_MS) {
+        lastCaptions = now;
+        const since = captionsSince;
+        captionsSince = deps.clock.now();
+        await preparer.captionsChangedSince(since).catch((error) => {
+          captionsSince = since;
+          log(`[prepare] captions failed: ${(error as Error).message}`);
+        });
       }
       if (now - lastPrune >= 3_600_000) {
         lastPrune = now;

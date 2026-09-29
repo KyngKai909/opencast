@@ -361,6 +361,24 @@ export function isNoSpaceCompressionError(error: unknown): boolean {
   return isNoSpaceErrorText(error.message);
 }
 
+/** Subtitle codecs that are text (they can be carried as mov_text, and read as WebVTT). */
+export const TEXT_SUBTITLE_CODECS = new Set(["mov_text", "subrip", "srt", "ass", "ssa", "webvtt", "text"]);
+
+/**
+ * The first text subtitle track in a file (X2, added 2026-09-29): its index among the file's
+ * subtitle streams, or null. Bitmap subtitles (DVD, PGS) can't be read as text and are left out.
+ */
+export async function firstTextSubtitle(inputPath: string): Promise<number | null> {
+  const result = await runCommand("ffprobe", ["-v", "error", "-select_streams", "s", "-show_entries", "stream=codec_name", "-of", "json", inputPath], { timeoutMs: 60_000 });
+  try {
+    const streams = (JSON.parse(result.stdout) as { streams?: Array<{ codec_name?: string }> }).streams ?? [];
+    const i = streams.findIndex((st) => TEXT_SUBTITLE_CODECS.has(st.codec_name ?? ""));
+    return i >= 0 ? i : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function compressForStreaming(
   inputPath: string,
   outputDir: string,
@@ -406,6 +424,8 @@ export async function compressForStreaming(
   }
 
   const outputPath = path.join(outputDir, `${baseName}.mp4`);
+  // A text subtitle track comes along (as mov_text), so preparing for air can read it (X2).
+  const subtitle = await firstTextSubtitle(inputPath);
   const result = await runCommand(
     "ffmpeg",
     [
@@ -431,6 +451,7 @@ export async function compressForStreaming(
       "aac",
       "-b:a",
       "128k",
+      ...(subtitle === null ? [] : ["-map", `0:s:${subtitle}`, "-c:s", "mov_text"]),
       "-movflags",
       "+faststart",
       outputPath

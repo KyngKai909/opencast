@@ -512,3 +512,12 @@ Words for what the API answers now (A4, A5, B3, B6, C4, G3, G5, G7, L5 to L7, N1
 | Ready to sign on | the API's "Items prepared for air" line: shown as fine and not counted in "{Four} checks." while everything is prepared; while something isn't, a warning ("… one is a warning you can sign on through.") with the API's detail and no fix |
 | A library item, Prepared for air | "For air": "Prepared for air", "Being prepared" (queued or preparing) or "Couldn't be prepared", in place of "Ready for tonight: Cached on the playout server"; no line until something asks for it (`not_asked`) |
 
+### Captions in the stream (X2, contracts of 2026-09-29)
+
+The channel's playlists now carry captions (a WebVTT subtitle rendition on the TV band). The viewer's and the TV's caption settings ("Captions" On, Off, Muted only; "Caption size") are the frames' words and are unchanged. What's new:
+
+| Where | Words |
+|---|---|
+| The subtitle rendition's name, as a device's own caption menu shows it (Safari and iOS, Apple TV, a Chromecast's) | The language's name in itself: "English", "Español" (from the station's programs' captions language; "English" when none is set). No other words |
+| Upload with a caption file, and Upload captions (L7): when the file is neither WebVTT nor SRT | "That isn't WebVTT or SRT captions." (the API's words, shown as they come; unchanged from L7) |
+| Master control, a translator (no screen yet; proposed): the choice | "Draw captions into the picture"; help "Off: {YouTube} gets the picture without captions. On: captions are part of the picture there, for everyone watching." Off by default |

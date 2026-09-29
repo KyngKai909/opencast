@@ -277,6 +277,25 @@ describe("the heartbeat", () => {
 
 void byId;
 
+describe("the caption setting", () => {
+  it("on shows the stream's captions, off hides them, and muted only shows them while the sound is off", async () => {
+    const t = engine.tune(BEAT.station.id);
+    await flush(10);
+    await t;
+    const active = () => driver.handles.filter((h) => !h.destroyed && h.url.includes("/beat/")).pop()!;
+    engine.setCaptions("on", "large");
+    expect(active().captions).toBe(true);
+    expect(engine.getState().captionSize).toBe("large");
+    engine.setCaptions("off");
+    expect(active().captions).toBe(false);
+    engine.setCaptions("muted_only");
+    engine.setMuted(false);
+    expect(active().captions).toBe(false);
+    engine.setMuted(true);
+    expect(active().captions).toBe(true);
+  });
+});
+
 describe("captions above the banner", () => {
   it("counts enough caption lines up from the bottom to clear the lift, at each size", async () => {
     const { captionLineFor, CAPTION_SCALE } = await import("./PlayerEngine");
