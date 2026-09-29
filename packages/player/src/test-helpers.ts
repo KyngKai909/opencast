@@ -3,7 +3,7 @@
 
 import { vi } from "vitest";
 import type { Channel } from "./types";
-import type { MediaDriver, Quality } from "./engine/driver";
+import type { AttachOptions, MediaDriver, PlaylistInfo, Quality } from "./engine/driver";
 
 export const frameDelay: Record<string, number> = {};
 
@@ -28,6 +28,12 @@ export interface FakeHandle {
   quality: Quality;
   destroyed: boolean;
   live: number | null;
+  /** The program date-time of the picture (ms): set it to move the stream's clock. */
+  programDate: number | null;
+  /** The pre-warmed start the deck asked for. */
+  start: AttachOptions["start"];
+  /** Deliver a playlist load, as hls.js does on every reload. */
+  playlist: (info: Partial<PlaylistInfo>) => void;
 }
 
 export function fakeDriver(o: { webAudio?: boolean } = {}): MediaDriver & { handles: FakeHandle[] } {
@@ -36,13 +42,24 @@ export function fakeDriver(o: { webAudio?: boolean } = {}): MediaDriver & { hand
     name: "fake",
     webAudio: o.webAudio,
     handles,
-    attach(video, url) {
+    attach(video, url, _onFatal, options = {}) {
       // A browser says it can play once the first segments are in.
       setTimeout(() => video.dispatchEvent(new Event("canplay")), 0);
-      const h: FakeHandle = { url, buffer: 0, captions: false, quality: "auto", destroyed: false, live: 30 };
+      const h: FakeHandle = {
+        url,
+        buffer: 0,
+        captions: false,
+        quality: "auto",
+        destroyed: false,
+        live: 30,
+        programDate: null,
+        start: options.start,
+        playlist: (info) => options.onPlaylist?.({ ranges: [], ended: false, edge: null, ...info })
+      };
       handles.push(h);
       return {
         liveSyncPosition: () => h.live,
+        programDate: () => h.programDate,
         setBufferAhead: (s) => (h.buffer = s),
         setCaptions: (on) => (h.captions = on),
         setQuality: (q) => (h.quality = q),
@@ -63,6 +80,34 @@ export function station(callSign: string, channel: string, opts: Partial<{ band:
     playback: opts.onAir === false ? null : { kind: opts.kind ?? "hls", url: `/mock-hls/${callSign.toLowerCase()}/master.m3u8` }
   };
 }
+
+/**
+ * A fetch stand-in serving playlists and segments by URL (a function of the URL, so a live
+ * playlist can change between calls), recording every URL asked for.
+ */
+export function fakeFetch(serve: (url: string) => string | null) {
+  const urls: string[] = [];
+  const fn = vi.fn(async (input: string) => {
+    const url = String(input);
+    urls.push(url);
+    const body = serve(url);
+    return new Response(body ?? "not found", { status: body === null ? 404 : 200 });
+  });
+  return { fetch: fn as unknown as (url: string, init?: RequestInit) => Promise<Response>, urls };
+}
+
+/** A live media playlist: `count` segments from `first`, 2 seconds each, program date-time from `pdt`. */
+export function livePlaylist(o: { first: number; count?: number; pdt?: number; ended?: boolean; extra?: string[] }): string {
+  const count = o.count ?? 6;
+  const lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:2", `#EXT-X-MEDIA-SEQUENCE:${o.first}`];
+  if (o.pdt !== undefined) lines.push(`#EXT-X-PROGRAM-DATE-TIME:${new Date(o.pdt).toISOString()}`);
+  lines.push(...(o.extra ?? []));
+  for (let k = o.first; k < o.first + count; k++) lines.push("#EXTINF:2.000,", `seg_${k}.ts`);
+  if (o.ended) lines.push("#EXT-X-ENDLIST");
+  return lines.join("\n") + "\n";
+}
+
+export const MASTER = ["#EXTM3U", '#EXT-X-STREAM-INF:BANDWIDTH=2400000,RESOLUTION=1280x720', "hi.m3u8", '#EXT-X-STREAM-INF:BANDWIDTH=650000,RESOLUTION=640x360', "live.m3u8", ""].join("\n");
 
 /** Lets pending promises and zero-delay timers run under fake timers. */
 export async function flush(ms = 0) {

@@ -23,7 +23,9 @@ beforeEach(() => {
   for (const k of Object.keys(frameDelay)) delete frameDelay[k];
   driver = fakeDriver();
   host = document.createElement("div");
-  engine = new PlayerEngine({ driver, bannerMs: 5000, numberWaitMs: 2000, pauseHoldMs: 30 * 60_000 });
+  // These tests warm neighbours with a hidden <video> ("buffer"); pre-warming by playlists and a
+  // first segment (the default) has its own tests (warming.test.ts).
+  engine = new PlayerEngine({ driver, warm: "buffer", bannerMs: 5000, numberWaitMs: 2000, pauseHoldMs: 30 * 60_000 });
   engine.attach(host);
   engine.setChannels(dial);
 });
@@ -341,7 +343,7 @@ describe("picture quality", () => {
   });
 
   it("applies to the picture on screen and the warm neighbours at once", async () => {
-    const e = new PlayerEngine({ driver, quality: "data_saver" });
+    const e = new PlayerEngine({ driver, warm: "buffer", quality: "data_saver" });
     e.attach(document.createElement("div"));
     e.setChannels(dial);
     const t = e.tune(BEAT.station.id);

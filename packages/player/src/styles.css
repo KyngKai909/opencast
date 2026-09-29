@@ -31,6 +31,50 @@
 .oc-player__cover > * { width: 100%; height: 100%; border-radius: 0; }
 .oc-player__embed { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--screen); }
 
+/* ---------- The station's graphics (Overlays.tsx), from the playlist's DATERANGE tags ----------
+   Inside the style guide's safe areas, as the frames draw them. Web and phone sizes come from the
+   viewer frames (.pic .bug, .pic .l3: container units with a floor and a ceiling); TV sizes from
+   tv/opencast-tv.html (.tv .pic .bug 40/22px at right 5%, bottom 6%; .tv .pic .l3 44/28px), in
+   player units so they're exact at 1920. The code is business/opencast-biz-spots.html's .codebug
+   (on a picture about 570px wide), scaled the same way. */
+.oc-ovl { position: absolute; inset: 0; pointer-events: none; }
+/* The bug: bottom right by default; the tag can put it in any corner. */
+.oc-ovl__bug { position: absolute; inset: 0; }
+.oc-ovl__bug[data-position^="top"] .oc-bug { bottom: auto; top: 7%; }
+.oc-ovl__bug[data-position$="left"] .oc-bug { right: auto; left: 3.5%; text-align: left; }
+.oc-ovl__logo {
+  position: absolute; right: 3.5%; bottom: 7%; height: clamp(18px, 3.4cqw, 32px); width: auto; max-width: 20%;
+  object-fit: contain; opacity: var(--bug-opacity);
+}
+.oc-ovl__bug[data-position^="top"] .oc-ovl__logo { bottom: auto; top: 7%; }
+.oc-ovl__bug[data-position$="left"] .oc-ovl__logo { right: auto; left: 3.5%; }
+.oc-ovl--tv .oc-bug { right: 5%; bottom: 6%; }
+.oc-ovl--tv .oc-bug__cs { font-size: calc(40 * var(--u)); }
+.oc-ovl--tv .oc-bug__ch { font-size: calc(22 * var(--u)); }
+.oc-ovl--tv .oc-ovl__bug[data-position^="top"] .oc-bug { top: 6%; }
+.oc-ovl--tv .oc-ovl__bug[data-position$="left"] .oc-bug { left: 5%; }
+.oc-ovl--tv .oc-ovl__logo { right: 5%; bottom: 6%; height: calc(66 * var(--u)); }
+.oc-ovl--tv .oc-ovl__bug[data-position^="top"] .oc-ovl__logo { top: 6%; }
+.oc-ovl--tv .oc-ovl__bug[data-position$="left"] .oc-ovl__logo { left: 5%; }
+/* The lower third (ui's LowerThird: left 5%, bottom 8%). */
+.oc-ovl--tv .oc-l3__nm { font-size: calc(44 * var(--u)); }
+.oc-ovl--tv .oc-l3__tt { font-size: calc(28 * var(--u)); }
+/* The code and QR, bottom left, for the spot's last seconds. The panel is the screen colour at 85%. */
+.oc-ovl__code {
+  position: absolute; left: 6%; bottom: 7%;
+  display: flex; align-items: center; gap: clamp(6px, 1.75cqw, 16px);
+  background: rgb(10 17 36 / .85); color: #fff;
+  padding: clamp(5px, 1.4cqw, 12px) clamp(8px, 2.1cqw, 18px); border-radius: 6px;
+}
+.oc-ovl__qr { display: block; width: clamp(30px, 7.4cqw, 68px); height: auto; aspect-ratio: 1; background: var(--on-tally); border-radius: 2px; }
+.oc-ovl__qr path { fill: var(--on-signal); }
+.oc-ovl__code-c { display: block; font: 500 clamp(11px, 2.8cqw, 24px)/1.15 var(--font-mono); }
+.oc-ovl__code-o { display: block; font-size: clamp(9px, 1.9cqw, 16px); opacity: .8; }
+.oc-ovl--tv .oc-ovl__code { gap: calc(34 * var(--u)); padding: calc(27 * var(--u)) calc(40 * var(--u)); border-radius: calc(20 * var(--u)); }
+.oc-ovl--tv .oc-ovl__qr { width: calc(142 * var(--u)); border-radius: calc(7 * var(--u)); }
+.oc-ovl--tv .oc-ovl__code-c { font-size: calc(54 * var(--u)); }
+.oc-ovl--tv .oc-ovl__code-o { font-size: calc(37 * var(--u)); }
+
 /* The TV's panels (.tv-panel): the dark glass the banner and the number sit on. */
 .oc-banner, .oc-numpad {
   position: absolute;

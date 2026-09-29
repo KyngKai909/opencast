@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Slate, Tag, cx } from "@opencast/ui";
+import { Button, Slate, Tag, clock as clockText, cx } from "@opencast/ui";
 import type { Hint } from "../input/types";
 import { CAPTION_SCALE } from "../engine/PlayerEngine";
 import { usePlayer, usePlayerDock } from "./context";
 import { Banner } from "./Banner";
 import { NumberPanel } from "./NumberPanel";
 import { RadioScreen } from "./RadioScreen";
+import { Overlays } from "./Overlays";
 
 export interface PlayerSurfaceProps {
   /** web: inside a page (the tuned-in page, the phone's full player). tv: the ten-foot screen. */
@@ -17,6 +18,11 @@ export interface PlayerSurfaceProps {
   lastChannelHint?: boolean;
   /** The time to show (the banner's clock and progress). Defaults to the device's clock. */
   clock?: () => Date;
+  /**
+   * The station's graphics from its playlist (bug, lower thirds, codes). On by default; off where
+   * the picture is shown small inside something else (the TV guide's window).
+   */
+  overlays?: boolean;
   className?: string;
 }
 
@@ -32,7 +38,7 @@ function useClock(clock: () => Date, ms = 1000): Date {
 }
 
 /** The picture and everything drawn over it. Needs a PlayerProvider above it. */
-export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, clock = deviceClock, className }: PlayerSurfaceProps) {
+export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, clock = deviceClock, overlays = true, className }: PlayerSurfaceProps) {
   const [s, engine] = usePlayer();
   const stage = useRef<HTMLDivElement>(null);
   const now = useClock(clock);
@@ -59,6 +65,9 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
   const onAirHere = s.status === "playing" && !!current?.onAir && s.pendingId === null;
   const levelsFor = useCallback((bars: number) => engine.audioLevels(bars), [engine]);
   const captionSize = CAPTION_SCALE[s.captionSize];
+  // Off air: when it's back, from its stream's sign-off tag or the dial's off-air block.
+  const backAt = current && s.status === "off_air" ? (s.offAir?.stationId === current.station.id ? s.offAir.backAt : null) ?? (current.now?.kind === "off_air" ? current.now.endsAt : null) : null;
+  const ident = current ? [current.station.callSign, current.station.channel].filter(Boolean).join("\u00a0") || current.station.name : "";
 
   return (
     <div
@@ -70,11 +79,28 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
     >
       <div ref={stage} className="oc-player__stage" />
 
+      {overlays && !isRadio && (
+        <Overlays
+          channel={current}
+          size={size}
+          onScreen={s.onScreen?.stationId === s.currentId ? s.onScreen : null}
+          showing={(s.status === "playing" || s.status === "paused") && !!current}
+          banner={!!bannerFor && !s.entry}
+        />
+      )}
+
       {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} size={size} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} levels={levelsFor} />}
 
       {current && s.status === "off_air" && (
         <div className="oc-player__cover">
-          <Slate kind="off-air" callSign={current.station.callSign ?? undefined} name={current.station.name} size={size === "tv" ? "tv" : "screen"} />
+          <Slate kind="off-air" callSign={current.station.callSign ?? undefined} name={current.station.name} size={size === "tv" ? "tv" : "screen"}>
+            {backAt ? (
+              <>
+                {`${ident} signs on again at `}
+                <span className="oc-mono">{clockText(backAt, { timeZone })}</span>.
+              </>
+            ) : null}
+          </Slate>
         </div>
       )}
 

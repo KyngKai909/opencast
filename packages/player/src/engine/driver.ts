@@ -3,6 +3,8 @@
 // either way, and tests can use a fake.
 
 import Hls from "hls.js";
+import { parseDateRanges, type HlsDateRange } from "@opencast/contracts";
+import { isMaster, mediaPlaylist, variants, type Fetch } from "./playlist";
 
 /**
  * Picture quality (TV settings, "Picture and sound"): "auto" follows the connection (hls.js's
@@ -10,9 +12,30 @@ import Hls from "hls.js";
  */
 export type Quality = "auto" | "data_saver" | "best";
 
+/** What a playlist load says besides its segments. */
+export interface PlaylistInfo {
+  /** Its `#EXT-X-DATERANGE` tags, read with the contract's parser. */
+  ranges: HlsDateRange[];
+  /** `#EXT-X-ENDLIST`: the station signed off (or the stream ended). */
+  ended: boolean;
+  /** The program date-time at the end of its last segment (ms), when it has one. */
+  edge: number | null;
+}
+
+export interface AttachOptions {
+  /** Every playlist load (hls.js) or poll (the browser's own HLS). */
+  onPlaylist?: (info: PlaylistInfo) => void;
+  /** A pre-warmed start: the rendition to start at, and how many target durations from the end to join. */
+  start?: { bandwidth: number | null; syncCount: number } | null;
+  /** For polling playlists where the driver can't read them itself (the browser's own HLS). */
+  fetch?: Fetch;
+}
+
 export interface MediaHandle {
   /** The live edge to join at (the playlist's sync point), in media seconds; null until known. */
   liveSyncPosition(): number | null;
+  /** The program date-time (ms since the epoch) of the picture on screen, from `#EXT-X-PROGRAM-DATE-TIME`; null when the stream has none. */
+  programDate(): number | null;
   /** How much to keep buffered ahead: small while warm, normal while on screen. */
   setBufferAhead(seconds: number): void;
   /** Captions from the stream's subtitle rendition. */
@@ -29,8 +52,33 @@ export interface MediaDriver {
    * on Safari): the engine then never routes them into its graph, so their sound is left alone.
    */
   readonly webAudio?: boolean;
-  attach(video: HTMLVideoElement, url: string, onFatal: (message: string) => void): MediaHandle;
+  attach(video: HTMLVideoElement, url: string, onFatal: (message: string) => void, options?: AttachOptions): MediaHandle;
 }
+
+/** A playlist's text as PlaylistInfo. */
+export function playlistInfo(text: string, url: string): PlaylistInfo {
+  const media = mediaPlaylist(text, url);
+  return { ranges: parseDateRanges(text), ended: media.ended, edge: media.edge };
+}
+
+/**
+ * hls.js settings for joins: between items (each prepared on its own, so every item starts a new
+ * discontinuity with its own timestamps) and into and out of live blocks.
+ * - A short video track at the end of an item is stretched to its audio (the last frame holds,
+ *   never black), and holes up to half a second are jumped rather than stalled on.
+ * - Gaps in the sound are filled with silent frames (maxAudioFramesDrift 1), so it doesn't pop.
+ * - A stall at a join is nudged past quickly (checked every second, five tries).
+ * - Every discontinuity starts on a keyframe.
+ */
+export const JOIN_CONFIG = {
+  stretchShortVideoTrack: true,
+  maxBufferHole: 0.5,
+  maxAudioFramesDrift: 1,
+  forceKeyFrameOnDiscontinuity: true,
+  highBufferWatchdogPeriod: 1,
+  nudgeMaxRetry: 5,
+  nudgeOnVideoHole: true
+} as const;
 
 // ---------- Picture quality ----------
 
@@ -159,17 +207,31 @@ export class QualityRules {
 export function hlsDriver(): MediaDriver {
   return {
     name: "hls.js",
-    attach(video, url, onFatal) {
+    attach(video, url, onFatal, options = {}) {
       const hls = new Hls({
-        liveSyncDurationCount: 3,
+        // A pre-warmed start joins on the segment already fetched (3, or more if the playlist moved on).
+        liveSyncDurationCount: options.start?.syncCount ?? 3,
         maxBufferLength: 8,
         backBufferLength: 10,
         enableWebVTT: true,
-        renderTextTracksNatively: true
+        renderTextTracksNatively: true,
+        // The overlays read the DATERANGE tags from the playlist text; no metadata cues needed.
+        enableDateRangeMetadataCues: false,
+        ...JOIN_CONFIG
       });
       const quality = new QualityRules(hls);
       // Before the first segment loads (the autostart runs after MANIFEST_PARSED's listeners).
-      hls.on(Hls.Events.MANIFEST_PARSED, () => quality.onLevels());
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const bw = options.start?.bandwidth;
+        if (bw) {
+          const i = hls.levels.findIndex((l) => l.bitrate === bw);
+          if (i >= 0) hls.startLevel = i;
+        }
+        quality.onLevels();
+      });
+      hls.on(Hls.Events.LEVEL_LOADED, (_e, data) => {
+        if (options.onPlaylist && data.details?.m3u8) options.onPlaylist(playlistInfo(data.details.m3u8, data.details.url));
+      });
       hls.on(Hls.Events.LEVELS_UPDATED, () => quality.onLevels());
       hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => quality.onLevelSwitched(data.level));
       let recoveries = 0;
@@ -188,6 +250,7 @@ export function hlsDriver(): MediaDriver {
       hls.attachMedia(video);
       return {
         liveSyncPosition: () => hls.liveSyncPosition ?? null,
+        programDate: () => hls.playingDate?.getTime() ?? null,
         setBufferAhead: (s) => {
           hls.config.maxBufferLength = s;
           hls.config.maxMaxBufferLength = Math.max(s, 30);
@@ -213,12 +276,18 @@ export function nativeDriver(): MediaDriver {
   return {
     name: "native",
     webAudio: false,
-    attach(video, url, onFatal) {
+    attach(video, url, onFatal, options = {}) {
       const onError = () => onFatal(video.error?.message || "media error");
       video.addEventListener("error", onError);
       video.src = url;
+      const stopPolling = options.onPlaylist ? pollPlaylist(url, options.fetch ?? ((u, i) => fetch(u, i)), options.onPlaylist) : () => {};
       return {
         liveSyncPosition: () => (video.seekable.length ? Math.max(0, video.seekable.end(video.seekable.length - 1) - 6) : null),
+        // Safari maps the stream's program date-time onto the timeline: its start date plus the time.
+        programDate: () => {
+          const start = (video as HTMLVideoElement & { getStartDate?: () => Date }).getStartDate?.().getTime();
+          return start !== undefined && !Number.isNaN(start) ? start + video.currentTime * 1000 : null;
+        },
         setBufferAhead: () => {},
         // Native HLS has no way to choose or cap levels: always auto.
         setQuality: () => {},
@@ -226,12 +295,48 @@ export function nativeDriver(): MediaDriver {
           for (const t of Array.from(video.textTracks)) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
         },
         destroy: () => {
+          stopPolling();
           video.removeEventListener("error", onError);
           video.removeAttribute("src");
           video.load();
         }
       };
     }
+  };
+}
+
+/**
+ * The browser's own HLS doesn't hand its playlists to the page (its DATERANGE metadata cues carry
+ * one attribute each, with no END or SCTE-35 to merge them by), so the tags are read from the
+ * playlist itself: the first variant's, every target duration, until it ends.
+ */
+function pollPlaylist(url: string, fetchFn: Fetch, onPlaylist: (info: PlaylistInfo) => void): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let mediaUrl: string | null = null;
+  const abort = new AbortController();
+  const poll = async () => {
+    let next = 4000;
+    try {
+      if (!mediaUrl) {
+        const first = await (await fetchFn(url, { signal: abort.signal })).text();
+        mediaUrl = isMaster(first) ? (variants(first, url)[0]?.url ?? url) : url;
+      }
+      const text = await (await fetchFn(mediaUrl, { signal: abort.signal })).text();
+      if (stopped) return;
+      const info = playlistInfo(text, mediaUrl);
+      onPlaylist(info);
+      next = info.ended ? 0 : Math.max(1, mediaPlaylist(text, mediaUrl).targetDuration) * 1000;
+    } catch {
+      // Try again at the next poll.
+    }
+    if (!stopped && next) timer = setTimeout(() => void poll(), next);
+  };
+  void poll();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+    abort.abort();
   };
 }
 

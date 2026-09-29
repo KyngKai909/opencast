@@ -22,7 +22,8 @@
   "dependencies": {
     "@opencast/contracts": "*",
     "@opencast/ui": "*",
-    "hls.js": "^1.6.13"
+    "hls.js": "^1.6.13",
+    "uqr": "^0.1.3"
   },
   "peerDependencies": {
     "react": "^19.1.1",

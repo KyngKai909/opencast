@@ -3,3 +3,4 @@ export { PlayerSurface, type PlayerSurfaceProps } from "./PlayerSurface";
 export { Banner, type BannerProps } from "./Banner";
 export { NumberPanel } from "./NumberPanel";
 export { RadioScreen } from "./RadioScreen";
+export { Overlays, visibleGraphics, type OverlaysProps, type GraphicsInput } from "./Overlays";

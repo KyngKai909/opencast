@@ -2,7 +2,12 @@
 //
 // - Tuning joins live, mid-program. There's no seeking.
 // - A channel change keeps the old picture (and sound) until the new one has a frame on screen.
-// - The neighbouring channels are warm, so up and down switch in well under a second.
+// - The neighbouring channels are warm (their playlists and first segment), so up and down are quick.
+// - The station's bug, lower thirds and a spot's code and QR are drawn over the picture, timed
+//   from the playlist's DATERANGE tags against the media's program date-time (onScreen).
+// - Items join without a glitch (hls.js's join settings, driver.ts). A playlist that ends after the
+//   sign-off slate puts the station off air with its back time, and it tunes back in when a new
+//   playlist appears.
 // - Every change shows the banner for five seconds (a setting on TV).
 // - Pause holds your place for up to 30 minutes, then offers Back to live.
 // - Number entry: 1, 2 tunes 12.1 after a short wait, or at once on OK.
@@ -14,9 +19,11 @@
 import type { Channel, Command, CommandSource } from "../types";
 import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../dial";
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
-import { Deck, type WarmMode } from "./Deck";
+import { Deck, SignedOffError, type WarmMode } from "./Deck";
 import { defaultDriver, type MediaDriver, type Quality } from "./driver";
 import { AudioLevels } from "./meter";
+import { isLive, Prefetch, type Fetch } from "./playlist";
+import { onScreenKey, type OnScreen } from "./timeline";
 
 export type CaptionMode = "off" | "on" | "muted_only";
 export type CaptionSize = "small" | "medium" | "large";
@@ -53,12 +60,18 @@ export interface PlayerState {
   sleep: { endsAt: number; fading: boolean } | null;
   /** Who changed the channel last, when the input says (a Cast sender). */
   changedBy: string | null;
+  /** What the station's playlist says is on screen now (the bug, a lower third, a code, the item), for the picture on screen. */
+  onScreen: (OnScreen & { stationId: string }) | null;
+  /** Signed off by its stream (the playlist ended after the sign-off slate): when it's back, if said. */
+  offAir: { stationId: string; backAt: string | null } | null;
 }
 
 export interface EngineOptions {
   driver?: MediaDriver;
-  /** Warm the neighbours by buffering near live (default), by playing them hidden, or not at all. */
+  /** How to warm the neighbours: their playlists and first segment (default), playlists only, buffering near live, playing them hidden, or not at all. */
   warm?: WarmMode | "none";
+  /** For pre-warming and checking whether a signed-off station is back (defaults to the global fetch). */
+  fetch?: Fetch;
   neighbours?: NeighbourOptions;
   /** How long the banner stays up. */
   bannerMs?: number;
@@ -77,6 +90,11 @@ export interface EngineOptions {
 }
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
+/** How often what's on screen is checked against the playlist's tags. */
+const ON_SCREEN_TICK_MS = 250;
+/** After the back time, how often to look for the new playlist (doubling up to a minute). */
+const BACK_RETRY_MS = 5_000;
+const BACK_RETRY_MAX_MS = 60_000;
 const SLEEP_FADE_MS = 60 * 1000;
 
 /** Caption type as a share of the picture's width, per caption size (the player's --oc-cue). */
@@ -97,9 +115,19 @@ export class PlayerEngine {
   private decks = new Map<string, Deck>();
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
-  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets">> & Pick<EngineOptions, "onCommand">;
+  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch">> & Pick<EngineOptions, "onCommand">;
+  private fetch: Fetch;
+  private prefetches = new Map<string, Prefetch>();
   private presets: Record<number, string>;
-  private timers = { banner: 0 as ReturnType<typeof setTimeout> | 0, entry: 0 as ReturnType<typeof setTimeout> | 0, pause: 0 as ReturnType<typeof setTimeout> | 0, sleep: 0 as ReturnType<typeof setInterval> | 0 };
+  private timers = {
+    banner: 0 as ReturnType<typeof setTimeout> | 0,
+    entry: 0 as ReturnType<typeof setTimeout> | 0,
+    pause: 0 as ReturnType<typeof setTimeout> | 0,
+    sleep: 0 as ReturnType<typeof setInterval> | 0,
+    onScreen: 0 as ReturnType<typeof setInterval> | 0,
+    back: 0 as ReturnType<typeof setTimeout> | 0
+  };
+  private onScreenKey = "";
   private tuneSeq = 0;
   /** A tune asked for before the surface attached: it runs on attach. */
   private queuedTune: { stationId: string; source?: CommandSource } | null = null;
@@ -108,8 +136,9 @@ export class PlayerEngine {
 
   constructor(options: EngineOptions = {}) {
     this.driver = options.driver ?? defaultDriver();
+    this.fetch = options.fetch ?? ((url, init) => fetch(url, init));
     this.o = {
-      warm: options.warm ?? "buffer",
+      warm: options.warm ?? "prefetch",
       neighbours: options.neighbours ?? {},
       bannerMs: options.bannerMs ?? 5000,
       numberWaitMs: options.numberWaitMs ?? 2000,
@@ -138,7 +167,9 @@ export class PlayerEngine {
       warm: [],
       lastTune: null,
       sleep: null,
-      changedBy: null
+      changedBy: null,
+      onScreen: null,
+      offAir: null
     };
   }
 
@@ -157,7 +188,10 @@ export class PlayerEngine {
   }
 
   private refreshWarm() {
-    const warm = [...this.decks.values()].filter((d) => d.role === "warm").map((d) => ({ stationId: d.stationId, state: d.state }));
+    const warm = [
+      ...[...this.decks.values()].filter((d) => d.role === "warm").map((d) => ({ stationId: d.stationId, state: d.state as string })),
+      ...[...this.prefetches].map(([stationId, p]) => ({ stationId, state: p.state === "ready" ? "prefetched" : p.state }))
+    ];
     this.patch({ warm });
   }
 
@@ -180,7 +214,15 @@ export class PlayerEngine {
 
   setChannels(channels: Channel[]) {
     this.patch({ channels });
-    if (this.state.currentId) this.rewarm(this.state.currentId);
+    const id = this.state.currentId;
+    if (!id) return;
+    // Off air by the dial, and the dial now says it's on: tune back in.
+    const c = this.channel(id);
+    if (this.state.status === "off_air" && !this.state.offAir && !this.state.pendingId && c?.onAir && c.playback?.kind === "hls") {
+      void this.tune(id, { input: "return" }, true);
+      return;
+    }
+    this.rewarm(id);
   }
 
   setPresets(presets: Record<number, string>) {
@@ -191,7 +233,10 @@ export class PlayerEngine {
     const quality = p.quality !== undefined && p.quality !== this.o.quality;
     Object.assign(this.o, Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)));
     // The picture on screen and the warm neighbours at once.
-    if (quality) for (const d of this.decks.values()) d.setQuality(this.o.quality);
+    if (quality) {
+      for (const d of this.decks.values()) d.setQuality(this.o.quality);
+      for (const p of this.prefetches.values()) p.setQuality(this.o.quality);
+    }
     this.audio.setEvenOut(this.o.eveningOut);
     if (this.state.currentId) this.rewarm(this.state.currentId);
   }
@@ -204,7 +249,19 @@ export class PlayerEngine {
     if (!this.host || c.playback?.kind !== "hls") return null;
     let d = this.decks.get(c.station.id);
     if (!d) {
-      d = new Deck({ stationId: c.station.id, url: c.playback.url, host: this.host, driver: this.driver, quality: this.o.quality, onChange: () => this.refreshWarm() });
+      // A pre-warmed station starts on the segment already fetched, at its rendition.
+      const start = this.prefetches.get(c.station.id)?.startHint() ?? null;
+      d = new Deck({
+        stationId: c.station.id,
+        url: c.playback.url,
+        host: this.host,
+        driver: this.driver,
+        quality: this.o.quality,
+        start,
+        fetch: this.fetch,
+        onChange: () => this.refreshWarm(),
+        onSignOff: (deck) => this.deckSignedOff(deck)
+      });
       this.decks.set(c.station.id, d);
     }
     return d;
@@ -213,21 +270,23 @@ export class PlayerEngine {
   // ---------- Tuning ----------
 
   /** Tune to a station by id. The old picture stays until the new one has a frame on screen. */
-  async tune(stationId: string, source?: CommandSource): Promise<void> {
+  async tune(stationId: string, source?: CommandSource, again = false): Promise<void> {
     const c = this.channel(stationId);
     if (!c) return;
     this.clearEntry();
     if (source?.who) this.patch({ changedBy: source.who });
-    // After stop() (the sleep timer), the same station tunes again from scratch.
-    if (stationId === this.state.currentId && !this.state.pendingId && this.state.status !== "stopped") {
+    // After stop() (the sleep timer), the same station tunes again from scratch; `again` is a
+    // station coming back on air.
+    if (!again && stationId === this.state.currentId && !this.state.pendingId && this.state.status !== "stopped") {
       this.showBanner();
       return;
     }
     const seq = ++this.tuneSeq;
     const t0 = performance.now();
-    const previous = this.state.currentId;
+    const previous = again ? this.state.lastId : this.state.currentId;
     this.showBanner(stationId);
     this.clearPause();
+    this.clearBack();
 
     if (!c.onAir || !c.playback) {
       this.settle(stationId, previous, "off_air");
@@ -243,9 +302,16 @@ export class PlayerEngine {
       this.patch({ pendingId: stationId });
       return;
     }
+    const prefetched = this.prefetches.get(stationId);
     const deck = this.deckFor(c);
     if (!deck) return;
-    const wasWarm = deck.state === "ready" || deck.state === "playing";
+    const wasWarm = deck.state === "ready" || deck.state === "playing" || prefetched?.state === "ready";
+    // On screen now, it's a deck of its own: the prefetch has done its job.
+    if (prefetched) {
+      prefetched.stop();
+      this.prefetches.delete(stationId);
+    }
+    // The picture (or the off-air screen) on now stays until the new one is ready.
     this.patch({ pendingId: stationId, status: this.state.currentId ? this.state.status : "tuning", error: null });
     try {
       await deck.start();
@@ -253,11 +319,20 @@ export class PlayerEngine {
     } catch (e) {
       if (seq !== this.tuneSeq) return;
       const err = e as Error;
+      if (err instanceof SignedOffError) {
+        // Its playlist had already ended: off air, with the back time the stream gives.
+        this.dropDeck(stationId);
+        this.settle(stationId, previous, "off_air");
+        this.signedOff(stationId, err.backAt, deck.signedOff?.at ?? null);
+        return;
+      }
       if (err.name === "NotAllowedError") {
         // Autoplay with sound refused: it can still play muted until someone taps.
         this.patch({ mutedByBrowser: true });
       } else {
         this.patch({ pendingId: null, status: this.state.currentId ? this.state.status : "error", error: deck.error ?? err.message });
+        // Coming back didn't work this time: keep looking.
+        if (again && this.state.offAir?.stationId === stationId) this.signedOff(stationId, this.state.offAir.backAt, null);
         return;
       }
     }
@@ -268,16 +343,19 @@ export class PlayerEngine {
     this.applyCaptions(deck);
     this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
     this.settle(stationId, previous, "playing");
+    this.watchOnScreen();
     this.mediaSession();
   }
 
   private settle(stationId: string, previous: string | null, status: Status) {
     if (status !== "playing") for (const d of this.decks.values()) if (d.role === "active") d.warm("buffer");
+    if (status !== "playing") this.stopOnScreen();
     this.patch({
       currentId: stationId,
       pendingId: null,
       lastId: previous && previous !== stationId ? previous : this.state.lastId,
-      status
+      status,
+      offAir: null
     });
     this.rewarm(stationId);
   }
@@ -286,13 +364,13 @@ export class PlayerEngine {
   private rewarm(currentId: string) {
     const keep = new Set<string>([currentId]);
     if (this.state.pendingId) keep.add(this.state.pendingId);
-    if (this.o.warm !== "none") {
-      for (const n of neighbours(this.state.channels, currentId, this.o.neighbours)) {
-        if (n.onAir && n.playback?.kind === "hls") {
-          keep.add(n.station.id);
-          const d = this.deckFor(n);
-          if (d && d.role !== "active") d.warm(this.o.warm);
-        }
+    const mode = this.o.warm;
+    const warmable = mode === "none" ? [] : neighbours(this.state.channels, currentId, this.o.neighbours).filter((n) => n.onAir && n.playback?.kind === "hls");
+    if (mode === "buffer" || mode === "play") {
+      for (const n of warmable) {
+        keep.add(n.station.id);
+        const d = this.deckFor(n);
+        if (d && d.role !== "active") d.warm(mode);
       }
     }
     for (const [id, d] of this.decks) {
@@ -301,7 +379,105 @@ export class PlayerEngine {
         this.decks.delete(id);
       }
     }
+    // Playlists and a first segment only: no <video> until it's tuned.
+    const prefetch = new Set<string>();
+    if (mode === "prefetch" || mode === "playlists") {
+      for (const n of warmable) {
+        const id = n.station.id;
+        if (this.decks.has(id) || n.playback?.kind !== "hls") continue;
+        prefetch.add(id);
+        if (!this.prefetches.has(id)) {
+          this.prefetches.set(id, new Prefetch({ url: n.playback.url, quality: this.o.quality, fetch: this.fetch, segment: mode === "prefetch", onChange: () => this.refreshWarm() }));
+        }
+      }
+    }
+    for (const [id, p] of this.prefetches) {
+      if (!prefetch.has(id)) {
+        p.stop();
+        this.prefetches.delete(id);
+      }
+    }
     this.refreshWarm();
+  }
+
+  private dropDeck(stationId: string) {
+    const d = this.decks.get(stationId);
+    if (!d) return;
+    d.destroy();
+    this.decks.delete(stationId);
+  }
+
+  // ---------- What's on screen (the playlist's tags) ----------
+
+  /** Follows the tags for the picture on screen: patches onScreen when anything drawn changes. */
+  private watchOnScreen() {
+    this.stopOnScreen();
+    const tick = () => {
+      const d = this.active();
+      if (!d || d.role !== "active") return;
+      const os = d.onScreen();
+      const key = `${d.stationId}|${onScreenKey(os)}`;
+      if (key === this.onScreenKey) return;
+      this.onScreenKey = key;
+      this.patch({ onScreen: { ...os, stationId: d.stationId } });
+    };
+    tick();
+    this.timers.onScreen = setInterval(tick, ON_SCREEN_TICK_MS);
+  }
+
+  private stopOnScreen() {
+    if (this.timers.onScreen) clearInterval(this.timers.onScreen);
+    this.timers.onScreen = 0;
+    this.onScreenKey = "";
+    if (this.state.onScreen) this.patch({ onScreen: null });
+  }
+
+  // ---------- Sign-off (the playlist ends after the slate) and coming back ----------
+
+  private deckSignedOff(d: Deck) {
+    // A tune still waiting on it hears through firstFrame (SignedOffError).
+    if (d.stationId !== this.state.currentId || d.stationId === this.state.pendingId) return;
+    if (this.state.status !== "playing" && this.state.status !== "paused") return;
+    this.dropDeck(d.stationId);
+    this.clearPause();
+    this.patch({ status: "off_air" });
+    this.stopOnScreen();
+    this.signedOff(d.stationId, d.signedOff?.backAt ?? null, d.signedOff?.at ?? null);
+    this.rewarm(d.stationId);
+  }
+
+  /**
+   * Off air until the back time, then look for the new playlist and tune back in. The wait is
+   * counted on the stream's own clock (its program date-time when it signed off), so a device
+   * clock that's off doesn't move it; after the back time it looks again every few seconds.
+   */
+  private signedOff(stationId: string, backAt: string | null, streamNow: number | null) {
+    this.patch({ offAir: { stationId, backAt } });
+    const back = backAt ? Date.parse(backAt) : NaN;
+    const wait = Number.isNaN(back) ? BACK_RETRY_MAX_MS : Math.max(0, back - (streamNow ?? this.o.now()));
+    let retry = BACK_RETRY_MS;
+    const look = async () => {
+      if (!this.stillOffAir(stationId)) return;
+      const url = this.channel(stationId)?.playback?.url;
+      const live = url ? await isLive(this.fetch, url) : false;
+      if (!this.stillOffAir(stationId)) return;
+      if (live) void this.tune(stationId, { input: "return" }, true);
+      else {
+        this.timers.back = setTimeout(() => void look(), retry);
+        retry = Math.min(retry * 2, BACK_RETRY_MAX_MS);
+      }
+    };
+    this.clearBack();
+    this.timers.back = setTimeout(() => void look(), wait);
+  }
+
+  private stillOffAir(stationId: string) {
+    return this.state.currentId === stationId && this.state.status === "off_air" && this.state.offAir?.stationId === stationId && !this.state.pendingId;
+  }
+
+  private clearBack() {
+    if (this.timers.back) clearTimeout(this.timers.back);
+    this.timers.back = 0;
   }
 
   channelStep(dir: "up" | "down", source?: CommandSource) {
@@ -488,7 +664,11 @@ export class PlayerEngine {
   stop() {
     for (const d of this.decks.values()) d.destroy();
     this.decks.clear();
-    this.patch({ status: "stopped", sleep: null, banner: null, warm: [] });
+    for (const p of this.prefetches.values()) p.stop();
+    this.prefetches.clear();
+    this.stopOnScreen();
+    this.clearBack();
+    this.patch({ status: "stopped", sleep: null, banner: null, warm: [], offAir: null });
   }
 
   // ---------- Commands ----------
@@ -577,8 +757,11 @@ export class PlayerEngine {
   destroy() {
     Object.values(this.timers).forEach((t) => t && clearTimeout(t as ReturnType<typeof setTimeout>));
     if (this.timers.sleep) clearInterval(this.timers.sleep);
+    if (this.timers.onScreen) clearInterval(this.timers.onScreen);
     for (const d of this.decks.values()) d.destroy();
     this.decks.clear();
+    for (const p of this.prefetches.values()) p.stop();
+    this.prefetches.clear();
     this.listeners.clear();
   }
 }

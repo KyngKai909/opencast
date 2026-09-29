@@ -3,20 +3,16 @@
 // is the remote itself.
 
 import type { ReactNode } from "react";
-import { Bug, Button, Sheet } from "@opencast/ui";
-import { PlayerSurface, usePlayer } from "@opencast/player";
+import { Button, Sheet } from "@opencast/ui";
+import { PlayerSurface } from "@opencast/player";
 import { MARKET_TZ, now } from "../../../lib/clock";
 import "./mirror.css";
 
-/** The phone's picture behind the sheet, as the tuned-in page shows it. */
+/** The phone's picture behind the sheet, as the tuned-in page shows it (the player draws the bug). */
 export function PictureBehind() {
-  const [s] = usePlayer();
-  const row = s.channels.find((c) => c.station.id === s.currentId);
-  const bug = row && row.station.band !== "radio" && row.station.callSign && row.station.channel;
   return (
     <div className="vw-mir-pic">
       <PlayerSurface timeZone={MARKET_TZ} clock={now} />
-      {bug && <Bug callSign={row.station.callSign!} channel={row.station.channel!} />}
     </div>
   );
 }

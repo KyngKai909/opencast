@@ -11,7 +11,8 @@ import { useSavedSettings } from "../layout/SettingsSync";
 import { lockScreenInput, nowPlayingInfo } from "../native/lockScreen";
 import { hasPlugin } from "../native/platform";
 
-const OPTIONS: EngineOptions = { warm: "buffer", neighbours: { sameBand: true }, bannerMs: 5000, numberWaitMs: 2000 };
+// Neighbours are pre-warmed by their playlists and first segment (no hidden <video>).
+const OPTIONS: EngineOptions = { warm: "prefetch", neighbours: { sameBand: true }, bannerMs: 5000, numberWaitMs: 2000 };
 // The lock screen and headset buttons: the web's Media Session, or the apps' own plugin.
 const INPUTS: InputAdapter[] = [lockScreenInput()];
 

@@ -66,8 +66,9 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
   const settings = getDevice().settings;
   const options = useMemo<EngineOptions>(
     () => ({
-      // Neighbours warm by buffering near live; on a Chromecast only the playlists (memory).
-      warm: mode === "cast" ? "none" : "buffer",
+      // Neighbours are pre-warmed by their playlists and first segment (no hidden <video>); on a
+      // Chromecast only the playlists (memory).
+      warm: mode === "cast" ? "playlists" : "prefetch",
       neighbours: { sameBand: !settings.includeRadioBand },
       bannerMs: settings.bannerSeconds * 1000,
       numberWaitMs: settings.numberWaitSeconds * 1000,
@@ -201,8 +202,10 @@ export function TvLayout() {
   // After a week on this TV the key hints hide; the casting and mirroring chips never do.
   const hidden = mode === "tv" && keyHintsHidden(readFirstUse(), now().getTime());
   const hints = loc.pathname === "/" ? visibleHints(adapters.flatMap((a) => a.hints?.() ?? []), hidden) : [];
+  // The guide shows the picture small in its window: no station graphics there.
+  const graphics = !loc.pathname.startsWith("/guide");
   return (
-    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} />}>
+    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} overlays={graphics} />}>
       <Outlet />
     </TvShell>
   );

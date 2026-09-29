@@ -1,9 +1,10 @@
-// The picture: the player's surface, with the airing station's bug in the corner. On the phone a
+// The picture: the player's surface (it draws the airing station's bug, lower thirds and codes
+// from the stream's tags). On the phone a
 // vertical swipe changes channel, showing the next station's number and call sign as it moves,
 // so it reads as tuning, not scrolling.
 
 import { useRef, useState, type PointerEvent, type ReactNode } from "react";
-import { Bug, cx } from "@opencast/ui";
+import { cx } from "@opencast/ui";
 import { PlayerSurface } from "@opencast/player";
 import { MARKET_TZ, now } from "../../../lib/clock";
 import type { DialRowX } from "../../api/ext";
@@ -12,11 +13,6 @@ import { neighbourOf, swipeChannel, swipePreview } from "./logic";
 
 export function Picture({ w, swipe, className, children }: { w: WatchData; swipe?: boolean; className?: string; children?: ReactNode }) {
   const s = w.state;
-  const current = w.channels.find((c) => c.station.id === s.currentId);
-  const radio = current?.station.band === "radio";
-  // The bug: the station airing it, on a picture that's showing. The banner carries the same ident while it's up.
-  const bug = current && !radio && !s.banner && !s.entry && (s.status === "playing" || s.status === "paused") && current.station.callSign && current.station.channel;
-
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const [drag, setDrag] = useState<{ dy: number; dx: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -55,7 +51,6 @@ export function Picture({ w, swipe, className, children }: { w: WatchData; swipe
   return (
     <div ref={box} className={cx("vw-pic", swipe && "vw-pic--swipe", className)} {...handlers}>
       <PlayerSurface timeZone={MARKET_TZ} clock={now} />
-      {bug && <Bug callSign={current.station.callSign!} channel={current.station.channel!} />}
       {next && (
         <div className="vw-pic__next" aria-hidden="true" style={{ ["--vw-dy" as string]: `${Math.max(-60, Math.min(60, (drag?.dy ?? 0) / 3))}px` }}>
           <span className="vw-pic__ch oc-mono">{next.station.channel}</span>

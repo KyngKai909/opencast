@@ -3,9 +3,22 @@
 // second. A warm deck is hidden and silent; "buffer" keeps a few seconds near the live edge,
 // "play" keeps it decoding.
 
-import type { MediaDriver, MediaHandle, Quality } from "./driver";
+import type { HlsDateRange } from "@opencast/contracts";
+import type { AttachOptions, MediaDriver, MediaHandle, PlaylistInfo, Quality } from "./driver";
+import type { Fetch } from "./playlist";
+import { mergeRanges, onScreenAt, signOffIn, type OnScreen } from "./timeline";
 
-export type WarmMode = "buffer" | "play";
+/**
+ * How the neighbouring channels are kept warm:
+ * - "prefetch" (the default): their playlists and the segment a switch starts on, into the HTTP
+ *   cache, with no <video> (cheap: one small rendition, no decoding).
+ * - "playlists": their playlists only.
+ * - "buffer": a hidden <video> keeping a few seconds near live (the quickest switch, and the dearest).
+ * - "play": a hidden <video> playing silently.
+ */
+export type WarmMode = "prefetch" | "playlists" | "buffer" | "play";
+/** The modes that keep a Deck (a <video>) for a neighbour. */
+export type DeckWarmMode = "buffer" | "play";
 export type DeckState = "loading" | "ready" | "playing" | "error";
 
 export interface DeckOptions {
@@ -19,8 +32,22 @@ export interface DeckOptions {
   activeBuffer?: number;
   /** Picture quality (auto by default). */
   quality?: Quality;
+  /** A pre-warmed start: where the fetched first segment is (Prefetch.startHint). */
+  start?: AttachOptions["start"];
+  /** For the browser's own HLS, which polls the playlist for its tags. */
+  fetch?: Fetch;
   onChange: () => void;
+  /** The playlist ended (ENDLIST) and the picture has played out to its end: the station is off air. */
+  onSignOff?: (deck: Deck) => void;
   now?: () => number;
+}
+
+/** The first frame won't come: the station's playlist has ended (it signed off before we got there). */
+export class SignedOffError extends Error {
+  override name = "SignedOffError";
+  constructor(readonly backAt: string | null) {
+    super("The station has signed off.");
+  }
 }
 
 const WARM_KEEPER_MS = 4000;
@@ -38,15 +65,24 @@ export class Deck {
   private handle: MediaHandle;
   private keeper: ReturnType<typeof setInterval> | null = null;
   private frameWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
-  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now" | "quality">> & Pick<DeckOptions, "onChange">;
+  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now" | "quality" | "start" | "fetch" | "onSignOff">> & Pick<DeckOptions, "onChange" | "onSignOff">;
   private now: () => number;
+  /** The playlist's DATERANGE tags seen so far, by ID. */
+  private ranges = new Map<string, HlsDateRange>();
+  private playlistLoads = 0;
+  /** The playlist has `#EXT-X-ENDLIST`. */
+  playlistEnded = false;
+  /** The program date-time at the end of the playlist's last segment (ms). */
+  edge: number | null = null;
+  /** Set once the station has signed off: when it's back (ISO), if the playlist says. */
+  signedOff: { backAt: string | null; at: number | null } | null = null;
 
   constructor(o: DeckOptions) {
     this.stationId = o.stationId;
     this.url = o.url;
     this.now = o.now ?? (() => performance.now());
     this.createdAt = this.now();
-    this.opts = { stationId: o.stationId, url: o.url, warmBuffer: o.warmBuffer ?? 6, activeBuffer: o.activeBuffer ?? 20, onChange: o.onChange };
+    this.opts = { stationId: o.stationId, url: o.url, warmBuffer: o.warmBuffer ?? 6, activeBuffer: o.activeBuffer ?? 20, onChange: o.onChange, onSignOff: o.onSignOff };
     const v = document.createElement("video");
     v.className = "oc-player__video";
     v.muted = true;
@@ -61,16 +97,54 @@ export class Deck {
       this.set("playing");
       this.watchFrame();
     });
+    // The sign-off slate has played to its end.
+    v.addEventListener("ended", () => this.playlistEnded && this.signOff());
     this.video = v;
     // Captions arrive cue by cue on a live stream: each new one takes the current lift.
     v.textTracks?.addEventListener?.("addtrack", (e) => (e as TrackEvent).track?.addEventListener("cuechange", this.applyCueLine));
     o.host.appendChild(v);
-    this.handle = o.driver.attach(v, o.url, (message) => {
-      this.error = message;
-      this.set("error");
-    });
+    this.handle = o.driver.attach(
+      v,
+      o.url,
+      (message) => {
+        this.error = message;
+        this.set("error");
+      },
+      { onPlaylist: (info) => this.onPlaylist(info), start: o.start, fetch: o.fetch }
+    );
     this.handle.setBufferAhead(this.opts.warmBuffer);
     this.handle.setQuality(o.quality ?? "auto");
+  }
+
+  private onPlaylist(info: PlaylistInfo) {
+    this.playlistLoads++;
+    this.ranges = mergeRanges(this.ranges, info.ranges, this.handle?.programDate() ?? info.edge);
+    if (info.edge !== null) this.edge = info.edge;
+    if (!info.ended) return;
+    this.playlistEnded = true;
+    // Ended on the first load: the station signed off before we tuned in. There's nothing to play
+    // out (only the end of the slate), so it's off air now. Otherwise the slate plays to its end.
+    if (this.playlistLoads === 1 && signOffIn(this.ranges.values())) this.signOff();
+  }
+
+  private signOff() {
+    if (this.signedOff) return;
+    this.signedOff = { backAt: signOffIn(this.ranges.values())?.backAt ?? null, at: this.programDate() ?? this.edge };
+    const waiters = this.frameWaiters;
+    this.frameWaiters = [];
+    waiters.forEach((w) => w.reject(new SignedOffError(this.signedOff!.backAt)));
+    this.opts.onSignOff?.(this);
+  }
+
+  /** The program date-time of the picture on screen (ms), or null. */
+  programDate(): number | null {
+    // (A driver may report a playlist before attach has returned.)
+    return this.handle ? this.handle.programDate() : null;
+  }
+
+  /** What the playlist's tags say is on screen now. */
+  onScreen(): OnScreen {
+    return onScreenAt(this.ranges.values(), this.programDate());
   }
 
   private set(s: DeckState) {
@@ -107,6 +181,7 @@ export class Deck {
   }
 
   firstFrame(timeoutMs = 15000): Promise<void> {
+    if (this.signedOff) return Promise.reject(new SignedOffError(this.signedOff.backAt));
     if (this.firstFrameAt !== null) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error("The picture didn't arrive in time.")), timeoutMs);
@@ -124,7 +199,7 @@ export class Deck {
   }
 
   /** Keep this deck ready for a quick switch. */
-  warm(mode: WarmMode) {
+  warm(mode: DeckWarmMode) {
     this.role = "warm";
     this.video.muted = true;
     this.video.classList.remove("is-on");
