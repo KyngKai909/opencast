@@ -35,6 +35,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 2,
   retries: 0,
+  // On GitHub Actions (CI is set), a test.only left in fails the run instead of skipping the rest.
+  forbidOnly: !!process.env.CI,
   globalSetup: "./real/global-setup.ts",
   globalTeardown: "./real/global-teardown.ts",
   reporter: [["list"], ["html", { open: "never", outputFolder: "report/real" }]],

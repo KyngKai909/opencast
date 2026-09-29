@@ -46,6 +46,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 2,
   retries: 0,
+  // On GitHub Actions (CI is set), a test.only left in fails the run instead of skipping the rest.
+  forbidOnly: !!process.env.CI,
   reporter: [["list"], ["html", { open: "never", outputFolder: "report" }]],
   use: { channel: "chrome", trace: "off", screenshot: "only-on-failure", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
   projects: [

@@ -216,7 +216,9 @@ function OrderMock({ order: o }: { order: ProductionOrder }) {
       label: `${cs} quotes`,
       run: async () => {
         // The maker's usual quote, from the mock (loaded only here, in mock mode).
-        const { mockQuoteFor, getDeals } = await import("../../mocks/fixtures/deals");
+        const mock = import.meta.env.VITE_MOCK === "true" ? await import("../../mocks/fixtures/deals") : null;
+        if (!mock) throw new Error("Not in the mock.");
+        const { mockQuoteFor, getDeals } = mock;
         const fx = getDeals().orders.find((x) => x.id === o.id);
         if (!fx) throw new Error("Not in the mock.");
         await call(spotsApi.quoteOrder, { ...id, body: mockQuoteFor(fx) });
