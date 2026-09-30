@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, serial, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, boolean, check, date, index, integer, jsonb, serial, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, millis } from "./columns.js";
 import { network, band } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -332,7 +332,10 @@ export const listedSources = network.table("listed_sources", {
   removedBand: band("removed_band"),
   removedTenths: integer("removed_tenths"),
   /** When its held channel was freed (90 days after it was taken off). */
-  channelReleasedAt: at("channel_released_at")
+  channelReleasedAt: at("channel_released_at"),
+  // ---- A229 (added 2026-09-30, migration 0042): shared call signs ----
+  /** Taken off the dial with the listing on X.1 whose call sign it shares ("Put back" on X.1 brings it back too). */
+  removedWith: uuid("removed_with").references((): AnyPgColumn => listedSources.id)
 });
 
 /**

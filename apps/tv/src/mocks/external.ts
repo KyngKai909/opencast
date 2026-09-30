@@ -1,5 +1,6 @@
 // External stations' streams in mock mode (follow-up Phase 6): up unless put down from the console
-// or a Playwright flow (`ocMock.externalDown("COLT")`, `ocMock.externalUp("COLT")`). Down, a station
+// or a Playwright flow (`ocMock.externalDown("COLT")`, `ocMock.externalUp("COLT")`; a station is
+// named by call sign, address or id: "RIVC" is the family's 15.1, "rivc-15-2" its 15.2). Down, a station
 // stays on the dial for its first 5 minutes, then it's off the dial, the guide, search and the
 // swipe order until it's back, as the API's minute checks do. Kept in localStorage, so a reload
 // keeps it; the dial reads it on each request.

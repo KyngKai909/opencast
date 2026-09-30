@@ -201,7 +201,8 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       const ident = stationId ? (await services.stations.idents([stationId])).get(stationId) : undefined;
       if (!ident?.callSign) return `${appOrigin}/control`;
       const page = parts[0] === "stations" ? CONTROL_PAGES[parts[2] ?? ""] : undefined;
-      return `${appOrigin}/control/${ident.callSign.toLowerCase()}/${page ?? "monitor"}${page && query ? `?${query}` : ""}`;
+      // A229: a station sharing its call sign has its channel in its address (`/control/beat-12-2`).
+      return `${appOrigin}/control/${ident.slug ?? ident.callSign.toLowerCase()}/${page ?? "monitor"}${page && query ? `?${query}` : ""}`;
     }
     return `${appOrigin}${link.startsWith("/") ? "" : "/"}${link}`;
   }

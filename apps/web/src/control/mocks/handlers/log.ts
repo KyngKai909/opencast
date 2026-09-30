@@ -16,7 +16,7 @@ import { addDays, broadcastDay, isoDate, timeOn } from "../../components/onair/t
 import { now, STATION_TZ } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationBreaks, stationLog, type DbStation } from "../db";
 import { breakSlot, type DbBreak, type DbFill, type DbLogEntry } from "../fixtures/evening";
-import { DEFAULT_BREAK_MS, MOCK_STREAMS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState } from "../fixtures/onair";
+import { DEFAULT_BREAK_MS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState, mockStreamOf } from "../fixtures/onair";
 import { itemsPreparedCheck, readinessOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
 import { breakRuleOf, breaksAiring } from "../fixtures/station";
@@ -61,12 +61,9 @@ function runsUntil(stationId: string, from: string) {
   return coverageUntil([...log, ...off], from);
 }
 
-function slug(st: DbStation) {
-  return (st.ident.callSign ?? st.ident.handle ?? st.ident.id).toLowerCase();
-}
-
 function outputUrl(st: DbStation) {
-  return MOCK_STREAMS.includes(slug(st)) ? `/mock-hls/${slug(st)}/master.m3u8` : null;
+  const stream = mockStreamOf(st.ident);
+  return stream ? `/mock-hls/${stream}/master.m3u8` : null;
 }
 
 /** Signed on, and not in planned off air (a sign-off, or the off air hours). */
@@ -227,7 +224,7 @@ export function signOnChecks(st: DbStation) {
 
   // The output, in the API's words: the channel is assembled from prepared items, nothing to set up.
   // (The API's watchUrl is null until the channel has aired; the mock streams play from the start.)
-  const url = MOCK_STREAMS.includes(slug(st)) ? `/mock-hls/${slug(st)}/master.m3u8` : null;
+  const url = outputUrl(st);
   checks.push({ key: "output", label: "Output ready", passed: true, blocking: false, detail: "Assembled from prepared items", watchUrl: url });
 
   // Live blocks without a source: a slate airs in their place (a warning).

@@ -28,6 +28,11 @@ export interface GuideStation {
   programs: GuideProgram[];
   /** An external station (follow-up Phase 6): the dashed External tag under its channel. */
   external?: boolean;
+  /**
+   * A229: the station's own name, for a call sign shared across a channel's subchannels (15.1 SBCO,
+   * 15.2 SBCO): shown as the column's last line, so each stream is told apart by more than its channel.
+   */
+  name?: string;
 }
 
 export interface GuideGridProps {
@@ -138,10 +143,15 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
   );
 
   const body = rows.map((r) => (
-    <div key={r.id} className="oc-guide__row" role="group" aria-label={`${r.callSign} ${r.channel}`}>
+    <div key={r.id} className="oc-guide__row" role="group" aria-label={`${r.callSign} ${r.channel}${r.name ? `, ${r.name}` : ""}`}>
       <div className="oc-guide__st">
         <span className="oc-cs">{r.callSign}</span>
         <span className="oc-ch">{r.channel}</span>
+        {r.name && !compact && (
+          <small className="oc-guide__nm" title={r.name}>
+            {r.name}
+          </small>
+        )}
         {r.external && !compact && (
           <Tag variant="listed" className="oc-guide__ext">
             External

@@ -95,6 +95,8 @@ export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> |
       channel: r.station.channel ?? "",
       callSign: r.station.callSign ?? r.station.handle ?? "",
       external: r.station.kind === "listed",
+      // A229: a shared call sign's streams carry their own names too.
+      ...(r.station.sharesCallSign ? { name: r.station.name } : {}),
       // An external station is on between what its source lists (follow-up Phase 6): its name,
       // "Live, nothing listed", never a made-up title.
       programs: (r.station.kind === "listed" && guide ? withNothingListed(r.airings, r.station.name, guide.from, guide.to) : r.airings).map((a): GuideProgram => {

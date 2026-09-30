@@ -41,7 +41,7 @@ export const SECTIONS: Section[] = [
 ];
 
 function lede(id: string, s: StationState, phone: boolean) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   switch (id) {
     case "identity":
       return `How ${cs} appears on the dial, in the guide and on its own picture.`;
@@ -77,8 +77,8 @@ function Body({ id, s, phone }: { id: string; s: StationState; phone: boolean })
     case "translators":
       return (
         <div className="cc-settings__translators">
-          <TranslatorsPanel stationId={s.id} callSign={s.station.callSign ?? s.station.name} owner={s.role === "owner"} accountHref={`${s.base}/settings/account`} phone={phone} />
-          <p className="cc-settings__note">{relayStopsNote(s.station.callSign ?? s.station.name)}</p>
+          <TranslatorsPanel stationId={s.id} callSign={s.label} owner={s.role === "owner"} accountHref={`${s.base}/settings/account`} phone={phone} />
+          <p className="cc-settings__note">{relayStopsNote(s.label)}</p>
           {s.station.band === "radio" && <RelayBackground stationId={s.id} callSign={s.station.callSign ?? s.station.name} channel={s.station.channel} colour={s.station.colour} canEdit={s.can("programming")} />}
         </div>
       );
@@ -112,7 +112,7 @@ export default function Settings() {
   if (inviting && !s.can("manage")) return <Navigate to={`${s.base}/settings/team`} replace />;
 
   const sections: SettingsSection[] = available.map((x) => ({ id: x.id, label: x.label, danger: x.danger, href: `${s.base}/settings/${x.id}` }));
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const heading = phone && active === "notifications" ? `${cs} notifications` : undefined;
 
   return (

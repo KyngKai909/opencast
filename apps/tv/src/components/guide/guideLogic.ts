@@ -5,6 +5,7 @@
 import type { Command } from "@opencast/player";
 import { clock, clockRange } from "@opencast/ui";
 import type { AiringX, StationIdentX } from "../../api/ext";
+import { callSignLabel } from "../../lib/stationRef";
 import { matchChannel } from "../search/searchLogic";
 import { channelValue } from "../station/when";
 
@@ -243,7 +244,7 @@ export function cellLine(c: Cell, now: number, timeZone?: string): { live: boole
   const isNow = onNow(c, now);
   if (a.live) return { live: true, text: isNow ? `until ${until(c.end, now, timeZone)}` : `${short(c.start, timeZone)} – ${short(c.end, timeZone)}` };
   if (isNow && a.kind === "listed") return { live: false, text: `External, until ${until(c.end, now, timeZone)}` };
-  if (a.carriedFrom?.callSign) return { live: false, text: `From ${a.carriedFrom.callSign}` };
+  if (a.carriedFrom?.callSign) return { live: false, text: `From ${callSignLabel(a.carriedFrom)}` };
   if (isNow) return { live: false, text: `Until ${until(c.end, now, timeZone)}` };
   return { live: false, text: short(c.start, timeZone) };
 }

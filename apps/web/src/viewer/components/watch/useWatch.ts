@@ -25,10 +25,18 @@ export function useWatch(stationRef: string | undefined) {
 
   const engineChannels = s.channels as DialRowX[];
   // The URL's station on the market's dial, or read on its own (a nearby market's, from a thin dial).
-  const inDial = resolveStation(channels, stationRef);
-  const ref = inDial ? stationSlug(inDial.station) : stationRef ?? "";
+  const named = resolveStation(channels, stationRef);
+  const ref = named ? stationSlug(named.station) : stationRef ?? "";
   const page = useApiAs("watch", stationsApi.getStation, { params: { stationRef: ref } }, StationPageX, !!ref);
+  // An older address (A229: a call sign that changed, or a station's before it shared X.1's) that the
+  // API still finds: the station on the dial it names now.
+  const renamed = !named && page.data ? (channels.find((c) => c.station.id === page.data!.station.id) ?? null) : null;
+  const inDial = named ?? renamed;
   const outside = useMemo(() => (dialReady && !inDial && page.data ? rowFromPage(page.data) : null), [dialReady, inDial, page.data]);
+  useEffect(() => {
+    // Its address now replaces the old one.
+    if (renamed) navigate(`/watch/${stationSlug(renamed.station)}${window.location.search}`, { replace: true });
+  }, [renamed, navigate]);
 
   // A station from outside the dial joins the player's dial while you're on it, so it can be
   // tuned (and stays when the market's dial refreshes over it).

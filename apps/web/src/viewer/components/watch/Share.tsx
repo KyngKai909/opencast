@@ -24,7 +24,7 @@ export function airingWhen(a: Pick<AiringX, "startsAt" | "endsAt">, now: Date, t
 }
 
 /** The link: the station page, or the tuned-in page for one airing (which tunes in, or offers a reminder). */
-export function shareUrl(origin: string, station: { id: string; callSign: string | null; handle: string | null }, airing?: Pick<AiringX, "logEntryId" | "listedAiringId"> | null): string {
+export function shareUrl(origin: string, station: { id: string; callSign: string | null; handle: string | null; slug?: string }, airing?: Pick<AiringX, "logEntryId" | "listedAiringId"> | null): string {
   const slug = stationSlug(station);
   const id = airing?.logEntryId ?? airing?.listedAiringId;
   return id ? `${origin}/watch/${slug}?airing=${encodeURIComponent(id)}` : `${origin}/${station.handle ?? slug}`;

@@ -3,7 +3,8 @@
 // (`/new` creates it, then carries on at /setup/:stationId/station). A colour that fails 4.5:1
 // against white can't be saved, and says why. From a waitlist invite (added 2026-09-29), the call
 // sign held is filled in and locked, and the channel held is chosen in its market; choosing another
-// lets the held one go when it saves.
+// lets the held one go when it saves. Beside the owner's own station on X.1 (added 2026-09-30, A229),
+// a subchannel is offered too, sharing X.1's call sign unless they untick it (components/onair/family.ts).
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -12,6 +13,7 @@ import { accountsApi, stationsApi, waitlistApi, type ReservationInvite, type Sta
 import {
   Button,
   ChannelPicker,
+  Checkbox,
   ControlFoot,
   ControlTitle,
   DialRow,
@@ -30,6 +32,7 @@ import {
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import { now, STATION_TZ } from "../../../lib/clock";
+import { besideFor, chooseChannelBody, channelChanged, familyChannelNote, familyHelp, headWords, ownSubchannelOptions, ownSubchannelWords, shareHelper, shareLabel, shownCallSign } from "./family";
 import "./StationForm.css";
 import { controlPath } from "../../../areas";
 
@@ -78,6 +81,9 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
   const [pickedMarketId, setPickedMarketId] = useState<string | null>(held?.market?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // On a subchannel beside their own X.1: share its call sign (on by default when it's picked).
+  const sharesWith = setup?.sharesCallSignWith ?? null;
+  const [share, setShare] = useState(!!sharesWith);
 
   const markets = useApi(stationsApi.listMarkets, {});
   const me = useApi(accountsApi.getMe, {});
@@ -87,10 +93,14 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
     markets.data?.[0] ??
     null;
   const channels = useApi(stationsApi.availableChannels, { params: { marketSlug: market?.slug ?? "" }, query: { band } }, { enabled: !!market });
+  // Subchannels beside the owner's own stations on X.1, and the one chosen, if it's one of those.
+  const ownSubs = ownSubchannelOptions(channels.data?.ownSubchannels, { self: id, band, channel, sharesWith });
+  const beside = besideFor(channel, ownSubs);
+  const sharing = !!beside && share;
   const typedSign = useDebounced(callSign, 250);
-  const check = useApi(waitlistApi.checkCallSign, { params: { callSign: typedSign } }, { enabled: !held && /^[A-Z]{3,5}$/.test(typedSign) && typedSign !== st?.callSign });
-  // The call sign held for them is theirs: no need to ask.
-  const signState = held ? "free" : callSignState(callSign, st?.callSign ?? null, typedSign === callSign ? check.data : undefined);
+  const check = useApi(waitlistApi.checkCallSign, { params: { callSign: typedSign } }, { enabled: !held && !sharing && /^[A-Z]{3,5}$/.test(typedSign) && typedSign !== st?.callSign });
+  // The call sign held for them is theirs: no need to ask. Sharing X.1's is theirs too.
+  const signState = held || sharing ? "free" : callSignState(callSign, sharesWith ? null : (st?.callSign ?? null), typedSign === callSign ? check.data : undefined);
   // The channel held with it, in this market and band.
   const heldChannel = held?.channel && held.band === band && held.market?.id === market?.id ? held.channel : null;
 
@@ -126,9 +136,10 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
 
   const saveAll = async (sid: string) => {
     if (name.trim() && name.trim() !== st?.name) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { name: name.trim() } });
-    if (!held && signState === "free" && callSign !== st?.callSign && !fixed) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } });
     if (passes && colour && colour !== st?.colour) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { colour } });
-    if (channel && market && !fixed && (channel !== st?.channel || band !== st?.band)) await call(stationsApi.chooseChannel, { params: { stationId: sid }, body: { marketId: market.id, band, channel } });
+    // The channel first: sharing X.1's call sign sets it, and not sharing lets it go.
+    if (channel && market && !fixed && channelChanged({ channel: st?.channel ?? null, band: st?.band ?? null, sharing: !!sharesWith }, { channel, band, beside, share })) await call(stationsApi.chooseChannel, { params: { stationId: sid }, body: chooseChannelBody(market.id, band, channel, beside, share) });
+    if (!held && !sharing && signState === "free" && callSign && (callSign !== st?.callSign || !!sharesWith) && !fixed) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } });
   };
 
   // The first save on /new starts the station, then setup carries on under its id.
@@ -151,6 +162,21 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
     const full = band === "tv" ? `${v}.1` : v;
     setChannel(full);
     if (market && !fixed) void saveField((sid) => call(stationsApi.chooseChannel, { params: { stationId: sid }, body: { marketId: market.id, band, channel: full } }));
+  };
+
+  // A subchannel beside their own X.1: sharing its call sign to start with.
+  const pickOwnSubchannel = (full: string) => {
+    const next = besideFor(full, ownSubs);
+    setChannel(full);
+    setShare(true);
+    if (market && !fixed) void saveField((sid) => call(stationsApi.chooseChannel, { params: { stationId: sid }, body: chooseChannelBody(market.id, band, full, next, true) }));
+  };
+
+  const changeShare = (on: boolean) => {
+    setShare(on);
+    // Not sharing: the station picks its own (the shared one isn't its to keep).
+    if (!on && beside && callSign === beside.callSign) setCallSign("");
+    if (channel && market && !fixed) void saveField((sid) => call(stationsApi.chooseChannel, { params: { stationId: sid }, body: chooseChannelBody(market.id, band, channel, beside, on) }));
   };
 
   const pickColour = (c: string) => {
@@ -182,9 +208,15 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
     const mine = c.channel === channel || c.channel === st?.channel || c.channel === heldChannel;
     return { value: band === "tv" ? c.channel.split(".")[0] : c.channel, taken: c.state !== "open" && !mine };
   });
-  const pickerValue = channel ? (band === "tv" ? channel.split(".")[0] : channel) : undefined;
+  // An own subchannel shows below the picker, chosen there, not on the picker's taken X.1.
+  const pickerValue = channel && !beside ? (band === "tv" ? channel.split(".")[0] : channel) : undefined;
   const channelText = channel ?? "";
-  const shown = { channel: channelText, callSign: callSign || "", colour: passes && colour ? colour : (st?.colour ?? SWATCHES[1]), name: name || undefined };
+  const sign = shownCallSign(callSign, beside, share);
+  // X.1 with stations sharing its call sign stays where it is (the API says `family_channel`).
+  const familyStays = setup && !fixed ? familyChannelNote(setup) : null;
+  // A call sign of its own, let go when it shares X.1's.
+  const letGo = !sharesWith ? (held?.callSign ?? st?.callSign ?? null) : null;
+  const shown = { channel: channelText, callSign: sign, colour: passes && colour ? colour : (st?.colour ?? SWATCHES[1]), name: name || undefined };
   const firstUntil = (() => {
     const t = new Date(now());
     t.setMinutes(60, 0, 0);
@@ -196,13 +228,13 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
     <Field
       label="Call sign"
       className="cc-sf__sign"
-      value={callSign}
+      value={sign}
       onChange={(e) => setCallSign(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 5))}
-      onBlur={() => !held && signState === "free" && callSign !== st?.callSign && void saveField((sid) => call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } }))}
-      disabled={fixed || !!held}
+      onBlur={() => !held && !sharing && signState === "free" && callSign && (callSign !== st?.callSign || !!sharesWith) && void saveField((sid) => call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } }))}
+      disabled={fixed || !!held || sharing}
       autoComplete="off"
       spellCheck={false}
-      ok={signState === "free" && !held ? `${callSign} is free` : undefined}
+      ok={signState === "free" && !held && !sharing ? `${callSign} is free` : undefined}
       error={
         signState === "invalid"
           ? "Three to five capital letters"
@@ -213,13 +245,16 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
               : `${callSign} is taken`
             : undefined
       }
-      help={fixed ? "Fixed since the first sign-on" : held ? "Held for you on the waitlist" : undefined}
+      help={
+        (setup && (sharesWith ? sharing : !beside) ? familyHelp(setup) : null) ??
+        (fixed ? "Fixed since the first sign-on" : sharing && beside ? `Shared with ${headWords(beside)}. The channel tells them apart.` : held ? "Held for you on the waitlist" : undefined)
+      }
     />
   );
 
   return (
     <div className="cc-sf">
-      <ControlTitle title="Your station" description="Where you sit on the dial and how viewers will know you. You can change the name and colour later; the call sign and channel stay." />
+      <ControlTitle title="Your station" description="Where you sit on the dial and how viewers will know you. You can change the name and colour later. The call sign and channel are fixed once you sign on." />
       <div className="cc-sf__split">
         <div className="cc-sf__form">
           <div className="cc-sf__row">
@@ -235,7 +270,7 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
                 label="Band"
                 value={band}
                 onChange={(b) => {
-                  if (fixed) return;
+                  if (fixed || familyStays) return;
                   setBand(b);
                   setChannel(null);
                 }}
@@ -271,7 +306,8 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
                 value={marketName}
                 readOnly
                 end={
-                  !fixed && (
+                  !fixed &&
+                  !familyStays && (
                     <Button variant="text" size="sm" onClick={() => setChangingMarket(true)}>
                       Change
                     </Button>
@@ -285,14 +321,30 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
             {channels.isError ? (
               <p className="cc-sf__help">{channels.error.message}</p>
             ) : (
-              <ChannelPicker options={options} value={pickerValue} onChange={fixed ? undefined : pickChannel} columns={10} label={band === "tv" ? "Channel" : "Frequency"} />
+              <ChannelPicker options={options} value={pickerValue} onChange={fixed || familyStays ? undefined : pickChannel} columns={10} label={band === "tv" ? "Channel" : "Frequency"} />
             )}
             <div className="cc-sf__help">
               {band === "tv"
-                ? `Open channels in the ${marketName}. Taken ones are struck through.${channel ? ` You'll be ${channel}; subchannels ${channel.split(".")[0]}.2 and up are for stations you carry around the clock.` : ""}`
+                ? `Open channels in the ${marketName}. Taken ones are struck through.${channel ? (beside ? ` You'll be ${channel}, beside ${headWords(beside)}.` : ` You'll be ${channel}; subchannels ${channel.split(".")[0]}.2 and up are for stations you carry around the clock, or your own.`) : ""}`
                 : `Open frequencies in the ${marketName}. Taken ones are struck through.`}
             </div>
+            {familyStays && <div className="cc-sf__help">{familyStays}</div>}
             {heldChannel && !fixed && <div className="cc-sf__help">{`${heldChannel} is held for you. If you choose another, ${heldChannel} is let go.`}</div>}
+            {ownSubs.length > 0 && !fixed && !familyStays && (
+              <div className="cc-sf__own" role="group" aria-labelledby="cc-sf-own">
+                <span className="cc-sf__lb" id="cc-sf-own">
+                  Beside your own station
+                </span>
+                <div className="cc-sf__own-list">
+                  {ownSubs.map((o) => (
+                    <Button key={o.channel} size="sm" variant={channel === o.channel ? "primary" : undefined} aria-pressed={channel === o.channel} onClick={() => pickOwnSubchannel(o.channel)}>
+                      {ownSubchannelWords(o)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {beside && channel && !fixed && <Checkbox checked={share} onChange={changeShare} label={shareLabel(beside)} helper={shareHelper(beside, channel, share, share ? letGo : null)} ruled={false} className="cc-sf__share" />}
           </div>
           <div className="cc-sf__fld">
             <span className="cc-sf__lb">Station colour</span>
@@ -335,13 +387,13 @@ export function StationForm({ setup, reservation = null }: { setup: StationSetup
           </div>
           <div>
             <div className="cc-sf__lbl">Your bug, on your picture</div>
-            <PictureFrame bug={band === "tv" && callSign ? { callSign, channel: channelText } : undefined}>
+            <PictureFrame bug={band === "tv" && sign ? { callSign: sign, channel: channelText } : undefined}>
               <PicturePlaceholder scene="reel" />
             </PictureFrame>
           </div>
           <div>
             <div className="cc-sf__lbl">Station card</div>
-            <StationBand channel={channelText} callSign={callSign} colour={shown.colour} name={name} place={marketName} rounded />
+            <StationBand channel={channelText} callSign={sign} colour={shown.colour} name={name} place={marketName} rounded />
           </div>
         </div>
       </div>

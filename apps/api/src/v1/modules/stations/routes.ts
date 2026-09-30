@@ -224,14 +224,15 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     await accounts.requireStation(user, params.stationId, ["owner"]);
     return stations.updateSetup(user, params.stationId, body);
   });
-  r.handle(api.availableChannels, async ({ params, query }) => {
+  r.handle(api.availableChannels, async ({ user, params, query }) => {
     const market = await network.marketBySlug(params.marketSlug);
     if (!market) throw notFound("That market");
-    return { market, band: query.band, channels: await stations.availableChannels(market.id, query.band) };
+    const [channels, ownSubchannels] = await Promise.all([stations.availableChannels(market.id, query.band), stations.ownSubchannels(user, market.id, query.band)]);
+    return { market, band: query.band, channels, ownSubchannels };
   });
   r.handle(api.chooseChannel, async ({ user, params, body }) => {
     await accounts.requireStation(user, params.stationId, ["owner"]);
-    return stations.chooseChannel(params.stationId, body);
+    return stations.chooseChannel(params.stationId, body, user);
   });
 
   r.handle(api.getBreakRule, async ({ user, params }) => {

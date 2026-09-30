@@ -61,7 +61,20 @@ export const StationIdent = z.object({
   band: Band.nullable(),
   channel: ChannelNumber.nullable(),
   marketSlug: z.string().nullable(),
-  homeCity: z.string().nullable()
+  homeCity: z.string().nullable(),
+  // ---- Added 2026-09-30: shared call signs (A229) ----
+  /**
+   * The station's part of its addresses (`/watch/{slug}`, the station page `/{slug}`, master
+   * control `/control/{slug}/…`): its call sign in lower case (`sbco`), or, for a station sharing
+   * X.1's call sign, the call sign and its channel (`sbco-15-2`). Absent from an older API: an app
+   * then uses the call sign in lower case, as before. Every address that worked keeps working.
+   */
+  slug: z.string().optional(),
+  /**
+   * True when this call sign is shared (X.1 with a family, or X.n sharing X.1's). Where only a call
+   * sign would show, add the channel ("SBCO 15.2") so the family's streams are told apart.
+   */
+  sharesCallSign: z.boolean().optional()
 });
 export type StationIdent = z.infer<typeof StationIdent>;
 

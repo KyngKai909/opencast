@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, DialRowX } from "../../api/ext";
-import { backAtOf, bandHint, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel, watchKey } from "./logic";
+import { backAtOf, bandHint, callSignLabelOf, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel, watchKey } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 2026 at 8:42 pm in Redlands (UTC−7).
@@ -35,6 +35,27 @@ describe("the station a URL names", () => {
   });
   it("writes the call sign in lower case", () => {
     expect(stationSlug(DIAL[2]!.station)).toBe("beat");
+  });
+
+  // A229: a call sign shared on one channel's subchannels (15.1 RIVC, 15.2 RIVC).
+  const family = (id: string, channel: string, slug: string) => {
+    const r = row(id, "RIVC", channel, "tv");
+    return { ...r, station: { ...r.station, handle: channel === "15.1" ? "rivc" : null, slug, sharesCallSign: true } } as DialRowX;
+  };
+  const FAMILY = [...DIAL, family("f1", "15.1", "rivc"), family("f2", "15.2", "rivc-15-2"), family("f3", "15.3", "rivc-15-3")];
+  it("tells a family apart by address: the call sign alone is X.1's", () => {
+    expect(resolveStation(FAMILY, "rivc-15-2")?.station.id).toBe("f2");
+    expect(resolveStation(FAMILY, "RIVC-15-3")?.station.id).toBe("f3");
+    expect(resolveStation(FAMILY, "rivc")?.station.id).toBe("f1");
+    expect(resolveStation(FAMILY, "RIVC")?.station.id).toBe("f1");
+    expect(resolveStation(FAMILY, "f2")?.station.id).toBe("f2");
+    // Every older address still works.
+    expect(resolveStation(FAMILY, "beat")?.station.id).toBe("b");
+    expect(FAMILY.slice(-3).map((r) => stationSlug(r.station))).toEqual(["rivc", "rivc-15-2", "rivc-15-3"]);
+  });
+  it("adds the channel where only a shared call sign would show", () => {
+    expect(callSignLabelOf(FAMILY[FAMILY.length - 2]!.station)).toBe("RIVC 15.2");
+    expect(callSignLabelOf(DIAL[2]!.station)).toBe("BEAT");
   });
 });
 

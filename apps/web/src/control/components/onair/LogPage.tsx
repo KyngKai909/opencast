@@ -41,6 +41,7 @@ import { FillOptions, useFill, type Gap } from "./Fill";
 import { offAirSource } from "./offAir";
 import { cadenceOf, cadenceWords } from "../station/breakRule";
 import { OffAirHoursSection } from "./OffAirHours";
+import { stationLabel } from "../../station/slug";
 import { DayOrigin, RepeatDaySection } from "./RepeatDay";
 import { entrySource } from "./rundown";
 import { DAY_KEYS, DAY_SHORT, broadcastDay, isoDate, spanText, viewWindow, weekOf, weekdayOf, type LogView, type Ymd } from "./time";
@@ -282,7 +283,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
     />
   );
 
-  const offAirSection = view !== "week" && <OffAirHoursSection stationId={stationId} callSign={station.callSign ?? station.name} phone={phone} />;
+  const offAirSection = view !== "week" && <OffAirHoursSection stationId={stationId} callSign={stationLabel(station)} phone={phone} />;
 
   // Fill it: the gap's pane (from the week, on the evening of the gap's day).
   const fillFrom = (g: Gap & { key: string }) =>

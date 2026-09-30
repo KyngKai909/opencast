@@ -50,7 +50,7 @@ export type MarketTab = "browse" | "offered" | "carried";
 export function MarketTabs({ value, waiting }: { value: MarketTab; waiting?: number }) {
   const s = useStation();
   const navigate = useNavigate();
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const items = [
     { value: "browse" as const, label: "Browse" },
     { value: "offered" as const, label: `Offered by ${name}`, count: waiting || undefined, countLabel: waiting ? `${waiting} waiting` : undefined },

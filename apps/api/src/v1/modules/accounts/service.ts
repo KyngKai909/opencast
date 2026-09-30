@@ -92,6 +92,8 @@ export interface AccountsService {
   addStationMember(db: Executor, stationId: string, userId: string, role: StationRole): Promise<void>;
   addBusinessMember(db: Executor, businessId: string, userId: string, role: BusinessRole): Promise<void>;
   stationMemberIds(stationId: string, roles?: StationRole[]): Promise<string[]>;
+  /** Added 2026-09-30 (A230): the stations a person holds the owner role on (their own subchannels). */
+  ownedStationIds(userId: string): Promise<string[]>;
   /** Opencast admins (Network desk). */
   adminIds(): Promise<string[]>;
   /** The wallet a user signed in with or linked (Privy), if any: where the escrow can pay them. */
@@ -986,6 +988,14 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         tvs,
         clear: me.clear ?? null
       };
+    },
+
+    async ownedStationIds(userId) {
+      const rows = await db
+        .select({ stationId: schema.stationMemberships.stationId })
+        .from(schema.stationMemberships)
+        .where(and(eq(schema.stationMemberships.userId, userId), eq(schema.stationMemberships.role, "owner")));
+      return rows.map((r) => r.stationId);
     },
 
     async deleteAccount(userId) {

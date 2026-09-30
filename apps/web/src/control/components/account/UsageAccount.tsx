@@ -51,7 +51,7 @@ function Top({ title, sub, end, id }: { title: string; sub?: ReactNode; end?: Re
 
 export function UsageAccount() {
   const s = useStation();
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const params = { stationId: s.id };
   const q = useStationAccount(s.id);
   const qc = useQueryClient();

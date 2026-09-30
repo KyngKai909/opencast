@@ -14,6 +14,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, asc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import { callSignLabel } from "@opencast/domain";
 import {
   PLATFORM_NAMES,
   type AddManualPlatform,
@@ -226,7 +227,8 @@ export function createPlatformsService({ deps, services }: ModuleContext): Platf
   async function stationTitle(stationId: string) {
     const ident = (await services.stations.idents([stationId])).get(stationId);
     const name = ident?.name ?? "Opencast";
-    return { ident, title: ident?.callSign ? `${ident.callSign}: ${name}` : name, description: `${name}, live on Opencast.${ident?.channel ? ` Channel ${ident.channel}.` : ""}` };
+    // A229: a shared call sign is told apart by its channel ("BEAT 12.2: Beat Tapes").
+    return { ident, title: ident?.callSign ? `${ident ? callSignLabel(ident) : ""}: ${name}` : name, description: `${name}, live on Opencast.${ident?.channel ? ` Channel ${ident.channel}.` : ""}` };
   }
 
   const back = (returnTo: string, fields: Record<string, string>) => `${deps.config.appOrigin.replace(/\/+$/, "")}${returnTo}${returnTo.includes("?") ? "&" : "?"}${new URLSearchParams(fields)}`;
@@ -259,7 +261,7 @@ export function createPlatformsService({ deps, services }: ModuleContext): Platf
         userId,
         verifierEnc: secrets.seal(verifier, secretContext("platform_sign_ins", state, "verifier")),
         redirectUri,
-        returnTo: returnTo ?? `/control/${ident?.callSign ?? stationId}/translators`,
+        returnTo: returnTo ?? `/control/${ident?.slug ?? ident?.callSign?.toLowerCase() ?? stationId}/translators`,
         createdAt: now,
         expiresAt: new Date(now.getTime() + SIGN_IN_MS)
       });

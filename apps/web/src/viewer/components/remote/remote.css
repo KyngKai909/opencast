@@ -13,6 +13,7 @@
 .vw-rm-now__id { display: flex; gap: 10px; align-items: baseline; }
 .vw-rm-now__id .oc-ch, .vw-rm-now__id .oc-cs { font-size: 18px; line-height: 1.2; }
 .vw-rm-now__id .oc-tag { align-self: center; }
+.vw-rm-now__name { display: block; font-size: 13px; color: var(--ink-70); margin-top: 2px; }
 .vw-rm-now__title { display: block; font: 800 22px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; margin: 4px 0 8px; }
 .vw-rm-changed { margin: 0; padding: 10px 18px; border-bottom: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); }
 

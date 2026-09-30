@@ -46,7 +46,7 @@ function SponsorsPage() {
   const [fullScreen, setFullScreen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const focus = useRef<HTMLElement | null>(null);
-  const call_ = s.station.callSign ?? s.station.name;
+  const call_ = s.label;
   const canAnswer = s.can("spots");
   const canEnd = s.can("manage");
 
@@ -111,7 +111,7 @@ function SponsorsPage() {
   const slateFor = (x: Sponsorship | undefined, variant: "preview" | "air" = "preview") => {
     const lead = x ? creditLead(x.program, s.station.name) : creditLead(null, s.station.name);
     const sponsors = x ? [{ name: x.business.name, line: x.creditText }] : current.filter((c) => !c.program).map((c) => ({ name: c.business.name, line: c.creditText }));
-    return <CreditSlate colour={s.station.colour ?? "var(--line)"} lead={lead} sponsors={sponsors} members={members?.creditName} callSign={call_} channel={s.station.channel ?? ""} variant={variant} />;
+    return <CreditSlate colour={s.station.colour ?? "var(--line)"} lead={lead} sponsors={sponsors} members={members?.creditName} callSign={s.station.callSign ?? s.station.name} channel={s.station.channel ?? ""} variant={variant} />;
   };
 
   const decline = (x: Sponsorship) =>

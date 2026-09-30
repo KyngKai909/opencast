@@ -31,7 +31,7 @@ export default function Earnings() {
   const raw = params.get("period");
   const period: EarningsPeriod = isEarningsPeriod(raw) ? raw : "month";
   const owner = s.can("moveMoney");
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const [moving, setMoving] = useState(false);
 
   // The phone's page names itself under the top bar, as the notice opens it (04.2).

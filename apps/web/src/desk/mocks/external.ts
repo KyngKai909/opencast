@@ -3,20 +3,20 @@
 // listing is checked after a minute), and mock mode puts a listing down or back up for demos
 // (`ocMock.externalDown("COLT", 6)`, `ocMock.externalUp("COLT")` in the browser console).
 // A215: what the desk does to a listing (changed so it waits for evidence, taken off the dial for
-// good, put back) reaches the viewer's mock dial by call sign ("oc-mock-external-off").
+// good, put back) reaches the viewer's mock dial by address ("oc-mock-external-off": "colt", "rivc-15-2").
 
 import { now } from "../../lib/clock";
 import type { DbListed } from "./fixtures/listed";
-import { getDb, newId, saveDb, stationById } from "./db";
+import { getDb, newId, saveDb, stationById, stationByRef } from "./db";
 
 const MIN = 60_000;
 /** Down this long, a listing leaves the dial (the API's DOWN_AFTER_MS). */
 export const DOWN_AFTER_MS = 5 * MIN;
 
-/** The listing whose station has this call sign. */
-function byCallSign(callSign: string): DbListed | undefined {
-  const cs = callSign.trim().toUpperCase();
-  return getDb().listed.find((l) => stationById(l.stationId)?.ident.callSign === cs);
+/** The listing whose station this is: by call sign (a shared one is X.1's), address ("rivc-15-2") or id. */
+function byCallSign(ref: string): DbListed | undefined {
+  const station = stationByRef(ref);
+  return station ? getDb().listed.find((l) => l.stationId === station.ident.id) : undefined;
 }
 
 /**
@@ -82,10 +82,12 @@ export const EXTERNAL_OFF_KEY = "oc-mock-external-off";
 export function publishExternalOff(waiting: (l: DbListed) => string | null): void {
   const off: Record<string, "removed" | "waiting"> = {};
   for (const l of getDb().listed) {
-    const cs = stationById(l.stationId)?.ident.callSign;
-    if (!cs) continue;
-    if (l.removed) off[cs] = "removed";
-    else if (waiting(l) && waiting(l) !== "down") off[cs] = "waiting";
+    // By address (A229): "colt", "rivc-15-2", so a family's streams are told apart.
+    const ident = stationById(l.stationId)?.ident;
+    const key = ident?.slug ?? ident?.callSign?.toLowerCase();
+    if (!key) continue;
+    if (l.removed) off[key] = "removed";
+    else if (waiting(l) && waiting(l) !== "down") off[key] = "waiting";
   }
   try {
     localStorage.setItem(EXTERNAL_OFF_KEY, JSON.stringify(off));

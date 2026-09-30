@@ -6,7 +6,11 @@ declare global {
   interface Window {
     /** Mock mode only: put the mock world in a state from the console or a Playwright flow. */
     ocMock?: {
-      /** External stations (follow-up Phase 6): a stream down since `minutesAgo` (5 or more: off the dial), or back. */
+      /**
+       * External stations (follow-up Phase 6): a stream down since `minutesAgo` (5 or more: off the
+       * dial), or back. `station`: a call sign ("COLT"; a shared one is its family's X.1, "RIVC" is
+       * 15.1), an address ("rivc-15-2") or an id.
+       */
       externalDown(station: string, minutesAgo?: number): void;
       externalUp(station: string): void;
       /** DASH stream links (A201): the rule played (the default) or not. */

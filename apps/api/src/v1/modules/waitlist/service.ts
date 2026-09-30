@@ -34,6 +34,8 @@ export interface WaitlistService {
   releaseHeldFor(db: Executor, input: { callSign: string; stationId: string }): Promise<void>;
   /** `forStationId` (added 2026-09-30): a name held for that station, or its own, counts as available to it. */
   isAvailable(callSign: string, forStationId?: string): Promise<boolean>;
+  /** Added 2026-09-30 (A229): the stations a call sign is held for (an address from before it changed still finds them). */
+  stationsHolding(callSign: string): Promise<string[]>;
   countInMarket(marketId: string): Promise<number>;
   join(input: { role: Role; email: string; zip: string; callSign?: string; name?: string; about?: string }): Promise<{ role: Role; market: Market | null; message: string; heldCallSign: string | null }>;
   reservations(marketId?: string): Promise<Reservation[]>;
@@ -295,8 +297,17 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       if (!isValidCallSign(callSign)) return false;
       const held = await db.select({ stationId: R.stationId }).from(R).where(and(eq(R.callSign, callSign), isNull(R.releasedAt)));
       if (held.some((h) => !forStationId || h.stationId !== forStationId)) return false;
-      const station = await services.stations.byRef(callSign);
-      return !station || (!!forStationId && station.id === forStationId);
+      // A229: a family shares X.1's call sign, so it's still free for X.1 (or its family) itself.
+      const [having, family] = await Promise.all([services.stations.stationsWithCallSign(callSign), forStationId ? services.stations.familyIds(forStationId) : Promise.resolve(new Set<string>())]);
+      return having.every((id) => id === forStationId || family.has(id));
+    },
+
+    async stationsHolding(callSign) {
+      const rows = await db
+        .select({ stationId: R.stationId })
+        .from(R)
+        .where(and(eq(R.callSign, callSign), isNull(R.releasedAt), isNotNull(R.stationId)));
+      return [...new Set(rows.map((r) => r.stationId!))];
     },
 
     async countInMarket(marketId) {

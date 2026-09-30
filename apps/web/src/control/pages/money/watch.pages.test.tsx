@@ -20,6 +20,7 @@ import { ProgramWatch } from "../../components/watch/ProgramWatch";
 import { ShellOptionsProvider } from "../../layout/shell";
 import { StationProvider } from "../../station/StationContext";
 import Audience from "./Audience";
+import { stationLabel } from "../../station/slug";
 
 const server = setupServer(...handlers);
 beforeAll(() => {
@@ -35,7 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => server.resetHandlers());
 
-const as = (station: typeof BEAT, base: string, studio = false) => ({ station, id: station.id, role: "owner" as const, studio, base, can: () => true });
+const as = (station: typeof BEAT, base: string, studio = false) => ({ station, id: station.id, role: "owner" as const, studio, base, label: stationLabel(station), can: () => true });
 
 function renderAudience(station: typeof BEAT, base: string) {
   return renderWithApi(

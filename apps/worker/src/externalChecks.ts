@@ -24,7 +24,8 @@ export function startExternalChecks(services: Services, isLeader: () => boolean,
       if (Date.now() - lastSync >= SYNC_EVERY_MS) {
         lastSync = Date.now();
         const synced = await services.network.syncExternalSchedules();
-        if (synced.synced || synced.failed) log(`[worker] external schedules ${JSON.stringify(synced)}`);
+        // A223: the same pass frees channels held 90 days after signing off for good (external and full stations).
+        if (synced.synced || synced.failed || synced.released || synced.releasedStations) log(`[worker] external schedules ${JSON.stringify(synced)}`);
       }
     } catch (error) {
       console.error("[worker] external station checks failed", error);

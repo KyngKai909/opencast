@@ -49,7 +49,7 @@ export function programById(id: string) {
 
 type Slot = [start: string, end: string, title: string, program: string | null, extra?: Partial<Pick<MockAiring, "episodeTitle" | "note" | "live" | "listed" | "carriedFrom">>];
 
-/** Each station's day, by weekday (0 Sunday). Times after 24:00 run into the next morning. */
+/** Each station's day, by weekday (0 Sunday), by call sign (a family member's by its address). Times after 24:00 run into the next morning. */
 const WEEK: Record<string, (weekday: number, day: number) => Slot[]> = {
   BEAT: (wd, day) => [
     ["06:00", "12:00", "Morning crates", "crate-session", { note: "From the library" }],
@@ -63,6 +63,12 @@ const WEEK: Record<string, (weekday: number, day: number) => Slot[]> = {
       : ([["20:00", "23:00", "Sunday crates", "crate-session", { note: "Three producers, one hour each" }]] as Slot[])),
     ["23:00", "24:00", "Slow Hours", "slow-hours", { carriedFrom: "HALL" }],
     ["24:00", "26:00", "Late Crate, repeats", "late-crate", { note: "Overnight repeat" }]
+  ],
+  // BEAT 12.2, the mock call-sign family member (keyed by its address, as fixtureKey files it).
+  "BEAT-12-2": () => [
+    ["18:00", "21:00", "Beat Tapes: side A", "beat-tapes", { note: "Back to back" }],
+    ["21:00", "24:00", "Beat Tapes: side B", "beat-tapes", { note: "Back to back" }],
+    ["24:00", "30:00", "Beat Tapes overnight", "beat-tapes", { note: "Overnight repeat" }]
   ],
   CIVC: (wd) => [
     ["06:00", "09:00", "Council Watch", "council-watch", { note: "Repeat" }],
@@ -228,7 +234,12 @@ export const STATION_EXTRA: Record<string, StationExtra> = {
   NITE: { madeHere: [{ program: "night-desk", carriers: 4 }], searchLine: "Classic. Old-time radio overnight" },
   HALL: { madeHere: [{ program: "slow-hours", carriers: 1 }], searchLine: "Music. Slow beats for late work" },
   CRAT: { madeHere: [{ program: "producers-hour", carriers: 9 }], searchLine: "Music. Producers and their tapes" },
-  VOZE: { searchLine: "Music. Oldies en español" }
+  VOZE: { searchLine: "Music. Oldies en español" },
+  // The mock call-sign families (A229), by fixtureKey: X.1's extras stay its own.
+  "BEAT-12-2": { line: "Beat tapes from Inland Beat's producers, back to back, evenings and overnight.", searchLine: "Music. Beat tapes, back to back" },
+  RIVC: { searchLine: "Public affairs. External, the county's own stream" },
+  "RIVC-15-2": { searchLine: "Public affairs. External, the county's own stream" },
+  "RIVC-15-3": { searchLine: "Public affairs. External, the county's own stream" }
 };
 
 // ---------------------------------------------------------------------------------------------

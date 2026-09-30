@@ -24,6 +24,7 @@ import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Monitor.css";
 import { controlPath } from "../../../areas";
+import { stationLabel } from "../../station/slug";
 
 const QUARTER = 15 * 60_000;
 const HOUR = 3_600_000;
@@ -59,7 +60,7 @@ export default function Monitor() {
   const audience = useApi(audienceApi.getAudience, { params, query: { from: iso(quarter - HOUR), to: iso(quarter + QUARTER) } }, { retry: false, refetchInterval: 30_000 });
   const market = useApi(catalogApi.browse, { query: { forStation: s.id, fitsSchedule: true } }, { retry: false });
   const claimable = s.station.kind === "claimable";
-  const page = useApi(stationsApi.getStation, { params: { stationRef: s.station.callSign ?? s.id } }, { enabled: claimable, retry: false });
+  const page = useApi(stationsApi.getStation, { params: { stationRef: s.station.slug ?? s.station.callSign ?? s.id } }, { enabled: claimable, retry: false });
 
   const cue = useApiMutation(playoutApi.cueBreak, { invalidates: LOG_READS });
   const signOn = useApiMutation(playoutApi.signOn, { invalidates: LOG_READS });
@@ -97,7 +98,7 @@ export default function Monitor() {
   if (setup.data?.status === "setting_up" && !status?.onAir) {
     return (
       <div className="cc-mon-page">
-        <ControlTitle title="Monitor" description={`${s.station.callSign ?? s.station.name} isn't on air yet. Finish setting it up, then sign on.`} />
+        <ControlTitle title="Monitor" description={`${s.label} isn't on air yet. Finish setting it up, then sign on.`} />
         <Button variant="primary" href={controlPath(`/setup/${s.id}/station`)}>
           Continue setting up
         </Button>
@@ -191,7 +192,7 @@ export default function Monitor() {
     const g = f ? (f.reason === "dead_air" ? f.startsAt : null) : gapAt;
     return g ? `${s.base}/market?gap=${encodeURIComponent(g)}` : `${s.base}/market/offers/${o.id}`;
   };
-  const maker = (o: Offer) => (o.makerKind === "catalog" ? "catalog" : `from ${o.maker.callSign ?? o.maker.name}`);
+  const maker = (o: Offer) => (o.makerKind === "catalog" ? "catalog" : `from ${stationLabel(o.maker)}`);
   const marketRows: HealthRow[] = offers.map((o) => ({
     label: (
       <>

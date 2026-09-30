@@ -219,8 +219,9 @@ test("a phone's commands over the relay change the channel and set the sleep tim
   const beat = (await lastState())!.stationId;
 
   // CH up on the phone: the TV changes channel, the hint row names the phone, the phone hears it.
+  // (A229: next up from 12.1 is 12.2, Beat Tapes, sharing BEAT's call sign.)
   await send({ command: { type: "channel", dir: "up" } });
-  await onChannel(page, "18.1", "SAZN");
+  await onChannel(page, "12.2", "BEAT");
   await expect(page.getByText("Playing from Kai's phone")).toBeVisible();
   await expect.poll(async () => (await lastState())?.stationId).not.toBe(beat);
 

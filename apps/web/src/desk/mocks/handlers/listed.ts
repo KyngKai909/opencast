@@ -15,7 +15,8 @@ import { callSignRefusal, networkApi, type CallSignRules, type ListedChange, typ
 import { now } from "../../../lib/clock";
 import type { DbCreator } from "../fixtures/creators";
 import type { DbListed } from "../fixtures/listed";
-import { callSignTaken, creatorById, creatorView, getDb, marketById, newId, saveDb, stationById, tenthsOf } from "../db";
+import { callSignTaken, creatorById, creatorView, getDb, marketById, newId, saveDb, stationById, tenthsOf, withFamilies } from "../db";
+import type { DbStation } from "../fixtures/stations";
 import { advanceHealth, publishExternalOff } from "../external";
 import { isAdminNow } from "../settingsDb";
 import { isIptvOrgAddress, parseIptvList, SAMPLE_LIST } from "../iptv";
@@ -90,9 +91,43 @@ export function listedView(l: DbListed): ListedSource | null {
     health: l.health,
     outages: l.outages.slice(0, 5),
     creatorId: l.creatorId,
-    removed: l.removed ? { at: l.removed.at, by: l.removed.by, channel: l.removed.channel, channelHeldUntil: new Date(Date.parse(l.removed.at) + REMOVED_CHANNEL_HOLD_MS).toISOString() } : null,
-    earlierPermissions: l.earlierPermissions ?? []
+    removed: l.removed ? { at: l.removed.at, by: l.removed.by, channel: l.removed.channel, channelHeldUntil: new Date(Date.parse(l.removed.at) + REMOVED_CHANNEL_HOLD_MS).toISOString(), withListing: l.removedWith ?? null } : null,
+    earlierPermissions: l.earlierPermissions ?? [],
+    family: familyOf(s)
   };
+}
+
+// ---- A229: shared call signs ----
+
+const channelOrder = (s: DbStation) => (s.ident.channel ? tenthsOf(s.ident.channel) : 0);
+
+/** X.1 and the stations sharing its call sign that are on the list, by any of them; null when it shares nothing. */
+function familyStations(s: DbStation): { head: DbStation; members: DbStation[] } | null {
+  const d = getDb();
+  const head = s.sharesCallSignWith ? stationById(s.sharesCallSignWith) : s;
+  if (!head) return null;
+  const members = d.stations.filter((m) => m.sharesCallSignWith === head.ident.id && m.public).sort((a, b) => channelOrder(a) - channelOrder(b));
+  if (!members.length && !s.sharesCallSignWith) return null;
+  return { head, members };
+}
+
+function familyOf(s: DbStation): ListedSource["family"] {
+  const f = familyStations(s);
+  return f ? { role: f.head === s ? "head" : "member", head: f.head.ident, members: f.members.map((m) => m.ident) } : null;
+}
+
+const labelOf = (s: DbStation) => [s.ident.channel, s.ident.callSign].filter(Boolean).join(" ");
+
+/** The external station on X.1 a listing on `channel` can share a call sign with (the API's familyHeadFor), or why not. */
+function familyHead(marketId: string, band: "tv" | "radio", channel: string): DbStation | Response {
+  const t = tenthsOf(channel);
+  const major = Math.floor(t / 10);
+  if (band !== "tv" || t % 10 === 1) return fail(422, "cannot_share", `Only a subchannel (${band === "tv" ? `${major}.2` : "X.2"} and up) shares the call sign of the station on its .1.`);
+  const head = getDb().stations.find((s) => s.marketId === marketId && s.ident.band === "tv" && s.ident.channel === `${major}.1`);
+  if (!head) return fail(422, "cannot_share", `Nothing is on ${major}.1 to share a call sign with.`);
+  if (head.ident.kind !== "listed") return fail(422, "cannot_share", `${labelOf(head)} is a full station. External stations share only an external station's call sign.`);
+  if (!head.public) return fail(422, "cannot_share", `${labelOf(head)} was taken off the dial. Put it back first.`);
+  return head;
 }
 
 /** A feed's format from its address, when the desk didn't say. */
@@ -208,6 +243,7 @@ function releaseHeldChannels() {
 
 /** Saved, and the viewer's mock told what's off the dial now. */
 function saved() {
+  withFamilies(getDb().stations);
   saveDb();
   publishExternalOff((l) => waitingOf(l));
 }
@@ -219,6 +255,34 @@ function knownStreams() {
     leads: new Set(d.creators.flatMap((c) => (c.lead ? [c.lead.streamUrl, c.sourceUrl] : [c.sourceUrl]))),
     external: new Set(d.listed.map((l) => l.streamUrl))
   };
+}
+
+/** A215: one listing back on the list, on its channel (or `channel`), waiting for its checks; or why not. */
+function restoreOne(l: DbListed, station: DbStation, channel: string | undefined, who: string): Response | null {
+  const d = getDb();
+  if (!l.removed) return null;
+  if (l.creatorId && d.listed.some((x) => x !== l && x.creatorId === l.creatorId && !x.removed)) return fail(409, "already_external", "Its lead is already another external station.");
+  const want = channel ?? station.ident.channel ?? l.removed.channel;
+  if (!want) return fail(400, "invalid", "Choose a channel.", { channel: "Required" });
+  const old = l.removed.channel;
+  if (want !== station.ident.channel) {
+    const bad = channelProblem(l.removed.marketId, l.removed.band ?? "tv", want, station.ident.id);
+    if (bad) return bad;
+  }
+  station.ident = { ...station.ident, channel: want };
+  station.public = true;
+  l.removed = null;
+  l.removedWith = null;
+  l.health = unchecked();
+  l.addedAt = now().toISOString();
+  const lead = l.creatorId ? creatorById(l.creatorId) : undefined;
+  if (lead) {
+    l.leadStageBefore = lead.stage;
+    Object.assign(lead, { stationId: station.ident.id, listedSourceId: l.id, nextAction: null, nextActionDue: null, ...(basisOf(l) ? { stage: "on_air" as const } : {}) } satisfies Partial<DbCreator>);
+  }
+  sync(l);
+  recordChange(l, who, "restored", want !== old ? [{ field: "channel", from: old, to: want }] : [], []);
+  return null;
 }
 
 export const listedHandlers: HttpHandler[] = [
@@ -256,11 +320,19 @@ export const listedHandlers: HttpHandler[] = [
     if (!market) return fail(404, "not_found", "That market wasn't found.");
     const channel = channelProblem(b.marketId, b.band, b.channel);
     if (channel) return channel;
-    const callSign = callSignProblem(b.callSign);
-    if (callSign) return callSign;
+    // A229: "Same brand as 15.1 RIVC" takes X.1's call sign; otherwise its own, by the usual rules.
+    const head = b.shareCallSign ? familyHead(b.marketId, b.band, b.channel) : null;
+    if (head instanceof Response) return head;
+    if (head && b.callSign && b.callSign !== head.ident.callSign) return fail(400, "invalid", `It shares ${labelOf(head)}'s call sign.`, { callSign: `Shares ${head.ident.callSign}` });
+    if (!head && !b.callSign) return fail(400, "invalid", "Give it a call sign, or share the call sign of the station on its .1.", { callSign: "Required" });
+    const cs = head ? head.ident.callSign! : b.callSign!;
+    if (!head) {
+      const callSign = callSignProblem(cs);
+      if (callSign) return callSign;
+    }
     const at = now().toISOString();
-    const ident: StationIdent = { id: newId(), kind: "listed", callSign: b.callSign, handle: b.callSign.toLowerCase(), name: b.name, colour: null, band: b.band, channel: b.channel, marketSlug: market.slug, homeCity: null };
-    d.stations.push({ ident, marketId: market.id, public: true, firstSignedOnAt: at, escrowId: null, signOnAt: null });
+    const ident: StationIdent = { id: newId(), kind: "listed", callSign: cs, handle: cs.toLowerCase(), name: b.name, colour: null, band: b.band, channel: b.channel, marketSlug: market.slug, homeCity: null };
+    d.stations.push({ ident, marketId: market.id, public: true, firstSignedOnAt: at, escrowId: null, signOnAt: null, sharesCallSignWith: head?.ident.id ?? null });
     const e = b.evidence;
     const l: DbListed = {
       id: newId(),
@@ -366,12 +438,37 @@ export const listedHandlers: HttpHandler[] = [
     const playsChanged = plays !== l.plays;
     if (plays === "embed" && playsChanged && !b.embedTerms) return fail(400, "invalid", "Say whether their terms allow embedding.", { embedTerms: "Required for an embed" });
     const channel = b.channel && b.channel !== station.ident.channel ? b.channel : null;
+    // A229: X.1 with a family stays put; a family's call sign is X.1's to change.
+    const family = familyStations(station);
+    const members = family && family.head === station ? family.members : [];
+    if (channel && members.length) {
+      const n = members.length;
+      return fail(409, "family_channel", `${members.map(labelOf).join(", ")} ${n === 1 ? "shares" : "share"} its call sign. Move ${n === 1 ? "it" : "them"} first, or give ${n === 1 ? "it its own call sign" : "them their own call signs"}.`);
+    }
     if (channel) {
       const bad = channelProblem(station.marketId, station.ident.band ?? "tv", channel, station.ident.id);
       if (bad) return bad;
     }
-    const callSign = b.callSign && b.callSign !== station.ident.callSign ? b.callSign : null;
-    if (callSign) {
+    let callSign = b.callSign && b.callSign !== station.ident.callSign ? b.callSign : null;
+    let join: DbStation | null = null;
+    let leave = false;
+    const at = channel ?? station.ident.channel;
+    if (b.shareCallSign === true && at) {
+      const head = familyHead(station.marketId, station.ident.band ?? "tv", at);
+      if (head instanceof Response) return head;
+      if (callSign && callSign !== head.ident.callSign) return fail(400, "invalid", `It shares ${labelOf(head)}'s call sign.`, { callSign: `Shares ${head.ident.callSign}` });
+      if (head.ident.id !== station.sharesCallSignWith) {
+        join = head;
+        callSign = head.ident.callSign;
+      } else callSign = null;
+    } else if (station.sharesCallSignWith) {
+      const movedOut = !!channel && !!station.ident.channel && Math.floor(tenthsOf(channel) / 10) !== Math.floor(tenthsOf(station.ident.channel) / 10);
+      if (b.shareCallSign === false || callSign || movedOut) {
+        if (!callSign) return fail(400, "invalid", "Give it its own call sign to stop sharing the call sign of the station on its .1.", { callSign: "Required" });
+        leave = true;
+      }
+    }
+    if (callSign && !join) {
       const bad = callSignProblem(callSign, station.ident.id);
       if (bad) return bad;
     }
@@ -439,7 +536,16 @@ export const listedHandlers: HttpHandler[] = [
     if (channel) station.ident = { ...station.ident, channel };
     if (callSign) {
       station.ident = { ...station.ident, callSign, handle: callSign.toLowerCase() };
-      l.heldCallSigns = [...(l.heldCallSigns ?? []).filter((c) => c !== callSign), ...(oldIdent.callSign ? [oldIdent.callSign] : [])];
+      // A229: a station leaving a family leaves the family's name with it; the rest hold their old one (A222).
+      l.heldCallSigns = [...(l.heldCallSigns ?? []).filter((c) => c !== callSign), ...(oldIdent.callSign && !leave ? [oldIdent.callSign] : [])];
+      if (join) station.sharesCallSignWith = join.ident.id;
+      if (leave) station.sharesCallSignWith = null;
+      // On X.1: the whole family's call sign changes with it, and each member's history says so.
+      for (const m of members) {
+        m.ident = { ...m.ident, callSign };
+        const ml = getDb().listed.find((x) => x.stationId === m.ident.id);
+        if (ml) recordChange(ml, whoOf(p), "changed", [{ field: "callSign", from: oldIdent.callSign, to: callSign }], []);
+      }
     }
 
     const fields: ListedChange["fields"] = [];
@@ -485,7 +591,7 @@ export const listedHandlers: HttpHandler[] = [
     );
   }),
 
-  http.post(path(networkApi.removeListedSource), ({ request, params }) => {
+  http.post(path(networkApi.removeListedSource), async ({ request, params }) => {
     const p = needsAdmin(request);
     if (p instanceof Response) return p;
     const l = getDb().listed.find((x) => x.id === String(params.sourceId));
@@ -493,17 +599,28 @@ export const listedHandlers: HttpHandler[] = [
     if (l.removed) return fail(409, "removed", `${l.name} is already off the dial.`);
     const station = stationById(l.stationId);
     if (!station) return fail(404, "not_found", "That external station wasn't found.");
-    // Archived like a full station that signs off for good: nothing is deleted.
-    l.removed = { at: now().toISOString(), by: whoOf(p), channel: station.ident.channel, band: station.ident.band, marketId: station.marketId };
-    endOutage(l, "removed");
-    l.health = unchecked();
-    station.public = false;
-    const lead = l.creatorId ? creatorById(l.creatorId) : undefined;
-    if (lead) {
-      const was = [station.ident.channel, station.ident.callSign].filter(Boolean).join(" ");
-      Object.assign(lead, { stage: lead.stage === "on_air" ? (l.leadStageBefore ?? "found") : lead.stage, stationId: null, listedSourceId: null, nextAction: `Was external station ${was || l.name}. Taken off the dial`, nextActionDue: null } satisfies Partial<DbCreator>);
+    const body = ((await bodyOf(request)) ?? {}) as { withFamily?: boolean };
+    // A231: X.1 with a family goes with its family, and only when the desk says so, naming them.
+    const family = familyStations(station);
+    const members = family && family.head === station ? family.members : [];
+    if (members.length && !body.withFamily) {
+      return fail(409, "family", `${members.map(labelOf).join(", ")} ${members.length === 1 ? "shares" : "share"} its call sign and would go with it. Take them off too, or give them their own call signs first.`);
     }
-    recordChange(l, whoOf(p), "removed", [], []);
+    const theirs = members.flatMap((m) => getDb().listed.filter((x) => x.stationId === m.ident.id && !x.removed));
+    for (const [x, st, withId] of [[l, station, null], ...theirs.map((t) => [t, stationById(t.stationId)!, l.id] as const)] as const) {
+      // Archived like a full station that signs off for good: nothing is deleted.
+      x.removed = { at: now().toISOString(), by: whoOf(p), channel: st.ident.channel, band: st.ident.band, marketId: st.marketId };
+      x.removedWith = withId;
+      endOutage(x, "removed");
+      x.health = unchecked();
+      st.public = false;
+      const lead = x.creatorId ? creatorById(x.creatorId) : undefined;
+      if (lead) {
+        const was = [st.ident.channel, st.ident.callSign].filter(Boolean).join(" ");
+        Object.assign(lead, { stage: lead.stage === "on_air" ? (x.leadStageBefore ?? "found") : lead.stage, stationId: null, listedSourceId: null, nextAction: `Was external station ${was || x.name}. Taken off the dial`, nextActionDue: null } satisfies Partial<DbCreator>);
+      }
+      recordChange(x, whoOf(p), "removed", [], []);
+    }
     saved();
     return reply(networkApi.removeListedSource.response, listedView(l)!);
   }),
@@ -517,28 +634,18 @@ export const listedHandlers: HttpHandler[] = [
     const parsed = networkApi.restoreListedSource.body.safeParse((await bodyOf(request)) ?? {});
     if (!parsed.success) return fail(400, "invalid", "Check the channel.", fieldsOf(parsed.error.issues));
     if (!l.removed) return fail(409, "not_removed", `${l.name} is on the list.`);
-    if (l.creatorId && d.listed.some((x) => x !== l && x.creatorId === l.creatorId && !x.removed)) return fail(409, "already_external", "Its lead is already another external station.");
     const station = stationById(l.stationId);
     if (!station) return fail(404, "not_found", "That external station wasn't found.");
-    const want = parsed.data.channel ?? station.ident.channel ?? l.removed.channel;
-    if (!want) return fail(400, "invalid", "Choose a channel.", { channel: "Required" });
-    const old = l.removed.channel;
-    if (want !== station.ident.channel) {
-      const bad = channelProblem(l.removed.marketId, l.removed.band ?? "tv", want, station.ident.id);
-      if (bad) return bad;
+    // A231: a station sharing X.1's call sign comes back after X.1.
+    const head = station.sharesCallSignWith ? stationById(station.sharesCallSignWith) : undefined;
+    if (head && !head.public) return fail(409, "family_removed", `Put ${labelOf(head)} back first. It shares its call sign, and brings back the streams taken off with it.`);
+    const back = restoreOne(l, station, parsed.data.channel, whoOf(p));
+    if (back instanceof Response) return back;
+    // X.1's family, taken off with it: back beside it.
+    for (const x of d.listed.filter((y) => y.removedWith === l.id && y.removed)) {
+      const st = stationById(x.stationId);
+      if (st) restoreOne(x, st, undefined, whoOf(p));
     }
-    station.ident = { ...station.ident, channel: want };
-    station.public = true;
-    l.removed = null;
-    l.health = unchecked();
-    l.addedAt = now().toISOString();
-    const lead = l.creatorId ? creatorById(l.creatorId) : undefined;
-    if (lead) {
-      l.leadStageBefore = lead.stage;
-      Object.assign(lead, { stationId: station.ident.id, listedSourceId: l.id, nextAction: null, nextActionDue: null, ...(basisOf(l) ? { stage: "on_air" as const } : {}) } satisfies Partial<DbCreator>);
-    }
-    sync(l);
-    recordChange(l, whoOf(p), "restored", want !== old ? [{ field: "channel", from: old, to: want }] : [], []);
     saved();
     return reply(networkApi.restoreListedSource.response, listedView(l)!);
   }),

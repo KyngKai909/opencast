@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 afterEach(() => server.resetHandlers());
 
-const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", can: () => true };
+const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", label: "BEAT 12.1", can: () => true };
 const select = (name: string) => screen.getByRole("combobox", { name }) as HTMLSelectElement;
 const labels = (s: HTMLSelectElement) => within(s).getAllByRole("option").map((o) => o.textContent);
 

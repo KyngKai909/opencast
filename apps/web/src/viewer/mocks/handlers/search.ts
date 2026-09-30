@@ -8,7 +8,7 @@ import { SearchFull } from "../../api/ext/station";
 import { matchChannel, numberQuery, orderAirings } from "../../components/search/searchLogic";
 import { channelValue } from "../../components/station/when";
 import { now } from "../../../lib/clock";
-import { STATION_EXTRA, programById, weekAirings } from "../fixtures/station";
+import { extraOf, programById, weekAirings } from "../fixtures/station";
 import { STATIONS, stationById } from "../fixtures/stations";
 import { path, reply } from "../respond";
 import { airingX, identX } from "../view";
@@ -24,7 +24,7 @@ export function searchResults(qRaw: string, market: string | null) {
   const m = matchChannel(q, inMkt.map((s) => s.ident.channel ?? ""));
   const tuneTo = m?.found ? identX(inMkt.find((s) => s.ident.channel === m.channel)!) : null;
 
-  const lineOf = (s: (typeof STATIONS)[number]) => STATION_EXTRA[s.ident.callSign ?? ""]?.searchLine ?? `${s.category}. ${s.description.replace(/\.$/, "")}`;
+  const lineOf = (s: (typeof STATIONS)[number]) => extraOf(s.ident)?.searchLine ?? `${s.category}. ${s.description.replace(/\.$/, "")}`;
   const stations = inMkt
     .filter((s) => [s.ident.callSign, s.ident.name, s.ident.handle, s.category, lineOf(s), s.description].some((v) => v?.toLowerCase().includes(q)) || (s.ident.channel ?? "").startsWith(q))
     .sort((a, b) => channelValue(a.ident.channel) - channelValue(b.ident.channel))

@@ -166,7 +166,8 @@ test("changing channel: the number at once over soft static, then the picture an
   await useGround(page, "dark");
   await page.goto("/");
   await page.evaluate(() => localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null })));
-  await page.goto("/watch/beat");
+  // From 15.3 RIVC (A229: 12.2 is now next up from BEAT 12.1), up to SAZN on 18.1.
+  await page.goto("/watch/rivc-15-3");
   const player = page.locator(".oc-player").first();
   await expect(player).toHaveAttribute("data-status", "playing");
 
@@ -186,4 +187,24 @@ test("changing channel: the number at once over soft static, then the picture an
   await expect(page.getByTestId("tuning-static")).toHaveCount(0);
   await expect(page.locator(".oc-tune__osd")).toBeVisible();
   await expect(page.getByTestId("tuning")).toHaveCount(0);
+});
+
+// A229: one county's three streams share RIVC on 15; the channel and each stream's name tell them
+// apart, and each has its own address.
+test("a shared call sign: each stream on its own channel and address, with its own name (A229)", async ({ page }) => {
+  await useGround(page, "dark");
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null })));
+  await page.goto("/watch/rivc-15-2");
+  const banner = page.locator(".oc-banner").first();
+  await expect(banner.locator(".oc-banner__ch")).toHaveText("15.2");
+  await expect(banner.locator(".oc-banner__cs")).toHaveText("RIVC");
+  await expect(banner).toContainText("Riverside County, Public Works");
+  await page.getByRole("button", { name: "Channel up to 15.3" }).first().click();
+  await expect(banner.locator(".oc-banner__ch")).toHaveText("15.3");
+  await expect(banner).toContainText("Riverside County Library Live");
+  await expect(page).toHaveURL(/\/watch\/rivc-15-3$/);
+  // The call sign alone is X.1's, as before.
+  await page.goto("/watch/rivc");
+  await expect(page.locator(".oc-banner .oc-banner__ch").first()).toHaveText("15.1");
 });

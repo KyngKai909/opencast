@@ -18,6 +18,8 @@ import { STATION_TZ, now } from "../../../lib/clock";
 import { Quiet } from "../common";
 import "./SetupSignOn.css";
 import { controlPath } from "../../../areas";
+import { controlSlug, stationLabel } from "../../station/slug";
+import { signOnFamilyNote } from "../../components/onair/family";
 
 const HOUR = 3_600_000;
 const SERVICE: Record<string, string> = { youtube: "YouTube", twitch: "Twitch" };
@@ -40,7 +42,7 @@ export default function SetupSignOn() {
   if (setup.isLoading || checks.isLoading) return <Quiet />;
   if (!setup.data) return <ControlTitle title="Ready to sign on" description={setup.error?.message} />;
   const st = setup.data.station;
-  const slug = (st.callSign ?? st.handle ?? st.id).toLowerCase();
+  const slug = controlSlug(st);
   const ident = [st.callSign, st.channel].filter(Boolean).join(" ");
   const list = checks.data?.checks ?? [];
 
@@ -91,6 +93,7 @@ export default function SetupSignOn() {
   const relays = (translators.data ?? []).filter((x) => x.enabled && x.status !== "not_connected").map((x) => SERVICE[x.service] ?? x.name);
   const marketName = markets.data?.find((m) => m.slug === st.marketSlug)?.name ?? "your market's";
   const where = `on the ${marketName} dial${relays.length ? ` and on ${relays.join(" and ")}` : ""}`;
+  const shared = signOnFamilyNote(setup.data);
 
   const go = () =>
     signOn.mutate(
@@ -118,7 +121,9 @@ export default function SetupSignOn() {
           <Button variant="ink" size="lg" onClick={go} disabled={!checks.data?.ready || signOn.isPending || lit}>
             Sign on
           </Button>
-          <small className="cc-so__note">Signing on puts {st.callSign ?? st.name} {where}. You can sign off at any time.</small>
+          <small className="cc-so__note">
+            Signing on puts {stationLabel(st)} {where}. You can sign off at any time.{shared ? ` ${shared}` : ""}
+          </small>
         </div>
       </div>
       {signOn.isError && (

@@ -6,7 +6,7 @@ import { ProgramPageX, StationPageFull, type EpisodeX, type WhereToWatch } from 
 import { now } from "../../lib/clock";
 import { type MockAiring } from "../fixtures/schedule";
 import { PROGRAM_EXTRA, STATION_EXTRA, atDay, outsideIdent, programById, programByKey, registerReminded, weekAirings } from "../fixtures/station";
-import { STATIONS, inMarket, playbackFor, stationById, stationByRef } from "../fixtures/stations";
+import { STATIONS, fixtureKey, inMarket, playbackFor, stationById, stationByRef } from "../fixtures/stations";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { fail, path, reply } from "../respond";
 import { airingX, identX } from "../view";
@@ -24,14 +24,14 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   const iso = t.toISOString();
   const mine = weekAirings().filter((a) => a.stationId === s.ident.id);
   const nn = nowNextIn(mine, iso);
-  const x = STATION_EXTRA[s.ident.callSign ?? ""] ?? {};
+  const x = STATION_EXTRA[fixtureKey(s)] ?? {};
   const listed = s.ident.kind === "listed";
   const down = hiddenExternal(s.ident.id, t);
   const lo = from ?? new Date(t.getTime() - 12 * 3600e3).toISOString();
   const hi = to ?? new Date(t.getTime() + 24 * 3600e3).toISOString();
   const programs = [...new Set(mine.map((a) => a.programId).filter(Boolean))]
     .map((id) => programById(id!))
-    .filter((p): p is NonNullable<typeof p> => !!p && p.maker === s.ident.callSign)
+    .filter((p): p is NonNullable<typeof p> => !!p && stationByRef(p.maker) === s)
     .map((p) => ({ id: p.id, title: p.title, description: p.description, live: !!p.live }));
   const members = listed ? undefined : s.members;
   return {
@@ -85,7 +85,7 @@ export function programPage(programId: string, market: string | null) {
       .map((w) => byId(w.cs))
       .filter((s) => inMkt.includes(s))
       .map((s) => {
-        const w = x.where!.find((y) => y.cs === s.ident.callSign)!;
+        const w = x.where!.find((y) => byId(y.cs) === s)!;
         const list = all.filter((a) => a.stationId === s.ident.id && (w.allDay || a.programId === p.id));
         const nn = nowNextIn(list, iso);
         return { station: identX(s), slot: w.slot, now: nn.now ? airingX(nn.now) : null, next: nn.next ? airingX(nn.next) : null };
@@ -115,7 +115,7 @@ export function programPage(programId: string, market: string | null) {
     nextAiring: e.next ? atStation(e.next.cs, (l) => l.find((a) => a.title === e.next!.title && a.start > iso && a.start.slice(0, 10) >= atDay(e.next!.day, "00:00").slice(0, 10))) : null
   }));
 
-  const madeHere = STATION_EXTRA[p.maker]?.madeHere?.find((m) => programByKey(m.program)?.id === p.id);
+  const madeHere = STATION_EXTRA[fixtureKey(maker)]?.madeHere?.find((m) => programByKey(m.program)?.id === p.id);
   const outside = x.carriers?.outside ?? [];
   const carriers = x.carriers
     ? { total: x.carriers.total, outsideMarket: outside.length, outside: outside.map((c, i) => ({ station: stationByRef(c.callSign) ? identX(stationByRef(c.callSign)!) : outsideIdent(c, i), market: c.market })) }

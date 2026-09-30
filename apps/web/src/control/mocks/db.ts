@@ -12,7 +12,7 @@ import { seedEvening, seedLiveSources, type DbBreak, type DbLogEntry } from "./f
 import { seedLibrary } from "./fixtures/library";
 import { seedOffAirRules, type DbOffAirRule } from "./fixtures/offair";
 import { JEN, KAI, MARCUS, SAM } from "./fixtures/people";
-import { BEAT, CRAT, HALL, LAB, STATIONS } from "./fixtures/stations";
+import { BEAT, CRAT, HALL, LAB, STATIONS, TAPE } from "./fixtures/stations";
 import { seedTemplates, type DbTemplate } from "./fixtures/templates";
 import { at } from "./fixtures/time";
 
@@ -33,6 +33,8 @@ export interface DbStation {
   /** Playout: going out now, since when. */
   onAir: boolean;
   onAirSince: string | null;
+  /** The station on X.1 whose call sign this one shares (A229, mocks/family.ts), or null. */
+  sharesWith?: string | null;
 }
 
 export interface Db {
@@ -53,7 +55,8 @@ export interface Db {
 }
 
 // 6: the log's times on 4-second segment boundaries (prepare once, then assemble).
-export const DB_VERSION = 6;
+// 7: 12.2 BEAT Beat Tapes, sharing 12.1 BEAT's call sign (A229).
+export const DB_VERSION = 7;
 const KEY = "oc-mock-control-db";
 
 function setup(ident: StationIdent, o: Partial<DbStation["setup"]> = {}): DbStation["setup"] {
@@ -83,10 +86,11 @@ export function seed(): Db {
   // On segment boundaries, as the API answers them (the seed already is; this keeps it so).
   const log = [...weekdays, ...evening.log].map(snapSpan);
   const breaks = evening.breaks.map((b) => ({ ...b, startsAt: snapTime(b.startsAt) }));
-  const ours = [BEAT, HALL, CRAT, LAB];
+  const ours = [BEAT, TAPE, HALL, CRAT, LAB];
   const stations: DbStation[] = STATIONS.filter((s) => ours.includes(s)).map((ident) => ({
     ident,
     setup: setup(ident, {
+      ...(ident === TAPE ? { description: "Beat tapes from the Inland Empire's producers, back to back.", category: "Music", firstSignedOnAt: at("-7 18:00"), legalName: "Inland Beat Collective", legalContact: "kai@example.com" } : {}),
       ...(ident === BEAT ? { description: "Music from producers around the Inland Empire, on air around the clock.", category: "Music", firstSignedOnAt: at("-14 18:00"), legalName: "Inland Beat Collective", legalContact: "kai@example.com", orders: { takesOrders: true, turnaround: "About a week", fromMicros: 100_000_000 } } : {}),
       ...(ident === HALL ? { description: "Slow beats for late work.", category: "Music" } : {}),
       // CRAT is run by Opencast until someone claims it (rights 05.1, 05.2).
@@ -94,7 +98,9 @@ export function seed(): Db {
       ...(ident === LAB ? { description: "A studio. Your programs air on the stations that carry them.", category: "Music", firstSignedOnAt: null } : {})
     }),
     onAir: ident !== LAB,
-    onAirSince: ident === LAB ? null : at("18:00")
+    onAirSince: ident === LAB ? null : at("18:00"),
+    // 12.2 shares 12.1 BEAT's call sign.
+    sharesWith: ident === TAPE ? BEAT.id : null
   }));
   return {
     version: DB_VERSION,
@@ -103,6 +109,8 @@ export function seed(): Db {
       { stationId: BEAT.id, personId: KAI.id, role: "owner", hosts: null, hostProgramIds: [], lastInAt: at("20:42") },
       { stationId: BEAT.id, personId: MARCUS.id, role: "operator", hosts: "Hosts Crate Talk", hostProgramIds: [], lastInAt: at("16:10") },
       { stationId: BEAT.id, personId: JEN.id, role: "host", hosts: "Beat Tape Live", hostProgramIds: [], lastInAt: at("-7 21:00") },
+      // Kai owns 12.2 BEAT too (the same owner runs a family, A229).
+      { stationId: TAPE.id, personId: KAI.id, role: "owner", hosts: null, hostProgramIds: [], lastInAt: at("19:30") },
       { stationId: HALL.id, personId: KAI.id, role: "operator", hosts: null, hostProgramIds: [], lastInAt: at("-1 23:00") },
       { stationId: LAB.id, personId: SAM.id, role: "owner", hosts: null, hostProgramIds: [], lastInAt: at("19:00") }
     ].map((m) => ({ ...m, hostProgramIds: m.hosts === "Beat Tape Live" ? [library.programs.find((p) => p.title === "Beat Tape Live")!.id] : m.hosts === "Hosts Crate Talk" ? [library.programs.find((p) => p.title === "Crate Talk")!.id] : [] })) as DbMember[],

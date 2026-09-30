@@ -15,6 +15,7 @@ import { StationPageX, type AiringX, type StationIdentX } from "../../api/ext";
 import type { ApiError } from "../../api/client";
 import { useApi } from "../../api/hooks";
 import { MARKET_TZ, useNow } from "../../lib/clock";
+import { callSignLabel } from "../../lib/stationRef";
 import { useCommandLayer } from "../../tv/commands";
 import { useChannels } from "../../tv/data";
 import { focusKey, FocusContext, useTvFocusable } from "../../tv/focus";
@@ -22,6 +23,7 @@ import { TvButton } from "../../components/guide/TvButton";
 import { cellLine, identText, type Cell } from "../../components/guide/guideLogic";
 import { externalDownLine, externalOf, externalStreamLine } from "../../components/watching/external";
 import { signOnAt } from "../../components/watching/offAir";
+import { pledgeRoute } from "../../components/watching/pledge";
 import "./About.css";
 
 /** Stations that take pledges: not a city's listed stream, a studio or the catalog. */
@@ -147,7 +149,7 @@ export default function About() {
             <TvButton
               focusKey="tvg-about-tune"
               primary
-              label={`Tune to ${station.callSign ?? station.name} now`}
+              label={`Tune to ${callSignLabel(station)} now`}
               onSelect={() => {
                 if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
                 navigate("/", { replace: true });
@@ -158,7 +160,7 @@ export default function About() {
             <TvButton
               focusKey="tvg-about-pledge"
               label={`Pledge to ${station.name}`}
-              onSelect={() => navigate(`/pledge/${encodeURIComponent(station.callSign ?? station.id)}`, { state: { from: `/about/${encodeURIComponent(ref)}` } })}
+              onSelect={() => navigate(pledgeRoute(station), { state: { from: `/about/${encodeURIComponent(ref)}` } })}
             />
           )}
         </div>

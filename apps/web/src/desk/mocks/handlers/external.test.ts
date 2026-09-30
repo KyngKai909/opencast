@@ -47,6 +47,9 @@ describe("the reference's six rows", () => {
       // A201: a DASH stream link on the dial (DASH stream links are played).
       ["LOMA", "stream_link", "public_source", "none", true, null, "up"],
       ["NASA", "stream_link", "public_source", "guide_data", true, null, "up"],
+      // A229: Riverside County's streams sharing RIVC on 15.
+      ["RIVC", "stream_link", "public_source", "none", true, null, "up"],
+      ["RIVC", "stream_link", "public_source", "none", true, null, "up"],
       ["RUSD", "embed", null, "none", false, "terms_unclear", "unchecked"],
       ["SBCO", "embed", "embed_terms", "none", false, "down", "hidden"]
     ]);

@@ -10,7 +10,7 @@ import { useViewerActions } from "../../data/viewer";
 import { useOverlayParams } from "./overlay";
 import { PresetButton } from "./usePresetButton";
 import { carriedText, scheduleLine } from "./lines";
-import { callSignOf, identText, tonightRows } from "./logic";
+import { callSignOf, identText, stationSlug, tonightRows } from "./logic";
 import type { WatchData } from "./useWatch";
 
 /** The title and its line: "8:30 – 9:00 pm  Carried from REEL 24.1" (the link opens the carried-from modal). */
@@ -75,7 +75,8 @@ export function Actions({ w, className }: { w: WatchData; className?: string }) 
   const { open } = useOverlayParams();
   const st = w.row?.station;
   if (!st) return null;
-  const cs = callSignOf(st);
+  // A229: the param is its address, so a station sharing X.1's call sign is still the one meant.
+  const cs = stationSlug(st);
   const share = () => open({ modal: "share", station: cs, ...(w.now?.logEntryId ? { airing: w.now.logEntryId } : {}) }, ["airing"]);
   return (
     <div className={cx("vw-w-acts", st.kind === "listed" && "vw-w-acts--two", className)}>
@@ -132,7 +133,7 @@ export function MembersLine({ w, className }: { w: WatchData; className?: string
   return (
     <p className={cx("vw-w-members", className)}>
       {page.station.name} is supported by {n.toLocaleString("en-US")} {n === 1 ? "member" : "members"} and by local underwriters.{" "}
-      <Button variant="text" onClick={() => open({ modal: "pledge", station: callSignOf(page.station) })}>
+      <Button variant="text" onClick={() => open({ modal: "pledge", station: stationSlug(page.station) })}>
         Pledge
       </Button>
     </p>

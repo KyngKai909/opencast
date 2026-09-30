@@ -28,6 +28,7 @@ import { StationProvider } from "../../station/StationContext";
 import { stubMatchMedia } from "../onair/testing";
 import { AccountBanner } from "./AccountBanner";
 import { UsageAccount } from "./UsageAccount";
+import { stationLabel } from "../../station/slug";
 
 const server = setupServer(...handlers);
 beforeAll(() => {
@@ -52,7 +53,7 @@ function renderAccount(station: typeof BEAT, role: Role, ui = <UsageAccount />) 
       <ToastProvider>
         <MemoryRouter initialEntries={[`${base}/settings/account`]}>
           <AuthProvider>
-            <StationProvider value={{ station, id: station.id, role, studio: false, base, can: (a) => can(role, a) }}>{ui}</StationProvider>
+            <StationProvider value={{ station, id: station.id, role, studio: false, base, label: stationLabel(station), can: (a) => can(role, a) }}>{ui}</StationProvider>
           </AuthProvider>
         </MemoryRouter>
       </ToastProvider>
@@ -168,7 +169,8 @@ describe("what pays", () => {
     expect(clear.getAttribute("aria-disabled") === "true" || (clear as HTMLButtonElement).disabled).toBe(true);
     expect(within(choices).getByText("Connect Clear first.")).toBeTruthy();
     expect(screen.getByText("You haven't chosen, so the card pays: a Clear wallet with full access first, otherwise the card.")).toBeTruthy();
-    expect(screen.getByText("BEAT's earnings")).toBeTruthy();
+    // BEAT shares its call sign with 12.2 Beat Tapes, so it's named with its channel.
+    expect(screen.getByText("BEAT 12.1's earnings")).toBeTruthy();
   });
 
   it("with Clear linked with full access, the owner chooses it", async () => {

@@ -9,10 +9,12 @@ import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog, type DbStation } from "../db";
 import type { DbLogEntry } from "../fixtures/evening";
 import { stationState } from "../fixtures/station";
-import { HELD, MOCK_STREAMS, TV_CHANNELS, mockReservations, radioFrequencies, saveReservations, type MockReservation } from "../fixtures/onair";
+import { HELD, TV_CHANNELS, mockStreamOf, mockReservations, radioFrequencies, saveReservations, type MockReservation } from "../fixtures/onair";
 import type { MockPerson } from "../fixtures/people";
 import { MARKET, STATIONS } from "../fixtures/stations";
 import { fail, needsUser, path, personOf, reply } from "../respond";
+import { findByStationRef } from "../../station/slug";
+import { familyOf, headOnMajor, ownSubchannelsAllowed, ownSubchannelsFor, refreshFamilies, setupView, subchannelTaken, tvTenths } from "../family";
 import { maskEmail } from "./station";
 
 /** Every station the dial knows: the shared db's, and the market's others (listed, carried). */
@@ -54,7 +56,7 @@ function reservationInvite(r: MockReservation, p: MockPerson | null): Reservatio
 }
 
 function setupOf(st: DbStation) {
-  return { station: st.ident, ...st.setup };
+  return setupView(st);
 }
 
 function airing(e: DbLogEntry) {
@@ -64,15 +66,15 @@ function airing(e: DbLogEntry) {
 export const onairHandlers = [
   // A station page. Master control reads it for a claimable station's "Run by Opencast" (rights 05.2).
   http.get(path(stationsApi.getStation), ({ params }) => {
-    const ref = String(params.stationRef).toLowerCase();
-    const ident = allIdents().find((s) => s.id === ref || s.callSign?.toLowerCase() === ref || s.handle === ref);
+    // By slug ("beat-12-2"), call sign (a bare one is X.1), handle or id.
+    const ident = findByStationRef(allIdents(), String(params.stationRef), (s) => s);
     if (!ident) return fail(404, "not_found", "That station wasn't found.");
     const st = dbStation(ident.id);
     const t = now().toISOString();
     const log = st ? stationLog(ident.id).filter((e) => e.endsAt > t) : [];
     const onNow = log.find((e) => e.startsAt <= t) ?? null;
     const onAir = !!st?.onAir && onNow?.kind !== "off_air";
-    const slug = (ident.callSign ?? ident.handle ?? "").toLowerCase();
+    const stream = mockStreamOf(ident);
     // Who a claimable station is run for: the creator named on its claim (the Station area's handover).
     const token = stationState().claimTokens.find((c) => c.stationId === ident.id);
     const claimed = stationState().handovers.some((h) => h.stationId === ident.id && h.kind === "claim" && h.status === "completed");
@@ -85,7 +87,7 @@ export const onairHandlers = [
       programs: getDb().library.programs.filter((p) => p.station.id === ident.id).map((p) => ({ id: p.id, title: p.title, description: p.description, live: p.live })),
       claimable: ident.kind === "claimable" || token ? { runFor: token?.page.personName ?? "its creator", claimed: claimed || ident.kind !== "claimable", escrowContract: token?.page.escrowContract ?? null, escrowStationId: token?.page.escrowStationId ?? 0 } : null,
       pledgesTaxDeductible: st?.setup.pledgesTaxDeductible ?? null,
-      playback: onAir && MOCK_STREAMS.includes(slug) ? { kind: "hls" as const, url: `/mock-hls/${slug}/master.m3u8` } : null
+      playback: onAir && stream ? { kind: "hls" as const, url: `/mock-hls/${stream}/master.m3u8` } : null
     });
   }),
 
@@ -166,6 +168,7 @@ export const onairHandlers = [
     db.stations.push(st);
     // The creator becomes the owner.
     db.members.push({ stationId: id, personId: p.id, role: "owner", hosts: null, hostProgramIds: [], lastInAt: t });
+    refreshFamilies();
     saveDb();
     if (reservation) {
       reservation.stationId = id;
@@ -180,7 +183,9 @@ export const onairHandlers = [
     const slug = String(params.marketSlug);
     if (slug !== MARKET.slug) return fail(404, "not_found", "That market wasn't found.");
     const band = new URL(request.url).searchParams.get("band") === "radio" ? "radio" : "tv";
-    return reply(stationsApi.availableChannels.response, { market: { ...MARKET, open: true }, band, channels: channelsFor(band, slug) });
+    // Beside each station they own on X.1: the next free subchannel (rule numbering.own_subchannels).
+    const ownSubchannels = ownSubchannelsFor(p.id, slug, band, (ch) => subchannelTaken(allIdents(), slug, ch));
+    return reply(stationsApi.availableChannels.response, { market: { ...MARKET, open: true }, band, channels: channelsFor(band, slug), ownSubchannels });
   }),
 
   http.put(path(stationsApi.chooseChannel), async ({ request, params }) => {
@@ -192,15 +197,50 @@ export const onairHandlers = [
     if (st.setup.fixed) return fail(409, "fixed", "Call sign, channel, band and market are fixed after the first sign-on.");
     const body = stationsApi.chooseChannel.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "Choose a channel.");
-    const { band, channel, marketId } = body.data;
+    const { band, channel, marketId, shareCallSign } = body.data;
     if (marketId !== MARKET.id) return fail(404, "not_found", "That market wasn't found.");
-    const state = channelsFor(band).find((c) => c.channel === channel)?.state;
+    const moving = st.ident.band !== band || st.ident.channel !== channel;
+    // X.1 stays while stations share its call sign (A229).
+    const family = familyOf(st.ident.id);
+    // The API's words (stations.chooseChannel).
+    if (family.length && moving) return fail(409, "family_channel", `${family.map((m) => `${m.ident.channel} ${m.ident.callSign}`).join(", ")} ${family.length === 1 ? "shares" : "share"} this station's call sign. Move ${family.length === 1 ? "it" : "them"} first.`);
     // The channel held with the station's waitlist call sign is its to choose.
     const held = mockReservations().find((r) => r.stationId === st.ident.id && !r.releasedAt && r.channel);
-    const mine = (st.ident.band === band && st.ident.channel === channel) || (held?.band === band && held.channel === channel);
-    if (!state) return fail(422, "channel", `${channel} isn't a channel on the ${band === "tv" ? "TV" : "radio"} band here.`);
-    if (state !== "open" && !mine) return fail(409, "channel_taken", `${channel} is taken. Choose another channel.`);
-    st.ident = { ...st.ident, band, channel, marketSlug: MARKET.slug };
+    const tenths = band === "tv" ? tvTenths(channel) : null;
+    if (tenths !== null && tenths % 10 !== 1) {
+      // A subchannel: only beside a station they own on X.1, while the rule allows it.
+      if (!ownSubchannelsAllowed()) return fail(400, "bad_request", "A station gets X.1. Subchannels are for stations you carry around the clock.", { channel: "Use X.1" });
+      const head = headOnMajor(allIdents(), MARKET.slug, channel);
+      if (!head) return fail(400, "bad_request", `Start at ${channel.split(".")[0]}.1. A subchannel goes beside your own station on its .1.`, { channel: "Use X.1" });
+      if (head.id === st.ident.id || head.kind !== "station" || membership(head.id, p.id)?.role !== "owner") return fail(409, "not_your_subchannel", `${[head.channel, head.callSign].filter(Boolean).join(" ")} isn't yours. A subchannel goes beside a station you own.`);
+      if (subchannelTaken(allIdents(), MARKET.slug, channel, st.ident.id)) return fail(409, "channel_taken", `${channel} is taken. Choose another channel.`);
+      st.ident = { ...st.ident, band, channel, marketSlug: MARKET.slug };
+      if (shareCallSign) {
+        st.sharesWith = head.id;
+        // Its own call sign, held on the waitlist, is let go.
+        const own = mockReservations().find((r) => r.stationId === st.ident.id && !r.releasedAt);
+        if (own) {
+          own.releasedAt = now().toISOString();
+          saveReservations();
+        }
+      } else if (st.sharesWith) {
+        // Not sharing: it picks its own call sign next.
+        st.sharesWith = null;
+        st.ident = { ...st.ident, callSign: null };
+      }
+    } else {
+      const state = channelsFor(band).find((c) => c.channel === channel)?.state;
+      const mine = (st.ident.band === band && st.ident.channel === channel) || (held?.band === band && held.channel === channel);
+      if (!state) return fail(422, "channel", `${channel} isn't a channel on the ${band === "tv" ? "TV" : "radio"} band here.`);
+      if (state !== "open" && !mine) return fail(409, "channel_taken", `${channel} is taken. Choose another channel.`);
+      st.ident = { ...st.ident, band, channel, marketSlug: MARKET.slug };
+      // Moving off the family's subchannel: it stops sharing, and picks its own call sign next.
+      if (st.sharesWith) {
+        st.sharesWith = null;
+        st.ident = { ...st.ident, callSign: null };
+      }
+    }
+    refreshFamilies();
     saveDb();
     // Another than the one held: the held one goes.
     if (held && (held.band !== band || held.channel !== channel)) {

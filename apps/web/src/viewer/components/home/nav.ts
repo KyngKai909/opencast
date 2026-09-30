@@ -22,11 +22,11 @@ export function useAppLink() {
   );
 }
 
-type Station = Pick<StationIdent, "id" | "callSign">;
+type Station = Pick<StationIdent, "id" | "callSign"> & { slug?: string };
 
-/** The tuned-in page for a station. */
+/** The tuned-in page for a station (A229: a station sharing X.1's call sign has its channel in it). */
 export function watchHref(s: Station): string {
-  return `/watch/${s.callSign?.toLowerCase() ?? s.id}`;
+  return `/watch/${s.slug ?? s.callSign?.toLowerCase() ?? s.id}`;
 }
 
 /** Tunes in and opens the tuned-in page (a dial row, the hero's Tune in). */
@@ -48,7 +48,7 @@ export function useOpenStation() {
   return useCallback(
     (s: Station) =>
       setParams((p) => {
-        p.set("station", s.callSign ?? s.id);
+        p.set("station", s.slug ?? s.callSign ?? s.id);
         return p;
       }),
     [setParams]

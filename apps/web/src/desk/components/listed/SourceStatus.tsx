@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { Icon, Lines } from "@opencast/ui";
 import type { ListedSource } from "@opencast/contracts";
-import { nowWords, PLAYS_LABELS, playsDetail, playsOf, scheduleWords, sourceDetail, type NowTone, type Tone } from "./external";
+import { familyLine, nowWords, PLAYS_LABELS, playsDetail, playsOf, scheduleWords, sourceDetail, type NowTone, type Tone } from "./external";
 import "./SourceStatus.css";
 
 export function Ok({ children, detail, warn }: { children: ReactNode; detail?: string; warn?: boolean }) {
@@ -39,7 +39,14 @@ export function channelText(s: ListedSource): string | null {
 }
 
 export function sourceCell(s: ListedSource) {
-  return <Lines title={s.name} detail={sourceDetail(s)} />;
+  // A229: a family's streams sit together by channel; a member says whose call sign it shares.
+  const family = familyLine(s);
+  return (
+    <div className={s.family?.role === "member" ? "nd-listed__member" : undefined}>
+      <Lines title={s.name} detail={sourceDetail(s)} />
+      {family && <small className="nd-listed__family">{family}</small>}
+    </div>
+  );
 }
 
 export function channelCell(s: ListedSource) {

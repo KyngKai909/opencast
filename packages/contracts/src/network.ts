@@ -416,11 +416,30 @@ export const ListedSource = z.object({
    * `not_listed` and `onDial` false. Null while it's listed.
    */
   removed: z
-    .object({ at: Timestamp, by: z.string().nullable(), channel: ChannelNumber.nullable(), channelHeldUntil: Timestamp })
+    .object({
+      at: Timestamp,
+      by: z.string().nullable(),
+      channel: ChannelNumber.nullable(),
+      channelHeldUntil: Timestamp,
+      /** Added 2026-09-30 (A231): taken off with the listing on X.1 whose call sign it shares (its id); "Put back" on that one brings it back too. */
+      withListing: Id.nullable().optional()
+    })
     .nullable()
     .optional(),
   /** Written permissions recorded earlier for this listing that don't cover its address now (kept, never edited), newest first. */
-  earlierPermissions: z.array(StreamPermission).optional()
+  earlierPermissions: z.array(StreamPermission).optional(),
+  // ---- Added 2026-09-30: shared call signs (A229) ----
+  /**
+   * One brand's streams sharing a call sign on one channel's subchannels (15.1 SBCO, 15.2 SBCO,
+   * 15.3 SBCO). `head`: this listing is on X.1 and its call sign is shared; `member`: it's on X.n
+   * sharing X.1's. `members`: the streams sharing it, in channel order (the ones on the list; one
+   * taken off the dial isn't counted). Each keeps its own evidence, health, outages and watch data:
+   * only the call sign is shared. Null when it shares nothing.
+   */
+  family: z
+    .object({ role: z.enum(["head", "member"]), head: StationIdent, members: z.array(StationIdent) })
+    .nullable()
+    .optional()
 });
 
 /** The evidence a listing is added with, or recorded later (`recordListedEvidence`). */
@@ -736,12 +755,13 @@ export const networkApi = {
     path: "/admin/listed-sources",
     auth: "admin",
     summary:
-      "List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations.",
+      "List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations. Added 2026-09-30 (A229): `shareCallSign` on X.n beside an external X.1 shares its call sign (\"Same brand as 15.1\").",
     body: z.object({
       marketId: Id,
       band: Band,
       channel: ChannelNumber,
-      callSign: CallSign,
+      /** Optional (2026-09-30) only with `shareCallSign`, which takes X.1's; required otherwise. */
+      callSign: CallSign.optional(),
       name: z.string().min(1),
       description: z.string().max(160).optional(),
       /** The embed's address, or the stream link. */
@@ -760,7 +780,13 @@ export const networkApi = {
       /** A pipeline lead (an IPTV-list channel) becoming this external station. */
       creatorId: Id.optional(),
       /** The source is outside this market (a county meeting that covers two). Waits unless `external.other_markets` allows it (A200). */
-      outsideMarket: z.boolean().optional()
+      outsideMarket: z.boolean().optional(),
+      /**
+       * Added 2026-09-30 (A229): "Same brand as 15.1 SBCO". On X.n (n ≥ 2) beside an external
+       * station on X.1, share its call sign; `callSign` can then be left out (or must be X.1's).
+       * 422 `cannot_share` anywhere else (a full station on X.1, another major or market, X.1 itself).
+       */
+      shareCallSign: z.boolean().optional()
     }),
     response: ListedSource,
     status: 201
@@ -844,7 +870,13 @@ export const networkApi = {
           .optional(),
         /** A new channel, in the same band. */
         channel: ChannelNumber.optional(),
-        callSign: CallSign.optional()
+        /**
+         * On X.1 with a family (A229): the whole family's call sign changes with it, and the old one is
+         * held a year for the family. On a family member: its own call sign, so it leaves the family.
+         */
+        callSign: CallSign.optional(),
+        /** Added 2026-09-30 (A229): `true` shares X.1's call sign (on X.n beside an external X.1); `false` with `callSign` leaves the family. */
+        shareCallSign: z.boolean().optional()
       })
       .refine((b) => Object.values(b).some((v) => v !== undefined), "Change at least one thing"),
     response: ListedSource
@@ -862,8 +894,14 @@ export const networkApi = {
     path: "/admin/listed-sources/:sourceId/remove",
     auth: "admin",
     summary:
-      "A215: take a listing off the dial for good. Archived, never deleted: its permission records, outage history, change history, watch data and lead link stay. It leaves the dial, the guide, search and the swipe order at once, its checks and schedule reads stop. Like a full station that signs off for good, its channel is held for it 90 days and then freed, and its call sign stays its own (held a year on the waitlist's side). Its pipeline lead goes back to the stage it had before it went on air (Found when that wasn't recorded) and is a lead again. 409 `removed` when it already is.",
+      "A215: take a listing off the dial for good. Archived, never deleted: its permission records, outage history, change history, watch data and lead link stay. It leaves the dial, the guide, search and the swipe order at once, its checks and schedule reads stop. Like a full station that signs off for good, its channel is held for it 90 days and then freed, and its call sign stays its own (held a year on the waitlist's side). Its pipeline lead goes back to the stage it had before it went on air (Found when that wasn't recorded) and is a lead again. 409 `removed` when it already is. Added 2026-09-30 (A231): X.1 whose call sign stations share goes with them, only with `withFamily` (409 `family` names them otherwise).",
     params: z.object({ sourceId: Id }),
+    /**
+     * Added 2026-09-30 (A229): X.1 with a family (streams sharing its call sign) is taken off with
+     * its family, and only when `withFamily` says so (409 `family` names them otherwise). "Put back
+     * on the list" on X.1 brings back the ones taken off with it.
+     */
+    body: z.object({ withFamily: z.boolean().optional() }).optional(),
     response: ListedSource
   }),
   restoreListedSource: endpoint({

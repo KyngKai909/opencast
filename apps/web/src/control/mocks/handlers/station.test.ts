@@ -198,7 +198,8 @@ describe("the switcher's status (A5)", () => {
     const beat = r.json.find((x: { stationId: string }) => x.stationId === BEAT.id);
     expect(beat.onAir).toBe(true);
     expect(hall.onAir).toBe(true);
-    expect(r.json).toHaveLength(2);
+    // BEAT 12.1, BEAT 12.2 (Beat Tapes, sharing its call sign) and HALL.
+    expect(r.json).toHaveLength(3);
   });
   it("finds the first moment nothing is on the log", () => {
     const e = (a: string, b: string) => ({ startsAt: `2026-09-27T${a}:00.000Z`, endsAt: `2026-09-27T${b}:00.000Z` });

@@ -42,7 +42,7 @@ const august = usageStatement(BEAT.id)!;
 function renderAt(path: string) {
   return renderWithApi(
     <ShellOptionsProvider>
-      <StationProvider value={{ station: BEAT, id: BEAT.id, role: "owner", studio: false, base, can: () => true }}>
+      <StationProvider value={{ station: BEAT, id: BEAT.id, role: "owner", studio: false, base, label: "BEAT 12.1", can: () => true }}>
         <Routes>
           <Route path={`${base}/earnings/statements`} element={<Statements />} />
           <Route path={`${base}/earnings/statements/:statementId`} element={<Statement />} />

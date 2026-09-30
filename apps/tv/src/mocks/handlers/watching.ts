@@ -9,12 +9,15 @@
 // Mock-only switches in the TV's address, read once at start:
 //   ?offAir=CIVC   that station is signed off now (tv 05.2 at the reference moment)
 //   ?standby=CIVC  that station is on air but waiting for its signal (the stand-by variant)
+// Each takes call signs or addresses: a shared call sign is its family's X.1 ("BEAT" is 12.1),
+// and "beat-12-2" names the station sharing it on 12.2.
 // The shared dial handler answers first; this patches its rows.
 
 import { getResponse, http, HttpResponse } from "msw";
 import { stationsApi } from "@opencast/contracts";
 import { DialX as DialSchema, type DialRowX, type DialX } from "../../api/ext";
 import { now } from "../../lib/clock";
+import { refersTo } from "../../lib/stationRef";
 import { path, reply } from "../respond";
 import { dialHandlers } from "./dial";
 
@@ -45,9 +48,9 @@ export const switches = readSwitches();
 
 /** One row as the watching screen gets it. */
 export function patchRow(r: DialRowX, t: Date, sw: Switches): DialRowX {
-  const cs = (r.station.callSign ?? "").toUpperCase();
+  const named = (list: string[]) => list.some((v) => refersTo(v, r.station));
   let row: DialRowX = { ...r, signal: "ok" };
-  if (sw.offAir.includes(cs)) {
+  if (named(sw.offAir)) {
     const six = nextSixAm(t);
     const back = row.next && row.next.startsAt < six ? row.next.startsAt : six;
     const now = { logEntryId: null, title: "Off air", episodeTitle: null, code: "OPEN" as const, kind: "off_air" as const, startsAt: t.toISOString(), endsAt: back, live: false, carriedFrom: null, programId: null, backAt: back };
@@ -55,7 +58,7 @@ export function patchRow(r: DialRowX, t: Date, sw: Switches): DialRowX {
   }
   // The contract leaves `signal` out when the station isn't on air.
   if (!row.onAir) delete row.signal;
-  if (row.onAir && sw.standby.includes(cs)) row = { ...row, signal: "standby" };
+  if (row.onAir && named(sw.standby)) row = { ...row, signal: "standby" };
   return row;
 }
 

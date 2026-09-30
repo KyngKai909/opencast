@@ -97,6 +97,8 @@ test("someone new signs on for the first time", async ({ page }) => {
   await expect(page.getByText("Tape Talks, ep. 1").first()).toBeVisible();
 });
 
+// A229: BEAT shares its call sign with 12.2 Beat Tapes in the mock, so where only a call sign would
+// show, master control names it with its channel ("BEAT 12.1").
 test("BEAT carries a program from the syndication market", async ({ page }) => {
   await signInAs(page, "kai");
   await page.goto("/control/beat/market");
@@ -116,7 +118,7 @@ test("BEAT carries a program from the syndication market", async ({ page }) => {
 
   // Placing it in the log: Sundays at 8 pm, from tomorrow.
   await expect(page.getByRole("heading", { name: "Place Nights at the observatory" })).toBeVisible();
-  await expect(page.getByText("Choose when it airs on BEAT. Free terms, One sponsor credit an hour.")).toBeVisible();
+  await expect(page.getByText("Choose when it airs on BEAT 12.1. Free terms, One sponsor credit an hour.")).toBeVisible();
   await expect(page.getByText("Sundays, 8:00 to 10:00 pm")).toBeVisible();
   await expect(page.getByText('Opencast catalog is told, and it appears in your listings as "Carried from the Opencast catalog".')).toBeVisible();
   await page.getByRole("button", { name: "Carry Nights at the observatory" }).click();
@@ -145,7 +147,7 @@ test("BEAT fills a break from the spot market", async ({ page }) => {
 
   // The spot market (C.2): add Orange Street Coffee.
   await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
-  await expect(page.getByText("Spots businesses have listed for stations in the Inland Empire. You choose which air on BEAT.")).toBeVisible();
+  await expect(page.getByText("Spots businesses have listed for stations in the Inland Empire. You choose which air on BEAT 12.1.")).toBeVisible();
   const orange = page.getByRole("row").filter({ hasText: "Orange Street Coffee" });
   await expect(orange).toContainText("$8.00");
   await page.getByRole("button", { name: "Add Orange Street Coffee to your rotation" }).click();
@@ -308,7 +310,7 @@ test("BEAT's translators: connect YouTube, relay everything BEAT airs, and show 
   // YouTube, removed (confirmed) and connected again by signing in: the mock comes straight back.
   await page.getByRole("button", { name: "Remove YouTube" }).click();
   await page.getByRole("dialog", { name: "Remove YouTube?" }).getByRole("button", { name: "Remove" }).click();
-  await expect(page.getByText("YouTube removed. BEAT no longer relays there.")).toBeVisible();
+  await expect(page.getByText("YouTube removed. BEAT 12.1 no longer relays there.")).toBeVisible();
   await page.getByRole("button", { name: "Connect with Google" }).click();
   await expect(page.getByText("YouTube is connected.")).toBeVisible();
   await expect(page).toHaveURL(/\/control\/beat\/translators$/);
@@ -318,9 +320,9 @@ test("BEAT's translators: connect YouTube, relay everything BEAT airs, and show 
   const modes = page.getByRole("radiogroup", { name: "What gets relayed" });
   await modes.getByRole("radio", { name: /Live shows only/ }).click();
   await expect(modes.getByRole("radio", { name: /Live shows only/ })).toHaveAttribute("aria-checked", "true");
-  await modes.getByRole("radio", { name: /Everything BEAT airs/ }).click();
-  await expect(page.getByText("BEAT relays everything it airs, at $0.20 an hour.")).toBeVisible();
-  await expect(modes.getByRole("radio", { name: /Everything BEAT airs/ })).toHaveAttribute("aria-checked", "true");
+  await modes.getByRole("radio", { name: /Everything BEAT 12\.1 airs/ }).click();
+  await expect(page.getByText("BEAT 12.1 relays everything it airs, at $0.20 an hour.")).toBeVisible();
+  await expect(modes.getByRole("radio", { name: /Everything BEAT 12\.1 airs/ })).toHaveAttribute("aria-checked", "true");
 
   // During breaks, relays show the station ID slate.
   const breaks = page.getByRole("radiogroup", { name: "During breaks, relays show" });

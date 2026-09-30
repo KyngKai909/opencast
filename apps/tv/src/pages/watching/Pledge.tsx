@@ -13,6 +13,7 @@ import { QrCode } from "../../components/common/QrCode";
 import { byRef, pledgeUrl, shownUrl } from "../../components/watching/pledge";
 import { TvButton } from "../../components/watching/TvButton";
 import { config } from "../../config";
+import { callSignLabel } from "../../lib/stationRef";
 import { FocusContext, focusKey, useTvFocusable } from "../../tv/focus";
 import { useQuietPicture } from "../../components/watching/useQuietPicture";
 import "./Pledge.css";
@@ -40,7 +41,8 @@ export default function Pledge() {
   }, []);
 
   const close = () => navigate("/", { replace: true });
-  const who = station ? (station.callSign ?? station.name) : "";
+  // "BEAT", or "BEAT 12.2" for a station sharing its call sign.
+  const who = station ? callSignLabel(station) : "";
 
   return (
     <aside className="tvw-pledge" aria-labelledby="tvw-pledge-h">

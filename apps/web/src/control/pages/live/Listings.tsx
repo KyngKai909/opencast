@@ -16,6 +16,7 @@ import { dayLabel, descriptionCount } from "../../components/live/logic";
 import { CATEGORIES, isEpisodeNumber, languageName, listingLine, STATUS } from "../../components/live/listings";
 import { Quiet } from "../common";
 import "./Listings.css";
+import { stationLabel } from "../../station/slug";
 
 /** The end of today in the station's zone, for "Today". */
 function endOfToday(t: Date): string {
@@ -51,7 +52,7 @@ export default function Listings() {
 
   if (q.isLoading) return <Quiet />;
   const need = q.data?.needDescription ?? 0;
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   const selected = rows.find((l) => l.entryId === entryId) ?? rows.find((l) => l.status === "needs_description") ?? rows[0];
 
   const columns: Column<Listing>[] = [
@@ -176,7 +177,7 @@ function Editor({ listing }: { listing: Listing }) {
         value={title}
         disabled={carried || !program}
         maxLength={120}
-        help={carried ? `From ${listing.carriedFrom?.callSign ?? listing.carriedFrom?.name}. ${s.station.callSign ?? s.station.name} can add a local note.` : undefined}
+        help={carried ? `From ${listing.carriedFrom ? stationLabel(listing.carriedFrom) : ""}. ${s.label} can add a local note.` : undefined}
         onChange={(e) => setTitle(e.target.value)}
         onBlur={() => program && title.trim() && title !== program.title && void patchProgram({ title: title.trim() })}
       />

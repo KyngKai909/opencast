@@ -131,7 +131,7 @@ export function RequestDialog({ request: r, offer, onClose }: { request: Carriag
       {facts}
       {!phone && r.audioOnly && (
         <p className="cc-mk-req__note">
-          Audio only: {title}'s sound airs without its picture. {cs}'s listings will say "From {s.station.callSign ?? s.station.name}
+          Audio only: {title}'s sound airs without its picture. {cs}'s listings will say "From {s.label}
           {s.station.channel ? ` ${s.station.channel}` : ""}".
         </p>
       )}

@@ -22,9 +22,21 @@ const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0"
 
 function station(n: number, callSign: string, channel: string, name: string, colour: string, band: "tv" | "radio", market: string, extra: Omit<MockStation, "ident">, kind: StationIdent["kind"] = "station", homeCity = "Redlands"): MockStation {
   return {
-    ident: { id: uid(n), kind, callSign, handle: callSign.toLowerCase(), name, colour, band, channel, marketSlug: market, homeCity },
+    ident: { id: uid(n), kind, callSign, handle: callSign.toLowerCase(), name, colour, band, channel, marketSlug: market, homeCity, slug: callSign.toLowerCase() },
     ...extra
   };
+}
+
+/**
+ * A229: a station sharing the call sign of X.1 beside it (15.2 RIVC beside 15.1 RIVC): its address
+ * carries its channel ("rivc-15-2"), and it has no handle of its own.
+ */
+function sharing(s: MockStation): MockStation {
+  return { ...s, ident: { ...s.ident, handle: null, slug: `${s.ident.callSign!.toLowerCase()}-${s.ident.channel!.replace(".", "-")}`, sharesCallSign: true } };
+}
+/** X.1 whose call sign its subchannels share. */
+function shared(s: MockStation): MockStation {
+  return { ...s, ident: { ...s.ident, sharesCallSign: true } };
 }
 
 const IE = "inland-empire";
@@ -38,7 +50,15 @@ export const STATIONS: MockStation[] = [
   // A DASH stream link (A201): a public-access channel's own DASH, played in Opencast's player
   // (packages/player/mock's "loma", served live by live-dash.mjs). A mock station, with no schedule.
   station(97, "LOMA", "9.7", "Loma Linda Community Access", "#5A4E7A", "tv", IE, { category: "Public affairs", description: "Public access from Loma Linda: commissions, the school board and community notices.", stream: { kind: "dash", slug: "loma" }, external: { source: "Loma Linda Community Access", plays: "stream_link", schedule: "none" } }, "listed", "Loma Linda"),
-  station(12, "BEAT", "12.1", "Inland Beat", "#8C3B7A", "tv", IE, { category: "Music", description: "Beat makers, crate diggers and the Inland Empire's producers.", about: "Inland Beat is run by a collective of producers in Redlands. Live from the studio on Saturdays.", members: 214, onDialSince: "2026-07-18", hours: "On air all day.", stream: { kind: "hls", slug: "beat" } }),
+  shared(station(12, "BEAT", "12.1", "Inland Beat", "#8C3B7A", "tv", IE, { category: "Music", description: "Beat makers, crate diggers and the Inland Empire's producers.", about: "Inland Beat is run by a collective of producers in Redlands. Live from the studio on Saturdays.", members: 214, onDialSince: "2026-07-18", hours: "On air all day.", stream: { kind: "hls", slug: "beat" } })),
+  // A229: the same owner's second station on 12.2, sharing BEAT's call sign (mock stream "tape":
+  // another loop, with BEAT 12.2's bug).
+  sharing(station(122, "BEAT", "12.2", "Beat Tapes", "#8C3B7A", "tv", IE, { category: "Music", description: "Tapes from Inland Beat's producers, around the clock.", about: "Inland Beat's second channel: the collective's tapes, start to finish.", hours: "On air all day.", stream: { kind: "hls", slug: "tape" } })),
+  // A229: one county's three public streams on one channel, sharing a call sign (external stations:
+  // clearly public sources; mock streams "rivc", "rvpw" and "rvlb" are other mock loops, untagged).
+  shared(station(151, "RIVC", "15.1", "Riverside County, Board of Supervisors", "#355C7D", "tv", IE, { category: "Public affairs", description: "The Board of Supervisors' meetings, from the county's own stream.", stream: { kind: "hls", slug: "rivc" }, external: { source: "Riverside County", plays: "stream_link", schedule: "none" } }, "listed", "Riverside")),
+  sharing(station(152, "RIVC", "15.2", "Riverside County, Public Works", "#355C7D", "tv", IE, { category: "Public affairs", description: "Public Works briefings and road projects, from the county's own stream.", stream: { kind: "hls", slug: "rvpw" }, external: { source: "Riverside County", plays: "stream_link", schedule: "none" } }, "listed", "Riverside")),
+  sharing(station(153, "RIVC", "15.3", "Riverside County Library Live", "#355C7D", "tv", IE, { category: "Public affairs", description: "Story times, author talks and classes from the county library.", stream: { kind: "hls", slug: "rvlb" }, external: { source: "Riverside County", plays: "stream_link", schedule: "none" } }, "listed", "Riverside")),
   station(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", IE, { category: "Food", description: "Home cooking from Inland Empire kitchens.", members: 96, stream: { kind: "hls", slug: "sazn" } }, "station", "Fontana"),
   station(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", IE, { category: "Classic", description: "Restored public-domain films, cartoons and newsreels.", members: 301, stream: { kind: "hls", slug: "reel" } }, "station", "Riverside"),
   station(31, "PREP", "31.1", "Inland Preps", "#1F5E8C", "tv", IE, { category: "Sports", description: "High school football, basketball and the Friday scoreboard.", members: 142, stream: { kind: "hls", slug: "prep" } }, "station", "Rialto"),
@@ -67,10 +87,14 @@ export function stationById(id: string): MockStation | undefined {
   return STATIONS.find((s) => s.ident.id === id);
 }
 
-/** By id, call sign or handle (getStation takes any of them). */
+/** By id, address (A229: "rivc-15-2"), call sign (a shared one is X.1's) or handle (getStation takes any of them). */
 export function stationByRef(ref: string): MockStation | undefined {
   const r = ref.toLowerCase();
-  return STATIONS.find((s) => s.ident.id === ref || s.ident.callSign?.toLowerCase() === r || s.ident.handle === r);
+  return (
+    STATIONS.find((s) => s.ident.id === ref) ??
+    STATIONS.find((s) => s.ident.slug === r) ??
+    STATIONS.find((s) => s.ident.callSign?.toLowerCase() === r || s.ident.handle === r)
+  );
 }
 
 export function inMarket(slug: string, band?: "tv" | "radio"): MockStation[] {

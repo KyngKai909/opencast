@@ -26,6 +26,7 @@ import os from "node:os";
 import path from "node:path";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import { callSignLabel } from "@opencast/domain";
 import type { PlatformsSeam, RelayDestination, RelayHealth, RelayMode } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { LIVEPEER_API_BASE, LIVEPEER_API_KEY, LIVEPEER_RTMP_INGEST_BASE } from "../../../config.js";
@@ -334,7 +335,8 @@ export function createRelayRunner(ctx: ModuleContext, options: RelayRunnerOption
     }
     if (current) await stopSender(stationId);
     const output = makeOutput(outs);
-    const r: Running = { stationId, callSign: l.callSign, mode: settings.relayMode, signature, output, dests, startedAt: Date.now(), sender: null as unknown as SenderLike };
+    // A229: named with its channel when its call sign is shared ("BEAT 12.2's relays stopped").
+    const r: Running = { stationId, callSign: l.callSign ? callSignLabel(l) : null, mode: settings.relayMode, signature, output, dests, startedAt: Date.now(), sender: null as unknown as SenderLike };
     r.sender = makeSender({ stationId, settings, output, look: l, onPaidPromotion: () => paidQueue.add(stationId), platforms: () => r.dests.length });
     r.sender.start();
     running.set(stationId, r);

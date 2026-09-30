@@ -41,7 +41,7 @@ export default function LiveSources() {
   const sources = useLiveSources();
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [adding, setAdding] = useState(false);
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   const refresh = () => qc.invalidateQueries({ queryKey: ["GET", stationsApi.listLiveSources.path] });
 
   const blocks = useMemo(() => {
@@ -302,7 +302,7 @@ function AddSource({ open, hasBrowser, onClose, onAdded }: { open: boolean; hasB
         onChange={setKind}
         options={[
           { value: "encoder", title: "Encoder", helper: "For OBS, vMix or a hardware encoder. Its streaming key is shown once." },
-          { value: "browser", title: "Browser", helper: hasBrowser ? `${s.station.callSign ?? s.station.name} has one. It works from any computer or phone.` : "Go live from this computer's camera and microphone, or a phone's. Nothing to install.", disabled: hasBrowser }
+          { value: "browser", title: "Browser", helper: hasBrowser ? `${s.label} has one. It works from any computer or phone.` : "Go live from this computer's camera and microphone, or a phone's. Nothing to install.", disabled: hasBrowser }
         ]}
       />
       {kind === "encoder" && <Field label="Name" className="cc-add-src__name" value={name} maxLength={80} placeholder="Studio B" onChange={(e) => setName(e.target.value)} />}

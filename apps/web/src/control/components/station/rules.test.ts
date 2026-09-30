@@ -71,7 +71,10 @@ describe("the station switcher (station-settings 04.1, 05.2)", () => {
 
   it("says your role and whether it's on air, and marks where you are", () => {
     const r = switchRow(beat, { stationId: BEAT.id, onAir: true, deadAirAt: null }, BEAT.id, NOW, false);
-    expect(r).toMatchObject({ href: "/control/beat/monitor", channel: "12.1", name: "BEAT", line: "Owner. On air", attention: null, current: true });
+    // A229: BEAT shares its call sign with 12.2 in the mock, so its row names it too.
+    expect(r).toMatchObject({ href: "/control/beat/monitor", channel: "12.1", name: "BEAT", line: "Inland Beat. Owner. On air", attention: null, current: true });
+    const alone = switchRow({ ...beat, station: { ...BEAT, sharesCallSign: undefined } }, { stationId: BEAT.id, onAir: true, deadAirAt: null }, BEAT.id, NOW, false);
+    expect(alone.line).toBe("Owner. On air");
   });
   it("flags dead air coming beside the row on the web, and in the line on the phone", () => {
     const status = { stationId: HALL.id, onAir: true, deadAirAt: deadAir };
@@ -83,7 +86,7 @@ describe("the station switcher (station-settings 04.1, 05.2)", () => {
     expect(r).toMatchObject({ href: "/control/inland-sound-lab/programs", channel: null, name: "Inland Sound Lab", line: "Owner. Studio" });
   });
   it("leaves the air state out until it's known", () => {
-    expect(switchRow(beat, undefined, BEAT.id, NOW, false).line).toBe("Owner");
+    expect(switchRow(beat, undefined, BEAT.id, NOW, false).line).toBe("Inland Beat. Owner");
   });
 });
 

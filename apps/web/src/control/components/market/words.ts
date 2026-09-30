@@ -5,6 +5,7 @@
 import type { CarriageTerm, CashPlusBarter, Offer, Slot, StationIdent } from "@opencast/contracts";
 import { duration, money } from "@opencast/ui";
 import type { ProgramFormat } from "../../api/types";
+import { stationLabel } from "../../station/slug";
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -84,7 +85,7 @@ export function whoFills(offer: Pick<Offer, "maker" | "makerKind">, viewerId: st
   if (viewerId && offer.maker.id === viewerId) return "You";
   if (offer.makerKind === "studio") return "The studio";
   if (offer.makerKind === "catalog") return "Opencast";
-  return offer.maker.callSign ?? offer.maker.name;
+  return stationLabel(offer.maker);
 }
 
 function fills(who: string): string {
@@ -198,7 +199,7 @@ export function noticeText(days: number, either = false): string {
 export function approvalText(offer: Pick<Offer, "approval" | "maker">, viewerId: string | null, style: "carrier" | "maker-list" = "carrier"): string {
   if (offer.approval === "any_station") return "Any station";
   if (style === "maker-list" && viewerId === offer.maker.id) return "You approve each";
-  return `Approved by ${offer.maker.callSign ?? offer.maker.name}`;
+  return `Approved by ${stationLabel(offer.maker)}`;
 }
 
 // ---- when a carrier airs it ----
@@ -238,7 +239,7 @@ export function slotText(slots: readonly Slot[], style: "at" | "comma" = "at"): 
 
 /** A station's name in a list: "BEAT 12.1", "HALL, Study Hall" (`named`), "DUST 96.2, High Desert". */
 export function stationWords(s: StationIdent, style: "channel" | "named" = "channel"): string {
-  if (style === "named") return `${s.callSign ?? s.name}, ${s.name}`;
+  if (style === "named") return `${stationLabel(s)}, ${s.name}`;
   return s.callSign ? `${s.callSign}${s.channel ? ` ${s.channel}` : ""}` : s.name;
 }
 

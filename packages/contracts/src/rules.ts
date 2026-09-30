@@ -230,6 +230,15 @@ export const RULES = {
     display: (v) => `TV ${v.tv.firstMajor} to ${v.tv.lastMajor}, radio ${(v.radio.firstTenths / 10).toFixed(1)} to ${(v.radio.lastTenths / 10).toFixed(1)}`,
     scoped: true
   }),
+  // Shared call signs (added 2026-09-30, A230, Open for review). No first version: the fallback holds until one is set.
+  "numbering.own_subchannels": def({
+    group: "numbering",
+    title: "Owners' own subchannels",
+    detail: "An owner can put another of their stations on a subchannel beside their own X.1 (12.2 beside 12.1), and it can share X.1's call sign. Off: a station gets X.1 only, and subchannels are for 24/7 carriage and external stations. Stations already on one keep it",
+    schema: z.object({ allowed: z.boolean() }),
+    fallback: { allowed: true },
+    display: (v) => (v.allowed ? "Allowed" : "Not allowed")
+  }),
   "escrow.signers": def({
     group: "escrow",
     title: "Escrow signers",

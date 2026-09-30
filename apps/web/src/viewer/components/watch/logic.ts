@@ -5,27 +5,44 @@
 import { neighbour, type Command } from "@opencast/player";
 import type { AiringX, DialRowX, StationPageX } from "../../api/ext";
 
-type Ident = { id: string; callSign: string | null; handle: string | null; name?: string; channel: string | null };
+type Ident = { id: string; callSign: string | null; handle: string | null; name?: string; channel: string | null; slug?: string; sharesCallSign?: boolean };
 
-/** The URL part for a station: its call sign in lower case ("beat"), or its handle. */
-export function stationSlug(s: Pick<Ident, "id" | "callSign" | "handle">): string {
-  return (s.callSign ?? s.handle ?? s.id).toLowerCase();
+/**
+ * The URL part for a station: the API's `slug` (A229: "rivc-15-2" for a station sharing X.1's
+ * call sign), else its call sign in lower case ("beat"), or its handle.
+ */
+export function stationSlug(s: Pick<Ident, "id" | "callSign" | "handle"> & { slug?: string }): string {
+  return (s.slug ?? s.callSign ?? s.handle ?? s.id).toLowerCase();
 }
 
-/** What a station is called in a URL param and on a button: its call sign, or its handle. */
+/** What a station is called on a button: its call sign, or its handle. (A URL param takes `stationSlug`.) */
 export function callSignOf(s: Pick<Ident, "id" | "callSign" | "handle">): string {
   return s.callSign ?? s.handle ?? s.id;
+}
+
+/** Its call sign where only a call sign fits, with the channel when the call sign is shared ("RIVC 15.2"). */
+export function callSignLabelOf(s: Pick<Ident, "id" | "callSign" | "handle" | "channel"> & { sharesCallSign?: boolean }): string {
+  const cs = callSignOf(s);
+  return s.sharesCallSign && s.callSign && s.channel ? `${cs} ${s.channel}` : cs;
 }
 
 export function identText(s: Pick<Ident, "callSign" | "channel">): string {
   return [s.callSign, s.channel].filter(Boolean).join(" ");
 }
 
-/** The dial row a `/watch/:stationRef` means: by id, call sign or handle. */
+/**
+ * The dial row a `/watch/:stationRef` means: by id, by its address ("rivc-15-2"), then by call sign
+ * (a shared one means X.1, whose address it is) or handle, so every older link still finds it.
+ */
 export function resolveStation(channels: DialRowX[], ref: string | undefined): DialRowX | null {
   if (!ref) return null;
   const r = ref.toLowerCase();
-  return channels.find((c) => c.station.id === ref || c.station.callSign?.toLowerCase() === r || c.station.handle?.toLowerCase() === r) ?? null;
+  return (
+    channels.find((c) => c.station.id === ref) ??
+    channels.find((c) => stationSlug(c.station) === r) ??
+    channels.find((c) => c.station.callSign?.toLowerCase() === r || c.station.handle?.toLowerCase() === r) ??
+    null
+  );
 }
 
 /**

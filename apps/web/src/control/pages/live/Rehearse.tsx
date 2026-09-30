@@ -19,7 +19,7 @@ export default function Rehearse() {
   if (sources.isLoading) return <Quiet />;
   const source = sources.data?.find((x) => x.id === sourceId);
   if (!source) return <NotFound />;
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   return (
     <>
       {!phone && (

@@ -3,7 +3,8 @@
 
 import { Navigate } from "react-router";
 import { Button } from "@opencast/ui";
-import { stationSlug, useMe, useMyStations } from "../station/StationContext";
+import { useMe, useMyStations } from "../station/StationContext";
+import { stationPath } from "../station/slug";
 import { Quiet } from "./common";
 import { controlPath } from "../../areas";
 
@@ -14,7 +15,7 @@ export default function Home() {
   if (me.isError) return <main className="cc-center"><p className="cc-center__p">{me.error.message}</p></main>;
   const first = mine[0];
   if (first) {
-    const base = controlPath(`/${stationSlug(first.station)}`);
+    const base = stationPath(first.station);
     const page = first.station.kind === "studio" ? "programs" : first.role === "host" ? "live" : "monitor";
     return <Navigate to={`${base}/${page}`} replace />;
   }

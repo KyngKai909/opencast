@@ -4,7 +4,7 @@
 // swipe order until it's back, as the API's minute checks do. Kept in localStorage, so a reload
 // keeps it; the dial reads it on each request. A215: the Network desk's mock says which it has taken
 // off the dial for good, or has waiting for evidence after a change ("oc-mock-external-off", by
-// call sign): those are off the dial too, and a station taken off for good has no page.
+// address: "colt", "rivc-15-2"): those are off the dial too, and a station taken off for good has no page.
 
 import { now } from "../../lib/clock";
 import { stationById, stationByRef } from "./fixtures/stations";
@@ -85,10 +85,15 @@ const OFF_KEY = "oc-mock-external-off";
 
 /** A215: off the dial by the desk's hand: taken off for good ("removed"), or waiting for evidence after a change. */
 export function externalOff(stationId: string): "removed" | "waiting" | null {
-  const cs = stationByRef(stationId)?.ident.callSign;
-  if (!cs) return null;
+  const ident = stationByRef(stationId)?.ident;
+  const cs = ident?.callSign;
+  if (!ident || !cs) return null;
   try {
-    return (JSON.parse(localStorage.getItem(OFF_KEY) ?? "{}") as Record<string, "removed" | "waiting">)[cs] ?? null;
+    const off = JSON.parse(localStorage.getItem(OFF_KEY) ?? "{}") as Record<string, "removed" | "waiting">;
+    // By address (A229: "rivc-15-2" for a station sharing X.1's call sign); a call sign alone (as
+    // written before) is the station that doesn't share it.
+    const slug = ident.slug ?? cs.toLowerCase();
+    return off[slug] ?? (slug === cs.toLowerCase() ? off[cs] : undefined) ?? null;
   } catch {
     return null;
   }

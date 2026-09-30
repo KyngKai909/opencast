@@ -21,6 +21,7 @@ import { STATION_TZ } from "../../../lib/clock";
 import { useStation, type StationState } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Offer.css";
+import { stationLabel } from "../../station/slug";
 
 export default function Offer() {
   const s = useStation();
@@ -63,7 +64,7 @@ function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX;
   const deals = dealLines(o, "short");
   const fit = o.fit ?? [];
   const rows = carrierRows(o.carriedBy, s.station, (iso) => monthName(iso));
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   return (
     <div className="cc-mk-offer">
       <div className="cc-mk-offer__head">
@@ -80,7 +81,7 @@ function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX;
           <div className="cc-mk-offer__meta">
             <span>{formatLine(o.program)}</span>
             {o.program.category && <span>{o.program.category}</span>}
-            {o.makerKind !== "catalog" && <span>Made by {o.maker.callSign ?? o.maker.name}</span>}
+            {o.makerKind !== "catalog" && <span>Made by {stationLabel(o.maker)}</span>}
             <span>
               Carried by {o.carriers} {o.carriers === 1 ? "station" : "stations"}
             </span>
@@ -115,7 +116,7 @@ function ProgramPage({ offer: o, carrying, initialTerm }: { offer: OfferDetailX;
                 <TitleCard colour={o.program.colour ?? o.maker.colour ?? "#26345A"} title={e.episodeNumber != null ? `Ep. ${e.episodeNumber}` : o.program.title} decorative className="cc-mk-ep__tc" />
                 <div className="cc-mk-ep__words">
                   <b>{e.title}</b>
-                  {e.firstAiredAt && <small>{firstAired(e.firstAiredAt, e.firstAiredOn?.callSign ?? null, e === o.episodes[0])}</small>}
+                  {e.firstAiredAt && <small>{firstAired(e.firstAiredAt, e.firstAiredOn?.callSign ? stationLabel(e.firstAiredOn) : null, e === o.episodes[0])}</small>}
                 </div>
                 <span className="cc-mk-ep__d">{e.durationMs != null ? duration(e.durationMs) : ""}</span>
                 <Button size="sm" icon="play" href={`${s.base}/market/offers/${o.id}/preview/${e.id}`} aria-label={`Preview ${e.title}`}>
@@ -196,7 +197,7 @@ function MainAction({ offer: o, carrying, term, inModal }: { offer: OfferDetailX
   if (s.studio || !s.can("programming")) return null;
   if (o.status === "withdrawn") return <p className="cc-mk-offer__note">No longer offered to new carriers.</p>;
   if (s.station.band === "radio" && !o.radioBandAllowed && !(o.program.format?.bands ?? []).includes("radio"))
-    return <p className="cc-mk-offer__note">{o.maker.callSign ?? o.maker.name} doesn't offer it to radio band stations.</p>;
+    return <p className="cc-mk-offer__note">{stationLabel(o.maker)} doesn't offer it to radio band stations.</p>;
   const gap = exactGap(o);
   if (gap?.startsAt && (carrying || o.approval === "any_station")) {
     const t = carrying?.term ?? term;

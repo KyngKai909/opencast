@@ -281,6 +281,13 @@
       "when": 1790805659590,
       "tag": "0041_dash_stream_links_played",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790809316189,
+      "tag": "0042_shared_call_signs",
+      "breakpoints": true
     }
   ]
 }

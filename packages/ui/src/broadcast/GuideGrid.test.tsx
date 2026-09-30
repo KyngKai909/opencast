@@ -74,3 +74,16 @@ describe("external stations (follow-up Phase 6)", () => {
     expect(tags[0].closest(".oc-guide__row")?.getAttribute("aria-label")).toBe("RDLS 9.1");
   });
 });
+
+// A229: a call sign shared on one channel's subchannels: each row names its own stream.
+describe("a shared call sign", () => {
+  it("shows each stream's name under its call sign and channel", () => {
+    const rows: GuideStation[] = [
+      { id: "r1", channel: "15.1", callSign: "RIVC", name: "Riverside County, Board of Supervisors", external: true, programs: [] },
+      { id: "r2", channel: "15.2", callSign: "RIVC", name: "Riverside County, Public Works", external: true, programs: [] }
+    ];
+    const { getByRole, getByText } = render(<GuideGrid rows={rows} from={at(20)} to={at(22)} now={at(20, 42)} timeZone={TZ} />);
+    expect(getByRole("group", { name: "RIVC 15.2, Riverside County, Public Works" })).toBeTruthy();
+    expect(getByText("Riverside County, Board of Supervisors")).toBeTruthy();
+  });
+});

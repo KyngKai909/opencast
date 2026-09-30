@@ -5,7 +5,7 @@ import { accountsApi, libraryApi, stationsApi } from "@opencast/contracts";
 import { ProgramPageX, StationPageFull, type EpisodeX, type WhereToWatch } from "../../api/ext/station";
 import { now } from "../../../lib/clock";
 import { type MockAiring } from "../fixtures/schedule";
-import { PROGRAM_EXTRA, STATION_EXTRA, atDay, outsideIdent, programById, programByKey, registerReminded, weekAirings } from "../fixtures/station";
+import { PROGRAM_EXTRA, STATION_EXTRA, atDay, extraOf, outsideIdent, programById, programByKey, registerReminded, weekAirings } from "../fixtures/station";
 import { STATIONS, inMarket, playbackFor, stationById, stationByRef } from "../fixtures/stations";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { fail, path, reply } from "../respond";
@@ -24,7 +24,7 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   const iso = t.toISOString();
   const mine = weekAirings().filter((a) => a.stationId === s.ident.id);
   const nn = nowNextIn(mine, iso);
-  const x = STATION_EXTRA[s.ident.callSign ?? ""] ?? {};
+  const x = extraOf(s.ident) ?? {};
   const listed = s.ident.kind === "listed";
   const down = hiddenExternal(s.ident.id, t);
   // A215: waiting for evidence after a change on the desk: off the dial, not down.
@@ -33,7 +33,7 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   const hi = to ?? new Date(t.getTime() + 24 * 3600e3).toISOString();
   const programs = [...new Set(mine.map((a) => a.programId).filter(Boolean))]
     .map((id) => programById(id!))
-    .filter((p): p is NonNullable<typeof p> => !!p && p.maker === s.ident.callSign)
+    .filter((p): p is NonNullable<typeof p> => !!p && stationByRef(p.maker)?.ident.id === s.ident.id)
     .map((p) => ({ id: p.id, title: p.title, description: p.description, live: !!p.live }));
   const members = listed ? undefined : s.members;
   return {

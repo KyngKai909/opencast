@@ -28,7 +28,7 @@ export default function SignOff() {
       },
       { replace: true }
     );
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const allowed = s.can("manage");
 
   const go = () =>

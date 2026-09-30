@@ -55,7 +55,7 @@ export default function Audience() {
   const raw = params.get("period");
   const period: AudiencePeriod = isAudiencePeriod(raw) ? raw : "tonight";
   const radio = s.station.band === "radio";
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   useShellOptions({ context: "Audience" });
 
   // The window moves with the clock a minute at a time; the query key with it.

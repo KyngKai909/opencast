@@ -14,7 +14,8 @@ describe("the rocker's neighbours", () => {
     const civc = rockerNeighbours(DIAL, id("CIVC"));
     expect([identText(civc.up), identText(civc.down)]).toEqual(["9.1 RDLS", "31.1 PREP"]);
     const beat = rockerNeighbours(DIAL, id("BEAT"));
-    expect([identText(beat.up), identText(beat.down)]).toEqual(["18.1 SAZN", "9.7 LOMA"]);
+    // A229: BEAT 12.2 (Beat Tapes, sharing BEAT's call sign) is next up the dial.
+    expect([identText(beat.up), identText(beat.down)]).toEqual(["12.2 BEAT", "9.7 LOMA"]);
     // Casting to a Chromecast, whose up and down skip DASH stream links (A201).
     expect(identText(rockerNeighbours(DIAL, id("BEAT"), { skipDash: true }).down)).toBe("9.2 COLT");
   });
@@ -45,7 +46,7 @@ describe("the keypad", () => {
   it("says a number with no station, and names the nearest two", () => {
     const e = keypadEntry(type([1, 3]), DIAL);
     expect(keypadChannel(e)).toBeNull();
-    expect(keypadLine(e, null)).toEqual({ lead: "No station on 13", rest: ". Nearest: 9.7 LOMA, 12.1 BEAT" });
+    expect(keypadLine(e, null)).toEqual({ lead: "No station on 13", rest: ". Nearest: 12.1 BEAT, 12.2 BEAT" });
     // One digit is still being typed: nothing to say yet.
     expect(keypadLine(keypadEntry("5", DIAL), null)).toBeNull();
   });

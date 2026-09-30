@@ -31,7 +31,7 @@ export default function Library() {
     { refetchInterval: (q) => (q.state.data?.items.some((i) => i.status === "preparing") ? 2000 : false) }
   );
   if (lib.isLoading) return <Quiet />;
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   if (lib.isError || !lib.data) {
     return (
       <div className="cc-lib-main">

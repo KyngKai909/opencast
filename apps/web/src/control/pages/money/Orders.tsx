@@ -48,7 +48,7 @@ function OrderList({ base }: { base: string }) {
   if (orders.isLoading) return <Quiet />;
   if (orders.error) return <ErrorLine>{errorText(orders.error)}</ErrorLine>;
   const rows = orders.data ?? [];
-  if (!rows.length) return <p className="cc-ord__empty">No orders yet. When a business asks {s.station.callSign ?? s.station.name} to make a spot, it's here.</p>;
+  if (!rows.length) return <p className="cc-ord__empty">No orders yet. When a business asks {s.label} to make a spot, it's here.</p>;
   const columns: Column<ProductionOrder>[] = [
     { key: "order", header: "Order", cell: (o) => <Lines title={o.title} detail={`${spotLength(o.lengthSec)}, asked ${asked(o)}`} /> },
     { key: "business", header: "Business", width: "minmax(0, 220px)", cell: (o) => o.business.name },

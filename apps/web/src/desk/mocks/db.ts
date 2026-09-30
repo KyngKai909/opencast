@@ -46,7 +46,7 @@ export interface Db {
   seq: number;
 }
 
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 export const DB_KEY = "oc-mock-desk-db";
 
 export function seed(): Db {
@@ -57,7 +57,7 @@ export function seed(): Db {
   return {
     version: DB_VERSION,
     markets: MARKETS,
-    stations: seedStations(),
+    stations: withFamilies(seedStations()),
     reservations: seedReservations(),
     creators: seedCreators(),
     works,
@@ -153,6 +153,30 @@ export function marketById(id: string): Market | undefined {
 
 export function marketBySlug(slug: string): Market | undefined {
   return getDb().markets.find((m) => m.slug === slug);
+}
+
+/**
+ * A229: each station's address and whether its call sign is shared, as the API gives them: a
+ * station sharing X.1's call sign has its channel in its address ("rivc-15-2") and no handle; X.1
+ * shares while a station on the list shares with it.
+ */
+export function withFamilies(stations: DbStation[]): DbStation[] {
+  for (const s of stations) {
+    const cs = s.ident.callSign;
+    const member = !!s.sharesCallSignWith;
+    const head = stations.some((m) => m.sharesCallSignWith === s.ident.id && m.public);
+    const slug = member && cs && s.ident.channel ? `${cs.toLowerCase()}-${s.ident.channel.replace(".", "-")}` : (cs ?? s.ident.handle ?? s.ident.id).toLowerCase();
+    const { sharesCallSign: _was, ...rest } = s.ident;
+    s.ident = { ...rest, handle: member ? null : (cs?.toLowerCase() ?? rest.handle), slug, ...(member || head ? { sharesCallSign: true } : {}) };
+  }
+  return stations;
+}
+
+/** A station by id, address ("rivc-15-2") or call sign (a shared one is X.1's). */
+export function stationByRef(ref: string): DbStation | undefined {
+  const d = getDb();
+  const r = ref.trim().toLowerCase();
+  return d.stations.find((s) => s.ident.id === ref) ?? d.stations.find((s) => s.ident.slug === r) ?? d.stations.find((s) => s.ident.callSign?.toLowerCase() === r && !s.sharesCallSignWith);
 }
 
 export function stationById(id: string | null | undefined): DbStation | undefined {

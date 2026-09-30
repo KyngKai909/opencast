@@ -125,7 +125,7 @@ export function OfferForm({ programId, offer }: { programId: string; offer: Offe
 
   if (!offer && library.isLoading) return <Quiet />;
   if (!program) return <Quietly role="alert">{library.error?.message ?? "That program wasn't found."}</Quietly>;
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const editing = !!offer && offer.status === "offered";
   if (phone)
     return (

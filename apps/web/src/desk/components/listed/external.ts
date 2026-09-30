@@ -27,6 +27,63 @@ export function needsEvidence(s: ListedSource): boolean {
 /** Off the dial for something other than its stream being down. */
 export const waitingOffDial = (s: ListedSource) => !!s.waiting && s.waiting !== "down";
 
+// ---- A229: one brand's streams sharing a call sign on one channel's subchannels ----
+
+type Ident = { channel: string | null; callSign: string | null; name?: string };
+const idText = (i: Ident) => [i.channel, i.callSign].filter(Boolean).join(" ");
+
+/** "15.2 RIVC", "15.2 RIVC and 15.3 RIVC", "15.2 RIVC, 15.3 RIVC and 15.4 RIVC". */
+export function andList(items: string[]): string {
+  return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** The family line: "Same brand as 15.1 RIVC" on a member; "Its call sign is shared by 15.2 and 15.3" on X.1. */
+export function familyLine(s: ListedSource): string | null {
+  const f = s.family;
+  if (!f) return null;
+  if (f.role === "member") return `Same brand as ${idText(f.head)}`;
+  return f.members.length ? `Its call sign is shared by ${andList(f.members.map((m) => m.channel ?? m.name))}` : null;
+}
+
+/**
+ * The external station on X.1 a new listing on `channel` could share a call sign with: X.n (n ≥ 2)
+ * beside an external station on the list at X.1 of the same major (the API's rule, A229).
+ */
+export function familyHeadFor(listings: readonly ListedSource[], band: "tv" | "radio", channel: string): ListedSource | null {
+  const m = /^(\d{1,3})\.(\d)$/.exec(channel.trim());
+  if (band !== "tv" || !m || m[2] === "1" || m[2] === "0") return null;
+  return listings.find((l) => l.listingState === "listed" && l.station.band === "tv" && l.station.channel === `${Number(m[1])}.1` && l.family?.role !== "member") ?? null;
+}
+
+/** The "Same brand" checkbox's words: "Same brand as 15.1 RIVC (share its call sign)". */
+export function sameBrandLabel(head: ListedSource): string {
+  return `Same brand as ${idText(head.station)} (share its call sign)`;
+}
+
+/**
+ * Changing X.1's call sign changes its family's (A229): the confirmation names them. Null when it
+ * has no family or the call sign isn't changing.
+ */
+export function familyCallSignChange(s: ListedSource, next: string): { text: string; button: string } | null {
+  const f = s.family;
+  if (!f || f.role !== "head" || !f.members.length || !next || next === s.station.callSign) return null;
+  const all = [s.station, ...f.members];
+  const n = all.length;
+  const all3 = n === 2 ? "both" : `all ${n}`;
+  return {
+    text: `This changes the call sign of ${all3} streams: ${andList(all.map(idText))} become ${next}. ${s.station.callSign} is held a year for them, so their old addresses still work and nobody else takes it.`,
+    button: `Change ${all3} to ${next}`
+  };
+}
+
+/** Taking X.1 off the dial for good takes its family (A231): the confirmation names them. */
+export function familyRemoval(s: ListedSource): { members: string[]; text: string } | null {
+  const f = s.family;
+  if (!f || f.role !== "head" || !f.members.length) return null;
+  const names = f.members.map((m) => `${idText(m)}, ${m.name}`);
+  return { members: names, text: `${andList(f.members.map(idText))} ${f.members.length === 1 ? "shares" : "share"} its call sign and ${f.members.length === 1 ? "goes" : "go"} off the dial with it. Put back on the list, they come back together.` };
+}
+
 /** The Source column's second line. A lead-born listing says where it was found. */
 export function sourceDetail(s: ListedSource): string | null {
   if (!s.creatorId) return s.description;

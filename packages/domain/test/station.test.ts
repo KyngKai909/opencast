@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  callSignLabel,
+  canShareCallSignOn,
   contrastOnWhite,
+  familyHeadTenths,
+  parseStationSlug,
+  stationSlugOf,
   formatChannelNumber,
   isSubchannel,
   isValidCallSign,
@@ -120,5 +125,32 @@ describe("credit text", () => {
       ["price_or_offer", "off"]
     ]);
     expect(result.flags.every((f) => f.suggestion.length > 0)).toBe(true);
+  });
+});
+
+describe("shared call signs (A229)", () => {
+  it("lets X.n share X.1's call sign in the same major, on TV only", () => {
+    expect(familyHeadTenths(153)).toBe(151);
+    expect(canShareCallSignOn({ band: "tv", tenths: 152 }, { band: "tv", tenths: 151 })).toBe(true);
+    expect(canShareCallSignOn({ band: "tv", tenths: 151 }, { band: "tv", tenths: 151 })).toBe(false);
+    expect(canShareCallSignOn({ band: "tv", tenths: 162 }, { band: "tv", tenths: 151 })).toBe(false);
+    expect(canShareCallSignOn({ band: "radio", tenths: 884 }, { band: "radio", tenths: 882 })).toBe(false);
+  });
+
+  it("gives a family member an address with its channel, and reads it back", () => {
+    expect(stationSlugOf({ id: "x", callSign: "SBCO", channel: "15.1" })).toBe("sbco");
+    expect(stationSlugOf({ id: "x", callSign: "SBCO", channel: "15.2", familyMember: true })).toBe("sbco-15-2");
+    expect(stationSlugOf({ id: "x", callSign: null, handle: "bench" })).toBe("bench");
+    expect(parseStationSlug("sbco-15-2")).toEqual({ callSign: "SBCO", tenths: 152 });
+    expect(parseStationSlug("SBCO")).toEqual({ callSign: "SBCO", tenths: null });
+    expect(parseStationSlug("beat-12-1")).toEqual({ callSign: "BEAT", tenths: 121 });
+    expect(parseStationSlug("sbco-15-0")).toBeNull();
+    expect(parseStationSlug("00000000-0000-4000-8000-000000000001")).toBeNull();
+  });
+
+  it("adds the channel where only a call sign would show, for a shared one", () => {
+    expect(callSignLabel({ callSign: "SBCO", channel: "15.2", sharesCallSign: true })).toBe("SBCO 15.2");
+    expect(callSignLabel({ callSign: "BEAT", channel: "12.1" })).toBe("BEAT");
+    expect(callSignLabel({ callSign: null, name: "Bench" })).toBe("Bench");
   });
 });

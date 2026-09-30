@@ -13,6 +13,8 @@ import { ApiError, call } from "../../../api/client";
 import { useAuth } from "../../../auth/AuthProvider";
 import { controlPath } from "../../../areas";
 import { NotFound, Quiet } from "../common";
+import { useMyStations, type StationMembership } from "../../station/StationContext";
+import { stationPath } from "../../station/slug";
 import SignIn from "../SignIn";
 import "./AcceptInvite.css";
 
@@ -23,8 +25,16 @@ const ROLE: Record<InvitePreview["role"], { a: string; does: string }> = {
   viewer: { a: "a viewer", does: "Viewers see results and statements, but can't spend or change anything." }
 };
 
-/** Master control's address for the station: its call sign, else the list of your stations. */
-const stationHome = (team: InvitePreview["team"]) => (team.callSign ? controlPath(`/${team.callSign.toLowerCase()}`) : controlPath());
+/**
+ * Master control's address for the station: its slug once it's among your stations ("beat", a
+ * station sharing a call sign "beat-12-2"), else its id (the call sign alone would name 12.1),
+ * else the list of your stations.
+ */
+function stationHome(team: InvitePreview["team"], mine: StationMembership[]): string {
+  const m = mine.find((x) => x.station.id === team.id);
+  if (m) return stationPath(m.station);
+  return team.callSign ? controlPath(`/${team.id}`) : controlPath();
+}
 
 export default function AcceptInvite() {
   const { inviteId = "" } = useParams();
@@ -34,6 +44,7 @@ export default function AcceptInvite() {
   const [joined, setJoined] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const tried = useRef(false);
+  const mine = useMyStations();
   // Read again whenever who's signed in changes: the match is theirs.
   const who = auth.signedIn ? (auth.email ?? "signed-in") : "signed-out";
   const invite = useQuery({ queryKey: ["invite", inviteId, who], queryFn: () => call(accountsApi.getInvite, { params: { inviteId } }), retry: false });
@@ -75,7 +86,7 @@ export default function AcceptInvite() {
     );
   }
   if (p.team.kind !== "station") return <NotFound />;
-  if (joined || (p.state === "accepted" && p.acceptedByYou)) return <Navigate to={stationHome(p.team)} replace />;
+  if (joined || (p.state === "accepted" && p.acceptedByYou)) return <Navigate to={stationHome(p.team, mine)} replace />;
 
   const role = ROLE[p.role];
   const station = p.team.callSign ? `${p.team.callSign}, ${p.team.name}` : p.team.name;

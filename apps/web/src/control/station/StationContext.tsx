@@ -1,6 +1,7 @@
 // The station on screen: `/control/:callSign/...` (or a studio's `/control/:handle/...`) resolved against the
 // signed-in person's memberships, with their role. The API is scoped by station id; the routes
-// by call sign, so every page reads `useStation().id` for its calls.
+// by the station's slug (its call sign, "beat", or a family member's "beat-12-2": station/slug.ts),
+// so every page reads `useStation().id` for its calls.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { useParams } from "react-router";
@@ -8,7 +9,7 @@ import { accountsApi, type Membership, type StationIdent } from "@opencast/contr
 import { useApi } from "../../api/hooks";
 import { useAuth } from "../../auth/AuthProvider";
 import { can, type Ability, type Role } from "./abilities";
-import { controlPath } from "../../areas";
+import { controlSlug, findByStationRef, stationLabel, stationPath } from "./slug";
 
 export function useMe() {
   const auth = useAuth();
@@ -27,10 +28,8 @@ export function useMyStations(): StationMembership[] {
   }, [me.data]);
 }
 
-/** The route's segment for a station: its call sign, or a studio's handle. */
-export function stationSlug(s: Pick<StationIdent, "callSign" | "handle" | "id">): string {
-  return (s.callSign ?? s.handle ?? s.id).toLowerCase();
-}
+/** The route's segment for a station: its slug ("beat", a family member's "beat-12-2"), or a studio's handle. */
+export const stationSlug = controlSlug;
 
 export interface StationState {
   station: StationIdent;
@@ -38,8 +37,10 @@ export interface StationState {
   role: Role;
   /** A studio: a station with no channel (the studio shell, no on-air pages). */
   studio: boolean;
-  /** "/control/beat": prefix for this station's routes. */
+  /** "/control/beat" (a family member's "/control/beat-12-2"): prefix for this station's routes. */
   base: string;
+  /** How the station is named where only its call sign would show: "BEAT", a family member's "BEAT 12.2", a studio's name. */
+  label: string;
   can(ability: Ability): boolean;
 }
 
@@ -50,7 +51,7 @@ export function useResolvedStation(): { state: StationState | null; loading: boo
   const { callSign = "" } = useParams();
   const me = useMe();
   const mine = useMyStations();
-  const m = mine.find((x) => stationSlug(x.station) === callSign.toLowerCase());
+  const m = findByStationRef(mine, callSign, (x) => x.station);
   const state = useMemo<StationState | null>(
     () =>
       m
@@ -59,7 +60,8 @@ export function useResolvedStation(): { state: StationState | null; loading: boo
             id: m.station.id,
             role: m.role,
             studio: m.station.kind === "studio",
-            base: controlPath(`/${stationSlug(m.station)}`),
+            base: stationPath(m.station),
+            label: stationLabel(m.station),
             can: (a: Ability) => can(m.role, a)
           }
         : null,

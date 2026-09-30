@@ -179,6 +179,7 @@ export default function Listed() {
       {dialog?.kind === "change" && dialogFor && (
         <ListSource
           market={market}
+          listings={rows}
           editing={dialogFor}
           onClose={closeDialog}
           // Saved and now waiting for its evidence: straight on to recording it.
@@ -199,6 +200,7 @@ export default function Listed() {
       {dialog?.kind === "restore" && dialogFor && (
         <RestoreListing
           source={dialogFor}
+          removed={gone}
           timeZone={tz}
           onClose={closeDialog}
           onRestored={() => {
@@ -210,6 +212,7 @@ export default function Listed() {
       {adding && (
         <ListSource
           market={market}
+          listings={rows}
           onClose={closeAdd}
           prefill={lead?.lead ? { name: lead.displayName, description: lead.description ?? undefined, streamUrl: lead.lead.streamUrl, plays: "stream_link", creatorId: lead.id } : undefined}
         />

@@ -12,6 +12,7 @@ import { useMe, type StationState } from "../../../station/StationContext";
 import { ColourPicker } from "../ColourPicker";
 import { longDate, marketName } from "../format";
 import { Quiet } from "../../../pages/common";
+import { familyLine } from "../../onair/family";
 import "./common.css";
 import "./IdentitySection.css";
 
@@ -64,12 +65,14 @@ export function IdentitySection({ s }: { s: StationState }) {
   };
   const errorFor = (f: string) => (error?.field === f ? error.message : undefined);
 
+  // A call sign shared on one channel's subchannels (A229): who shares it.
+  const family = familyLine(d);
   const fixedLine = d.fixed && d.firstSignedOnAt ? `Fixed since first sign-on, ${longDate(d.firstSignedOnAt, STATION_TZ)}` : "Set until the first sign-on, then fixed";
 
   return (
     <div className="cc-identity">
       <div className="cc-identity__main">
-        {!canEdit && <p className="cc-identity__note">Only the owner can change {cs}'s identity.</p>}
+        {!canEdit && <p className="cc-identity__note">Only the owner can change {s.label}'s identity.</p>}
         <div className="cc-sec-top">
           <h4 className="cc-sec-top__h">On the dial</h4>
           <span className="cc-sec-top__sub">{fixedLine}</span>
@@ -80,7 +83,7 @@ export function IdentitySection({ s }: { s: StationState }) {
             <dd className="cc-lockrow__v oc-cs">{st.callSign ?? "Not chosen yet"}</dd>
             <dd className="cc-lockrow__why">
               <Icon name="lock" size={13} />
-              Viewers and presets use it
+              {family ? `${family}. The channel tells them apart` : "Viewers and presets use it"}
             </dd>
           </div>
           <div className="cc-lockrow">

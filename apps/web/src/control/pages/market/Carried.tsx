@@ -12,6 +12,7 @@ import { useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Market.css";
+import { stationLabel } from "../../station/slug";
 
 export default function Carried() {
   const s = useStation();
@@ -21,7 +22,7 @@ export default function Carried() {
   useShellOptions({ context: "Syndication market" });
   if (agreements.isLoading) return <Quiet />;
   if (agreements.error) return <Quietly role="alert">{agreements.error.message}</Quietly>;
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const offerOf = (a: Agreement): Offer | undefined => offers.data?.find((o) => o.id === a.offerId);
   const rows = agreements.data?.carrying ?? [];
   const waiting = requests.data?.incoming.filter((r) => r.status === "asked").length ?? 0;
@@ -74,7 +75,7 @@ export default function Carried() {
       {!rows.length && <Quietly>{name} doesn't carry any programs yet. Browse the market for one that fits.</Quietly>}
       {asked.length > 0 && (
         <p className="cc-mk-quiet">
-          Asked, waiting for the maker: {asked.map((r) => `${r.program.title} from ${r.maker.callSign ?? r.maker.name}`).join("; ")}.
+          Asked, waiting for the maker: {asked.map((r) => `${r.program.title} from ${stationLabel(r.maker)}`).join("; ")}.
         </p>
       )}
     </div>

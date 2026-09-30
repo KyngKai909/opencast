@@ -27,3 +27,7 @@
   .cc-sf__split, .cc-sf__row { grid-template-columns: minmax(0, 1fr); }
   .cc-sf__pane { border-left: 0; padding-left: 0; }
 }
+/* Beside the owner's own station on X.1 (A229): its subchannel, and sharing its call sign. */
+.cc-sf__own { margin-top: 12px; }
+.cc-sf__own-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-sf__share { margin-top: 10px; }

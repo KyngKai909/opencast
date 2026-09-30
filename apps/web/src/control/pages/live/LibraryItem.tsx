@@ -60,8 +60,8 @@ export default function LibraryItem() {
   if (!item) return itemQ.error && (itemQ.error as { status?: number }).status !== 404 ? <p role="alert">{itemQ.error.message}</p> : <NotFound />;
   const data = lib.data;
   const folder = data?.folders.find((f) => f.id === (params.get("folder") ?? item.folderId));
-  const callSign = s.station.callSign ?? s.station.name;
-  const ident = `${callSign} ${s.station.channel ?? ""}`.trim();
+  const callSign = s.label;
+  const ident = `${s.station.callSign ?? s.station.name} ${s.station.channel ?? ""}`.trim();
   const program = data?.programs.find((p) => p.id === item.programId);
   const h = history.data;
   const now = clockNow();

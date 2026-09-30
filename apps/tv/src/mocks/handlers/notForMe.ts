@@ -9,6 +9,7 @@
 import { http } from "msw";
 import { audienceApi, configApi } from "@opencast/contracts";
 import { now } from "../../lib/clock";
+import { refersTo } from "../../lib/stationRef";
 import { nowNext } from "../fixtures/schedule";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { stationById } from "../fixtures/stations";
@@ -48,7 +49,7 @@ export const notForMeHandlers = [
     if (!st) return fail(404, "not_found", "That station wasn't found.");
     await syncStreamSignOff();
     const on = nowNext(stationId, now()).now;
-    if (!on || on.offAir || switches.offAir.includes((st.ident.callSign ?? "").toUpperCase())) return fail(409, "nothing_on", "There's nothing on the log to vote on right now.");
+    if (!on || on.offAir || switches.offAir.some((v) => refersTo(v, st.ident))) return fail(409, "nothing_on", "There's nothing on the log to vote on right now.");
     const key = `${body.data.sessionId}:${on.id}`;
     const status = votes.has(key) ? ("already_recorded" as const) : ("recorded" as const);
     votes.add(key);

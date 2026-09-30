@@ -25,7 +25,7 @@ export function contactOf(text: string): { email: string } | { phone: string } |
 }
 
 export function InviteModal({ s, open, onClose, phone }: { s: StationState; open: boolean; onClose: () => void; phone: boolean }) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const library = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} }, { enabled: open });
   const qc = useQueryClient();
   const toast = useToast();

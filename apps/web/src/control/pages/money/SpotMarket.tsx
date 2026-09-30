@@ -80,7 +80,7 @@ function MarketTab() {
   const avails = useAvails(s.id);
   const rule = useApi(stationsApi.getBreakRule, { params: { stationId: s.id } }, { retry: false });
   const setRotation = useSetRotation();
-  const call = s.station.callSign ?? s.station.name;
+  const call = s.label;
   const blocked = rule.data?.blockedCategories ?? [];
 
   const list = useMemo(() => (market.data ?? []).filter((m) => length === "any" || m.spot.lengthSec === Number(length)), [market.data, length]);

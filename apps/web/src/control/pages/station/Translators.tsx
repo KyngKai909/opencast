@@ -13,7 +13,7 @@ import "./Translators.css";
 export default function Translators() {
   const s = useStation();
   const phone = useIsPhone();
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   useShellOptions({ context: "Translators" });
   return (
     <section className="cc-translators" aria-labelledby="cc-translators-h">
@@ -21,7 +21,7 @@ export default function Translators() {
       <TranslatorsPanel stationId={s.id} callSign={cs} owner={s.role === "owner"} accountHref={`${s.base}/settings/account`} phone={phone} />
       <p className="cc-translators__note">{relayStopsNote(cs)}</p>
       {/* Radio: the picture relays air under the station's sound. */}
-      {s.station.band === "radio" && <RelayBackground stationId={s.id} callSign={cs} channel={s.station.channel} colour={s.station.colour} canEdit={s.can("programming")} />}
+      {s.station.band === "radio" && <RelayBackground stationId={s.id} callSign={s.station.callSign ?? s.station.name} channel={s.station.channel} colour={s.station.colour} canEdit={s.can("programming")} />}
     </section>
   );
 }

@@ -12,3 +12,6 @@
 /* .src-row .tier: 13px over 11.5px. */
 .nd-tier .oc-lines__title { font-size: 13px; }
 .nd-tier .oc-lines__detail { font-size: 11.5px; }
+/* A229: a stream sharing X.1's call sign sits under it, indented, and says so. */
+.nd-listed__member { padding-left: 14px; border-left: 2px solid var(--hair); }
+.nd-listed__family { display: block; margin-top: 2px; font-size: 11.5px; color: var(--ink-70); }

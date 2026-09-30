@@ -13,7 +13,7 @@ import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
 import { dateAtTime } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
-import { changeWords, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail } from "./external";
+import { changeWords, familyLine, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail } from "./external";
 import { channelText } from "./SourceStatus";
 import "./SourceDetails.css";
 
@@ -121,7 +121,7 @@ export function SourceDetails({
       onClose={onClose}
       width={560}
       title={s.name}
-      subtitle={[gone ? `${gone.text}. ${gone.detail}` : (ch ?? "Not on the dial"), sourceDetail(s)].filter(Boolean).join(". ")}
+      subtitle={[gone ? `${gone.text}. ${gone.detail}` : (ch ?? "Not on the dial"), familyLine(s), sourceDetail(s)].filter(Boolean).join(". ")}
       footer={
         gone ? (
           <>

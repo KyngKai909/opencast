@@ -18,12 +18,18 @@
 //   plays: a written permission names one exact stream address, embed terms were checked for one
 //   player's host, a public basis is about the source) and taken off the dial for good (archived,
 //   like a full station that signs off for good), then put back. Every change is kept.
+// - A229: one brand's streams share a call sign on one channel's subchannels (15.1 SBCO, 15.2 SBCO,
+//   15.3 SBCO): X.n beside an external X.1 in the same market and major. Only the call sign is
+//   shared; each stream keeps its own evidence, checks, outages and watch data. A change on X.1 is
+//   the family's (the old one held a year for it), X.1 moves only on its own, and taking X.1 off
+//   the dial takes its family with it (A231), when the desk says so; "Put back" brings them back.
 
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { formatChannelNumber, isSubchannel, parseChannelNumber, type Band } from "@opencast/domain";
+import { CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, isSubchannel, parseChannelNumber, type Band, type ChannelNumber } from "@opencast/domain";
 import type { Creator, CreatorStage, ExternalInfo, ExternalOutage, IptvChannel, ListedChange, ListedField, ListedSource, StreamPermission } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
+import type { StationProfile } from "../stations/service.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
@@ -47,7 +53,7 @@ const LIST_TIMEOUT_MS = 15_000;
  * freed: the rule for a full station that signs off for good (docs/reference/control, station
  * settings). Its call sign stays its own, held a year on the waitlist's side like one's.
  */
-export const REMOVED_CHANNEL_HOLD_MS = 90 * 86_400_000;
+export const REMOVED_CHANNEL_HOLD_MS = CHANNEL_HOLD_AFTER_SIGN_OFF_MS;
 
 export type Fetch = typeof fetch;
 type Row = typeof LS.$inferSelect;
@@ -64,12 +70,15 @@ export interface AddListedInput {
   marketId: string;
   band: Band;
   channel: string;
-  callSign: string;
+  /** Required unless `shareCallSign` (A229), which takes X.1's. */
+  callSign?: string;
   name: string;
   description?: string;
   streamUrl: string;
   embedTerms?: "allowed" | "unclear";
   calendarUrl?: string;
+  /** A229: "Same brand as 15.1 SBCO": share the call sign of the external station on X.1. */
+  shareCallSign?: boolean;
   plays?: "embed" | "stream_link";
   calendarFormat?: ScheduleFormat;
   guideData?: { checkedAgainst: string; checkedOn: string };
@@ -110,6 +119,8 @@ export interface UpdateListedInput {
     | { source: "none" };
   channel?: string;
   callSign?: string;
+  /** A229: true shares X.1's call sign; false (with `callSign`) stops sharing it. */
+  shareCallSign?: boolean;
 }
 
 export interface ExternalPart {
@@ -119,7 +130,7 @@ export interface ExternalPart {
   /** A215: change a listing; never onto the dial without evidence that covers what now plays. */
   updateListedSource(user: CurrentUser | null, sourceId: string, input: UpdateListedInput, fetchFn?: Fetch): Promise<ListedSource>;
   /** A215: take a listing off the dial for good (archived, never deleted). */
-  removeListedSource(user: CurrentUser | null, sourceId: string): Promise<ListedSource>;
+  removeListedSource(user: CurrentUser | null, sourceId: string, input?: { withFamily?: boolean }): Promise<ListedSource>;
   /** A215: put a listing taken off the dial back on the list, on its channel (or another). */
   restoreListedSource(user: CurrentUser | null, sourceId: string, input?: { channel?: string }, fetchFn?: Fetch): Promise<ListedSource>;
   /** A215: its change history, newest first; addresses in full for admins. */
@@ -133,8 +144,11 @@ export interface ExternalPart {
   externalDial(stationIds: string[]): Promise<Map<string, ExternalDial>>;
   /** The worker's minute: every listing that could be on the dial, checked. */
   checkExternalStations(options?: { fetch?: Fetch }): Promise<ExternalCheckResult>;
-  /** Hourly: each listing's feed read again, and (A215) the channels of listings taken off the dial 90 days ago freed. */
-  syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number }>;
+  /**
+   * Hourly: each listing's feed read again, and (A215) the channels of listings taken off the dial
+   * 90 days ago freed; (A223) full stations' too, 90 days after they signed off for good.
+   */
+  syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number; releasedStations?: number }>;
   previewIptvList(input: { m3u?: string; url?: string }, fetchFn?: Fetch): Promise<{ listUrl: string | null; channels: Array<IptvChannel & { already: "lead" | "external" | null }>; skipped: number }>;
   importIptvLeads(input: { marketId: string; listUrl?: string; channels: IptvChannel[] }): Promise<{ imported: Creator[]; skipped: number }>;
 }
@@ -296,7 +310,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
     const permissionIds = rows.map((r) => r.streamPermissionId).filter((v): v is string => !!v);
-    const [idents, counts, permissions, outages, rule] = await Promise.all([
+    const [idents, counts, permissions, outages, rule, families] = await Promise.all([
       services.stations.idents(rows.map((r) => r.stationId)),
       db
         .select({ sourceId: LA.listedSourceId, n: sql<number>`count(*)::int` })
@@ -310,7 +324,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         .where(permissionIds.length ? or(inArray(SP.id, permissionIds), inArray(SP.listedSourceId, ids)) : inArray(SP.listedSourceId, ids))
         .orderBy(desc(SP.recordedAt)),
       db.select().from(OU).where(inArray(OU.listedSourceId, ids)).orderBy(desc(OU.downSince)),
-      rules()
+      rules(),
+      // A229: the call-sign family each is in, if any.
+      Promise.all(rows.map((r) => services.stations.callSignFamily(r.stationId)))
     ]);
     const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy)].filter((v): v is string => !!v));
     const permissionView = (p: (typeof permissions)[number]): StreamPermission => ({
@@ -324,9 +340,10 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       recordedBy: p.recordedBy ? (names.get(p.recordedBy) ?? null) : null,
       creatorId: p.creatorId
     });
-    return rows.flatMap((r) => {
+    return rows.flatMap((r, i) => {
       const station = idents.get(r.stationId);
       if (!station) return [];
+      const family = families[i];
       const removed = !!r.removedAt;
       // Taken off the dial: nothing to wait for but being put back; what its evidence lacks still shows.
       const waiting = waitingFor({ ...r, health: removed ? "unchecked" : r.health }, rule);
@@ -360,10 +377,12 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
               at: r.removedAt.toISOString(),
               by: r.removedBy ? (names.get(r.removedBy) ?? null) : null,
               channel: r.removedBand && r.removedTenths ? formatChannelNumber({ band: r.removedBand, tenths: r.removedTenths }) : null,
-              channelHeldUntil: new Date(r.removedAt.getTime() + REMOVED_CHANNEL_HOLD_MS).toISOString()
+              channelHeldUntil: new Date(r.removedAt.getTime() + REMOVED_CHANNEL_HOLD_MS).toISOString(),
+              withListing: r.removedWith
             }
           : null,
-        earlierPermissions: permissions.filter((x) => x.listedSourceId === r.id && x.id !== r.streamPermissionId).map(permissionView)
+        earlierPermissions: permissions.filter((x) => x.listedSourceId === r.id && x.id !== r.streamPermissionId).map(permissionView),
+        family: family ? { role: family.head.id === r.stationId ? "head" : "member", head: family.head.ident, members: family.members.map((m) => m.ident) } : null
       };
       return [view];
     });
@@ -409,6 +428,26 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     // held for this station, its old one, is its own to take back).
     await services.waitlist.requireAllowed(callSign);
     if (!(await services.waitlist.isAvailable(callSign, forStationId))) throw conflict("call_sign_taken", `${callSign} is taken or held. Try another.`);
+  }
+
+  const label = (p: Pick<StationProfile, "ident">) => [p.ident.channel, p.ident.callSign].filter(Boolean).join(" ");
+  const names = (ps: StationProfile[]) => ps.map(label).join(", ");
+
+  /**
+   * A229: the external station on X.1 whose call sign a listing on `number` can share: X.n (n ≥ 2)
+   * in the same market and major, beside an external station on X.1 that's on the list. 422
+   * `cannot_share` anywhere else.
+   */
+  async function familyHeadFor(marketId: string, band: Band, number: ChannelNumber): Promise<StationProfile> {
+    const major = Math.floor(number.tenths / 10);
+    if (band !== "tv" || !isSubchannel(number)) throw refused("cannot_share", `Only a subchannel (${band === "tv" ? `${major}.2` : "X.2"} and up) shares the call sign of the station on its .1.`);
+    const x1 = formatChannelNumber({ band, tenths: familyHeadTenths(number.tenths) });
+    const head = (await services.stations.inMarkets([marketId])).find((p) => p.ident.band === band && p.ident.channel === x1);
+    if (!head) throw refused("cannot_share", `Nothing is on ${x1} to share a call sign with.`);
+    if (head.kind !== "listed") throw refused("cannot_share", `${label(head)} is a full station. External stations share only an external station's call sign.`);
+    if (head.status === "signed_off") throw refused("cannot_share", `${label(head)} was taken off the dial. Put it back first.`);
+    if (!head.ident.callSign) throw refused("cannot_share", `${x1} has no call sign.`);
+    return head;
   }
 
   function checkEvidence(plays: "embed" | "stream_link", input: { embedTerms?: "allowed" | "unclear"; evidence?: EvidenceInput }) {
@@ -521,6 +560,38 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     return true;
   }
 
+  /** A215: one listing taken off the dial, back on the list (its channel, or `channel`), waiting for its checks. */
+  async function restoreOne(user: CurrentUser | null, row: Row, profile: StationProfile, channel?: string) {
+    if (row.creatorId && (await db.select({ id: LS.id }).from(LS).where(and(eq(LS.creatorId, row.creatorId), isNull(LS.removedAt)))).length) {
+      throw conflict("already_external", `Its lead is already another external station.`);
+    }
+    const marketId = profile.marketId ?? row.removedMarketId;
+    const band = profile.ident.band ?? row.removedBand;
+    if (!marketId || !band) throw conflict("channel_taken", "Its channel isn't known. Choose one.");
+    const old = row.removedTenths ? formatChannelNumber({ band, tenths: row.removedTenths }) : null;
+    const want = channel ?? profile.ident.channel ?? old;
+    if (!want) throw badRequest("Choose a channel.", { channel: "Required" });
+    // Still its own (held 90 days) unless another was asked for; after that, it has to be free.
+    const keep = !!profile.ident.channel && want === profile.ident.channel;
+    const number = keep ? null : await checkChannel(marketId, band, want, row.stationId);
+    const callSign = profile.ident.callSign;
+    // A229: a family's call sign is held for X.1, and so is its family's to take back.
+    if (callSign && !(await services.waitlist.isAvailable(callSign, profile.sharesCallSignWith ?? row.stationId))) throw conflict("call_sign_taken", `${callSign} has gone to someone else.`);
+    await db.transaction(async (tx) => {
+      if (number) await services.stations.changeManaged(tx, row.stationId, { channel: { marketId, band, tenths: number.tenths } });
+      await services.stations.markSignedOn(tx, row.stationId);
+      if (callSign && !profile.sharesCallSignWith) await services.waitlist.releaseHeldFor(tx, { callSign, stationId: row.stationId });
+      const [lead] = row.creatorId ? await tx.select().from(CR).where(eq(CR.id, row.creatorId)) : [];
+      // Back as it was, waiting for its checks.
+      await tx
+        .update(LS)
+        .set({ removedAt: null, removedBy: null, removedMarketId: null, removedBand: null, removedTenths: null, channelReleasedAt: null, removedWith: null, ...unchecked, ...(lead ? { leadStageBefore: lead.stage } : {}) })
+        .where(eq(LS.id, row.id));
+      if (lead) await tx.update(CR).set({ stationId: row.stationId, nextAction: null, nextActionDue: null, ...(basisFor(row) ? { stage: "on_air" as const } : {}) }).where(eq(CR.id, lead.id));
+      await recordChange(tx, user, row.id, "restored", number ? [{ field: "channel", from: old, to: want }] : [], []);
+    });
+  }
+
   const part: ExternalPart = {
     async listedSources(marketId, show = "listed") {
       const rows = await db
@@ -545,10 +616,15 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // One listing on the list per lead (A215: one taken off the dial doesn't count; it stays archived).
       if (creator && (await db.select({ id: LS.id }).from(LS).where(and(eq(LS.creatorId, creator.id), isNull(LS.removedAt)))).length) throw conflict("already_external", `${creator.displayName} is already an external station.`);
       const number = await checkChannel(input.marketId, input.band, input.channel);
-      await checkCallSign(input.callSign);
+      // A229: "Same brand as 15.1 SBCO" takes X.1's call sign; otherwise its own, by the usual rules.
+      const head = input.shareCallSign ? await familyHeadFor(input.marketId, input.band, number) : null;
+      if (head && input.callSign && input.callSign !== head.ident.callSign) throw badRequest(`It shares ${label(head)}'s call sign.`, { callSign: `Shares ${head.ident.callSign}` });
+      if (!head && !input.callSign) throw badRequest("Give it a call sign, or share the call sign of the station on its .1.", { callSign: "Required" });
+      const callSign = head ? head.ident.callSign! : input.callSign!;
+      if (!head) await checkCallSign(callSign);
       const outsideMarket = input.outsideMarket ?? false;
       const sourceId = await db.transaction(async (tx) => {
-        const stationId = await services.stations.createManaged(tx, { kind: "listed", name: input.name, callSign: input.callSign, marketId: input.marketId, band: input.band, tenths: number.tenths, description: input.description });
+        const stationId = await services.stations.createManaged(tx, { kind: "listed", name: input.name, callSign, marketId: input.marketId, band: input.band, tenths: number.tenths, description: input.description, sharesCallSignWith: head?.id ?? null });
         // The station row is public from now; the dial shows it once its evidence holds (waitingFor).
         await services.stations.markSignedOn(tx, stationId);
         const streamPermissionId = plays === "stream_link" && input.evidence?.permission ? await recordPermission(tx, user, input.streamUrl, creator?.id ?? null, input.evidence.permission) : null;
@@ -692,9 +768,35 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
 
       // Channel and call sign: the rules for listing.
       const channel = input.channel && input.channel !== ident.channel ? input.channel : null;
-      const number = channel ? await checkChannel(profile.marketId ?? "", ident.band ?? "tv", channel, row.stationId) : null;
-      const callSign = input.callSign && input.callSign !== ident.callSign ? input.callSign : null;
-      if (callSign) await checkCallSign(callSign, row.stationId);
+      const band = ident.band ?? "tv";
+      // A229: X.1 with a family stays put (its family's channels hang off it).
+      const family = await services.stations.callSignFamily(row.stationId);
+      const members = family && family.head.id === row.stationId ? family.members : [];
+      if (channel && members.length) {
+        throw conflict("family_channel", `${names(members)} ${members.length === 1 ? "shares" : "share"} its call sign. Move ${members.length === 1 ? "it" : "them"} first, or give ${members.length === 1 ? "it its own call sign" : "them their own call signs"}.`);
+      }
+      const number = channel ? await checkChannel(profile.marketId ?? "", band, channel, row.stationId) : null;
+      const at = number ?? (ident.channel ? (parseChannelNumber(band, ident.channel) ?? null) : null);
+      let callSign = input.callSign && input.callSign !== ident.callSign ? input.callSign : null;
+      // A229: joining X.1's family (its call sign), or leaving it (its own call sign, or a move to another major).
+      let join: StationProfile | null = null;
+      let leave = false;
+      if (input.shareCallSign === true && at) {
+        const head = await familyHeadFor(profile.marketId ?? "", band, at);
+        if (callSign && callSign !== head.ident.callSign) throw badRequest(`It shares ${label(head)}'s call sign.`, { callSign: `Shares ${head.ident.callSign}` });
+        if (head.id !== profile.sharesCallSignWith) {
+          join = head;
+          callSign = head.ident.callSign;
+        } else callSign = null;
+      } else if (profile.sharesCallSignWith) {
+        const was = ident.channel ? parseChannelNumber(band, ident.channel) : undefined;
+        const movedOut = !!number && !!was && familyHeadTenths(number.tenths) !== familyHeadTenths(was.tenths);
+        if (input.shareCallSign === false || callSign || movedOut) {
+          if (!callSign) throw badRequest("Give it its own call sign to stop sharing the call sign of the station on its .1.", { callSign: "Required" });
+          leave = true;
+        }
+      }
+      if (callSign && !join) await checkCallSign(callSign, row.stationId);
 
       const name = input.name !== undefined && input.name.trim() !== row.name ? input.name.trim() : null;
       const description = input.description !== undefined && (input.description?.trim() || null) !== row.description ? input.description?.trim() || null : undefined;
@@ -748,13 +850,20 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             ...(name ? { name } : {}),
             ...(description !== undefined ? { description } : {}),
             ...(callSign ? { callSign } : {}),
-            ...(number && profile.marketId && ident.band ? { channel: { marketId: profile.marketId, band: ident.band, tenths: number.tenths } } : {})
+            ...(number && profile.marketId && ident.band ? { channel: { marketId: profile.marketId, band: ident.band, tenths: number.tenths } } : {}),
+            ...(join ? { sharesCallSignWith: join.id } : leave ? { sharesCallSignWith: null } : {})
           });
         }
         if (callSign) {
           // The old call sign stays held for it (a year), and a held one it takes back is its own again.
+          // A229: on X.1 the new one is its family's too (it follows to them), and the old one is held
+          // for X.1, so the family's. A station leaving a family doesn't hold the family's name.
           await services.waitlist.releaseHeldFor(tx, { callSign, stationId: row.stationId });
-          if (ident.callSign) await services.waitlist.holdCallSign(tx, { callSign: ident.callSign, stationId: row.stationId });
+          if (ident.callSign && !leave) await services.waitlist.holdCallSign(tx, { callSign: ident.callSign, stationId: row.stationId });
+          if (members.length) {
+            const theirs = await tx.select({ id: LS.id }).from(LS).where(inArray(LS.stationId, members.map((m) => m.id)));
+            for (const m of theirs) await recordChange(tx, user, m.id, "changed", [{ field: "callSign", from: ident.callSign, to: callSign }], []);
+          }
         }
         // Its lead leaves On air while the listing waits for evidence (recording it puts the lead back).
         if (effects.includes("waits_for_evidence")) await leadBack(tx, row, null);
@@ -765,27 +874,38 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       return one(sourceId);
     },
 
-    async removeListedSource(user, sourceId) {
+    async removeListedSource(user, sourceId, input = {}) {
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That external station");
       if (row.removedAt) throw conflict("removed", `${row.name} is already off the dial.`);
       const profile = (await services.stations.profiles([row.stationId])).get(row.stationId);
-      const tenths = profile?.ident.channel && profile.ident.band ? parseChannelNumber(profile.ident.band, profile.ident.channel)?.tenths : null;
+      // A231: X.1 with a family goes with its family, and only when the desk says so, naming them.
+      const family = await services.stations.callSignFamily(row.stationId);
+      const members = family && family.head.id === row.stationId ? family.members : [];
+      if (members.length && !input.withFamily) {
+        throw conflict("family", `${names(members)} ${members.length === 1 ? "shares" : "share"} its call sign and would go with it. Take them off too, or give them their own call signs first.`);
+      }
+      const theirs = members.length ? await db.select().from(LS).where(and(inArray(LS.stationId, members.map((m) => m.id)), isNull(LS.removedAt))) : [];
       await db.transaction(async (tx) => {
-        // Archived: its permissions, outages, changes, airings, watch data and lead link all stay.
-        await tx
-          .update(LS)
-          .set({ removedAt: deps.clock.now(), removedBy: user?.id ?? null, removedMarketId: profile?.marketId ?? null, removedBand: profile?.ident.band ?? null, removedTenths: tenths ?? null, channelReleasedAt: null, ...unchecked })
-          .where(eq(LS.id, sourceId));
-        await endOutage(tx, sourceId, "removed");
-        // Like a full station that signs off for good: not public (off the dial, the guide, search and
-        // the swipe order at once; its page is gone), its call sign held a year, its channel 90 days.
-        await services.stations.markSignedOff(tx, row.stationId, true);
-        if (profile?.ident.callSign) await services.waitlist.holdCallSign(tx, { callSign: profile.ident.callSign, stationId: row.stationId });
-        // Its lead is a lead again, at the stage it had before it went on air.
-        const was = [profile?.ident.channel, profile?.ident.callSign].filter(Boolean).join(" ");
-        await leadBack(tx, row, `Was external station ${was || row.name}. Taken off the dial`);
-        await recordChange(tx, user, sourceId, "removed", [], []);
+        for (const [r, p, withId] of [[row, profile, null], ...theirs.map((t) => [t, members.find((m) => m.id === t.stationId), row.id] as const)] as const) {
+          const tenths = p?.ident.channel && p.ident.band ? parseChannelNumber(p.ident.band, p.ident.channel)?.tenths : null;
+          // Archived: its permissions, outages, changes, airings, watch data and lead link all stay.
+          await tx
+            .update(LS)
+            .set({ removedAt: deps.clock.now(), removedBy: user?.id ?? null, removedMarketId: p?.marketId ?? null, removedBand: p?.ident.band ?? null, removedTenths: tenths ?? null, channelReleasedAt: null, removedWith: withId, ...unchecked })
+            .where(eq(LS.id, r.id));
+          await endOutage(tx, r.id, "removed");
+          // Like a full station that signs off for good: not public (off the dial, the guide, search and
+          // the swipe order at once; its page is gone), its call sign held a year, its channel 90 days.
+          await services.stations.markSignedOff(tx, r.stationId, true);
+          // A229: a family's call sign is held for X.1 (and so for its family); a station sharing one
+          // taken off alone leaves the name with its family.
+          if (p?.ident.callSign && !p.sharesCallSignWith) await services.waitlist.holdCallSign(tx, { callSign: p.ident.callSign, stationId: r.stationId });
+          // Its lead is a lead again, at the stage it had before it went on air.
+          const was = [p?.ident.channel, p?.ident.callSign].filter(Boolean).join(" ");
+          await leadBack(tx, r, `Was external station ${was || r.name}. Taken off the dial`);
+          await recordChange(tx, user, r.id, "removed", [], []);
+        }
       });
       return one(sourceId);
     },
@@ -794,37 +914,39 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That external station");
       if (!row.removedAt) throw conflict("not_removed", `${row.name} is on the list.`);
-      if (row.creatorId && (await db.select({ id: LS.id }).from(LS).where(and(eq(LS.creatorId, row.creatorId), isNull(LS.removedAt)))).length) {
-        throw conflict("already_external", `Its lead is already another external station.`);
-      }
       const profile = (await services.stations.profiles([row.stationId])).get(row.stationId);
       if (!profile) throw notFound("That external station");
-      const marketId = profile.marketId ?? row.removedMarketId;
-      const band = profile.ident.band ?? row.removedBand;
-      if (!marketId || !band) throw conflict("channel_taken", "Its channel isn't known. Choose one.");
-      const old = row.removedTenths ? formatChannelNumber({ band, tenths: row.removedTenths }) : null;
-      const want = input.channel ?? profile.ident.channel ?? old;
-      if (!want) throw badRequest("Choose a channel.", { channel: "Required" });
-      // Still its own (held 90 days) unless another was asked for; after that, it has to be free.
-      const keep = !!profile.ident.channel && want === profile.ident.channel;
-      const number = keep ? null : await checkChannel(marketId, band, want, row.stationId);
-      const callSign = profile.ident.callSign;
-      if (callSign && !(await services.waitlist.isAvailable(callSign, row.stationId))) throw conflict("call_sign_taken", `${callSign} has gone to someone else.`);
-      await db.transaction(async (tx) => {
-        if (number) await services.stations.changeManaged(tx, row.stationId, { channel: { marketId, band, tenths: number.tenths } });
-        await services.stations.markSignedOn(tx, row.stationId);
-        if (callSign) await services.waitlist.releaseHeldFor(tx, { callSign, stationId: row.stationId });
-        const [lead] = row.creatorId ? await tx.select().from(CR).where(eq(CR.id, row.creatorId)) : [];
-        // Back as it was, waiting for its checks.
-        await tx
-          .update(LS)
-          .set({ removedAt: null, removedBy: null, removedMarketId: null, removedBand: null, removedTenths: null, channelReleasedAt: null, ...unchecked, ...(lead ? { leadStageBefore: lead.stage } : {}) })
-          .where(eq(LS.id, sourceId));
-        if (lead) await tx.update(CR).set({ stationId: row.stationId, nextAction: null, nextActionDue: null, ...(basisFor(row) ? { stage: "on_air" as const } : {}) }).where(eq(CR.id, lead.id));
-        await recordChange(tx, user, sourceId, "restored", number ? [{ field: "channel", from: old, to: want }] : [], []);
-      });
+      // A231: a station sharing X.1's call sign comes back after X.1 (which brings back the ones taken off with it).
+      if (profile.sharesCallSignWith) {
+        const head = (await services.stations.profiles([profile.sharesCallSignWith])).get(profile.sharesCallSignWith);
+        if (head?.status === "signed_off") throw conflict("family_removed", `Put ${label(head)} back first. It shares its call sign, and brings back the streams taken off with it.`);
+      }
+      await restoreOne(user, row, profile, input.channel);
+      // X.1's family, taken off with it: back beside it on their own channels (or the next free ones).
+      const family = await db.select().from(LS).where(and(eq(LS.removedWith, row.id), isNotNull(LS.removedAt)));
+      if (family.length) {
+        const head = (await services.stations.profiles([row.stationId])).get(row.stationId);
+        const headMajor = head?.ident.channel ? Math.floor(Math.round(Number(head.ident.channel) * 10) / 10) : null;
+        for (const member of family) {
+          const p = (await services.stations.profiles([member.stationId])).get(member.stationId);
+          if (!p) continue;
+          // Its own channel while it's held (90 days); after that the same subchannel beside X.1, if free.
+          const minor = member.removedTenths ? member.removedTenths % 10 : null;
+          const want = p.ident.channel ?? (headMajor && minor ? `${headMajor}.${minor}` : null);
+          try {
+            await restoreOne(user, member, p, want ?? undefined);
+          } catch (error) {
+            // Its channel has gone: it stays off the dial, to be put back on another.
+            if (!(error instanceof HttpError)) throw error;
+          }
+        }
+      }
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (after?.calendarUrl) await sync(after, fetchFn);
+      for (const member of family) {
+        const [m] = await db.select().from(LS).where(eq(LS.id, member.id));
+        if (m && !m.removedAt && m.calendarUrl) await sync(m, fetchFn);
+      }
       return one(sourceId);
     },
 
@@ -919,7 +1041,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           await tx.update(LS).set({ channelReleasedAt: deps.clock.now() }).where(eq(LS.id, row.id));
         });
       }
-      return { synced, failed, released: due.length };
+      // A223: a full station that signed off for good 90 days ago lets its channel go too.
+      const releasedStations = await services.stations.releaseSignedOffChannels();
+      return { synced, failed, released: due.length, releasedStations };
     },
 
     async previewIptvList(input, fetchFn = publicFetch) {

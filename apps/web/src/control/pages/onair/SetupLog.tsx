@@ -8,6 +8,7 @@ import { useApi } from "../../../api/hooks";
 import { LogPage } from "../../components/onair/LogPage";
 import { Quiet } from "../common";
 import { controlPath } from "../../../areas";
+import { stationPath } from "../../station/slug";
 
 export default function SetupLog() {
   const { stationId = "" } = useParams();
@@ -15,6 +16,6 @@ export default function SetupLog() {
   if (setup.isLoading) return <Quiet />;
   if (!setup.data) return <ControlTitle title="Program log" description={setup.error?.message} />;
   const st = setup.data.station;
-  const base = st.callSign ? controlPath(`/${st.callSign.toLowerCase()}`) : null;
+  const base = st.callSign ? stationPath(st) : null;
   return <LogPage stationId={stationId} station={st} base={base} canEdit setup={{ back: controlPath(`/setup/${stationId}/library`), next: controlPath(`/setup/${stationId}/translators`) }} />;
 }

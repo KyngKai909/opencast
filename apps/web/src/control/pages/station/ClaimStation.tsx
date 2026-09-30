@@ -18,6 +18,7 @@ import { NotFound, Quiet } from "../common";
 import SignIn from "../SignIn";
 import "./ClaimStation.css";
 import { controlPath } from "../../../areas";
+import { stationPath } from "../../station/slug";
 
 const PLATFORM: Record<ClaimPage["sourcePlatform"], string> = {
   youtube: "YouTube",
@@ -185,7 +186,7 @@ export default function ClaimStation() {
                 state: steps.takeOver,
                 action:
                   steps.takeOver === "done" ? (
-                    <Button variant="primary" size="sm" href={controlPath(`/${cs.toLowerCase()}/monitor`)}>
+                    <Button variant="primary" size="sm" href={stationPath(st, "/monitor")}>
                       Open master control
                     </Button>
                   ) : undefined

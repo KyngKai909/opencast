@@ -21,6 +21,7 @@ import { now, STATION_TZ } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Breaks.css";
+import { stationLabel } from "../../station/slug";
 
 interface Row extends BreakView {
   id: string;
@@ -41,7 +42,7 @@ function detailOf(b: BreakSlot, aired: boolean, airing: boolean): string {
 
 function carrierAt(entries: LogEntry[], at: string): string | null {
   const e = entries.find((x) => x.startsAt <= at && at < x.endsAt && x.carriedFrom);
-  return e?.carriedFrom?.callSign ?? null;
+  return e?.carriedFrom?.callSign ? stationLabel(e.carriedFrom) : null;
 }
 
 export default function Breaks() {

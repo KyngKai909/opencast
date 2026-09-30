@@ -19,7 +19,8 @@ const HR = 60 * MIN;
 // ---- stations the market names that master control's own fixtures don't ----
 
 function other(n: number, callSign: string | null, channel: string | null, name: string, colour: string, band: Band | null, market: string | null, city: string | null, kind: StationIdent["kind"] = "station"): StationIdent {
-  return { id: uid(n), kind, callSign, handle: (callSign ?? name).toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, colour, band, channel, marketSlug: market, homeCity: city };
+  const handle = (callSign ?? name).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return { id: uid(n), kind, callSign, handle, name, colour, band, channel, marketSlug: market, homeCity: city, slug: callSign ? callSign.toLowerCase() : handle };
 }
 
 /** The viewer's DUST 96.2 (same id): High Desert, the next market over. */

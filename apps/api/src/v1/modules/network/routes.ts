@@ -86,7 +86,7 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     if (!user.isAdmin) await inMarket(user, marketId);
     return network.listedChanges(params.sourceId, user.isAdmin);
   });
-  r.handle(api.removeListedSource, ({ user, params }) => network.removeListedSource(user, params.sourceId));
+  r.handle(api.removeListedSource, ({ user, params, body }) => network.removeListedSource(user, params.sourceId, body ?? {}));
   r.handle(api.restoreListedSource, ({ user, params, body }) => network.restoreListedSource(user, params.sourceId, body));
   // IPTV lists are leads: anyone on the desk can read one; importing is for the market's lead or an admin.
   r.handle(api.previewIptvList, ({ body }) => network.previewIptvList(body));

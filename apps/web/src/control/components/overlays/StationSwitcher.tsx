@@ -44,7 +44,8 @@ export function switchRow(m: StationMembership, status: StationStatus | undefine
     colour: m.station.colour ?? "#525C73",
     channel: studio ? null : m.station.channel,
     name: studio ? m.station.name : (m.station.callSign ?? m.station.name),
-    line: state ? `${ROLE[m.role] ?? m.role}. ${state}` : (ROLE[m.role] ?? m.role),
+    // A229: a shared call sign's stations say which is which ("Beat Tapes. Owner. On air").
+    line: [m.station.sharesCallSign && !studio ? m.station.name : null, state ? `${ROLE[m.role] ?? m.role}. ${state}` : (ROLE[m.role] ?? m.role)].filter(Boolean).join(". "),
     attention: phone ? null : attention,
     current: m.station.id === currentId
   };

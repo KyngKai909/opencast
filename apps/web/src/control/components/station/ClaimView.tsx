@@ -28,9 +28,10 @@ import {
 } from "./claimWords";
 import { airingWhen, longDate, rangeText } from "./format";
 import "./ClaimView.css";
+import { stationLabel } from "../../station/slug";
 
 export function ClaimView({ s, claim, phone }: { s: StationState; claim: ClaimX; phone: boolean }) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const now = useNow(60_000);
   const toast = useToast();
   const library = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} }, { retry: false });
@@ -162,7 +163,7 @@ export function ClaimView({ s, claim, phone }: { s: StationState; claim: ClaimX;
                 {own.flatMap((t) =>
                   (t.airings ?? []).map((a) => (
                     <li key={a.startsAt} className="cc-claim__row">
-                      <Lines title={airingLine(a.startsAt, t.station.callSign ?? cs, now, STATION_TZ)} detail={a.replacedWith ? `Replaced with ${a.replacedWith}` : undefined} />
+                      <Lines title={airingLine(a.startsAt, t.station.callSign ? stationLabel(t.station) : cs, now, STATION_TZ)} detail={a.replacedWith ? `Replaced with ${a.replacedWith}` : undefined} />
                       <Tag>Pulled</Tag>
                     </li>
                   ))

@@ -16,6 +16,7 @@ import { now } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Carriers.css";
+import { stationLabel } from "../../station/slug";
 
 type Row = { kind: "carrier"; a: Agreement } | { kind: "asked"; r: CarriageRequest };
 
@@ -41,8 +42,8 @@ export default function Carriers() {
   if (offer.isLoading || agreements.isLoading) return <Quiet />;
   if (offer.error || !offer.data) return <Quietly role="alert">{offer.error?.message ?? "That program isn't offered."}</Quietly>;
   const o = offer.data;
-  const name = s.station.callSign ?? s.station.name;
-  if (o.maker.id !== s.id) return <Quietly role="alert">Only {o.maker.callSign ?? o.maker.name} sees who carries {o.program.title}.</Quietly>;
+  const name = s.label;
+  if (o.maker.id !== s.id) return <Quietly role="alert">Only {stationLabel(o.maker)} sees who carries {o.program.title}.</Quietly>;
 
   const carrying = (agreements.data?.carriedBy ?? []).filter((a) => a.offerId === o.id || a.program.id === o.program.id);
   const active = carrying.filter((a) => !a.endsAt || a.endsAt > now().toISOString());
@@ -70,7 +71,7 @@ export default function Carriers() {
     try {
       const a = await call(catalogApi.endAgreement, { params: { agreementId: ending.id } });
       refresh();
-      toast.show({ message: `Notice given. ${a.carrier.callSign ?? a.carrier.name} carries ${o.program.title} until ${a.endsAt ? monthDay(localDate(a.endsAt)) : "the notice ends"}.` });
+      toast.show({ message: `Notice given. ${stationLabel(a.carrier)} carries ${o.program.title} until ${a.endsAt ? monthDay(localDate(a.endsAt)) : "the notice ends"}.` });
       setEnding(null);
     } catch (e) {
       toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
@@ -112,7 +113,7 @@ export default function Carriers() {
       align: "end",
       cell: (row) =>
         row.kind === "asked" ? (
-          <Button size="sm" href={`${s.base}/market/offered/requests/${row.r.id}`} aria-label={`Review ${row.r.carrier.callSign ?? row.r.carrier.name}'s request`}>
+          <Button size="sm" href={`${s.base}/market/offered/requests/${row.r.id}`} aria-label={`Review ${stationLabel(row.r.carrier)}'s request`}>
             Review
           </Button>
         ) : (
@@ -131,7 +132,7 @@ export default function Carriers() {
             width: "40px",
             align: "end" as const,
             cell: (row: Row) =>
-              row.kind === "carrier" && !row.a.endNoticeGivenAt ? <Menu label={`More for ${row.a.carrier.callSign ?? row.a.carrier.name}`} items={[{ label: "End carriage", danger: true, onSelect: () => setEnding(row.a) }]} /> : null
+              row.kind === "carrier" && !row.a.endNoticeGivenAt ? <Menu label={`More for ${stationLabel(row.a.carrier)}`} items={[{ label: "End carriage", danger: true, onSelect: () => setEnding(row.a) }]} /> : null
           }
         ]
       : [])
@@ -177,7 +178,7 @@ export default function Carriers() {
         <Modal
           open
           onClose={() => setEnding(null)}
-          title={`End carriage with ${ending.carrier.callSign ?? ending.carrier.name}?`}
+          title={`End carriage with ${stationLabel(ending.carrier)}?`}
           footer={
             <>
               <Button variant="primary" onClick={giveNotice} disabled={busy}>
@@ -188,7 +189,7 @@ export default function Carriers() {
           }
         >
           <p className="cc-mk-carriers__confirm">
-            {ending.carrier.callSign ?? ending.carrier.name} is told now, and {o.program.title} stays on its log for the {ending.terms.noticeDays} days' notice the terms promise.
+            {stationLabel(ending.carrier)} is told now, and {o.program.title} stays on its log for the {ending.terms.noticeDays} days' notice the terms promise.
           </p>
         </Modal>
       )}

@@ -173,7 +173,15 @@ export const StationSetup = z.object({
   /** Makes spots to order ("Made for you"). */
   orders: z.object({ takesOrders: z.boolean(), turnaround: z.string().nullable(), fromMicros: z.number().int().nullable() }),
   /** IAB Content Taxonomy 3.0 ids for the station (added 2026-09-28), derived from its category unless set. */
-  iabCategories: z.array(z.string()).optional()
+  iabCategories: z.array(z.string()).optional(),
+  /**
+   * Added 2026-09-30 (A229): the station on X.1 whose call sign this one shares (12.2 sharing 12.1
+   * BEAT's), or null. Set with `chooseChannel`'s `shareCallSign`; fixed, like the call sign, after
+   * first sign-on.
+   */
+  sharesCallSignWith: StationIdent.nullable().optional(),
+  /** Added 2026-09-30 (A229): the owner's own stations on this one's subchannels that share its call sign. */
+  callSignFamily: z.array(StationIdent).optional()
 });
 
 /**
@@ -317,7 +325,13 @@ export const AvailableChannels = z.object({
   market: Market,
   band: Band,
   /** Main channels (X.1) and whether each is free. Held ones show as taken. */
-  channels: z.array(z.object({ channel: ChannelNumber, state: z.enum(["open", "taken", "held"]) }))
+  channels: z.array(z.object({ channel: ChannelNumber, state: z.enum(["open", "taken", "held"]) })),
+  /**
+   * Added 2026-09-30 (A229, rule `numbering.own_subchannels`): subchannels open to the signed-in
+   * owner, beside a station they own on X.1 (`beside`), each the next free X.n in that major. It can
+   * share X.1's call sign (`chooseChannel`'s `shareCallSign`). Empty when the rule is off.
+   */
+  ownSubchannels: z.array(z.object({ channel: ChannelNumber, beside: StationIdent })).optional()
 });
 
 /**
@@ -410,7 +424,7 @@ export const stationsApi = {
     method: "GET",
     path: "/stations/:stationRef",
     auth: "public",
-    summary: "A station page, by id or call sign",
+    summary: "A station page, by id or call sign. Added 2026-09-30 (A229): or by its address (`StationIdent.slug`): `rivc-15-2` for a station sharing X.1's call sign (the call sign alone is X.1's); a call sign that changed still finds its station through the year it's held",
     params: z.object({ stationRef: z.string() }),
     response: StationPage
   }),
@@ -503,9 +517,10 @@ export const stationsApi = {
     method: "PUT",
     path: "/stations/:stationId/channel",
     auth: "user",
-    summary: "Choose market, band and channel before first sign-on. A station gets X.1. Changed 2026-09-29: choosing another than the channel held with its waitlist call sign lets the held one go.",
+    summary:
+      "Choose market, band and channel before first sign-on. A station gets X.1. Changed 2026-09-29: choosing another than the channel held with its waitlist call sign lets the held one go. Added 2026-09-30 (A229, rule `numbering.own_subchannels`): an owner's own subchannel X.n beside a station they own on X.1 in the same market (409 `not_your_subchannel` otherwise), sharing X.1's call sign with `shareCallSign` (the station then has X.1's call sign; its own, if it had one, is let go). A station sharing a call sign that moves elsewhere, or takes its own call sign (`updateSetup`), stops sharing. X.1 can't move while stations share its call sign (409 `family_channel`).",
     params: StationParams,
-    body: z.object({ marketId: Id, band: Band, channel: ChannelNumber }),
+    body: z.object({ marketId: Id, band: Band, channel: ChannelNumber, shareCallSign: z.boolean().optional() }),
     response: StationSetup
   }),
 

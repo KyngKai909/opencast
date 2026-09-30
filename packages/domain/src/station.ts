@@ -65,6 +65,63 @@ export function isSubchannel({ band, tenths }: ChannelNumber): boolean {
   return band === "tv" && tenths % 10 !== 1;
 }
 
+/**
+ * A station that signs off for good (or an external station taken off the dial for good) keeps its
+ * channel this long, then the number is freed (A221, A223). Its call sign stays on its row, held a
+ * year on the waitlist's side.
+ */
+export const CHANNEL_HOLD_AFTER_SIGN_OFF_DAYS = 90;
+export const CHANNEL_HOLD_AFTER_SIGN_OFF_MS = CHANNEL_HOLD_AFTER_SIGN_OFF_DAYS * 86_400_000;
+
+/** When a channel held after signing off for good is freed. */
+export function channelFreedAt(signedOffAt: Date): Date {
+  return new Date(signedOffAt.getTime() + CHANNEL_HOLD_AFTER_SIGN_OFF_MS);
+}
+
+// ---- Shared call signs (added 2026-09-30, A229) ----
+//
+// One brand's streams on one channel's subchannels can share a call sign, as real TV does (KCET,
+// KCET-DT2): 15.1 SBCO, 15.2 SBCO, 15.3 SBCO. Only X.n (n ≥ 2) beside X.1 in the same market and
+// major, and only external stations beside an external X.1 or an owner's own stations beside its
+// X.1 (never mixed). The channel tells them apart, so each family member's address carries it:
+// X.1 keeps `/watch/sbco`, X.2 is `/watch/sbco-15-2`.
+
+/** The station a family member shares its call sign with sits on X.1 of the same major. */
+export function familyHeadTenths(tenths: number): number {
+  return Math.floor(tenths / 10) * 10 + 1;
+}
+
+/** Whether a TV channel may share X.1's call sign: X.n, n ≥ 2, same major (radio never). */
+export function canShareCallSignOn(member: ChannelNumber, head: ChannelNumber): boolean {
+  return member.band === "tv" && head.band === "tv" && isSubchannel(member) && head.tenths === familyHeadTenths(member.tenths);
+}
+
+/** A station's part of an address: its call sign in lower case ("beat"), a family member's with its channel ("sbco-15-2"). */
+export function stationSlugOf(s: { id: string; callSign: string | null; handle?: string | null; channel?: string | null; familyMember?: boolean }): string {
+  if (s.callSign && s.familyMember && s.channel) return `${s.callSign.toLowerCase()}-${s.channel.replace(".", "-")}`;
+  return (s.callSign ?? s.handle ?? s.id).toLowerCase();
+}
+
+/**
+ * An address's station part: a call sign ("sbco", "SBCO"), or a call sign with its channel
+ * ("sbco-15-2", which also names a station that doesn't share: "beat-12-1"). Null for anything else.
+ */
+export function parseStationSlug(ref: string): { callSign: string; tenths: number | null } | null {
+  const m = /^([a-z]{3,5})(?:-(\d{1,2})-([1-9]))?$/i.exec(ref.trim());
+  if (!m) return null;
+  return { callSign: m[1].toUpperCase(), tenths: m[2] ? Number(m[2]) * 10 + Number(m[3]) : null };
+}
+
+/**
+ * How a station is named where only a call sign would show (a notification's title, a compact
+ * row, a log line): the call sign, with the channel when it shares it ("SBCO 15.2"), so family
+ * members are told apart.
+ */
+export function callSignLabel(s: { callSign: string | null; channel?: string | null; sharesCallSign?: boolean; name?: string }): string {
+  if (!s.callSign) return s.name ?? "";
+  return s.sharesCallSign && s.channel ? `${s.callSign} ${s.channel}` : s.callSign;
+}
+
 /** Station colours must hold this contrast against white text. */
 export const MIN_STATION_COLOUR_CONTRAST = 4.5;
 

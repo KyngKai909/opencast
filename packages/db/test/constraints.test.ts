@@ -66,6 +66,152 @@ describe("call signs", () => {
   });
 });
 
+// A229 (migration 0042): a station on X.n may share X.1's call sign in the same market and major,
+// both external, or both the same owner's full stations. Everywhere else call signs stay unique.
+describe("shared call signs", () => {
+  const listed = async (tx: Tx, callSign: string, marketId: string, tenths: number, shares: string | null = null, kind = "listed") => {
+    const s = await tx.one<{ id: string }>(
+      `INSERT INTO broadcast.stations (kind, call_sign, name, first_signed_on_at, status, shares_call_sign_with) VALUES ($1, $2, $3, now(), 'on_air', $4) RETURNING id`,
+      [kind, callSign, `${callSign} ${tenths}`, shares]
+    );
+    await channel(tx, s.id, marketId, "tv", tenths);
+    return s;
+  };
+  const owner = (tx: Tx, stationId: string, userId: string) => tx.run(`INSERT INTO accounts.station_memberships (station_id, user_id, role) VALUES ($1, $2, 'owner')`, [stationId, userId]);
+
+  test("an external X.n shares an external X.1's call sign, and the channel tells them apart", async (tx) => {
+    const m = await market(tx);
+    const head = await listed(tx, "SBCO", m.id, 151);
+    await tx.accepts(async () => {
+      await listed(tx, "SBCO", m.id, 152, head.id);
+      await listed(tx, "SBCO", m.id, 153, head.id);
+    });
+  });
+
+  test("a duplicate outside a family is refused, as before", async (tx) => {
+    const m = await market(tx);
+    await listed(tx, "SBCO", m.id, 151);
+    await tx.rejects(/stations_call_sign/, () => station(tx, { callSign: "SBCO" }));
+    await tx.rejects(/stations_call_sign/, () => station(tx, { callSign: "SBCO", kind: "listed" }));
+  });
+
+  test("a member names X.1's own call sign (the foreign key), never another", async (tx) => {
+    const m = await market(tx);
+    const head = await listed(tx, "SBCO", m.id, 151);
+    await tx.rejects(/stations_call_sign_family_fk/, () => listed(tx, "SBCP", m.id, 152, head.id));
+  });
+
+  test("only on X.n beside X.1, in the same market and major", async (tx) => {
+    const m = await market(tx);
+    const other = await market(tx, "high-desert");
+    const head = await listed(tx, "SBCO", m.id, 151);
+    await tx.rejects(/same market and major/, async () => {
+      await listed(tx, "SBCO", m.id, 162, head.id);
+      await tx.check();
+    });
+    await tx.rejects(/same market and major/, async () => {
+      await listed(tx, "SBCO", other.id, 152, head.id);
+      await tx.check();
+    });
+    // X.1 on 16.1 can't lend its call sign to 15.2 either.
+    const sixteen = await listed(tx, "SIXT", m.id, 161);
+    await tx.rejects(/same market and major/, async () => {
+      await listed(tx, "SIXT", m.id, 152, sixteen.id);
+      await tx.check();
+    });
+  });
+
+  test("never mixed: an external X.1 has no full-station member, nor the other way", async (tx) => {
+    const m = await market(tx);
+    const external = await listed(tx, "SBCO", m.id, 151);
+    await tx.rejects(/never mixed/, async () => {
+      await listed(tx, "SBCO", m.id, 152, external.id, "station");
+      await tx.check();
+    });
+    const full = await listed(tx, "BEAT", m.id, 121, null, "station");
+    await tx.rejects(/never mixed/, async () => {
+      await listed(tx, "BEAT", m.id, 122, full.id);
+      await tx.check();
+    });
+    const claimable = await listed(tx, "CRAT", m.id, 181, null, "claimable");
+    await tx.rejects(/never mixed/, async () => {
+      await listed(tx, "CRAT", m.id, 182, claimable.id, "claimable");
+      await tx.check();
+    });
+  });
+
+  test("a full station shares X.1's call sign only when the same owner runs both", async (tx) => {
+    const m = await market(tx);
+    const kai = await user(tx);
+    const sam = await user(tx);
+    const beat = await tx.one<{ id: string }>(`INSERT INTO broadcast.stations (kind, call_sign, name) VALUES ('station', 'BEAT', 'Inland Beat') RETURNING id`);
+    await channel(tx, beat.id, m.id, "tv", 121);
+    await owner(tx, beat.id, kai.id);
+    await tx.accepts(async () => {
+      const tapes = await tx.one<{ id: string }>(`INSERT INTO broadcast.stations (kind, name) VALUES ('station', 'Beat Tapes') RETURNING id`);
+      await owner(tx, tapes.id, kai.id);
+      await channel(tx, tapes.id, m.id, "tv", 122);
+      await tx.run(`UPDATE broadcast.stations SET call_sign = 'BEAT', shares_call_sign_with = $2 WHERE id = $1`, [tapes.id, beat.id]);
+    });
+    await tx.rejects(/same owner runs both/, async () => {
+      const theirs = await tx.one<{ id: string }>(`INSERT INTO broadcast.stations (kind, name) VALUES ('station', 'Not Beat') RETURNING id`);
+      await owner(tx, theirs.id, sam.id);
+      await channel(tx, theirs.id, m.id, "tv", 123);
+      await tx.run(`UPDATE broadcast.stations SET call_sign = 'BEAT', shares_call_sign_with = $2 WHERE id = $1`, [theirs.id, beat.id]);
+      await tx.check();
+    });
+  });
+
+  test("no chains: a member's call sign comes from X.1 itself", async (tx) => {
+    const m = await market(tx);
+    const head = await listed(tx, "SBCO", m.id, 151);
+    const two = await listed(tx, "SBCO", m.id, 152, head.id);
+    await tx.rejects(/X.1 itself/, async () => {
+      await listed(tx, "SBCO", m.id, 153, two.id);
+      await tx.check();
+    });
+  });
+
+  test("X.1's call sign change follows to its family; a full family's is fixed once one has signed on", async (tx) => {
+    const m = await market(tx);
+    const head = await listed(tx, "SBCO", m.id, 151);
+    const two = await listed(tx, "SBCO", m.id, 152, head.id);
+    await tx.run(`UPDATE broadcast.stations SET call_sign = 'SBCN' WHERE id = $1`, [head.id]);
+    await tx.check();
+    const after = await tx.one<{ call_sign: string }>(`SELECT call_sign FROM broadcast.stations WHERE id = $1`, [two.id]);
+    if (after.call_sign !== "SBCN") throw new Error(`member has ${after.call_sign}`);
+
+    const kai = await user(tx);
+    const beat = await tx.one<{ id: string }>(`INSERT INTO broadcast.stations (kind, call_sign, name) VALUES ('station', 'BEAT', 'Inland Beat') RETURNING id`);
+    await channel(tx, beat.id, m.id, "tv", 121);
+    await owner(tx, beat.id, kai.id);
+    const tapes = await tx.one<{ id: string }>(`INSERT INTO broadcast.stations (kind, name) VALUES ('station', 'Beat Tapes') RETURNING id`);
+    await owner(tx, tapes.id, kai.id);
+    await channel(tx, tapes.id, m.id, "tv", 122);
+    await tx.run(`UPDATE broadcast.stations SET call_sign = 'BEAT', shares_call_sign_with = $2, first_signed_on_at = now(), status = 'on_air' WHERE id = $1`, [tapes.id, beat.id]);
+    await tx.check();
+    await tx.rejects(/fixed after first sign-on/, () => tx.run(`UPDATE broadcast.stations SET call_sign = 'BETA' WHERE id = $1`, [beat.id]));
+    // Nor can the member leave by renaming after its own sign-on.
+    await tx.rejects(/fixed after first sign-on/, () => tx.run(`UPDATE broadcast.stations SET call_sign = 'TAPE', shares_call_sign_with = NULL WHERE id = $1`, [tapes.id]));
+  });
+
+  test("a waitlist hold still keeps a name from everyone but its station's family", async (tx) => {
+    const m = await market(tx);
+    const head = await listed(tx, "SBCO", m.id, 151);
+    await listed(tx, "SBCO", m.id, 152, head.id);
+    // The family's call sign changes; the old one is held for X.1 (A222), and so for the family.
+    await tx.run(`UPDATE broadcast.stations SET call_sign = 'SBCN' WHERE id = $1`, [head.id]);
+    await tx.run(`INSERT INTO network.call_sign_reservations (call_sign, reason, station_id) VALUES ('SBCO', 'signed_off', $1)`, [head.id]);
+    await tx.rejects(/held for someone else/, () => station(tx, { callSign: "SBCO" }));
+    await tx.accepts(() => tx.run(`UPDATE broadcast.stations SET call_sign = 'SBCO' WHERE id = $1`, [head.id]));
+    // A hold for anyone else is refused to the family too.
+    await tx.run(`INSERT INTO network.call_sign_reservations (call_sign, reason) VALUES ('TACO', 'waitlist')`);
+    await tx.rejects(/held for someone else/, () => tx.run(`UPDATE broadcast.stations SET call_sign = 'TACO' WHERE id = $1`, [head.id]));
+    // A hold for X.1 while the family has the name (taken off the dial together) is allowed.
+    await tx.accepts(() => tx.run(`INSERT INTO network.call_sign_reservations (call_sign, reason, station_id) VALUES ('SBCN', 'signed_off', $1)`, [head.id]));
+  });
+});
+
 describe("channels", () => {
   test("TV is 2.1 to 69.9; radio is 88.2 to 107.8 in even tenths", async (tx) => {
     const m = await market(tx);

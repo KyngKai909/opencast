@@ -6,6 +6,7 @@ import type { TimelineItem } from "@opencast/ui";
 import { clock } from "@opencast/ui";
 import type { ClaimX, TakedownX } from "../../api/ext/station";
 import { airingWhen, dayWord, longDate, shortDate, shortName } from "./format";
+import { stationLabel } from "../../station/slug";
 
 export type Basis = "made_it" | "owner_permission" | "public_domain";
 
@@ -116,7 +117,7 @@ export function resolvedSummary(c: ClaimX, callSign: string, timeZone: string): 
 /** A closed or answered claim's timeline (rights 04.1). */
 export function resolvedTimeline(c: ClaimX, callSign: string, timeZone: string): TimelineItem[] {
   const n = c.takedowns.length;
-  const items: TimelineItem[] = [{ state: "done", when: shortDate(c.receivedAt, timeZone), title: n === 1 ? `Claim, pulled from ${c.takedowns[0]!.station.callSign ?? callSign}` : `Claim, pulled from ${n} stations` }];
+  const items: TimelineItem[] = [{ state: "done", when: shortDate(c.receivedAt, timeZone), title: n === 1 ? `Claim, pulled from ${(c.takedowns[0]!.station.callSign ? stationLabel(c.takedowns[0]!.station) : callSign)}` : `Claim, pulled from ${n} stations` }];
   if (c.answer) items.push({ state: "done", when: shortDate(c.answer.answeredAt, timeZone), title: `${callSign} answered`, detail: basisTitle(c.answer.basis) });
   const back = latest(c.takedowns.map((t) => t.restoredAt));
   const everywhere = n === 1 ? "Back on air" : `Back on air on all ${n} stations`;

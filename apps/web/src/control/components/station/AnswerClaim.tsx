@@ -42,7 +42,7 @@ export function answerBlocker(a: { basis: Basis | null; file: boolean; note: str
 }
 
 export function AnswerClaim({ s, claim, phone, onClose }: { s: StationState; claim: ClaimX; phone: boolean; onClose: () => void }) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const auth = useAuth();
   const toast = useToast();
   const answer = useApiMutation(trustApi.answerClaim, { invalidates: [trustApi.listClaims] });

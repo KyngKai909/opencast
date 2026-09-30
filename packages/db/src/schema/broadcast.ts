@@ -5,6 +5,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -50,8 +51,19 @@ export const stations = broadcast.table(
   {
     id: id(),
     kind: stationKind("kind").notNull().default("station"),
-    /** Null for a studio, or before setup. Unique platform-wide; fixed after first sign-on. */
+    /**
+     * Null for a studio, or before setup. Unique platform-wide, except within a family (A229, migration
+     * 0042): a station on X.n may share the call sign of X.1 in its market and major (`shares_call_sign_with`).
+     * Fixed after first sign-on (an external station's can change, A222).
+     */
     callSign: text("call_sign"),
+    /**
+     * A229 (added 2026-09-30, migration 0042): the station on X.1 whose call sign this one shares, or
+     * null. Both external, or both the same owner's stations (never mixed); this one on X.n, n ≥ 2,
+     * in X.1's market and major (checked at commit, `broadcast.call_sign_family_check`). The call sign
+     * follows X.1's (on update cascade).
+     */
+    sharesCallSignWith: uuid("shares_call_sign_with"),
     /** A studio's short handle in place of a call sign. */
     handle: text("handle"),
     name: text("name").notNull(),
@@ -99,8 +111,13 @@ export const stations = broadcast.table(
     check("studio_never_signs_on", sql`${t.kind} <> 'studio' or ${t.firstSignedOnAt} is null`),
     check("signed_on_has_call_sign", sql`${t.firstSignedOnAt} is null or ${t.callSign} is not null`),
     check("bug_opacity_range", sql`${t.bugOpacity} between 0 and 100`),
-    uniqueIndex("stations_call_sign").on(t.callSign),
-    uniqueIndex("stations_handle").on(t.handle)
+    check("shares_call_sign_with_x1", sql`${t.sharesCallSignWith} is null or (${t.callSign} is not null and ${t.sharesCallSignWith} <> ${t.id})`),
+    // A229: unique, except for a family's members, which share X.1's (the foreign key below).
+    uniqueIndex("stations_call_sign").on(t.callSign).where(sql`${t.sharesCallSignWith} is null`),
+    uniqueIndex("stations_handle").on(t.handle),
+    uniqueIndex("stations_id_call_sign").on(t.id, t.callSign),
+    index("stations_call_sign_family").on(t.sharesCallSignWith).where(sql`${t.sharesCallSignWith} is not null`),
+    foreignKey({ name: "stations_call_sign_family_fk", columns: [t.sharesCallSignWith, t.callSign], foreignColumns: [t.id, t.callSign] }).onUpdate("cascade")
   ]
 );
 

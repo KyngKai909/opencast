@@ -57,7 +57,7 @@ function RightsList({ claims, phone }: { claims: ClaimsX; phone: boolean }) {
   const s = useStation();
   const now = useNow(60_000);
   const library = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} }, { retry: false });
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const imported = (c: ClaimX) => library.data?.items.find((i) => i.id === c.item.id)?.source === "link";
   const { standing } = claims;
 

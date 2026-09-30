@@ -10,6 +10,7 @@ import { usePlayer } from "@opencast/player";
 import type { ApiError } from "../../api/client";
 import { useApi, useApiMutation } from "../../api/hooks";
 import { MARKET_TZ, useNow } from "../../lib/clock";
+import { callSignLabel, stationAddress } from "../../lib/stationRef";
 import { useCommandLayer } from "../../tv/commands";
 import { focusKey, FocusContext, useTvFocusable } from "../../tv/focus";
 import { useSignedIn } from "../../tv/data";
@@ -82,7 +83,8 @@ function Options({ cellKey, found }: { cellKey: string; found: NonNullable<Retur
   }, [signedIn, cellKey]);
 
   const dialRow = player.channels.find((c) => c.station.id === station.id);
-  const call = station.callSign ?? station.name;
+  // "RIVC 15.2" for a station sharing its call sign, so the family's streams are told apart.
+  const call = callSignLabel(station);
   const remind = remindText(reminder);
   const sw = switchText(reminder, airing.startsAt, MARKET_TZ);
 
@@ -152,7 +154,7 @@ function Options({ cellKey, found }: { cellKey: string; found: NonNullable<Retur
             <TvButton
               focusKey="tvg-about"
               label={`About ${station.name}`}
-              onSelect={() => navigate(`/about/${encodeURIComponent(station.callSign ?? station.id)}`, { state: { from: `/guide/options/${encodeURIComponent(cellKey)}` } })}
+              onSelect={() => navigate(`/about/${encodeURIComponent(stationAddress(station))}`, { state: { from: `/guide/options/${encodeURIComponent(cellKey)}` } })}
             />
             {failed && (
               <p className="tvg-dlg__error" role="alert">

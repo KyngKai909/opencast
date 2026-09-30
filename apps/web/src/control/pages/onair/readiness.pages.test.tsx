@@ -38,7 +38,7 @@ beforeEach(() => {
 afterEach(() => server.resetHandlers());
 
 const lateCrate15 = () => getDb().log.find((e) => e.stationId === BEAT.id && e.title === "Late Crate, ep. 15" && e.startsAt === "2026-09-27T05:00:00.000Z")!;
-const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", can: () => true };
+const beat = { station: BEAT, id: BEAT.id, role: "owner" as const, studio: false, base: "/control/beat", label: "BEAT 12.1", can: () => true };
 
 describe("the Monitor's Prepared for air", () => {
   it("links the item named to its airing on the log", async () => {

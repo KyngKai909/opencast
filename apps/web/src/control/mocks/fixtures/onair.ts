@@ -3,7 +3,7 @@
 // the preview monitor's cards (G2), and this area's own saved state (how each day repeats).
 // Tonight's log and breaks themselves live in the shared db (fixtures/evening.ts).
 
-import type { LibraryItem, LogEntry } from "@opencast/contracts";
+import type { LibraryItem, LogEntry, StationIdent } from "@opencast/contracts";
 import type { BreakRow } from "@opencast/contracts";
 import type { DbBreak, DbFill, DbLogEntry } from "./evening";
 
@@ -80,7 +80,13 @@ export function resetReservations() {
 }
 
 /** The mock streams (`npm run mock:streams -w @opencast/player`): a station's output plays only if it has one. */
-export const MOCK_STREAMS = ["civc", "beat", "reel", "sazn", "prep", "nite", "hall", "crat", "voze"];
+export const MOCK_STREAMS = ["civc", "beat", "reel", "sazn", "prep", "nite", "hall", "crat", "voze", "tape"];
+
+/** The mock HLS server's stream for a station: its slug, but 12.2 BEAT's is "tape" (it carries BEAT 12.2's bug). */
+export function mockStreamOf(ident: Pick<StationIdent, "id" | "callSign" | "handle" | "slug">): string | null {
+  const slug = ident.slug === "beat-12-2" ? "tape" : (ident.slug ?? (ident.callSign ?? ident.handle ?? ident.id).toLowerCase());
+  return MOCK_STREAMS.includes(slug) ? slug : null;
+}
 
 // ---- Sign-on (A.6) ----
 

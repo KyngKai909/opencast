@@ -57,6 +57,29 @@ const GRAPHICS = {
   beat: { carriedFrom: "REEL" },
   sazn: { logo: true }
 };
+/**
+ * Mock call-sign families (A229, added 2026-09-30): streams that play another station's loop under
+ * their own slug. `external`: a source's own stream (no Opencast tags); otherwise the tags carry the
+ * family member's own call sign and channel (its bug says BEAT 12.2).
+ */
+const ALIASES = {
+  rivc: { of: "colt", external: true, callSign: "RIVC", channel: "15.1", name: "Riverside County, Board of Supervisors" },
+  rvpw: { of: "civc", external: true, callSign: "RIVC", channel: "15.2", name: "Riverside County, Public Works" },
+  rvlb: { of: "reel", external: true, callSign: "RIVC", channel: "15.3", name: "Riverside County Library Live" },
+  tape: { of: "sazn", callSign: "BEAT", channel: "12.2", name: "Beat Tapes", colour: "#8C3B7A" }
+};
+
+/** A station in the manifest by its slug, or a family member's alias of one (`files`: whose segments it plays). */
+function stationBySlug(m, slug) {
+  const own = m.stations.find((s) => s.slug === slug);
+  if (own) return { ...own, files: own.slug };
+  const alias = ALIASES[slug];
+  const base = alias && m.stations.find((s) => s.slug === alias.of);
+  if (!base) return null;
+  const { of, ...rest } = alias;
+  return { ...base, ...rest, slug, files: of };
+}
+
 const SCTE35_OUT = "0xFC302000000000000000FFF00F05000000017FEFFE00A4CB80C0000000000000";
 const SCTE35_IN = "0xFC302000000000000000FFF00F05000000017F4FFE00000000C0000000000000";
 
@@ -295,7 +318,7 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
     }
 
     const match = /^\/([a-z0-9-]+)\/([A-Za-z0-9_.-]+)$/.exec(url);
-    const station = match && m.stations.find((s) => s.slug === match[1]);
+    const station = match && stationBySlug(m, match[1]);
     if (!match || !station) return next();
     const [, slug, name] = match;
     const last = lastOf(slug);
@@ -330,7 +353,7 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
       return send("application/vnd.apple.mpegurl", playlist({ timeline, last, window, seg, pdt, tags: null, file: (a) => (a.kind === "off" ? `suboff_${pad(a.file)}.vtt` : `sub_${pad(a.file)}.vtt`) }));
     }
     if (name === "logo.svg") return send("image/svg+xml", logoSvg(station));
-    const file = path.join(root, slug, name);
+    const file = path.join(root, station.files, name);
     if (/^([a-z0-9]+_(seg|off)_\d{3}\.ts|(sub|suboff)_\d{3}\.vtt)$/.test(name) && fs.existsSync(file)) {
       return send(name.endsWith(".ts") ? "video/mp2t" : "text/vtt", { file });
     }

@@ -19,6 +19,7 @@ import { now, STATION_TZ } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./PlaceInLog.css";
+import { stationLabel } from "../../station/slug";
 
 const HALF = 30 * 60_000;
 const WORDS = ["Nothing", "One", "Two", "Three", "Four", "Five", "Six"];
@@ -82,7 +83,7 @@ export default function PlaceInLog() {
   if (s.studio) return <Quietly>Studios don't broadcast, so there's no log to place it in.</Quietly>;
   if (!o.termsOffered.includes(term) && !carrying) return <Quietly role="alert">That deal isn't offered.</Quietly>;
 
-  const maker = o.maker.callSign ?? o.maker.name;
+  const maker = stationLabel(o.maker);
   const makerWords = o.makerKind === "catalog" ? "the Opencast catalog" : stationWords(o.maker);
   const detail = termDetail(o, term, s.id);
   const termsWords = `${termNames([term])}${detail ? `, ${detail}` : ""}`;
@@ -147,7 +148,7 @@ export default function PlaceInLog() {
 
   return (
     <div className="cc-mk-place">
-      <ControlTitle title={`Place ${o.program.title}`} description={`Choose when it airs on ${s.station.callSign ?? s.station.name}. ${termNames([term])} terms${detail ? `, ${detail}` : ""}.`} />
+      <ControlTitle title={`Place ${o.program.title}`} description={`Choose when it airs on ${s.label}. ${termNames([term])} terms${detail ? `, ${detail}` : ""}.`} />
       <div className="cc-mk-place__split">
         <div className="cc-mk-week" role="table" aria-label={`The week from ${shortDay(first)}`}>
           <div role="row" className="cc-mk-week__row">
@@ -191,7 +192,7 @@ export default function PlaceInLog() {
                         here.map((e) => (
                           <span key={e.id} className={`cc-mk-week__it${e.kind === "live" ? " cc-mk-week__it--live" : ""}`}>
                             {e.title}
-                            {e.carriedFrom ? `, from ${e.carriedFrom.callSign ?? e.carriedFrom.name}` : ""}
+                            {e.carriedFrom ? `, from ${stationLabel(e.carriedFrom)}` : ""}
                           </span>
                         ))
                       )}

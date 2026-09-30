@@ -52,7 +52,7 @@ export default function LiveBlock() {
   const source = sources.data?.find((x) => x.id === entry.liveSourceId) ?? null;
   const kind = source?.kind ?? "browser";
   const title = kind === "browser" ? `${entry.title}, from this browser` : `${entry.title}, from ${source?.name ?? "an encoder"}`;
-  const callSign = s.station.callSign ?? s.station.name;
+  const callSign = s.label;
   return (
     <>
       {!phone && (

@@ -15,6 +15,7 @@ import { hintsFor, keyHintsHidden, readFirstUse } from "../components/watching/h
 import { useNotForMeFlag } from "../components/watching/notForMe";
 import { config } from "../config";
 import { now, MARKET_TZ } from "../lib/clock";
+import { findByRef } from "../lib/stationRef";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
 import { useAccountMotion } from "./motion";
@@ -184,7 +185,9 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     }
     if (loc.pathname === "/radio") return;
     started.current = true;
-    const last = getDevice().settings.startOn === "last_channel" ? channels.find((c) => c.station.id === getDevice().lastStationId) : null;
+    // The last station's id (or, on the mirror, the address's `station`, which may be a slug: "rivc-15-2").
+    const lastRef = getDevice().lastStationId;
+    const last = getDevice().settings.startOn === "last_channel" && lastRef ? findByRef(channels, lastRef, (c) => c.station) : null;
     void engine.tune((last ?? channels[0]).station.id, { input: "app" });
   }, [channels, engine, state.currentId, state.pendingId, loc.pathname]);
   useEffect(() => {

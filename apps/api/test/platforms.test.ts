@@ -65,7 +65,7 @@ describe("signing in to YouTube and Twitch", () => {
     expect(url.searchParams.get("scope")).toContain("youtube.force-ssl");
     expect(url.searchParams.get("scope")).toContain("yt-analytics.readonly");
     expect(url.searchParams.get("code_challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(location).toBe("https://app.opencast.test/control/BEAT/translators?platform=youtube&connected=1");
+    expect(location).toBe("https://app.opencast.test/control/beat/translators?platform=youtube&connected=1");
     // Opencast made the relay's live stream and the first broadcast, bound to it, titled for the station.
     expect(fake.calls.filter((c) => c.provider === "youtube").map((c) => c.op)).toEqual(["exchangeCode", "createStream", "createBroadcast"]);
     expect(fake.calls.find((c) => c.op === "createBroadcast")!.args).toMatchObject({ title: "BEAT: Inland Beat", description: expect.stringContaining("Inland Beat, live on Opencast") });
@@ -100,7 +100,7 @@ describe("signing in to YouTube and Twitch", () => {
     const start = await kai.post(`/v1/stations/${beat.id}/platforms/oauth/youtube/start`, {}).expect(200);
     const state = new URL(start.body.url).searchParams.get("state")!;
     const denied = await request(h.app).get(`/v1/platforms/oauth/youtube/callback?state=${state}&error=access_denied`).expect(302);
-    expect(denied.headers.location).toBe("https://app.opencast.test/control/BEAT/translators?platform=youtube&error=denied");
+    expect(denied.headers.location).toBe("https://app.opencast.test/control/beat/translators?platform=youtube&error=denied");
     const again = await request(h.app).get(`/v1/platforms/oauth/youtube/callback?state=${state}&code=whatever`).expect(302);
     expect(again.headers.location).toContain("error=expired");
     const forged = await request(h.app).get(`/v1/platforms/oauth/youtube/callback?state=forged&code=whatever`).expect(302);

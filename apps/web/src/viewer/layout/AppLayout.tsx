@@ -155,7 +155,7 @@ export function AppLayout() {
   const stationLine = row
     ? [[row.station.callSign, row.station.channel].filter(Boolean).join(" "), row.now?.carriedFrom?.callSign ? `carried from ${row.now.carriedFrom.callSign}` : row.station.band === "radio" ? row.now?.episodeTitle : null].filter(Boolean).join(", ")
     : "";
-  const openPlayer = row ? () => navigate(`/watch/${row.station.callSign?.toLowerCase() ?? row.station.id}`) : undefined;
+  const openPlayer = row ? () => navigate(`/watch/${stationSlug(row.station)}`) : undefined;
   const showPlayer = shell.player !== false && !!row;
   const radio = row?.station.band === "radio";
 

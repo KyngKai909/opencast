@@ -55,6 +55,8 @@ export interface ChannelLook extends StationLook {
   band: Band;
   bug: { mode: "off" | "call_sign_and_channel" | "logo"; opacity: number; position: string };
   logoUrl: string | null;
+  /** A229: its call sign is shared with the rest of its family (its channel tells it apart). */
+  sharesCallSign?: boolean;
 }
 
 export interface AssemblerOptions {

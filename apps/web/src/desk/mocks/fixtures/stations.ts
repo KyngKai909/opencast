@@ -18,6 +18,8 @@ export interface DbStation {
   escrowId: number | null;
   /** A scheduled first sign-on. */
   signOnAt: string | null;
+  /** A229: the station on X.1 whose call sign this one shares (15.3 RIVC beside 15.1 RIVC). */
+  sharesCallSignWith?: string | null;
 }
 
 type Kind = StationIdent["kind"];
@@ -40,7 +42,9 @@ export const STATION_IDS = {
   // Follow-up Phase 6: NASA on 61.1, and Inland Community TV waiting for its permission.
   NASA: U(118), ICTV: U(119),
   // A201: a public-access channel's DASH stream link on 9.7 (a mock station).
-  LOMA: U(197)
+  LOMA: U(197),
+  // A229: Riverside County's streams sharing one call sign on 15 (15.2 is listed in the demo).
+  RIVC: U(151), RIVC_LIB: U(153)
 };
 
 /** Monday, September 28, 6:00 am in the Inland Empire: LUPE's first sign-on. */
@@ -71,7 +75,10 @@ export function seedStations(): DbStation[] {
     st(118, IE.id, "listed", "tv", "61.1", "NASA", "NASA", null),
     st(119, IE.id, "listed", "tv", null, "ICTV", "Inland Community TV", null, { public: false, firstSignedOnAt: null }, "Riverside"),
     // A201: a DASH stream link, played in Opencast's player (a mock station).
-    st(197, IE.id, "listed", "tv", "9.7", "LOMA", "Loma Linda Community Access", null, {}, "Loma Linda")
+    st(197, IE.id, "listed", "tv", "9.7", "LOMA", "Loma Linda Community Access", null, {}, "Loma Linda"),
+    // A229: one county, one call sign, a stream per subchannel (the channel tells them apart).
+    st(151, IE.id, "listed", "tv", "15.1", "RIVC", "Riverside County, Board of Supervisors", null, {}, "Riverside"),
+    st(153, IE.id, "listed", "tv", "15.3", "RIVC", "Riverside County Library Live", null, { sharesCallSignWith: U(151) }, "Riverside")
   ];
 }
 

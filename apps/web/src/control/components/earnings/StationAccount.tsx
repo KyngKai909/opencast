@@ -34,7 +34,7 @@ function Payouts() {
   const s = useStation();
   const headingId = useId();
   const owner = s.can("moveMoney");
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const [moving, setMoving] = useState(false);
   const earnings = useApi(ledgerApi.getStationEarnings, { params: { stationId: s.id }, query: { period: "month" } }, { enabled: s.can("seeMoney") });
   const account = useApi(ledgerApi.getPayoutAccount, { params: { stationId: s.id } }, { enabled: owner, retry: false });

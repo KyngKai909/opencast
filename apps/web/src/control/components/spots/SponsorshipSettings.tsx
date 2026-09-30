@@ -13,6 +13,7 @@ import { errorText, useSponsorships, useWrite } from "./data";
 import { parseMoney } from "./format";
 import { ErrorLine } from "./parts";
 import "./SponsorshipSettings.css";
+import { stationLabel } from "../../station/slug";
 
 /** The section's line under its heading: "What businesses see when they choose to sponsor BEAT or one of its programs." */
 export function sponsorshipDescription(callSign: string): string {
@@ -41,7 +42,7 @@ export default function SponsorshipSettings() {
   const data = useSponsorships(s.id);
   const save = useWrite(spotsApi.setSponsorshipSettings, [spotsApi.listStationSponsorships]);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const call = s.station.callSign ?? s.station.name;
+  const call = s.label;
   const canEdit = s.can("manage");
   const rows = data.data?.settings ?? [];
   const key = (x: SponsorshipSetting) => x.programId ?? "station";
@@ -64,7 +65,7 @@ export default function SponsorshipSettings() {
     save.mutate({ params: { stationId: s.id }, body }, { onSuccess: () => toast.show({ message: "Saved." }), onError: (e) => toast.show({ message: errorText(e) }) });
   };
 
-  const sub = (x: SponsorshipSetting) => (x.sponsoredThrough ? `Carried from ${x.sponsoredThrough.callSign ?? x.sponsoredThrough.name}` : x.programId === null ? "Credited in every break" : x.format ?? undefined);
+  const sub = (x: SponsorshipSetting) => (x.sponsoredThrough ? `Carried from ${stationLabel(x.sponsoredThrough)}` : x.programId === null ? "Credited in every break" : x.format ?? undefined);
 
   return (
     <div className="cc-sps">
@@ -81,7 +82,7 @@ export default function SponsorshipSettings() {
           <div key={k} className="cc-sps__row" role="group" aria-label={x.title}>
             <Lines title={x.title} detail={sub(x)} />
             {x.sponsoredThrough ? (
-              <span className="cc-sps__theirs">{x.sponsoredThrough.callSign ?? x.sponsoredThrough.name}'s to sponsor</span>
+              <span className="cc-sps__theirs">{stationLabel(x.sponsoredThrough)}'s to sponsor</span>
             ) : (
               <>
                 <input

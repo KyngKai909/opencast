@@ -14,7 +14,7 @@ import { AirPlayLine } from "./AirPlay";
 import { Picture } from "./Picture";
 import { NotForMe } from "./NotForMe";
 import { Actions, NowTitle, SharedAiring, Tonight } from "./parts";
-import { callSignOf, bandHint, neighbourOf } from "./logic";
+import { callSignOf, bandHint, neighbourOf, stationSlug } from "./logic";
 import { useOverlayParams } from "./overlay";
 import { WatchOnSheet } from "../remote/WatchOnSheet";
 import { useCastSession } from "../../cast/session";
@@ -45,7 +45,7 @@ export function WatchTop() {
         label="Share"
         bare
         disabled={!row}
-        onClick={() => row && open({ modal: "share", station: callSignOf(row.station), ...(row.now?.logEntryId ? { airing: row.now.logEntryId } : {}) }, ["airing"])}
+        onClick={() => row && open({ modal: "share", station: stationSlug(row.station), ...(row.now?.logEntryId ? { airing: row.now.logEntryId } : {}) }, ["airing"])}
       />
       <WatchOnSheet />
     </header>

@@ -76,7 +76,10 @@ describe("the page as drawn", () => {
     expect(within(ictv).getAllByText("Not on the dial")).toHaveLength(2);
     // On the dial first, by channel; then the rest by name.
     const names = within(table()).getAllByRole("row").slice(1).map((r) => r.querySelector(".oc-lines__title")?.textContent);
-    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "Loma Linda Community Access", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    // A229: Riverside County's streams sit together on 15, the one sharing 15.1's call sign says so.
+    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "Loma Linda Community Access", "Riverside County, Board of Supervisors", "Riverside County Library Live", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    has(rowOf(/^Riverside County Library Live/), ["15.3 RIVC", "Same brand as 15.1 RIVC"]);
+    has(rowOf(/^Riverside County, Board of Supervisors/), ["15.1 RIVC", "Its call sign is shared by 15.3"]);
     // A201: a DASH stream link, on the dial now that DASH stream links are played.
     has(rowOf(/^Loma Linda Community Access/), ["9.7 LOMA", "Stream link", "Up"]);
     expect(screen.getByRole("heading", { name: "Opencast catalog station" })).toBeTruthy();
@@ -118,6 +121,10 @@ describe("List a source", () => {
     expect(within(d).getByText("Say who said yes, and for whom.")).toBeTruthy();
     fill(d, "Whose stream", "City of Rialto");
     fill(d, "Channel", "9.4");
+    // A229: beside an external 9.1, "Same brand" is offered, on; Rialto is its own brand.
+    const same = within(d).getByRole("checkbox", { name: /Same brand as 9.1 RDLS \(share its call sign\)/ });
+    expect((same as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(same);
     fill(d, "Call sign", "RIAL");
     fill(d, "Stream address", "https://rialto.example.gov/live/council.m3u8");
     fill(d, "Who said yes", "Maria Lopez, City Clerk, City of Rialto");
@@ -137,6 +144,7 @@ describe("List a source", () => {
     const d = await screen.findByRole("dialog", { name: "List a source" });
     fill(d, "Whose stream", "City of Fontana");
     fill(d, "Channel", "9.4");
+    fireEvent.click(within(d).getByRole("checkbox", { name: /Same brand as 9.1 RDLS/ }));
     fill(d, "Call sign", "FONT");
     fill(d, "Their player's address", "https://fontana.example.gov/live");
     expect(within(d).getByText("Without the terms page and the day it was checked, it's saved but not on the dial.")).toBeTruthy();
@@ -190,5 +198,53 @@ describe("Record evidence", () => {
     fireEvent.change(within(f).getByLabelText("The basis"), { target: { value: "Public access, stream published for the public" } });
     fireEvent.click(within(f).getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Inland Community TV is on the dial.")).toBeTruthy();
+  });
+});
+
+// A229/A231: one brand's streams sharing a call sign on 15 (15.1 and 15.3 RIVC in the mock).
+describe("the same brand on one channel", () => {
+  it("lists 15.2 as the same brand as 15.1 RIVC, sharing its call sign", async () => {
+    renderAt(`${PAGE}?add=1`);
+    const d = await screen.findByRole("dialog", { name: "List a source" });
+    fireEvent.click(within(d).getByRole("radio", { name: "Stream link" }));
+    fireEvent.change(within(d).getByLabelText("Whose stream"), { target: { value: "Riverside County, Public Works" } });
+    fireEvent.change(within(d).getByLabelText("Channel"), { target: { value: "15.2" } });
+    const same = within(d).getByRole("checkbox", { name: /Same brand as 15.1 RIVC \(share its call sign\)/ });
+    expect((same as HTMLInputElement).checked).toBe(true);
+    const cs = within(d).getByLabelText("Call sign") as HTMLInputElement;
+    expect([cs.value, cs.disabled]).toEqual(["RIVC", true]);
+    expect(within(d).getByText("The channel tells them apart: 15.2 RIVC.")).toBeTruthy();
+    fireEvent.change(within(d).getByLabelText("Stream address"), { target: { value: "https://riverside.example.gov/live/works/index.m3u8" } });
+    fireEvent.click(within(d).getByRole("radio", { name: /public/i }));
+    fireEvent.change(within(d).getByLabelText("The basis"), { target: { value: "County government, stream published for the public" } });
+    fireEvent.click(within(d).getByRole("radio", { name: "None" }));
+    fireEvent.click(within(d).getByRole("button", { name: "List it" }));
+    expect(await screen.findByText("Riverside County, Public Works is on the dial at 15.2.")).toBeTruthy();
+    const row = await waitFor(() => rowOf(/^Riverside County, Public Works/));
+    has(row, ["15.2 RIVC", "Same brand as 15.1 RIVC"]);
+    has(rowOf(/^Riverside County, Board of Supervisors/), ["Its call sign is shared by 15.2 and 15.3"]);
+  });
+
+  it("names the family before changing X.1's call sign or taking it off the dial", async () => {
+    renderAt(`${PAGE}?source=${"00000000-0000-4000-8000-000000000751"}`);
+    const details = await screen.findByRole("dialog", { name: "Riverside County, Board of Supervisors" });
+    fireEvent.click(within(details).getByRole("button", { name: "Change" }));
+    const f = await screen.findByRole("dialog", { name: "Change the listing" });
+    expect((within(f).getByLabelText("Channel") as HTMLInputElement).disabled).toBe(true);
+    fireEvent.change(within(f).getByLabelText("Call sign"), { target: { value: "RVCO" } });
+    expect(within(f).getByText(/This changes the call sign of both streams: 15.1 RIVC and 15.3 RIVC become RVCO/)).toBeTruthy();
+    fireEvent.click(within(f).getByRole("button", { name: "Change both to RVCO" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Change the listing" })).toBeNull());
+    await waitFor(() => has(rowOf(/^Riverside County Library Live/), ["15.3 RVCO"]));
+  });
+
+  it("takes X.1 off with its family, naming each stream", async () => {
+    renderAt(`${PAGE}?source=${"00000000-0000-4000-8000-000000000751"}`);
+    const details = await screen.findByRole("dialog", { name: "Riverside County, Board of Supervisors" });
+    fireEvent.click(within(details).getByRole("button", { name: "Take off the dial for good" }));
+    const d = await screen.findByRole("dialog", { name: "Take 15.1 RIVC and its family off the dial for good?" });
+    expect(within(d).getByText("15.3 RIVC, Riverside County Library Live")).toBeTruthy();
+    fireEvent.click(within(d).getByRole("button", { name: "Take both off the dial" }));
+    await waitFor(() => expect(screen.queryByText("Riverside County Library Live")).toBeNull());
   });
 });

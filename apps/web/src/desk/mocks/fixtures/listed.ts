@@ -50,10 +50,12 @@ export interface DbListed {
   leadStageBefore?: CreatorStage | null;
   /** Call signs it had before a change (or has while it's off the dial), held for it. */
   heldCallSigns?: string[];
+  /** A231: taken off the dial with the listing on X.1 whose call sign it shares (that listing's id). */
+  removedWith?: string | null;
 }
 
 /** The ids of the seed's listings, by call sign. */
-export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706), LOMA: U(797) };
+export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706), LOMA: U(797), RIVC: U(751), RIVC_LIB: U(753) };
 
 /** The last minute's check, just before the mock clock's 8:42:12 pm. */
 const CHECKED = "2026-09-27T03:42:00.000Z";
@@ -133,6 +135,17 @@ export function seedListed(): DbListed[] {
       id: LISTED_IDS.LOMA, stationId: STATION_IDS.LOMA, name: "Loma Linda Community Access", description: "Public access: commissions, the school board and community notices", plays: "stream_link",
       streamUrl: "https://lomalinda.example.gov/live/manifest.mpd", embedTerms: "unclear", publicBasis: "Public access channel, stream published for the public",
       health: { state: "up", since: "2026-09-26T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
+    }),
+    // A229: Riverside County's public streams, sharing RIVC on 15 (15.2 Public Works is listed in the demo).
+    listing({
+      id: LISTED_IDS.RIVC, stationId: STATION_IDS.RIVC, name: "Riverside County, Board of Supervisors", description: "Board meetings, from the county's own stream", plays: "stream_link",
+      streamUrl: "https://riverside.example.gov/live/board/index.m3u8", embedTerms: "unclear", publicBasis: "County government, stream published for the public",
+      health: { state: "up", since: "2026-09-20T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
+    }),
+    listing({
+      id: LISTED_IDS.RIVC_LIB, stationId: STATION_IDS.RIVC_LIB, name: "Riverside County Library Live", description: "Story times, author talks and classes", plays: "stream_link",
+      streamUrl: "https://riverside.example.gov/live/library/index.m3u8", embedTerms: "unclear", publicBasis: "County library, stream published for the public",
+      health: { state: "up", since: "2026-09-20T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     })
   ];
 }

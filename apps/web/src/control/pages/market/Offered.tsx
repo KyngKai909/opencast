@@ -21,6 +21,7 @@ import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import { ProgramWatch } from "../../components/watch/ProgramWatch";
 import "./Offered.css";
+import { stationLabel } from "../../station/slug";
 
 interface Row {
   key: string;
@@ -37,7 +38,7 @@ export default function Offered() {
   const phone = useIsPhone();
   const navigate = useNavigate();
   const { requestId } = useParams();
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const library = useLibrary(s.id);
   const mine = useBrowse({ maker: s.id });
   const requests = useRequests(s.id);
@@ -81,10 +82,10 @@ export default function Offered() {
       className="cc-mk-offered__req"
       swatch={r.carrier.colour ?? undefined}
       channel={r.carrier.channel ?? undefined}
-      title={`${r.carrier.callSign ?? r.carrier.name} wants to carry ${r.program.title}`}
+      title={`${stationLabel(r.carrier)} wants to carry ${r.program.title}`}
       detail={`${slotText(r.slots)}, on ${termNames([r.term]).toLowerCase()} terms. Asked ${agoWords(r.createdAt, now().getTime())}`}
       action={
-        <Button size="sm" href={`${s.base}/market/offered/requests/${r.id}`} aria-label={`Review ${r.carrier.callSign ?? r.carrier.name}'s request`}>
+        <Button size="sm" href={`${s.base}/market/offered/requests/${r.id}`} aria-label={`Review ${stationLabel(r.carrier)}'s request`}>
           Review
         </Button>
       }
@@ -117,7 +118,7 @@ export default function Offered() {
                 </dt>
                 <dd>
                   {approved.length > 0 ? (
-                    <Tag>Approved {approved.map((q) => q.carrier.callSign ?? q.carrier.name).join(", ")}</Tag>
+                    <Tag>Approved {approved.map((q) => stationLabel(q.carrier)).join(", ")}</Tag>
                   ) : r.state === "not_offered" && s.can("programming") ? (
                     <Button size="sm" href={`${s.base}/market/offered/${r.programId}/offer`} aria-label={`Offer ${r.title}`}>
                       Offer
@@ -183,7 +184,7 @@ export default function Offered() {
       align: "end",
       cell: (r) => {
         const approved = approvedNow(r.programId);
-        if (approved.length) return <Tag>Approved {approved.map((q) => q.carrier.callSign ?? q.carrier.name).join(", ")}</Tag>;
+        if (approved.length) return <Tag>Approved {approved.map((q) => stationLabel(q.carrier)).join(", ")}</Tag>;
         if (r.state === "cannot") return <span className="cc-mk-offered__local">Link imports stay local</span>;
         if (!s.can("programming")) return r.offer && r.state === "offered" ? <Button size="sm" href={`${s.base}/market/offers/${r.offer.id}/carriers`}>Carriers</Button> : null;
         if (r.state === "not_offered")
@@ -224,14 +225,14 @@ export default function Offered() {
 function CarriageMoney({ name, carriedBy }: { name: string; carriedBy: Agreement[] }) {
   const barter = carriedBy.filter((a) => a.term === "barter" || a.term === "cash_plus_barter");
   const cash = carriedBy.filter((a) => a.term === "cash");
-  const who = (list: Agreement[]) => [...new Set(list.map((a) => a.carrier.callSign ?? a.carrier.name))];
+  const who = (list: Agreement[]) => [...new Set(list.map((a) => stationLabel(a.carrier)))];
   const and = (l: string[]) => (l.length <= 1 ? (l[0] ?? "") : `${l.slice(0, -1).join(", ")} and ${l.at(-1)}`);
   const sum = (list: Agreement[]) => list.reduce((n, a) => n + a.paidThisMonthMicros, 0);
   const airings = (list: Agreement[]) => list.reduce((n, a) => n + a.airingsThisMonth, 0);
   const paying = (list: Agreement[]) => list.filter((a) => a.paidThisMonthMicros > 0);
   const cashDetail =
     paying(cash).length === 1
-      ? `${paying(cash)[0]!.program.title} on ${paying(cash)[0]!.carrier.callSign ?? paying(cash)[0]!.carrier.name}, ${airings(paying(cash))} airings`
+      ? `${paying(cash)[0]!.program.title} on ${stationLabel(paying(cash)[0]!.carrier)}, ${airings(paying(cash))} airings`
       : paying(cash).length
         ? `${airings(paying(cash))} airings on ${and(who(paying(cash)))}`
         : "None this month";

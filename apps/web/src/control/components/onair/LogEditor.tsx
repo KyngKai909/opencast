@@ -20,6 +20,7 @@ import { LOG_READS } from "./data";
 import { airable } from "./repeat";
 import { draftBreaks, draftEntries, dragTo, insertId, lockOf, rippleFrom, timeValue, typedTime, wholeMinutes, withChange, type DraftEntry, type DraftItem } from "./logEdit";
 import { dayClock, spanText } from "./time";
+import { stationLabel } from "../../station/slug";
 
 const MIN = 60_000;
 
@@ -582,7 +583,7 @@ export function InsertDialog({ edit, stationId, anchor, where, base, onClose }: 
         <SelectField label="Program" size="sm" value={agreement?.id ?? ""} onChange={(e) => (setAgreementId(e.target.value), setChosen(null))}>
           {carrying.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.program.title}, from {a.maker.callSign ?? a.maker.name}
+              {a.program.title}, from {stationLabel(a.maker)}
             </option>
           ))}
         </SelectField>

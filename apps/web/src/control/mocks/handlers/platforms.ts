@@ -95,7 +95,7 @@ export const platformHandlers: HttpHandler[] = [
     if (r instanceof Response) return r;
     if (provider !== "youtube" && provider !== "twitch") return fail(400, "bad_request", "Sign in to YouTube or Twitch; add anything else with its address and key.");
     const body = (await bodyOf<{ returnTo?: string }>(request)) ?? {};
-    const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/control/") ? body.returnTo : `/control/${r.station.ident.callSign ?? id}/translators`;
+    const returnTo = typeof body.returnTo === "string" && body.returnTo.startsWith("/control/") ? body.returnTo : `/control/${r.station.ident.slug ?? r.station.ident.callSign?.toLowerCase() ?? id}/translators`;
     const list = mockPlatformsOf(id);
     const name = r.station.ident.name;
     const existing = list.find((p) => p.kind === provider && p.method === "signed_in");

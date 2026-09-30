@@ -53,6 +53,8 @@ export const PROGRAMS: Record<string, { id: string; title: string; maker: string
   "saturday-reel": { id: P("saturday-reel"), title: "Saturday Reel", maker: "REEL", description: "Cartoons from 1928 to 1934, restored from the original prints.", category: "Classic" },
   "beat-tape-live": { id: P("beat-tape-live"), title: "Beat Tape Live", maker: "BEAT", description: "Producers play unreleased tapes and talk through how they were made. Live from the Redlands studio.", live: true, category: "Music" },
   "crate-session": { id: P("crate-session"), title: "Crate Session", maker: "BEAT", description: "Sessions from the Inland Beat library.", category: "Music" },
+  // A229: Beat Tapes, BEAT 12.2 (the maker is named by its address: it shares BEAT's call sign).
+  "beat-tapes": { id: P("beat-tapes"), title: "Beat Tapes", maker: "beat-12-2", description: "A producer's tape, start to finish, from the Inland Beat collective.", category: "Music" },
   "slow-hours": { id: P("slow-hours"), title: "Slow Hours", maker: "HALL", description: "Slow beats for late work.", category: "Music" },
   "tamales": { id: P("tamales"), title: "Tamales for forty", maker: "SAZN", description: "A family kitchen in Fontana makes tamales for a party of forty.", category: "Food" },
   "orange-street": { id: P("orange-street"), title: "Orange Street after hours", maker: "SAZN", description: "Redlands' Orange Street, after the kitchens close.", category: "Food" },
@@ -100,6 +102,10 @@ export const AIRINGS: MockAiring[] = [
   a("BEAT", "22:00", "23:00", "Late Crate, ep. 15", "late-crate", { episodeTitle: "ep. 15", note: "Beat showcase" }),
   a("BEAT", "23:00", "24:00", "Slow Hours", "slow-hours", { carriedFrom: "HALL" }),
   a("BEAT", "24:00", "26:00", "Late Crate, eps. 12 to 15", "late-crate", { note: "Overnight repeat" }),
+  // BEAT 12.2 Beat Tapes (A229: the same owner's second station, sharing BEAT's call sign)
+  a("beat-12-2", "18:00", "20:00", "Tape 31: Redlands summer", "beat-tapes"),
+  a("beat-12-2", "20:00", "22:00", "Tape 32: Night drive", "beat-tapes"),
+  a("beat-12-2", "22:00", "26:00", "Tapes all night", "beat-tapes"),
   // SAZN 18.1
   a("SAZN", "19:00", "20:00", "Sazón archive", "sazon-archive"),
   a("SAZN", "20:00", "21:00", "Tamales for forty", "tamales", { note: "A family kitchen in Fontana" }),

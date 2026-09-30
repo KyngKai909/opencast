@@ -17,7 +17,7 @@ import "./OwnershipSection.css";
 import { CONTROL } from "../../../../areas";
 
 export function OwnershipSection({ s }: { s: StationState }) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const team = useTeam(s);
   const toast = useToast();
   const navigate = useNavigate();

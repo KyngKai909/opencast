@@ -10,6 +10,10 @@
 // shows, the address, how it plays, their terms, what's on, and its channel and call sign. Evidence
 // is recorded on its own (Record evidence); the form says plainly, before saving, when the change
 // takes the station off the dial until new evidence is recorded.
+//
+// A229: on X.n beside an external station on X.1, "Same brand as 15.1 RIVC (share its call sign)",
+// on by default: the call sign is X.1's and the channel tells them apart. Off, it takes its own.
+// Changing X.1's call sign changes its family's: the button names how many, and the form names them.
 import { useState, type FormEvent } from "react";
 import { networkApi, type ListedSource, type Market } from "@opencast/contracts";
 import { Button, Checkbox, Field, Modal, Notice, Segmented, TextAreaField, useToast } from "@opencast/ui";
@@ -18,7 +22,7 @@ import { useApiMutation } from "../../../api/hooks";
 import { errorText } from "../../pages/common";
 import { callSignProblem } from "../setup/draft";
 import { complete, EmbedEvidenceFields, emptyEvidence, evidenceInput, evidenceProblems, isLink, NoteField, StreamEvidenceFields, type EvidenceDraft } from "./EvidenceFields";
-import { changeWarning, onceWords, playsOf, type Plays } from "./external";
+import { changeWarning, familyCallSignChange, familyHeadFor, onceWords, playsOf, sameBrandLabel, type Plays } from "./external";
 import { channelText } from "./SourceStatus";
 import "../pipeline/forms.css";
 
@@ -50,7 +54,9 @@ function draftOf(s: ListedSource) {
     calendarUrl: s.calendarUrl ?? "",
     checkedAgainst: s.schedule?.checkedAgainst ?? "",
     checkedOn: s.schedule?.checkedOn ?? "",
-    outsideMarket: false
+    outsideMarket: false,
+    // A229: sharing X.1's call sign.
+    sameBrand: s.family?.role === "member"
   };
 }
 
@@ -59,7 +65,8 @@ export function ListSource({
   onClose,
   prefill = {},
   editing,
-  onSaved
+  onSaved,
+  listings = []
 }: {
   market: Market;
   onClose: () => void;
@@ -68,6 +75,8 @@ export function ListSource({
   editing?: ListedSource;
   /** After a change is saved, with the listing as it is now. */
   onSaved?: (saved: ListedSource) => void;
+  /** A229: the market's listings, to offer "Same brand as X.1" on a subchannel. */
+  listings?: readonly ListedSource[];
 }) {
   const toast = useToast();
   const invalidates = [networkApi.listListedSources, networkApi.getBoard, networkApi.listCreators, networkApi.listListedChanges, networkApi.listExternalOutages];
@@ -88,7 +97,8 @@ export function ListSource({
           calendarUrl: "",
           checkedAgainst: "",
           checkedOn: "",
-          outsideMarket: false
+          outsideMarket: false,
+          sameBrand: true
         }
   );
   // A lead's stream has no permission yet: "Not yet" until someone records it.
@@ -99,6 +109,12 @@ export function ListSource({
   const set = <K extends keyof typeof f>(k: K) => (v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const setE = <K extends keyof EvidenceDraft>(k: K) => (v: EvidenceDraft[K]) => setD((x) => ({ ...x, [k]: v }));
   const dash = f.plays === "stream_link" && /\.mpd($|[?#])/i.test(f.streamUrl.trim());
+  // A229: X.1 whose call sign this channel could share (never X.1 itself, and never a listing's own family head for X.1).
+  const head = familyHeadFor(listings.filter((l) => l.id !== editing?.id), f.band, f.channel);
+  const isHead = editing?.family?.role === "head" && editing.family.members.length > 0;
+  const sharing = !!head && f.sameBrand;
+  const shownCallSign = sharing ? (head.station.callSign ?? "") : f.callSign;
+  const familyChange = editing && isHead ? familyCallSignChange(editing, f.callSign) : null;
 
   /** A215: only what changed goes to the API; nothing changed says so. */
   const saveChange = async (s: ListedSource) => {
@@ -121,7 +137,8 @@ export function ListSource({
           }
         : {}),
       ...(f.channel.trim() !== was.channel ? { channel: f.channel.trim() } : {}),
-      ...(f.callSign !== was.callSign ? { callSign: f.callSign } : {})
+      // A229: sharing X.1's call sign, or leaving it with a call sign of its own.
+      ...(sharing ? (was.sameBrand && f.channel.trim() === was.channel ? {} : { shareCallSign: true }) : f.callSign !== was.callSign ? { callSign: f.callSign, ...(was.sameBrand ? { shareCallSign: false } : {}) } : {})
     };
     setNothing(!Object.keys(body).length);
     if (!Object.keys(body).length) return;
@@ -141,8 +158,10 @@ export function ListSource({
     const errs: Record<string, string> = editing ? {} : { ...evidenceProblems(f.plays, d) };
     if (!f.name.trim()) errs.name = "Say whose stream it is.";
     if (!/^\d{1,3}\.\d$/.test(f.channel.trim())) errs.channel = f.band === "tv" ? "A channel like 9.4." : "A frequency like 89.2.";
-    const cs = callSignProblem(f.callSign);
+    const cs = sharing ? null : callSignProblem(f.callSign);
     if (cs) errs.callSign = cs;
+    // A229: leaving a family needs a call sign of its own.
+    else if (!sharing && editing?.family?.role === "member" && f.callSign === editing.station.callSign) errs.callSign = "Give it a call sign of its own, or keep sharing.";
     if (!isLink(f.streamUrl)) errs.streamUrl = f.plays === "embed" ? "Paste the address of their player." : "Paste the stream's address.";
     if (f.schedule !== "none" && !isLink(f.calendarUrl)) errs.calendarUrl = f.schedule === "feed" ? "Paste the link to their calendar or feed." : "Paste the guide data's address.";
     if (f.schedule === "guide") {
@@ -160,7 +179,7 @@ export function ListSource({
           marketId: market.id,
           band: f.band,
           channel: f.channel.trim(),
-          callSign: f.callSign,
+          ...(sharing ? { shareCallSign: true } : { callSign: f.callSign }),
           name,
           description: f.description.trim() || undefined,
           streamUrl: f.streamUrl.trim(),
@@ -199,7 +218,7 @@ export function ListSource({
             Cancel
           </Button>
           <Button variant="primary" type="submit" form="nd-list-source" disabled={pending}>
-            {editing ? (warning?.waits ? "Save, and wait for evidence" : "Save changes") : "List it"}
+            {editing ? (warning?.waits ? "Save, and wait for evidence" : familyChange ? familyChange.button : "Save changes") : "List it"}
           </Button>
         </>
       }
@@ -214,9 +233,37 @@ export function ListSource({
           </div>
         )}
         <div className="nd-form__pair">
-          <Field label="Channel" mono value={f.channel} placeholder={f.band === "tv" ? "9.4" : "89.2"} onChange={(e) => set("channel")(e.target.value)} error={errors.channel} />
-          <Field label="Call sign" mono maxLength={5} value={f.callSign} onChange={(e) => set("callSign")(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} error={errors.callSign} />
+          <Field
+            label="Channel"
+            mono
+            value={f.channel}
+            placeholder={f.band === "tv" ? "9.4" : "89.2"}
+            onChange={(e) => set("channel")(e.target.value)}
+            error={errors.channel}
+            disabled={isHead}
+            help={isHead ? "Its call sign is shared on its subchannels, so it stays here." : undefined}
+          />
+          <Field
+            label="Call sign"
+            mono
+            maxLength={5}
+            value={shownCallSign}
+            onChange={(e) => set("callSign")(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))}
+            error={errors.callSign}
+            disabled={sharing}
+            help={sharing ? `The channel tells them apart: ${f.channel.trim()} ${shownCallSign}.` : undefined}
+          />
         </div>
+        {head && (
+          <Checkbox
+            checked={f.sameBrand}
+            onChange={(v) => setF((x) => ({ ...x, sameBrand: v, callSign: v ? x.callSign : x.callSign === (head.station.callSign ?? "") ? "" : x.callSign }))}
+            label={sameBrandLabel(head)}
+            helper={f.sameBrand ? `${head.name} and this stream keep their own evidence and checks. Only the call sign is shared.` : "It takes a call sign of its own."}
+            ruled={false}
+          />
+        )}
+        {familyChange && <Notice tone="standby" icon="warn">{familyChange.text}</Notice>}
         <div>
           <span className="nd-form__label">How it plays</span>
           <Segmented label="How it plays" value={f.plays} onChange={(v) => set("plays")(v)} options={[{ value: "embed", label: "Official embed" }, { value: "stream_link", label: "Stream link" }]} />

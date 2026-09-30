@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
+import { blockedIabAdProducts, CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, parseStationSlug, radioBandTenths, stationSlugOf, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 import type { CurrentUser } from "../../http.js";
-import { badRequest, notFound, refused } from "../../errors.js";
+import { badRequest, conflict, notFound, refused } from "../../errors.js";
 import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackground.js";
 import { cadenceOf, type BreakCadence } from "../playout/engine/cadence.js";
 import { kindOfTranslator } from "../relays/platforms.js";
@@ -56,6 +56,10 @@ export interface StationSetupView {
   orders: { takesOrders: boolean; turnaround: string | null; fromMicros: number | null };
   /** IAB Content Taxonomy 3.0 ids: the station's own, or derived from its category. */
   iabCategories: string[];
+  /** A229: the station on X.1 whose call sign this one shares, or null. */
+  sharesCallSignWith?: StationIdent | null;
+  /** A229: the stations on its subchannels that share its call sign. */
+  callSignFamily?: StationIdent[];
 }
 
 /** What spot targeting and the market board need about a station. */
@@ -74,6 +78,8 @@ export interface StationProfile {
   pledgesTaxDeductible: boolean | null;
   /** The station's key in the escrow contract. */
   escrowId: number;
+  /** A229: the station on X.1 whose call sign this one shares, or null. */
+  sharesCallSignWith: string | null;
 }
 
 export interface StationsService {
@@ -89,7 +95,18 @@ export interface StationsService {
   onDial(marketId: string, band: Band): Promise<StationProfile[]>;
   /** Public stations in these markets (both bands), for targeting and the market board. */
   inMarkets(marketIds: string[]): Promise<StationProfile[]>;
+  /**
+   * By id, call sign or address (A229): `sbco` is the station on X.1 (or the one alone with it),
+   * `sbco-15-2` the one sharing it on 15.2. A call sign that changed (A222) still finds its station
+   * through the year it's held for it.
+   */
   byRef(ref: string): Promise<StationProfile | null>;
+  /** A229: the stations that have this call sign (X.1 and its family, or the one). */
+  stationsWithCallSign(callSign: string): Promise<string[]>;
+  /** A229: the station's call-sign family (X.1 and every station sharing it, signed off or not); just itself when it shares nothing. */
+  familyIds(stationId: string): Promise<Set<string>>;
+  /** A229: X.1 and the stations sharing its call sign now (not signed off for good), by any of them; null when it shares nothing. */
+  callSignFamily(stationId: string): Promise<{ head: StationProfile; members: StationProfile[] } | null>;
   /** Added 2026-09-29 (reserved call signs): of these call signs, the ones a station has. */
   takenCallSigns(callSigns: string[]): Promise<Set<string>>;
   search(q: string, marketId?: string): Promise<{ tuneTo: StationProfile | null; stations: StationProfile[] }>;
@@ -124,6 +141,8 @@ export interface StationsService {
     logoUrl: string | null;
     /** The band it's on (TV unless it has a radio channel): what it's prepared and assembled for. */
     band: Band;
+    /** A229: its call sign is shared (name it with its channel where only a call sign would show). */
+    sharesCallSign?: boolean;
   } | null>;
   /** Added 2026-09-29: stations that air (a station or a claimable one, setting up or on air, not signed off for good). */
   airingStationIds(): Promise<string[]>;
@@ -164,22 +183,32 @@ export interface StationsService {
   relayBackground(stationId: string): Promise<{ loopKey: string; frames: number } | null>;
   settleRelayBackgrounds(): Promise<void>;
   /** Used by Network desk to set up claimable, listed and catalog stations. */
-  createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string }): Promise<string>;
+  createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string; sharesCallSignWith?: string | null }): Promise<string>;
   /**
    * A215 (added 2026-09-30): an external station's listing changed on Network desk: its name,
    * description, call sign (the old one is the caller's to hold) or channel (the old channel row is
    * released and a new one made: a channel is otherwise fixed after first sign-on). External stations only.
    */
-  changeManaged(db: Executor, stationId: string, input: { name?: string; description?: string | null; callSign?: string; channel?: { marketId: string; band: Band; tenths: number } }): Promise<void>;
+  changeManaged(db: Executor, stationId: string, input: { name?: string; description?: string | null; callSign?: string; channel?: { marketId: string; band: Band; tenths: number }; sharesCallSignWith?: string | null }): Promise<void>;
   /** A215: a station's channel is let go (an external station taken off the dial, 90 days on). */
   releaseChannel(db: Executor, stationId: string): Promise<void>;
+  /**
+   * A223 (closed 2026-09-30): frees the channels of stations that signed off for good at least 90
+   * days ago (not external stations: theirs go with their listing, A221). X.1 whose call sign is
+   * shared by a station still on the air keeps its number until that one signs off too (A233).
+   * Idempotent. Returns how many stations' channels were freed.
+   */
+  releaseSignedOffChannels(): Promise<number>;
 
   /** `reservationId` (added 2026-09-29): started from a waitlist invite, with the call sign and any channel held. */
   create(user: CurrentUser, input: { kind: "station" | "studio"; name: string; description?: string; colour?: string; handle?: string; reservationId?: string }): Promise<StationSetupView>;
   setup(stationId: string): Promise<StationSetupView>;
   updateSetup(user: CurrentUser, stationId: string, input: SetupPatch): Promise<StationSetupView>;
   availableChannels(marketId: string, band: Band): Promise<Array<{ channel: string; state: "open" | "taken" | "held" }>>;
-  chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string }): Promise<StationSetupView>;
+  /** A230: the owner's own subchannels in a market: the next free X.n beside each station they own on X.1. */
+  ownSubchannels(user: CurrentUser, marketId: string, band: Band): Promise<Array<{ channel: string; beside: StationIdent }>>;
+  /** `user` (A230): the owner, for a subchannel beside their own X.1; `shareCallSign` shares its call sign. */
+  chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string; shareCallSign?: boolean }, user?: CurrentUser): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
   setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] } }): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
@@ -306,7 +335,20 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     const blocked = found.length
       ? await db.select().from(schema.blockedCategories).where(inArray(schema.blockedCategories.stationId, found.map((r) => r.station.id)))
       : [];
+    // A229: X.1 stations whose call sign is shared by a station on the air (not signed off for good).
+    const heads = found.length
+      ? new Set(
+          (
+            await db
+              .select({ head: S.sharesCallSignWith })
+              .from(S)
+              .where(and(inArray(S.sharesCallSignWith, found.map((r) => r.station.id)), sql`${S.status} <> 'signed_off'`))
+          ).map((r) => r.head)
+        )
+      : new Set<string | null>();
     return found.map(({ station, channel }) => {
+      const channelText = channel ? formatChannelNumber({ band: channel.band, tenths: channel.tenths }) : null;
+      const member = station.sharesCallSignWith !== null;
       const ident: StationIdent = {
         id: station.id,
         kind: station.kind,
@@ -315,9 +357,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         name: station.name,
         colour: station.colour,
         band: channel?.band ?? null,
-        channel: channel ? formatChannelNumber({ band: channel.band, tenths: channel.tenths }) : null,
+        channel: channelText,
         marketSlug: channel ? (markets.get(channel.marketId)?.slug ?? null) : null,
-        homeCity: station.homeCity
+        homeCity: station.homeCity,
+        // A229: its addresses' part (`sbco`, `sbco-15-2`), and whether its call sign is shared.
+        slug: stationSlugOf({ id: station.id, callSign: station.callSign, handle: station.handle, channel: channelText, familyMember: member }),
+        ...(member || heads.has(station.id) ? { sharesCallSign: true } : {})
       };
       return {
         id: station.id,
@@ -332,12 +377,13 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         blockedCategories: blocked.filter((b) => b.stationId === station.id).map((b) => b.category),
         description: station.description,
         pledgesTaxDeductible: station.pledgesTaxDeductible,
-        escrowId: station.escrowId
+        escrowId: station.escrowId,
+        sharesCallSignWith: station.sharesCallSignWith
       };
     });
   }
 
-  function setupView(profile: StationProfile, station: typeof S.$inferSelect): StationSetupView {
+  function setupView(profile: StationProfile, station: typeof S.$inferSelect, family?: { head: StationIdent | null; members: StationIdent[] }): StationSetupView {
     return {
       station: profile.ident,
       description: station.description,
@@ -353,7 +399,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       pledgesTaxDeductible: station.pledgesTaxDeductible,
       memberCreditStyle: station.memberCreditStyle,
       orders: { takesOrders: station.kind === "studio" || station.takesOrders, turnaround: station.orderTurnaround, fromMicros: station.orderFromMicros },
-      iabCategories: iabContentCategories({ override: station.iabCategories, category: station.category })
+      iabCategories: iabContentCategories({ override: station.iabCategories, category: station.category }),
+      ...(family ? { sharesCallSignWith: family.head, callSignFamily: family.members } : {})
     };
   }
 
@@ -487,12 +534,55 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     },
 
     async byRef(ref) {
-      const isId = /^[0-9a-f-]{36}$/i.test(ref);
-      const [row] = await db
+      if (/^[0-9a-f-]{36}$/i.test(ref)) {
+        const [row] = await db.select({ id: S.id }).from(S).where(eq(S.id, ref));
+        return row ? ((await service.profiles([row.id])).get(row.id) ?? null) : null;
+      }
+      // A229: a call sign (`sbco`) or a call sign and channel (`sbco-15-2`).
+      const parsed = parseStationSlug(ref);
+      if (!parsed) return null;
+      let ids = await service.stationsWithCallSign(parsed.callSign);
+      if (!ids.length) {
+        // An address from before a call sign changed (A222): the name is held a year for the station
+        // that had it, and a family's for X.1, so its family's addresses find their stations too.
+        const holders = await services.waitlist.stationsHolding(parsed.callSign);
+        if (holders.length) ids = (await db.select({ id: S.id }).from(S).where(or(inArray(S.id, holders), inArray(S.sharesCallSignWith, holders)))).map((r) => r.id);
+      }
+      const found = [...(await service.profiles(ids)).values()];
+      if (parsed.tenths !== null) {
+        const channel = formatChannelNumber({ band: "tv", tenths: parsed.tenths });
+        return found.find((p) => p.ident.band === "tv" && p.ident.channel === channel) ?? null;
+      }
+      // The bare call sign is X.1's (or the one station's).
+      return found.find((p) => !p.sharesCallSignWith) ?? found[0] ?? null;
+    },
+
+    async stationsWithCallSign(callSign) {
+      return (await db.select({ id: S.id }).from(S).where(eq(S.callSign, callSign))).map((r) => r.id);
+    },
+
+    async familyIds(stationId) {
+      const [row] = await db.select({ id: S.id, head: S.sharesCallSignWith }).from(S).where(eq(S.id, stationId));
+      if (!row) return new Set();
+      const head = row.head ?? row.id;
+      const members = await db.select({ id: S.id }).from(S).where(eq(S.sharesCallSignWith, head));
+      return new Set([head, ...members.map((m) => m.id)]);
+    },
+
+    async callSignFamily(stationId) {
+      const [row] = await db.select({ id: S.id, head: S.sharesCallSignWith }).from(S).where(eq(S.id, stationId));
+      if (!row) return null;
+      const headId = row.head ?? row.id;
+      const members = await db
         .select({ id: S.id })
         .from(S)
-        .where(isId ? eq(S.id, ref) : eq(S.callSign, ref.toUpperCase()));
-      return row ? ((await service.profiles([row.id])).get(row.id) ?? null) : null;
+        .where(and(eq(S.sharesCallSignWith, headId), sql`${S.status} <> 'signed_off'`));
+      if (!members.length && !row.head) return null;
+      const all = await service.profiles([headId, ...members.map((m) => m.id)]);
+      const head = all.get(headId);
+      if (!head) return null;
+      const tenths = (p: StationProfile) => (p.ident.channel ? Math.round(Number(p.ident.channel) * 10) : 0);
+      return { head, members: members.flatMap((m) => all.get(m.id) ?? []).sort((a, b) => tenths(a) - tenths(b)) };
     },
 
     async takenCallSigns(callSigns) {
@@ -671,7 +761,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         colour: profile.ident.colour,
         bug: { mode: found.station.bugMode, opacity: found.station.bugOpacity, position: found.station.bugPosition },
         logoUrl: found.station.logoUrl,
-        band: found.channel?.band ?? "tv"
+        band: found.channel?.band ?? "tv",
+        ...(profile.ident.sharesCallSign ? { sharesCallSign: true } : {})
       };
     },
 
@@ -753,7 +844,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const patch = {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.callSign !== undefined ? { callSign: input.callSign } : {})
+        ...(input.callSign !== undefined ? { callSign: input.callSign } : {}),
+        // A229: joining X.1's family (its call sign) or leaving it (its own).
+        ...(input.sharesCallSignWith !== undefined ? { sharesCallSignWith: input.sharesCallSignWith } : {})
       };
       if (Object.keys(patch).length) await tx.update(S).set({ ...patch, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
       if (input.channel) {
@@ -766,11 +859,30 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       await tx.update(C).set({ releasedAt: deps.clock.now() }).where(and(eq(C.stationId, stationId), isNull(C.releasedAt)));
     },
 
+    async releaseSignedOffChannels() {
+      const before = new Date(deps.clock.now().getTime() - CHANNEL_HOLD_AFTER_SIGN_OFF_MS);
+      const due = await db
+        .selectDistinct({ id: S.id })
+        .from(S)
+        .innerJoin(C, and(eq(C.stationId, S.id), isNull(C.releasedAt)))
+        .where(and(inArray(S.kind, ["station", "claimable", "catalog"]), eq(S.status, "signed_off"), isNotNull(S.signedOffAt), lte(S.signedOffAt, before)));
+      if (!due.length) return 0;
+      // A233: X.1 stays while a station sharing its call sign is on the air (the family hangs off its number).
+      const onAir = await db
+        .select({ head: S.sharesCallSignWith })
+        .from(S)
+        .where(and(inArray(S.sharesCallSignWith, due.map((d) => d.id)), sql`${S.status} <> 'signed_off'`));
+      const keep = new Set(onAir.map((r) => r.head));
+      const free = due.filter((d) => !keep.has(d.id));
+      for (const d of free) await db.transaction((tx) => service.releaseChannel(tx, d.id));
+      return free.length;
+    },
+
     async createManaged(tx, input) {
       if (input.colour && !isValidStationColour(input.colour)) throw badRequest("That colour doesn't hold 4.5:1 against white.");
       const [station] = await tx
         .insert(S)
-        .values({ kind: input.kind, name: input.name, callSign: input.callSign, colour: input.colour ?? null, description: input.description ?? null })
+        .values({ kind: input.kind, name: input.name, callSign: input.callSign, colour: input.colour ?? null, description: input.description ?? null, sharesCallSignWith: input.sharesCallSignWith ?? null })
         .returning();
       await tx.insert(C).values({ stationId: station.id, marketId: input.marketId, band: input.band, tenths: input.tenths });
       await tx.insert(schema.breakRules).values({ stationId: station.id }).onConflictDoNothing();
@@ -813,7 +925,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const [found] = await rows([stationId]);
       if (!found) throw notFound("That station");
       const [profile] = await build([found]);
-      return setupView(profile, found.station);
+      // A229: the X.1 it shares its call sign with, or the stations sharing its own.
+      const family = await service.callSignFamily(stationId);
+      return setupView(profile, found.station, {
+        head: family && family.head.id !== stationId ? family.head.ident : null,
+        members: family && family.head.id === stationId ? family.members.map((m) => m.ident) : []
+      });
     },
 
     async updateSetup(user, stationId, input) {
@@ -825,6 +942,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       if (input.callSign && current.kind === "studio") throw refused("studio", "A studio has a handle, not a call sign.");
       if (input.callSign && current.firstSignedOnAt && input.callSign !== current.callSign) {
         throw refused("fixed_after_sign_on", "The call sign is fixed after first sign-on.");
+      }
+      // A229: a new call sign on X.1 is its family's too, so it can't change once one of them has signed on.
+      const changingSign = !!input.callSign && input.callSign !== current.callSign;
+      const signedOnMember = changingSign && !current.sharesCallSignWith
+        ? (await db.select({ id: S.id }).from(S).where(and(eq(S.sharesCallSignWith, stationId), isNotNull(S.firstSignedOnAt))))[0]
+        : undefined;
+      if (signedOnMember) {
+        const m = (await service.idents([signedOnMember.id])).get(signedOnMember.id);
+        throw refused("fixed_after_sign_on", `${[m?.callSign, m?.channel].filter(Boolean).join(" ")} has signed on with this call sign, so it stays.`);
       }
       await db.transaction(async (tx) => {
         if (input.callSign && input.callSign !== current.callSign) {
@@ -838,6 +964,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (input.description !== undefined) patch.description = input.description;
         if (input.colour !== undefined) patch.colour = input.colour.toUpperCase();
         if (input.callSign !== undefined) patch.callSign = input.callSign;
+        // A229: a station sharing X.1's call sign that takes its own stops sharing (before sign-on only).
+        if (changingSign && current.sharesCallSignWith) patch.sharesCallSignWith = null;
         if (input.bug?.mode !== undefined) patch.bugMode = input.bug.mode;
         if (input.bug?.position !== undefined) patch.bugPosition = input.bug.position;
         if (input.bug?.opacity !== undefined) patch.bugOpacity = input.bug.opacity;
@@ -889,10 +1017,47 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       return channels;
     },
 
-    async chooseChannel(stationId, input) {
+    async ownSubchannels(user, marketId, band) {
+      if (band !== "tv" || !(await services.settings.valueAt("numbering.own_subchannels")).allowed) return [];
+      const owned = await services.accounts.ownedStationIds(user.id);
+      if (!owned.length) return [];
+      const heads = (await service.profiles(owned)).values();
+      const x1 = [...heads].filter((p) => p.kind === "station" && p.status !== "signed_off" && p.marketId === marketId && p.ident.band === "tv" && p.ident.channel?.endsWith(".1") && !p.sharesCallSignWith);
+      if (!x1.length) return [];
+      const [taken, held] = await Promise.all([
+        db.select({ tenths: C.tenths }).from(C).where(and(eq(C.marketId, marketId), eq(C.band, "tv"), isNull(C.releasedAt))),
+        services.waitlist.heldChannels(marketId, "tv")
+      ]);
+      const used = new Set([...taken.map((t) => t.tenths), ...held.map((h) => h.tenths)]);
+      return x1.flatMap((p) => {
+        const base = Math.round(Number(p.ident.channel) * 10);
+        for (let t = base + 1; t < base + 9; t++) if (!used.has(t)) return [{ channel: formatChannelNumber({ band: "tv", tenths: t }), beside: p.ident }];
+        return [];
+      });
+    },
+
+    async chooseChannel(stationId, input, user) {
       const number = parseChannelNumber(input.band, input.channel);
       if (!number) throw badRequest(input.band === "tv" ? "TV channels run from 2.1 to 69.9." : "Radio runs from 88.2 to 107.8, in even tenths.", { channel: "Out of range" });
-      if (isSubchannel(number)) throw badRequest("A station gets X.1. Subchannels are for stations you carry around the clock.", { channel: "Use X.1" });
+      // A230 (Open, rule numbering.own_subchannels): an owner's own subchannel beside their X.1.
+      let head: StationProfile | null = null;
+      if (isSubchannel(number)) {
+        const words = "A station gets X.1. Subchannels are for stations you carry around the clock.";
+        if (!(await services.settings.valueAt("numbering.own_subchannels")).allowed) throw badRequest(words, { channel: "Use X.1" });
+        const major = Math.floor(number.tenths / 10);
+        const [x1] = await db
+          .select({ id: C.stationId })
+          .from(C)
+          .where(and(eq(C.marketId, input.marketId), eq(C.band, "tv"), eq(C.tenths, familyHeadTenths(number.tenths)), eq(C.isPrimary, true), isNull(C.releasedAt)));
+        head = x1 ? ((await service.profiles([x1.id])).get(x1.id) ?? null) : null;
+        if (!head) throw badRequest(`Start at ${major}.1. A subchannel goes beside your own station on its .1.`, { channel: "Use X.1" });
+        const mine = !!user && (await services.accounts.stationMemberIds(head.id, ["owner"])).includes(user.id);
+        if (head.id === stationId || head.kind !== "station" || !mine) {
+          throw conflict("not_your_subchannel", `${[head.ident.channel, head.ident.callSign].filter(Boolean).join(" ")} isn't yours. A subchannel goes beside a station you own.`);
+        }
+        if (head.status === "signed_off") throw conflict("not_your_subchannel", `${[head.ident.channel, head.ident.callSign].filter(Boolean).join(" ")} has signed off for good.`);
+        if (head.sharesCallSignWith) throw badRequest(`Start at ${major}.1.`, { channel: "Use X.1" });
+      }
       if (!(await services.network.marketsByIds([input.marketId])).size) throw badRequest("That market doesn't exist.");
       const range = await services.settings.numberingFor(input.marketId);
       const outside =
@@ -906,12 +1071,36 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const [station] = await db.select().from(S).where(eq(S.id, stationId));
       if (!station) throw notFound("That station");
       if (station.firstSignedOnAt) throw refused("fixed_after_sign_on", "The channel is fixed after first sign-on.");
+      if (head && station.kind !== "station") throw badRequest("A station gets X.1. Subchannels are for stations you carry around the clock.", { channel: "Use X.1" });
+      const [current] = await db.select().from(C).where(and(eq(C.stationId, stationId), eq(C.isPrimary, true), isNull(C.releasedAt)));
+      const moving = !current || current.marketId !== input.marketId || current.band !== input.band || current.tenths !== number.tenths;
+      // A229: X.1 stays put while stations share its call sign.
+      if (moving) {
+        const family = await service.callSignFamily(stationId);
+        if (family && family.head.id === stationId && family.members.length) {
+          const names = family.members.map((m) => [m.ident.channel, m.ident.callSign].filter(Boolean).join(" ")).join(", ");
+          throw conflict("family_channel", `${names} ${family.members.length === 1 ? "shares" : "share"} this station's call sign. Move ${family.members.length === 1 ? "it" : "them"} first.`);
+        }
+        if (head) {
+          const [taken] = await db.select({ id: C.id }).from(C).where(and(eq(C.marketId, input.marketId), eq(C.band, "tv"), eq(C.tenths, number.tenths), isNull(C.releasedAt)));
+          const held = (await services.waitlist.heldChannels(input.marketId, "tv")).some((h) => h.tenths === number.tenths);
+          if (taken || held) throw conflict("channel_taken", `${input.channel} is taken. Pick another.`);
+        }
+      }
+      // Sharing X.1's call sign: asked for, or kept by one already sharing it that moves within the family.
+      const share = !!head && (input.shareCallSign ?? station.sharesCallSignWith === head.id);
+      if (share && !head!.ident.callSign) throw badRequest(`${head!.ident.channel} needs its call sign first.`, { shareCallSign: "X.1 has no call sign yet" });
       await db.transaction(async (tx) => {
-        const [existing] = await tx.select().from(C).where(and(eq(C.stationId, stationId), eq(C.isPrimary, true), isNull(C.releasedAt)));
-        if (existing) {
-          await tx.update(C).set({ marketId: input.marketId, band: input.band, tenths: number.tenths }).where(eq(C.id, existing.id));
+        if (current) {
+          await tx.update(C).set({ marketId: input.marketId, band: input.band, tenths: number.tenths }).where(eq(C.id, current.id));
         } else {
           await tx.insert(C).values({ stationId, marketId: input.marketId, band: input.band, tenths: number.tenths });
+        }
+        if (share) {
+          await tx.update(S).set({ callSign: head!.ident.callSign, sharesCallSignWith: head!.id, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
+        } else if (station.sharesCallSignWith) {
+          // It stops sharing: it chooses its own call sign next.
+          await tx.update(S).set({ callSign: null, sharesCallSignWith: null, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
         }
         // Another than the channel held with its waitlist call sign: the held one goes (added 2026-09-29).
         await services.waitlist.releaseOtherChannels(tx, stationId, { marketId: input.marketId, band: input.band, tenths: number.tenths });

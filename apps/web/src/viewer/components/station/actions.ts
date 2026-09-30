@@ -7,16 +7,16 @@ import { useLocation, useNavigate } from "react-router";
 import type { StationIdent } from "@opencast/contracts";
 import { useTune } from "../../player/PlayerRoot";
 
-type Tunable = Pick<StationIdent, "id" | "callSign" | "handle">;
+type Tunable = Pick<StationIdent, "id" | "callSign" | "handle"> & { slug?: string };
 
-/** The tuned-in page's path for a station: /watch/beat. */
+/** The tuned-in page's path for a station: /watch/beat (A229: /watch/rivc-15-2 for a station sharing X.1's call sign). */
 export function watchPath(s: Tunable): string {
-  return `/watch/${s.callSign?.toLowerCase() ?? s.handle ?? s.id}`;
+  return `/watch/${s.slug ?? s.callSign?.toLowerCase() ?? s.handle ?? s.id}`;
 }
 
-/** The station page's path: /beat. */
-export function stationPath(s: Pick<StationIdent, "id" | "callSign" | "handle">): string {
-  return `/${s.handle ?? s.callSign?.toLowerCase() ?? s.id}`;
+/** The station page's path: /beat (A229: /rivc-15-2). */
+export function stationPath(s: Pick<StationIdent, "id" | "callSign" | "handle"> & { slug?: string }): string {
+  return `/${s.handle ?? s.slug ?? s.callSign?.toLowerCase() ?? s.id}`;
 }
 
 /** Tunes the player to a station and opens the tuned-in page. */

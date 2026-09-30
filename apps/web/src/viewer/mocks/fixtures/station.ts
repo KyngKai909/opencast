@@ -112,6 +112,11 @@ const WEEK: Record<string, (weekday: number, day: number) => Slot[]> = {
     ["24:00", "30:00", "Madrugada", "madrugada"]
   ],
   MOJV: () => [["20:00", "21:00", "High Desert tonight", "mojave"]],
+  // A229: BEAT 12.2, by its address (it shares BEAT's call sign).
+  "beat-12-2": () => [
+    ["18:00", "22:00", "Beat Tapes", "beat-tapes"],
+    ["22:00", "30:00", "Tapes all night", "beat-tapes"]
+  ],
   DUST: () => [["20:00", "24:00", "Desert rock", "desert-rock"]]
 };
 
@@ -184,6 +189,12 @@ export interface StationExtra {
   underwriters?: string[];
   /** Search's line for the station ("Public affairs. Town halls and council meetings"). */
   searchLine?: string;
+}
+
+/** A station's extras, by call sign; a station sharing X.1's call sign (A229) has none of X.1's. */
+export function extraOf(ident: { callSign: string | null; slug?: string }): StationExtra | undefined {
+  const cs = ident.callSign ?? "";
+  return !ident.slug || ident.slug === cs.toLowerCase() ? STATION_EXTRA[cs] : undefined;
 }
 
 export const STATION_EXTRA: Record<string, StationExtra> = {

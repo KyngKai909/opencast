@@ -23,7 +23,7 @@ export function ClearWallet() {
   const toast = useToast();
   const qc = useQueryClient();
   const owner = s.can("moveMoney");
-  const name = s.station.callSign ?? s.station.name;
+  const name = s.label;
   const payout = useApi(ledgerApi.getPayoutAccount, { params: { stationId: s.id } }, { enabled: owner, retry: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

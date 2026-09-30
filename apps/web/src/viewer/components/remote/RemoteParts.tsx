@@ -60,6 +60,8 @@ export function NowStrip({ row, paused, now, flicker }: { row: DialRowX; paused:
           {airing?.live && <Tag variant="live">Live</Tag>}
           {airing?.kind === "listed" && !airing.live && <Tag variant="listed">External</Tag>}
         </div>
+        {/* A229: a shared call sign (15.1 RIVC, 15.2 RIVC): each stream's own name under it. */}
+        {row.station.sharesCallSign && airing && <small className="vw-rm-now__name">{row.station.name}</small>}
         <b className="vw-rm-now__title">{airing?.title ?? (row.onAir ? row.station.name : "Off air")}</b>
         {airing && airing.kind !== "off_air" && <ProgressBar start={airing.startsAt} end={airing.endsAt} now={now} timeZone={MARKET_TZ} showLeft={false} />}
       </div>

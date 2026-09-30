@@ -44,8 +44,8 @@ export function StudioView({ entry, source, log }: StudioViewProps) {
   const now = useNow(250);
   const kind = source?.kind ?? "browser";
   const camera = useCamera(kind === "browser");
-  const callSign = s.station.callSign ?? s.station.name;
-  const bug = { callSign, channel: s.station.channel ?? "" };
+  const callSign = s.label;
+  const bug = { callSign: s.station.callSign ?? s.station.name, channel: s.station.channel ?? "" };
 
   const stationId = s.id;
   const entryParams = entry ? { stationId, entryId: entry.id } : null;

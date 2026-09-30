@@ -41,7 +41,7 @@ export function TeamSection({ s, phone = false }: { s: StationState; phone?: boo
   const me = useMe();
   const now = useNow(60_000);
   const toast = useToast();
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const owner = s.can("manage");
   const invalidates = [accountsApi.getStationTeam, accountsApi.getMe];
   const update = useApiMutation(accountsApi.updateStationMember, { invalidates });
@@ -204,6 +204,6 @@ export function TeamSection({ s, phone = false }: { s: StationState; phone?: boo
 export function TeamLede({ s }: { s: StationState }) {
   const team = useTeam(s);
   if (!team.data) return null;
-  return <>{peopleLine(team.data.members.length + team.data.invites.length, s.station.callSign ?? s.station.name)}</>;
+  return <>{peopleLine(team.data.members.length + team.data.invites.length, s.label)}</>;
 }
 

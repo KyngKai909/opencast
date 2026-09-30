@@ -44,7 +44,7 @@ const CAPS = Array.from({ length: 16 }, (_, i) => (i + 1) * 30_000).map((v) => (
 const SAME_SPOT = [1, 2, 3, 4].map((n) => ({ value: n, label: perHour(n) }));
 
 export function BreaksSection({ s }: { s: StationState }) {
-  const cs = s.station.callSign ?? s.station.name;
+  const cs = s.label;
   const params = { stationId: s.id };
   const rule = useApi(stationsApi.getBreakRule, { params });
   const rotations = useApi(spotsApi.getRotations, { params }, { retry: false });

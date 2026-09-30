@@ -29,7 +29,7 @@ import { useBack, useLink, useOpenOverlay, useTuneIn } from "../components/stati
 import { SecTop, StationSide } from "../components/station/StationSide";
 import { StationListing } from "../components/station/StationListing";
 import { broadcastDayKey, clockAfter, onDay, weekTabs } from "../components/station/when";
-import { isOffAir } from "../components/watch/logic";
+import { isOffAir, stationSlug } from "../components/watch/logic";
 import { BackAt } from "../components/watch/lines";
 import "../components/station/Station.css";
 
@@ -145,7 +145,7 @@ function OnNow({ page, t }: { page: Page; t: Date }) {
             {cf && (
               <>
                 Carried from{" "}
-                <a className="vw-now__from" {...link(a.programId ? `/program/${a.programId}` : `/${cf.handle ?? cf.callSign?.toLowerCase()}`)}>
+                <a className="vw-now__from" {...link(a.programId ? `/program/${a.programId}` : `/${cf.handle ?? stationSlug(cf)}`)}>
                   {[cf.callSign, cf.channel].filter(Boolean).join(" ")}
                 </a>
                 .
@@ -199,7 +199,7 @@ export default function StationPage() {
   // /:handle/pledge (the TV's QR code): the pledge opens over the station page.
   const pledgePath = loc.pathname.endsWith("/pledge");
   useEffect(() => {
-    if (pledgePath && page?.station.callSign) navigate({ pathname: `/${handle}`, search: `?modal=pledge&station=${page.station.callSign}` }, { replace: true });
+    if (pledgePath && page?.station.callSign) navigate({ pathname: `/${handle}`, search: `?modal=pledge&station=${stationSlug(page.station)}` }, { replace: true });
   }, [pledgePath, page?.station.callSign, handle, navigate]);
 
   const tabs = useMemo(() => weekTabs(t, MARKET_TZ), [broadcastDayKey(t, MARKET_TZ)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -240,8 +240,9 @@ export default function StationPage() {
   };
 
   const bandName = `${s.name}. ${page.description ?? ""}`.trim();
-  const pledge = () => openOverlay({ modal: "pledge", station: cs });
-  const share = () => openOverlay({ modal: "share", station: cs });
+  // A229: overlays name the station by its address, so a family member is the one meant.
+  const pledge = () => openOverlay({ modal: "pledge", station: stationSlug(s) });
+  const share = () => openOverlay({ modal: "share", station: stationSlug(s) });
 
   const schedHeading = (
     <SecTop
@@ -334,7 +335,7 @@ export default function StationPage() {
             </div>
           </section>
         </div>
-        <aside className="vw-station__side" aria-label={`About ${cs}`}>
+        <aside className="vw-station__side" aria-label={`About ${s.sharesCallSign && s.channel ? `${cs} ${s.channel}` : cs}`}>
           <StationSide page={page} marketName={marketName} />
         </aside>
       </div>

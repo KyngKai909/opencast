@@ -27,7 +27,8 @@ export async function startMocks() {
   // by call sign, handle or id: `ocMock.setAccountState("BEAT", "grace")`, then reload.
   // External stations: `ocMock.externalDown("COLT")` (still on the dial for 5 minutes), `ocMock.externalDown("COLT", 5)`
   // (off the dial now), `ocMock.externalUp("COLT")`: the viewer's dial and the desk's External sources
-  // both follow. What's open reads it again at once ("oc-mock-changed").
+  // both follow. What's open reads it again at once ("oc-mock-changed"). A229: a station sharing a
+  // call sign by its address (`ocMock.externalDown("rivc-15-2")`); the call sign alone is X.1's.
   const changed = () => window.dispatchEvent(new Event("oc-mock-changed"));
   // The viewer's mock has two external stations (RDLS, COLT), the desk's six: each follows what it has.
   const quietly = (f: () => void) => {
