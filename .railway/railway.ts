@@ -38,17 +38,10 @@ export default defineRailway((ctx) => {
   const media = production ? null : bucket("media", { region: "sjc" });
 
   // Where files live, for the API and the worker only.
-  const storage = !media
-    ? { R2_ACCOUNT_ID: secret(), R2_ACCESS_KEY_ID: secret(), R2_SECRET_ACCESS_KEY: secret(), R2_BUCKET: secret(), R2_PUBLIC_BASE: secret() }
-    : {
-        R2_ENDPOINT: ref(media, "ENDPOINT"),
-        R2_ACCESS_KEY_ID: ref(media, "ACCESS_KEY_ID"),
-        R2_SECRET_ACCESS_KEY: ref(media, "SECRET_ACCESS_KEY"),
-        R2_BUCKET: ref(media, "BUCKET"),
-        // Railway buckets use virtual-host URLs, and have no storage classes.
-        S3_FORCE_PATH_STYLE: "false",
-        S3_STORAGE_CLASSES: "false"
-      };
+  // Cloudflare R2 in every environment (staging moved off the Railway bucket on 2026-09-30; `media`
+  // stays as a backup until it's no longer wanted). R2_BUCKET: opencast-staging / opencast-production;
+  // R2_PUBLIC_BASE: the bucket's r2.dev address on staging, a custom domain in production.
+  const storage = { R2_ACCOUNT_ID: secret(), R2_ACCESS_KEY_ID: secret(), R2_SECRET_ACCESS_KEY: secret(), R2_BUCKET: secret(), R2_PUBLIC_BASE: secret() };
   const origin = (name: string) => `https://\${{${name}.RAILWAY_PUBLIC_DOMAIN}}`;
   // The web apps are on Vercel (team Deed3Labs: opencast-web, opencast-business, opencast-site,
   // opencast-tv), on their free vercel.app addresses until a domain is bought. Railway runs only
