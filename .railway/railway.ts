@@ -126,7 +126,7 @@ export default defineRailway((ctx) => {
       WORKER_SCRATCH_DIR: "/data/scratch",
       // Items prepared at once; each FFmpeg pass wants about 2 vCPU.
       PREPARE_CONCURRENCY: "1",
-      // Prepare once, then assemble (the old continuous encode only runs when this is "on").
+      // Unused: the old queue loop is gone from the worker. Remove at the next config apply (docs/deploy.md).
       LEGACY_PLAYOUT: "off",
       // Only the worker sends transactions (the weekly escrow batch, the pool's fund share).
       SETTLEMENT_PRIVATE_KEY: secret()

@@ -48,9 +48,9 @@ HLS: items are prepared once into segments in object storage, and each station's
 | `HLS_PUBLIC_URL` | ✓ | | optional (A117): the worker's public origin, for a station's own HLS (`/hls/<stationId>/index.m3u8`) when it has no Livepeer output. Unset: the API's origin |
 | `TRUST_PROXY_HOPS` | ✓ | | how many proxies add `X-Forwarded-For` entries before the API (default 1, Railway's edge): the client's address is that many entries from the end |
 | `STORAGE_ROOT` | `/tmp/opencast` | `/data/storage` | the API only keeps temporary files (an upload until its original is stored); prepared segments and proof frames live in object storage |
-| `WORKER_SCRATCH_DIR` | | ✓ | `/data/scratch`: preparation and translators (the volume is 5 GB on staging, 20 GB in production) |
+| `WORKER_SCRATCH_DIR` | | ✓ | `/data/scratch`: preparation and translators (the volume is 5 GB on staging, 20 GB in production; it keeps its old name, `worker-cache`, so it's resized rather than replaced, but it holds no cache) |
 | `PREPARE_CONCURRENCY` | | ✓ | items prepared at once (1; each FFmpeg pass wants about 2 vCPU). `PREPARE_PRESET` is optional |
-| `LEGACY_PLAYOUT` | | `off` | `on` runs the old continuous encode instead of prepare once, then assemble |
+| `LEGACY_PLAYOUT` | | `off` | **unused**: the worker's old queue loop was removed (2026-09-29) and nothing reads it. It's still in `.railway/railway.ts` so removing it isn't an unplanned change; take it out there at the next `config apply` |
 | `JOBS` | `off` | | the minute jobs run in the worker |
 | `OPENCAST_ADMIN_EMAILS` | ✓ | | added 2026-09-29: comma-separated emails; whoever signs in through Privy with one (email, Google or Apple) becomes an Opencast admin (the Network desk, and owner of every network station). It only adds admins. Set in Railway, never in the repo |
 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | ✓ | ✓ | staging: the Railway bucket `media` (virtual-host URLs; `S3_STORAGE_CLASSES=false`; it doesn't verify upload checksums, so only reads catch a bad copy). Production: Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_PUBLIC_BASE` too) |
@@ -81,18 +81,16 @@ The API and the worker send email through [Resend](https://resend.com) when `RES
 
 ## Staging
 
-| Service | URL |
-|---|---|
-| api | https://api-staging-9fae.up.railway.app |
-| worker | https://worker-staging-79d5.up.railway.app |
-| control | https://control-staging-28f7.up.railway.app |
-| viewer | https://viewer-staging-a773.up.railway.app |
-| spots | https://spots-staging.up.railway.app |
-| desk | https://desk-staging-ceae.up.railway.app |
-| site | https://site-staging-77bf.up.railway.app |
-| tv | https://tv-staging.up.railway.app |
+| Service | Where | URL |
+|---|---|---|
+| api | Railway | https://api-staging-9fae.up.railway.app |
+| worker | Railway | https://worker-staging-79d5.up.railway.app |
+| web (the viewer, `/control`, `/desk`) | Vercel | https://opencast-web.vercel.app |
+| business | Vercel | https://opencast-business.vercel.app |
+| site | Vercel | https://opencast-site.vercel.app |
+| tv | Vercel | https://opencast-tv.vercel.app |
 
-These predate the Opencast app (handoff 4): the viewer, control and desk services become one `web` service (`apps/web`, with master control at `/control` and the desk at `/desk`), and spots is `business`, once `.railway/railway.ts` is applied again.
+The separate Railway web services from before the Opencast app (control, viewer, spots, desk, site and tv, handoff 4) aren't in `.railway/railway.ts` any more; anything left of them on staging is unused.
 
 Staging's database is fresh. For markets on the dial, seed it once from inside the api service (`railway ssh -s api -- npm run seed -w @opencast/db`); the seed is safe to rerun.
 
@@ -117,7 +115,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs.
 4. **Keys.** Make fresh ones for production. Don't reuse the old project's Livepeer or Pinata keys, which are to be rotated:
    - Privy: Opencast's own production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed, and embedded wallets created only for people who sign in;
-   - Clear: its provider app ID (`CLEAR_PRIVY_PROVIDER_APP_ID` on api, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` on control and spots) and `CLEAR_WALLET_ACCESS`, once Clear has requested global-wallet provider access in its own Privy dashboard and allowed Opencast's app;
+   - Clear: its provider app ID (`CLEAR_PRIVY_PROVIDER_APP_ID` on api, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` on the web and business apps in Vercel) and `CLEAR_WALLET_ACCESS`, once Clear has requested global-wallet provider access in its own Privy dashboard and allowed Opencast's app;
    - Livepeer: a new API key;
    - Stripe: live `STRIPE_SECRET_KEY`, plus a webhook to `https://<api>/v1/webhooks/stripe` for its `STRIPE_WEBHOOK_SECRET`;
    - `PAYMENTS_PROVIDER`: `stripe_only` until Clear has what docs/clear-integration.md lists, then `clear`.
@@ -126,7 +124,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 6. **Create production.** `railway link --environment production`, then `config plan` and `config apply`. Then set every `preserve()` secret above with `railway variables --set` on api and worker (the R2 ones on those two only).
 7. **Check it.** Every service's `/health`; the API's pre-deploy log says "Migrations applied"; seed the markets; the worker's `/health` shows the leader, preparation and readiness. Sign in on the viewer, and put one test station on air end to end.
 8. **Move off Pinata.** With production's storage variables and `PINATA_JWT`, run `npm run storage:move-off-pinata -w @opencast/api`, which reports. Then `--copy`, which copies each pin in, verifies it by hash, and points every item that used the pin at its new content ID (see "One-off storage steps"). Check Pinata's dashboard total matches (the old key sees only v3 files), mark any catalog pins, and only then `--unpin --yes-unpin`. Unpinning can't be undone. Then run the other one-off storage steps below.
-9. **Domains.** Add the custom domains to the production services and update DNS. Update `WEB_ORIGIN`, `APP_ORIGIN`, `BUSINESS_ORIGIN`, Privy's allowed origins and Stripe's webhook URL if they were the Railway ones. Verify the sending domain in Resend and set `EMAIL_FROM` on it (see "Email").
+9. **Domains.** Add the custom domains (api and worker in Railway, the apps in Vercel) and update DNS. Update `WEB_ORIGIN`, `APP_ORIGIN`, `BUSINESS_ORIGIN`, Privy's allowed origins and Stripe's webhook URL if they were the Railway ones. Verify the sending domain in Resend and set `EMAIL_FROM` on it (see "Email").
 10. **Retire the old project.** Stop pointing anything at `glistening-truth`, then delete it from the Railway dashboard, along with the root `railway.json`. Its Postgres holds the only copy of the old `opencast_state`, which production doesn't import (a fresh start); take a `pg_dump` first if it might ever be wanted.
 11. **Rotate and tidy.** Rotate the old Livepeer and Pinata keys, and anything else reused on staging. Delete the Livepeer test streams the early tests made. In the Railway dashboard, delete the stray project bucket `media-probe` (empty, no instance).
 

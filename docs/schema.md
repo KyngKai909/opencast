@@ -1,6 +1,6 @@
 # Schema
 
-One Postgres database, eight schemas, 96 tables. It's defined in Drizzle (`packages/db/src/schema/`), and the SQL migrations are checked in (`packages/db/migrations/`). The old `public.opencast_state` table sits beside them, untouched, until each API module moves over in Phase 4.
+One Postgres database, eight schemas, 96 tables. It's defined in Drizzle (`packages/db/src/schema/`), and the SQL migrations are checked in (`packages/db/migrations/`). The old `public.opencast_state` table sits beside them, untouched: no code reads or writes it any more (the old `/api` routes were removed on 2026-09-29), except the one-time legacy migration below.
 
 ```bash
 npm run db:up        # Postgres 17 and Redis 7 in Docker (ports 54329, 63799)

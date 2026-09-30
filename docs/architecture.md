@@ -4,10 +4,10 @@
 
 | Service | What it is | State |
 |---|---|---|
-| `apps/api` | Express. `/v1` is the new API on the new schema; `/api` is the old one, kept for the old master control until the apps prompt replaces it | Postgres |
-| `apps/worker` | Playout: the engine (below) airs every station from its program log; the minute tick. Also runs the old queue loop for stations still on the old model (`LEGACY_PLAYOUT`) | Postgres, Redis lock |
+| `apps/api` | Express. The API is `/v1`; the server also serves channels' playlists and prepared segments (`/hls`), local-disk objects in development (`/objects`), provider webhooks and `/health`. The old `/api` routes are gone | Postgres |
+| `apps/worker` | Playout: the engine (below) airs every station from its program log; the minute tick | Postgres, Redis lock |
 | `apps/web` (the viewer, master control at `/control`, Network desk at `/desk`), `business`, `tv`, `site` | The apps (the apps prompt) | none; they call `/v1` |
-| Postgres | One database, ten schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`, `tv`), plus the old `public.opencast_state` | |
+| Postgres | One database, ten schemas (`accounts`, `broadcast`, `catalog`, `spots`, `ledger`, `trust`, `network`, `audience`, `notify`, `tv`), plus the old `public.opencast_state`, which no code reads or writes any more (kept as a backup; `packages/db/src/legacy/migrate.ts` reads it once) | |
 | Redis | The worker's leader lock; the API's pub/sub for the TV remote's relay | |
 
 ## The v1 API
@@ -24,7 +24,7 @@ apps/api/src/v1/
   events.ts       in-process events, handled after the request (mostly notifications)
   jobs.ts         the minute tick: reminders, dead air, deadlines, daily caps, sponsorship months
   media.ts        probe, loudness, prepare for air (ffmpeg, R2), link import (yt-dlp)
-  payments.ts     the one money interface (Clear, Stripe in Phase 6; a local fake now)
+  payments/       the one money interface: adapters for Clear, Stripe only, and a local fake
   ownership.ts    which tables each module owns
   modules/<name>/ service.ts (the module's functions) and routes.ts (its endpoints)
 ```
@@ -175,8 +175,8 @@ Ads from partners (a programmatic backfill for break time still open after the s
 
 To come: an `adfill` interface in the playout module, so the provider can change (Google Ad Manager's Dynamic Ad Insertion, or AWS Elemental MediaTailor), fed by VAST or VMAP requests at each marked break with the station's and program's IAB categories, the blocked ad products, the rating and the child-directed flag. The as-run log will record a "partner ads" block with its length and impressions, not individual spots; per-viewer ads are allowed only in this backfill; spots in the spot market are still billed on Opencast's own count, with partner impression counts shown beside it. `ads.txt` and `app-ads.txt` get published on the site and the apps' domains. Which provider, whether to start through a FAST aggregator, and Opencast's share are open (docs/open-decisions.md).
 
-## Still to move (later phases)
+## What was removed
 
-- `/api` and `apps/control` stay until the apps prompt's master control replaces them.
-- `payments.ts` is a local fake: Phase 6 adds the Clear and Stripe adapters and the escrow contract.
-- The old queue loop in the worker stays (`LEGACY_PLAYOUT=on`) until nothing is on the old model.
+- The old `/api` routes, the JSON state store over `public.opencast_state` and the old upload path (compress to 720p, key by asset, optional Pinata pin) are gone from the API. The table and its data stay untouched.
+- The worker's old queue loop (`LEGACY_PLAYOUT`) is gone; every station airs from its program log.
+- `apps/control` and `apps/desk` are gone: master control and the Network desk are `/control` and `/desk` in `apps/web`.

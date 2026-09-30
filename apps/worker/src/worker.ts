@@ -9,17 +9,17 @@
 // GET /health reports leadership, stations on air, preparation (items prepared, waiting, and the
 // time preparing takes) and readiness; GET /hls/<station>/master.m3u8 (and <rendition>.m3u8) serves
 // a channel's playlists, rendered from the database, so any replica answers them.
-//
-// The old queue loop (the model before the program log) only runs with LEGACY_PLAYOUT=on.
 
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
 import { STORAGE_ROOT } from "./config.js";
-import { startLegacyPlayout, workerInstanceId } from "./legacy.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
 
 const TICK_MS = 1_000;
+// This replica's name in the leadership lease.
+const workerInstanceId = `${process.env.RAILWAY_REPLICA_ID ?? process.pid}-${randomUUID()}`;
 const JOBS_EVERY_MS = 60_000;
 
 const deps = createDeps(process.env, STORAGE_ROOT);
@@ -28,7 +28,6 @@ const { services } = createV1(deps);
 const ingestPort = process.env.WORKER_INGEST_PORT === "off" ? null : Number(process.env.WORKER_INGEST_PORT ?? 1935);
 const engine = createEngine({ deps, services }, { log: (line) => console.log(line), ingest: ingestPort === null ? null : { port: ingestPort } });
 const jobs = createJobs(deps, services);
-const legacy = process.env.LEGACY_PLAYOUT === "on" ? startLegacyPlayout() : null;
 
 let leader = false;
 let lastJobs = 0;
@@ -132,7 +131,6 @@ async function shutdown(signal: NodeJS.Signals) {
   health.close();
   console.log(`[worker] ${signal}: signing stations off the worker`);
   await engine.stopAll();
-  await legacy?.stop();
   await releaseLeadershipLease(workerInstanceId);
   await closeRedis();
   process.exit(0);
