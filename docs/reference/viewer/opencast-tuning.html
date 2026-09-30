@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Network desk · Opencast reference</title>
+<title>Changing channel · Opencast reference</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
@@ -605,94 +605,70 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 .notif .top { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--ink-50); margin-bottom:4px; }
 .notif .top svg { width:16px; height:13px; }
 .notif b { display:block; font-weight:600; font-size:14.5px; }
+.tv-demo { max-width:960px; }
+.tv { position:relative; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:#0A1124; color:#fff; }
+.tv .prog { position:absolute; inset:0; background:radial-gradient(120% 90% at 30% 35%, color-mix(in srgb, var(--pc,#333) 85%, #fff 15%), var(--pc,#333) 55%, color-mix(in srgb, var(--pc,#333) 60%, #000 40%)); display:flex; flex-direction:column; justify-content:center; padding:0 9%; transition:opacity .2s linear; }
+.tv .ptitle { font:800 clamp(22px,4.6vw,48px)/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.tv .psub { font-size:clamp(12px,1.5vw,16px); opacity:.85; margin-top:8px; }
+.tv .snow { position:absolute; inset:0; width:100%; height:100%; image-rendering:pixelated; opacity:0; pointer-events:none; }
+.tv .snow.on { opacity:1; }
+.tv .snow.roll { animation:roll .16s linear forwards; }
+@keyframes roll { from { clip-path:inset(0 0 0 0); } to { clip-path:inset(100% 0 0 0); } }
+.tv .osd { position:absolute; top:6%; right:6%; text-align:right; opacity:0; line-height:1; text-shadow:0 1px 8px rgb(0 0 0 / .5); }
+.tv .osd.on { opacity:1; }
+.tv .osd .n { display:block; font:500 clamp(28px,6vw,64px) var(--font-mono); letter-spacing:-.04em; }
+.tv .osd .c { display:block; font:800 clamp(14px,2.2vw,24px) var(--font-display); font-stretch:125%; margin-top:4px; }
+.tv .hold { position:absolute; left:8%; bottom:12%; opacity:0; transition:opacity .2s; text-shadow:0 1px 8px rgb(0 0 0 / .5); }
+.tv .hold.on { opacity:1; }
+.tv .hold b { display:block; font:800 clamp(16px,2.8vw,30px) var(--font-display); font-stretch:112%; }
+.tv .hold span { font-size:clamp(11px,1.3vw,14px); opacity:.8; }
+.tv .banner { position:absolute; left:5%; right:5%; bottom:6%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:16px; align-items:center; background:rgb(10 17 36 / .82); border-radius:10px; padding:10px 16px; transform:translateY(140%); transition:transform .24s cubic-bezier(.2,.7,.2,1); }
+.tv .banner.on { transform:none; }
+.tv .banner .bcs { display:block; font:800 clamp(14px,2vw,22px) var(--font-display); font-stretch:125%; line-height:1; }
+.tv .banner .bch { font:500 12px var(--font-mono); opacity:.8; }
+.tv .banner b { display:block; font-weight:600; font-size:clamp(12px,1.6vw,17px); }
+.tv .banner .bnext { font-size:clamp(10px,1.2vw,13px); opacity:.75; }
+.tv .banner .tally { font-size:10px; }
+.tv .bug { position:absolute; right:6%; bottom:8%; text-align:right; opacity:0; line-height:1; transition:opacity .3s; }
+.tv .bug.on { opacity:.8; }
+.tv .bug .cs { display:block; font:800 clamp(12px,1.8vw,18px) var(--font-display); font-stretch:125%; }
+.tv .bug .ch { font:500 clamp(9px,1vw,11px) var(--font-mono); }
+.controls { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:14px; }
+.opt2 { display:inline-flex; gap:6px; align-items:center; font-size:14px; color:var(--ink-70); margin-left:6px; }
+.seq { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:14px; }
+.seq figure { margin:0; }
+.seq figcaption { font-size:12.5px; color:var(--ink-70); margin-top:8px; line-height:1.4; }
+.seq figcaption b { display:block; color:var(--ink); font-size:12px; margin-bottom:2px; }
+.tv.sm { border-radius:8px; }
+.tv.sm .osd .n { font-size:22px; } .tv.sm .osd .c { font-size:11px; }
+.tv.sm .ptitle { font-size:15px; } .tv.sm .hold b { font-size:12px; } .tv.sm .hold span { font-size:9px; }
+.tv.sm .banner { padding:4px 6px; gap:6px; border-radius:5px; } .tv.sm .banner .bcs { font-size:9px; } .tv.sm .banner .bch { font-size:7px; } .tv.sm .banner b { font-size:8px; } .tv.sm .banner .bnext { font-size:6.5px; } .tv.sm .banner .tally { font-size:6px; padding:1px 3px; }
+.tv.sm .banner .bnext, .tv.sm .banner .tally { display:none; }
+.tv.sm .banner { left:6%; right:6%; bottom:7%; grid-template-columns:auto minmax(0,1fr); }
+.tv.sm .ptitle { margin-bottom:18%; }
+.tv.sm .bug .cs { font-size:9px; } .tv.sm .bug .ch { font-size:7px; }
+.snow-still { position:absolute; inset:0; background:
+  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='4'/><feColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.64 0 0 0 0 0.70 0 0 0 0.22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>") center/cover, #1C2440; }
+.radio-demo { max-width:900px; border:1px solid var(--line); border-radius:14px; padding:22px 24px; background:var(--raised); }
+.scale { position:relative; height:64px; border-bottom:2px solid var(--ink-50); }
+.ticks { position:absolute; inset:0; display:flex; justify-content:space-between; align-items:flex-end; }
+.ticks span { position:relative; width:1px; background:var(--ink-50); }
+.ticks span b { position:absolute; bottom:calc(100% + 4px); left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); color:var(--ink-70); font-weight:500; }
+.needle { position:absolute; top:-6px; bottom:-8px; width:3px; border-radius:2px; background:var(--live); left:1%; box-shadow:0 0 10px rgb(217 48 31 / .5); transition:left .4s cubic-bezier(.45,0,.2,1); }
+.rinfo { display:flex; align-items:baseline; gap:16px; margin-top:16px; }
+.freq { font:500 40px var(--font-mono); letter-spacing:-.04em; }
+.rname { font:700 18px var(--font-display); }
+.hiss { display:inline-flex; gap:3px; align-items:flex-end; height:20px; margin-left:auto; opacity:0; transition:opacity .15s; }
+.hiss.on { opacity:1; }
+.hiss i { width:3px; background:var(--ink-50); animation:hz .12s steps(2) infinite alternate; }
+.hiss i:nth-child(odd) { animation-duration:.09s; }
+@keyframes hz { from { height:4px; } to { height:18px; } }
+.spec { border-top:2px solid var(--ink); max-width:980px; }
+.spec div { display:grid; grid-template-columns:260px minmax(0,1fr); gap:16px; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14.5px; }
+.spec div span:first-child { font-weight:600; }
+@media (max-width:760px) { .seq { grid-template-columns:repeat(2,minmax(0,1fr)); } .spec div { grid-template-columns:1fr; gap:2px; } }
+@media (prefers-reduced-motion: reduce) { .needle { transition:none; } .hiss i { animation:none; height:10px; } }
 
-.sec-top { display:flex; align-items:baseline; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-top:22px; }
-.sec-top:first-child { margin-top:0; }
-.sec-top h3 { margin:0; font:700 17px/1.2 var(--font-display); letter-spacing:-.015em; }
-.sec-top .sub { font-size:13px; color:var(--ink-50); }
-.sec-top .end { margin-left:auto; display:flex; gap:8px; }
-.row2 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; }
-.row2 b { display:block; font-weight:600; font-size:14.5px; } .row2 small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:1px; }
-.row2 .end { display:flex; gap:8px; align-items:center; }
-
-/* network desk shell */
-.nd-head { height:56px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1px solid var(--hair); background:var(--raised); }
-.nd-head .mc-lock b { font-weight:600; font-size:15px; }
-.nd-head .internal { font:600 11.5px var(--font-text); color:var(--standby); border:1px solid var(--standby); border-radius:var(--r-sign); padding:2px 7px; }
-.nd-head .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
-.nd-rail a .ct { margin-left:auto; font:500 12px var(--font-mono); color:var(--ink-50); }
-
-/* market board */
-.legend3 { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--ink-70); margin:4px 0 12px; }
-.legend3 span { display:inline-flex; align-items:center; gap:6px; }
-.legend3 i { width:14px; height:14px; border-radius:3px; display:inline-block; }
-.dialmap { display:grid; grid-template-columns:repeat(17,1fr); gap:4px; }
-.slot { height:52px; border-radius:4px; border:1px solid var(--hair); display:flex; flex-direction:column; justify-content:space-between; padding:4px 5px; font:500 11px var(--font-mono); color:var(--ink-50); overflow:hidden; }
-.slot b { font:800 11px var(--font-display); font-stretch:112%; color:#fff; letter-spacing:0; }
-.slot.st { color:rgb(255 255 255 / .8); border:0; }
-.slot.cl { border:2px dashed var(--signal); color:var(--ink); } .slot.cl b { color:var(--ink); }
-.slot.li { border:1px dashed var(--line); color:var(--ink-70); } .slot.li b { color:var(--ink-70); }
-.slot.rs { background:repeating-linear-gradient(135deg, var(--hair) 0 4px, transparent 4px 8px); color:var(--ink-70); } .slot.rs b { color:var(--ink-70); }
-.slot.ho { background:var(--ink); color:var(--ground); border:0; } .slot.ho b { color:var(--ground); }
-.slot.sel { box-shadow:0 0 0 2px var(--standby); }
-.radiomap { display:grid; grid-template-columns:repeat(20,1fr); gap:4px; }
-.cov { display:grid; grid-template-columns:repeat(4,1fr); border-top:2px solid var(--ink); margin-bottom:16px; }
-.cov > div { padding:12px 16px 0 0; }
-.cov > div + div { padding-left:16px; border-left:1px solid var(--hair); }
-.cov .v { font:500 26px var(--font-mono); letter-spacing:-.03em; }
-.cov small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:2px; }
-
-/* pipeline */
-.stages { display:grid; grid-template-columns:repeat(7,1fr); border-top:2px solid var(--ink); margin-bottom:14px; }
-.stages > div { padding:10px 12px 0 0; }
-.stages > div + div { padding-left:12px; border-left:1px solid var(--hair); }
-.stages .v { font:500 24px var(--font-mono); letter-spacing:-.03em; }
-.stages small { display:block; font-size:12.5px; color:var(--ink-70); }
-.stages > div.on small { color:var(--ink); font-weight:600; }
-.pp-h, .pp { display:grid; grid-template-columns:minmax(0,1.2fr) 150px 130px 150px minmax(0,1fr) 110px; gap:12px; align-items:center; }
-.pp-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
-.pp { padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
-.pp b { display:block; font-weight:600; } .pp small { display:block; font-size:12.5px; color:var(--ink-70); }
-.stg { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
-.stg.yes { border-color:var(--signal); color:var(--signal); }
-.stg.air { background:var(--ink); color:var(--ground); border-color:var(--ink); }
-.stg.wait { border-color:var(--standby); color:var(--standby); }
-.stg.no { border-style:dashed; color:var(--ink-50); }
-.stg.lic { border-color:var(--ink); color:var(--ink); background:var(--raised); }
-.pp .next { font-size:13px; color:var(--ink-70); }
-.pp .next.due { color:var(--standby); font-weight:600; }
-
-/* ask */
-.ask { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:28px; }
-.msg { border:1px solid var(--line); border-radius:var(--r-screen); padding:16px 18px; background:var(--raised); font-size:14.5px; line-height:1.55; }
-.msg .from { font-size:12.5px; color:var(--ink-50); margin-bottom:10px; }
-.msg p { margin:0 0 10px; }
-.msg .lnk { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 16px; border-radius:var(--r-control); background:var(--signal-fill); color:var(--on-signal); font-weight:600; font-size:14px; }
-.works { border-top:1px solid var(--line); }
-.wk { display:grid; grid-template-columns:22px minmax(0,1fr) auto; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; align-items:center; }
-.wk .bx { width:18px; height:18px; border-radius:4px; background:var(--signal-fill); color:var(--on-signal); display:grid; place-items:center; }
-.wk .bx svg { width:12px; height:12px; }
-.wk.off .bx { background:transparent; border:1.5px solid var(--line); }
-.wk small { color:var(--ink-70); font-size:12.5px; }
-
-/* recipe */
-.recipe { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:26px; }
-.day24 { display:flex; height:46px; border-radius:6px; overflow:hidden; border:1px solid var(--line); margin:10px 0 6px; }
-.day24 i { display:flex; align-items:center; justify-content:center; font:600 11px var(--font-text); color:#fff; white-space:nowrap; overflow:hidden; }
-.hours { display:flex; justify-content:space-between; font:500 11px var(--font-mono); color:var(--ink-50); }
-.src-row { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
-.src-row b { display:block; font-weight:600; } .src-row small { display:block; font-size:12.5px; color:var(--ink-70); }
-.src-h { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
-.ok-t { font-size:13px; color:var(--ink-70); display:flex; gap:6px; align-items:center; }
-.ok-t svg { width:14px; height:14px; flex:none; }
-.ok-t small { display:block; font-size:11.5px; color:var(--ink-50); }
-.src-row .tier b { font-size:13px; } .src-row .tier small { font-size:11.5px; }
-.dot-up, .dot-down { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-.dot-up { background:#3FA66B; } .dot-down { background:var(--live); }
-/* creator phone */
-.perm-page { padding:18px 18px 22px; display:flex; flex-direction:column; flex:1; overflow:auto; }
-.perm-page h2 { margin:10px 0 10px; font:800 28px/1.02 var(--font-display); font-stretch:125%; letter-spacing:-.035em; }
-.perm-page > p { font-size:14.5px; color:var(--ink-70); margin:0 0 14px; }
 </style>
 </head>
 <body>
@@ -723,361 +699,164 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </defs></svg>
 
-
 <header class="ref-head"><div class="wrap">
   <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
-  <span class="crumb">Reference: Network desk</span>
+  <span class="crumb">Reference: changing channel</span>
   <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
 </div></header>
 
 <main id="top">
 <section class="intro"><div class="wrap">
-  <div class="ch-label"><span class="n">Ref. 12</span><span>Internal app for Opencast's team, web</span></div>
-  <h1>Filling a dial, one yes at a time.</h1>
-  <p>Network desk is Opencast's own tool for building a market: seeing every channel on the dial and what fills it, finding local creators and asking permission, turning a yes into a running station, and managing the city streams and catalog programming that fill the rest. Claimable stations are the core of it. PEG listings, the public-domain catalog and reserved call signs sit on the same board, because they all answer the same question: what's on this dial tonight?</p>
-  <p>Same tokens as everything else, with an "Internal" mark in the header. It's the Inland Empire market, Saturday, September 26.</p>
+  <div class="ch-label"><span class="n">Motion 01</span><span>Viewer app, TV mode and the radio band</span></div>
+  <h1>Changing channel should feel like turning a dial.</h1>
+  <p>The one piece of motion the viewer sees most. When someone changes channel, the picture breaks into soft static and the new channel's number appears in the corner, the way an old set's display did. The static lasts at least a moment, so every change feels deliberate, and it covers the time the next channel takes to load. On the radio band, the needle sweeps and a little hiss plays between stations.</p>
+  <p>Try it below: change channel, turn on a slow connection, or switch to reduced motion.</p>
   <ul class="toc">
-    <li><a href="#board"><span class="mono">01</span>The market board</a></li>
-    <li><a href="#pipeline"><span class="mono">02</span>The creator pipeline</a></li>
-    <li><a href="#ask"><span class="mono">03</span>Asking permission</a></li>
-    <li><a href="#setup"><span class="mono">04</span>Setting up a claimable station</a></li>
-    <li><a href="#listed"><span class="mono">05</span>City streams and the catalog</a></li>
-    <li><a href="#creator"><span class="mono">06</span>What the creator sees</a></li>
-    <li><a href="#held"><span class="mono">07</span>Held earnings</a></li>
+    <li><a href="#demo"><span class="mono">01</span>Try it</a></li>
+    <li><a href="#sequence"><span class="mono">02</span>Frame by frame</a></li>
+    <li><a href="#radio"><span class="mono">03</span>The radio band</a></li>
+    <li><a href="#rules"><span class="mono">04</span>Timing and rules</a></li>
   </ul>
   <div class="principles">
-    <div><h3>Permission before air</h3><p class="muted">Either the creator said yes, or their work is already published under a licence that allows it, like CC BY. Nothing is copied or aired on anything less, and the yes or the licence is kept as the rights record.</p></div>
-    <div><h3>One board for the dial</h3><p class="muted">Independent stations, claimable stations, city streams, the catalog station and reserved call signs, all on one map of the market.</p></div>
-    <div><h3>Recipes, not hand-built logs</h3><p class="muted">A claimable station starts from a template schedule filled from the creator's work and the catalog, so the team can run many without hand-scheduling each.</p></div>
-    <div><h3>Their money, held in escrow</h3><p class="muted">What a claimable station earns is held in an escrow contract under the station's ID. The contract can only pay the creator, or the creator fund if it's never claimed.</p></div>
+    <div><h3>A click, not a spinner</h3><p class="muted">Loading is shown as tuning. There's never a spinner or a progress bar over the picture.</p></div>
+    <div><h3>Static means changing, bars mean trouble</h3><p class="muted">Static is only for changing channel. The colour bars stay reserved for a lost signal, so viewers always know which is which.</p></div>
+    <div><h3>Soft, never a strobe</h3><p class="muted">Low-contrast grain with a steady brightness. It never flashes, and it's replaced by a crossfade for anyone who asks for less motion.</p></div>
+    <div><h3>Quiet unless it's radio</h3><p class="muted">The hiss plays on the radio band. On video it's off unless the viewer turns "Tuning sound" on.</p></div>
   </div>
 </div></section>
 
-<!-- ================= BOARD ================= -->
-<section class="ref" id="board"><div class="wrap">
-  <div class="ch-label"><span class="n">01</span><span>The market board</span></div>
-  <h2>Every channel, and what fills it.</h2>
-  <p class="lede">The Inland Empire's TV band as a grid from 2 to 69 and the radio band below it, each slot coloured by what's there: an independent station, a claimable station, an external city stream, Opencast's catalog station, a call sign held from the waitlist, or open. Above it, how much of tonight is local.</p>
+<!-- ================= DEMO ================= -->
+<section class="ref" id="demo"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Try it</span></div>
+  <h2>Change channel.</h2>
+  <p class="lede">A working version of the effect, at TV proportions. Up and down step through five stations in channel order. "Slow connection" makes the next channel take two seconds to arrive, so you can see how the static holds and says what's coming.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="860"><div class="scaler">
-      <div class="app nd" data-nav="board" style="height:860px">
-        <div class="mc-title"><div><h2>Inland Empire</h2><p>8 stations, 2 claimable stations on air, 3 external city streams and the catalog station. 26 people on the waitlist here.</p></div><div class="end"><div class="seg"><button aria-pressed="true">Inland Empire</button><button aria-pressed="false">High Desert</button><button aria-pressed="false">Los Angeles</button></div></div></div>
-        <div class="cov">
-          <div><span class="v">71%</span><small>Of tonight's station hours are local programming</small></div>
-          <div><span class="v">2</span><small>Claimable stations on air, waiting to be claimed</small></div>
-          <div><span class="v">4</span><small>Creators who said yes, not set up yet</small></div>
-          <div><span class="v">1</span><small>Station with dead air coming, HALL 90.7</small></div>
-        </div>
-        <div class="legend3"><span><i style="background:#8C3B7A"></i>Independent station</span><span><i style="border:2px dashed var(--signal)"></i>Claimable, run by Opencast</span><span><i style="border:1px dashed var(--line)"></i>External city stream</span><span><i style="background:var(--ink)"></i>Opencast catalog</span><span><i style="background:repeating-linear-gradient(135deg,var(--hair) 0 3px,transparent 3px 6px)"></i>Held for the waitlist</span><span><i style="border:1px solid var(--hair)"></i>Open</span></div>
-        <div class="sec-top" style="margin-top:0"><h3>TV band</h3><span class="sub">2 to 69, main channels</span></div>
-        <div class="dialmap" id="tvmap" style="margin-top:10px"></div>
-        <div class="sec-top"><h3>Radio band</h3><span class="sub">88.1 to 107.9</span></div>
-        <div class="radiomap" id="radiomap" style="margin-top:10px"></div>
-        <div class="row2" style="margin-top:14px;border-top:1px solid var(--line)"><div><b>33.1 LUPE, selected</b><small>Claimable. Tía Lupe's Kitchen said yes September 22. Recipe set, signs on Monday at 6:00 am</small></div><div class="end"><button class="btn btn-ghost btn-sm">Open in master control</button><button class="btn btn-ghost btn-sm">Pipeline</button></div></div>
+    <div class="tv-demo">
+      <div class="tv" id="tv">
+        <div class="prog" id="prog"><div class="ptitle" id="ptitle"></div><div class="psub" id="psub"></div></div>
+        <canvas class="snow" id="snow" width="320" height="180" aria-hidden="true"></canvas>
+        <div class="osd" id="osd"><span class="n" id="osdN"></span><span class="c" id="osdC"></span></div>
+        <div class="hold" id="hold"><b id="holdT"></b><span>Tuning in</span></div>
+        <div class="banner" id="banner"><div class="bl"><span class="bcs" id="bCs"></span><span class="bch" id="bCh"></span></div><div class="bm"><b id="bNow"></b><span class="bnext" id="bNext"></span></div><span class="tally lit" id="bTally">ON AIR</span></div>
+        <div class="bug" id="bug"><span class="cs" id="bugCs"></span><span class="ch" id="bugCh"></span></div>
       </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>The dial as a map</h3><p>Every number in the market at a glance. Gaps are visible as open slots, which is how the team decides what the market needs next.</p></div>
-      <div class="note"><h3>Local share, not viewers</h3><p>The headline number is how much of tonight is local programming, not how many people watched. It's the measure of whether a market is working.</p></div>
-      <div class="note"><h3>Held call signs</h3><p>Reservations from the website's waitlist show as hatched slots, so the team never sets up a claimable station on a number someone already asked for.</p></div>
-      <div class="note"><h3>Subchannels live inside a slot</h3><p>9.1, 9.2 and 9.3 are three city streams on channel 9. The board shows the main channel; opening it lists the subchannels.</p></div>
+      <div class="controls">
+        <button class="btn btn-ghost" id="dn" aria-label="Channel down"><svg class="i"><use href="#i-down"/></svg>Channel down</button>
+        <button class="btn btn-primary" id="up" aria-label="Channel up"><svg class="i"><use href="#i-up"/></svg>Channel up</button>
+        <label class="opt2"><input type="checkbox" id="slow"> Slow connection</label>
+        <label class="opt2"><input type="checkbox" id="rm"> Reduced motion</label>
+        <label class="opt2"><input type="checkbox" id="snd"> Tuning sound</label>
+      </div>
     </div>
-  </div>
-</div></section>
-
-<!-- ================= PIPELINE ================= -->
-<section class="ref" id="pipeline"><div class="wrap">
-  <div class="ch-label"><span class="n">02</span><span>The creator pipeline</span></div>
-  <h2>From found to claimed, one row each.</h2>
-  <p class="lede">Every local creator the team is talking to, where they are, where their work lives, and the next thing to do. Most go found, asked, said yes, setting up, on air, then claimed or declined. Creators whose work is already published under a licence that allows commercial use, like CC BY, skip asking: their station can go on air with attribution while they're invited to claim it.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app nd" data-nav="pipeline">
-        <div class="mc-title"><div><h2>Creator pipeline</h2><p>Inland Empire. Sorted by what needs doing first.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>Add a creator</button></div></div>
-        <div class="stages">
-          <div><span class="v">6</span><small>Found</small></div>
-          <div><span class="v">2</span><small>Already licensed</small></div>
-          <div><span class="v">3</span><small>Asked</small></div>
-          <div class="on"><span class="v">4</span><small>Said yes</small></div>
-          <div><span class="v">1</span><small>Setting up</small></div>
-          <div><span class="v">1</span><small>On air, not claimed</small></div>
-          <div><span class="v">3</span><small>Claimed</small></div>
-        </div>
-        <div class="pp-h"><span>Creator</span><span>Their work lives on</span><span>Stage</span><span>Station</span><span>Next</span><span></span></div>
-        <div id="ppRows"></div>
-      </div>
-    </div></div>
     <div class="notes">
-      <div class="note"><h3>Sorted by the next action</h3><p>Overdue follow-ups and new yeses first, finished rows last. The pipeline is a to-do list, not a funnel chart.</p></div>
-      <div class="note"><h3>Where the work lives</h3><p>The source matters twice: it's where the work is imported from, and it's the account the creator connects later to prove it's them when they claim.</p></div>
-      <div class="note"><h3>One reminder, then stop</h3><p>A creator who hasn't answered gets one reminder after a week. After that the row is marked "No answer" and the team doesn't ask again.</p></div>
-      <div class="note"><h3>Declines are respected, and kept</h3><p>A creator who said no is kept on the list so nobody asks twice.</p></div>
-      <div class="note"><h3>"Already licensed" is checked per work</h3><p>The licence has to allow commercial use, because stations carry spots. CC BY does; the non-commercial variants don't. Each work's licence and link are saved, and the credit airs as the licence requires.</p></div>
+      <div class="note"><h3>Corner number first</h3><p>The channel number and call sign appear the instant the button is pressed, before anything loads, so the viewer always knows where they're going.</p></div>
+      <div class="note"><h3>The banner comes after</h3><p>When the first frame arrives, the static clears and the usual banner slides in with what's on and what's next.</p></div>
+      <div class="note"><h3>Holding down the button</h3><p>Pressing repeatedly skips ahead: the number updates on each press, the static keeps running, and only the channel you land on loads.</p></div>
     </div>
   </div>
 </div></section>
 
-<!-- ================= ASK ================= -->
-<section class="ref" id="ask"><div class="wrap">
-  <div class="ch-label"><span class="n">03</span><span>Asking permission</span></div>
-  <h2>A short message, and exactly what they'd be saying yes to.</h2>
-  <p class="lede">Asking starts from the creator's row. The team picks which of their works to include and writes a short note; the message carries one link to a permission page that spells out everything. The right side previews the message as the creator will get it.</p>
+<!-- ================= SEQUENCE ================= -->
+<section class="ref" id="sequence"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Frame by frame</span></div>
+  <h2>Five moments of one channel change.</h2>
+  <p class="lede">What happens between pressing channel up on BEAT 12.1 and watching SAZN 18.1, including the slow case and the reduced-motion version.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="840"><div class="scaler">
-      <div class="app nd" data-nav="pipeline" style="height:840px">
-        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Pipeline / Desert Skate Films</span><h2>Ask Desert Skate Films</h2></div></div>
-        <div class="ask">
-          <div>
-            <div class="fld"><label>Send to</label><div class="field" style="color:var(--ink)">Vimeo message and hello@desertskate.example</div></div>
-            <div class="sec-top"><h3>Which works</h3><span class="sub">14 found on their Vimeo</span></div>
-            <div class="works">
-              <div class="wk"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b style="font-weight:600">Full-length skate films</b><br><small>6 films, 4 hr 10 min in total</small></div><span class="quiet" style="font-size:12.5px">Included</span></div>
-              <div class="wk"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b style="font-weight:600">Park session edits</b><br><small>7 shorts, 58 min</small></div><span class="quiet" style="font-size:12.5px">Included</span></div>
-              <div class="wk off"><span class="bx"></span><div><b style="font-weight:600">Sponsor edit for a shoe brand</b><br><small>Likely someone else's rights. Left out</small></div><span class="quiet" style="font-size:12.5px">Left out</span></div>
-            </div>
-            <div class="sec-top"><h3>What we'd do</h3></div>
-            <div class="row2"><div><b>A TV band station, 38.1 or 45.1</b><small>Their films at night, with catalog programming in between</small></div><span></span></div>
-            <div class="row2"><div><b>Earnings held for them</b><small>Everything their station earns, until they claim it or say stop</small></div><span></span></div>
-            <div class="fld" style="margin-top:14px"><label>A note from you</label><div class="field" style="height:78px;align-items:flex-start;padding-top:10px;color:var(--ink)">Your Joshua Tree film is the best thing we've seen from out here. We'd love to put it on the air where people who skate those parks can find it.</div></div>
-          </div>
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>What they'll get</h3></div>
-            <div class="msg" style="margin-top:12px">
-              <div class="from">From Opencast, the Inland Empire dial</div>
-              <p>Your Joshua Tree film is the best thing we've seen from out here. We'd love to put it on the air where people who skate those parks can find it.</p>
-              <p>We'd run a TV station of your films on Opencast, a local 24/7 dial, and hold everything it earns for you. It's yours to take over whenever you want, or to stop with one tap.</p>
-              <div style="border-top:1px solid var(--hair);margin:4px 0 12px;padding-top:10px;font-size:13px"><div style="font-weight:600;margin-bottom:4px">Your station tonight, if you say yes</div><div style="display:grid;grid-template-columns:70px 1fr;gap:2px 10px;font-size:12.5px"><span class="mono">7:00 pm</span><span>Joshua Tree, full film</span><span class="mono">8:10 pm</span><span>Park sessions: Palm Springs</span><span class="mono">8:30 pm</span><span>Classic films from the catalog</span></div></div>
-              <span class="lnk">See what you'd be saying yes to</span>
-              <p class="quiet" style="font-size:12.5px;margin:10px 0 0">If you don't answer, we'll remind you once in a week and then leave it.</p>
-            </div>
-            <button class="btn btn-primary btn-block" style="margin-top:16px">Send</button>
-          </div>
-        </div>
-      </div>
-    </div></div>
+    <div class="seq">
+      <figure><div class="tv sm" style="--pc:#8C3B7A"><div class="prog"><div class="ptitle">Late Crate</div></div><div class="bug on"><span class="cs">BEAT</span><span class="ch">12.1</span></div></div><figcaption><b class="mono">0 ms</b>Watching BEAT. The viewer presses channel up.</figcaption></figure>
+      <figure><div class="tv sm"><div class="prog" style="opacity:.25;--pc:#8C3B7A"></div><div class="snow-still"></div><div class="osd on"><span class="n">18.1</span><span class="c">SAZN</span></div></div><figcaption><b class="mono">0 to 300 ms</b>Static over the old picture. The new number and call sign appear at once.</figcaption></figure>
+      <figure><div class="tv sm"><div class="snow-still"></div><div class="osd on"><span class="n">18.1</span><span class="c">SAZN</span></div><div class="hold on"><b>Tamales for forty</b><span>Tuning in</span></div></div><figcaption><b class="mono">After 800 ms, if slow</b>The static holds and says what's on. Still no spinner.</figcaption></figure>
+      <figure><div class="tv sm" style="--pc:#A3402A"><div class="prog"><div class="ptitle">Tamales for forty</div></div><div class="banner on"><div class="bl"><span class="bcs">SAZN</span><span class="bch">18.1</span></div><div class="bm"><b>Tamales for forty</b><span class="bnext">Next at 7:00 pm, Kitchen Radio</span></div><span class="tally lit">ON AIR</span></div></div><figcaption><b class="mono">First frame</b>The static clears in one short roll and the banner slides in.</figcaption></figure>
+      <figure><div class="tv sm" style="--pc:#A3402A"><div class="prog" style="opacity:.55"><div class="ptitle">Tamales for forty</div></div><div class="osd on"><span class="n">18.1</span><span class="c">SAZN</span></div></div><figcaption><b class="mono">Reduced motion</b>No static: a 200 ms crossfade, with the same corner number.</figcaption></figure>
+    </div>
     <div class="notes">
-      <div class="note"><h3>Works are chosen, not assumed</h3><p>The team ticks which works to include and leaves out anything that might belong to someone else, like a sponsor edit. Only ticked works are covered by the yes.</p></div>
-      <div class="note"><h3>The message is short on purpose</h3><p>A personal note, two sentences of what Opencast would do, and one link. The details live on the permission page, where they can be read properly.</p></div>
-      <div class="note"><h3>Show them their station</h3><p>The message includes tonight's schedule as it would be, using their own titles. Seeing it gets more yeses than describing it. It's built from titles and lengths only; no files are copied before the yes.</p></div>
-      <div class="note"><h3>Sent where they already are</h3><p>A message on the platform where their work lives, plus email if there is one. Never a cold call, never a follow-up beyond the one reminder.</p></div>
+      <div class="note"><h3>Never less than 300 ms</h3><p>Neighbouring channels are preloaded, so up and down are often instant. The static still runs 300 ms so a change never looks like a glitch.</p></div>
+      <div class="note"><h3>Slow loads say what's coming</h3><p>After 800 ms the program's name appears over the static. After 8 seconds with no picture, it becomes the Stand by screen with the colour bars, because by then it really is a signal problem.</p></div>
+      <div class="note"><h3>The same on every screen</h3><p>Phones, the web player, TV mode, Chromecast and AirPlay all draw the same effect, sized to the screen. On a TV, the corner number is set large enough to read across a room.</p></div>
     </div>
   </div>
 </div></section>
 
-<!-- ================= SETUP ================= -->
-<section class="ref" id="setup"><div class="wrap">
-  <div class="ch-label"><span class="n">04</span><span>Setting up a claimable station</span></div>
-  <h2>A yes becomes a station from a recipe.</h2>
-  <p class="lede">Once a creator says yes, the station is set up from a recipe: a channel from the board, a call sign, the creator's works imported from their source with the permission attached as the rights record, and a 24-hour template that mixes their work with catalog programming. Then a team member is assigned and it signs on.</p>
+<!-- ================= RADIO ================= -->
+<section class="ref" id="radio"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>The radio band</span></div>
+  <h2>The needle sweeps, and there's a little hiss.</h2>
+  <p class="lede">On the radio band the frequency is the picture, so tuning is the needle moving along the scale to the next station, with a short hiss between stations. The hiss is on by default here, because on radio it's part of the experience; it can be turned off.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="860"><div class="scaler">
-      <div class="app nd" data-nav="pipeline" style="height:860px">
-        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Pipeline / Tía Lupe's Kitchen</span><h2>Set up LUPE 33.1</h2><p>Said yes September 22. Covers 48 cooking videos on YouTube.</p></div></div>
-        <div class="recipe">
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>Recipe</h3><span class="sub">Cooking and food, TV band</span></div>
-            <div class="day24" aria-hidden="true">
-              <i style="flex:2;background:#1F3A5F">Catalog</i><i style="flex:4;background:#A3402A">Lupe's kitchen</i><i style="flex:1;background:#2E6B5A">CIVC</i><i style="flex:5;background:#A3402A">Lupe's kitchen</i><i style="flex:4;background:#9A5412">Catalog films</i><i style="flex:4;background:#A3402A">Lupe, repeats</i><i style="flex:4;background:#1F3A5F">Catalog, overnight</i>
-            </div>
-            <div class="hours"><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span><span>6 am</span></div>
-            <div class="row2" style="margin-top:10px"><div><b>Her videos</b><small>48 videos, 31 hr in total. Each airs at most 3 times a week</small></div><span class="quiet" style="font-size:13px">13 hr a day</span></div>
-            <div class="row2"><div><b>Carried: Council Watch from CIVC</b><small>Weeknights at noon, public affairs for the market</small></div><span class="quiet" style="font-size:13px">1 hr</span></div>
-            <div class="row2"><div><b>Opencast catalog</b><small>Classic films and overnight programming</small></div><span class="quiet" style="font-size:13px">10 hr</span></div>
-            <div class="row2"><div><b>Breaks</b><small>Every 30 min, 2:00, spots from the market, never alcohol</small></div><span></span></div>
-          </div>
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>Station</h3></div>
-            <div class="row2"><div><b>Channel</b><small>From the board, open</small></div><span class="mono">33.1</span></div>
-            <div class="row2"><div><b>Call sign</b><small>Suggested from her name. She can't change it after claiming</small></div><span class="cs">LUPE</span></div>
-            <div class="row2"><div><b>Rights record</b><small>Permission from Lupe Ortiz, September 22, for the 48 listed videos</small></div><span class="ok-t"><svg><use href="#i-check"/></svg>Attached</span></div>
-            <div class="row2"><div><b>Import</b><small>From her YouTube channel, prepared for air</small></div><span class="quiet" style="font-size:13px">31 of 48</span></div>
-            <div class="row2"><div><b>Held earnings</b><small>In the escrow contract under LUPE's station ID. No wallet is created until Lupe claims</small></div><span class="mono" style="font-size:12.5px">Station #33</span></div>
-            <div class="row2"><div><b>Run by</b><small>Opencast team operator</small></div><span>Dee A.</span></div>
-            <div class="row2"><div><b>Signs on</b></div><span>Monday, 6:00 am</span></div>
-            <button class="btn btn-primary btn-block" style="margin-top:14px">Schedule sign-on</button>
-          </div>
-        </div>
-      </div>
-    </div></div>
+    <div class="radio-demo">
+      <div class="scale"><div class="ticks" id="ticks"></div><div class="needle" id="needle"></div></div>
+      <div class="rinfo"><span class="freq" id="freq">88.3</span><span class="rname" id="rname">NITE, Night Desk</span><span class="hiss" id="hiss" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+      <div class="controls" style="margin-top:14px"><button class="btn btn-ghost" id="rdn">Down the band</button><button class="btn btn-primary" id="rup">Up the band</button><label class="opt2"><input type="checkbox" id="rsnd" checked> Tuning sound</label></div>
+    </div>
     <div class="notes">
-      <div class="note"><h3>Ready before the yes</h3><p>The channel, call sign and recipe are prepared from titles and lengths while the ask is out. Files are only copied once the yes arrives, so a yes can be on air within the hour.</p></div>
-      <div class="note"><h3>Why the call sign is careful</h3><p>Call signs are permanent once a station signs on. The team suggests one from the creator's own name, and the creator is told it's theirs to keep.</p></div>
-      <div class="note"><h3>Permission is the rights record</h3><p>Every imported item's rights are "Permission from the owner", pointing at the yes. That's what makes these imports different from the station-local link imports in the library.</p></div>
-      <div class="note"><h3>Recipes keep it light</h3><p>A recipe by category fills the day from the creator's work, the catalog and one carried local program, with sensible repeat limits. One team member can look after several stations.</p></div>
-      <div class="note"><h3>A local anchor in every station</h3><p>Each recipe carries one local public-affairs program, like Council Watch, so every new station helps the civic side of the dial too.</p></div>
+      <div class="note"><h3>A sweep, not a jump</h3><p>The needle travels the real distance between frequencies in 400 ms, easing in and out, passing over the empty band between them.</p></div>
+      <div class="note"><h3>Hiss, then the station</h3><p>A short, quiet burst of noise plays while the needle moves, then the station fades up. Sound starts only after the listener has tapped something, as browsers require.</p></div>
     </div>
   </div>
 </div></section>
 
-<!-- ================= LISTED ================= -->
-<section class="ref" id="listed"><div class="wrap">
-  <div class="ch-label"><span class="n">05</span><span>City streams and the catalog</span></div>
-  <h2>External stations, and what fills the dial without a creator.</h2>
-  <p class="lede">External stations are channels whose video comes straight from the source's own stream, with no Opencast playout, spots or breaks. They play one of two ways: the source's official embedded player where its terms allow it, or its raw stream link, only with permission or for clearly public sources. Network desk keeps each one's schedule and checks its stream, hiding it from the dial while it's down. The catalog station is Opencast's own, filled from the catalog.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="880"><div class="scaler">
-      <div class="app nd" data-nav="listed" style="height:880px">
-        <div class="mc-title"><div><h2>External sources</h2><p>Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>List a source</button></div></div>
-        <div class="src-h"><span>Source</span><span>Channel</span><span>How it plays</span><span>What's on</span><span>Right now</span></div>
-        <div class="src-row"><div><b>City of Redlands</b><small>Council and planning meetings</small></div><span class="mono">9.1 RDLS</span><div class="tier"><b>Official embed</b><small>The city's own player, embedding allowed</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>City of Colton</b><small>Council meetings</small></div><span class="mono">9.2 COLT</span><div class="tier"><b>Stream link</b><small>Public body, stream published for the public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>San Bernardino County</b><small>Board of Supervisors</small></div><span class="mono">9.3 SBCO</span><div class="tier"><b>Official embed</b><small>The county's own player</small></div><span class="ok-t" style="color:var(--standby)"><svg><use href="#i-warn"/></svg><span>No schedule found<small>Banner shows name and Live</small></span></span><span class="ok-t" style="color:var(--live)"><span class="dot-down"></span><span>Down 14 min<small>Hidden from the dial</small></span></span></div>
-        <div class="src-row"><div><b>NASA</b><small>Launches and live coverage</small></div><span class="mono">61.1 NASA</span><div class="tier"><b>Stream link</b><small>US government, public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Guide data<small>Checked, from their published schedule</small></span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>Riverside Unified School District</b><small>Board meetings</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Official embed</b><small>Terms unclear, asked Sept 22</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
-        <div class="src-row"><div><b>Inland Community TV</b><small>From an IPTV list. A community channel's raw stream</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Stream link</b><small>Needs their permission. In the creator pipeline</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
-        <div class="sec-top"><h3>Opencast catalog station</h3></div>
-        <div class="row2"><div><b>60.1 OCAT, Opencast Classics</b><small>Filled entirely from the catalog. Made possible by Clear. Also offered to every station for carriage</small></div><div class="end"><button class="btn btn-ghost btn-sm">Open in master control</button></div></div>
-        <div class="row2"><div><b>When a local station is ready for 60.1</b><small>The catalog station moves to a free channel so the number can go to someone local</small></div><span></span></div>
-      </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>Two ways to play</h3><p>An official embed uses the source's own player, only where its terms allow embedding. A raw stream link plays in Opencast's player and needs the source's permission, unless it's clearly public: government bodies, public access, NASA and the like.</p></div>
-      <div class="note"><h3>IPTV lists are leads, not listings</h3><p>A channel found on a public IPTV list goes into the creator pipeline first. Once it says yes, it can be added as an external station, or become a full station with spots and earnings.</p></div>
-      <div class="note"><h3>What's on, when we can get it</h3><p>From the source's own calendar or schedule feed, or guide data checked against their published schedule. With neither, the banner shows the station's name, "Live" and the source, and no progress bar. Nothing is made up.</p></div>
-      <div class="note"><h3>Hidden while it's down</h3><p>Each stream is checked every minute. After 5 minutes down, the station leaves the dial and the swipe order; anyone already watching sees Stand by. It comes back on its own when the stream does, and Network desk is told both times.</p></div>
-      <div class="note"><h3>No spots, no earnings</h3><p>External stations never air spots, sponsor credits or partner ads, can't be carried or offered in the market, and show an "External" tag in the banner and guide.</p></div>
-      <div class="note"><h3>The catalog station steps aside</h3><p>Opencast's own station holds a channel until a local station wants it, then moves. The dial should fill up with local stations, not with Opencast.</p></div>
-      <div class="note open"><h3>Other markets' streams</h3><p>Whether a city stream from outside a market can be added in it as an external station, for example a county meeting that covers two markets, isn't decided.</p></div>
-    </div>
-  </div>
-</div></section>
-
-<!-- ================= CREATOR ================= -->
-<section class="ref" id="creator"><div class="wrap">
-  <div class="ch-label"><span class="n">06</span><span>What the creator sees</span></div>
-  <h2>Everything they'd be saying yes to, then the yes.</h2>
-  <p class="lede">The link in the message opens the permission page, most likely on a phone. It lists exactly which works, what Opencast would do with them, what happens to the money, and how to stop. Saying yes is one button, and they don't need an account to do it.</p>
-  <div class="stage phones">
-    <div class="phone-row">
-      <div>
-        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
-          <div class="phone">
-            <div class="sbar"><span>10:14</span><span class="dots"><i></i><b></b></span></div>
-            <div class="perm-page">
-              <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
-              <h2>A station of your films, on the Inland Empire dial.</h2>
-              <p>Here's exactly what you'd be agreeing to. Nothing happens until you say yes.</p>
-              <div class="row2"><div><b>These works only</b><small>6 skate films and 7 park session edits from your Vimeo. Not the shoe sponsor edit</small></div></div>
-              <div class="row2"><div><b>A TV station, run for you</b><small>Your films in the evenings, other programming in between. Labelled "Run by Opencast for Desert Skate Films"</small></div></div>
-              <div class="row2"><div><b>The money is yours</b><small>Everything it earns is held in escrow for you, in a public contract that can only pay you, until you claim it</small></div></div>
-              <div class="row2"><div><b>Stop any time</b><small>One tap takes it off the dial within a day, and we pay out what it earned</small></div></div>
-              <button class="btn btn-primary btn-block" style="margin-top:16px">Yes, go ahead</button>
-              <button class="btn btn-ghost btn-block" style="margin-top:8px">No thanks</button>
-            </div>
-            <div class="hind"><i></i></div>
-          </div>
-        </div></div>
-        <p class="cap"><b>The permission page.</b></p>
-      </div>
-      <div>
-        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
-          <div class="phone">
-            <div class="sbar"><span>10:15</span><span class="dots"><i></i><b></b></span></div>
-            <div class="perm-page">
-              <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
-              <h2>Thanks. We'll set it up.</h2>
-              <p>Your station should sign on within a week. We'll send you the channel and call sign before it does.</p>
-              <div class="row2"><div><b>What you said yes to</b><small>13 works, on September 27 at 10:15 am. We've emailed you a copy</small></div></div>
-              <div class="row2"><div><b>Changed your mind?</b><small>This link works to stop it at any time</small></div><button class="btn btn-ghost btn-sm">Stop</button></div>
-              <div class="row2"><div><b>Want to run it yourself from day one?</b><small>Claim it now and skip the team-run part</small></div><button class="btn btn-ghost btn-sm">Claim now</button></div>
-            </div>
-            <div class="hind"><i></i></div>
-          </div>
-        </div></div>
-        <p class="cap"><b>After saying yes.</b></p>
-      </div>
-    </div>
-    <div class="notes">
-      <div class="note"><h3>No account to say yes</h3><p>The yes is recorded against the link, with a timestamp and the exact list of works, and a copy is emailed. An account only matters when they claim.</p></div>
-      <div class="note"><h3>Stop is always one tap</h3><p>The same link stops everything later, so saying yes never feels like a trap.</p></div>
-      <div class="note"><h3>Claiming early</h3><p>A creator who'd rather run it themselves can claim straight away and go to the normal sign-on flow, with the recipe already filled in.</p></div>
-      <div class="note open"><h3>The permission wording</h3><p>This page is a licence in plain words. It should be reviewed by a lawyer before the first creator sees it, as noted when claimable stations first came up.</p></div>
-    </div>
-  </div>
-</div></section>
-<!-- ================= HELD ================= -->
-<section class="ref" id="held"><div class="wrap">
-  <div class="ch-label"><span class="n">07</span><span>Held earnings</span></div>
-  <h2>Every claimable station's money, held in escrow.</h2>
-  <p class="lede">Claimable stations don't get wallets. Their earnings, after the same fees and pool share as any station, are paid into one escrow contract each week, held under the station's ID. The contract has only three ways out: to the verified creator when they claim, to them if they ask to stop, or to the creator fund if it's never claimed. It has no way to pay Opencast.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app nd" data-nav="team">
-        <div class="mc-title"><div><h2>Held earnings</h2><p>Money earned by stations Opencast runs for creators. None of it is Opencast's.</p></div></div>
-        <div class="cov">
-          <div><span class="v">$227.00</span><small>Held across 2 stations</small></div>
-          <div><span class="v">2</span><small>Claim invitations out</small></div>
-          <div><span class="v">$0.00</span><small>Ever moved to Opencast. It can't be</small></div>
-          <div><span class="v">3 years</span><small>Unclaimed until it goes to the creator fund</small></div>
-        </div>
-        <div class="src-h" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><span>Station</span><span>In escrow as</span><span>Held</span><span>Status</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>101.9 CRAT, for Marcus Reyes</b><small>On air since August 12, with permission</small></div><span class="mono" style="font-size:13px">Station #101</span><span class="mono">$214.60</span><span class="stg wait">Claim link sent</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>91.9 FLDR, for Mojave Field Recordings</b><small>On air since September 20, under CC BY 4.0</small></div><span class="mono" style="font-size:13px">Station #91</span><span class="mono">$12.40</span><span class="stg wait">Invited Sept 24</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>33.1 LUPE, for Lupe Ortiz</b><small>Signs on Monday</small></div><span class="mono" style="font-size:13px">Station #33</span><span class="mono">$0.00</span><span class="stg">Not on air yet</span></div>
-        <div class="sec-top"><h3>Where held money can go</h3></div>
-        <div class="row2"><div><b>To the creator, when they claim</b><small>Paid to the wallet made when they sign in, after verification and a 72-hour public waiting period</small></div><span></span></div>
-        <div class="row2"><div><b>To the creator, if they say stop</b><small>Paid out to them within a week of the station signing off</small></div><span></span></div>
-        <div class="row2"><div><b>To the creator fund, if never claimed</b><small>After 3 years with no claim, the fund that backs new stations and programs</small></div><span></span></div>
-        <div class="row2"><div><b>Nowhere else</b><small>The contract has no other way to send money. Not to Opencast, not to another station, not to cover costs</small></div><span></span></div>
-        <div class="row2" style="border-bottom:0"><div><b>Escrow contract</b><small>Public, with every deposit and payout visible</small></div><span class="mono" style="font-size:13px">0x5ee2&hellip;a41d</span></div>
-      </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>One contract, a balance per station</h3><p>One escrow contract holds every claimable station's earnings, each under its own station ID, so each creator's money is exactly what their station earned. Wallets only exist for people who have signed in.</p></div>
-      <div class="note"><h3>Fees come off first, like everyone</h3><p>Opencast's share and the pool apply to a claimable station the same as to every other station. What's left is the creator's.</p></div>
-      <div class="note"><h3>"It can't be"</h3><p>Not a promise: the contract has no function that pays Opencast, and anyone can read it. The only thing Opencast controls is who is verified as the creator.</p></div>
-      <div class="note"><h3>Verification is the trust point</h3><p>Claims are approved by a multi-signature key, not one person, and every approved claim waits 72 hours in public before it pays out, so a wrong claim can be challenged.</p></div>
-      <div class="note open"><h3>Where the contract lives</h3><p>Opencast's own contract, or part of the Clear protocol alongside its encumbrance. Which chain, and the 3-year unclaimed period, are defaults to confirm.</p></div>
-    </div>
+<!-- ================= RULES ================= -->
+<section class="ref" id="rules"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Timing and rules</span></div>
+  <h2>The numbers the player uses.</h2>
+  <p class="lede">These go into `packages/player` as constants, and the photosensitivity rule is a hard limit, checked in tests.</p>
+  <div class="spec">
+    <div><span>Static, minimum</span><span>300 ms, even if the next channel is ready</span></div>
+    <div><span>Program name over the static</span><span>After 800 ms without a first frame</span></div>
+    <div><span>Stand by</span><span>After 8 s without a first frame, the colour bars and "Please stand by"</span></div>
+    <div><span>Static clears</span><span>One 160 ms roll, top to bottom, then the banner slides in</span></div>
+    <div><span>Corner number</span><span>Appears on the press, top right inside title safe; mono numerals, call sign in Archivo</span></div>
+    <div><span>Grain</span><span>2 px grain, 24 new frames a second, grey only, within 15% of the ground's brightness</span></div>
+    <div><span>Brightness</span><span>The frame's average brightness stays constant; no full-screen change larger than 10% more than 3 times a second (WCAG 2.3.1)</span></div>
+    <div><span>Reduced motion</span><span>No grain: a 200 ms crossfade with the corner number</span></div>
+    <div><span>Sound, video</span><span>Off by default; "Tuning sound" in Watching settings and TV settings</span></div>
+    <div><span>Sound, radio band</span><span>On by default; 250 ms of soft noise, well below the program's level</span></div>
+    <div><span>Never used for</span><span>Stand by, off air, first launch, or pausing</span></div>
   </div>
 </div></section>
 </main>
 
-<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, Network desk. Creators, stations, cities and sources are illustrations. Nothing here is legal advice. Opencast is a working name.</p></div></footer>
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, changing channel. Stations and programs are illustrations. Opencast is a working name.</p></div></footer>
 
 <script>
 (function(){
-  /* Network desk shell */
-  var NAV = [['Markets',[['board','Market board'],['pipeline','Creator pipeline','4'],['listed','External sources','1'],['catalog','Catalog']]],['Stations',[['team','Held earnings','$227'],['claims','Rights claims'],['reserved','Reserved call signs','26']]],['Opencast',[['sponsors','Catalog sponsors'],['settings','Settings']]]];
-  document.querySelectorAll('.app.nd').forEach(function(app){
-    var nav=app.dataset.nav, content=app.innerHTML;
-    var head='<div class="nd-head"><span class="mc-lock"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><span class="div"></span><b>Network desk</b></span><span class="internal">Internal</span><div class="end"><span class="quiet" style="font-size:13px">Opencast team</span><span class="avatar">DA</span></div></div>';
-    var rail='<nav class="mc-rail nd-rail">'+NAV.map(function(g){ return '<div class="g">'+g[0]+'</div>'+g[1].map(function(it){ return '<a href="#top" class="'+(it[0]===nav?'on':'')+'">'+it[1]+(it[2]?'<span class="ct">'+it[2]+'</span>':'')+'</a>'; }).join(''); }).join('')+'</nav>';
-    app.innerHTML=head+'<div class="mc-body">'+rail+'<div class="mc-main">'+content+'</div></div>';
-  });
-  function fill(id,h){ var e=document.getElementById(id); if(e) e.innerHTML=h; }
-  /* TV board: 2..69 = 68 slots */
-  var TV = { 7:['st','CIVC','#2E6B5A'], 9:['li','RDLS'], 12:['st','BEAT','#8C3B7A'], 18:['st','SAZN','#A3402A'], 24:['st','REEL','#9A5412'], 31:['st','PREP','#1F5E8C'], 33:['cl','LUPE'], 41:['rs','TACO'], 44:['rs','SK8'], 52:['rs','HOOP'], 60:['ho','OCAT'] };
-  var h=''; for (var n=2;n<=69;n++){ var d=TV[n]; if(!d){ h+='<div class="slot"><span>'+n+'</span></div>'; continue; } var sty=d[0]==='st'?' style="background:'+d[2]+'"':''; h+='<div class="slot '+d[0]+(n===33?' sel':'')+'"'+sty+'><span>'+n+(n===9?'.1\u20133':'')+'</span><b>'+d[1]+'</b></div>'; }
-  fill('tvmap', h);
-  var RD = { '88.3':['st','NITE','#33507A'], '90.7':['st','HALL','#56508A'], '95.5':['rs','GOSP'], '91.9':['cl','FLDR'], '101.9':['cl','CRAT'], '104.3':['st','VOZE','#1D6A70'] };
-  var r=''; for (var f=88.1; f<=107.95; f+=1.0){ var k=f.toFixed(1); } 
-  var list=['88.1','88.3','89.1','90.7','91.9','92.7','93.5','94.3','95.5','96.1','96.9','97.7','98.5','99.3','100.1','101.1','101.9','102.7','104.3','106.5'];
-  list.forEach(function(k){ var d=RD[k]; if(!d){ r+='<div class="slot"><span>'+k+'</span></div>'; return; } var sty=d[0]==='st'?' style="background:'+d[2]+'"':''; r+='<div class="slot '+d[0]+'"'+sty+'><span>'+k+'</span><b>'+d[1]+'</b></div>'; });
-  fill('radiomap', r);
-  /* pipeline */
-  var PP = [
-    ['Tía Lupe\u2019s Kitchen','Cooking in Spanish, Fontana','YouTube','<span class="stg yes">Said yes</span>','33.1 LUPE','<span class="next">Signs on Monday, 6:00 am</span>','Set up'],
-    ['Desert Skate Films','Skate films, Joshua Tree','Vimeo','<span class="stg">Found</span>','38.1 or 45.1','<span class="next">Ask, with a preview of their station</span>','Ask'],
-    ['Mojave Field Recordings','Desert soundscapes, CC BY 4.0','Internet Archive','<span class="stg lic">Already licensed</span>','91.9 FLDR','<span class="next">On air with credit. Claim invite sent Sept 24</span>','Open'],
-    ['Riverside Poetry Collective','Readings and open mics','Instagram','<span class="stg wait">Asked</span>','Radio band','<span class="next due">Reminder due today</span>','Remind'],
-    ['Inland Gospel Choirs','Sunday services and rehearsals','Facebook','<span class="stg yes">Said yes</span>','95.5, held','<span class="next">Waitlist holds 95.5; pick another</span>','Set up'],
-    ['Marcus Reyes','Mixes and producer interviews','SoundCloud','<span class="stg air">On air</span>','101.9 CRAT','<span class="next">Claim link sent Sept 20</span>','Open'],
-    ['Saz\u00f3n family kitchen','Home cooking, Fontana','YouTube','<span class="stg">Claimed</span>','18.1 SAZN','<span class="next">Claimed August 28. Running it themselves</span>',''],
-    ['Inland Jazz Society','Concert archive','Bandcamp','<span class="stg no">Declined</span>','','<span class="next">Said no Sept 2. Don\u2019t ask again</span>','']
-  ];
-  fill('ppRows', PP.map(function(p){ return '<div class="pp"><div><b>'+p[0]+'</b><small>'+p[1]+'</small></div><span>'+p[2]+'</span><span>'+p[3]+'</span><span class="mono" style="font-size:13px">'+p[4]+'</span>'+p[5]+'<span style="text-align:right">'+(p[6]?'<button class="btn btn-ghost btn-sm">'+p[6]+'</button>':'')+'</span></div>'; }).join(''));
-
-  function fitAll(){ document.querySelectorAll('.fit').forEach(function(f){ var w=+f.dataset.w, h=+f.dataset.h, s=Math.min(1, f.clientWidth/w); var sc=f.querySelector('.scaler'); sc.style.transform='scale('+s+')'; sc.style.width=w+'px'; f.style.height=(h*s)+'px'; }); }
-  fitAll(); window.addEventListener('resize', fitAll);
-  if (window.ResizeObserver){ var ro=new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
-  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  var ST=[['7.1','CIVC','Council Watch','Live from City Hall','Next at 8:00 pm, Town Hall','#2E6B5A'],['12.1','BEAT','Late Crate','Episode 15','Next at 10:30 pm, Slow Hours','#8C3B7A'],['18.1','SAZN','Tamales for forty','Episode 3','Next at 7:00 pm, Kitchen Radio','#A3402A'],['24.1','REEL','Saturday Reel','Cartoons, 1928 to 1936','Next at 9:00 pm, Newsreels','#33507A'],['33.1','LUPE','Lupe en la cocina','Episode 12','Next at 8:30 pm, Mercado','#9A5412']];
+  var idx=1, tv=document.getElementById('tv'); if(!tv) return;
+  var $=function(id){return document.getElementById(id)};
+  var snow=$('snow'), cx=snow.getContext('2d'), img=cx.createImageData(snow.width,snow.height), raf=null, last=0, token=0, audio=null;
+  function drawSnow(t){ if(t-last>41){ last=t; var d=img.data, base=46, amp=18; for(var i=0;i<d.length;i+=4){ var v=base+((Math.random()*2-1)*amp)|0; d[i]=v; d[i+1]=v+2; d[i+2]=v+10; d[i+3]=255; } cx.putImageData(img,0,0); } raf=requestAnimationFrame(drawSnow); }
+  function startSnow(){ snow.classList.remove('roll'); snow.classList.add('on'); if(!raf) raf=requestAnimationFrame(drawSnow); }
+  function stopSnow(){ snow.classList.add('roll'); setTimeout(function(){ snow.classList.remove('on','roll'); if(raf){ cancelAnimationFrame(raf); raf=null; } },170); }
+  function hiss(ms,vol){ try{ if(!audio) audio=new (window.AudioContext||window.webkitAudioContext)(); var n=audio.createBuffer(1,audio.sampleRate*ms/1000,audio.sampleRate), ch=n.getChannelData(0); for(var i=0;i<ch.length;i++) ch[i]=(Math.random()*2-1); var s=audio.createBufferSource(); s.buffer=n; var g=audio.createGain(); g.gain.value=vol; var f=audio.createBiquadFilter(); f.type='bandpass'; f.frequency.value=3000; s.connect(f); f.connect(g); g.connect(audio.destination); s.start(); }catch(e){} }
+  function show(i,instant){ var s=ST[i]; tv.querySelector('.prog').style.setProperty('--pc',s[5]); $('ptitle').textContent=s[2]; $('psub').textContent=s[3]; $('bCs').textContent=s[1]; $('bCh').textContent=s[0]; $('bNow').textContent=s[2]; $('bNext').textContent=s[4]; $('bugCs').textContent=s[1]; $('bugCh').textContent=s[0]; }
+  function banner(){ var b=$('banner'), bug=$('bug'); bug.classList.remove('on'); b.classList.add('on'); clearTimeout(banner.t); banner.t=setTimeout(function(){ b.classList.remove('on'); bug.classList.add('on'); },4000); }
+  function change(dir){
+    idx=(idx+dir+ST.length)%ST.length; var s=ST[idx], my=++token, rm=$('rm').checked, slow=$('slow').checked;
+    $('osdN').textContent=s[0]; $('osdC').textContent=s[1]; $('osd').classList.add('on'); $('banner').classList.remove('on'); $('bug').classList.remove('on'); $('hold').classList.remove('on');
+    var prog=$('prog'), load=slow?2000:120, start=performance.now();
+    if(rm){ prog.style.opacity='.35'; setTimeout(function(){ if(my!==token) return; show(idx); prog.style.opacity='1'; setTimeout(function(){ if(my!==token) return; $('osd').classList.remove('on'); banner(); },200); }, Math.max(load,200)); return; }
+    startSnow(); if($('snd').checked) hiss(250,0.06);
+    setTimeout(function(){ if(my!==token) return; $('holdT').textContent=s[2]; $('hold').classList.add('on'); },800);
+    setTimeout(function(){ if(my!==token) return; show(idx); $('hold').classList.remove('on'); $('osd').classList.remove('on'); stopSnow(); banner(); }, Math.max(300,load));
+  }
+  $('up').addEventListener('click',function(){change(1)}); $('dn').addEventListener('click',function(){change(-1)});
+  document.addEventListener('keydown',function(e){ if(e.target.tagName==='INPUT') return; if(e.key==='ArrowUp'){e.preventDefault();change(1)} if(e.key==='ArrowDown'){e.preventDefault();change(-1)} });
+  show(idx); $('bug').classList.add('on');
+  // radio
+  var RS=[['88.3','NITE, Night Desk'],['90.1','HALL, Hall Sessions'],['94.7','SOLA, Sola Radio'],['99.5','DUSK, Dusk FM'],['104.3','HUMM, Hummingbird']], ri=0;
+  var ticks=$('ticks'); for(var f=88;f<=108;f+=2){ var sp=document.createElement('span'); sp.style.height=(f%4===0?'22px':'12px'); if(f%4===0){ var b=document.createElement('b'); b.textContent=f; sp.appendChild(b);} ticks.appendChild(sp); }
+  function pos(fr){ return ((parseFloat(fr)-88)/20*98+1)+'%'; }
+  function tune(dir){ ri=(ri+dir+RS.length)%RS.length; var r=RS[ri]; $('needle').style.left=pos(r[0]); $('hiss').classList.add('on'); $('rname').style.opacity='.3'; if($('rsnd').checked) hiss(400,0.05); setTimeout(function(){ $('freq').textContent=r[0]; $('rname').textContent=r[1]; $('rname').style.opacity='1'; $('hiss').classList.remove('on'); },420); }
+  $('needle').style.left=pos(RS[0][0]);
+  $('rup').addEventListener('click',function(){tune(1)}); $('rdn').addEventListener('click',function(){tune(-1)});
+  var root=document.documentElement, btn=$('groundToggle');
   function cur(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
   function lab(){ btn.textContent = cur()==='dark'?'Light ground':'Dark ground'; }
   try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
-  lab();
-  btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+  lab(); btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) $('rm').checked=true;
 })();
+
 </script>
 </body>
 </html>

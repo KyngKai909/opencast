@@ -23,11 +23,11 @@ The designs are in `docs/reference/`, one folder per app. They are self-containe
 | Folder | Files | Builds |
 |---|---|---|
 | `brand/` | `opencast-style.html` (style guide), `opencast-site.html` | Tokens, type, voice; `apps/site` |
-| `viewer/` | `opencast-home.html`, `opencast-you.html`, `opencast-station-pages.html` | `apps/web`, the viewer area at `/` |
+| `viewer/` | `opencast-home.html`, `opencast-you.html`, `opencast-station-pages.html`, `opencast-tuning.html` | `apps/web`, the viewer area at `/` |
 | `tv/` | `opencast-tv.html`, `opencast-tv-update.html` | `apps/tv` and the Cast receiver |
 | `control/` | `opencast-master-control.html`, `opencast-live-listings.html`, `opencast-station-settings.html`, `opencast-offering.html`, `opencast-market.html`, `opencast-earnings.html`, `opencast-rights.html` | `apps/web`, the master control area at `/control` |
 | `business/` | `opencast-biz-funding.html`, `opencast-biz-spots.html`, `opencast-biz-results.html`, `opencast-sponsorships.html`, `opencast-production-orders.html`, `opencast-biz-settings.html` | `apps/business` |
-| `desk/` | `opencast-network-desk.html` | `apps/web`, the Network desk area at `/desk` |
+| `desk/` | `opencast-network-desk.html`, `opencast-desk-catalog.html`, `opencast-desk-pages.html` | `apps/web`, the Network desk area at `/desk` |
 
 `opencast-sponsorships.html` and `opencast-production-orders.html` show both sides: the business app and master control. Build both halves.
 
@@ -89,7 +89,7 @@ Write `docs/apps/inventory.md`: for every frame in every reference file, the app
 
 Build the design system once:
 - **Tokens** for both grounds, and the TV's always-dark set, from the style guide.
-- **Primitives:** buttons (primary, ghost, text, small, block), fields, toggles, segmented controls, chips, tags (including Live and Listed), the tally, tooltips, toasts with Undo, modals (web) and sheets (phone), notices (the amber standby notice and the plain one).
+- **Primitives:** buttons (primary, ghost, text, small, block), fields, toggles, segmented controls, chips, tags (including Live and External), the tally, tooltips, toasts with Undo, modals (web) and sheets (phone), notices (the amber standby notice and the plain one).
 - **Broadcast components:** channel number and call sign ident, station colour band, title card, picture frame with bug, lower third, listing row, dial row, guide grid with now-line, program log timeline with codes (PGM, SPT, UND, BMP, SID), break bar, schedule list with the tally edge on the current row, progress bar (not a scrub bar), radio band scale with needle, level meter.
 - **Data components:** stat rows (the ruled number groups), key-value lists, tables with mono amounts, timeline (done, current, future), step rails, permissions table, charts (line with a comparison line and shaded breaks, as in the audience page).
 - **Shells:** viewer web (header, nav, market button, player bar), viewer phone (top bar, four tabs, mini player), master control (header with station switcher, clock and tally; rail; setup step rail; the studio variant with no on-air pages), business (header with business switcher and balance; rail; setup step rail), Network desk (header with the Internal mark), and the settings layout (sub-rail and pane) used by viewer, station and business settings.
@@ -183,7 +183,7 @@ From `tv/`: watching with the banner, number entry, the guide with its options d
 
 ## Phase 7: the Network desk area (`/desk`) and `apps/site`
 
-- **Network desk,** from `desk/`: the market board, the creator pipeline (including "Already licensed"), asking permission with the station preview, setting up from a recipe, listed sources, the creator's permission page (which needs no account), and held earnings with the escrow's station IDs. Admin sign-in only.
+- **Network desk,** from `desk/`: the market board, the creator pipeline (including "Already licensed"), asking permission with the station preview, setting up from a recipe, external sources, the creator's permission page (which needs no account), and held earnings with the escrow's station IDs. Admin sign-in only.
 - **The site,** from `brand/opencast-site.html`: one page, the working tuner in the hero, the waitlist with four roles (viewer, station with a held call sign, producer, business) posting to the API's waitlist endpoint.
 
 **STOP.** Show both.

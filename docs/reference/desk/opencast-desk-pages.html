@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Network desk · Opencast reference</title>
+<title>Network desk, the remaining pages · Opencast reference</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
@@ -680,15 +680,11 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 .day24 { display:flex; height:46px; border-radius:6px; overflow:hidden; border:1px solid var(--line); margin:10px 0 6px; }
 .day24 i { display:flex; align-items:center; justify-content:center; font:600 11px var(--font-text); color:#fff; white-space:nowrap; overflow:hidden; }
 .hours { display:flex; justify-content:space-between; font:500 11px var(--font-mono); color:var(--ink-50); }
-.src-row { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.src-row { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
 .src-row b { display:block; font-weight:600; } .src-row small { display:block; font-size:12.5px; color:var(--ink-70); }
-.src-h { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.src-h { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
 .ok-t { font-size:13px; color:var(--ink-70); display:flex; gap:6px; align-items:center; }
-.ok-t svg { width:14px; height:14px; flex:none; }
-.ok-t small { display:block; font-size:11.5px; color:var(--ink-50); }
-.src-row .tier b { font-size:13px; } .src-row .tier small { font-size:11.5px; }
-.dot-up, .dot-down { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-.dot-up { background:#3FA66B; } .dot-down { background:var(--live); }
+.ok-t svg { width:14px; height:14px; }
 /* creator phone */
 .perm-page { padding:18px 18px 22px; display:flex; flex-direction:column; flex:1; overflow:auto; }
 .perm-page h2 { margin:10px 0 10px; font:800 28px/1.02 var(--font-display); font-stretch:125%; letter-spacing:-.035em; }
@@ -726,314 +722,240 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 
 <header class="ref-head"><div class="wrap">
   <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
-  <span class="crumb">Reference: Network desk</span>
+  <span class="crumb">Reference: Network desk, claims, call signs, sponsors, settings</span>
   <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
 </div></header>
 
+<style>
+.rc-h, .rc2 { display:grid; grid-template-columns:12px minmax(0,1fr) 150px 120px 56px; gap:12px; align-items:center; }
+.rc-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.rc2 { padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rc2 .sw { width:14px; height:14px; border-radius:3px; }
+.rc2 b { display:block; font-weight:600; } .rc2 small { display:block; font-size:12.5px; color:var(--ink-70); }
+.rc2 .due { font-size:13px; color:var(--ink-70); }
+.rc2.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.st9 { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.st9.off { border-color:var(--live); color:var(--live); }
+.st9.wait { border-color:var(--standby); color:var(--standby); }
+.st9.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.tl2 { border-top:1px solid var(--line); }
+.tl2 .r { display:grid; grid-template-columns:18px 104px minmax(0,1fr); gap:10px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13px; align-items:start; }
+.tl2 .dot { width:10px; height:10px; border-radius:50%; border:2px solid var(--line); margin-top:4px; }
+.tl2 .done .dot { background:var(--ink); border-color:var(--ink); }
+.tl2 .cur .dot { background:var(--standby-fill); border-color:var(--standby); }
+.tl2 .w { font:500 12px var(--font-mono); color:var(--ink-70); }
+.tl2 b { font-weight:600; } .tl2 small { display:block; color:var(--ink-70); font-size:12px; }
+.rs-h, .rs { display:grid; grid-template-columns:90px 80px minmax(0,1fr) 120px 150px 130px; gap:12px; align-items:center; }
+.rs-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.rs { padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rs .cs { font:800 17px var(--font-display); font-stretch:112%; letter-spacing:-.01em; }
+.rs .ch { font:500 13.5px var(--font-mono); color:var(--ink-70); }
+.rs small { display:block; font-size:12.5px; color:var(--ink-70); }
+.rs .end2 { display:flex; gap:6px; justify-content:flex-end; }
+.sp-h2, .sp2 { display:grid; grid-template-columns:minmax(0,1fr) 160px 110px 84px 64px; gap:12px; align-items:center; }
+.sp-h2 { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.sp-h2 span:nth-child(n+4) { text-align:right; }
+.sp2 { padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sp2 b { display:block; font-weight:600; } .sp2 small { display:block; font-size:12.5px; color:var(--ink-70); }
+.sp2 .m { font:500 14px var(--font-mono); text-align:right; }
+.sp2.open2 { color:var(--ink-50); } .sp2.open2 b { color:var(--ink-70); }
+.swrap2 { display:grid; grid-template-columns:200px minmax(0,1fr); height:100%; margin:-22px -28px -28px; }
+.snav2 { border-right:1px solid var(--hair); padding:20px 12px; }
+.snav2 h2 { margin:0 0 12px 8px; font:800 24px var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.snav2 a { display:flex; align-items:center; height:34px; padding:0 8px; border-radius:var(--r-control); font-size:14px; color:var(--ink-70); text-decoration:none; font-weight:500; }
+.snav2 a.on { background:var(--raised); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair); }
+.spane2 { padding:20px 30px 30px; overflow:auto; }
+.spane2 > h3 { margin:0 0 4px; font:800 26px var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.spane2 > p { margin:0 0 16px; font-size:14.5px; color:var(--ink-70); max-width:70ch; }
+.rule2 { display:grid; grid-template-columns:minmax(0,1fr) 260px 90px; gap:14px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rule2 b { display:block; font-weight:600; } .rule2 small { display:block; font-size:12.5px; color:var(--ink-70); }
+.rule2 .v { font:500 13.5px var(--font-mono); text-align:right; }
+.rule2 .v.unset { color:var(--ink-50); }
+.grp { font-size:12.5px; color:var(--ink-50); font-weight:600; margin:18px 0 4px; }
+.grp:first-of-type { margin-top:0; }
+</style>
 <main id="top">
 <section class="intro"><div class="wrap">
-  <div class="ch-label"><span class="n">Ref. 12</span><span>Internal app for Opencast's team, web</span></div>
-  <h1>Filling a dial, one yes at a time.</h1>
-  <p>Network desk is Opencast's own tool for building a market: seeing every channel on the dial and what fills it, finding local creators and asking permission, turning a yes into a running station, and managing the city streams and catalog programming that fill the rest. Claimable stations are the core of it. PEG listings, the public-domain catalog and reserved call signs sit on the same board, because they all answer the same question: what's on this dial tonight?</p>
-  <p>Same tokens as everything else, with an "Internal" mark in the header. It's the Inland Empire market, Saturday, September 26.</p>
+  <div class="ch-label"><span class="n">Ref. 12c</span><span>Network desk, the remaining pages</span></div>
+  <h1>Claims, call signs, sponsors and the rules.</h1>
+  <p>The four Network desk pages that weren't designed yet. Rights claims is Opencast's view of every claim on every station, with the clock each one is on. Reserved call signs manages the waitlist's held names and numbers. Catalog sponsors sells the one credit an hour in catalog programs, market by market. Settings holds the team and every rule that's set once and read everywhere: prices, shares, public-domain dates, numbering and platform limits.</p>
+  <p>Same tokens and Network desk shell. Tuesday, September 29, 2026.</p>
   <ul class="toc">
-    <li><a href="#board"><span class="mono">01</span>The market board</a></li>
-    <li><a href="#pipeline"><span class="mono">02</span>The creator pipeline</a></li>
-    <li><a href="#ask"><span class="mono">03</span>Asking permission</a></li>
-    <li><a href="#setup"><span class="mono">04</span>Setting up a claimable station</a></li>
-    <li><a href="#listed"><span class="mono">05</span>City streams and the catalog</a></li>
-    <li><a href="#creator"><span class="mono">06</span>What the creator sees</a></li>
-    <li><a href="#held"><span class="mono">07</span>Held earnings</a></li>
+    <li><a href="#claims"><span class="mono">01</span>Rights claims</a></li>
+    <li><a href="#reserved"><span class="mono">02</span>Reserved call signs</a></li>
+    <li><a href="#sponsors"><span class="mono">03</span>Catalog sponsors</a></li>
+    <li><a href="#settings"><span class="mono">04</span>Settings</a></li>
   </ul>
   <div class="principles">
-    <div><h3>Permission before air</h3><p class="muted">Either the creator said yes, or their work is already published under a licence that allows it, like CC BY. Nothing is copied or aired on anything less, and the yes or the licence is kept as the rights record.</p></div>
-    <div><h3>One board for the dial</h3><p class="muted">Independent stations, claimable stations, city streams, the catalog station and reserved call signs, all on one map of the market.</p></div>
-    <div><h3>Recipes, not hand-built logs</h3><p class="muted">A claimable station starts from a template schedule filled from the creator's work and the catalog, so the team can run many without hand-scheduling each.</p></div>
-    <div><h3>Their money, held in escrow</h3><p class="muted">What a claimable station earns is held in an escrow contract under the station's ID. The contract can only pay the creator, or the creator fund if it's never claimed.</p></div>
+    <div><h3>Every clock visible</h3><p class="muted">Claims run on legal deadlines. Each row says what's due, by when, from whom.</p></div>
+    <div><h3>Names are held, not owned</h3><p class="muted">A reserved call sign is a promise to the waitlist with an end date, not something to trade.</p></div>
+    <div><h3>Sponsors by market</h3><p class="muted">The catalog's credit can be sold separately in each market, so a local library can thank viewers in its own area.</p></div>
+    <div><h3>Rules in one place</h3><p class="muted">Anything marked Open elsewhere in Opencast is set here, with a date it takes effect and who changed it.</p></div>
   </div>
 </div></section>
 
-<!-- ================= BOARD ================= -->
-<section class="ref" id="board"><div class="wrap">
-  <div class="ch-label"><span class="n">01</span><span>The market board</span></div>
-  <h2>Every channel, and what fills it.</h2>
-  <p class="lede">The Inland Empire's TV band as a grid from 2 to 69 and the radio band below it, each slot coloured by what's there: an independent station, a claimable station, an external city stream, Opencast's catalog station, a call sign held from the waitlist, or open. Above it, how much of tonight is local.</p>
+<!-- ================= CLAIMS ================= -->
+<section class="ref" id="claims"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Rights claims</span></div>
+  <h2>Every claim on every station, and what's due next.</h2>
+  <p class="lede">Opencast's side of the rights system stations see in master control. The list shows each open claim with its station, program, claimant, state and next deadline. Selecting one shows the timeline: off air everywhere at once, the station's answer, the counter-notice, and the date it can come back.</p>
   <div class="stage">
     <div class="fit" data-w="1280" data-h="860"><div class="scaler">
-      <div class="app nd" data-nav="board" style="height:860px">
-        <div class="mc-title"><div><h2>Inland Empire</h2><p>8 stations, 2 claimable stations on air, 3 external city streams and the catalog station. 26 people on the waitlist here.</p></div><div class="end"><div class="seg"><button aria-pressed="true">Inland Empire</button><button aria-pressed="false">High Desert</button><button aria-pressed="false">Los Angeles</button></div></div></div>
+      <div class="app nd" data-nav="claims" style="height:860px">
+        <div class="mc-title"><div><h2>Rights claims</h2><p>Claims against programs on any station, and the answers.</p></div><div class="end"><div class="seg"><button aria-pressed="true">Open</button><button aria-pressed="false">Closed</button><button aria-pressed="false">By station</button></div></div></div>
         <div class="cov">
-          <div><span class="v">71%</span><small>Of tonight's station hours are local programming</small></div>
-          <div><span class="v">2</span><small>Claimable stations on air, waiting to be claimed</small></div>
-          <div><span class="v">4</span><small>Creators who said yes, not set up yet</small></div>
-          <div><span class="v">1</span><small>Station with dead air coming, HALL 90.7</small></div>
+          <div><span class="v">4</span><small>Open claims, all off air</small></div>
+          <div><span class="v">1</span><small>Station answer due in 2 days</small></div>
+          <div><span class="v">11</span><small>Stations carrying something that was claimed</small></div>
+          <div><span class="v">0</span><small>Stations near the repeat limit</small></div>
         </div>
-        <div class="legend3"><span><i style="background:#8C3B7A"></i>Independent station</span><span><i style="border:2px dashed var(--signal)"></i>Claimable, run by Opencast</span><span><i style="border:1px dashed var(--line)"></i>External city stream</span><span><i style="background:var(--ink)"></i>Opencast catalog</span><span><i style="background:repeating-linear-gradient(135deg,var(--hair) 0 3px,transparent 3px 6px)"></i>Held for the waitlist</span><span><i style="border:1px solid var(--hair)"></i>Open</span></div>
-        <div class="sec-top" style="margin-top:0"><h3>TV band</h3><span class="sub">2 to 69, main channels</span></div>
-        <div class="dialmap" id="tvmap" style="margin-top:10px"></div>
-        <div class="sec-top"><h3>Radio band</h3><span class="sub">88.1 to 107.9</span></div>
-        <div class="radiomap" id="radiomap" style="margin-top:10px"></div>
-        <div class="row2" style="margin-top:14px;border-top:1px solid var(--line)"><div><b>33.1 LUPE, selected</b><small>Claimable. Tía Lupe's Kitchen said yes September 22. Recipe set, signs on Monday at 6:00 am</small></div><div class="end"><button class="btn btn-ghost btn-sm">Open in master control</button><button class="btn btn-ghost btn-sm">Pipeline</button></div></div>
-      </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>The dial as a map</h3><p>Every number in the market at a glance. Gaps are visible as open slots, which is how the team decides what the market needs next.</p></div>
-      <div class="note"><h3>Local share, not viewers</h3><p>The headline number is how much of tonight is local programming, not how many people watched. It's the measure of whether a market is working.</p></div>
-      <div class="note"><h3>Held call signs</h3><p>Reservations from the website's waitlist show as hatched slots, so the team never sets up a claimable station on a number someone already asked for.</p></div>
-      <div class="note"><h3>Subchannels live inside a slot</h3><p>9.1, 9.2 and 9.3 are three city streams on channel 9. The board shows the main channel; opening it lists the subchannels.</p></div>
-    </div>
-  </div>
-</div></section>
-
-<!-- ================= PIPELINE ================= -->
-<section class="ref" id="pipeline"><div class="wrap">
-  <div class="ch-label"><span class="n">02</span><span>The creator pipeline</span></div>
-  <h2>From found to claimed, one row each.</h2>
-  <p class="lede">Every local creator the team is talking to, where they are, where their work lives, and the next thing to do. Most go found, asked, said yes, setting up, on air, then claimed or declined. Creators whose work is already published under a licence that allows commercial use, like CC BY, skip asking: their station can go on air with attribution while they're invited to claim it.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app nd" data-nav="pipeline">
-        <div class="mc-title"><div><h2>Creator pipeline</h2><p>Inland Empire. Sorted by what needs doing first.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>Add a creator</button></div></div>
-        <div class="stages">
-          <div><span class="v">6</span><small>Found</small></div>
-          <div><span class="v">2</span><small>Already licensed</small></div>
-          <div><span class="v">3</span><small>Asked</small></div>
-          <div class="on"><span class="v">4</span><small>Said yes</small></div>
-          <div><span class="v">1</span><small>Setting up</small></div>
-          <div><span class="v">1</span><small>On air, not claimed</small></div>
-          <div><span class="v">3</span><small>Claimed</small></div>
-        </div>
-        <div class="pp-h"><span>Creator</span><span>Their work lives on</span><span>Stage</span><span>Station</span><span>Next</span><span></span></div>
-        <div id="ppRows"></div>
-      </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>Sorted by the next action</h3><p>Overdue follow-ups and new yeses first, finished rows last. The pipeline is a to-do list, not a funnel chart.</p></div>
-      <div class="note"><h3>Where the work lives</h3><p>The source matters twice: it's where the work is imported from, and it's the account the creator connects later to prove it's them when they claim.</p></div>
-      <div class="note"><h3>One reminder, then stop</h3><p>A creator who hasn't answered gets one reminder after a week. After that the row is marked "No answer" and the team doesn't ask again.</p></div>
-      <div class="note"><h3>Declines are respected, and kept</h3><p>A creator who said no is kept on the list so nobody asks twice.</p></div>
-      <div class="note"><h3>"Already licensed" is checked per work</h3><p>The licence has to allow commercial use, because stations carry spots. CC BY does; the non-commercial variants don't. Each work's licence and link are saved, and the credit airs as the licence requires.</p></div>
-    </div>
-  </div>
-</div></section>
-
-<!-- ================= ASK ================= -->
-<section class="ref" id="ask"><div class="wrap">
-  <div class="ch-label"><span class="n">03</span><span>Asking permission</span></div>
-  <h2>A short message, and exactly what they'd be saying yes to.</h2>
-  <p class="lede">Asking starts from the creator's row. The team picks which of their works to include and writes a short note; the message carries one link to a permission page that spells out everything. The right side previews the message as the creator will get it.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="840"><div class="scaler">
-      <div class="app nd" data-nav="pipeline" style="height:840px">
-        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Pipeline / Desert Skate Films</span><h2>Ask Desert Skate Films</h2></div></div>
-        <div class="ask">
+        <div class="split" style="grid-template-columns:minmax(0,1fr) 350px">
           <div>
-            <div class="fld"><label>Send to</label><div class="field" style="color:var(--ink)">Vimeo message and hello@desertskate.example</div></div>
-            <div class="sec-top"><h3>Which works</h3><span class="sub">14 found on their Vimeo</span></div>
-            <div class="works">
-              <div class="wk"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b style="font-weight:600">Full-length skate films</b><br><small>6 films, 4 hr 10 min in total</small></div><span class="quiet" style="font-size:12.5px">Included</span></div>
-              <div class="wk"><span class="bx"><svg><use href="#i-check"/></svg></span><div><b style="font-weight:600">Park session edits</b><br><small>7 shorts, 58 min</small></div><span class="quiet" style="font-size:12.5px">Included</span></div>
-              <div class="wk off"><span class="bx"></span><div><b style="font-weight:600">Sponsor edit for a shoe brand</b><br><small>Likely someone else's rights. Left out</small></div><span class="quiet" style="font-size:12.5px">Left out</span></div>
-            </div>
-            <div class="sec-top"><h3>What we'd do</h3></div>
-            <div class="row2"><div><b>A TV band station, 38.1 or 45.1</b><small>Their films at night, with catalog programming in between</small></div><span></span></div>
-            <div class="row2"><div><b>Earnings held for them</b><small>Everything their station earns, until they claim it or say stop</small></div><span></span></div>
-            <div class="fld" style="margin-top:14px"><label>A note from you</label><div class="field" style="height:78px;align-items:flex-start;padding-top:10px;color:var(--ink)">Your Joshua Tree film is the best thing we've seen from out here. We'd love to put it on the air where people who skate those parks can find it.</div></div>
+            <div class="rc-h"><span></span><span>Program and claim</span><span>State</span><span>Next</span><span style="text-align:right">Carriers</span></div>
+            <div class="rc2 sel"><span class="sw" style="background:#8C3B7A"></span><div><b>Late Crate, ep. 9, on BEAT 12.1</b><small>Northside Records: two tracks in the second half</small></div><span><span class="st9 wait">Counter-notice sent</span></span><span class="due">Back Oct 14</span><span class="due" style="text-align:right">3</span></div>
+            <div class="rc2"><span class="sw" style="background:#A3402A"></span><div><b>Tamales for forty, ep. 3, on SAZN 18.1</b><small>A photographer: stills used in the intro</small></div><span><span class="st9 off">Off air</span></span><span class="due">SAZN answers by Oct 1</span><span class="due" style="text-align:right">1</span></div>
+            <div class="rc2"><span class="sw" style="background:#525C73"></span><div><b>Harbor Nights, ep. 2, on KILN 44.1</b><small>A film distributor: the whole episode</small></div><span><span class="st9 off">Off air</span></span><span class="due">KILN answers by Oct 6</span><span class="due" style="text-align:right">1</span></div>
+            <div class="rc2"><span class="sw" style="background:#2E6B5A"></span><div><b>Council Watch, Sept 22, on CIVC 7.1</b><small>A resident: their face shown without consent</small></div><span><span class="st9 off">Off air</span></span><span class="due">Privacy, not copyright</span><span class="due" style="text-align:right">6</span></div>
           </div>
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>What they'll get</h3></div>
-            <div class="msg" style="margin-top:12px">
-              <div class="from">From Opencast, the Inland Empire dial</div>
-              <p>Your Joshua Tree film is the best thing we've seen from out here. We'd love to put it on the air where people who skate those parks can find it.</p>
-              <p>We'd run a TV station of your films on Opencast, a local 24/7 dial, and hold everything it earns for you. It's yours to take over whenever you want, or to stop with one tap.</p>
-              <div style="border-top:1px solid var(--hair);margin:4px 0 12px;padding-top:10px;font-size:13px"><div style="font-weight:600;margin-bottom:4px">Your station tonight, if you say yes</div><div style="display:grid;grid-template-columns:70px 1fr;gap:2px 10px;font-size:12.5px"><span class="mono">7:00 pm</span><span>Joshua Tree, full film</span><span class="mono">8:10 pm</span><span>Park sessions: Palm Springs</span><span class="mono">8:30 pm</span><span>Classic films from the catalog</span></div></div>
-              <span class="lnk">See what you'd be saying yes to</span>
-              <p class="quiet" style="font-size:12.5px;margin:10px 0 0">If you don't answer, we'll remind you once in a week and then leave it.</p>
+          <div class="pane">
+            <h4>Late Crate, ep. 9</h4>
+            <div class="tl2">
+              <div class="r done"><span class="dot"></span><span class="w">Sept 12, 2:04 pm</span><div><b>Claim received</b><small>Northside Records, with the two track names and timestamps</small></div></div>
+              <div class="r done"><span class="dot"></span><span class="w">Sept 12, 2:04 pm</span><div><b>Off air on BEAT and 3 carriers</b><small>Pulled from every log at once</small></div></div>
+              <div class="r done"><span class="dot"></span><span class="w">Sept 15</span><div><b>BEAT answered</b><small>"The owner gave permission," with the license attached</small></div></div>
+              <div class="r done"><span class="dot"></span><span class="w">Sept 16</span><div><b>Counter-notice sent to the claimant</b><small>They were told the episode returns unless they take legal action</small></div></div>
+              <div class="r cur"><span class="dot"></span><span class="w">Oct 14</span><div><b>Can return to air</b><small>If Northside hasn't filed suit, it goes back in every log that had it</small></div></div>
             </div>
-            <button class="btn btn-primary btn-block" style="margin-top:16px">Send</button>
+            <div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-ghost btn-sm">See evidence</button><button class="btn btn-ghost btn-sm">Message BEAT</button></div>
+            <p class="m-note">Opencast doesn't decide who's right. It follows the process, keeps the record, and restores or removes on the dates.</p>
           </div>
         </div>
       </div>
     </div></div>
     <div class="notes">
-      <div class="note"><h3>Works are chosen, not assumed</h3><p>The team ticks which works to include and leaves out anything that might belong to someone else, like a sponsor edit. Only ticked works are covered by the yes.</p></div>
-      <div class="note"><h3>The message is short on purpose</h3><p>A personal note, two sentences of what Opencast would do, and one link. The details live on the permission page, where they can be read properly.</p></div>
-      <div class="note"><h3>Show them their station</h3><p>The message includes tonight's schedule as it would be, using their own titles. Seeing it gets more yeses than describing it. It's built from titles and lengths only; no files are copied before the yes.</p></div>
-      <div class="note"><h3>Sent where they already are</h3><p>A message on the platform where their work lives, plus email if there is one. Never a cold call, never a follow-up beyond the one reminder.</p></div>
+      <div class="note"><h3>Carriers count</h3><p>A claim on a carried program pulls it from every station airing it. The carriers column shows how far a claim reached, and they're all restored together.</p></div>
+      <div class="note"><h3>Not every claim is copyright</h3><p>A privacy complaint, like someone filmed without consent, follows its own path. The row says so rather than forcing it into the copyright timeline.</p></div>
+      <div class="note"><h3>Repeat limit</h3><p>Stations with upheld claims are counted against the repeat-infringer policy. The number that triggers action is set in Settings.</p></div>
+      <div class="note open"><h3>Deadlines and wording</h3><p>The answer window, the counter-notice waiting period and every word the claimant and station receive need a lawyer's review before launch. The dates here are placeholders set in Settings.</p></div>
     </div>
   </div>
 </div></section>
 
-<!-- ================= SETUP ================= -->
-<section class="ref" id="setup"><div class="wrap">
-  <div class="ch-label"><span class="n">04</span><span>Setting up a claimable station</span></div>
-  <h2>A yes becomes a station from a recipe.</h2>
-  <p class="lede">Once a creator says yes, the station is set up from a recipe: a channel from the board, a call sign, the creator's works imported from their source with the permission attached as the rights record, and a 24-hour template that mixes their work with catalog programming. Then a team member is assigned and it signs on.</p>
+<!-- ================= RESERVED ================= -->
+<section class="ref" id="reserved"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Reserved call signs</span></div>
+  <h2>Names and numbers held for the waitlist.</h2>
+  <p class="lede">People who join the waitlist as a station can reserve a call sign, and optionally a channel, in their market. This page shows every reservation with its state and end date, and flags the ones that need a decision: two people wanting the same name, or a name Opencast won't allow.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="860"><div class="scaler">
-      <div class="app nd" data-nav="pipeline" style="height:860px">
-        <div class="mc-title"><div><span class="quiet" style="font-size:13px">Pipeline / Tía Lupe's Kitchen</span><h2>Set up LUPE 33.1</h2><p>Said yes September 22. Covers 48 cooking videos on YouTube.</p></div></div>
-        <div class="recipe">
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>Recipe</h3><span class="sub">Cooking and food, TV band</span></div>
-            <div class="day24" aria-hidden="true">
-              <i style="flex:2;background:#1F3A5F">Catalog</i><i style="flex:4;background:#A3402A">Lupe's kitchen</i><i style="flex:1;background:#2E6B5A">CIVC</i><i style="flex:5;background:#A3402A">Lupe's kitchen</i><i style="flex:4;background:#9A5412">Catalog films</i><i style="flex:4;background:#A3402A">Lupe, repeats</i><i style="flex:4;background:#1F3A5F">Catalog, overnight</i>
-            </div>
-            <div class="hours"><span>6 am</span><span>12 pm</span><span>6 pm</span><span>12 am</span><span>6 am</span></div>
-            <div class="row2" style="margin-top:10px"><div><b>Her videos</b><small>48 videos, 31 hr in total. Each airs at most 3 times a week</small></div><span class="quiet" style="font-size:13px">13 hr a day</span></div>
-            <div class="row2"><div><b>Carried: Council Watch from CIVC</b><small>Weeknights at noon, public affairs for the market</small></div><span class="quiet" style="font-size:13px">1 hr</span></div>
-            <div class="row2"><div><b>Opencast catalog</b><small>Classic films and overnight programming</small></div><span class="quiet" style="font-size:13px">10 hr</span></div>
-            <div class="row2"><div><b>Breaks</b><small>Every 30 min, 2:00, spots from the market, never alcohol</small></div><span></span></div>
-          </div>
-          <div>
-            <div class="sec-top" style="margin-top:0"><h3>Station</h3></div>
-            <div class="row2"><div><b>Channel</b><small>From the board, open</small></div><span class="mono">33.1</span></div>
-            <div class="row2"><div><b>Call sign</b><small>Suggested from her name. She can't change it after claiming</small></div><span class="cs">LUPE</span></div>
-            <div class="row2"><div><b>Rights record</b><small>Permission from Lupe Ortiz, September 22, for the 48 listed videos</small></div><span class="ok-t"><svg><use href="#i-check"/></svg>Attached</span></div>
-            <div class="row2"><div><b>Import</b><small>From her YouTube channel, prepared for air</small></div><span class="quiet" style="font-size:13px">31 of 48</span></div>
-            <div class="row2"><div><b>Held earnings</b><small>In the escrow contract under LUPE's station ID. No wallet is created until Lupe claims</small></div><span class="mono" style="font-size:12.5px">Station #33</span></div>
-            <div class="row2"><div><b>Run by</b><small>Opencast team operator</small></div><span>Dee A.</span></div>
-            <div class="row2"><div><b>Signs on</b></div><span>Monday, 6:00 am</span></div>
-            <button class="btn btn-primary btn-block" style="margin-top:14px">Schedule sign-on</button>
-          </div>
-        </div>
+    <div class="fit" data-w="1280" data-h="800"><div class="scaler">
+      <div class="app nd" data-nav="reserved">
+        <div class="mc-title"><div><h2>Reserved call signs</h2><p>26 held from the waitlist in the Inland Empire, 9 with a channel held.</p></div><div class="end"><button class="btn btn-ghost btn-sm">Inland Empire<svg class="i" style="width:14px;height:14px"><use href="#i-down"/></svg></button><button class="btn btn-primary btn-sm">Invite the next 10</button></div></div>
+        <div class="rs-h"><span>Call sign</span><span>Channel</span><span>Reserved by</span><span>Since</span><span>State</span><span></span></div>
+        <div class="rs"><span class="cs">HALO</span><span class="ch">52.1</span><div>Ruth O.<small>Community choir, Riverside</small></div><span>Aug 30</span><span><span class="st9 on">Invited, signing on</span></span><span class="end2"><button class="btn btn-ghost btn-sm">Open</button></span></div>
+        <div class="rs"><span class="cs">DUSK</span><span class="ch">&mdash;</span><div>Marco T.<small>Late-night film club, Redlands</small></div><span>Sept 3</span><span><span class="st9">Waiting for an invite</span></span><span class="end2"><button class="btn btn-ghost btn-sm">Invite</button></span></div>
+        <div class="rs"><span class="cs">VALE</span><span class="ch">&mdash;</span><div>2 people<small>A skate crew and a church, both Fontana</small></div><span>Sept 8, Sept 11</span><span><span class="st9 wait">Same name twice</span></span><span class="end2"><button class="btn btn-ghost btn-sm">Decide</button></span></div>
+        <div class="rs"><span class="cs">KFRO</span><span class="ch">&mdash;</span><div>J. Park<small>Wanted a real-looking call sign</small></div><span>Sept 14</span><span><span class="st9 off">Not allowed</span></span><span class="end2"><button class="btn btn-ghost btn-sm">Suggest</button></span></div>
+        <div class="rs"><span class="cs">GOLD</span><span class="ch">31.1</span><div>Hank V.<small>Oldies, Upland</small></div><span>June 2</span><span><span class="st9">Ends tomorrow</span></span><span class="end2"><button class="btn btn-ghost btn-sm">Extend</button><button class="btn btn-ghost btn-sm">Release</button></span></div>
+        <p class="quiet" style="font-size:13px;margin:14px 0 0">Showing 5 of 26. Reservations last 120 days, or until the invite is accepted or declined.</p>
       </div>
     </div></div>
     <div class="notes">
-      <div class="note"><h3>Ready before the yes</h3><p>The channel, call sign and recipe are prepared from titles and lengths while the ask is out. Files are only copied once the yes arrives, so a yes can be on air within the hour.</p></div>
-      <div class="note"><h3>Why the call sign is careful</h3><p>Call signs are permanent once a station signs on. The team suggests one from the creator's own name, and the creator is told it's theirs to keep.</p></div>
-      <div class="note"><h3>Permission is the rights record</h3><p>Every imported item's rights are "Permission from the owner", pointing at the yes. That's what makes these imports different from the station-local link imports in the library.</p></div>
-      <div class="note"><h3>Recipes keep it light</h3><p>A recipe by category fills the day from the creator's work, the catalog and one carried local program, with sensible repeat limits. One team member can look after several stations.</p></div>
-      <div class="note"><h3>A local anchor in every station</h3><p>Each recipe carries one local public-affairs program, like Council Watch, so every new station helps the civic side of the dial too.</p></div>
+      <div class="note"><h3>First come, with a person deciding ties</h3><p>When two people reserve the same name, the earlier one usually wins, but the desk decides and offers the other a suggestion. The fairest answer isn't always the earliest.</p></div>
+      <div class="note"><h3>Names Opencast won't allow</h3><p>Four letters starting with K or W look like FCC stations, so they're refused with a suggestion. So are names that impersonate a real station, brand or person.</p></div>
+      <div class="note"><h3>Held, then released</h3><p>A reservation ends after 120 days unless the person signs on or the desk extends it, so the dial isn't blocked by names nobody uses. When call sign licenses exist, this is where their renewals will show.</p></div>
+      <div class="note"><h3>Invite in batches</h3><p>"Invite the next 10" sends invites in reservation order, so a market can open at the pace the desk can support.</p></div>
     </div>
   </div>
 </div></section>
 
-<!-- ================= LISTED ================= -->
-<section class="ref" id="listed"><div class="wrap">
-  <div class="ch-label"><span class="n">05</span><span>City streams and the catalog</span></div>
-  <h2>External stations, and what fills the dial without a creator.</h2>
-  <p class="lede">External stations are channels whose video comes straight from the source's own stream, with no Opencast playout, spots or breaks. They play one of two ways: the source's official embedded player where its terms allow it, or its raw stream link, only with permission or for clearly public sources. Network desk keeps each one's schedule and checks its stream, hiding it from the dial while it's down. The catalog station is Opencast's own, filled from the catalog.</p>
+<!-- ================= SPONSORS ================= -->
+<section class="ref" id="sponsors"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>Catalog sponsors</span></div>
+  <h2>One credit an hour, sold by market.</h2>
+  <p class="lede">Catalog programs keep one sponsor credit an hour. By default it thanks Clear everywhere. The desk can sell it market by market and series by series, so a sponsor in the Inland Empire is thanked only on Inland Empire stations. Each row is one sponsor, where it's credited, what it pays, and how many credits aired.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="880"><div class="scaler">
-      <div class="app nd" data-nav="listed" style="height:880px">
-        <div class="mc-title"><div><h2>External sources</h2><p>Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>List a source</button></div></div>
-        <div class="src-h"><span>Source</span><span>Channel</span><span>How it plays</span><span>What's on</span><span>Right now</span></div>
-        <div class="src-row"><div><b>City of Redlands</b><small>Council and planning meetings</small></div><span class="mono">9.1 RDLS</span><div class="tier"><b>Official embed</b><small>The city's own player, embedding allowed</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>City of Colton</b><small>Council meetings</small></div><span class="mono">9.2 COLT</span><div class="tier"><b>Stream link</b><small>Public body, stream published for the public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>San Bernardino County</b><small>Board of Supervisors</small></div><span class="mono">9.3 SBCO</span><div class="tier"><b>Official embed</b><small>The county's own player</small></div><span class="ok-t" style="color:var(--standby)"><svg><use href="#i-warn"/></svg><span>No schedule found<small>Banner shows name and Live</small></span></span><span class="ok-t" style="color:var(--live)"><span class="dot-down"></span><span>Down 14 min<small>Hidden from the dial</small></span></span></div>
-        <div class="src-row"><div><b>NASA</b><small>Launches and live coverage</small></div><span class="mono">61.1 NASA</span><div class="tier"><b>Stream link</b><small>US government, public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Guide data<small>Checked, from their published schedule</small></span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
-        <div class="src-row"><div><b>Riverside Unified School District</b><small>Board meetings</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Official embed</b><small>Terms unclear, asked Sept 22</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
-        <div class="src-row"><div><b>Inland Community TV</b><small>From an IPTV list. A community channel's raw stream</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Stream link</b><small>Needs their permission. In the creator pipeline</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
-        <div class="sec-top"><h3>Opencast catalog station</h3></div>
-        <div class="row2"><div><b>60.1 OCAT, Opencast Classics</b><small>Filled entirely from the catalog. Made possible by Clear. Also offered to every station for carriage</small></div><div class="end"><button class="btn btn-ghost btn-sm">Open in master control</button></div></div>
-        <div class="row2"><div><b>When a local station is ready for 60.1</b><small>The catalog station moves to a free channel so the number can go to someone local</small></div><span></span></div>
-      </div>
-    </div></div>
-    <div class="notes">
-      <div class="note"><h3>Two ways to play</h3><p>An official embed uses the source's own player, only where its terms allow embedding. A raw stream link plays in Opencast's player and needs the source's permission, unless it's clearly public: government bodies, public access, NASA and the like.</p></div>
-      <div class="note"><h3>IPTV lists are leads, not listings</h3><p>A channel found on a public IPTV list goes into the creator pipeline first. Once it says yes, it can be added as an external station, or become a full station with spots and earnings.</p></div>
-      <div class="note"><h3>What's on, when we can get it</h3><p>From the source's own calendar or schedule feed, or guide data checked against their published schedule. With neither, the banner shows the station's name, "Live" and the source, and no progress bar. Nothing is made up.</p></div>
-      <div class="note"><h3>Hidden while it's down</h3><p>Each stream is checked every minute. After 5 minutes down, the station leaves the dial and the swipe order; anyone already watching sees Stand by. It comes back on its own when the stream does, and Network desk is told both times.</p></div>
-      <div class="note"><h3>No spots, no earnings</h3><p>External stations never air spots, sponsor credits or partner ads, can't be carried or offered in the market, and show an "External" tag in the banner and guide.</p></div>
-      <div class="note"><h3>The catalog station steps aside</h3><p>Opencast's own station holds a channel until a local station wants it, then moves. The dial should fill up with local stations, not with Opencast.</p></div>
-      <div class="note open"><h3>Other markets' streams</h3><p>Whether a city stream from outside a market can be added in it as an external station, for example a county meeting that covers two markets, isn't decided.</p></div>
-    </div>
-  </div>
-</div></section>
-
-<!-- ================= CREATOR ================= -->
-<section class="ref" id="creator"><div class="wrap">
-  <div class="ch-label"><span class="n">06</span><span>What the creator sees</span></div>
-  <h2>Everything they'd be saying yes to, then the yes.</h2>
-  <p class="lede">The link in the message opens the permission page, most likely on a phone. It lists exactly which works, what Opencast would do with them, what happens to the money, and how to stop. Saying yes is one button, and they don't need an account to do it.</p>
-  <div class="stage phones">
-    <div class="phone-row">
-      <div>
-        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
-          <div class="phone">
-            <div class="sbar"><span>10:14</span><span class="dots"><i></i><b></b></span></div>
-            <div class="perm-page">
-              <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
-              <h2>A station of your films, on the Inland Empire dial.</h2>
-              <p>Here's exactly what you'd be agreeing to. Nothing happens until you say yes.</p>
-              <div class="row2"><div><b>These works only</b><small>6 skate films and 7 park session edits from your Vimeo. Not the shoe sponsor edit</small></div></div>
-              <div class="row2"><div><b>A TV station, run for you</b><small>Your films in the evenings, other programming in between. Labelled "Run by Opencast for Desert Skate Films"</small></div></div>
-              <div class="row2"><div><b>The money is yours</b><small>Everything it earns is held in escrow for you, in a public contract that can only pay you, until you claim it</small></div></div>
-              <div class="row2"><div><b>Stop any time</b><small>One tap takes it off the dial within a day, and we pay out what it earned</small></div></div>
-              <button class="btn btn-primary btn-block" style="margin-top:16px">Yes, go ahead</button>
-              <button class="btn btn-ghost btn-block" style="margin-top:8px">No thanks</button>
-            </div>
-            <div class="hind"><i></i></div>
-          </div>
-        </div></div>
-        <p class="cap"><b>The permission page.</b></p>
-      </div>
-      <div>
-        <div class="fit ph" data-w="406" data-h="860"><div class="scaler">
-          <div class="phone">
-            <div class="sbar"><span>10:15</span><span class="dots"><i></i><b></b></span></div>
-            <div class="perm-page">
-              <span class="a-logo"><svg><use href="#mk"/></svg>opencast</span>
-              <h2>Thanks. We'll set it up.</h2>
-              <p>Your station should sign on within a week. We'll send you the channel and call sign before it does.</p>
-              <div class="row2"><div><b>What you said yes to</b><small>13 works, on September 27 at 10:15 am. We've emailed you a copy</small></div></div>
-              <div class="row2"><div><b>Changed your mind?</b><small>This link works to stop it at any time</small></div><button class="btn btn-ghost btn-sm">Stop</button></div>
-              <div class="row2"><div><b>Want to run it yourself from day one?</b><small>Claim it now and skip the team-run part</small></div><button class="btn btn-ghost btn-sm">Claim now</button></div>
-            </div>
-            <div class="hind"><i></i></div>
-          </div>
-        </div></div>
-        <p class="cap"><b>After saying yes.</b></p>
-      </div>
-    </div>
-    <div class="notes">
-      <div class="note"><h3>No account to say yes</h3><p>The yes is recorded against the link, with a timestamp and the exact list of works, and a copy is emailed. An account only matters when they claim.</p></div>
-      <div class="note"><h3>Stop is always one tap</h3><p>The same link stops everything later, so saying yes never feels like a trap.</p></div>
-      <div class="note"><h3>Claiming early</h3><p>A creator who'd rather run it themselves can claim straight away and go to the normal sign-on flow, with the recipe already filled in.</p></div>
-      <div class="note open"><h3>The permission wording</h3><p>This page is a licence in plain words. It should be reviewed by a lawyer before the first creator sees it, as noted when claimable stations first came up.</p></div>
-    </div>
-  </div>
-</div></section>
-<!-- ================= HELD ================= -->
-<section class="ref" id="held"><div class="wrap">
-  <div class="ch-label"><span class="n">07</span><span>Held earnings</span></div>
-  <h2>Every claimable station's money, held in escrow.</h2>
-  <p class="lede">Claimable stations don't get wallets. Their earnings, after the same fees and pool share as any station, are paid into one escrow contract each week, held under the station's ID. The contract has only three ways out: to the verified creator when they claim, to them if they ask to stop, or to the creator fund if it's never claimed. It has no way to pay Opencast.</p>
-  <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app nd" data-nav="team">
-        <div class="mc-title"><div><h2>Held earnings</h2><p>Money earned by stations Opencast runs for creators. None of it is Opencast's.</p></div></div>
+    <div class="fit" data-w="1280" data-h="800"><div class="scaler">
+      <div class="app nd" data-nav="sponsors">
+        <div class="mc-title"><div><h2>Catalog sponsors</h2><p>Businesses and organizations thanked in the catalog's credit.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>Add a sponsor</button></div></div>
         <div class="cov">
-          <div><span class="v">$227.00</span><small>Held across 2 stations</small></div>
-          <div><span class="v">2</span><small>Claim invitations out</small></div>
-          <div><span class="v">$0.00</span><small>Ever moved to Opencast. It can't be</small></div>
-          <div><span class="v">3 years</span><small>Unclaimed until it goes to the creator fund</small></div>
+          <div><span class="v">2,840</span><small>Catalog credits aired in September</small></div>
+          <div><span class="v">$550.00</span><small>Sponsorship a month, all markets</small></div>
+          <div><span class="v">3</span><small>Markets with a local sponsor slot open</small></div>
+          <div><span class="v">0%</span><small>Share to the creator fund. Not set yet</small></div>
         </div>
-        <div class="src-h" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><span>Station</span><span>In escrow as</span><span>Held</span><span>Status</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>101.9 CRAT, for Marcus Reyes</b><small>On air since August 12, with permission</small></div><span class="mono" style="font-size:13px">Station #101</span><span class="mono">$214.60</span><span class="stg wait">Claim link sent</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>91.9 FLDR, for Mojave Field Recordings</b><small>On air since September 20, under CC BY 4.0</small></div><span class="mono" style="font-size:13px">Station #91</span><span class="mono">$12.40</span><span class="stg wait">Invited Sept 24</span></div>
-        <div class="src-row" style="grid-template-columns:minmax(0,1fr) 180px 160px 150px"><div><b>33.1 LUPE, for Lupe Ortiz</b><small>Signs on Monday</small></div><span class="mono" style="font-size:13px">Station #33</span><span class="mono">$0.00</span><span class="stg">Not on air yet</span></div>
-        <div class="sec-top"><h3>Where held money can go</h3></div>
-        <div class="row2"><div><b>To the creator, when they claim</b><small>Paid to the wallet made when they sign in, after verification and a 72-hour public waiting period</small></div><span></span></div>
-        <div class="row2"><div><b>To the creator, if they say stop</b><small>Paid out to them within a week of the station signing off</small></div><span></span></div>
-        <div class="row2"><div><b>To the creator fund, if never claimed</b><small>After 3 years with no claim, the fund that backs new stations and programs</small></div><span></span></div>
-        <div class="row2"><div><b>Nowhere else</b><small>The contract has no other way to send money. Not to Opencast, not to another station, not to cover costs</small></div><span></span></div>
-        <div class="row2" style="border-bottom:0"><div><b>Escrow contract</b><small>Public, with every deposit and payout visible</small></div><span class="mono" style="font-size:13px">0x5ee2&hellip;a41d</span></div>
+        <div class="split" style="grid-template-columns:minmax(0,1fr) 300px">
+          <div>
+            <div class="sp-h2"><span>Sponsor</span><span>Credited in</span><span>Where</span><span>A month</span><span>Credits</span></div>
+            <div class="sp2"><div><b>Clear</b><small>The house sponsor, thanked wherever nobody else is</small></div><span>Every catalog series</span><span>Every market</span><span class="m">$400.00</span><span class="m">2,412</span></div>
+            <div class="sp2"><div><b>Inland Empire Libraries</b><small>Since August</small></div><span>Nights at the observatory</span><span>Inland Empire</span><span class="m">$150.00</span><span class="m">428</span></div>
+            <div class="sp2 open2"><div><b>Open slot</b><small>Cartoons, 1928 to 1936, airs 12 times a day here</small></div><span>Cartoons, 1928 to 1936</span><span>Inland Empire</span><span class="m">&mdash;</span><span class="m">&mdash;</span></div>
+            <div class="sp2 open2"><div><b>Open slot</b><small>Every catalog series in the market</small></div><span>Every catalog series</span><span>Los Angeles</span><span class="m">&mdash;</span><span class="m">&mdash;</span></div>
+          </div>
+          <div class="pane">
+            <h4>Inland Empire Libraries' credit</h4>
+            <div class="slate" style="background:#1F3A5F;margin-top:10px;aspect-ratio:16/9;border-radius:var(--r-screen);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:0 8%">
+              <span style="font-size:12px;opacity:.85">Nights at the observatory is made possible by</span>
+              <span style="font:800 21px/1.05 var(--font-display);font-stretch:112%;margin:6px 0 4px">Inland Empire Libraries</span>
+              <span style="font-size:11.5px;opacity:.9">Free cards, free films, free rooms to think, in every city in the valley.</span>
+            </div>
+            <p class="m-note">Checked against the same credit rules as station sponsorships: who they are, not what they sell.</p>
+            <div class="kv"><div><span>Airs on</span><span>6 Inland Empire stations</span></div><div><span>Renews</span><span>October 1</span></div></div>
+          </div>
+        </div>
       </div>
     </div></div>
     <div class="notes">
-      <div class="note"><h3>One contract, a balance per station</h3><p>One escrow contract holds every claimable station's earnings, each under its own station ID, so each creator's money is exactly what their station earned. Wallets only exist for people who have signed in.</p></div>
-      <div class="note"><h3>Fees come off first, like everyone</h3><p>Opencast's share and the pool apply to a claimable station the same as to every other station. What's left is the creator's.</p></div>
-      <div class="note"><h3>"It can't be"</h3><p>Not a promise: the contract has no function that pays Opencast, and anyone can read it. The only thing Opencast controls is who is verified as the creator.</p></div>
-      <div class="note"><h3>Verification is the trust point</h3><p>Claims are approved by a multi-signature key, not one person, and every approved claim waits 72 hours in public before it pays out, so a wrong claim can be challenged.</p></div>
-      <div class="note open"><h3>Where the contract lives</h3><p>Opencast's own contract, or part of the Clear protocol alongside its encumbrance. Which chain, and the 3-year unclaimed period, are defaults to confirm.</p></div>
+      <div class="note"><h3>Clear fills the gaps</h3><p>Clear is thanked anywhere no other sponsor has bought the slot, so the catalog is never unsponsored and Clear gets steady, honest visibility.</p></div>
+      <div class="note"><h3>Sold where it airs</h3><p>A slot is a series in a market. The row says how often the series airs there, which is what a sponsor is buying.</p></div>
+      <div class="note open"><h3>Where catalog money goes</h3><p>Whether catalog sponsorship funds Opencast, the co-op pool, or the creator fund, and in what split, isn't decided. The share is shown as not set.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= SETTINGS ================= -->
+<section class="ref" id="settings"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Settings</span></div>
+  <h2>The team, and every rule Opencast runs on.</h2>
+  <p class="lede">Desk settings in two parts: the team with its roles, and the rules everything else reads: prices, shares, rights dates, numbering and platform limits. Each rule shows its value, and changes take effect from a date so statements can always say which rule applied.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1060"><div class="scaler">
+      <div class="app nd" data-nav="settings" style="height:1060px">
+        <div class="swrap2">
+          <nav class="snav2"><h2>Settings</h2><a href="#settings">Team</a><a class="on" href="#settings">Rules</a><a href="#settings">Markets</a><a href="#settings">Escrow signers</a><a href="#settings">Change log</a></nav>
+          <div class="spane2">
+            <h3>Rules</h3>
+            <p>Set once, read everywhere. A change takes effect from the date you choose; the old value stays in the change log.</p>
+            <div class="grp">Pay-as-you-go</div>
+            <div class="rule2"><div><b>Storage</b><small>Per GB a month, originals and prepared together</small></div><span class="v unset">Not set yet</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Relays, everything a station airs</b><small>Per hour relayed, per station</small></div><span class="v unset">Not set yet</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Live hours</b><small>Per hour live</small></div><span class="v unset">Not set yet</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Free each month</b><small>Before anything is charged</small></div><span class="v">10 GB, 5 live hours</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="grp">Shares</div>
+            <div class="rule2"><div><b>Opencast's share of spots and sponsorships</b><small>Taken from the station's side</small></div><span class="v unset">0%, not set yet</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>The pool</b><small>Base share, watch-time share, creator fund</small></div><span class="v unset">Not set yet</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="grp">Rights</div>
+            <div class="rule2"><div><b>Public domain in the US</b><small>Published this year or earlier. Moves forward every January 1</small></div><span class="v">1930</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Answer window and counter-notice wait</b><small>Placeholders until reviewed by a lawyer</small></div><span class="v">5 days, 10 business days</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Repeat limit</b><small>Upheld claims in 12 months before a station is reviewed</small></div><span class="v">3</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="rule2"><div><b>Unclaimed earnings go to the creator fund after</b><small>For claimable stations' escrow</small></div><span class="v">3 years</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+            <div class="grp">Relays</div>
+            <div class="rule2"><div><b>Platform limits</b><small>Twitch 48 hours, Facebook 8 hours, YouTube saves broadcasts under 12 hours</small></div><span class="v">3 platforms</span><button class="btn btn-ghost btn-sm">Edit</button></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Open decisions live here</h3><p>Everything marked Open in the other files has its switch on this page, showing "Not set yet" until it's decided. Nothing is hidden in code.</p></div>
+      <div class="note"><h3>Changes have dates</h3><p>A new price or share starts on a date, never retroactively, and statements show which value applied to each line.</p></div>
+      <div class="note"><h3>Team roles</h3><p>Admins change rules and signers. Rights reviewers do the second check on catalog items and handle claims. Market leads run the pipeline and reservations in their markets.</p></div>
+      <div class="note"><h3>Markets and signers</h3><p>Markets holds each market's numbering ranges (TV 2 to 69 with subchannels, radio 88.1 to 107.9), so they can grow without code. Escrow signers shows the multi-sig verifier keys, and changing one needs the others to approve.</p></div>
     </div>
   </div>
 </div></section>
 </main>
 
-<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, Network desk. Creators, stations, cities and sources are illustrations. Nothing here is legal advice. Opencast is a working name.</p></div></footer>
+
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, Network desk, the remaining pages. Creators, stations, cities and sources are illustrations. Nothing here is legal advice. Opencast is a working name.</p></div></footer>
 
 <script>
 (function(){
