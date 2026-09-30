@@ -161,3 +161,29 @@ test("Not for me: off by default; with the switch on, one vote for what's airing
   await expect(page.getByText("Noted", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Not for me/ })).toHaveCount(0);
 });
+
+test("changing channel: the number at once over soft static, then the picture and the banner; a crossfade with reduced motion (follow-up Phase 5)", async ({ page }) => {
+  await useGround(page, "dark");
+  await page.goto("/");
+  await page.evaluate(() => localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null })));
+  await page.goto("/watch/beat");
+  const player = page.locator(".oc-player").first();
+  await expect(player).toHaveAttribute("data-status", "playing");
+
+  await page.getByRole("button", { name: "Channel up to 18.1" }).first().click();
+  // At once: SAZN's number and call sign, top right, over the static; no banner yet.
+  await expect(page.locator(".oc-tune__osd")).toHaveText("18.1SAZN");
+  await expect(page.getByTestId("tuning-static")).toBeVisible();
+  // Then the picture, and the banner slides in once the static has rolled away.
+  await expect(page.locator(".oc-banner .oc-banner__cs")).toHaveText("SAZN");
+  await expect(page.getByTestId("tuning")).toHaveCount(0);
+  await expect(player).toHaveAttribute("data-status", "playing");
+
+  // Reduced motion: no grain, a crossfade with the same corner number.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: /^Channel up to/ }).first().click();
+  await expect(page.getByTestId("tuning")).toHaveAttribute("data-look", "fade");
+  await expect(page.getByTestId("tuning-static")).toHaveCount(0);
+  await expect(page.locator(".oc-tune__osd")).toBeVisible();
+  await expect(page.getByTestId("tuning")).toHaveCount(0);
+});

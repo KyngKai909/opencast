@@ -191,9 +191,45 @@
 .oc-player__live[data-side="right"] { left: auto; right: calc(96 * var(--u)); }
 .oc-player__live-key { display: inline-flex; align-items: center; gap: calc(10 * var(--u)); color: var(--pic-ink-70); font-weight: 500; }
 @media (prefers-reduced-motion: no-preference) {
-  :root:not([data-motion="reduce"]) .oc-banner, :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
+  :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
   @keyframes oc-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  /* The banner slides in from below the picture (after a channel change, once the static has cleared). */
+  :root:not([data-motion="reduce"]) .oc-banner { animation: oc-banner-in var(--oc-banner-slide, .24s) var(--oc-banner-slide-ease, ease-out); }
+  @keyframes oc-banner-in { from { transform: translateY(140%); } to { transform: none; } }
 }
+
+/* ---------- Changing channel (follow-up Phase 5: viewer/opencast-tuning.html) ----------
+   Timings come from tuning/constants.ts as custom properties on the player (tuningStyle). */
+.oc-tune { position: absolute; inset: 0; pointer-events: none; color: var(--on-screen); }
+/* The static: a canvas at half size, stretched to 2 px grain. Its colour behind the first frame is the grain's average. */
+.oc-tune__static { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: rgb(46 48 56); }
+/* It clears in one roll, top to bottom. */
+.oc-tune__static.is-rolling { animation: oc-tune-roll var(--oc-tune-roll) linear forwards; }
+@keyframes oc-tune-roll { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(100% 0 0 0); } }
+/* Reduced motion: the old picture dims (the screen colour over it), then the pictures crossfade. */
+.oc-tune__dim { position: absolute; inset: 0; background: var(--screen); opacity: calc(1 - var(--oc-tune-dim)); animation: oc-tune-dim var(--oc-tune-fade) linear; transition: opacity var(--oc-tune-fade) linear; }
+@keyframes oc-tune-dim { from { opacity: 0; } }
+.oc-tune.is-clearing .oc-tune__dim { opacity: 0; }
+.oc-player[data-tune="fade"] .oc-player__video { transition: opacity var(--oc-tune-fade) linear; }
+/* The corner number: top right inside title safe, mono numerals and the call sign in Archivo. */
+.oc-tune__osd { position: absolute; top: 6%; right: 6%; text-align: right; line-height: 1; text-shadow: 0 1px 8px rgb(0 0 0 / .5); }
+.oc-tune__n { display: block; font: 500 clamp(28px, 6.7cqw, 64px)/1 var(--font-mono); letter-spacing: -.04em; }
+.oc-tune__c { display: block; font-size: clamp(14px, 2.5cqw, 24px); margin-top: 4px; }
+/* After 800 ms: the program's name and "Tuning in", over the static. */
+.oc-tune__hold { position: absolute; left: 8%; bottom: 12%; text-shadow: 0 1px 8px rgb(0 0 0 / .5); }
+.oc-tune__hold b { display: block; font: 800 clamp(16px, 3.1cqw, 30px)/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+.oc-tune__hold span { font-size: clamp(11px, 1.5cqw, 14px); opacity: .8; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .oc-tune__hold { animation: oc-tune-hold var(--oc-tune-fade) linear; }
+  @keyframes oc-tune-hold { from { opacity: 0; } }
+}
+/* TV: title safe (5%) in the player's units, and set to read across a room. */
+.oc-tune--tv .oc-tune__osd { top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
+.oc-tune--tv .oc-tune__n { font-size: calc(128 * var(--u)); }
+.oc-tune--tv .oc-tune__c { font-size: calc(48 * var(--u)); margin-top: calc(8 * var(--u)); }
+.oc-tune--tv .oc-tune__hold { left: calc(154 * var(--u)); bottom: calc(130 * var(--u)); }
+.oc-tune--tv .oc-tune__hold b { font-size: calc(60 * var(--u)); }
+.oc-tune--tv .oc-tune__hold span { font-size: calc(30 * var(--u)); }
 
 /* ---------- Radio (tv 05.1: .radio-full) ---------- */
 .oc-radio { position: absolute; inset: 0; color: #fff; }
@@ -223,6 +259,24 @@
 }
 :root[data-motion="reduce"] .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
 .oc-radio__tally { position: absolute; top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
+/* Tuning along the band: the new frequency at once, the old station's colour until the sound
+   arrives (then one change of colour), the name dim until then, and the needle sweeping. */
+.oc-radio { transition: background-color var(--oc-tune-fade) linear; }
+.oc-radio__sub { transition: opacity var(--oc-tune-fade) linear; }
+.oc-radio--tuning .oc-radio__sub { opacity: .3; }
+.oc-radio--tuning.is-clearing .oc-radio__sub { opacity: .88; }
+.oc-radio__hold { font-size: max(calc(30 * var(--u)), 12px); opacity: .85; margin-top: calc(8 * var(--u)); }
+.oc-radio__band {
+  position: relative; width: calc(1480 * var(--u)); height: calc(56 * var(--u)); margin-bottom: calc(34 * var(--u));
+  border-bottom: 2px solid rgb(255 255 255 / .7); transition: opacity var(--oc-tune-fade) linear;
+}
+.oc-radio__band.is-clearing { opacity: 0; }
+.oc-radio__needle-track { position: absolute; inset: 0; display: block; will-change: transform; }
+.oc-radio__needle {
+  position: absolute; left: 0; top: calc(-8 * var(--u)); bottom: calc(-12 * var(--u));
+  width: max(calc(6 * var(--u)), 3px); margin-left: min(calc(-3 * var(--u)), -1.5px); border-radius: 2px;
+  background: var(--tally); box-shadow: 0 0 10px var(--tally-glow);
+}
 
 /* The dock: videos wait here, playing, while no surface shows them. */
 .oc-player-dock { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; left: -10px; top: -10px; }

@@ -4,12 +4,16 @@
 import { vi } from "vitest";
 import type { Channel } from "./types";
 import type { AttachOptions, MediaDriver, PlaylistInfo, Quality } from "./engine/driver";
+import { CLEAR_GAP_MS, MIN_STATIC_MS, ROLL_MS } from "./tuning/constants";
 
 export const frameDelay: Record<string, number> = {};
+/** Stations whose play() never settles and never plays (a playlist that never loaded, a stalled network). */
+export const stalled = new Set<string>();
 
 export function stubMedia() {
   Object.defineProperty(HTMLMediaElement.prototype, "paused", { configurable: true, get() { return (this as { _paused?: boolean })._paused ?? true; } });
   HTMLMediaElement.prototype.play = function (this: HTMLVideoElement & { _paused?: boolean }) {
+    if (stalled.has(this.dataset.station ?? "")) return new Promise<void>(() => {});
     const wasPaused = this._paused !== false;
     this._paused = false;
     if (wasPaused) setTimeout(() => this.dispatchEvent(new Event("playing")), frameDelay[this.dataset.station ?? ""] ?? 0);
@@ -36,15 +40,19 @@ export interface FakeHandle {
   playlist: (info: Partial<PlaylistInfo>) => void;
 }
 
-export function fakeDriver(o: { webAudio?: boolean } = {}): MediaDriver & { handles: FakeHandle[] } {
+export function fakeDriver(o: { webAudio?: boolean; fails?: (url: string) => string | null } = {}): MediaDriver & { handles: FakeHandle[] } {
   const handles: FakeHandle[] = [];
   return {
     name: "fake",
     webAudio: o.webAudio,
     handles,
-    attach(video, url, _onFatal, options = {}) {
+    attach(video, url, onFatal, options = {}) {
+      // A playlist that won't load: the driver says so (as hls.js's manifest errors do), and the
+      // element never gets anything to play.
+      const failure = o.fails?.(url) ?? null;
+      if (failure) setTimeout(() => onFatal(failure), 0);
       // A browser says it can play once the first segments are in.
-      setTimeout(() => video.dispatchEvent(new Event("canplay")), 0);
+      else setTimeout(() => video.dispatchEvent(new Event("canplay")), 0);
       const h: FakeHandle = {
         url,
         buffer: 0,
@@ -125,6 +133,25 @@ export const MASTER = [
 /** A radio station's master playlist: AAC 128k (listed first, the reference) and 64k. */
 export const RADIO_MASTER = ["#EXTM3U", '#EXT-X-STREAM-INF:BANDWIDTH=140000,CODECS="mp4a.40.2"', "a128.m3u8", '#EXT-X-STREAM-INF:BANDWIDTH=72000,CODECS="mp4a.40.2"', "a64.m3u8", ""].join("\n");
 
+/**
+ * Long enough for any channel change to finish with a picture ready at once: the static's
+ * minimum or the photosensitivity guard's gap since the last clear, whichever is longer, and the
+ * roll (tuning/constants.ts), and a little over.
+ */
+export const CHANGE_MS = Math.max(MIN_STATIC_MS, CLEAR_GAP_MS) + ROLL_MS + 40;
+
+/**
+ * Moves the fake clock on in small steps until the promise settles (a tune: at once on first
+ * launch, after the static's minimum on a channel change), so the time a test's clock has moved
+ * is no more than the tune needed.
+ */
+export async function until<T>(p: Promise<T>, stepMs = 10, maxMs = 20_000): Promise<T> {
+  let done = false;
+  const q = p.finally(() => (done = true));
+  for (let t = 0; t < maxMs && !done; t += stepMs) await vi.advanceTimersByTimeAsync(stepMs);
+  return q;
+}
+
 /** Lets pending promises and zero-delay timers run under fake timers. */
 export async function flush(ms = 0) {
   await vi.advanceTimersByTimeAsync(ms);
@@ -137,6 +164,11 @@ export interface FakeNode {
   /** The last value each AudioParam was set or ramped to, and whether it ramped. */
   params: Record<string, { value: number; ramped: boolean }>;
   element?: HTMLMediaElement;
+  /** Linear ramps, in order (the hiss's envelope). */
+  ramps?: Array<{ param: string; value: number }>;
+  /** A buffer source: when it was started and stopped (context seconds). */
+  started?: number;
+  stopped?: number;
 }
 
 export function stubWebAudio() {
@@ -156,6 +188,10 @@ export function stubWebAudio() {
       },
       setTargetAtTime(v: number) {
         n.params[name] = { value: v, ramped: true };
+      },
+      linearRampToValueAtTime(v: number) {
+        n.params[name] = { value: v, ramped: true };
+        n.ramps = [...(n.ramps ?? []), { param: name, value: v }];
       }
     };
   };
@@ -168,8 +204,25 @@ export function stubWebAudio() {
   };
   class FakeAudioContext {
     state = "suspended";
-    currentTime = 0;
+    sampleRate = 48000;
+    private born = Date.now();
+    /** Context time follows the (fake) clock. */
+    get currentTime() {
+      return (Date.now() - this.born) / 1000;
+    }
     destination = node("destination");
+    createBuffer(_channels: number, length: number, sampleRate: number) {
+      const data = new Float32Array(length);
+      return { length, sampleRate, getChannelData: () => data };
+    }
+    createBufferSource() {
+      const s = node("bufferSource");
+      const n = s.__node as FakeNode;
+      return Object.assign(s, { buffer: null as unknown, onended: null as unknown, start: (t = 0) => (n.started = t), stop: (t = 0) => (n.stopped = t) });
+    }
+    createBiquadFilter() {
+      return Object.assign(node("biquad", { frequency: 350, Q: 1 }), { type: "lowpass" });
+    }
     resume() {
       this.state = "running";
       return Promise.resolve();

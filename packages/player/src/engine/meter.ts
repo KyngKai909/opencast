@@ -69,7 +69,8 @@ export class AudioLevels {
   private silentSince: number | null = null;
   private evenOut = false;
 
-  private context(): Ctx | null {
+  /** The player's one AudioContext (made on first use), shared with the tuning hiss. */
+  context(): Ctx | null {
     if (this.ctx) return this.ctx;
     const AC = typeof window !== "undefined" ? (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) : undefined;
     if (!AC) return null;

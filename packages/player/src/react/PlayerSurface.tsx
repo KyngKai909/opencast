@@ -7,6 +7,8 @@ import { Banner } from "./Banner";
 import { NumberPanel } from "./NumberPanel";
 import { RadioScreen } from "./RadioScreen";
 import { Overlays, visibleGraphics } from "./Overlays";
+import { StandbyScreen, TuningLayer } from "./Tuning";
+import { tuningStyle } from "../tuning/constants";
 
 export interface PlayerSurfaceProps {
   /** web: inside a page (the tuned-in page, the phone's full player). tv: the ten-foot screen. */
@@ -82,6 +84,11 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
   const bannerFor = s.banner ? s.channels.find((c) => c.station.id === s.banner!.stationId) : undefined;
   const last = s.channels.find((c) => c.station.id === s.lastId);
   const isRadio = current?.station.band === "radio";
+  // Changing channel: where it's going (the corner number, "Tuning in", the needle).
+  const tuning = s.tuning;
+  const target = tuning ? s.channels.find((c) => c.station.id === tuning.stationId) : undefined;
+  const sweeping = tuning?.look === "sweep" && !!target;
+  const radioShown = sweeping ? (current && isRadio && s.status !== "off_air" && s.status !== "standby" ? current : target) : current && isRadio && s.status !== "off_air" && s.status !== "standby" ? current : undefined;
   const onAirHere = s.status === "playing" && !!current?.onAir && s.pendingId === null;
   const levelsFor = useCallback((bars: number) => engine.audioLevels(bars), [engine]);
   const captionSize = CAPTION_SCALE[s.captionSize];
@@ -136,7 +143,8 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
       className={cx("oc-player", `oc-player--${size}`, className)}
       data-status={s.status}
       data-tv={size === "tv" ? "" : undefined}
-      style={{ ["--oc-cue" as string]: `${captionSize * 100}cqw` }}
+      data-tune={tuning?.look}
+      style={{ ...tuningStyle, ["--oc-cue" as string]: `${captionSize * 100}cqw` }}
       aria-busy={s.pendingId !== null}
     >
       <div ref={stage} className="oc-player__stage" />
@@ -151,7 +159,19 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
         />
       )}
 
-      {current && isRadio && s.status !== "off_air" && <RadioScreen channel={current} size={size} playing={s.status === "playing"} onAirHere={onAirHere} tally={!bannerFor || !!s.entry} levels={levelsFor} />}
+      {radioShown && (
+        <RadioScreen
+          channel={radioShown}
+          size={size}
+          playing={s.status === "playing"}
+          onAirHere={onAirHere && !sweeping}
+          tally={!bannerFor || !!s.entry}
+          levels={levelsFor}
+          tuning={sweeping && target ? { to: target, phase: tuning!.phase, sweep: tuning!.sweep } : null}
+        />
+      )}
+
+      {current && s.status === "standby" && <StandbyScreen channel={current} size={size} />}
 
       {current && s.status === "off_air" && (
         <div className="oc-player__cover">
@@ -171,6 +191,8 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
       )}
 
       {s.pendingId && !s.currentId && <div className="oc-player__cover oc-player__cover--tuning" aria-hidden="true" />}
+
+      {tuning && !sweeping && target && <TuningLayer tuning={tuning} channel={target} size={size} entry={!!s.entry} />}
 
       {s.status === "paused" && s.paused && (
         <div className="oc-player__paused" data-side={bugTopLeft ? "right" : undefined}>

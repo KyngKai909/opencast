@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dateRangeTag, HLS_CLASS, parseDateRanges } from "@opencast/contracts";
 import { PlayerEngine } from "./PlayerEngine";
-import { fakeDriver, fakeFetch, flush, frameDelay, livePlaylist, MASTER, station, stubMedia, type FakeHandle } from "../test-helpers";
+import { CHANGE_MS, fakeDriver, fakeFetch, flush, until, frameDelay, livePlaylist, MASTER, station, stubMedia, type FakeHandle } from "../test-helpers";
 
 const CIVC = station("CIVC", "7.1");
 const BEAT = station("BEAT", "12.1");
@@ -42,9 +42,7 @@ function make(o: ConstructorParameters<typeof PlayerEngine>[0] = {}) {
   return engine;
 }
 async function tuned(e: PlayerEngine, c: typeof CIVC) {
-  const t = e.tune(c.station.id);
-  await flush(10);
-  await t;
+  await until(e.tune(c.station.id));
 }
 const handleFor = (c: typeof CIVC): FakeHandle => driver.handles.filter((h) => h.url.includes(`/${slug(c)}/`) && !h.destroyed).at(-1)!;
 const videoFor = (c: typeof CIVC) => host.querySelector<HTMLVideoElement>(`video[data-station="${c.station.id}"]`);
@@ -242,7 +240,7 @@ describe("the sign-off", () => {
     expect(videoFor(REEL)).toBeNull();
     // Channels still work from here.
     e.handle({ type: "channel", dir: "down" });
-    await flush(10);
+    await flush(CHANGE_MS);
     expect(e.getState()).toMatchObject({ currentId: BEAT.station.id, status: "playing", offAir: null });
   });
 

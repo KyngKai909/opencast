@@ -34,7 +34,7 @@ function PlayerSync() {
     // The account's, or this device's when signed out.
     const w = settings?.watching;
     if (w?.captions) engine.setCaptions(w.captions, w.captionSize);
-    // "Tuning sound", per band (on for radio, off for video unless set): kept for Phase 5's tuning.
+    // "Tuning sound", per band (on for radio, off for video unless set): the hiss when changing channel.
     engine.setOptions({ tuningSound: tuningSoundFrom(w) });
   }, [engine, settings?.watching]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), isPhone() ? "phone" : "web"), [engine]);

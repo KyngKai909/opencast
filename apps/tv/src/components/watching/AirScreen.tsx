@@ -1,7 +1,8 @@
 // Off air and stand by (tv 05.2), over the picture on "/": the headline, when the station is back,
 // and always a way out, with "Tune to REEL 24.1" focused and "Open the guide" beside it. ▲ ▼
 // still flip the dial (Watching's command layer). Stand by is the same layout with the colour
-// bars, shown only when the dial says the station is waiting for its signal (S13).
+// bars, shown when the dial says the station is waiting for its signal (S13), or when a channel
+// change got no picture in 8 s (the player's Stand by, which keeps trying).
 
 import { useEffect } from "react";
 import { usePlayer } from "@opencast/player";
@@ -33,9 +34,11 @@ export function AirScreen({ kind, row, suggest, now, onTune, onGuide }: AirScree
   const back = kind === "off_air" ? backTime(row, ps.offAir) : null;
   const day = back ? signOnDay(back, now, MARKET_TZ) : null;
   const other = suggest ? ` ${identText(suggest.station)} is on now.` : "";
+  // The player's Stand by (no picture 8 s after changing channel) says what it's doing about it.
+  const playerStandby = kind === "standby" && row.signal !== "standby" && ps.status === "standby" && ps.currentId === row.station.id;
   const line =
     kind === "standby" ? (
-      <>{`${here} is waiting for its signal.${other}`}</>
+      <>{playerStandby ? `The signal from ${here} isn't coming through. Trying again.${other}` : `${here} is waiting for its signal.${other}`}</>
     ) : back ? (
       <>
         {`${here} signs on again ${day ? `${day} ` : ""}at `}

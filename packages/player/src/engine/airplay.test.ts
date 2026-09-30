@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerEngine } from "./PlayerEngine";
-import { fakeDriver, flush, station, stubMedia } from "../test-helpers";
+import { CHANGE_MS, fakeDriver, flush, station, stubMedia } from "../test-helpers";
 
 const CIVC = station("CIVC", "7.1");
 const BEAT = station("BEAT", "12.1");
@@ -128,7 +128,7 @@ describe("AirPlay", () => {
     goWireless(onScreen(), true);
     expect(engine.getState().airPlay.active).toBe(true);
     const t = engine.tune(BEAT.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t;
     expect(engine.getState().airPlay.active).toBe(false);
     engine.destroy();

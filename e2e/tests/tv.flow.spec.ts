@@ -14,11 +14,11 @@ const banner = (page: Page) => page.locator(".oc-banner");
 const focused = (page: Page) => page.locator(".tv-focus");
 
 /**
- * The banner names the channel, e.g. "12.1" and "BEAT", and its picture is on screen. The banner
- * names a channel as soon as it's asked for, while the old picture holds (aria-busy); waiting for
- * the new picture keeps a later page.clock.fastForward from jumping past a tune still under way (a
- * half-hour jump in no real time runs out the player's wait for the first frame, and the tune fails
- * over to the channel before).
+ * The banner names the channel, e.g. "12.1" and "BEAT", and its picture is on screen. On a channel
+ * change the banner comes once the new picture is in and the static has rolled away (follow-up
+ * Phase 5); going straight to a city's player or an off-air station, at once. Waiting for the new
+ * picture (aria-busy) keeps a later page.clock.fastForward from jumping past a tune still under way
+ * (a half-hour jump in no real time would reach the tune's Stand by).
  */
 async function onChannel(page: Page, channel: string, callSign: string) {
   await expect(banner(page).locator(".oc-banner__ch")).toHaveText(channel);
@@ -37,8 +37,13 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   // ▲ ▼ change channel along the dial.
   await page.keyboard.press("ArrowUp");
   await onChannel(page, "9.1", "RDLS");
+  // Changing channel (follow-up Phase 5): the number and call sign at once, top right, over soft
+  // static; then the picture, the static rolling away, and the banner.
   await page.keyboard.press("ArrowDown");
+  await expect(page.locator(".oc-tune__osd")).toHaveText("7.1CIVC");
+  await expect(page.getByTestId("tuning-static")).toBeVisible();
   await onChannel(page, "7.1", "CIVC");
+  await expect(page.getByTestId("tuning")).toHaveCount(0);
 
   // A number, then OK to tune right away.
   await page.keyboard.press("1");

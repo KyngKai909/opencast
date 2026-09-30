@@ -2,6 +2,11 @@
 //
 // - Tuning joins live, mid-program. There's no seeking.
 // - A channel change keeps the old picture (and sound) until the new one has a frame on screen.
+//   Changing channel (follow-up Phase 5, tuning/): the new channel's number shows at once and soft
+//   static covers the old picture (muted) for at least 300 ms and until the first frame, "Tuning
+//   in" after 800 ms, Stand by with the colour bars after 8 s whatever the reason; then the
+//   static rolls away and the banner slides in. Reduced motion: a crossfade. The radio band: the
+//   needle sweeps, with a soft hiss. Repeated presses load only the channel the viewer lands on.
 // - The neighbouring channels are warm (their playlists and first segment), so up and down are quick.
 // - The station's bug, lower thirds and a spot's code and QR are drawn over the picture, timed
 //   from the playlist's DATERANGE tags against the media's program date-time (onScreen).
@@ -27,11 +32,20 @@ import { defaultDriver, nativeDriver, type MediaDriver, type Quality } from "./d
 import { AudioLevels } from "./meter";
 import { isLive, Prefetch, type Fetch } from "./playlist";
 import { onScreenKey, type OnScreen } from "./timeline";
+import { ChannelChange, type TuningLook, type TuningState } from "../tuning/change";
+import { LAND_MS, REBUILD_AFTER_MS, RETRY_FIRST_MS, RETRY_MAX_MS } from "../tuning/constants";
+import { Hiss, hissAllowed, pageHasBeenActive } from "../tuning/hiss";
+import { frequencyOf } from "../tuning/sweep";
 
 export type CaptionMode = "off" | "on" | "muted_only";
 
 export type CaptionSize = "small" | "medium" | "large";
-export type Status = "idle" | "tuning" | "playing" | "paused" | "off_air" | "embed" | "error" | "stopped";
+/**
+ * `standby`: a channel change that got no picture in 8 s (the playlist, the network or the
+ * browser), shown as Stand by with the colour bars; the player keeps trying and plays as soon as
+ * a picture comes.
+ */
+export type Status = "idle" | "tuning" | "playing" | "paused" | "off_air" | "embed" | "standby" | "error" | "stopped";
 
 export interface TuneRecord {
   stationId: string;
@@ -79,6 +93,8 @@ export interface PlayerState {
    * playing on one now (`active`). WebKit doesn't say which TV.
    */
   airPlay: { available: boolean; active: boolean };
+  /** Changing channel: the static (or the crossfade, or the radio band's needle) and the corner number, or null. */
+  tuning: TuningState | null;
 }
 
 export interface EngineOptions {
@@ -106,9 +122,21 @@ export interface EngineOptions {
   airPlayDriver?: MediaDriver;
   /**
    * "Tuning sound": a soft hiss while changing channel, per band. On for the radio band and off for
-   * video unless the viewer changes it. Kept here for the tuning work (Phase 5); nothing plays yet.
+   * video unless the viewer changes it. It plays only after the viewer has interacted, and not while muted.
    */
   tuningSound?: Partial<TuningSound>;
+  /**
+   * Reduced motion: the channel change crossfades instead of showing static, and the needle jumps.
+   * Defaults to the system setting (prefers-reduced-motion) or the app's "Reduce motion"
+   * (data-motion="reduce" on <html>), read at each press.
+   */
+  reducedMotion?: () => boolean;
+}
+
+/** The system's or the app's "Reduce motion". */
+export function prefersReducedMotion(): boolean {
+  if (typeof document !== "undefined" && document.documentElement?.dataset?.motion === "reduce") return true;
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** Whether changing channel makes the soft hiss, on the video (TV) band and on the radio band. */
@@ -165,6 +193,13 @@ export class PlayerEngine {
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
   private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
+  /** Changing channel: the static's timing, Stand by at 8 s, and the photosensitivity guard. */
+  private change: ChannelChange;
+  private hiss: Hiss;
+  /** Someone has pressed, clicked or tapped (a command, or sound turned on): the hiss may play. */
+  private interacted = false;
+  /** The banner waits for the static to clear (it comes after, sliding in). */
+  private bannerAfterChange = false;
   private airPlayDriver: MediaDriver;
   /** A video element with no stream, listening for AirPlay TVs coming and going (Safari). */
   private airPlayProbe: HTMLVideoElement | null = null;
@@ -178,7 +213,9 @@ export class PlayerEngine {
     pause: 0 as ReturnType<typeof setTimeout> | 0,
     sleep: 0 as ReturnType<typeof setInterval> | 0,
     onScreen: 0 as ReturnType<typeof setInterval> | 0,
-    back: 0 as ReturnType<typeof setTimeout> | 0
+    back: 0 as ReturnType<typeof setTimeout> | 0,
+    /** Repeated presses: the wait before loading the channel landed on, and a retry after a failure. */
+    land: 0 as ReturnType<typeof setTimeout> | 0
   };
   private onScreenKey = "";
   private tuneSeq = 0;
@@ -199,12 +236,23 @@ export class PlayerEngine {
       quality: options.quality ?? "auto",
       eveningOut: options.eveningOut ?? false,
       tuningSound: { ...TUNING_SOUND_DEFAULTS, ...definedOnly(options.tuningSound) },
+      reducedMotion: options.reducedMotion ?? prefersReducedMotion,
       now: options.now ?? (() => Date.now()),
       onCommand: options.onCommand
     };
     this.presets = options.presets ?? {};
     this.airPlayDriver = options.airPlayDriver ?? nativeDriver();
     this.audio.setEvenOut(this.o.eveningOut);
+    this.hiss = new Hiss(() => this.audio.context());
+    this.change = new ChannelChange({
+      onChange: (tuning) => this.patch({ tuning }),
+      onStandby: (stationId) => this.standBy(stationId),
+      onCleared: (stationId, _look, fromStandby) => {
+        // The banner slides in once the static has cleared (or a picture replaced Stand by).
+        if ((this.bannerAfterChange || fromStandby) && stationId === this.state.currentId) this.showBanner(stationId);
+        this.bannerAfterChange = false;
+      }
+    });
     this.state = {
       channels: [],
       currentId: null,
@@ -226,7 +274,8 @@ export class PlayerEngine {
       changedBy: null,
       onScreen: null,
       offAir: null,
-      airPlay: { available: false, active: false }
+      airPlay: { available: false, active: false },
+      tuning: null
     };
   }
 
@@ -285,7 +334,7 @@ export class PlayerEngine {
 
   /**
    * Whether changing channel to this station makes the tuning hiss: its band's "Tuning sound"
-   * (a station with no band counts as video). Phase 5 plays the sound; nothing does yet.
+   * (a station with no band counts as video).
    */
   tuningSoundOn(stationId: string | null = this.state.pendingId ?? this.state.currentId): boolean {
     const band = this.channel(stationId)?.station.band;
@@ -344,33 +393,53 @@ export class PlayerEngine {
 
   // ---------- Tuning ----------
 
-  /** Tune to a station by id. The old picture stays until the new one has a frame on screen. */
+  /**
+   * Tune to a station by id. The old picture stays (muted, under the static) until the new one has
+   * a frame on screen; with no frame in 8 s, whatever the reason, it's Stand by, and the player
+   * keeps trying.
+   */
   async tune(stationId: string, source?: CommandSource, again = false): Promise<void> {
     const c = this.channel(stationId);
     if (!c) return;
     this.clearEntry();
     if (source?.who) this.patch({ changedBy: source.who });
     // After stop() (the sleep timer), the same station tunes again from scratch; `again` is a
-    // station coming back on air.
-    if (!again && stationId === this.state.currentId && !this.state.pendingId && this.state.status !== "stopped") {
+    // station coming back on air (or Stand by trying again).
+    if (!again && stationId === this.state.currentId && !this.state.pendingId && this.state.status !== "stopped" && this.state.status !== "standby" && !this.change.covering) {
       this.showBanner();
       return;
     }
     const seq = ++this.tuneSeq;
     const t0 = performance.now();
     const previous = again ? this.state.lastId : this.state.currentId;
-    this.showBanner(stationId);
     this.clearPause();
     this.clearBehind();
     this.clearBack();
+    this.clearLand();
+
+    // Changing channel: the corner number and the static at once (not on first launch, for a
+    // station coming back, or going straight to off air).
+    const look = this.lookFor(c, again);
+    // A press while the static is up: only the channel the viewer lands on loads.
+    const repeat = look !== "none" && this.change.covering;
+    this.change.press(stationId, look, look === "sweep" ? { from: frequencyOf(this.channel(this.state.currentId)?.station.channel), to: frequencyOf(c.station.channel)!, reduced: this.o.reducedMotion() } : undefined);
+    if (look !== "none") {
+      this.bannerAfterChange = true;
+      if (this.state.banner) this.hideBanner();
+      this.muteOnScreen();
+      this.playHiss(c);
+    } else {
+      this.bannerAfterChange = false;
+      this.showBanner(stationId);
+    }
 
     if (!c.onAir || !c.playback) {
       this.settle(stationId, previous, "off_air");
-      return;
+      return this.endWithoutPicture(seq);
     }
     if (c.playback.kind === "embed") {
       this.settle(stationId, previous, "embed");
-      return;
+      return this.endWithoutPicture(seq);
     }
     if (!this.host) {
       // The surface hasn't attached yet (its effect runs after the caller's): tune once it does.
@@ -378,41 +447,31 @@ export class PlayerEngine {
       this.patch({ pendingId: stationId });
       return;
     }
+    // The picture (or the off-air screen) on now stays until the new one is ready.
+    this.patch({ pendingId: stationId, status: this.state.currentId ? this.state.status : "tuning", error: null });
+    if (repeat) {
+      // Let go of a picture still loading for an earlier press, and wait for the presses to stop.
+      if (this.state.currentId) this.rewarm(this.state.currentId);
+      await new Promise<void>((resolve) => (this.timers.land = setTimeout(resolve, LAND_MS)));
+      if (seq !== this.tuneSeq) return;
+    }
     const prefetched = this.prefetches.get(stationId);
-    const deck = this.deckFor(c);
-    if (!deck) return;
-    const wasWarm = deck.state === "ready" || deck.state === "playing" || prefetched?.state === "ready";
+    const first = this.deckFor(c);
+    if (!first) return;
+    const wasWarm = first.state === "ready" || first.state === "playing" || prefetched?.state === "ready";
     // On screen now, it's a deck of its own: the prefetch has done its job.
     if (prefetched) {
       prefetched.stop();
       this.prefetches.delete(stationId);
     }
-    // The picture (or the off-air screen) on now stays until the new one is ready.
-    this.patch({ pendingId: stationId, status: this.state.currentId ? this.state.status : "tuning", error: null });
-    try {
-      await deck.start();
-      await deck.firstFrame();
-    } catch (e) {
-      if (seq !== this.tuneSeq) return;
-      const err = e as Error;
-      if (err instanceof SignedOffError) {
-        // Its playlist had already ended: off air, with the back time the stream gives.
-        this.dropDeck(stationId);
-        this.settle(stationId, previous, "off_air");
-        this.signedOff(stationId, err.backAt, deck.signedOff?.at ?? null);
-        return;
-      }
-      if (err.name === "NotAllowedError") {
-        // Autoplay with sound refused: it can still play muted until someone taps.
-        this.patch({ mutedByBrowser: true });
-      } else {
-        this.patch({ pendingId: null, status: this.state.currentId ? this.state.status : "error", error: deck.error ?? err.message });
-        // Coming back didn't work this time: keep looking.
-        if (again && this.state.offAir?.stationId === stationId) this.signedOff(stationId, this.state.offAir.backAt, null);
-        return;
-      }
-    }
-    if (seq !== this.tuneSeq) return; // A newer tune took over.
+    const got = await this.picture(c, first, seq, again, previous);
+    if (!got || seq !== this.tuneSeq) return;
+    const { deck, outcome } = got;
+    // Autoplay with sound refused: it can still play muted until someone taps.
+    if (outcome === "notAllowed") this.patch({ mutedByBrowser: true });
+    // The static stays at least 300 ms (and keeps its distance from the last clear).
+    if (!(await this.change.ready()) || seq !== this.tuneSeq) return;
+    if (this.decks.get(stationId) !== deck) return;
     for (const d of this.decks.values()) if (d !== deck && d.role === "active") d.warm(this.o.warm === "play" ? "play" : "buffer");
     // A browser that only allows sound after a click on the page doesn't refuse the unmute: Chrome
     // just pauses the picture. That pause is undone: it plays on muted, with the "tap for sound"
@@ -421,11 +480,137 @@ export class PlayerEngine {
     this.watchWireless(deck);
     this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
-    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
+    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm }, error: null });
     this.settle(stationId, previous, "playing");
+    // The static rolls away over the new picture; the banner follows.
+    this.change.clear();
     if (!deck.video.muted) this.keepPlayingIfUnmutePaused(deck);
     this.watchOnScreen();
     this.mediaSession();
+  }
+
+  /**
+   * How this change looks: static over the old picture (a crossfade with reduced motion, the
+   * needle on the radio band), or nothing on first launch, for a station coming back, and for a
+   * press straight to an off-air station or a city's player (never static for those).
+   */
+  private lookFor(c: Channel, again: boolean): TuningLook {
+    if (again) return "none";
+    const covering = this.change.state;
+    const playable = c.onAir && c.playback?.kind === "hls";
+    if (!covering && !playable) return "none";
+    const s = this.state.status;
+    if (!this.state.currentId || s === "stopped" || s === "idle") return "none";
+    const fromRadio = frequencyOf(this.channel(this.state.currentId)?.station.channel) !== null && this.channel(this.state.currentId)?.station.band === "radio";
+    const toRadio = c.station.band === "radio" && frequencyOf(c.station.channel) !== null;
+    // The radio band, station to station (from its own screen, not from off air or Stand by).
+    if (toRadio && fromRadio && s !== "off_air" && s !== "standby" && (!covering || covering.look === "sweep")) return "sweep";
+    return this.o.reducedMotion() ? "fade" : "static";
+  }
+
+  /** Landed with no picture to wait for (off air, a city's player): the static clears, or nothing was drawn. */
+  private async endWithoutPicture(seq: number) {
+    if (!this.change.covering) return this.change.cancel();
+    if ((await this.change.ready()) && seq === this.tuneSeq) this.change.clear();
+  }
+
+  /**
+   * Waits for the picture's first frame. A failure (the playlist, the network, play()) or a load
+   * that stalls loads it afresh after a pause that grows; the Stand by at 8 s says so meanwhile.
+   * Null when a newer tune took over, or the station turned out to be off air.
+   */
+  private async picture(c: Channel, first: Deck, seq: number, again: boolean, previous: string | null): Promise<{ deck: Deck; outcome: "frame" | "notAllowed" } | null> {
+    const stationId = c.station.id;
+    let deck = first;
+    let wait = RETRY_FIRST_MS;
+    for (;;) {
+      try {
+        return { deck, outcome: await this.firstPicture(deck) };
+      } catch (e) {
+        if (seq !== this.tuneSeq) return null;
+        const err = e as Error;
+        if (err instanceof SignedOffError) {
+          // Its playlist had already ended: off air, with the back time the stream gives.
+          this.dropDeck(stationId);
+          this.settle(stationId, previous, "off_air");
+          this.signedOff(stationId, err.backAt, deck.signedOff?.at ?? null);
+          void this.endWithoutPicture(seq);
+          return null;
+        }
+        // Let go of (a newer change, or stop): nothing more to do here.
+        if (err.name === "AbortError") return null;
+        this.patch({ error: deck.error ?? err.message });
+        if (again && this.state.offAir?.stationId === stationId) {
+          // Coming back didn't work this time: off air as it was, and keep looking.
+          this.change.cancel();
+          this.patch({ pendingId: null });
+          this.signedOff(stationId, this.state.offAir.backAt, null);
+          return null;
+        }
+        await new Promise<void>((resolve) => (this.timers.land = setTimeout(resolve, wait)));
+        wait = Math.min(wait * 2, RETRY_MAX_MS);
+        if (seq !== this.tuneSeq) return null;
+        this.dropDeck(stationId);
+        const fresh = this.deckFor(c);
+        if (!fresh) return null;
+        deck = fresh;
+      }
+    }
+  }
+
+  /**
+   * The deck's first frame, starting it without waiting on play(): a play() that never settles (a
+   * playlist that never loaded) can't hold the tune up. A load with no frame after
+   * REBUILD_AFTER_MS rejects, to be loaded afresh (by then it's Stand by already).
+   */
+  private firstPicture(deck: Deck): Promise<"frame" | "notAllowed"> {
+    return new Promise((resolve, reject) => {
+      deck.start().catch((e: Error) => {
+        // Refused autoplay plays muted with "Tap for sound"; any other refusal leaves it to the
+        // frame, which comes or doesn't (Stand by, then a fresh load).
+        if (e?.name === "NotAllowedError") resolve("notAllowed");
+      });
+      deck.firstFrame(REBUILD_AFTER_MS).then(() => resolve("frame"), reject);
+    });
+  }
+
+  /** 8 s without a picture: Stand by for this station (the old picture goes), still trying. */
+  private standBy(stationId: string) {
+    if (stationId !== (this.state.pendingId ?? this.state.currentId)) return;
+    if (this.state.offAir?.stationId === stationId && this.state.status === "off_air") {
+      // A station coming back that didn't in time: it's still off air, and keeps looking.
+      this.change.cancel();
+      this.patch({ pendingId: null });
+      this.signedOff(stationId, this.state.offAir.backAt, null);
+      return;
+    }
+    const previous = this.state.currentId !== stationId ? this.state.currentId : this.state.lastId;
+    this.bannerAfterChange = false;
+    this.hideBanner();
+    this.settle(stationId, previous, "standby");
+  }
+
+  /** The picture on screen goes quiet while the static covers it. */
+  private muteOnScreen() {
+    const d = this.active();
+    if (d && d.role === "active") d.video.muted = true;
+  }
+
+  /** The tuning hiss, when the band's "Tuning sound" is on, someone has interacted, and it isn't muted. */
+  private playHiss(c: Channel) {
+    const setting = this.tuningSoundOn(c.station.id);
+    if (!hissAllowed({ setting, interacted: this.interacted || pageHasBeenActive(), muted: this.state.muted || this.state.mutedByBrowser })) return;
+    this.hiss.play(this.volume);
+  }
+
+  /** Hisses played so far (tests, and the recordings). */
+  hissesPlayed(): number {
+    return this.hiss.played;
+  }
+
+  private clearLand() {
+    if (this.timers.land) clearTimeout(this.timers.land);
+    this.timers.land = 0;
   }
 
   /** If unmuting paused it (no click on the page yet), play on muted with the prompt. */
@@ -825,7 +1010,10 @@ export class PlayerEngine {
   // ---------- Sound and captions ----------
 
   setMuted(muted: boolean) {
-    if (!muted) this.audio.unlock();
+    if (!muted) {
+      this.interacted = true;
+      this.audio.unlock();
+    }
     const d = this.active();
     if (d) d.video.muted = muted;
     this.patch({ muted, mutedByBrowser: false });
@@ -919,6 +1107,8 @@ export class PlayerEngine {
 
   /** The app stops itself: on a TV app it returns to the TV's home; casting, the stream ends. */
   stop() {
+    this.change.cancel();
+    this.clearLand();
     for (const d of this.decks.values()) d.destroy();
     this.decks.clear();
     for (const p of this.prefetches.values()) p.stop();
@@ -932,7 +1122,8 @@ export class PlayerEngine {
 
   /** Acts on a command from any input. Commands the player doesn't own go to onCommand. */
   handle(command: Command, source?: CommandSource): void {
-    // A command means someone's there: let sound run through the level meter.
+    // A command means someone's there: let sound run through the level meter (and the tuning hiss play).
+    this.interacted = true;
     this.audio.unlock();
     // Any press during the sleep fade cancels the timer.
     if (this.state.sleep?.fading && command.type !== "sleep") this.sleep(null);
@@ -1016,6 +1207,7 @@ export class PlayerEngine {
   }
 
   destroy() {
+    this.change.destroy();
     this.wirelessOff?.();
     this.airPlayProbe?.remove();
     Object.values(this.timers).forEach((t) => t && clearTimeout(t as ReturnType<typeof setTimeout>));

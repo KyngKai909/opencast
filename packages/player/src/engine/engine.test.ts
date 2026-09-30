@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerEngine, TUNING_SOUND_DEFAULTS, tuningSoundFrom } from "./PlayerEngine";
-import { fakeDriver, flush, frameDelay, station, stubMedia, stubWebAudio } from "../test-helpers";
+import { CHANGE_MS, fakeDriver, flush, frameDelay, station, stubMedia, stubWebAudio } from "../test-helpers";
 import { startHeartbeat } from "../heartbeat";
 import { bestLevel, dataSaverLevel, nativeDriver, QualityRules, type LevelControl } from "./driver";
 import { LEVELLER, samplesReachWebAudio } from "./meter";
@@ -72,7 +72,7 @@ describe("tuning", () => {
     // Up from BEAT is SAZN (off air, nothing to warm), down is CIVC.
     expect(warm).toEqual([CIVC.station.id].sort());
     const t2 = engine.tune(REEL.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t2;
     const warm2 = engine.getState().warm.map((w) => w.stationId).sort();
     expect(warm2).toEqual([CIVC.station.id, SAZN.station.id].filter((id) => id !== SAZN.station.id).sort());
@@ -84,7 +84,7 @@ describe("tuning", () => {
     await flush(10);
     await t;
     const t2 = engine.tune(CIVC.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t2;
     expect(engine.getState().lastTune).toMatchObject({ stationId: CIVC.station.id, warm: true });
   });
@@ -104,7 +104,7 @@ describe("tuning", () => {
     await engine.tune(SAZN.station.id);
     expect(engine.getState()).toMatchObject({ currentId: SAZN.station.id, status: "off_air" });
     engine.handle({ type: "channel", dir: "up" });
-    await flush(10);
+    await flush(CHANGE_MS);
     expect(engine.getState().currentId).toBe(REEL.station.id);
   });
 
@@ -182,7 +182,7 @@ describe("pause", () => {
 describe("behind live", () => {
   const tuned = async (c = CIVC) => {
     const t = engine.tune(c.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t;
   };
   const handleOf = (c: typeof CIVC) => driver.handles.filter((h) => h.url === c.playback!.url).at(-1)!;
@@ -221,7 +221,7 @@ describe("behind live", () => {
     expect(engine.getState().behindLive).toBe(true);
     engine.handle({ type: "channel", dir: "up" });
     expect(engine.getState().behindLive).toBe(false);
-    await flush(10);
+    await flush(CHANGE_MS);
     expect(engine.getState().currentId).toBe(BEAT.station.id);
     engine.pause();
     expect(engine.getState().behindLive).toBe(true);
@@ -289,7 +289,7 @@ describe("behind live", () => {
     engine.handle({ type: "digit", digit: 2 });
     engine.handle({ type: "digit", digit: 4 });
     engine.handle({ type: "select", hold: true });
-    await flush(10);
+    await flush(CHANGE_MS);
     expect(engine.getState()).toMatchObject({ currentId: REEL.station.id, behindLive: false });
   });
 });
@@ -374,12 +374,12 @@ describe("the heartbeat", () => {
     expect(send).toHaveBeenCalledTimes(1);
     // Away and back: CIVC beats; BEAT stays quiet until its time.
     const a = engine.tune(CIVC.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await a;
     await flush(0);
     expect(send.mock.calls.at(-1)![0].stationId).toBe(CIVC.station.id);
     const b = engine.tune(BEAT.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await b;
     await flush(0);
     const beatsToBeat = () => send.mock.calls.filter((c) => c[0].stationId === BEAT.station.id).length;
@@ -547,7 +547,7 @@ describe("picture quality", () => {
     expect(live().map((h) => h.quality)).toEqual(["best", "best"]);
     // A neighbour warmed later starts at the setting too.
     const t2 = e.tune(REEL.station.id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t2;
     expect(live().map((h) => h.quality).every((q) => q === "best")).toBe(true);
     e.destroy();
@@ -566,7 +566,7 @@ describe("evening out the sound", () => {
   const video = (id: string) => host.querySelector<HTMLVideoElement>(`video[data-station="${id}"]`)!;
   const tuned = async (e: PlayerEngine, id: string) => {
     const t = e.tune(id);
-    await flush(10);
+    await flush(CHANGE_MS);
     await t;
   };
 

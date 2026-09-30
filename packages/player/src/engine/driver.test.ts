@@ -9,7 +9,7 @@ type Listener = (event: string, data: unknown) => void;
 const made: FakeHls[] = [];
 class FakeHls {
   static Events = { MANIFEST_PARSED: "manifestParsed", LEVELS_UPDATED: "levelsUpdated", LEVEL_SWITCHED: "levelSwitched", LEVEL_LOADED: "levelLoaded", ERROR: "hlsError", SUBTITLE_TRACKS_UPDATED: "subtitleTracksUpdated", SUBTITLE_TRACK_SWITCH: "subtitleTrackSwitch" };
-  static ErrorDetails = { BUFFER_STALLED_ERROR: "bufferStalledError" };
+  static ErrorDetails = { BUFFER_STALLED_ERROR: "bufferStalledError", MANIFEST_LOAD_ERROR: "manifestLoadError", MANIFEST_LOAD_TIMEOUT: "manifestLoadTimeOut", MANIFEST_PARSING_ERROR: "manifestParsingError", MANIFEST_INCOMPATIBLE_CODECS_ERROR: "manifestIncompatibleCodecsError", LEVEL_LOAD_ERROR: "levelLoadError" };
   static ErrorTypes = { NETWORK_ERROR: "networkError", MEDIA_ERROR: "mediaError" };
   static isSupported = () => true;
   private listeners = new Map<string, Listener[]>();
@@ -42,6 +42,11 @@ class FakeHls {
   }
   loadSource() {}
   attachMedia() {}
+  starts = 0;
+  startLoad() {
+    this.starts++;
+  }
+  recoverMediaError() {}
   destroy() {}
 }
 
@@ -192,5 +197,18 @@ describe("captions from the channel's subtitle rendition (X2)", () => {
     handle.setCaptions(false);
     expect(captions.mode).toBe("hidden");
     handle.destroy();
+  });
+
+  it("hls.js: a master playlist that won't load is said at once (startLoad() can't fetch it again); other network errors are retried first", () => {
+    const fatal: string[] = [];
+    hlsDriver().attach(document.createElement("video"), "/hls/beat/master.m3u8", (m) => fatal.push(m));
+    const hls = made[0]!;
+    hls.emit(FakeHls.Events.ERROR, { fatal: true, type: FakeHls.ErrorTypes.NETWORK_ERROR, details: FakeHls.ErrorDetails.MANIFEST_LOAD_ERROR });
+    expect(fatal).toEqual(["manifestLoadError"]);
+    expect(hls.starts).toBe(0);
+    // A media playlist's error: three tries at loading again, then it's said.
+    for (let i = 0; i < 4; i++) hls.emit(FakeHls.Events.ERROR, { fatal: true, type: FakeHls.ErrorTypes.NETWORK_ERROR, details: FakeHls.ErrorDetails.LEVEL_LOAD_ERROR });
+    expect(hls.starts).toBe(3);
+    expect(fatal).toEqual(["manifestLoadError", "levelLoadError"]);
   });
 });

@@ -11,8 +11,13 @@
 .oc-band-scale__stn .oc-cs { font-size: 12.5px; }
 .oc-band-scale__f { font: 500 12px var(--font-mono); color: var(--ink-70); }
 .oc-band-scale__bar { width: 6px; height: 38px; border-radius: 2px; background: var(--oc-station); }
-/* The needle: the frequency you're tuned to. */
+/* The needle: the frequency you're tuned to. Where the page gives the player's tuning timings
+   (@opencast/player's tuningStyle: --oc-tune-sweep, 400 ms eased), it sweeps the real distance to
+   the next station; without them, or with reduced motion, it moves at once. */
 .oc-band-scale__needle { position: absolute; bottom: -6px; top: 0; width: 2px; background: var(--tally); box-shadow: 0 0 8px var(--tally-glow); pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .oc-band-scale__needle { transition: left var(--oc-tune-sweep, 0s) var(--oc-tune-sweep-ease, linear); }
+}
 .oc-band-scale__needle::after { content: ""; position: absolute; top: -2px; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--tally); }
 /* The phone: 640px wide inside a sideways scroller (the reference's inline sizes). */
 .oc-band-scroll { overflow-x: auto; padding: 14px 16px 30px; scrollbar-width: none; }

@@ -51,11 +51,15 @@ export function backTime(r: Row, playerOffAir: { stationId: string; backAt: stri
   return fromStream ?? signOnAt(r);
 }
 
-/** Which screen shows over the picture on "/": off air, stand by, or none. */
+/**
+ * Which screen shows over the picture on "/": off air, stand by, or none. Stand by is the dial's
+ * (the station waiting for its signal, S13) or the player's (a channel change with no picture in
+ * 8 s, follow-up Phase 5).
+ */
 export function airState(r: Row | undefined, status: string): "off_air" | "standby" | null {
   if (!r) return null;
   if (status === "off_air" || !r.onAir) return "off_air";
-  if (r.signal === "standby") return "standby";
+  if (r.signal === "standby" || status === "standby") return "standby";
   return null;
 }
 

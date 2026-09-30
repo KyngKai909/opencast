@@ -940,3 +940,14 @@ Files go straight to storage in parts (docs/uploads.md). Each drop zone and file
 | API: `wrong_size`, `not_found`, `couldnt_read` | "The file that arrived isn't the size it said it was. Upload it again.", "The file didn't arrive. Upload it again.", "That file couldn't be read from storage. Upload it again." |
 | API: `signature` (a part URL changed or run out) | "That part URL has expired or isn't signed. Ask for a new one." (the uploader asks by itself) |
 | API: `uploads_need_bucket`, `uploads_unavailable` (a server set up wrong) | "Uploads need object storage (R2) on this server.", "Direct uploads aren't available on this server." |
+
+### Changing channel (follow-up Phase 5, 2026-09-30)
+
+The reference's words, final (not new): "Tuning in" under the program's name over the static (after 800 ms), and Stand by's "Please stand by" with the colour bars (the Slate's). The corner number is the channel and call sign ("18.1", "SAZN"), no words. The radio band shows "Tuning in" under the station's name the same way. The words below are new: no frame draws the line under Stand by after a channel change, or what a screen reader hears.
+
+| Where | Words |
+|---|---|
+| Stand by after a channel change (8 s with no picture), web, phone, TV mode and Cast, under "Please stand by" | "The signal from {BEAT 12.1} isn't coming through. Trying again." |
+| The same on the TV app (tv 05.2's layout, with its buttons "Tune to {REEL 24.1}" and "Open the guide") | "The signal from {BEAT 12.1} isn't coming through. Trying again. {REEL 24.1} is on now." (the dial's own Stand by keeps "{CIVC 7.1} is waiting for its signal.") |
+| The corner number (spoken, polite) | "Tuning to {BEAT 12.1}" |
+| "Tuning in" with no program on the dial | the station's name in place of the program's |

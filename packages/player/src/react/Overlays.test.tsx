@@ -3,7 +3,7 @@ import { act, render } from "@testing-library/react";
 import { dateRangeTag, HLS_CLASS, parseDateRanges } from "@opencast/contracts";
 import { NOTHING_ON_SCREEN, type OnScreen } from "../engine/timeline";
 import { PlayerEngine } from "../engine/PlayerEngine";
-import { fakeDriver, flush, station, stubMedia } from "../test-helpers";
+import { CHANGE_MS, fakeDriver, flush, station, stubMedia } from "../test-helpers";
 import { Overlays, visibleGraphics } from "./Overlays";
 import { PlayerProvider } from "./context";
 import { PlayerSurface } from "./PlayerSurface";
@@ -96,7 +96,7 @@ describe("on the player", () => {
     );
     await act(async () => {
       const t = engine.tune(id);
-      await flush(10);
+      await flush(CHANGE_MS);
       await t;
       const h = driver.handles.at(-1)!;
       h.playlist({ ranges });

@@ -1,10 +1,12 @@
 // The radio band (viewer/opencast-station-pages.html 04.1, 05.3): a tuner scale from 88 to 108
-// with each station at its frequency and the needle where you're tuned, then the same stations as
-// rows. Clicking a mark or a row tunes in; the arrow keys move along the band. The station you're
+// with each station at its frequency and the needle where you're tuned (it sweeps to the next
+// station in 400 ms, and the player plays the band's soft hiss: follow-up Phase 5), then the same
+// stations as rows. Clicking a mark or a row tunes in; the arrow keys move along the band. The station you're
 // on gets the tally edge and "You're here" (never a lit tally in a list: open question A2).
 
 import { useEffect, useMemo, type ReactNode } from "react";
 import { BandScale, DialRow, LiveText, bandStep, type BandStation } from "@opencast/ui";
+import { tuningStyle } from "@opencast/player";
 import type { DialRowX } from "../api/ext";
 import { useDial, useMarketSlug } from "../data/viewer";
 import { useIsPhone, useShellOptions } from "../layout/shell";
@@ -117,7 +119,8 @@ export default function RadioPage() {
   );
 
   return (
-    <div className={phone ? "vw-radio vw-radio--phone" : "vw-radio"}>
+    // The player's tuning timings, so the band's needle sweeps to the station as the player tunes it.
+    <div className={phone ? "vw-radio vw-radio--phone" : "vw-radio"} style={tuningStyle}>
       {!phone && (
         <div className="vw-radio__h">
           <h1>Radio band</h1>

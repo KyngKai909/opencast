@@ -220,6 +220,9 @@ function showTextTracks(video: HTMLVideoElement, on: boolean) {
   for (const t of Array.from(video.textTracks ?? [])) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
 }
 
+/** Fatal errors about the master playlist itself, which hls.js's startLoad() can't recover from. */
+const MANIFEST_ERRORS = new Set<string>([Hls.ErrorDetails.MANIFEST_LOAD_ERROR, Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT, Hls.ErrorDetails.MANIFEST_PARSING_ERROR, Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR]);
+
 /** hls.js, tuned for joining live: start at the sync point three segments from the edge. */
 export function hlsDriver(): MediaDriver {
   return {
@@ -268,6 +271,10 @@ export function hlsDriver(): MediaDriver {
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) quality.onStall();
         if (!data.fatal) return;
+        // The master playlist never loaded: startLoad() wouldn't fetch it again (there are no
+        // levels to load), so a tune would wait for ever. Say so at once; the engine loads the
+        // station afresh, and its Stand by (8 s) tells the viewer.
+        if (MANIFEST_ERRORS.has(data.details)) return onFatal(data.details);
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR && recoveries < 3) {
           recoveries++;
           hls.startLoad();

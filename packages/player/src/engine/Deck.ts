@@ -120,6 +120,11 @@ export class Deck {
       (message) => {
         this.error = message;
         this.set("error");
+        // A tune waiting on this picture hears at once (it tries again, and Stand by says so at 8 s).
+        const waiters = this.frameWaiters;
+        this.frameWaiters = [];
+        const e = Object.assign(new Error(message), { name: "PictureError" });
+        waiters.forEach((w) => w.reject(e));
       },
       { onPlaylist: (info) => this.onPlaylist(info), start: o.start, fetch: o.fetch }
     );
@@ -191,18 +196,24 @@ export class Deck {
     }
   }
 
-  firstFrame(timeoutMs = 15000): Promise<void> {
+  /**
+   * Resolves once a frame is on screen. Rejects when the picture fails (PictureError), the station
+   * has signed off (SignedOffError), the deck is let go (AbortError), or after `timeoutMs`. A tune
+   * passes null: how long a channel change waits is the tuning's (Stand by at 8 s, tuning/change.ts).
+   */
+  firstFrame(timeoutMs: number | null = 15000): Promise<void> {
     if (this.signedOff) return Promise.reject(new SignedOffError(this.signedOff.backAt));
     if (this.firstFrameAt !== null) return Promise.resolve();
+    if (this.state === "error") return Promise.reject(Object.assign(new Error(this.error ?? "The picture failed."), { name: "PictureError" }));
     return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error("The picture didn't arrive in time.")), timeoutMs);
+      const t = timeoutMs === null ? null : setTimeout(() => reject(new Error("The picture didn't arrive in time.")), timeoutMs);
       this.frameWaiters.push({
         resolve: () => {
-          clearTimeout(t);
+          if (t) clearTimeout(t);
           resolve();
         },
         reject: (e) => {
-          clearTimeout(t);
+          if (t) clearTimeout(t);
           reject(e);
         }
       });

@@ -151,7 +151,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand }, quality, eveningOut }),
     [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut]
   );
-  // "Tuning sound", per band: kept for Phase 5's tuning (nothing plays yet).
+  // "Tuning sound", per band: the soft hiss when changing channel (the player plays it).
   useEffect(() => engine.setOptions({ tuningSound: { video: tuningSound, radio: radioTuningSound } }), [engine, tuningSound, radioTuningSound]);
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);

@@ -77,11 +77,13 @@ describe("off air: the station to offer instead", () => {
     expect(signOnDay("2026-09-30T02:00:00Z", now, "America/Los_Angeles")).toBe("Tuesday");
   });
 
-  it("shows off air when the dial or the player says so, stand by only when the dial says standby", () => {
+  it("shows off air when the dial or the player says so, stand by when the dial says standby or the player stands by", () => {
     expect(airState(off(dial[0]!), "playing")).toBe("off_air");
     expect(airState(dial[0]!, "off_air")).toBe("off_air");
     expect(airState({ ...dial[0]!, signal: "standby" }, "playing")).toBe("standby");
     expect(airState({ ...dial[0]!, signal: "ok" }, "playing")).toBeNull();
+    // The player's Stand by: a channel change with no picture in 8 s (follow-up Phase 5).
+    expect(airState({ ...dial[0]!, signal: "ok" }, "standby")).toBe("standby");
     expect(airState(undefined, "idle")).toBeNull();
   });
 
