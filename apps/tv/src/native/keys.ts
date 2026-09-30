@@ -38,7 +38,7 @@ const digits = (prefix: "KEYCODE_" | "KEYCODE_NUMPAD_", first: number, firstKeyC
 export const ANDROID_KEYS: Record<string, Key> = {
   // Back: on the picture the last channel, in overlays close; held, the menu (keyboard.ts).
   KEYCODE_BACK: { code: 4, key: "GoBack", keyCode: 461 },
-  // OK. Held, OK with `hold` (replace a full preset slot).
+  // OK. Held, OK with `hold` (replace a full preset slot; on the picture behind live, Back to live).
   KEYCODE_DPAD_CENTER: { code: 23, key: "Enter", keyCode: 13 },
   KEYCODE_ENTER: { code: 66, key: "Enter", keyCode: 13 },
   KEYCODE_NUMPAD_ENTER: { code: 160, key: "Enter", keyCode: 13 },
@@ -57,8 +57,9 @@ export const ANDROID_KEYS: Record<string, Key> = {
   // Next and previous change channel, as the phone's lock screen does.
   KEYCODE_MEDIA_NEXT: { code: 87, key: "ChannelUp", keyCode: 427 },
   KEYCODE_MEDIA_PREVIOUS: { code: 88, key: "ChannelDown", keyCode: 428 },
-  // Fire TV's ⏪ ⏩: live TV has nothing to seek, and keyboard.ts maps neither (an open question
-  // whether they should change channel). Taken so they don't reach Android's media session.
+  // Fire TV's ⏪ ⏩: live TV has nothing to seek. ⏩ goes back to live on the picture (keyboard.ts);
+  // ⏪ means nothing yet (an open question whether it should change channel). Both are taken so
+  // they don't reach Android's media session.
   KEYCODE_MEDIA_REWIND: { code: 89, key: "MediaRewind", keyCode: 227 },
   KEYCODE_MEDIA_FAST_FORWARD: { code: 90, key: "MediaFastForward", keyCode: 228 },
   ...digits("KEYCODE_", 7, 48),

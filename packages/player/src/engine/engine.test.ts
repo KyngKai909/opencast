@@ -179,6 +179,121 @@ describe("pause", () => {
   });
 });
 
+describe("behind live", () => {
+  const tuned = async (c = CIVC) => {
+    const t = engine.tune(c.station.id);
+    await flush(10);
+    await t;
+  };
+  const handleOf = (c: typeof CIVC) => driver.handles.filter((h) => h.url === c.playback!.url).at(-1)!;
+  /** Paused for a while: the stream's live edge moves on (the fake's live sync point, in seconds). */
+  const pauseFor = async (s: number, c = CIVC) => {
+    engine.pause();
+    await flush(s * 1000);
+    handleOf(c).live! += s;
+  };
+
+  it("from a pause, and still after play resumes behind live, until Back to live", async () => {
+    await tuned();
+    expect(engine.getState().behindLive).toBe(false);
+    engine.handle({ type: "pause" });
+    expect(engine.getState()).toMatchObject({ status: "paused", behindLive: true });
+    await flush(60_000);
+    handleOf(CIVC).live! += 60;
+    engine.handle({ type: "play" });
+    await flush(1000);
+    expect(engine.getState()).toMatchObject({ status: "playing", behindLive: true });
+    engine.handle({ type: "backToLive" });
+    expect(engine.getState()).toMatchObject({ status: "playing", behindLive: false, paused: null });
+  });
+
+  it("Back to live straight from the pause plays at the live edge", async () => {
+    await tuned();
+    engine.pause();
+    engine.backToLive();
+    expect(engine.getState()).toMatchObject({ status: "playing", behindLive: false, paused: null });
+  });
+
+  it("ends with a channel change or a tune", async () => {
+    await tuned();
+    await pauseFor(20);
+    engine.play();
+    expect(engine.getState().behindLive).toBe(true);
+    engine.handle({ type: "channel", dir: "up" });
+    expect(engine.getState().behindLive).toBe(false);
+    await flush(10);
+    expect(engine.getState().currentId).toBe(BEAT.station.id);
+    engine.pause();
+    expect(engine.getState().behindLive).toBe(true);
+    await tuned(REEL);
+    expect(engine.getState()).toMatchObject({ currentId: REEL.station.id, status: "playing", behindLive: false });
+  });
+
+  it("ends when the picture catches up to the live edge by itself; not while paused", async () => {
+    await tuned();
+    const h = handleOf(CIVC);
+    const at = h.live!;
+    // Paused a moment, near the edge: still paused, still behind.
+    engine.pause();
+    await flush(1000);
+    expect(engine.getState().behindLive).toBe(true);
+    h.live = at + 60;
+    engine.play();
+    await flush(1000);
+    expect(engine.getState().behindLive).toBe(true);
+    // The driver says it's within a few seconds of the live sync point now.
+    h.live = at + 3;
+    await flush(300);
+    expect(engine.getState().behindLive).toBe(false);
+  });
+
+  it("stays when the driver can't tell where the edge is", async () => {
+    await tuned();
+    const h = handleOf(CIVC);
+    await pauseFor(20);
+    engine.play();
+    h.live = null;
+    await flush(5000);
+    expect(engine.getState().behindLive).toBe(true);
+  });
+
+  it("the backToLive command does nothing at the live edge (no jump, no banner)", async () => {
+    await tuned();
+    await flush(6000);
+    expect(engine.getState().banner).toBeNull();
+    engine.handle({ type: "backToLive" });
+    expect(engine.getState().banner).toBeNull();
+  });
+
+  it("holding OK on the picture goes back to live while behind; otherwise it's OK", async () => {
+    await tuned();
+    await flush(6000);
+    // At the live edge a held OK is OK: the banner.
+    engine.handle({ type: "select", hold: true });
+    expect(engine.getState().banner).not.toBeNull();
+    engine.hideBanner();
+    await pauseFor(20);
+    engine.play();
+    expect(engine.getState().behindLive).toBe(true);
+    engine.handle({ type: "select", hold: true });
+    expect(engine.getState()).toMatchObject({ status: "playing", behindLive: false });
+    // Paused: the same.
+    engine.pause();
+    engine.handle({ type: "select", hold: true });
+    expect(engine.getState()).toMatchObject({ status: "playing", behindLive: false, paused: null });
+  });
+
+  it("a held OK while typing a number tunes it, as OK does", async () => {
+    await tuned();
+    engine.pause();
+    engine.handle({ type: "digit", digit: 2 });
+    engine.handle({ type: "digit", digit: 4 });
+    engine.handle({ type: "select", hold: true });
+    await flush(10);
+    expect(engine.getState()).toMatchObject({ currentId: REEL.station.id, behindLive: false });
+  });
+});
+
 describe("OK and Back on the picture", () => {
   it("OK shows the banner; OK again opens the guide", async () => {
     const onCommand = vi.fn();

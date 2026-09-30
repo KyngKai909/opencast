@@ -16,6 +16,8 @@
 }
 .oc-player--tv { border-radius: 0; }
 .oc-player__stage, .oc-player__cover { position: absolute; inset: 0; }
+/* AirPlay's listener (Safari): a video with no stream, never seen. */
+.oc-player__probe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .oc-player__video {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: contain; background: transparent;
@@ -174,6 +176,20 @@
   border-radius: var(--r-screen); font: 600 calc(28 * var(--u)) var(--font-text);
 }
 .oc-player--tv .oc-player__sleep .oc-btn, .oc-player--tv .oc-player__paused .oc-btn { height: calc(78 * var(--u)); padding: 0 calc(28 * var(--u)); font-size: calc(30 * var(--u)); }
+/* A bug top left: paused and Back to live move to the top right. */
+.oc-player__paused[data-side="right"] { left: auto; right: 4%; }
+.oc-player--tv .oc-player__paused[data-side="right"] { left: auto; right: calc(96 * var(--u)); }
+/* TV, playing behind live: a small chip where paused sat, on the banner's dark glass. */
+.oc-player__live {
+  position: absolute; left: calc(96 * var(--u)); top: calc(54 * var(--u));
+  display: inline-flex; align-items: center; gap: calc(16 * var(--u));
+  height: calc(52 * var(--u)); padding: 0 calc(22 * var(--u));
+  background: rgb(12 20 42 / .82); color: var(--pic-ink); border: 0;
+  box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-control);
+  font: 600 max(calc(24 * var(--u)), 12px) var(--font-text); cursor: pointer;
+}
+.oc-player__live[data-side="right"] { left: auto; right: calc(96 * var(--u)); }
+.oc-player__live-key { display: inline-flex; align-items: center; gap: calc(10 * var(--u)); color: var(--pic-ink-70); font-weight: 500; }
 @media (prefers-reduced-motion: no-preference) {
   :root:not([data-motion="reduce"]) .oc-banner, :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
   @keyframes oc-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

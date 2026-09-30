@@ -2,6 +2,11 @@
 // screen, and warm ones for the neighbouring channels, so up and down switch in well under a
 // second. A warm deck is hidden and silent; "buffer" keeps a few seconds near the live edge,
 // "play" keeps it decoding.
+//
+// AirPlay (Safari): only the deck on screen may go to an AirPlay TV (x-webkit-airplay "allow"); a
+// warm deck is "deny", with remote playback off, so it's never offered. A deck on the browser's own
+// HLS (`native`) can AirPlay the stream itself; one on hls.js (Media Source) can't, and the engine
+// swaps in a native deck for it (PlayerEngine.showAirPlayPicker).
 
 import type { HlsDateRange } from "@opencast/contracts";
 import type { AttachOptions, MediaDriver, MediaHandle, PlaylistInfo, Quality } from "./driver";
@@ -59,6 +64,8 @@ export class Deck {
   state: DeckState = "loading";
   error: string | null = null;
   role: "active" | "warm" = "warm";
+  /** On the browser's own HLS (the video's src is the playlist), so AirPlay can send the stream itself. */
+  readonly native: boolean;
   /** When loading started, and when the first frame was on screen (ms), for tune timing. */
   readonly createdAt: number;
   firstFrameAt: number | null = null;
@@ -92,6 +99,7 @@ export class Deck {
     v.preload = "auto";
     v.crossOrigin = "anonymous";
     v.dataset.station = o.stationId;
+    this.native = o.driver.name === "native";
     v.addEventListener("canplay", () => this.set(this.state === "loading" ? "ready" : this.state));
     v.addEventListener("playing", () => {
       this.set("playing");
@@ -100,6 +108,9 @@ export class Deck {
     // The sign-off slate has played to its end.
     v.addEventListener("ended", () => this.playlistEnded && this.signOff());
     this.video = v;
+    // Warm until shown: never an AirPlay candidate (hls.js keeps remote playback off for Safari's
+    // ManagedMediaSource either way).
+    this.setRemote(false);
     // Captions arrive cue by cue on a live stream: each new one takes the current lift.
     v.textTracks?.addEventListener?.("addtrack", (e) => (e as TrackEvent).track?.addEventListener("cuechange", this.applyCueLine));
     o.host.appendChild(v);
@@ -204,6 +215,7 @@ export class Deck {
     this.video.muted = true;
     this.video.classList.remove("is-on");
     this.video.setAttribute("aria-hidden", "true");
+    this.setRemote(false);
     this.handle.setBufferAhead(this.opts.warmBuffer);
     this.handle.setCaptions(false);
     if (mode === "play") {
@@ -234,6 +246,20 @@ export class Deck {
     this.video.muted = muted;
     this.video.classList.add("is-on");
     this.video.removeAttribute("aria-hidden");
+    this.setRemote(true);
+  }
+
+  /**
+   * Whether this deck's video may play on an AirPlay TV (or another remote display). Allowed: the
+   * AirPlay attribute, and remote playback on, except for Safari's ManagedMediaSource, which hls.js
+   * opens only with remote playback off (that deck never AirPlays; a native one takes its place).
+   */
+  setRemote(allow: boolean) {
+    const v = this.video;
+    v.setAttribute("x-webkit-airplay", allow ? "allow" : "deny");
+    const mms = typeof (globalThis as { ManagedMediaSource?: unknown }).ManagedMediaSource !== "undefined";
+    if (!allow) v.disableRemotePlayback = true;
+    else if (this.native || !mms) v.disableRemotePlayback = false;
   }
 
   setCaptions(on: boolean) {

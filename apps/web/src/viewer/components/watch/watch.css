@@ -17,6 +17,8 @@
 .vw-watch__bar { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
 .vw-watch__tune { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
 .vw-watch__ch { font-size: 15px; font-weight: 500; min-width: 44px; text-align: center; }
+/* Back to live beside play and pause, at the icon buttons' height. */
+.vw-watch__live.oc-btn { height: 40px; }
 .vw-watch__hint { font-size: 13px; color: var(--ink-50); }
 .vw-watch__right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .vw-watch__rail { border-left: 1px solid var(--hair); overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; }
@@ -58,6 +60,8 @@
 .vw-wph__pad { padding: 14px 18px 24px; }
 .vw-wph__id { display: flex; align-items: center; gap: 10px; }
 .vw-wph__tally { margin-left: auto; }
+.vw-wph__id .vw-wph__live { margin-left: auto; }
+.vw-wph__id .vw-wph__live + .vw-wph__tally { margin-left: 0; }
 .vw-wph__acts { margin-top: 14px; }
 .vw-wph .vw-w-sched { margin-top: 20px; }
 
@@ -81,4 +85,11 @@
 .vw-wph__step.oc-icon-btn { width: 52px; height: 52px; }
 .vw-wph__play.oc-icon-btn { width: 68px; height: 68px; border-radius: 50%; background: var(--ink); color: var(--ground); border-color: var(--ink); }
 .vw-wph__play.oc-icon-btn svg { width: 26px; height: 26px; }
+.vw-wph--radio .vw-wph__live { display: flex; margin: 4px auto 14px; }
 .vw-wph__hint { text-align: center; font-size: 12.5px; color: var(--ink-50); margin: 0 0 16px; }
+
+/* AirPlay: while the picture plays on an AirPlay TV, a quiet line under it with Stop. */
+.vw-airplay { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; color: var(--ink-70); }
+.vw-airplay .oc-i { width: 20px; height: 16px; color: var(--signal); flex: none; }
+.vw-airplay .oc-btn { margin-left: auto; }
+.vw-airplay--phone { margin-top: 12px; border-bottom: 0; padding: 10px 12px; border-radius: var(--r-control); background: var(--raised); }

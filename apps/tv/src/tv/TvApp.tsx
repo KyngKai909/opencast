@@ -11,7 +11,7 @@ import { PlayerProvider, PlayerSurface, startHeartbeat, startInputs, usePlayer, 
 import { GroundProvider, TvShell } from "@opencast/ui";
 import { call, setAuthHandlers, setTokenSource } from "../api/client";
 import { useAccountSettingsSync } from "../components/settings/useTvSettings";
-import { keyHintsHidden, readFirstUse, visibleHints } from "../components/watching/hintRow";
+import { hintsFor, keyHintsHidden, readFirstUse } from "../components/watching/hintRow";
 import { now, MARKET_TZ } from "../lib/clock";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
@@ -201,11 +201,13 @@ export function TvLayout() {
   const mode = useTvMode();
   // After a week on this TV the key hints hide; the casting and mirroring chips never do.
   const hidden = mode === "tv" && keyHintsHidden(readFirstUse(), now().getTime());
-  const hints = loc.pathname === "/" ? visibleHints(adapters.flatMap((a) => a.hints?.() ?? []), hidden) : [];
+  // A remote on the picture holds OK to go back to live: the hint row and the chip say so.
+  const remote = loc.pathname === "/" && adapters.some((a) => a.name === "remote");
+  const hints = loc.pathname === "/" ? hintsFor(adapters.flatMap((a) => a.hints?.() ?? []), { hidden, behindLive: ps.behindLive, remote }) : [];
   // The guide shows the picture small in its window: the bug alone there, small, as tv 03.1 draws it.
   const graphics = loc.pathname.startsWith("/guide") ? "bug" : true;
   return (
-    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} overlays={graphics} />}>
+    <TvShell picture={<PlayerSurface size="tv" timeZone={MARKET_TZ} clock={now} hints={hints} lastChannelHint={!hidden} holdOkHint={remote} overlays={graphics} />}>
       <Outlet />
     </TvShell>
   );

@@ -3,6 +3,10 @@
 // phone's player. `?sheet=keypad` is the keypad (06.4); `?state=mirroring_stopped` is "Mirroring
 // stopped" (02.3) after a lock; `?tv=<name>` starts casting to that TV (a link, and dev:mock).
 // `/remote/mirror-guide?tv=<name>` is the one-time mirroring guide (02.1).
+//
+// Guide opens the TV's own guide (the user's request of 2026-09-29, over the frame's note that
+// Guide opens the phone's guide while casting): the remote then shows a d-pad for it. The phone's
+// guide, where choosing a program tunes the TV, is "Guide on this phone" under the buttons.
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -19,7 +23,7 @@ import { MARKET_TZ, useNow } from "../../lib/clock";
 import { useNowPlaying } from "../player/PlayerRoot";
 import { Keypad } from "../components/remote/Keypad";
 import { MirrorGuideSheet, MirrorStoppedSheet, PictureBehind } from "../components/remote/Mirroring";
-import { NowStrip, RemoteButtons, RemotePresets, RemoteTop, Rockers } from "../components/remote/RemoteParts";
+import { BackToLive, GuidePad, NowStrip, RemoteButtons, RemotePresets, RemoteTop, Rockers } from "../components/remote/RemoteParts";
 import { presetStrip, rockerNeighbours } from "../components/remote/logic";
 import { mirrorGuideHref } from "../components/remote/WatchOnSheet";
 import { useOverlayParams } from "../components/watch/overlay";
@@ -62,6 +66,22 @@ function Remote() {
   const send = (c: RemoteCommand) => sendToTv(c);
   const keypad = params.get("sheet") === "keypad";
 
+  // Guide opens the TV's guide (the TV's remote's Guide key): the phone then shows arrows and OK
+  // for it. The TV doesn't say whether its guide is open, so the phone follows what it sent:
+  // Guide again or Back closes it, and a new station on the TV (OK on what's on) means it closed.
+  const [tvGuide, setTvGuide] = useState(false);
+  const shownStation = useRef(receiver?.stationId ?? null);
+  useEffect(() => {
+    const id = receiver?.stationId ?? null;
+    if (id === shownStation.current) return;
+    shownStation.current = id;
+    setTvGuide(false);
+  }, [receiver?.stationId]);
+  const guide = () => {
+    send({ type: "guide" });
+    setTvGuide((open) => !open);
+  };
+
   if (session.status === "idle" || session.status === "mirror_stopped") {
     const choose = np.row ?? inChannelOrder(channels)[0] ?? null;
     return (
@@ -100,8 +120,25 @@ function Remote() {
       {!phone && <RemoteTop />}
       {row ? <NowStrip row={row} paused={paused} now={now} flicker={!litAtOpen.current} /> : <div className="vw-rm-quiet" aria-busy="true" aria-label="Waiting for the TV" />}
       {other && <p className="vw-rm-changed" role="status">{`${other} changed the channel.`}</p>}
-      <Rockers row={row} up={up} down={down} paused={paused} onCommand={send} />
-      <RemoteButtons onGuide={() => navigate(slug ? "/guide" : "/")} onInfo={() => send({ type: "info" })} onKeypad={() => open({ sheet: "keypad" })} onLast={() => send({ type: "last" })} />
+      {tvGuide ? (
+        <GuidePad
+          onCommand={send}
+          onBack={() => {
+            send({ type: "back" });
+            setTvGuide(false);
+          }}
+        />
+      ) : (
+        <Rockers row={row} up={up} down={down} paused={paused} onCommand={send} />
+      )}
+      {row && !tvGuide && (paused || receiver?.behindLive) && <BackToLive onCommand={send} />}
+      <RemoteButtons guideOpen={tvGuide} onGuide={guide} onInfo={() => send({ type: "info" })} onKeypad={() => open({ sheet: "keypad" })} onLast={() => send({ type: "last" })} />
+      {/* The phone's own guide (tv 06 "Guide on the phone"): choosing a program there tunes the TV. */}
+      {slug && (
+        <Button variant="text" size="sm" className="vw-rm-phoneguide" onClick={() => navigate("/guide")}>
+          Guide on this phone
+        </Button>
+      )}
       {mirroring ? (
         <div className="vw-rm-warn" role="note">
           <span className="vw-rm-warn__dot" aria-hidden="true">

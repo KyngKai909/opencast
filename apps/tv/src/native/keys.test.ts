@@ -69,10 +69,18 @@ describe("native keys, through TV mode's keyboard adapter", () => {
       { type: "dot" },
       { type: "dot" }
     ]);
-    // Fire TV's ⏪ ⏩ mean nothing yet.
+    // Fire TV's ⏪ means nothing yet; ⏩ goes back to live.
     r.press("KEYCODE_MEDIA_REWIND");
-    r.press("KEYCODE_MEDIA_FAST_FORWARD");
     expect(r.dispatch).toHaveBeenCalledTimes(14);
+    r.press("KEYCODE_MEDIA_FAST_FORWARD");
+    expect(r.sent().at(-1)).toEqual({ type: "backToLive" });
+    r.stop();
+  });
+
+  it("⏩ goes back to live on the picture only; in the guide and menus it does nothing", () => {
+    const r = remote("overlay");
+    r.press("KEYCODE_MEDIA_FAST_FORWARD");
+    expect(r.dispatch).not.toHaveBeenCalled();
     r.stop();
   });
 

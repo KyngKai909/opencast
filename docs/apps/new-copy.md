@@ -557,3 +557,29 @@ Master control's setup lets every step be passed (only signing on checks what's 
 | Library (setup's and the station's), the generated station ID's row | title "Generated station ID"; "Made for {BEAT}. Replaced by any station ID you upload"; type SID (not a choice); runs "0:10"; status "Ready for air", "Being prepared" or "Couldn't be prepared"; "Preview". Only in All items, not in a folder or the needs-attention lists |
 | The generated station ID's preview (a dialog; a sheet on the phone) | eyebrow "Made for you", title "Generated station ID", a picture of it ({BEAT} large, {12.1}, "{Inland Beat} · {Redlands}"; screen readers: "{BEAT 12.1} in {BEAT}'s colour"); TV: "Ten seconds over a soft sound bed, where {BEAT} needs a station ID: in breaks, in open time and when it signs back on." Radio: "Ten seconds of a soft sound bed, where {WAVE} needs a station ID. Relays show {WAVE}'s colour with its call sign and channel over it." Then "It's made again when {BEAT}'s name, call sign, channel or colour changes, and any station ID you upload replaces it."; "Done" |
 | The generated station ID itself (on air, no app words) | {BEAT} (or the station's name before it has a call sign), {12.1}, "{Inland Beat} · {Redlands}", white on the station's colour |
+
+### Back to live, on the web, the phone, TV mode and the phone remote (the user's request, 2026-09-29)
+
+"Back to live" is the reference's own words (home 03's "No scrub bar" note; you 01's "Pause holds for"). It now shows whenever the picture is behind live (from a pause until Back to live or a channel change, paused or playing on), not only after the 30-minute hold. No frame draws where; A145 and A146 in open-questions.md. The words below are what's new around it.
+
+| Where | Words |
+|---|---|
+| TV, the hint row on the banner, while behind live with the remote on the picture | "Hold" [OK] "Back to live" (the key drawn as the other key hints are). Last in the row; it stays after the week that hides the other key hints. Not casting or mirroring (the phone has the button) |
+| TV, the chip on the picture while playing behind live (top left, where "Paused" sits; top right when the station's bug is top left) | "Hold" [OK] "Back to live" with the remote; "Back to live" alone casting or mirroring. Screen readers: "Back to live". Hidden while the banner is up (its hint row says it) and in the guide's window |
+| Web, the controls under the picture; the phone's full player (beside the tally, and under the play row on the radio band); the paused sign on the picture | "Back to live" (button); no new labels |
+| The phone remote, under the rockers while the TV is paused or behind live | "Back to live" (button) |
+| Keys (no words on screen) | Web: l or End. TV: hold OK on the picture, ⏩ (MediaFastForward), next track (MediaTrackNext), l |
+
+### AirPlay in "Watch on", and the remote's Guide on the TV (the user's requests, 2026-09-29)
+
+No frame draws either. "Watch on" (tv 06.2) keeps its Chromecast and TV app rows as drawn; Safari adds a row for its own AirPlay list. The remote's Guide now opens the TV's guide (A147, A148); AirPlay's limits are A149.
+
+| Where | Words |
+|---|---|
+| Watch on, the AirPlay row (Safari, while an AirPlay TV is around) | title "AirPlay"; second line "Apple TV and AirPlay TVs", or "Playing on AirPlay" while it is; the primary button "AirPlay to a TV", or "Stop AirPlay" while it plays. "This phone"'s second line while AirPlaying: "Stop AirPlay" |
+| The tuned-in page, web: the controls under the picture | icon button "AirPlay" (screen readers and tooltip), beside sound and full screen, while an AirPlay TV is around |
+| The tuned-in page, web and phone, while the picture plays on an AirPlay TV | "Playing on AirPlay" and "Stop" (a status line under the picture). WebKit doesn't say which TV, so there's no "Playing on {TV name}" |
+| The phone remote, Guide | Pressed while the TV's guide is open (it closes there again) |
+| The phone remote, the d-pad in the rockers' place while the TV's guide is open | screen readers: "Guide on the TV" (the group), "Up", "Down", "Left", "Right"; "OK"; "Back" |
+| The phone remote, under Guide, Info, Keypad and Last | "Guide on this phone" (text button: the phone's guide, where choosing a program tunes the TV) |
+

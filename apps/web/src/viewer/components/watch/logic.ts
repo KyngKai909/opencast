@@ -2,7 +2,7 @@
 // station a URL means, keeping the URL in step with the channel on air, the swipe on the phone,
 // tonight's rows, and the radio band's wrap hint.
 
-import { neighbour } from "@opencast/player";
+import { neighbour, type Command } from "@opencast/player";
 import type { AiringX, DialRowX, StationPageX } from "../../api/ext";
 
 type Ident = { id: string; callSign: string | null; handle: string | null; name?: string; channel: string | null };
@@ -192,4 +192,26 @@ export function backAtOf(row: Pick<DialRowX, "now" | "next"> & { backAt?: string
   const fromPlayer = player && stationId && player.stationId === stationId ? player.backAt : null;
   const now = row?.now;
   return fromPlayer ?? row?.backAt ?? (isOffAir(now) ? (now!.backAt ?? now!.endsAt) : null) ?? row?.next?.startsAt ?? null;
+}
+
+/**
+ * The tuned-in page's keys: ▲ ▼ change channel, the space bar (or k) pauses and resumes, l (or
+ * End) goes back to live. Never with a modifier, in a text field, or inside a dialog, radio group,
+ * menu, list box or tab list; the space bar leaves a focused button, link or slider alone, and End
+ * a slider.
+ */
+export function watchKey(e: Pick<KeyboardEvent, "key" | "defaultPrevented" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey" | "target">): Command | null {
+  const toggle = e.key === " " || e.key === "k";
+  const live = e.key === "l" || e.key === "End";
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && !toggle && !live) return null;
+  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+  const t = e.target as HTMLElement | null;
+  if (t && t.tagName && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest('[role="dialog"], [role="radiogroup"], [role="menu"], [role="listbox"], [role="tablist"]'))) return null;
+  // Space on a focused button or link presses it; leave that alone.
+  if (toggle && t?.closest?.("button, a, [role='button'], [role='slider']")) return null;
+  // End on a slider moves it to its end.
+  if (e.key === "End" && t?.closest?.("[role='slider']")) return null;
+  if (toggle) return { type: "togglePlay" };
+  if (live) return { type: "backToLive" };
+  return { type: "channel", dir: e.key === "ArrowUp" ? "up" : "down" };
 }

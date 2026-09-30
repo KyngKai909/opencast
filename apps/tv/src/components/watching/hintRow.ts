@@ -1,7 +1,9 @@
 // The hint row teaches the remote, then gets out of the way: after a week of use the key hints
 // hide themselves (device-local: the first day this TV was used). The "Playing from…" and
 // "Mirrored from…" chips never hide: on cast and mirror they're the only way to know where the
-// controls are. A Cast receiver keeps nothing, so there it never hides.
+// controls are. A Cast receiver keeps nothing, so there it never hides. Behind live (paused, or
+// playing after a pause), the remote's "Hold OK, Back to live" joins them, and doesn't hide: it's
+// the only way a remote has back to live, and it's seldom needed.
 
 import type { Hint } from "@opencast/player";
 
@@ -34,4 +36,13 @@ export function recordFirstUse(now: number) {
   } catch {
     /* storage off: the hints stay */
   }
+}
+
+/** The remote's way back to live: holding OK on the picture. */
+export const LIVE_HINT: Hint = { kind: "key", key: "OK", label: "Back to live", hold: true };
+
+/** The hints to draw, with "Hold OK, Back to live" last while behind live on a remote. */
+export function hintsFor(hints: Hint[], o: { hidden: boolean; behindLive: boolean; remote: boolean }): Hint[] {
+  const shown = visibleHints(hints, o.hidden);
+  return o.behindLive && o.remote ? [...shown, LIVE_HINT] : shown;
 }

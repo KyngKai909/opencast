@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Button, Slate, Tag, clock as clockText, cx } from "@opencast/ui";
+import { Button, Kbd, Slate, Tag, clock as clockText, cx } from "@opencast/ui";
 import type { Hint } from "../input/types";
 import { CAPTION_SCALE } from "../engine/PlayerEngine";
 import { usePlayer, usePlayerDock } from "./context";
 import { Banner } from "./Banner";
 import { NumberPanel } from "./NumberPanel";
 import { RadioScreen } from "./RadioScreen";
-import { Overlays } from "./Overlays";
+import { Overlays, visibleGraphics } from "./Overlays";
 
 export interface PlayerSurfaceProps {
   /** web: inside a page (the tuned-in page, the phone's full player). tv: the ten-foot screen. */
@@ -16,6 +16,8 @@ export interface PlayerSurfaceProps {
   hints?: Hint[];
   /** TV: the hint row's "Back, Last channel" (off once the key hints have hidden themselves after a week of use). */
   lastChannelHint?: boolean;
+  /** TV with a remote on the picture: the Back to live chip says "Hold OK" (holding OK goes back to live). */
+  holdOkHint?: boolean;
   /** The time to show (the banner's clock and progress). Defaults to the device's clock. */
   clock?: () => Date;
   /**
@@ -38,7 +40,7 @@ function useClock(clock: () => Date, ms = 1000): Date {
 }
 
 /** The picture and everything drawn over it. Needs a PlayerProvider above it. */
-export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, clock = deviceClock, overlays = true, className }: PlayerSurfaceProps) {
+export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint = true, holdOkHint = false, clock = deviceClock, overlays = true, className }: PlayerSurfaceProps) {
   const [s, engine] = usePlayer();
   const stage = useRef<HTMLDivElement>(null);
   const now = useClock(clock);
@@ -91,6 +93,19 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
       : null;
   const ident = current ? [current.station.callSign, current.station.channel].filter(Boolean).join("\u00a0") || current.station.name : "";
 
+  const bannerUp = !!bannerFor && !s.entry;
+  const graphics = {
+    onScreen: s.onScreen?.stationId === s.currentId ? s.onScreen : null,
+    showing: (s.status === "playing" || s.status === "paused") && !!current,
+    banner: bannerUp
+  };
+  // Paused and Back to live sit top left; a bug drawn there moves them to the top right.
+  const bugTopLeft = !!overlays && !isRadio && visibleGraphics(graphics, overlays === "bug" ? "bug" : undefined).bug?.position === "top_left";
+  // Playing behind live on the TV: a small chip, since a remote can't reach a button. Not in the
+  // guide's window, and not while the banner (whose hint row says it) or number entry is up. On
+  // the web the controls under the picture have the button.
+  const liveChip = size === "tv" && s.behindLive && s.status === "playing" && !s.pendingId && overlays !== "bug" && !bannerUp && !s.entry;
+
   // Where the graphics are, measured after each render (and when the picture resizes): a spot's
   // code sits above the banner while it's up, and captions lift clear of a lower third or a code.
   const measure = useRef(() => {});
@@ -132,9 +147,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
           size={size}
           only={overlays === "bug" ? "bug" : undefined}
           codeLift={codeLift}
-          onScreen={s.onScreen?.stationId === s.currentId ? s.onScreen : null}
-          showing={(s.status === "playing" || s.status === "paused") && !!current}
-          banner={!!bannerFor && !s.entry}
+          {...graphics}
         />
       )}
 
@@ -160,14 +173,24 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
       {s.pendingId && !s.currentId && <div className="oc-player__cover oc-player__cover--tuning" aria-hidden="true" />}
 
       {s.status === "paused" && s.paused && (
-        <div className="oc-player__paused">
+        <div className="oc-player__paused" data-side={bugTopLeft ? "right" : undefined}>
           <Tag onPicture>Paused</Tag>
-          {s.paused.expired && (
-            <Button variant="primary" size={size === "tv" ? "lg" : "sm"} onClick={() => engine.backToLive()}>
-              Back to live
-            </Button>
-          )}
+          {/* Always offered; after the 30-minute hold, play goes back to live too. */}
+          <Button variant="primary" size={size === "tv" ? "lg" : "sm"} onClick={() => engine.backToLive()}>
+            Back to live
+          </Button>
         </div>
+      )}
+
+      {liveChip && (
+        <button type="button" className="oc-player__live" data-side={bugTopLeft ? "right" : undefined} onClick={() => engine.backToLive()}>
+          {holdOkHint && (
+            <span className="oc-player__live-key" aria-hidden="true">
+              Hold <Kbd size="tv">OK</Kbd>
+            </span>
+          )}
+          Back to live
+        </button>
       )}
 
       {s.mutedByBrowser && (
@@ -187,7 +210,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
 
       {s.entry && <NumberPanel entry={s.entry} size={size} />}
 
-      {bannerFor && !s.entry && (
+      {bannerFor && bannerUp && (
         <Banner
           channel={bannerFor}
           size={size}

@@ -186,6 +186,26 @@ describe("the casting session", () => {
     expect(s.getCastSession()).toEqual({ status: "idle", error: "Den TV was signed out." });
   });
 
+  it("the remote's Guide opens the guide on the TV, over the relay and over Cast, and the arrows and OK drive it there", async () => {
+    const s = await import("./session");
+    const guideKeys = [{ type: "guide" }, { type: "focus", dir: "down" }, { type: "focus", dir: "right" }, { type: "select" }, { type: "back" }] as const;
+    // The TV app, through the relay.
+    const den: CastTarget = { id: "00000000-0000-4000-8000-0000000c0002", name: "Den TV", kind: "tv_app", online: true };
+    relay.sent.length = 0;
+    await s.startCast(den, INTRO, null);
+    for (const c of guideKeys) s.sendToTv(c);
+    await Promise.resolve();
+    expect(relay.sent).toEqual(guideKeys);
+    s.stopCasting();
+    // A Chromecast: the same commands on Opencast's namespace, naming the phone.
+    bridge.posted.length = 0;
+    await s.startCast(LIVING, INTRO, null);
+    for (const c of guideKeys) s.sendToTv(c);
+    const sent = bridge.posted.filter((m) => "data" in m && (m.data as { type: string }).type !== "session").map((m) => (m as { data: unknown }).data);
+    expect(sent).toEqual(guideKeys.map((c) => ({ ...c, from: "Kai's phone" })));
+    s.stopCasting();
+  });
+
   it("follows the mirroring plugin: connected, locked, stopped", async () => {
     const s = await import("./session");
     s.applyMirrorStatus({ connected: true, tvName: "Bedroom TV", lockedAt: null });

@@ -9,7 +9,8 @@ import { remoteStateOf } from "./remoteState";
 export function MirrorStateToPhone({ target = window }: { target?: Pick<Window, "postMessage" | "location"> }) {
   const [s] = usePlayer();
   useEffect(() => {
-    target.postMessage({ opencast: "state", state: remoteStateOf(s, null) }, target.location.origin);
-  }, [target, s.currentId, s.status, s.sleep?.endsAt]);
+    // Behind live too (the relay's contract has no field for it; this message isn't the relay's).
+    target.postMessage({ opencast: "state", state: { ...remoteStateOf(s, null), behindLive: s.behindLive } }, target.location.origin);
+  }, [target, s.currentId, s.status, s.sleep?.endsAt, s.behindLive]);
   return null;
 }

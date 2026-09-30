@@ -97,6 +97,11 @@ describe("the web keyboard", () => {
     expect(commandForKey(key("7"), "web")).toBeNull();
     expect(commandForKey(key("ArrowDown"), "web")).toEqual({ type: "channel", dir: "down" });
   });
+  it("l or End go back to live", () => {
+    expect(commandForKey(key("l"), "web")).toEqual({ type: "backToLive" });
+    expect(commandForKey(key("End"), "web")).toEqual({ type: "backToLive" });
+    expect(commandForKey(key("L"), "web")).toBeNull();
+  });
 });
 
 describe("Cast messages", () => {
@@ -104,6 +109,7 @@ describe("Cast messages", () => {
     expect(parseCastCommand('{"type":"channel","dir":"up","from":"Kai\'s phone"}')).toEqual({ type: "channel", dir: "up", from: "Kai's phone" });
     expect(parseCastCommand({ type: "tune", channel: "24.1" })).toEqual({ type: "tune", channel: "24.1" });
     expect(parseCastCommand({ type: "tune", channel: "drop table" })).toBeNull();
+    expect(parseCastCommand('{"type":"backToLive","from":"Kai\'s phone"}')).toEqual({ type: "backToLive" });
     expect(parseCastCommand({ type: "preset", key: 9 })).toBeNull();
     expect(parseCastCommand({ type: "eval", code: "x" })).toBeNull();
     expect(parseCastCommand("not json")).toBeNull();
@@ -144,5 +150,38 @@ describe("a computer's keyboard in TV mode", () => {
     expect(commandForKey(key(" "), "tv")).toEqual({ type: "togglePlay" });
     expect(commandForKey(key("k"), "tv")).toEqual({ type: "togglePlay" });
     expect(commandForKey(key(" "), "tv", "overlay")).toBeNull();
+  });
+  it("l goes back to live on the picture", () => {
+    expect(commandForKey(key("l"), "tv")).toEqual({ type: "backToLive" });
+    expect(commandForKey(key("l"), "tv", "overlay")).toBeNull();
+  });
+});
+
+describe("Back to live on the TV remote", () => {
+  it("⏩ and next track go back to live on the picture, clear of the arrows, OK and Back", () => {
+    expect(commandForKey(key("MediaFastForward"), "tv")).toEqual({ type: "backToLive" });
+    expect(commandForKey(key("MediaTrackNext"), "tv")).toEqual({ type: "backToLive" });
+    // A TV browser's ⏩ by its keyCode (webOS, Tizen).
+    expect(commandForKey(key("Unidentified", 417), "tv")).toEqual({ type: "backToLive" });
+    expect(commandForKey(key("MediaFastForward"), "tv", "overlay")).toBeNull();
+    expect(commandForKey(key("MediaRewind"), "tv")).toBeNull();
+  });
+
+  it("holding OK on the picture sends OK with hold (the player goes back to live while behind); a press is still OK", () => {
+    vi.useFakeTimers();
+    const target = new EventTarget();
+    const dispatch = vi.fn();
+    const stop = keyboardInput({ profile: "tv", context: () => "picture", target: target as never }).start(dispatch);
+    const down = (k: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key: k, cancelable: true }));
+    const up = (k: string) => target.dispatchEvent(new KeyboardEvent("keyup", { key: k, cancelable: true }));
+    down("Enter");
+    up("Enter");
+    down("Enter");
+    vi.advanceTimersByTime(HOLD_MS);
+    up("Enter");
+    down("MediaFastForward");
+    expect(dispatch.mock.calls.map((c) => c[0])).toEqual([{ type: "select" }, { type: "select", hold: true }, { type: "backToLive" }]);
+    stop();
+    vi.useRealTimers();
   });
 });

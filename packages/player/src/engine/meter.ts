@@ -112,6 +112,11 @@ export class AudioLevels {
     if (chain) this.setPaths(chain, true);
   }
 
+  /** Whether this element runs through the graph (then it plays only through it, never to AirPlay). */
+  isRouted(el: HTMLMediaElement): boolean {
+    return this.sources.has(el);
+  }
+
   /** Whether the element on screen is running through the graph (and evened out, if that's on). */
   routed(): boolean {
     return !!this.current && this.sources.has(this.current);

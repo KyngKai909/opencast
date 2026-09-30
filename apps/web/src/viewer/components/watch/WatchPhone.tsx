@@ -4,12 +4,13 @@
 
 import { useRef } from "react";
 import { useNavigate } from "react-router";
-import { IconButton, Ident, Tally, clock } from "@opencast/ui";
+import { Button, IconButton, Ident, Tally, clock } from "@opencast/ui";
 import { usePlayer } from "@opencast/player";
 import { MARKET_TZ } from "../../../lib/clock";
 import type { DialRowX } from "../../api/ext";
 import { useChannels } from "../../data/viewer";
 import type { WatchData } from "./useWatch";
+import { AirPlayLine } from "./AirPlay";
 import { Picture } from "./Picture";
 import { Actions, NowTitle, SharedAiring, Tonight } from "./parts";
 import { callSignOf, bandHint, neighbourOf } from "./logic";
@@ -62,6 +63,12 @@ export function WatchPhone({ w }: { w: WatchData }) {
   const up: DialRowX | null = neighbourOf(w.channels, from, "up");
   const paused = s.status === "paused";
   const step = (dir: "up" | "down") => w.engine.handle({ type: "channel", dir });
+  // Paused, or playing on from a pause (the lock screen, the space bar): the one way to seek.
+  const live = s.behindLive ? (
+    <Button size="sm" className="vw-wph__live" onClick={() => w.engine.backToLive()}>
+      Back to live
+    </Button>
+  ) : null;
 
   if (radio && row) {
     const now = w.now;
@@ -70,6 +77,7 @@ export function WatchPhone({ w }: { w: WatchData }) {
       <div className="vw-wph vw-wph--radio">
         <Picture w={w} className="vw-wph__radio" />
         <div className="vw-wph__pad">
+          <AirPlayLine w={w} className="vw-airplay--phone" />
           <SharedAiring w={w} />
           <h2 className="vw-w-title vw-w-title--phone vw-wph__rtitle">{now?.title ?? "Off air"}</h2>
           {now && (
@@ -83,6 +91,7 @@ export function WatchPhone({ w }: { w: WatchData }) {
             <IconButton icon={paused ? "play" : "pause"} label={paused ? "Play" : "Pause"} className="vw-wph__play" onClick={() => w.engine.togglePlay()} />
             <IconButton icon="up" label={up ? `Up to ${up.station.channel}` : "Channel up"} className="vw-wph__step" onClick={() => step("up")} disabled={!up} />
           </div>
+          {live}
           {hint && <p className="vw-wph__hint">{hint.split(/(\d+\.\d)/).map((part, i) => (/^\d+\.\d$/.test(part) ? <span key={i} className="oc-mono">{part}</span> : part))}</p>}
           <Actions w={w} />
         </div>
@@ -104,8 +113,10 @@ export function WatchPhone({ w }: { w: WatchData }) {
         </div>
       </Picture>
       <div className="vw-wph__pad">
+        <AirPlayLine w={w} className="vw-airplay--phone" />
         <div className="vw-wph__id">
           {row && <Ident variant="block-sm" channel={row.station.channel ?? ""} callSign={callSignOf(row.station)} name={row.station.name} />}
+          {live}
           <Tally state={lit ? "lit" : "unlit"} flicker={!litAtOpen.current} className="vw-wph__tally" />
         </div>
         <SharedAiring w={w} />

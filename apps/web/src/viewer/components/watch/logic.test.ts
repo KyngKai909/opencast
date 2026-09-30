@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, DialRowX } from "../../api/ext";
-import { backAtOf, bandHint, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel } from "./logic";
+import { backAtOf, bandHint, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel, watchKey } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 2026 at 8:42 pm in Redlands (UTC−7).
@@ -160,5 +160,42 @@ describe("planned off air (G9)", () => {
     expect(backAtOf(r, { stationId: "q", backAt: pt("05:00", 1) }, "p")).toBe(pt("06:30", 1));
     expect(backAtOf({ ...r, now: null })).toBe(pt("07:00", 1));
     expect(backAtOf({ ...r, now: null, next: null })).toBeNull();
+  });
+});
+
+describe("the tuned-in page's keys", () => {
+  const press = (key: string, target: Element | null = document.body, o: Partial<KeyboardEvent> = {}) =>
+    watchKey({ key, target, defaultPrevented: false, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...o });
+
+  it("▲ ▼ change channel, space or k pause and resume, l or End go back to live", () => {
+    expect(press("ArrowUp")).toEqual({ type: "channel", dir: "up" });
+    expect(press("ArrowDown")).toEqual({ type: "channel", dir: "down" });
+    expect(press(" ")).toEqual({ type: "togglePlay" });
+    expect(press("k")).toEqual({ type: "togglePlay" });
+    expect(press("l")).toEqual({ type: "backToLive" });
+    expect(press("End")).toEqual({ type: "backToLive" });
+    expect(press("x")).toBeNull();
+  });
+
+  it("with the same guards: modifiers, text fields, dialogs and menus", () => {
+    expect(press("l", document.body, { shiftKey: true })).toBeNull();
+    expect(press("End", document.body, { metaKey: true })).toBeNull();
+    expect(press("l", document.body, { defaultPrevented: true })).toBeNull();
+    const input = document.createElement("input");
+    expect(press("l", input)).toBeNull();
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    const inside = dialog.appendChild(document.createElement("button"));
+    expect(press("End", inside)).toBeNull();
+  });
+
+  it("l and End work from a focused button (only the space bar presses it); End leaves a slider alone", () => {
+    const button = document.createElement("button");
+    expect(press("l", button)).toEqual({ type: "backToLive" });
+    expect(press("End", button)).toEqual({ type: "backToLive" });
+    expect(press(" ", button)).toBeNull();
+    const slider = document.createElement("div");
+    slider.setAttribute("role", "slider");
+    expect(press("End", slider)).toBeNull();
   });
 });

@@ -10,7 +10,7 @@ import { StationPageX, type DialRowX } from "../../api/ext";
 import { useChannels, useDial, useMarketSlug } from "../../data/viewer";
 import { useNowPlaying, useTune } from "../../player/PlayerRoot";
 import { useApiAs } from "./overlay";
-import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, withOutsideStation } from "./logic";
+import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, watchKey, withOutsideStation } from "./logic";
 
 export function useWatch(stationRef: string | undefined) {
   const [s, engine] = usePlayer();
@@ -77,19 +77,14 @@ export function useWatch(stationRef: string | undefined) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playingId, engineChannels, navigate]);
 
-  // Arrow keys change channel on this page, and only here; the space bar (or k) pauses and resumes.
+  // Arrow keys change channel on this page, and only here; the space bar (or k) pauses and resumes;
+  // l (or End) goes back to live (watchKey).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const toggle = e.key === " " || e.key === "k";
-      if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && !toggle) return;
-      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest('[role="dialog"], [role="radiogroup"], [role="menu"], [role="listbox"], [role="tablist"]'))) return;
-      // Space on a focused button or link presses it; leave that alone.
-      if (toggle && t && t.closest("button, a, [role='button'], [role='slider']")) return;
+      const cmd = watchKey(e);
+      if (!cmd) return;
       e.preventDefault();
-      if (toggle) engine.handle({ type: "togglePlay" }, { input: "keyboard" });
-      else engine.handle({ type: "channel", dir: e.key === "ArrowUp" ? "up" : "down" }, { input: "keyboard" });
+      engine.handle(cmd, { input: "keyboard" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

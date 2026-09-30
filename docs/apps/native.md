@@ -476,7 +476,7 @@ The WebView delivers the D-pad's arrows as `ArrowUp`, `ArrowDown`, `ArrowLeft` a
 | Android key | Page key (keyCode) | Command |
 |---|---|---|
 | `BACK` | `GoBack` (461) | Picture: last channel, or **leave the app when there's no last channel**. Overlay: close. Hold: menu. |
-| `DPAD_CENTER`, `ENTER`, `NUMPAD_ENTER` | `Enter` (13) | OK. Hold: OK with `hold` (replace a full preset slot). |
+| `DPAD_CENTER`, `ENTER`, `NUMPAD_ENTER` | `Enter` (13) | OK. Hold: OK with `hold` (replace a full preset slot; on the picture while behind live, Back to live). |
 | `CHANNEL_UP` / `CHANNEL_DOWN` | `ChannelUp` / `ChannelDown` (427/428) | Channel up and down; pages the guide. |
 | `PAGE_UP` / `PAGE_DOWN` | `PageUp` / `PageDown` | Channel up and down. |
 | `GUIDE` | `Guide` (458) | Guide. |
@@ -485,7 +485,7 @@ The WebView delivers the D-pad's arrows as `ArrowUp`, `ArrowDown`, `ArrowLeft` a
 | `LAST_CHANNEL` | `MediaLast` | Last channel. |
 | `MEDIA_PLAY_PAUSE`, `MEDIA_PLAY`, `MEDIA_PAUSE` | `MediaPlayPause`, `MediaPlay`, `MediaPause` | Pause and play. |
 | `MEDIA_NEXT` / `MEDIA_PREVIOUS` | `ChannelUp` / `ChannelDown` | Channel, as on the lock screen. |
-| `MEDIA_REWIND` / `MEDIA_FAST_FORWARD` (Fire TV's ⏪ ⏩) | `MediaRewind` / `MediaFastForward` | Nothing yet (open question). Taken so Android's media session doesn't act on them. |
+| `MEDIA_REWIND` / `MEDIA_FAST_FORWARD` (Fire TV's ⏪ ⏩) | `MediaRewind` / `MediaFastForward` | ⏪: nothing yet (open question). ⏩: Back to live, on the picture. Both taken so Android's media session doesn't act on them. |
 | `0`–`9`, `NUMPAD_0`–`9` | `0`–`9` | Tune by number. |
 | `PERIOD`, `NUMPAD_DOT`, `MINUS` | `.` | The dot. A US remote's dash for "12-1" is the dot too. |
 
@@ -588,7 +588,7 @@ TV mode's debug build was compiled and run on the "opencast-tv" AVD (Android TV 
 
 ### Open questions
 
-- **⏪ ⏩ on Fire TV's remote:** nothing, or channel down and up?
+- **⏪ on Fire TV's remote:** nothing, or channel down? (⏩ is Back to live, 2026-09-29.)
 - **A single APK for phones too?** Today it's TV-only (leanback required), and the viewer app is the phone app.
 - **Fire OS 5 devices** (API 22) are below Capacitor 8's `minSdk` 24. Accept that?
 - **Detecting Google TV** from its home-screen package is a heuristic. Google has no official feature flag for it; check it on a Chromecast with Google TV and on a Google TV set.

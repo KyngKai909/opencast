@@ -27,7 +27,8 @@ function safe(s: string): unknown {
   }
 }
 
-type PhoneState = { stationId: string | null; paused: boolean; changedBy: string | null; sleepEndsAt: number | null };
+/** `behindLive`: playing on from a pause (the phone's remote offers Back to live); Cast only, the relay's state has no such field. */
+type PhoneState = { stationId: string | null; paused: boolean; changedBy: string | null; sleepEndsAt: number | null; behindLive: boolean };
 /** What's on now, as last told to the phones: a phone that just spoke gets it at once. */
 let latest: PhoneState | null = null;
 
@@ -35,9 +36,9 @@ let latest: PhoneState | null = null;
 function StateToPhones({ cast, end }: { cast: ReturnType<typeof castInput>; end: () => void }) {
   const [s] = usePlayer();
   useEffect(() => {
-    latest = { stationId: s.currentId, paused: s.status === "paused", changedBy: session.changedBy, sleepEndsAt: s.sleep?.endsAt ?? null };
+    latest = { stationId: s.currentId, paused: s.status === "paused", changedBy: session.changedBy, sleepEndsAt: s.sleep?.endsAt ?? null, behindLive: s.behindLive };
     cast.broadcast(latest);
-  }, [cast, s.currentId, s.status, s.sleep?.endsAt]);
+  }, [cast, s.currentId, s.status, s.sleep?.endsAt, s.behindLive]);
   useEffect(() => {
     // The sleep timer stopped Opencast: casting, the stream ends (the TV goes back to its own screen).
     if (s.status === "stopped") end();

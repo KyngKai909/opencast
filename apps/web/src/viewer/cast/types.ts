@@ -34,6 +34,11 @@ export interface ReceiverState {
   changedBy: string | null;
   /** When the sleep timer ends, in ms since the epoch. */
   sleepEndsAt: number | null;
+  /**
+   * Playing on from a pause, behind live (the Cast receiver and the mirror say so; the TV app's
+   * relay state has no field for it, so there only paused is known).
+   */
+  behindLive?: boolean;
 }
 
 /** The phone remote's commands (the "Cast / bridge message" column of the remote spec). */
@@ -43,8 +48,14 @@ export type RemoteCommand =
   | { type: "preset"; key: number }
   | { type: "last" }
   | { type: "info" }
+  /** The TV's guide opens (or, open, closes), and the arrows, OK and Back then drive it there. */
+  | { type: "guide" }
+  | { type: "focus"; dir: "up" | "down" | "left" | "right" }
+  | { type: "select" }
+  | { type: "back" }
   | { type: "pause" }
   | { type: "play" }
+  | { type: "backToLive" }
   | { type: "sleep"; until: "end_of_program" | number | null };
 
 /** The first message a phone sends: who it is, which market, and whether other phones may change the channel. */

@@ -52,6 +52,15 @@ describe("the relay as an input", () => {
     stop();
   });
 
+  it("takes a phone's Back to live", async () => {
+    const { s, got, stop } = setup();
+    await flush();
+    s.event("command", command(KAI, { type: "backToLive" }));
+    await flush();
+    expect(got).toEqual([{ c: { type: "backToLive" }, s: { input: "relay", who: "Kai's phone" } }]);
+    stop();
+  });
+
   it("ignores what isn't a command, and the API's ping", async () => {
     const { s, got, stop } = setup();
     await flush();
@@ -77,6 +86,36 @@ describe("the relay as an input", () => {
     await flush();
     expect(handle).toHaveBeenCalledWith({ type: "preset", key: 2 }, { input: "relay", who: "Kai's phone" });
     stop();
+  });
+
+  it("a phone's Guide opens the TV's guide, and its arrows, OK and Back then drive it there", async () => {
+    clearLayers();
+    vi.resetModules();
+    vi.doMock("./focus", () => ({ moveFocus: vi.fn(), pressFocused: vi.fn() }));
+    const focus = await import("./focus");
+    const { dispatch: routeNow } = await import("./commands");
+    const { PlayerEngine } = await import("@opencast/player");
+    let path = "/";
+    const ui: Ui = { path: () => path, go: vi.fn((to: string) => void (path = to)), close: vi.fn(() => void (path = "/")) };
+    // The player passes the guide on to TV mode (TvApp's onCommand).
+    const engine = new PlayerEngine({ onCommand: (c) => c.type === "guide" && ui.go("/guide") });
+    const s = stream();
+    const relay = relayInput({ open: async () => s.res, othersCanChange: () => true, wait: () => new Promise(() => undefined) });
+    const stop = relay.start((c, src) => routeNow(c, src, ui, engine));
+    await flush();
+    s.event("command", command(KAI, { type: "guide" }));
+    await flush();
+    expect(ui.go).toHaveBeenCalledWith("/guide");
+    s.event("command", command(KAI, { type: "focus", dir: "down" }));
+    s.event("command", command(KAI, { type: "select" }));
+    s.event("command", command(KAI, { type: "back" }));
+    await flush();
+    expect(focus.moveFocus).toHaveBeenCalledWith("down");
+    expect(focus.pressFocused).toHaveBeenCalledOnce();
+    expect(ui.close).toHaveBeenCalledOnce();
+    stop();
+    engine.destroy();
+    vi.doUnmock("./focus");
   });
 
   it("lets only the phone that started change the channel when that's the setting", async () => {

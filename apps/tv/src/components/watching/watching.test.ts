@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { DialRowX } from "../../api/ext";
 import { bandTarget, lastOnBand, otherBand, rememberOnBand } from "./bands";
-import { keyHintsHidden, readFirstUse, recordFirstUse, visibleHints, WEEK_MS } from "./hintRow";
+import { hintsFor, keyHintsHidden, LIVE_HINT, readFirstUse, recordFirstUse, visibleHints, WEEK_MS } from "./hintRow";
 import { canPledge, menuItems, savedText, stationsText, toggledCaptions } from "./menu";
 import { airState, backTime, canSuggest, identText, signOnAt, signOnDay, suggestion, type Row } from "./offAir";
 import { byRef, pledgePath, pledgeRoute, pledgeUrl, shownUrl } from "./pledge";
@@ -196,6 +196,9 @@ describe("the watching screen's commands", () => {
 
   it("leaves the picture's commands to the player", () => {
     expect(watchCommand({ type: "select" }, base)).toBeNull();
+    // A held OK on the plain picture is the player's too (Back to live while behind live).
+    expect(watchCommand({ type: "select", hold: true }, base)).toBeNull();
+    expect(watchCommand({ type: "backToLive" }, base)).toBeNull();
     expect(watchCommand({ type: "channel", dir: "up" }, base)).toBeNull();
     expect(watchCommand({ type: "back" }, base)).toBeNull();
   });
@@ -303,6 +306,15 @@ describe("the hint row", () => {
     expect(keyHintsHidden(T - WEEK_MS, T)).toBe(true);
     expect(visibleHints(hints, true)).toEqual([hints[1]]);
     expect(visibleHints(hints, false)).toEqual(hints);
+  });
+
+  it("adds Hold OK, Back to live while behind live on a remote; it stays after the week", () => {
+    expect(LIVE_HINT).toEqual({ kind: "key", key: "OK", label: "Back to live", hold: true });
+    expect(hintsFor(hints, { hidden: false, behindLive: false, remote: true })).toEqual(hints);
+    expect(hintsFor(hints, { hidden: false, behindLive: true, remote: true })).toEqual([...hints, LIVE_HINT]);
+    expect(hintsFor(hints, { hidden: true, behindLive: true, remote: true })).toEqual([hints[1], LIVE_HINT]);
+    // Casting or mirroring, the phone has the controls: no remote key to hold.
+    expect(hintsFor(hints, { hidden: false, behindLive: true, remote: false })).toEqual(hints);
   });
 
   it("notes the first use once", () => {

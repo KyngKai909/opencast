@@ -9,10 +9,13 @@
 //   sign-off slate puts the station off air with its back time, and it tunes back in when a new
 //   playlist appears.
 // - Every change shows the banner for five seconds (a setting on TV).
-// - Pause holds your place for up to 30 minutes, then offers Back to live.
+// - Pause holds your place for up to 30 minutes, then offers Back to live. From a pause until Back
+//   to live (or a tune), the picture is behind live (behindLive), resumed or not.
 // - Number entry: 1, 2 tunes 12.1 after a short wait, or at once on OK.
 // - Captions, with the size setting; a sleep timer that fades the sound over its last minute.
 // - Picture quality (auto, data saver, best) and evening out the sound, settings on TV.
+// - AirPlay (Safari): offered while an AirPlay TV is around; the picture on screen plays on the TV
+//   by itself (the stream, not the phone's screen). Only the deck on screen is ever a candidate.
 //
 // Surfaces read its state (subscribe/getState) and send it commands (handle).
 
@@ -20,7 +23,7 @@ import type { Channel, Command, CommandSource } from "../types";
 import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../dial";
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, SignedOffError, type WarmMode } from "./Deck";
-import { defaultDriver, type MediaDriver, type Quality } from "./driver";
+import { defaultDriver, nativeDriver, type MediaDriver, type Quality } from "./driver";
 import { AudioLevels } from "./meter";
 import { isLive, Prefetch, type Fetch } from "./playlist";
 import { onScreenKey, type OnScreen } from "./timeline";
@@ -51,6 +54,12 @@ export interface PlayerState {
   /** Autoplay with sound was refused; it's playing muted until a tap. */
   mutedByBrowser: boolean;
   paused: { since: number; expired: boolean } | null;
+  /**
+   * Behind live: from a pause until Back to live, a tune or a channel change, paused or playing
+   * again (play resumes where it paused). Cleared too if the picture catches up to the live edge
+   * by itself (where the driver knows the edge).
+   */
+  behindLive: boolean;
   captions: CaptionMode;
   captionSize: CaptionSize;
   banner: { stationId: string; until: number } | null;
@@ -65,6 +74,11 @@ export interface PlayerState {
   onScreen: (OnScreen & { stationId: string }) | null;
   /** Signed off by its stream (the playlist ended after the sign-off slate): when it's back, if said. */
   offAir: { stationId: string; backAt: string | null } | null;
+  /**
+   * AirPlay (Safari only): an AirPlay TV is around to offer (`available`), and the picture is
+   * playing on one now (`active`). WebKit doesn't say which TV.
+   */
+  airPlay: { available: boolean; active: boolean };
 }
 
 export interface EngineOptions {
@@ -88,6 +102,8 @@ export interface EngineOptions {
   now?: () => number;
   /** Commands the player doesn't act on itself (guide, menu, presets, focus…), for the surface. */
   onCommand?: (command: Command, source?: CommandSource) => void;
+  /** AirPlay: the driver a picture on hls.js switches to (the browser's own HLS, by default). */
+  airPlayDriver?: MediaDriver;
 }
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
@@ -97,6 +113,8 @@ const ON_SCREEN_TICK_MS = 250;
 const BACK_RETRY_MS = 5_000;
 const BACK_RETRY_MAX_MS = 60_000;
 const SLEEP_FADE_MS = 60 * 1000;
+/** Within this many seconds of the live sync point, a resumed picture counts as live again. */
+const NEAR_LIVE_S = 4;
 
 /** Caption type as a share of the picture's width, per caption size (the player's --oc-cue). */
 export const CAPTION_SCALE: Record<CaptionSize, number> = { small: 0.034, medium: 0.042, large: 0.054 };
@@ -116,7 +134,11 @@ export class PlayerEngine {
   private decks = new Map<string, Deck>();
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
-  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch">> & Pick<EngineOptions, "onCommand">;
+  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver">> & Pick<EngineOptions, "onCommand">;
+  private airPlayDriver: MediaDriver;
+  /** A video element with no stream, listening for AirPlay TVs coming and going (Safari). */
+  private airPlayProbe: HTMLVideoElement | null = null;
+  private wirelessOff: (() => void) | null = null;
   private fetch: Fetch;
   private prefetches = new Map<string, Prefetch>();
   private presets: Record<number, string>;
@@ -150,6 +172,7 @@ export class PlayerEngine {
       onCommand: options.onCommand
     };
     this.presets = options.presets ?? {};
+    this.airPlayDriver = options.airPlayDriver ?? nativeDriver();
     this.audio.setEvenOut(this.o.eveningOut);
     this.state = {
       channels: [],
@@ -161,6 +184,7 @@ export class PlayerEngine {
       muted: false,
       mutedByBrowser: false,
       paused: null,
+      behindLive: false,
       captions: "off",
       captionSize: "medium",
       banner: null,
@@ -170,7 +194,8 @@ export class PlayerEngine {
       sleep: null,
       changedBy: null,
       onScreen: null,
-      offAir: null
+      offAir: null,
+      airPlay: { available: false, active: false }
     };
   }
 
@@ -206,6 +231,7 @@ export class PlayerEngine {
   attach(host: HTMLElement) {
     this.host = host;
     for (const d of this.decks.values()) host.appendChild(d.video);
+    this.probeAirPlay(host);
     if (this.queuedTune) {
       const { stationId, source } = this.queuedTune;
       this.queuedTune = null;
@@ -287,6 +313,7 @@ export class PlayerEngine {
     const previous = again ? this.state.lastId : this.state.currentId;
     this.showBanner(stationId);
     this.clearPause();
+    this.clearBehind();
     this.clearBack();
 
     if (!c.onAir || !c.playback) {
@@ -343,6 +370,7 @@ export class PlayerEngine {
     // just pauses the picture. That pause is undone: it plays on muted, with the "tap for sound"
     // prompt. (TVs' web views allow sound, so they're never muted for this.)
     deck.show(this.state.muted || this.state.mutedByBrowser);
+    this.watchWireless(deck);
     this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
     this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
@@ -374,7 +402,9 @@ export class PlayerEngine {
       pendingId: null,
       lastId: previous && previous !== stationId ? previous : this.state.lastId,
       status,
-      offAir: null
+      offAir: null,
+      // A new picture joins live.
+      behindLive: false
     });
     this.rewarm(stationId);
   }
@@ -434,6 +464,7 @@ export class PlayerEngine {
     const tick = () => {
       const d = this.active();
       if (!d || d.role !== "active") return;
+      this.checkCaughtUp(d);
       const os = d.onScreen();
       const key = `${d.stationId}|${onScreenKey(os)}`;
       if (key === this.onScreenKey) return;
@@ -459,6 +490,7 @@ export class PlayerEngine {
     if (this.state.status !== "playing" && this.state.status !== "paused") return;
     this.dropDeck(d.stationId);
     this.clearPause();
+    this.clearBehind();
     this.patch({ status: "off_air" });
     this.stopOnScreen();
     this.signedOff(d.stationId, d.signedOff?.backAt ?? null, d.signedOff?.at ?? null);
@@ -571,7 +603,7 @@ export class PlayerEngine {
     const d = this.active();
     if (!d || this.state.status !== "playing") return;
     d.video.pause();
-    this.patch({ status: "paused", paused: { since: this.o.now(), expired: false } });
+    this.patch({ status: "paused", paused: { since: this.o.now(), expired: false }, behindLive: true });
     this.holdBanner();
     if (this.timers.pause) clearTimeout(this.timers.pause);
     // After the hold the player offers Back to live rather than piling up a delay.
@@ -609,13 +641,137 @@ export class PlayerEngine {
     this.clearPause();
     d.joinLive(0);
     void d.video.play().catch(() => {});
-    this.patch({ status: "playing" });
+    this.patch({ status: "playing", behindLive: false });
     this.showBanner();
+    this.mediaSession();
   }
 
   private clearPause() {
     if (this.timers.pause) clearTimeout(this.timers.pause);
     if (this.state.paused) this.patch({ paused: null });
+  }
+
+  private clearBehind() {
+    if (this.state.behindLive) this.patch({ behindLive: false });
+  }
+
+  /** Playing behind live, and the picture has caught up to the live edge by itself: live again. */
+  private checkCaughtUp(d: Deck) {
+    if (!this.state.behindLive || this.state.status !== "playing" || this.state.pendingId) return;
+    const behind = d.behindLive();
+    if (behind !== null && behind <= NEAR_LIVE_S) this.patch({ behindLive: false });
+  }
+
+  // ---------- AirPlay (Safari) ----------
+
+  private probeAirPlay(host: HTMLElement) {
+    if (typeof window === "undefined" || !("WebKitPlaybackTargetAvailabilityEvent" in window)) return;
+    if (!this.airPlayProbe) {
+      const v = document.createElement("video");
+      v.className = "oc-player__probe";
+      v.setAttribute("aria-hidden", "true");
+      v.setAttribute("x-webkit-airplay", "allow");
+      v.muted = true;
+      // WebKit says when a listener is added, and whenever an AirPlay TV comes or goes.
+      v.addEventListener("webkitplaybacktargetavailabilitychanged", (e) => {
+        const available = (e as Event & { availability?: string }).availability === "available";
+        if (available !== this.state.airPlay.available) this.patch({ airPlay: { ...this.state.airPlay, available } });
+      });
+      this.airPlayProbe = v;
+    }
+    host.appendChild(this.airPlayProbe);
+  }
+
+  /** Follows whether the picture on screen is playing on an AirPlay TV. */
+  private watchWireless(d: Deck) {
+    this.wirelessOff?.();
+    const v = d.video as HTMLVideoElement & { webkitCurrentPlaybackTargetIsWireless?: boolean };
+    const check = () => {
+      const active = !!v.webkitCurrentPlaybackTargetIsWireless && this.decks.get(d.stationId) === d;
+      if (active !== this.state.airPlay.active) this.patch({ airPlay: { ...this.state.airPlay, active } });
+    };
+    v.addEventListener("webkitcurrentplaybacktargetiswirelesschanged", check);
+    this.wirelessOff = () => v.removeEventListener("webkitcurrentplaybacktargetiswirelesschanged", check);
+    check();
+  }
+
+  /**
+   * Opens Safari's AirPlay list for the picture on screen (from a click or tap: WebKit asks for
+   * one). The stream plays on the TV itself. A picture on hls.js can't go to AirPlay (Media Source
+   * isn't a stream the TV can fetch, and one already running through Web Audio plays only there),
+   * so a fresh <video> on Safari's own HLS takes its place first, starting at live: the list opens
+   * on it at once, and the old picture stays on screen until the new one has a frame.
+   */
+  showAirPlayPicker(): boolean {
+    const d = this.active();
+    if (!d || d.role !== "active" || !this.host) return false;
+    const deck = d.native && !this.audio.isRouted(d.video) ? d : this.nativeTwin(d);
+    deck.setRemote(true);
+    const v = deck.video as HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void };
+    v.webkitShowPlaybackTargetPicker?.();
+    return true;
+  }
+
+  /** Stops playing on the AirPlay TV: the picture comes back to this screen. */
+  stopAirPlay() {
+    const d = this.active();
+    // Remote playback off takes the picture back from the TV; showAirPlayPicker allows it again.
+    if (d) d.setRemote(false);
+    if (this.state.airPlay.active) this.patch({ airPlay: { ...this.state.airPlay, active: false } });
+  }
+
+  /** A deck on Safari's own HLS for the station on screen, taking the old one's place once it has a frame. */
+  private nativeTwin(old: Deck): Deck {
+    const id = old.stationId;
+    const twin = new Deck({
+      stationId: id,
+      url: old.url,
+      host: this.host!,
+      driver: this.airPlayDriver,
+      quality: this.o.quality,
+      fetch: this.fetch,
+      onChange: () => this.refreshWarm(),
+      onSignOff: (deck) => this.deckSignedOff(deck)
+    });
+    this.decks.set(id, twin);
+    this.watchWireless(twin);
+    const settle = (ok: boolean) => {
+      const current = this.decks.get(id) === twin;
+      if (ok && current) {
+        twin.show(this.state.muted || this.state.mutedByBrowser);
+        // Never through Web Audio: its sound goes to the TV as it is.
+        this.audio.measure(twin.video, false);
+        this.applyCaptions(twin);
+        // It started at live: a pause (and being behind live) ended with it.
+        if (this.state.status === "paused") {
+          this.clearPause();
+          this.patch({ status: "playing" });
+          if (this.state.banner) this.showBanner();
+        }
+        this.clearBehind();
+      } else if (current) {
+        // It didn't start: the old picture carries on.
+        twin.destroy();
+        this.decks.set(id, old);
+        this.watchWireless(old);
+        return;
+      }
+      // Done with the old picture (or a tune took over while this one started).
+      if (this.decks.get(id) !== old) old.destroy();
+    };
+    void (async () => {
+      try {
+        await twin.start();
+        await twin.firstFrame().catch((e: Error) => {
+          // Playing on the TV, a frame may never be drawn here.
+          if (!(twin.video as HTMLVideoElement & { webkitCurrentPlaybackTargetIsWireless?: boolean }).webkitCurrentPlaybackTargetIsWireless) throw e;
+        });
+        settle(true);
+      } catch {
+        settle(false);
+      }
+    })();
+    return twin;
   }
 
   // ---------- Sound and captions ----------
@@ -721,7 +877,7 @@ export class PlayerEngine {
     this.prefetches.clear();
     this.stopOnScreen();
     this.clearBack();
-    this.patch({ status: "stopped", sleep: null, banner: null, warm: [], offAir: null });
+    this.patch({ status: "stopped", sleep: null, banner: null, warm: [], offAir: null, behindLive: false });
   }
 
   // ---------- Commands ----------
@@ -741,6 +897,8 @@ export class PlayerEngine {
         return this.typeInto(".");
       case "select":
         if (this.state.entry) return this.commitEntry(source);
+        // Held OK while behind live: Back to live (the remote's way, with ▲ ▼ ◀ ▶ and Back taken).
+        if (command.hold && this.state.behindLive) return this.backToLive();
         // On the picture, OK shows the banner; OK again (while it's up) opens the guide.
         if (!this.state.banner) return this.showBanner();
         this.hideBanner();
@@ -769,7 +927,9 @@ export class PlayerEngine {
       case "togglePlay":
         return this.togglePlay();
       case "backToLive":
-        return this.backToLive();
+        // Only from behind live: at the live edge already, the key does nothing (no jump, no banner).
+        if (this.state.behindLive || this.state.status === "paused") this.backToLive();
+        return;
       case "sleep":
         return this.sleep(command.until);
     }
@@ -808,6 +968,8 @@ export class PlayerEngine {
   }
 
   destroy() {
+    this.wirelessOff?.();
+    this.airPlayProbe?.remove();
     Object.values(this.timers).forEach((t) => t && clearTimeout(t as ReturnType<typeof setTimeout>));
     if (this.timers.sleep) clearInterval(this.timers.sleep);
     if (this.timers.onScreen) clearInterval(this.timers.onScreen);

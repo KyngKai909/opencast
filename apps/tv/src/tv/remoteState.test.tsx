@@ -3,9 +3,10 @@ import { act, render } from "@testing-library/react";
 import type { RemoteState } from "@opencast/contracts";
 import { changedByOf, noteSource, RelayStateToPhones, remoteStateOf, statePoster } from "./remoteState";
 import type { RelayInput } from "./relay";
+import { MirrorStateToPhone } from "./mirrorState";
 
 // The player's state, driven by the test.
-type S = { currentId: string | null; status: string; sleep: { endsAt: number; fading: boolean } | null };
+type S = { currentId: string | null; status: string; sleep: { endsAt: number; fading: boolean } | null; behindLive?: boolean };
 let playerState: S;
 const listeners = new Set<() => void>();
 vi.mock("@opencast/player", async (orig) => {
@@ -87,5 +88,16 @@ describe("RelayStateToPhones", () => {
     expect(relay.reset).toHaveBeenCalledOnce();
     expect(post).toHaveBeenCalledTimes(posts);
     noteSource(undefined);
+  });
+});
+
+describe("what the mirror tells the iPhone", () => {
+  it("adds behind live, so the phone's remote can offer Back to live after a resume", () => {
+    playerState = { currentId: "civc", status: "playing", sleep: null, behindLive: false };
+    const postMessage = vi.fn();
+    render(<MirrorStateToPhone target={{ postMessage, location: { origin: "capacitor://localhost" } as Location }} />);
+    expect(postMessage).toHaveBeenLastCalledWith({ opencast: "state", state: { stationId: "civc", paused: false, changedBy: null, sleepEndsAt: null, behindLive: false } }, "capacitor://localhost");
+    setPlayer({ behindLive: true });
+    expect(postMessage).toHaveBeenLastCalledWith({ opencast: "state", state: expect.objectContaining({ paused: false, behindLive: true }) }, "capacitor://localhost");
   });
 });

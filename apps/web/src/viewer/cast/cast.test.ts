@@ -30,6 +30,7 @@ describe("messages on the Cast namespace", () => {
       { type: "info" },
       { type: "pause" },
       { type: "play" },
+      { type: "backToLive" },
       { type: "sleep", until: "end_of_program" },
       { type: "sleep", until: 30 }
     ];
@@ -45,6 +46,9 @@ describe("messages on the Cast namespace", () => {
     expect(parseState(s)).toEqual({ stationId: "b", paused: true, changedBy: "Dana's phone", sleepEndsAt: 123 });
     expect(parseState(JSON.stringify(s))).toEqual(parseState(s));
     expect(parseState({ type: "state", stationId: null })).toEqual({ stationId: null, paused: false, changedBy: null, sleepEndsAt: null });
+    // Behind live, when the receiver says so (Cast and the mirror; the relay's state has no field for it).
+    expect(parseState({ ...s, paused: false, behindLive: true })).toEqual({ stationId: "b", paused: false, changedBy: "Dana's phone", sleepEndsAt: 123, behindLive: true });
+    expect(parseState({ ...s, behindLive: "yes" })).not.toHaveProperty("behindLive");
     expect(parseState({ type: "receiver-ready" })).toBeNull();
     expect(parseState("not json")).toBeNull();
     expect(isReceiverReady({ type: "receiver-ready" })).toBe(true);
@@ -71,6 +75,8 @@ describe("Watch on: target kinds", () => {
   it("labels the button by the choice", () => {
     expect(primaryLabel({ kind: "tv", target: living }, null)).toBe("Cast to Living room TV");
     expect(primaryLabel({ kind: "tv", target: bedroom }, null)).toBe("Mirror to Bedroom TV");
+    expect(primaryLabel({ kind: "airplay", active: false }, null)).toBe("AirPlay to a TV");
+    expect(primaryLabel({ kind: "airplay", active: true }, null)).toBe("Stop AirPlay");
     expect(primaryLabel({ kind: "tv", target: den }, null)).toBe("Open the app on Den TV");
     expect(primaryLabel({ kind: "tv", target: living }, living)).toBe("Open the remote");
     expect(primaryLabel({ kind: "phone" }, living)).toBe("Watch on this phone");

@@ -115,10 +115,52 @@ export function Rockers({ row, up, down, paused, onCommand }: { row: DialRowX | 
   );
 }
 
-export function RemoteButtons({ onGuide, onInfo, onKeypad, onLast }: { onGuide: () => void; onInfo: () => void; onKeypad: () => void; onLast: () => void }) {
+/**
+ * The TV's guide from the phone: ▲ ▼ ◀ ▶ and OK move and choose on the TV (its remote's keys), Back
+ * steps back there. Takes the rockers' place while the TV's guide is open.
+ */
+export function GuidePad({ onCommand, onBack }: { onCommand: (c: RemoteCommand) => void; onBack: () => void }) {
+  const focus = (dir: "up" | "down" | "left" | "right") => () => onCommand({ type: "focus", dir });
+  return (
+    <div className="vw-rm-pad" role="group" aria-label="Guide on the TV">
+      <div className="vw-rm-pad__keys">
+        <button type="button" className="vw-rm-pad__up" aria-label="Up" onClick={focus("up")}>
+          <Icon name="up" />
+        </button>
+        <button type="button" className="vw-rm-pad__left" aria-label="Left" onClick={focus("left")}>
+          <Icon name="back2" />
+        </button>
+        <button type="button" className="vw-rm-pad__ok" onClick={() => onCommand({ type: "select" })}>
+          OK
+        </button>
+        <button type="button" className="vw-rm-pad__right" aria-label="Right" onClick={focus("right")}>
+          <Icon name="chev" />
+        </button>
+        <button type="button" className="vw-rm-pad__down" aria-label="Down" onClick={focus("down")}>
+          <Icon name="down" />
+        </button>
+      </div>
+      <Button size="sm" icon="back" onClick={onBack}>
+        Back
+      </Button>
+    </div>
+  );
+}
+
+/** Back to live, under the rockers while the TV is paused or playing on behind live. */
+export function BackToLive({ onCommand }: { onCommand: (c: RemoteCommand) => void }) {
+  return (
+    <div className="vw-rm-live">
+      <Button onClick={() => onCommand({ type: "backToLive" })}>Back to live</Button>
+    </div>
+  );
+}
+
+export function RemoteButtons({ onGuide, onInfo, onKeypad, onLast, guideOpen = false }: { onGuide: () => void; onInfo: () => void; onKeypad: () => void; onLast: () => void; guideOpen?: boolean }) {
   return (
     <div className="vw-rm-row">
-      <Button icon="guide" onClick={onGuide}>
+      {/* The TV's guide: pressed again, it closes there. */}
+      <Button icon="guide" onClick={onGuide} aria-pressed={guideOpen} set={guideOpen}>
         Guide
       </Button>
       <Button icon="info" onClick={onInfo}>

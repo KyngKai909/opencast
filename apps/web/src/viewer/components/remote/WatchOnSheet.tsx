@@ -2,6 +2,8 @@
 // on the Wi-Fi and the account's TVs with the Opencast app, each going the way that works best there
 // (the target-kind table in cast/targets.ts), "This phone", a word that the installed TV app beats
 // casting, and "Use a code from the TV" to pair with a TV app this phone can't reach otherwise.
+// In Safari, while an AirPlay TV is around, "AirPlay" opens Safari's own list of TVs: the stream
+// plays there by itself (PlayerEngine.showAirPlayPicker), with no remote.
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -17,6 +19,7 @@ import { PairTvSheet } from "./PairTv";
 import "./WatchOnSheet.css";
 
 const PHONE = "this-phone";
+const AIRPLAY = "airplay-picker";
 
 export function mirrorGuideHref(tvName: string): string {
   return `/remote/mirror-guide?tv=${encodeURIComponent(tvName)}`;
@@ -35,7 +38,7 @@ function WatchOn({ onClose }: { onClose: () => void }) {
   const [pairing, setPairing] = useState(false);
   const [offline, setOffline] = useState<string | null>(null);
   const intro = useCastIntro();
-  const [s] = usePlayer();
+  const [s, engine] = usePlayer();
   const navigate = useNavigate();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -46,8 +49,9 @@ function WatchOn({ onClose }: { onClose: () => void }) {
   const rows = useMemo(() => (current && !targets.some((t) => t.id === current.id) ? [current, ...targets] : targets), [current, targets]);
 
   const [chosen, setChosen] = useState<string | null>(null);
-  const value = chosen ?? current?.id ?? rows[0]?.id ?? (loading ? null : PHONE);
-  const choice: Choice | null = value === PHONE ? { kind: "phone" } : (() => {
+  const airPlay = s.airPlay.available || s.airPlay.active;
+  const value = chosen ?? current?.id ?? (s.airPlay.active ? AIRPLAY : null) ?? rows[0]?.id ?? (loading ? null : PHONE);
+  const choice: Choice | null = value === PHONE ? { kind: "phone" } : value === AIRPLAY ? { kind: "airplay", active: s.airPlay.active } : (() => {
     const t = rows.find((r) => r.id === value);
     return t ? { kind: "tv", target: t } : null;
   })();
@@ -68,8 +72,18 @@ function WatchOn({ onClose }: { onClose: () => void }) {
 
   const go = async () => {
     if (!choice) return;
+    // Before anything waits: Safari opens its AirPlay list only straight from the tap.
+    if (choice.kind === "airplay") {
+      if (choice.active) engine.stopAirPlay();
+      else {
+        if (driving) stopCasting();
+        engine.showAirPlayPicker();
+      }
+      return onClose();
+    }
     if (choice.kind === "phone") {
       if (driving) stopCasting();
+      if (s.airPlay.active) engine.stopAirPlay();
       return onClose();
     }
     const t = choice.target;
@@ -118,10 +132,24 @@ function WatchOn({ onClose }: { onClose: () => void }) {
         </span>
       )
     })),
+    ...(airPlay
+      ? [
+          {
+            value: AIRPLAY,
+            title: "AirPlay",
+            helper: s.airPlay.active ? "Playing on AirPlay" : "Apple TV and AirPlay TVs",
+            end: (
+              <span className="vw-wo__ic">
+                <Icon name="tv" />
+              </span>
+            )
+          }
+        ]
+      : []),
     {
       value: PHONE,
       title: "This phone",
-      helper: driving ? "Stop casting" : "Playing here",
+      helper: driving ? "Stop casting" : s.airPlay.active ? "Stop AirPlay" : "Playing here",
       end: (
         <span className="vw-wo__ic">
           <Icon name="phone" />
@@ -152,7 +180,7 @@ function WatchOn({ onClose }: { onClose: () => void }) {
         </div>
       ) : (
         <>
-          {!rows.length && <p className="vw-wo__none">No TVs found on this Wi-Fi.</p>}
+          {!rows.length && !airPlay && <p className="vw-wo__none">No TVs found on this Wi-Fi.</p>}
           <ChoiceList
             label="Watch on"
             options={options}

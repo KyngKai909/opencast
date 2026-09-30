@@ -13,10 +13,17 @@ test.use({ colorScheme: "dark" });
 const banner = (page: Page) => page.locator(".oc-banner");
 const focused = (page: Page) => page.locator(".tv-focus");
 
-/** The banner names the channel, e.g. "12.1" and "BEAT". */
+/**
+ * The banner names the channel, e.g. "12.1" and "BEAT", and its picture is on screen. The banner
+ * names a channel as soon as it's asked for, while the old picture holds (aria-busy); waiting for
+ * the new picture keeps a later page.clock.fastForward from jumping past a tune still under way (a
+ * half-hour jump in no real time runs out the player's wait for the first frame, and the tune fails
+ * over to the channel before).
+ */
 async function onChannel(page: Page, channel: string, callSign: string) {
   await expect(banner(page).locator(".oc-banner__ch")).toHaveText(channel);
   await expect(banner(page).locator(".oc-banner__cs")).toHaveText(callSign);
+  await expect(page.locator(".oc-player")).toHaveAttribute("aria-busy", "false");
 }
 
 test("change channel by number and arrows, open the guide, set the sleep timer", async ({ page }) => {
@@ -119,6 +126,51 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   await page.keyboard.press("Enter");
   await playing(page);
   await onChannel(page, "18.1", "SAZN");
+});
+
+test("pause, then back to live: holding OK, and the chip while playing on behind live", async ({ page }) => {
+  await page.clock.install();
+  await openTv(page, "/");
+  await playing(page);
+  const paused = page.locator(".oc-player__paused");
+  const chip = page.locator(".oc-player__live");
+  const hint = banner(page).locator(".oc-banner__hints");
+
+  // The space bar pauses: the paused sign offers Back to live at once, and the banner's hint row
+  // says how on a remote.
+  await page.keyboard.press(" ");
+  await expect(page.locator(".oc-player")).toHaveAttribute("data-status", "paused");
+  await expect(paused.getByRole("button", { name: "Back to live" })).toBeVisible();
+  await expect(hint).toContainText("HoldOKBack to live");
+
+  // Held OK: back to live.
+  await page.keyboard.down("Enter");
+  await page.waitForTimeout(700);
+  await page.keyboard.up("Enter");
+  await playing(page);
+  await expect(paused).toBeHidden();
+  await expect(chip).toBeHidden();
+
+  // Paused a while, then play: it plays on behind live. Once the banner goes, the chip says how back.
+  await page.keyboard.press(" ");
+  await expect(page.locator(".oc-player")).toHaveAttribute("data-status", "paused");
+  await page.waitForTimeout(10_000);
+  await page.keyboard.press(" ");
+  await playing(page);
+  await page.clock.fastForward("00:06");
+  await expect(banner(page)).toBeHidden();
+  await expect(chip).toHaveText("Hold OKBack to live");
+  // OK brings the banner up (the chip steps aside for its hint row); held, it's back to live.
+  await page.keyboard.press("Enter");
+  await expect(hint).toContainText("HoldOKBack to live");
+  await expect(chip).toBeHidden();
+  await page.keyboard.down("Enter");
+  await page.waitForTimeout(700);
+  await page.keyboard.up("Enter");
+  await page.clock.fastForward("00:06");
+  await expect(banner(page)).toBeHidden();
+  await expect(chip).toBeHidden();
+  await expect(page).toHaveURL(/\/$/);
 });
 
 test("a phone's commands over the relay change the channel and set the sleep timer", async ({ page, context }) => {

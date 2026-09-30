@@ -64,6 +64,7 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
           {hints.map((h, i) =>
             h.kind === "key" ? (
               <span key={i}>
+                {h.hold && "Hold"}
                 <Kbd size={size === "tv" ? "tv" : "app"}>{h.key}</Kbd>
                 {h.label}
               </span>

@@ -11,7 +11,8 @@ export interface InputAdapter {
   hints?(): Hint[];
 }
 
-export type Hint = { kind: "key"; key: string; label: string; end?: boolean } | { kind: "chip"; label: string; detail?: string };
+/** A key hint ("OK Guide"; `hold`: "Hold OK Back to live"), or a chip saying where the controls are. */
+export type Hint = { kind: "key"; key: string; label: string; end?: boolean; hold?: boolean } | { kind: "chip"; label: string; detail?: string };
 
 /** Combines inputs into one command stream. */
 export function startInputs(adapters: InputAdapter[], dispatch: Dispatch): () => void {

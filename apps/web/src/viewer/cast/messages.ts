@@ -62,7 +62,8 @@ export function parseState(data: unknown): ReceiverState | null {
     stationId: typeof s.stationId === "string" ? s.stationId : null,
     paused: s.paused === true,
     changedBy: typeof s.changedBy === "string" ? s.changedBy : null,
-    sleepEndsAt: typeof s.sleepEndsAt === "number" ? s.sleepEndsAt : null
+    sleepEndsAt: typeof s.sleepEndsAt === "number" ? s.sleepEndsAt : null,
+    ...(s.behindLive === true ? { behindLive: true } : {})
   };
 }
 

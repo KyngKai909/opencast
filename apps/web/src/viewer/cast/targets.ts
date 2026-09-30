@@ -86,7 +86,8 @@ export function uniqueTargets(targets: CastTarget[]): CastTarget[] {
   });
 }
 
-export type Choice = { kind: "tv"; target: CastTarget } | { kind: "phone" };
+/** `airplay`: Safari's own AirPlay list (the stream plays on the TV; not a target this app finds). */
+export type Choice = { kind: "tv"; target: CastTarget } | { kind: "phone" } | { kind: "airplay"; active: boolean };
 
 /**
  * The sheet's primary button. The frame's "Play on Living room TV" says the kind's verb instead
@@ -95,6 +96,7 @@ export type Choice = { kind: "tv"; target: CastTarget } | { kind: "phone" };
 export function primaryLabel(choice: Choice | null, current: CastTarget | null): string | null {
   if (!choice) return null;
   if (choice.kind === "phone") return "Watch on this phone";
+  if (choice.kind === "airplay") return choice.active ? "Stop AirPlay" : "AirPlay to a TV";
   if (current && current.id === choice.target.id) return "Open the remote";
   const row = TARGET_KINDS[choice.target.kind];
   if (choice.target.picker) return `${row.verb} to a TV`;

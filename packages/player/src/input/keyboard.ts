@@ -2,10 +2,12 @@
 // - "tv": a TV's remote (Android TV, Google TV, Fire TV, TV browsers). On the picture, ▲ ▼ change
 //   channel, ◀ opens presets, ▶ the guide, OK the banner (OK again the guide), numbers tune.
 //   In the guide and menus, the arrows move focus. OK and Back act when they're let go, so they
-//   can be held: hold OK is OK with `hold` (replace a full preset slot), hold Back opens the menu
-//   rail (a basic remote has no Menu key, and Home never reaches apps).
+//   can be held: hold OK is OK with `hold` (replace a full preset slot; on the picture, behind live,
+//   Back to live), hold Back opens the menu rail (a basic remote has no Menu key, and Home never
+//   reaches apps). ⏩ (MediaFastForward), next track and l go back to live on the picture.
 // - "web": the viewer app on a computer. Digits 1 to 6 tune presets from anywhere; arrows change
-//   channel on the tuned-in page (enable the adapter there); "/" belongs to search, not here.
+//   channel on the tuned-in page (enable the adapter there); l or End go back to live; "/" belongs
+//   to search, not here.
 // Keys typed into a text field are never taken.
 
 import type { Command } from "../types";
@@ -44,7 +46,7 @@ const TV_KEYS: Record<string, Command | "ok"> = {
   MediaLast: { type: "last" },
   Enter: "ok"
 };
-const TV_KEYCODES: Record<number, string> = { 427: "ChannelUp", 428: "ChannelDown", 33: "PageUp", 34: "PageDown", 457: "Info", 458: "Guide", 461: "GoBack", 10009: "GoBack" };
+const TV_KEYCODES: Record<number, string> = { 427: "ChannelUp", 428: "ChannelDown", 33: "PageUp", 34: "PageDown", 457: "Info", 458: "Guide", 461: "GoBack", 10009: "GoBack", 417: "MediaFastForward" };
 
 export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile: "tv" | "web", where: "picture" | "overlay" = "picture"): Command | null {
   const key = TV_KEYCODES[e.keyCode] && !TV_KEYS[e.key] ? TV_KEYCODES[e.keyCode] : e.key;
@@ -56,6 +58,7 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
     if (key === "PageDown" || key === "ChannelDown") return { type: "channel", dir: "down" };
     if (key === " " || key === "k" || key === "MediaPlayPause") return { type: "togglePlay" };
     if (key === "i") return { type: "info" };
+    if (key === "l" || key === "End") return { type: "backToLive" };
     return null;
   }
   // Numbers mean something in overlays too (presets 1 to 6, jumping in the guide): the app decides.
@@ -71,6 +74,9 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
   }
   // A computer's keyboard in TV mode: the space bar (or k) pauses and resumes, on the picture only.
   if ((key === " " || key === "k") && where === "picture") return { type: "togglePlay" };
+  // Back to live: ⏩ and next track on a remote (nothing to seek in a broadcast), l on a keyboard.
+  // Clear of ▲ ▼ ◀ ▶, OK and Back; holding OK does it too (the engine, while behind live).
+  if ((key === "MediaFastForward" || key === "MediaTrackNext" || key === "l") && where === "picture") return { type: "backToLive" };
   const mapped = TV_KEYS[key];
   if (mapped === "ok") return { type: "select" };
   if (mapped && where === "overlay" && mapped.type === "back") return mapped;
