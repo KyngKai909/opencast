@@ -388,8 +388,11 @@ export const LogChangesResult = z.object({
   warnings: z.array(
     z.object({
       index: z.number().int().nullable(),
-      /** `dead_air`: time left with nothing on the log. `held_spots`: a break with spots held in it goes, and they move to the next break. `held_spots_kept`: they couldn't move and are returned if they don't air. */
-      code: z.enum(["dead_air", "held_spots", "held_spots_kept"]),
+      /**
+       * `dead_air`: time left with nothing on the log. `held_spots`: a break with spots held in it goes, and they move to the next break. `held_spots_kept`: they couldn't move and are returned if they don't air.
+       * `reminders` (added 2026-09-29): viewers set reminders for an entry coming off; on publish each is moved to the program's next airing on the station within a week (and told), or cancelled (and told).
+       */
+      code: z.enum(["dead_air", "held_spots", "held_spots_kept", "reminders"]),
       message: z.string()
     })
   ),

@@ -4,6 +4,10 @@
 
 export interface Events {
   "reminder.due": { userId: string; reminderId: string; title: string; startsAt: string; switchMeOver: boolean };
+  /** Added 2026-09-29: the airing a reminder was for came off the log; the reminder moved to the program's next airing (`startsAt`). */
+  "reminder.moved": { userId: string; reminderId: string; stationId: string; title: string; startsAt: string };
+  /** Added 2026-09-29: the airing a reminder was for (`startsAt`) came off the log, and the program doesn't air again soon: the reminder is cancelled. */
+  "reminder.cancelled": { userId: string; reminderId: string; stationId: string; title: string; startsAt: string };
   "station.dead_air_warning": { stationId: string; gapStartsAt: string; minutesBefore: 30 | 12 };
   "station.dead_air_filled": { stationId: string; gapStartsAt: string; gapEndsAt: string };
   "station.signed_on": { stationId: string; first: boolean };

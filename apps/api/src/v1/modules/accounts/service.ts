@@ -62,6 +62,21 @@ export interface AccountsService {
   removeReminder(userId: string, reminderId: string): Promise<void>;
   dueReminders(withinMinutes: number): Promise<Array<ReminderRow & { userId: string }>>;
   markReminderNotified(reminderId: string): Promise<void>;
+  /**
+   * Added 2026-09-29 (log edits): the reminders on log entries, by entry (who set them). A log
+   * edit that takes an entry off warns with the count, and tells each of them.
+   */
+  remindersOnEntries(entryIds: string[], ex?: Executor): Promise<Map<string, Array<{ id: string; userId: string }>>>;
+  /**
+   * An entry comes off the log and the program airs again later: its reminders move to that
+   * airing, to be reminded again at its start. Someone who already has one there keeps that one
+   * (the moved one goes). Answers everyone whose reminder moved.
+   */
+  moveReminders(ex: Executor, fromEntryId: string, toEntryId: string): Promise<Array<{ id: string; userId: string }>>;
+  /** An entry comes off the log with nothing to move to: its reminders are cancelled. Answers them. */
+  cancelReminders(ex: Executor, entryIds: string[]): Promise<Array<{ id: string; userId: string; logEntryId: string }>>;
+  /** Entries moved (a new start): their reminders come again at the new start, even if one already went. */
+  rearmReminders(ex: Executor, entryIds: string[]): Promise<void>;
 
   /** Throws unless the user holds one of the roles (admins count as owner of stations Opencast runs). */
   requireStation(user: CurrentUser, stationId: string, roles: StationRole[]): Promise<StationRole>;
@@ -652,6 +667,49 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
 
     async markReminderNotified(reminderId) {
       await db.update(schema.reminders).set({ notifiedAt: deps.clock.now() }).where(eq(schema.reminders.id, reminderId));
+    },
+
+    async remindersOnEntries(entryIds, ex = db) {
+      const R = schema.reminders;
+      const out = new Map<string, Array<{ id: string; userId: string }>>();
+      if (!entryIds.length) return out;
+      const rows = await ex.select({ id: R.id, userId: R.userId, logEntryId: R.logEntryId }).from(R).where(inArray(R.logEntryId, [...new Set(entryIds)]));
+      for (const r of rows) {
+        const list = out.get(r.logEntryId!) ?? [];
+        list.push({ id: r.id, userId: r.userId });
+        out.set(r.logEntryId!, list);
+      }
+      return out;
+    },
+
+    async moveReminders(ex, fromEntryId, toEntryId) {
+      const R = schema.reminders;
+      const moving = await ex.select().from(R).where(eq(R.logEntryId, fromEntryId));
+      if (!moving.length) return [];
+      const there = await ex
+        .select({ userId: R.userId })
+        .from(R)
+        .where(and(eq(R.logEntryId, toEntryId), inArray(R.userId, [...new Set(moving.map((r) => r.userId))])));
+      const has = new Set(there.map((r) => r.userId));
+      const dupes = moving.filter((r) => has.has(r.userId)).map((r) => r.id);
+      if (dupes.length) await ex.delete(R).where(inArray(R.id, dupes));
+      const kept = moving.filter((r) => !has.has(r.userId)).map((r) => r.id);
+      // Reminded again at the new airing's start.
+      if (kept.length) await ex.update(R).set({ logEntryId: toEntryId, notifiedAt: null }).where(inArray(R.id, kept));
+      return moving.map((r) => ({ id: r.id, userId: r.userId }));
+    },
+
+    async cancelReminders(ex, entryIds) {
+      const R = schema.reminders;
+      if (!entryIds.length) return [];
+      const rows = await ex.delete(R).where(inArray(R.logEntryId, [...new Set(entryIds)])).returning({ id: R.id, userId: R.userId, logEntryId: R.logEntryId });
+      return rows.map((r) => ({ id: r.id, userId: r.userId, logEntryId: r.logEntryId! }));
+    },
+
+    async rearmReminders(ex, entryIds) {
+      const R = schema.reminders;
+      if (!entryIds.length) return;
+      await ex.update(R).set({ notifiedAt: null }).where(and(inArray(R.logEntryId, [...new Set(entryIds)]), sql`${R.notifiedAt} is not null`));
     },
 
     async stationRole(user, stationId) {

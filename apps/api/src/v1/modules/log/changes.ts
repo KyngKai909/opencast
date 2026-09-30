@@ -19,7 +19,7 @@ import { snapDate } from "../../lib/segments.js";
 import { STATION_ID_MS } from "../playout/engine/fill.js";
 import { partsOf } from "../playout/engine/cadence.js";
 import type { OffAirSpanView } from "./offair.js";
-import type { BreakSlotView } from "./service.js";
+import type { BreakSlotView, ReminderNews } from "./service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
 type Input = { kind: Row["kind"]; startsAt: string; endsAt?: string; itemId?: string; programId?: string; liveSourceId?: string; carriageAgreementId?: string; episodeTitle?: string; episodeDescription?: string; localNote?: string };
@@ -38,6 +38,14 @@ export interface ChangeHelpers {
   ensureBreaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
   breakContexts(breakIds: string[]): Promise<Map<string, string>>;
   markEdited(stationId: string, dates: Array<string | Date>): Promise<void>;
+  /** Who set reminders for each entry (by entry id). */
+  remindersOn(entryIds: string[]): Promise<Map<string, Array<{ id: string; userId: string }>>>;
+  /** Entries coming off the log, inside the transaction once what replaces them is on: their reminders move to the program's next airing, or are cancelled. */
+  settleReminders(ex: Executor, leaving: Row[]): Promise<ReminderNews[]>;
+  /** Moved entries: their reminders come again at the new start. */
+  rearmReminders(ex: Executor, entryIds: string[]): Promise<void>;
+  /** After the transaction: each viewer is told. */
+  tellReminders(news: ReminderNews[]): void;
 }
 
 export interface ChangeOps {
@@ -51,7 +59,7 @@ const LC = schema.logChanges;
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 /** Where entries wait inside the transaction while the batch shuffles them (so a swap never overlaps on the way). */
-const PARK = Date.UTC(1971, 0, 1);
+export const PARK = Date.UTC(1971, 0, 1);
 
 /**
  * A window's version: a hash of its entries (times, what airs, a live block ended early). The
@@ -224,6 +232,10 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         }
       }
 
+      // Carriage limits across the batch: each change is checked against the log as it is, so two
+      // airings of the same carried episode the batch adds are counted against each other here.
+      await batchCarriage();
+
       // The stretch the batch touches, before and after.
       const touched = [
         ...[...drafts.values()].flatMap((d) => [d.orig.startsAt, d.orig.endsAt, d.next.startsAt, d.next.endsAt]),
@@ -301,6 +313,14 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         }
       }
 
+      // Viewers who set reminders for an entry coming off: they're told (moved to the next airing, or cancelled).
+      const removing = [...drafts.values()].filter((d) => d.removed);
+      const reminded = removing.length ? await h.remindersOn(removing.map((d) => d.orig.id)) : new Map<string, Array<{ id: string; userId: string }>>();
+      for (const d of removing) {
+        const n = new Set((reminded.get(d.orig.id) ?? []).map((r) => r.userId)).size;
+        if (n) warnings.push({ index: d.index, code: "reminders", message: `${plural(n, "viewer")} set ${n === 1 ? "a reminder" : "reminders"} for this; they'll be told.` });
+      }
+
       // What each change says.
       const lines = changes.map((c, index) => {
         const a = about[index];
@@ -351,11 +371,12 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       const removed = [...drafts.values()].filter((d) => d.removed);
       const updated = live;
       const insertedIds = new Map<Insert, string>();
+      let news: ReminderNews[] = [];
       const recordRow = await db.transaction(async (tx) => {
         await h.releaseBreaks(tx, removed.map((d) => d.orig.id));
-        if (removed.length) await tx.delete(E).where(inArray(E.id, removed.map((d) => d.orig.id)));
-        // Out of the way first, so entries trading places never overlap on the way.
-        for (const [i, d] of updated.entries()) {
+        // Out of the way first, so entries trading places never overlap on the way. Entries coming
+        // off wait there too, until their reminders have gone to what the batch leaves on the log.
+        for (const [i, d] of [...updated, ...removed].entries()) {
           await tx.update(E).set({ startsAt: new Date(PARK + i * 2 * MIN), endsAt: new Date(PARK + i * 2 * MIN + MIN) }).where(eq(E.id, d.orig.id));
         }
         for (const d of updated) {
@@ -385,9 +406,16 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
             .returning({ id: E.id });
           insertedIds.set(ins, row.id);
         }
+        // Reminders: an entry that moved is reminded at its new start; one coming off moves to the
+        // program's next airing (one the batch puts on counts) or is cancelled. Then it goes.
+        await h.rearmReminders(tx, updated.filter((d) => d.next.startsAt.getTime() !== d.orig.startsAt.getTime()).map((d) => d.orig.id));
+        news = await h.settleReminders(tx, removed.map((d) => d.orig));
+        if (removed.length) await tx.delete(E).where(inArray(E.id, removed.map((d) => d.orig.id)));
         const [rec] = await tx.insert(LC).values({ stationId, userId, summary, lines, changes, createdAt: now }).returning();
         return rec;
       });
+
+      h.tellReminders(news);
 
       // Dates day templates made are exceptions now, as with a single edit.
       await h.markEdited(stationId, [
@@ -413,6 +441,38 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
 
       function itemLength(itemId: string | null) {
         return itemId ? (items.get(itemId)?.durationMs ?? null) : null;
+      }
+
+      /**
+       * Each carried episode the batch leaves on the log, counted with the batch's own: what's on
+       * the log now (less the entries the batch changes) plus, in the batch's order, each entry
+       * carrying it after the batch. One that puts it on past the agreement's airings per episode
+       * is a problem (an entry that already carried it only counts).
+       */
+      async function batchCarriage() {
+        const keyOf = (r: Row) => (r.carriageAgreementId && r.assetId ? `${r.carriageAgreementId}:${r.assetId}` : null);
+        const after = [
+          ...[...drafts.values()].filter((d) => !d.removed).map((d) => ({ index: d.index, key: keyOf(d.next), had: keyOf(d.next) === keyOf(d.orig) })),
+          ...inserts.map((i) => ({ index: i.index, key: keyOf(i.row), had: false }))
+        ].filter((x): x is { index: number; key: string; had: boolean } => x.key !== null);
+        const adding = after.filter((x) => !x.had);
+        if (!adding.length) return;
+        const agreements = await services.catalog.agreementsByIds([...new Set(adding.map((x) => x.key.split(":")[0]))]);
+        for (const key of new Set(adding.map((x) => x.key))) {
+          const [agreementId, itemId] = key.split(":");
+          const limit = agreements.get(agreementId)?.airingsPerEpisode;
+          if (!limit) continue;
+          const onLog = await db
+            .select({ id: E.id })
+            .from(E)
+            .where(and(eq(E.stationId, stationId), eq(E.carriageAgreementId, agreementId), eq(E.assetId, itemId)));
+          let count = onLog.filter((r) => !drafts.has(r.id)).length;
+          for (const x of after.filter((a) => a.key === key).sort((a, b) => a.index - b.index)) {
+            count++;
+            if (x.had || count <= limit || problems.some((p) => p.index === x.index)) continue;
+            problems.push({ index: x.index, code: "airing_limit", message: `The agreement allows ${limit} ${limit === 1 ? "airing" : "airings"} of each episode.` });
+          }
+        }
       }
     },
 

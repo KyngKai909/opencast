@@ -6,7 +6,7 @@ import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { EmailNotice } from "../../email.js";
 import type { Events } from "../../events.js";
-import { clockTime } from "../../lib/time.js";
+import { clockTime, localDate } from "../../lib/time.js";
 
 type Kind =
   | "reminder"
@@ -95,6 +95,16 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
 
 const DEFAULT_QUIET = { from: "22:00", to: "08:00" };
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/**
+ * When an airing is, for a viewer's notice: "Friday 9:00 pm" within the week, "October 9, 9:00 pm"
+ * further out (a weekday a week away would read as this week's).
+ */
+export function dayTime(at: Date, timezone: string, now: Date): string {
+  const days = Math.round((Date.parse(localDate(at, timezone)) - Date.parse(localDate(now, timezone))) / 86_400_000);
+  const day = new Intl.DateTimeFormat("en-US", days >= 0 && days < 7 ? { timeZone: timezone, weekday: "long" } : { timeZone: timezone, month: "long", day: "numeric" }).format(at);
+  return days >= 0 && days < 7 ? `${day} ${clockTime(at, timezone)}` : `${day}, ${clockTime(at, timezone)}`;
+}
 
 /** Whether a time falls in a quiet-hours window (which may run past midnight), in the time zone. */
 export function inQuietHours(at: Date, timezone: string, window: { from: string; to: string } = DEFAULT_QUIET): boolean {
@@ -313,7 +323,37 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       title: `${e.title} starts soon`,
       body: e.switchMeOver ? "We'll switch you over when it starts." : "Tune in when it starts.",
       scope: { kind: "viewer", id: null },
-      dedupeKey: `reminder:${e.reminderId}`
+      // Per start: a reminder whose airing moved (or that moved to another airing) comes again.
+      dedupeKey: `reminder:${e.reminderId}:${e.startsAt}`
+    });
+  });
+
+  // Added 2026-09-29: an airing someone set a reminder for came off the log.
+  const stationPage = async (stationId: string) => {
+    const handle = (await services.stations.idents([stationId])).get(stationId)?.handle;
+    return handle ? `/${handle}` : null;
+  };
+  deps.bus.on("reminder.moved", async (e) => {
+    const tz = await services.stations.timezoneOf(e.stationId);
+    await service.notify([e.userId], {
+      kind: "reminder",
+      title: `${e.title} moved to ${dayTime(new Date(e.startsAt), tz, deps.clock.now())} on ${await name(e.stationId)}`,
+      body: "Your reminder moved with it.",
+      link: await stationPage(e.stationId),
+      scope: { kind: "viewer", id: null },
+      dedupeKey: `reminder-moved:${e.reminderId}:${e.startsAt}`
+    });
+  });
+  deps.bus.on("reminder.cancelled", async (e) => {
+    const tz = await services.stations.timezoneOf(e.stationId);
+    const station = await name(e.stationId);
+    await service.notify([e.userId], {
+      kind: "reminder",
+      title: `${e.title} was taken off ${station}'s schedule`,
+      body: `It was on for ${dayTime(new Date(e.startsAt), tz, deps.clock.now())}. Your reminder is cancelled.`,
+      link: await stationPage(e.stationId),
+      scope: { kind: "viewer", id: null },
+      dedupeKey: `reminder-cancelled:${e.reminderId}`
     });
   });
 

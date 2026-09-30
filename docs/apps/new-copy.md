@@ -690,3 +690,14 @@ No frame draws it: the log page's own title bar, timeline and pane (A.4), with "
 | Publishing with a problem (422 `log_changes_refused`) | the first problem's words |
 | A stale draft (409 `log_changed`) | "The log changed since you started editing. Reload it to see what changed, then make your changes again." |
 | Warnings | "Dead air from {9:40 pm} to {10:00 pm} ({20 min})."; "{1} held spot in the break {after Late Crate} moves to the next break." ("{2} held spots … move …"); "{2} barter spots in the break {during Saturday Reel} move with it."; "{2} barter spots in the break … are returned if they don't air." (its program comes off); after publishing, if one found no room: "{1} held spot couldn't move to another break and is returned if it doesn't air." |
+
+### Reminders when an airing comes off the log (the catch-up report's follow-up, 2026-09-29)
+
+An airing a viewer set a reminder for comes off the log (a single remove, a batch remove, a carried slot placed over it, or its item pulled): the reminder moves to the same program's next airing on that station, no sooner than the one that went and within a week of it, or it's cancelled. Each viewer gets a notice (kind `reminder`: in the app, and push and email per their settings). A move or a new length keeps the entry, so its reminders follow it, at its new start.
+
+| When | Words |
+|---|---|
+| The notice, moved | title "{Late Crate} moved to {Friday 9:00 pm} on {BEAT 12.1}" ("{October 9}, {9:00 pm}" a week or more away); body "Your reminder moved with it." |
+| The notice, cancelled | title "{Late Crate} was taken off {BEAT 12.1}'s schedule"; body "It was on for {Friday 9:00 pm}. Your reminder is cancelled." |
+| Edit mode's warning (`applyLogChanges`, code `reminders`, dry run and published) | "{1} viewer set a reminder for this; they'll be told." / "{3} viewers set reminders for this; they'll be told." |
+| Edit mode's problem, a batch putting a carried episode on past its limit (code `airing_limit`) | the single edit's words: "The agreement allows {2} airings of each episode." |

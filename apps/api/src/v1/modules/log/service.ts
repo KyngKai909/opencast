@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -9,7 +9,7 @@ import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 import { cadenceContext, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
-import { createChangeOps, logVersion, type ChangeOps } from "./changes.js";
+import { createChangeOps, logVersion, PARK, type ChangeOps } from "./changes.js";
 
 export type { OffAirSpanView } from "./offair.js";
 
@@ -18,6 +18,22 @@ export const DEAD_AIR_NOTE = "Filled automatically: dead air";
 import type { ItemRef } from "../library/service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
+
+/**
+ * A viewer's reminder, settled when its airing came off the log (added 2026-09-29): moved to the
+ * program's next airing (`startsAt` is that one's), or cancelled (`startsAt` is the one that went).
+ */
+export interface ReminderNews {
+  event: "reminder.moved" | "reminder.cancelled";
+  userId: string;
+  reminderId: string;
+  stationId: string;
+  title: string;
+  startsAt: string;
+}
+
+/** Reminders on an airing that comes off move to the same program's next airing on the station, this far after it at most. */
+export const REMINDER_MOVE_MS = 7 * 24 * 60 * 60_000;
 
 export interface AiringRef {
   id: string;
@@ -205,6 +221,70 @@ export function createLogService(ctx: ModuleContext): LogService {
   async function changedNear(stationId: string, times: Date[]) {
     const now = deps.clock.now().getTime();
     if (times.some((t) => t.getTime() < now + 30 * 60_000)) await services.playout.replan(stationId);
+  }
+
+  /**
+   * Entries coming off the log (inside the transaction, before they go, once anything replacing
+   * them is on): viewers' reminders on them move to the same program's (or item's) next airing on
+   * the station, starting no sooner than the one that went and within a week of it; with none,
+   * they're cancelled. Reminders for an airing that already started just go. Answers who to tell
+   * (`tellReminders`, after the transaction). Before 2026-09-29 a reminder made removing its entry fail.
+   */
+  async function settleReminders(ex: Executor, leaving: Row[]): Promise<ReminderNews[]> {
+    if (!leaving.length) return [];
+    const on = await services.accounts.remindersOnEntries(leaving.map((r) => r.id), ex);
+    const reminded = leaving.filter((r) => on.has(r.id));
+    if (!reminded.length) return [];
+    const now = deps.clock.now();
+    const gone = leaving.map((r) => r.id);
+    const ctx = await context(reminded);
+    const news: ReminderNews[] = [];
+    const cancel: Row[] = [];
+    const stale: string[] = [];
+    for (const row of reminded) {
+      if (row.startsAt <= now) {
+        stale.push(row.id);
+        continue;
+      }
+      const programId = row.programId ?? (row.assetId ? ctx.items.get(row.assetId)?.programId : null) ?? null;
+      const same = [...(programId ? [eq(E.programId, programId)] : []), ...(row.assetId ? [eq(E.assetId, row.assetId)] : [])];
+      const [next] = same.length
+        ? await ex
+            .select({ id: E.id, startsAt: E.startsAt })
+            .from(E)
+            .where(
+              and(
+                eq(E.stationId, row.stationId),
+                gte(E.startsAt, row.startsAt),
+                lte(E.startsAt, new Date(row.startsAt.getTime() + REMINDER_MOVE_MS)),
+                notInArray(E.id, gone),
+                or(...same)
+              )
+            )
+            .orderBy(asc(E.startsAt))
+            .limit(1)
+        : [];
+      if (!next) {
+        cancel.push(row);
+        continue;
+      }
+      const title = titleOf(row, ctx);
+      for (const r of await services.accounts.moveReminders(ex, row.id, next.id)) {
+        news.push({ event: "reminder.moved", userId: r.userId, reminderId: r.id, stationId: row.stationId, title, startsAt: next.startsAt.toISOString() });
+      }
+    }
+    const byId = new Map(cancel.map((r) => [r.id, r]));
+    for (const r of await services.accounts.cancelReminders(ex, cancel.map((c) => c.id))) {
+      const row = byId.get(r.logEntryId)!;
+      news.push({ event: "reminder.cancelled", userId: r.userId, reminderId: r.id, stationId: row.stationId, title: titleOf(row, ctx), startsAt: row.startsAt.toISOString() });
+    }
+    await services.accounts.cancelReminders(ex, stale);
+    return news;
+  }
+
+  /** After the transaction: each viewer hears what happened to their reminder. */
+  function tellReminders(news: ReminderNews[]) {
+    for (const { event, ...payload } of news) deps.bus.emit(event, payload);
   }
 
   async function load(stationIds: string[], from: Date, to: Date) {
@@ -1004,11 +1084,14 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async pullItem(itemId) {
       const now = deps.clock.now();
+      let news: ReminderNews[] = [];
       const pulled = await db.transaction(async (tx) => {
-        const rows = await tx.select({ id: E.id }).from(E).where(and(eq(E.assetId, itemId), gt(E.startsAt, now)));
+        const rows = await tx.select().from(E).where(and(eq(E.assetId, itemId), gt(E.startsAt, now)));
         await releaseBreaks(tx, rows.map((r) => r.id));
+        news = await settleReminders(tx, rows);
         return rows.length ? tx.delete(E).where(inArray(E.id, rows.map((r) => r.id))).returning({ stationId: E.stationId }) : [];
       });
+      tellReminders(news);
       const counts = new Map<string, number>();
       for (const p of pulled) counts.set(p.stationId, (counts.get(p.stationId) ?? 0) + 1);
       return [...counts].map(([stationId, entries]) => ({ stationId, entries }));
@@ -1141,15 +1224,14 @@ export function createLogService(ctx: ModuleContext): LogService {
           blockedByLimit++;
           continue;
         }
+        let news: ReminderNews[] = [];
         await db.transaction(async (tx) => {
-          if (replaceExisting) {
-            const replacing = await tx.select({ id: E.id }).from(E).where(and(eq(E.stationId, carrierStationId), lt(E.startsAt, endsAt), gt(E.endsAt, start)));
-            await releaseBreaks(tx, replacing.map((r) => r.id));
-            const removed = await tx
-              .delete(E)
-              .where(and(eq(E.stationId, carrierStationId), lt(E.startsAt, endsAt), gt(E.endsAt, start)))
-              .returning({ id: E.id });
-            replaced += removed.length;
+          const replacing = replaceExisting ? await tx.select().from(E).where(and(eq(E.stationId, carrierStationId), lt(E.startsAt, endsAt), gt(E.endsAt, start))) : [];
+          await releaseBreaks(tx, replacing.map((r) => r.id));
+          // Out of the way while the carried slot goes on, so reminders on what it replaces can
+          // move to it (the same program placed again) before they go.
+          for (const [i, r] of replacing.entries()) {
+            await tx.update(E).set({ startsAt: new Date(PARK + i * 2 * MIN), endsAt: new Date(PARK + i * 2 * MIN + MIN) }).where(eq(E.id, r.id));
           }
           await tx.insert(E).values({
             stationId: carrierStationId,
@@ -1161,8 +1243,14 @@ export function createLogService(ctx: ModuleContext): LogService {
             programId,
             carriageAgreementId: agreementId
           });
+          news = await settleReminders(tx, replacing);
+          if (replacing.length) {
+            const removed = await tx.delete(E).where(inArray(E.id, replacing.map((r) => r.id))).returning({ id: E.id });
+            replaced += removed.length;
+          }
         }).then(
           () => {
+            tellReminders(news);
             placed++;
             index++;
           },
@@ -1257,21 +1345,29 @@ export function createLogService(ctx: ModuleContext): LogService {
         })
         .where(eq(E.id, entryId))
         .returning();
+      // Reminders follow the entry: at a new start, they come again then.
+      if (row.startsAt.getTime() !== current.startsAt.getTime()) await services.accounts.rearmReminders(db, [row.id]);
       await templates.markEdited(stationId, [current.templateDate ?? current.startsAt, row.startsAt]);
       await changedNear(stationId, [current.startsAt, row.startsAt]);
       return toEntry(row, await context([row]));
     },
 
     async remove(stationId, entryId) {
+      let news: ReminderNews[] = [];
       const removed = await db.transaction(async (tx) => {
-        const [mine] = await tx.select({ id: E.id }).from(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId)));
-        if (mine) await releaseBreaks(tx, [mine.id]);
+        const [mine] = await tx.select().from(E).where(and(eq(E.id, entryId), eq(E.stationId, stationId)));
+        if (mine) {
+          await releaseBreaks(tx, [mine.id]);
+          // Viewers' reminders move to the program's next airing, or are cancelled; they're told.
+          news = await settleReminders(tx, [mine]);
+        }
         return tx
           .delete(E)
           .where(and(eq(E.id, entryId), eq(E.stationId, stationId)))
           .returning({ startsAt: E.startsAt, templateDate: E.templateDate });
       });
       if (!removed.length) throw notFound("That log entry");
+      tellReminders(news);
       await templates.markEdited(stationId, [removed[0].templateDate ?? removed[0].startsAt]);
       await changedNear(stationId, [removed[0].startsAt]);
     },
@@ -1381,7 +1477,11 @@ export function createLogService(ctx: ModuleContext): LogService {
     gapsIn,
     ensureBreaks: (stationId, from, to) => service.ensureBreaks(stationId, from, to),
     breakContexts: (ids) => service.breakContexts(ids),
-    markEdited: (stationId, dates) => templates.markEdited(stationId, dates)
+    markEdited: (stationId, dates) => templates.markEdited(stationId, dates),
+    remindersOn: (entryIds) => services.accounts.remindersOnEntries(entryIds),
+    settleReminders,
+    rearmReminders: (ex, entryIds) => services.accounts.rearmReminders(ex, entryIds),
+    tellReminders
   });
   return service;
 }
