@@ -290,7 +290,7 @@ export const networkApi = {
   getBoard: endpoint({
     method: "GET",
     path: "/admin/markets/:marketSlug/board",
-    auth: "admin",
+    auth: "desk",
     summary: "Every channel's state in a market",
     params: z.object({ marketSlug: z.string() }),
     query: z.object({ band: Band.default("tv") }),
@@ -308,7 +308,7 @@ export const networkApi = {
   listCreators: endpoint({
     method: "GET",
     path: "/admin/creators",
-    auth: "admin",
+    auth: "desk",
     summary: "The creator pipeline, sorted by next action",
     query: z.object({ marketId: Id.optional(), stage: CreatorStage.optional() }),
     response: z.array(Creator)
@@ -316,7 +316,7 @@ export const networkApi = {
   addCreator: endpoint({
     method: "POST",
     path: "/admin/creators",
-    auth: "admin",
+    auth: "desk",
     summary: "Add a creator found in a market",
     body: z.object({
       marketId: Id,
@@ -337,7 +337,7 @@ export const networkApi = {
   updateCreator: endpoint({
     method: "PATCH",
     path: "/admin/creators/:creatorId",
-    auth: "admin",
+    auth: "desk",
     summary: "Change stage, proposed channel, next action",
     params: CreatorParams,
     body: z
@@ -356,11 +356,11 @@ export const networkApi = {
       .partial(),
     response: Creator
   }),
-  listWorks: endpoint({ method: "GET", path: "/admin/creators/:creatorId/works", auth: "admin", summary: "Works found on the creator's source", params: CreatorParams, response: z.array(CreatorWork) }),
+  listWorks: endpoint({ method: "GET", path: "/admin/creators/:creatorId/works", auth: "desk", summary: "Works found on the creator's source", params: CreatorParams, response: z.array(CreatorWork) }),
   addWorks: endpoint({
     method: "POST",
     path: "/admin/creators/:creatorId/works",
-    auth: "admin",
+    auth: "desk",
     summary: "Catalogue works from titles and lengths. Nothing is copied yet.",
     params: CreatorParams,
     body: z.array(
@@ -384,7 +384,7 @@ export const networkApi = {
   askPermission: endpoint({
     method: "POST",
     path: "/admin/creators/:creatorId/permission-requests",
-    auth: "admin",
+    auth: "desk",
     summary: "Send a permission request with a preview of the station's schedule built from titles",
     params: CreatorParams,
     body: z.object({
@@ -447,7 +447,7 @@ export const networkApi = {
   remindCreator: endpoint({
     method: "POST",
     path: "/admin/creators/:creatorId/reminders",
-    auth: "admin",
+    auth: "desk",
     summary:
       "N2: send the one reminder about the open permission request (to the contact email, with the same link). Next action becomes No answer, due in 7 days. 422 `not_asked` unless they're Asked; 422 `reminded` after the one reminder.",
     params: CreatorParams,
@@ -524,7 +524,7 @@ export const networkApi = {
         .optional()
     })
   }),
-  listListedSources: endpoint({ method: "GET", path: "/admin/listed-sources", auth: "admin", summary: "City and county streams", query: z.object({ marketId: Id.optional() }), response: z.array(ListedSource) }),
+  listListedSources: endpoint({ method: "GET", path: "/admin/listed-sources", auth: "desk", summary: "City and county streams", query: z.object({ marketId: Id.optional() }), response: z.array(ListedSource) }),
   addListedSource: endpoint({
     method: "POST",
     path: "/admin/listed-sources",

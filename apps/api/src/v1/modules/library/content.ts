@@ -20,7 +20,8 @@ const REF = schema.contentRefs;
 const PV = schema.contentPreviews;
 const NEED = schema.contentPreviewNeeds;
 
-export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background";
+/** Who points at a file. `catalog_item` and `catalog_evidence` (added 2026-09-29): the catalog shelf's items and the evidence behind their rights checks. */
+export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background" | "catalog_item" | "catalog_evidence";
 
 export interface ContentInfo {
   cid: string;
@@ -80,19 +81,20 @@ export function createContent({ deps, services }: ModuleContext) {
     },
 
     async addRef(tx: Executor, cid: string, owner: ContentOwner, ownerId: string) {
-      await tx.insert(REF).values({ cid, owner, ownerId }).onConflictDoNothing();
+      // `owner` is plain text in the table; the schema's list predates the catalog's owners.
+      await tx.insert(REF).values({ cid, owner: owner as (typeof REF.$inferInsert)["owner"], ownerId }).onConflictDoNothing();
     },
 
     /** Drops what an owner points at; files nothing else points at are deleted. */
     async release(owner: ContentOwner, ownerIds: string[]) {
       if (!ownerIds.length) return;
-      const refs = await db.delete(REF).where(and(eq(REF.owner, owner), inArray(REF.ownerId, ownerIds))).returning({ cid: REF.cid });
+      const refs = await db.delete(REF).where(and(eq(REF.owner, owner as (typeof REF.$inferInsert)["owner"]), inArray(REF.ownerId, ownerIds))).returning({ cid: REF.cid });
       await gc(refs.map((r) => r.cid));
     },
 
     /** Drops one reference (a caption track replaced by another); the file goes if nothing else points at it. */
     async releaseOne(cid: string, owner: ContentOwner, ownerId: string) {
-      await db.delete(REF).where(and(eq(REF.cid, cid), eq(REF.owner, owner), eq(REF.ownerId, ownerId)));
+      await db.delete(REF).where(and(eq(REF.cid, cid), eq(REF.owner, owner as (typeof REF.$inferInsert)["owner"]), eq(REF.ownerId, ownerId)));
       await gc([cid]);
     },
 

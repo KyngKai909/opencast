@@ -8,6 +8,8 @@
 //   sam@example.com       Sam T.: runs the studio Inland Sound Lab
 //   dee@opencast.example  Dee A.: on the Opencast team (Network desk)
 //   sam@opencast.example  Sam K.: on the Opencast team
+//   rae@opencast.example  Rae T.: a rights reviewer on the desk, not an admin (added 2026-09-29)
+//   lee@opencast.example  Lee R.: market lead for the High Desert, not an admin (added 2026-09-29)
 //
 // Anyone else signs in as someone new, with no station yet and not on the team. Station roles live
 // in master control's mock db (control/mocks/db.ts, members), so invites and ownership changes stick.
@@ -29,8 +31,11 @@ export const JEN: MockPerson = { id: uid(3), email: "jen@example.com", displayNa
 export const SAM: MockPerson = { id: uid(4), email: "sam@example.com", displayName: "Sam T.", initials: "ST", isAdmin: false };
 export const DEE: MockPerson = { id: uid(900), email: "dee@opencast.example", displayName: "Dee A.", initials: "DA", isAdmin: true };
 export const SAM_K: MockPerson = { id: uid(901), email: "sam@opencast.example", displayName: "Sam K.", initials: "SK", isAdmin: true };
+/** Desk roles besides admin live in the desk's settings mock (desk/mocks/settingsDb.ts). */
+export const RAE: MockPerson = { id: uid(902), email: "rae@opencast.example", displayName: "Rae T.", initials: "RT", isAdmin: false };
+export const LEE: MockPerson = { id: uid(903), email: "lee@opencast.example", displayName: "Lee R.", initials: "LR", isAdmin: false };
 
-export const PEOPLE: MockPerson[] = [KAI, MARCUS, JEN, SAM, DEE, SAM_K];
+export const PEOPLE: MockPerson[] = [KAI, MARCUS, JEN, SAM, DEE, SAM_K, RAE, LEE];
 
 /** The Opencast team (A6), for the desk's "Run by". */
 export function team(): MockPerson[] {

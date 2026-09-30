@@ -721,9 +721,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const held = await services.waitlist.heldChannels(marketId, band);
       const takenSet = new Set(taken.map((t) => t.tenths));
       const heldSet = new Set(held.map((h) => h.tenths));
+      // The market's numbering ranges (Network desk Settings, Markets; added 2026-09-29). By default
+      // the whole band, so nothing changes until a market's own ranges are set.
+      const range = await services.settings.numberingFor(marketId);
       const channels: Array<{ channel: string; state: "open" | "taken" | "held" }> = [];
       if (band === "tv") {
-        for (let major = 2; major <= 69; major++) {
+        for (let major = range.tv.firstMajor; major <= range.tv.lastMajor; major++) {
           // A major number is taken if anything in it is.
           const majorTaken = [...takenSet].some((t) => Math.floor(t / 10) === major);
           const majorHeld = [...heldSet].some((t) => Math.floor(t / 10) === major);
@@ -731,6 +734,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         }
       } else {
         for (const tenths of radioBandTenths()) {
+          if (tenths < range.radio.firstTenths || tenths > range.radio.lastTenths) continue;
           channels.push({ channel: formatChannelNumber({ band, tenths }), state: takenSet.has(tenths) ? "taken" : heldSet.has(tenths) ? "held" : "open" });
         }
       }
@@ -742,6 +746,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       if (!number) throw badRequest(input.band === "tv" ? "TV channels run from 2.1 to 69.9." : "Radio runs from 88.2 to 107.8, in even tenths.", { channel: "Out of range" });
       if (isSubchannel(number)) throw badRequest("A station gets X.1. Subchannels are for stations you carry around the clock.", { channel: "Use X.1" });
       if (!(await services.network.marketsByIds([input.marketId])).size) throw badRequest("That market doesn't exist.");
+      const range = await services.settings.numberingFor(input.marketId);
+      const outside =
+        input.band === "tv"
+          ? Math.floor(number.tenths / 10) < range.tv.firstMajor || Math.floor(number.tenths / 10) > range.tv.lastMajor
+          : number.tenths < range.radio.firstTenths || number.tenths > range.radio.lastTenths;
+      if (outside) {
+        const words = input.band === "tv" ? `TV channels here run from ${range.tv.firstMajor}.1 to ${range.tv.lastMajor}.9.` : `Radio here runs from ${(range.radio.firstTenths / 10).toFixed(1)} to ${(range.radio.lastTenths / 10).toFixed(1)}.`;
+        throw refused("outside_numbering", `${words} Choose a number in the market's range.`);
+      }
       const [station] = await db.select().from(S).where(eq(S.id, stationId));
       if (!station) throw notFound("That station");
       if (station.firstSignedOnAt) throw refused("fixed_after_sign_on", "The channel is fixed after first sign-on.");

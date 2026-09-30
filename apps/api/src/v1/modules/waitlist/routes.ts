@@ -11,7 +11,11 @@ export function waitlistRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     const callSign = params.callSign.toUpperCase();
     return { callSign, valid: isValidCallSign(callSign), available: await waitlist.isAvailable(callSign) };
   });
-  r.handle(api.listReservations, ({ query }) => waitlist.reservations(query.marketId));
+  // A market lead (added 2026-09-29) sees their own market's; the whole list is admins only.
+  r.handle(api.listReservations, async ({ user, query }) => {
+    await services.settings.requireDesk(user, query.marketId ? { market: query.marketId } : "admin");
+    return waitlist.reservations(query.marketId);
+  });
   r.handle(api.holdChannel, async ({ params, body }) => {
     await waitlist.holdChannel(params.reservationId, body);
     return { ok: true as const };

@@ -48,6 +48,8 @@ export interface CatalogService {
   /** Throws unless this airing is allowed under the agreement (dates, per-episode limit, window, live only). */
   checkAiring(input: { agreementId: string; carrierStationId: string; itemId: string; startsAt: Date; excludeEntryId?: string }): Promise<void>;
   carrierCount(programId: string): Promise<number>;
+  /** Added 2026-09-29 (the catalog's shelf): each program's carrying stations under an active agreement. */
+  carriersOf(programIds: string[]): Promise<Map<string, string[]>>;
   /**
    * A carried episode aired: under a cash deal the carrier pays the maker, once per log entry
    * (per airing, or per hour of the slot). Barter is settled with the spots in its breaks.
@@ -477,6 +479,11 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
 
     async carrierCount(programId) {
       return (await activeCarriers([programId])).get(programId)?.length ?? 0;
+    },
+
+    async carriersOf(programIds) {
+      const by = await activeCarriers(programIds);
+      return new Map([...by].map(([programId, rows]) => [programId, [...new Set(rows.map((r) => r.carrierStationId))]]));
     },
 
     async activeAgreements(stationId) {

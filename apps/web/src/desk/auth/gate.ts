@@ -1,5 +1,6 @@
-// Who gets the desk: signed in, and the API says you're on the Opencast team (Me.isAdmin). Every
-// desk endpoint is `auth: "admin"` as well, so the gate is for the words, not the only lock.
+// Who gets the desk: signed in, and the API says you're on the Opencast team: an admin (Me.isAdmin),
+// or since 2026-09-29 a rights reviewer or market lead (Me.deskRoles). Every desk endpoint is
+// `auth: "admin"` or `auth: "desk"` as well, so the gate is for the words, not the only lock.
 
 import type { Me } from "@opencast/contracts";
 
@@ -10,7 +11,7 @@ export interface GateInput {
   ready: boolean;
   signedIn: boolean;
   /** `accounts.getMe`: undefined while loading. */
-  me: Pick<Me, "isAdmin"> | undefined;
+  me: Pick<Me, "isAdmin" | "deskRoles"> | undefined;
   /** The HTTP status getMe failed with, if it did. */
   meError?: number | null;
 }
@@ -23,7 +24,7 @@ export function gateFor({ ready, signedIn, me, meError }: GateInput): Gate {
   if (meError === 403) return "not-admin";
   if (meError) return "error";
   if (!me) return "loading";
-  return me.isAdmin ? "desk" : "not-admin";
+  return me.isAdmin || (me.deskRoles?.length ?? 0) > 0 ? "desk" : "not-admin";
 }
 
 /** The two letters in the header's avatar: "Dee A." reads "DA". */

@@ -5,6 +5,7 @@ import { http, HttpResponse, type HttpHandler } from "msw";
 import { permissionLink } from "./permission";
 import { now } from "../../../lib/clock";
 import { advance, creatorById, getDb, newId, resetDb, saveDb, stationById, worksOf } from "../db";
+import { resetSettings } from "../settingsDb";
 import { bodyOf, fail, needsAdmin } from "../respond";
 
 export const MOCK_BASE = "*/v1/__mock/desk";
@@ -86,6 +87,7 @@ export const mockHandlers: HttpHandler[] = [
     const p = needsAdmin(request);
     if (p instanceof Response) return p;
     resetDb();
+    resetSettings();
     return HttpResponse.json({ ok: true });
   })
 ];

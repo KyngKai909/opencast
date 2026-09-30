@@ -497,22 +497,26 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async config(at = deps.clock.now()) {
-      const [row] = await db
-        .select()
-        .from(schema.revenueConfig)
-        .where(lte(schema.revenueConfig.effectiveFrom, at.toISOString().slice(0, 10)))
-        .orderBy(desc(schema.revenueConfig.effectiveFrom))
-        .limit(1);
+      // Read from the rules registry (Network desk Settings, added 2026-09-29), each value as it
+      // stood at `at`. Its first versions are ledger.revenue_config's rows (migration 0027), and a
+      // write to revenue_config still reaches it, so the shares read exactly as before.
+      const rules = services.settings;
+      const [opencast, pool, payoutSchedule, unclaimed] = await Promise.all([
+        rules.valueAt("shares.opencast", at),
+        rules.valueAt("shares.pool", at),
+        rules.valueAt("money.payout_schedule", at),
+        rules.valueAt("escrow.unclaimed_period", at)
+      ]);
       return {
-        opencastSpotShareBps: row?.opencastSpotShareBps ?? 0,
-        opencastPledgeShareBps: row?.opencastPledgeShareBps ?? 0,
-        opencastProductionShareBps: row?.opencastProductionShareBps ?? 0,
-        poolShareBps: row?.poolShareBps ?? 0,
-        poolBaseBps: row?.poolBaseBps ?? 0,
-        poolWatchTimeBps: row?.poolWatchTimeBps ?? 0,
-        poolFundBps: row?.poolFundBps ?? 0,
-        payoutSchedule: row?.payoutSchedule ?? "weekly",
-        unclaimedPeriodDays: row?.unclaimedPeriodDays ?? 1095
+        opencastSpotShareBps: opencast.spotBps,
+        opencastPledgeShareBps: opencast.pledgeBps,
+        opencastProductionShareBps: opencast.productionBps,
+        poolShareBps: pool.shareBps,
+        poolBaseBps: pool.baseBps,
+        poolWatchTimeBps: pool.watchTimeBps,
+        poolFundBps: pool.fundBps,
+        payoutSchedule,
+        unclaimedPeriodDays: unclaimed.days
       };
     },
 

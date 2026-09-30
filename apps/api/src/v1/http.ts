@@ -70,8 +70,8 @@ export interface HandlerContext<E extends EndpointDef> {
   params: Params<E>;
   query: Query<E>;
   body: Body<E>;
-  /** Set for `user` and `admin` endpoints; may be set for `optional`. */
-  user: E["auth"] extends "user" | "admin" ? CurrentUser : CurrentUser | null;
+  /** Set for `user`, `admin` and `desk` endpoints; may be set for `optional`. */
+  user: E["auth"] extends "user" | "admin" | "desk" ? CurrentUser : CurrentUser | null;
   /** Set for `device` endpoints; may be set elsewhere when a TV calls. */
   device: E["auth"] extends "device" ? DeviceCaller : DeviceCaller | null;
   /** A paired guest phone, when one calls with its phone token. */
@@ -201,7 +201,7 @@ export class RouteRegistrar {
     const callers: Callers = { user: null, device: null, phone: null };
     const token = tokenFrom({ authorization: req.headers.authorization, cookie: req.headers.cookie });
     if (!token) {
-      if (endpoint.auth === "user" || endpoint.auth === "admin" || endpoint.auth === "device") {
+      if (endpoint.auth === "user" || endpoint.auth === "admin" || endpoint.auth === "desk" || endpoint.auth === "device") {
         throw unauthorized(endpoint.auth === "device" ? "This is for the TV app." : undefined);
       }
       return callers;
@@ -226,6 +226,11 @@ export class RouteRegistrar {
     if (endpoint.auth === "admin" && !user.isAdmin) {
       throw forbidden();
     }
+    // Added 2026-09-29: anyone on the Opencast team (an admin, a rights reviewer, a market lead).
+    // What each role may do is checked by the handler (settings.requireDesk).
+    if (endpoint.auth === "desk" && !user.isAdmin && !(await this.services.settings.onTeam(user.id))) {
+      throw forbidden("Network desk is for the Opencast team.");
+    }
     return { ...callers, user };
   }
 
@@ -239,7 +244,7 @@ export class RouteRegistrar {
     if (found?.kind === "device") callers.device = { tvId: found.tvId, sessionId: null };
     if (found?.kind === "tv_session") {
       callers.device = { tvId: found.tvId, sessionId: found.sessionId };
-      if (endpoint.tvSession && endpoint.auth !== "admin") callers.user = found.user;
+      if (endpoint.tvSession && endpoint.auth !== "admin" && endpoint.auth !== "desk") callers.user = found.user;
     }
     if (found?.kind === "phone") callers.phone = { phoneId: found.phoneId, tvId: found.tvId };
 
@@ -253,6 +258,7 @@ export class RouteRegistrar {
         break;
       case "user":
       case "admin":
+      case "desk":
         if (callers.user) break;
         if (found?.kind === "tv_session") throw new HttpError(403, "tv_not_allowed", "A TV can't do that. Use your phone or computer.");
         if (!found) throw signedOut();

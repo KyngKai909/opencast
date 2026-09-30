@@ -34,6 +34,8 @@ export interface NetworkService extends DeskPart {
   listedPlayback(stationIds: string[]): Promise<Map<string, string>>;
   /** For a claimable station: who it's run for, and whether it's been claimed. */
   claimableInfo(stationId: string): Promise<{ runFor: string; claimed: boolean } | null>;
+  /** Added 2026-09-29: the market a creator is in (a market lead works only in theirs). */
+  creatorMarket(creatorId: string): Promise<string | null>;
 }
 
 export function toMarket(row: typeof schema.markets.$inferSelect): Market {
@@ -72,6 +74,11 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
       if (!unique.length) return new Map();
       const rows = await db.select().from(m).where(inArray(m.id, unique));
       return new Map(rows.map((r) => [r.id, toMarket(r)]));
+    },
+
+    async creatorMarket(creatorId) {
+      const [row] = await db.select({ marketId: schema.creators.marketId }).from(schema.creators).where(eq(schema.creators.id, creatorId));
+      return row?.marketId ?? null;
     },
 
     async marketBySlug(slug) {

@@ -9,3 +9,5 @@ export * from "./network.js";
 export * from "./audience.js";
 export * from "./notify.js";
 export * from "./tv.js";
+export * from "./settings.js";
+export * from "./shelf.js";

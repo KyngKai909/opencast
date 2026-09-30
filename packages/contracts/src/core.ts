@@ -8,12 +8,16 @@ import { z } from "zod";
  * - `admin`: an Opencast admin (Network desk).
  * - `device`: a TV app (added 2026-09-28): its `deviceToken` from `tv.registerTv`, or its TV
  *   session token once it's signed in, as `Authorization: Bearer`.
+ * - `desk` (added 2026-09-29): anyone on the Opencast team: an admin, a rights reviewer or a
+ *   market lead (`Me.deskRoles`). The API checks the role an action needs per request (403
+ *   `desk_role` otherwise): admins change rules, the team and signers; rights reviewers do the
+ *   catalog's checks; a market lead works in their own market only.
  *
  * A TV session token (from `tv.pollTvCode`) is accepted as `user` only by endpoints marked
  * `tvSession: true`, acting as the person who approved the TV; every other `user` or `admin`
  * endpoint answers it 403 `tv_not_allowed`.
  */
-export type Auth = "public" | "optional" | "user" | "admin" | "device";
+export type Auth = "public" | "optional" | "user" | "admin" | "device" | "desk";
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

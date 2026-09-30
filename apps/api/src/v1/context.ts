@@ -20,6 +20,8 @@ import type { NotificationsService } from "./modules/notifications/service.js";
 import type { WaitlistService } from "./modules/waitlist/service.js";
 import type { NetworkService } from "./modules/network/service.js";
 import type { TvService } from "./modules/tv/service.js";
+import type { SettingsService } from "./modules/settings/service.js";
+import type { ShelfService } from "./modules/shelf/service.js";
 import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
 import type { RelayBus } from "./relay.js";
@@ -111,6 +113,10 @@ export interface Services {
   waitlist: WaitlistService;
   network: NetworkService;
   tv: TvService;
+  /** Network desk Settings (added 2026-09-29): desk roles, the rules registry, signers, the change log. */
+  settings: SettingsService;
+  /** The catalog's shelf (added 2026-09-29): series, items and their rights checks, episodes. */
+  shelf: ShelfService;
 }
 
 export interface ModuleContext {

@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-268 endpoints in 14 modules.
+296 endpoints in 16 modules.
 
 ## accounts (35)
 
@@ -107,7 +107,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `putCaptionTrack` | PUT | `/library/:itemId/captions` | signed in | L7: upload or edit the caption track (owner, operator): WebVTT, or SRT (turned into WebVTT), up to 1 MB. The item's captions become `uploaded`. 422 `not_captions` when it isn't either. |
 | `removeCaptionTrack` | DELETE | `/library/:itemId/captions` | signed in | L7: remove the caption track (owner, operator); the item's captions go back to none |
 
-## log (19)
+## log (21)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -130,6 +130,8 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getLiveBlock` | GET | `/stations/:stationId/log/:entryId/live` | signed in | G3: a live block's state: ended early or not, and whether its signal is in (owner, operator, its host) |
 | `listListings` | GET | `/stations/:stationId/listings` | signed in | G5: every program and live airing in a window (at most 8 days) with its listing and status (owner, operator) |
 | `updateListing` | PATCH | `/stations/:stationId/listings/:entryId` | signed in | G5: an airing's episode title and description, or a carried program's local note (owner, operator). A carried program's title and description are the maker's: 409 `from_the_maker`. |
+| `applyLogChanges` | POST | `/stations/:stationId/log/changes` | signed in | Edit mode (owner, operator): check a batch of changes together (`dryRun`) or publish them all at once, in one transaction: moves, replacing an item, a new end, removals and inserts, with the same rules as `addEntry`, `updateEntry` and `removeEntry`. A problem refuses the whole batch (422 `log_changes_refused`, nothing applied); a dry run answers them instead. `base` is the window and version the draft began from: 409 `log_changed` if the log changed there since. On air, the entry airing now and anything starting within `LOG_EDIT_LEAD_MS` is locked. Publishing tells an on-air station to read its log again (once), marks template dates edited, moves spots held in a break that goes to the next break, and records the batch in the log's history. |
+| `listLogChanges` | GET | `/stations/:stationId/log/changes` | signed in | Edit mode: the log's published batches of changes, newest first, with who and when (owner, operator) |
 
 ## playout (6)
 
@@ -286,7 +288,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 |---|---|---|---|---|
 | `join` | POST | `/waitlist` | anyone | Join the waitlist. A station can ask for a call sign; it's held until the market opens. |
 | `checkCallSign` | GET | `/call-signs/:callSign` | anyone | Whether a call sign is free |
-| `listReservations` | GET | `/admin/reservations` | Opencast admin | Reserved call signs and the channels held for them |
+| `listReservations` | GET | `/admin/reservations` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Reserved call signs and the channels held for them |
 | `holdChannel` | POST | `/admin/reservations/:reservationId/channel` | Opencast admin | Hold a channel number for a reservation; no other station can take it |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
@@ -294,20 +296,20 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
-| `getBoard` | GET | `/admin/markets/:marketSlug/board` | Opencast admin | Every channel's state in a market |
+| `getBoard` | GET | `/admin/markets/:marketSlug/board` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Every channel's state in a market |
 | `createMarket` | POST | `/admin/markets` | Opencast admin | Add a market and the ZIPs in it |
-| `listCreators` | GET | `/admin/creators` | Opencast admin | The creator pipeline, sorted by next action |
-| `addCreator` | POST | `/admin/creators` | Opencast admin | Add a creator found in a market |
-| `updateCreator` | PATCH | `/admin/creators/:creatorId` | Opencast admin | Change stage, proposed channel, next action |
-| `listWorks` | GET | `/admin/creators/:creatorId/works` | Opencast admin | Works found on the creator's source |
-| `addWorks` | POST | `/admin/creators/:creatorId/works` | Opencast admin | Catalogue works from titles and lengths. Nothing is copied yet. |
+| `listCreators` | GET | `/admin/creators` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The creator pipeline, sorted by next action |
+| `addCreator` | POST | `/admin/creators` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Add a creator found in a market |
+| `updateCreator` | PATCH | `/admin/creators/:creatorId` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Change stage, proposed channel, next action |
+| `listWorks` | GET | `/admin/creators/:creatorId/works` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Works found on the creator's source |
+| `addWorks` | POST | `/admin/creators/:creatorId/works` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Catalogue works from titles and lengths. Nothing is copied yet. |
 | `recordLicence` | POST | `/admin/works/:workId/licence` | Opencast admin | Record a work's published licence. Only CC0, CC BY and CC BY-SA count. |
-| `askPermission` | POST | `/admin/creators/:creatorId/permission-requests` | Opencast admin | Send a permission request with a preview of the station's schedule built from titles |
+| `askPermission` | POST | `/admin/creators/:creatorId/permission-requests` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Send a permission request with a preview of the station's schedule built from titles |
 | `getPermissionPage` | GET | `/permission/:token` | anyone | The creator's permission page |
 | `answerPermission` | POST | `/permission/:token/answer` | anyone | Yes, go ahead / No thanks. Recorded against the link with the exact list of works; a copy is emailed. |
 | `stopFromLink` | POST | `/permission/:token/stop` | anyone | B8: stop from the permission link, any time after a yes. Nothing the yes covered airs again: a station set up from it signs off, and its held money goes to the creator by the stop path once they're verified (a stop handover the desk checks). 422 `nothing_to_stop` without a yes; stopping twice is the same page. |
 | `claimFromLink` | POST | `/permission/:token/claim` | signed in | B8: claim from the permission link, signed in, before or after the station exists. Before, the claim waits and joins the station when the desk sets it up. 422 `nothing_to_claim` without a yes, or after a stop; 422 `in_progress` while a claim is open. |
-| `remindCreator` | POST | `/admin/creators/:creatorId/reminders` | Opencast admin | N2: send the one reminder about the open permission request (to the contact email, with the same link). Next action becomes No answer, due in 7 days. 422 `not_asked` unless they're Asked; 422 `reminded` after the one reminder. |
+| `remindCreator` | POST | `/admin/creators/:creatorId/reminders` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | N2: send the one reminder about the open permission request (to the contact email, with the same link). Next action becomes No answer, due in 7 days. 422 `not_asked` unless they're Asked; 422 `reminded` after the one reminder. |
 | `sendClaimInvite` | POST | `/admin/creators/:creatorId/claim-invites` | Opencast admin | N3: tell a claimable station's creator it's theirs to claim: `invite` (the station is on air, claim when you like) or `link` (the claim link itself: their permission page's Claim). Held earnings then say Invited or Claim link sent. 422 `no_station` before the station is set up; 422 `no_contact` without a contact email. |
 | `listRecipes` | GET | `/admin/recipes` | Opencast admin | Station recipes |
 | `saveRecipe` | POST | `/admin/recipes` | Opencast admin | Add a recipe |
@@ -315,7 +317,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `heldEarnings` | GET | `/admin/held-earnings` | Opencast admin | Held earnings per claimable station |
 | `startHandover` | POST | `/stations/:stationId/claim` | signed in | Claim (or stop) a claimable station: connect the source account to prove it's you |
 | `approveHandover` | POST | `/admin/handovers/:handoverId/approve` | Opencast admin | Record the desk's check of the claimant. With the escrow contract live, the verifiers then approve on-chain (what they sign is in `onChain`) and the 72 hours start there |
-| `listListedSources` | GET | `/admin/listed-sources` | Opencast admin | City and county streams |
+| `listListedSources` | GET | `/admin/listed-sources` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | City and county streams |
 | `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a city stream on the dial. Viewers get the source's own player. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |
 | `getClaimPage` | GET | `/claim/:token` | anyone | N10: the creator's claim page, by the link we sent them (their permission link's token), and the claim's status once started. 404 when there's no station to claim from it. |
@@ -341,3 +343,39 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `pairPhone` | POST | `/tv/remote/pair` | anyone (personal if signed in) | Pair this phone with the TV showing the code. Wrong or run-out: 404 `code_not_found`; 10 wrong in 10 minutes: 429 `too_many_tries`. |
 | `phoneRemoteEvents` | GET | `/tv/remote/:tvId/events` | anyone (personal if signed in) (event stream) | A phone's stream for one TV (SSE): `state` and `ended`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |
 | `sendRemoteCommand` | POST | `/tv/remote/:tvId/commands` | anyone (personal if signed in) | Send a command to the TV, with the phone's name ("Kai's phone"). The TV isn't connected: 409 `tv_not_connected`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |
+
+## desk (13)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getTeam` | GET | `/admin/desk/team` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The Opencast team and their desk roles |
+| `addTeamMember` | POST | `/admin/desk/team` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Gives someone with an Opencast account desk roles, by their email (admins only) |
+| `setTeamRoles` | PUT | `/admin/desk/team/:userId` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Sets someone's desk roles; none takes them off the team (admins only) |
+| `listRules` | GET | `/admin/rules` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Every rule with its value (now, or at `at`) and the next change set |
+| `ruleValue` | GET | `/admin/rules/:key/value` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A rule's value at a moment |
+| `ruleVersions` | GET | `/admin/rules/:key/versions` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Every version of a rule, past and future, newest first |
+| `setRule` | POST | `/admin/rules/:key/versions` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A new value from a date, never before today (admins only). The old value stays in the change log |
+| `changeLog` | GET | `/admin/change-log` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Every change made in Settings, newest first |
+| `listNumbering` | GET | `/admin/numbering` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Each market's numbering ranges |
+| `getSigners` | GET | `/admin/escrow/signers` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The escrow's verifier keys (read-only), and changes proposed here |
+| `proposeSignerChange` | POST | `/admin/escrow/signer-proposals` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Proposes a change to the verifier keys; every other admin has to approve it (admins only) |
+| `decideSignerChange` | POST | `/admin/escrow/signer-proposals/:proposalId/decision` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Approves or refuses a proposed signer change (the other admins only) |
+| `withdrawSignerChange` | POST | `/admin/escrow/signer-proposals/:proposalId/withdraw` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Withdraws your own open proposal |
+
+## catalogShelf (13)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getShelf` | GET | `/admin/catalog/shelf` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The shelf: every series, its rights basis, episodes, carriers and state |
+| `createSeries` | POST | `/admin/catalog/series` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A new series, as a program on a catalog station (rights reviewers and admins) |
+| `getSeries` | GET | `/admin/catalog/series/:seriesId` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A series: its episodes and items, the offer and its carriers, and what was rebuilt |
+| `libraryChoices` | GET | `/admin/catalog/series/:seriesId/library` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Files in the catalog station's library that can become items (ready, not on the shelf yet) |
+| `addItem` | POST | `/admin/catalog/series/:seriesId/items` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Adds an item from the catalog station's library; its checklist starts from the public-domain rules (rights reviewers and admins) |
+| `getItem` | GET | `/admin/catalog/items/:itemId` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | An item's rights record: the checklist, evidence and both checks |
+| `setCheck` | PUT | `/admin/catalog/items/:itemId/checks/:line` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Answers one line of the checklist (rights reviewers and admins; not once it's sent) |
+| `addEvidence` | POST | `/admin/catalog/items/:itemId/checks/:line/evidence` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Attaches a file to a line of the checklist, stored by content ID (a PDF, image or text file up to 20 MB) |
+| `sendForSecondCheck` | POST | `/admin/catalog/items/:itemId/send` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The first check: every line answered with evidence, then sent for someone else to check. 422 `evidence_missing` |
+| `secondCheck` | POST | `/admin/catalog/items/:itemId/second-check` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The second check, by a different rights reviewer or admin (403 `same_person`): confirm it, send it back for more evidence, or fail it |
+| `failItem` | POST | `/admin/catalog/items/:itemId/fail` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Marks an item failed (a renewal found, a rights claim): it comes out of every episode, and those episodes are rebuilt |
+| `setEpisode` | PUT | `/admin/catalog/series/:seriesId/episodes/:number` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | An episode's items in order: double-checked items only (422 `not_passed`). Composed by the next rebuild |
+| `rebuildEpisodes` | POST | `/admin/catalog/series/:seriesId/rebuild` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Composes every episode whose items changed; the rest are left as they are |

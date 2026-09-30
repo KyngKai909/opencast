@@ -68,9 +68,12 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
   const A = schema.answers;
   const T = schema.takedowns;
 
+  // The repeat limit and the claim dates, from the rules registry (Network desk Settings, added
+  // 2026-09-29) as they stand now. Their first versions are trust.policy's row (migration 0027), and
+  // a write to trust.policy still reaches it.
   async function policy() {
-    const [row] = await db.select().from(schema.policy).where(eq(schema.policy.id, 1));
-    return { threshold: row?.upheldPerYearToPauseOffers ?? 3, answerDays: row?.answerDays ?? 14, replyDays: row?.claimantReplyBusinessDays ?? 10 };
+    const [limit, dates] = await Promise.all([services.settings.valueAt("rights.repeat_limit"), services.settings.valueAt("rights.claim_dates")]);
+    return { threshold: limit.upheldIn12Months, answerDays: dates.answerDays, replyDays: dates.counterNoticeBusinessDays };
   }
 
   async function views(rows: Array<typeof C.$inferSelect>): Promise<Claim[]> {

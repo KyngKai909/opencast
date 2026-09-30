@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { BusinessRole, Id, Market, Ok, StationIdent, StationRole, Timestamp } from "./common.js";
+import { DeskRoleGrant } from "./desk.js";
 import { Pledge } from "./ledger.js";
 import { Notice, NotificationPrefs } from "./notifications.js";
 import { Tv } from "./tv.js";
@@ -111,7 +112,13 @@ export const Me = z.object({
   memberships: z.array(Membership),
   settings: ViewerSettings,
   /** The linked Clear account (added 2026-09-28), or null. Absent from older servers. */
-  clear: ClearLink.nullable().optional()
+  clear: ClearLink.nullable().optional(),
+  /**
+   * Added 2026-09-29: the person's Network desk roles (admin, rights reviewer, market lead for a
+   * market). Empty for someone not on the Opencast team; `isAdmin` still says admin, as before.
+   * Absent from older servers.
+   */
+  deskRoles: z.array(DeskRoleGrant).optional()
 });
 export type Me = z.infer<typeof Me>;
 

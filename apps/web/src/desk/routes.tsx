@@ -1,13 +1,17 @@
-// Network desk's routes, under /desk (src/routes.tsx): every path here is relative to it. Admin
-// sign-in only: signed out, the sign-in page; signed in but not on the Opencast team, NotForYou;
-// otherwise the desk.
+// Network desk's routes, under /desk (src/routes.tsx): every path here is relative to it. The
+// Opencast team only (an admin, a rights reviewer or a market lead): signed out, the sign-in page;
+// signed in but not on the team, NotForYou; otherwise the desk.
 //
 //   /desk/markets/:marketSlug/board              01.1 the market board (?ch=33 selects a slot, ?ch=92.0 on radio)
 //   /desk/markets/:marketSlug/pipeline           02.1 the creator pipeline (?stage=said_yes filters, ?add=1 opens Add a creator)
 //   /desk/markets/:marketSlug/pipeline/:id/ask   03.1 asking permission
 //   /desk/markets/:marketSlug/pipeline/:id/setup 04.1 setting up a claimable station
 //   /desk/markets/:marketSlug/listed             05.1 listed sources and the catalog station (?add=1 opens List a source)
+//   /desk/markets/:marketSlug/catalog            desk-catalog 01 the shelf (?add=1 Add an item, ?series=1 New series)
+//   /desk/markets/:marketSlug/catalog/series/:id desk-catalog 02 a series and its items (?ep=14 picks the episode)
+//   /desk/markets/:marketSlug/catalog/items/:id  desk-catalog 03 an item's rights check
 //   /desk/held-earnings                          07.1 held earnings
+//   /desk/settings/:section                      desk-pages 04 Settings: team, rules, markets, signers, log, you
 // The creator's permission page (06.1, 06.2) is the viewer area's /permission/:token.
 
 import { Navigate, Route, Routes } from "react-router";
@@ -21,6 +25,9 @@ import { rememberedMarket } from "./layout/market";
 import { NotFound, Quiet, Unbuilt } from "./pages/common";
 import Ask from "./pages/Ask";
 import Board from "./pages/Board";
+import Catalog from "./pages/Catalog";
+import CatalogItem from "./pages/CatalogItem";
+import CatalogSeries from "./pages/CatalogSeries";
 import Held from "./pages/Held";
 import Listed from "./pages/Listed";
 import NotForYou from "./pages/NotForYou";
@@ -50,13 +57,16 @@ export function AppRoutes() {
           <Route path="pipeline/:creatorId/ask" element={<Ask />} />
           <Route path="pipeline/:creatorId/setup" element={<Setup />} />
           <Route path="listed" element={<Listed />} />
-          <Route path="catalog" element={<Unbuilt title="Catalog" about="Opencast's own programs: the public-domain catalog every station can carry." />} />
+          <Route path="catalog" element={<Catalog />} />
+          <Route path="catalog/series/:seriesId" element={<CatalogSeries />} />
+          <Route path="catalog/items/:itemId" element={<CatalogItem />} />
         </Route>
         <Route path="held-earnings" element={<Held />} />
         <Route path="reserved-call-signs" element={<Reserved />} />
         <Route path="rights-claims" element={<Unbuilt title="Rights claims" about="Claims against programs on any station, and the answers." />} />
         <Route path="catalog-sponsors" element={<Unbuilt title="Catalog sponsors" about="Businesses that sponsor the catalog station's programs." />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="settings" element={<Navigate to="rules" replace />} />
+        <Route path="settings/:section" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

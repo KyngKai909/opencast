@@ -38,7 +38,7 @@ export const waitlistApi = {
   listReservations: endpoint({
     method: "GET",
     path: "/admin/reservations",
-    auth: "admin",
+    auth: "desk",
     summary: "Reserved call signs and the channels held for them",
     query: z.object({ marketId: Id.optional() }),
     response: z.array(

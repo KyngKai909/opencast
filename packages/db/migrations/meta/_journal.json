@@ -183,6 +183,13 @@
       "when": 1790736823158,
       "tag": "0026_log_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790737367780,
+      "tag": "0027_desk_settings_and_catalog",
+      "breakpoints": true
     }
   ]
 }

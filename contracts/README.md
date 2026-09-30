@@ -46,6 +46,19 @@ The admin role can do these things, and nothing else:
 
 Neither contract has an admin function that moves money. The platform prompt asked for the escrow not to be upgradeable at all. It's upgradeable at the owner's request, to match the other contracts; the timelock is what keeps an upgrade from quietly adding a way out.
 
+## Changing a verifier key (Network desk, Settings, Escrow signers)
+
+Added 2026-09-29. Keys change on-chain only through the timelock (above). Before anyone schedules that, the change is agreed in Network desk:
+
+1. **Propose.** An admin proposes it in Settings, Escrow signers: add a key, remove one, replace one, or change how many approve a claim. The page lists the keys as deployed, read from the contract (`keys()`, `threshold()`), or from `ESCROW_VERIFIERS` and `ESCROW_THRESHOLD` when the API has no chain configured. It never writes to the chain.
+2. **Approve.** Every other admin at the time of the proposal has to approve it; any one of them can refuse it, and the proposer can't approve their own (the database refuses it too). One proposal is open at a time. Every step is in the change log.
+3. **Record.** Once approved, the new set and threshold are recorded as the `escrow.signers` rule, with who approved it and when (Settings, Change log). The page shows it as "Approved, waiting for the timelock" until the contract's own keys match.
+4. **Schedule.** The admin Safe schedules `CreatorEscrow.setVerifiers(signersAfter, thresholdAfter)` on the `TimelockController`, exactly as approved, and links the proposal in the Safe transaction's description.
+5. **Wait.** The delay is 7 days. Any verifier or steward can cancel it in that time. Note that changing the keys voids claims in progress.
+6. **Execute.** The Safe executes it after the delay. Settings then reads the new keys from the contract.
+
+A change that didn't go through steps 1 to 3 shouldn't be scheduled: anyone watching the timelock can compare it with the change log.
+
 ## CreatorEscrow: how money gets out
 
 Each station is keyed by its `escrow_id`: a number in `broadcast.stations`, not its channel, which can be released. USDC comes in through `deposit` or the weekly `depositBatch`, pulled from Opencast's settlement wallet. It leaves three ways:

@@ -30,6 +30,8 @@ export interface EscrowChain {
   /** What each verifier signs to approve a claim (for the Network desk to show). */
   approveCalldata(escrowId: number, payee: Address, kind: ClaimKind): Hex;
   balanceOf(escrowId: number): Promise<number>;
+  /** Added 2026-09-29 (desk Settings, Escrow signers): the verifier keys and how many approve a claim, read from the contract. */
+  signers?(): Promise<{ signers: string[]; threshold: number }>;
 }
 
 const REASONS = ["claim", "stop", "unclaimed"] as const;
@@ -132,6 +134,14 @@ export function escrowChain(config: { rpcUrl: string; escrow: Address; fund: Add
 
     async balanceOf(escrowId) {
       return Number(await pub.readContract({ address: config.escrow, abi: creatorEscrowAbi, functionName: "balanceOf", args: [BigInt(escrowId)] }));
+    },
+
+    async signers() {
+      const [keys, threshold] = await Promise.all([
+        pub.readContract({ address: config.escrow, abi: creatorEscrowAbi, functionName: "keys", args: [] }) as Promise<readonly Address[]>,
+        pub.readContract({ address: config.escrow, abi: creatorEscrowAbi, functionName: "threshold", args: [] }) as Promise<bigint>
+      ]);
+      return { signers: [...keys], threshold: Number(threshold) };
     }
   };
 }

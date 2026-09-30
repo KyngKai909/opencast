@@ -198,3 +198,89 @@ test("External sources: the rail, the page and the board's key (network-desk 01.
   await expect(page.getByText("Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.")).toBeVisible();
   await expect(page.getByRole("table", { name: "External sources" })).toContainText("Not on the dial");
 });
+
+// desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
+// the catalog station's library, its checklist answered with evidence and sent by Dee, and the
+// second check done by Rae, a rights reviewer: never the first checker.
+test("the catalog: the shelf, and adding an item checked by two people", async ({ page }) => {
+  const signIn = async (email: string) => {
+    await page.evaluate((e) => localStorage.setItem("oc-mock-signed-in", e), email);
+  };
+  await page.goto("/desk");
+  await signIn("dee@opencast.example");
+  await useGround(page, "dark");
+  await page.goto(`${IE}/catalog`);
+  await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
+  await expect(page.getByText("Opencast's own programs, offered free to every station. Made possible by Clear.")).toBeVisible();
+  await expect(page.getByText("Items with a confirmed rights record")).toBeVisible();
+  const shelf = page.getByRole("grid", { name: "Catalog series" });
+  await expect(shelf.getByRole("row", { name: /Nights at the observatory/ })).toContainText("US government work");
+  await expect(shelf.getByRole("row", { name: /The mystery hour/ })).toContainText("44 of 60");
+  await expect(shelf.getByRole("row", { name: /The mystery hour/ })).toContainText("7 in review");
+  await expect(shelf.getByRole("row", { name: /Licensed catalogs/ })).toContainText("Coming");
+
+  // Add an item: from the library, with its source and year. The rules pre-fill the checklist.
+  await page.getByRole("button", { name: "Add an item" }).click();
+  const add = page.getByRole("dialog", { name: "Add an item" });
+  await add.getByLabel("Series").selectOption({ label: "Cartoons, 1928 to 1936" });
+  await add.getByLabel("File").selectOption({ label: "Ferry Boat Follies, 6:45" });
+  await add.getByLabel("Source").fill("1933, original 35 mm print, Library of Congress");
+  await add.getByLabel("Published").fill("1933");
+  await add.getByRole("button", { name: "Start the rights check" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ferry Boat Follies" })).toBeVisible();
+  await expect(page.getByText("Why it's free to air")).toBeVisible();
+  await expect(page.getByText("Renewal would have been due in 1960 or 1961. Search the Copyright Office renewal records for the title and studio")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send for second check" })).toBeDisabled();
+
+  // Every line answered, with evidence: a file for the source, written records for the rest.
+  const lines = ["Source is an original, not a restoration", "Published 1933, with a copyright notice", "Copyright not renewed", "Soundtrack", "Characters and trademarks"];
+  for (const title of lines) {
+    await page.getByRole("button", { name: `Answer: ${title}` }).click();
+    const answer = page.getByRole("group", { name: `Answer: ${title}` });
+    await answer.getByRole("radio", { name: title === "Characters and trademarks" ? "Yes, with a caution" : "Yes", exact: true }).click();
+    if (title === lines[0]) {
+      await answer.getByLabel(`Evidence for ${title}`).setInputFiles({ name: "loc-record.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 Library of Congress record") });
+      await expect(answer.getByText("loc-record.pdf")).toBeVisible();
+    } else {
+      await answer.getByLabel(/The record/).fill(title === "Characters and trademarks" ? "noted" : "Copyright Office renewal records searched: none found");
+    }
+    await answer.getByRole("button", { name: "Save" }).click();
+    await expect(answer).toBeHidden();
+  }
+  await page.getByRole("button", { name: "Send for second check" }).click();
+  await expect(page.getByText("Waiting for a rights reviewer or admin other than Dee A.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Confirm: it's free to air" })).toHaveCount(0);
+
+  // Rae, a rights reviewer, does the second check.
+  const item = page.url();
+  await signIn("rae@opencast.example");
+  await page.goto(item);
+  await page.getByRole("button", { name: "Confirm: it's free to air" }).click();
+  await expect(page.getByText(/^Rae T\. reviewed the evidence and confirmed/)).toBeVisible();
+  await expect(page.getByText("1933. Not renewed")).toBeVisible();
+  await page.getByRole("link", { name: "Catalog / Cartoons, 1928 to 1936" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Cartoons, 1928 to 1936" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Items" }).getByRole("row", { name: /Ferry Boat Follies/ })).toContainText("Checked twice");
+});
+
+// desk-pages 04 (item 11): a rule set from a date, and the change log.
+test("Settings: a rule changed from a date, in the change log", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await useGround(page, "light");
+  await page.goto("/desk/settings");
+  await expect(page).toHaveURL(/\/desk\/settings\/rules$/);
+  await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Pay-as-you-go" }).getByText("Not set yet")).toHaveCount(3);
+  await expect(page.getByText("10 GB, 5 live hours")).toBeVisible();
+  await page.getByRole("button", { name: "Edit: Repeat limit" }).click();
+  const dialog = page.getByRole("dialog", { name: "Repeat limit" });
+  await dialog.getByLabel("Upheld claims in 12 months").fill("2");
+  await dialog.getByLabel("Takes effect").fill("2026-10-01");
+  await dialog.getByLabel("Note").fill("After the September review");
+  await dialog.getByRole("button", { name: "Set it" }).click();
+  await expect(page.getByText("2 from October 1")).toBeVisible();
+  await page.getByRole("link", { name: "Change log" }).click();
+  const log = page.getByRole("table", { name: "Change log" });
+  await expect(log.getByRole("row", { name: /Repeat limit: 3 to 2/ })).toContainText("After the September review");
+  await expect(log.getByRole("row", { name: /Repeat limit: 3 to 2/ })).toContainText("Dee A.");
+});

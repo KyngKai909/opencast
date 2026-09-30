@@ -121,6 +121,12 @@ export interface AccountsService {
   deleteAccount(userId: string): Promise<void>;
   /** A6: the Opencast team (admins). */
   opencastTeam(): Promise<OpencastTeamMember[]>;
+  /** Added 2026-09-29 (desk Settings): people by id, with the name to show and their account email. */
+  peopleByIds(userIds: string[]): Promise<Map<string, { name: string; email: string | null; isAdmin: boolean; adminByEmail: boolean }>>;
+  /** The account with this email (its own, or a verified linked email, Google or Apple address), if one exists. */
+  userIdByEmail(email: string): Promise<string | null>;
+  /** Makes someone an Opencast admin, or not (desk Settings, Team). OPENCAST_ADMIN_EMAILS still makes admins at sign-in. */
+  setAdmin(userId: string, isAdmin: boolean): Promise<void>;
   /** O2: the person's notification timing, and the time zone it's read in (their market's). */
   notificationTiming(userId: string): Promise<{ timing: NotificationTiming; timezone: string }>;
 
@@ -199,8 +205,9 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
   // with one of them (email, Google or Apple) is made an admin. It only ever adds admins; taking one
   // away is still `is_admin = false` by hand. Each user is looked at once per process.
   const lookedAtForAdmin = new Set<string>();
+  const adminEmails = () => new Set((process.env.OPENCAST_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
   async function promoteByEmail<T extends { id: string; isAdmin: boolean }>(user: T): Promise<T> {
-    const emails = new Set((process.env.OPENCAST_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+    const emails = adminEmails();
     if (user.isAdmin || !emails.size || lookedAtForAdmin.has(user.id)) return user;
     lookedAtForAdmin.add(user.id);
     const I = schema.identities;
@@ -425,7 +432,9 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           })
         ],
         settings: (user.settings ?? {}) as Me["settings"],
-        clear: clear ? { address: clear.address, access: clear.access, linkedAt: clear.linkedAt } : null
+        clear: clear ? { address: clear.address, access: clear.access, linkedAt: clear.linkedAt } : null,
+        // Added 2026-09-29: Network desk roles (admin, rights reviewer, market lead).
+        deskRoles: await services.settings.rolesOf({ id: user.id, isAdmin: user.isAdmin })
       };
     },
 
@@ -502,6 +511,49 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         await service.clearWatchHistory(userId);
       }
       return service.me(userId);
+    },
+
+    async peopleByIds(userIds) {
+      const ids = [...new Set(userIds)];
+      if (!ids.length) return new Map();
+      const rows = await db.select({ id: u.id, displayName: u.displayName, email: u.email, isAdmin: u.isAdmin }).from(u).where(inArray(u.id, ids));
+      const listed = adminEmails();
+      const linked = listed.size
+        ? await db
+            .select({ userId: schema.identities.userId, value: schema.identities.value })
+            .from(schema.identities)
+            .where(and(inArray(schema.identities.userId, ids), inArray(schema.identities.kind, ["email", "google", "apple"])))
+        : [];
+      return new Map(
+        rows.map((r) => [
+          r.id,
+          {
+            name: r.displayName ?? r.email ?? "Someone on the team",
+            email: r.email,
+            isAdmin: r.isAdmin,
+            adminByEmail: listed.size > 0 && [r.email, ...linked.filter((l) => l.userId === r.id).map((l) => l.value)].some((e) => !!e && listed.has(e.toLowerCase()))
+          }
+        ])
+      );
+    },
+
+    async userIdByEmail(email) {
+      const e = email.trim().toLowerCase();
+      const [own] = await db
+        .select({ id: u.id })
+        .from(u)
+        .where(and(sql`lower(${u.email}) = ${e}`, isNull(u.deletedAt)));
+      if (own) return own.id;
+      const [linked] = await db
+        .select({ id: schema.identities.userId })
+        .from(schema.identities)
+        .innerJoin(u, eq(u.id, schema.identities.userId))
+        .where(and(sql`lower(${schema.identities.value}) = ${e}`, inArray(schema.identities.kind, ["email", "google", "apple"]), isNull(u.deletedAt)));
+      return linked?.id ?? null;
+    },
+
+    async setAdmin(userId, isAdmin) {
+      await db.update(u).set({ isAdmin }).where(eq(u.id, userId));
     },
 
     async displayNames(userIds) {

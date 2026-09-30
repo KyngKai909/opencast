@@ -190,6 +190,7 @@ export async function createHarness(
     },
     async close() {
       // Background work (storing uploads, imports) finishes before the database goes.
+      await services.shelf.settle();
       await services.library.settle();
       await deps.bus.settle();
       await deps.relay.close();

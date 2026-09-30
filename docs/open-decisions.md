@@ -6,12 +6,12 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 
 | Decision | Where it lives | Default |
 |---|---|---|
-| Opencast's share of spot revenue | `ledger.revenue_config.opencast_spot_share_bps` | 0 ("Not set yet") |
-| Opencast's share of pledges | `revenue_config.opencast_pledge_share_bps` | 0 |
-| Whether Opencast's share applies to production orders | `revenue_config.opencast_production_share_bps` | 0 |
-| The pool: its share, and the split between base, watch time and fund | `revenue_config.pool_*_bps` | 0 |
-| Payout schedule | `revenue_config.payout_schedule` | weekly |
-| Unclaimed period before escrow goes to the creator fund | `revenue_config.unclaimed_period_days` | 1095 (3 years) |
+| Opencast's share of spot revenue | the rules registry, `shares.opencast.spotBps` (Network desk, Settings, Rules; since 2026-09-29, was `ledger.revenue_config.opencast_spot_share_bps`, which still reaches it) | 0 ("Not set yet") |
+| Opencast's share of pledges | `shares.opencast.pledgeBps` (was `revenue_config.opencast_pledge_share_bps`) | 0 |
+| Whether Opencast's share applies to production orders | `shares.opencast.productionBps` (was `revenue_config.opencast_production_share_bps`) | 0 |
+| The pool: its share, and the split between base, watch time and fund | `shares.pool` (was `revenue_config.pool_*_bps`) | 0 |
+| Payout schedule | `money.payout_schedule` (was `revenue_config.payout_schedule`) | weekly |
+| Unclaimed period before escrow goes to the creator fund | `escrow.unclaimed_period` (was `revenue_config.unclaimed_period_days`); the contract's own period is fixed at deployment | 1095 (3 years) |
 | Which chain the escrow contract is on, and whether it belongs to Opencast or to the Clear protocol beside its encumbrance | Phase 6 | the chain Clear uses by default |
 | Which entity holds advertisers' prepaid money, and what that requires legally | lawyer, before launch | none |
 | Final ownership terms for production orders | spots, Phase 4 | the business owns the spot; the maker may show it in samples |
@@ -62,11 +62,33 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 
 | Decision | Where it lives | Default |
 |---|---|---|
-| Repeat-infringer threshold (3 upheld in a year pauses carriage offers) | `trust.policy.upheld_per_year_to_pause_offers` | 3 (a placeholder) |
-| Days to answer a claim | `trust.policy.answer_days` | 14 |
-| Claimant's time to reply after an answer | `trust.policy.claimant_reply_business_days` | 10 |
+| Repeat-infringer threshold (3 upheld in a year pauses carriage offers) | the rules registry, `rights.repeat_limit` (since 2026-09-29; `trust.policy` still reaches it) | 3 (a placeholder) |
+| Days to answer a claim | `rights.claim_dates.answerDays` (was `trust.policy.answer_days`). The desk-pages frame shows 5 days: the code keeps 14 until someone sets it | 14 |
+| Claimant's time to reply after an answer | `rights.claim_dates.counterNoticeBusinessDays` (was `trust.policy.claimant_reply_business_days`) | 10 |
 | Takedown and counter-notice wording and deadlines | lawyer | none |
 | The claimable-station permission page wording | lawyer | none |
+
+## Network desk: Settings and the catalog (added 2026-09-29, follow-up Phase 0 items 10 and 11)
+
+Every Open rule is set in Network desk, Settings, Rules, from a date, with the old value kept in the change log (the rules registry, `network.rules`, read by the API's `settings.valueAt(key, at)`). Nothing is retroactive: a new version starts today or later. Migration 0027 started the registry with the values in effect before it, so nothing reads differently. Its definitions are `packages/contracts/src/rules.ts`.
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| Public domain in the US: works published this many years ago or more (the cut-off year moves every January 1) | `rights.public_domain_us.termYears` | 95 (in 2026, published in 1930 or earlier) |
+| Works published after the cut-off and up to this year are public domain only if not renewed (a renewal search) | `rights.public_domain_us.renewalRequiredThrough` | 1963 |
+| Works published up to this year are public domain if published without a notice | `rights.public_domain_us.noticeRequiredThrough` | 1977 |
+| Sound recordings (the Music Modernization Act's terms for recordings from before February 15, 1972) | `rights.sound_recordings_us` | before 1923 free; 1923 to 1946, 100 years; 1947 to 1956, 110 years; 1957 to 1972, until February 15, 2067 (in 2026, published in 1925 or earlier) |
+| Outside the US | the rules are US rules only | anything published elsewhere is checked by hand: the checklist can't be sent until the rules say it's public domain |
+| The checklist and the renewal-search method | lawyer, once, before the catalog launches (desk-catalog 03's note) | the five lines drawn: the source, publication and notice, renewal, soundtrack, characters and trademarks |
+| What counts as evidence | `shelf.send` | a file (PDF, picture or text, 20 MB), or a written record, on every line the rules don't answer |
+| Who can do the second check | desk roles | a rights reviewer or an admin who didn't do the first; the database refuses the same person |
+| Composing episodes: joined into one file (H.264/AAC, the tallest item's height up to 1080, 30 fps) and prepared once like any program | `shelf/compose.ts` | re-encoded, not stream-copied, so items from different sources join cleanly |
+| Bumpers inside catalog episodes | not built | none: an episode is its items; the carrier's breaks bring bumpers |
+| Prices, relay hours, live hours, the free allowance, platform limits | `prices.*`, `relays.platform_limits` | not set yet; 10 GB and 5 live hours free; Twitch 48 hours, Facebook 8, YouTube saves under 12 (read by Phases 2 and 3) |
+| Each market's numbering | `numbering.channels`, per market | TV 2 to 69 with subchannels; radio 88.2 to 107.8, even tenths (the user's decision; the frame's "88.1 to 107.9" is from before it). Stations choose only inside their market's range |
+| Market leads: which pages | desk roles | the board, the creator pipeline (creators, works, asking, reminders), external sources and reservations of their own market; everything else is admins' |
+| Escrow signer changes | Settings, Escrow signers | every other admin (as of the proposal) approves; any one refuses; one open at a time. Approved changes go to the timelock (contracts/README.md) |
+| Taking admin away from someone in OPENCAST_ADMIN_EMAILS | accounts | it doesn't stick: the list makes them an admin again at their next sign-in (Settings says so) |
 
 ## Product
 

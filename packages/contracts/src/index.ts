@@ -20,6 +20,8 @@ import { stationsApi } from "./stations.js";
 import { trustApi } from "./trust.js";
 import { waitlistApi } from "./waitlist.js";
 import { tvApi } from "./tv.js";
+import { deskApi } from "./desk.js";
+import { catalogShelfApi } from "./catalogShelf.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -39,6 +41,10 @@ export * from "./network.js";
 export * from "./tv.js";
 export * from "./hls.js";
 export * from "./segments.js";
+export * from "./desk.js";
+export * from "./catalogShelf.js";
+export * from "./publicDomain.js";
+export * from "./rules.js";
 
 export const API_PREFIX = "/v1";
 
@@ -57,7 +63,9 @@ export const api = {
   notifications: notificationsApi,
   waitlist: waitlistApi,
   network: networkApi,
-  tv: tvApi
+  tv: tvApi,
+  desk: deskApi,
+  catalogShelf: catalogShelfApi
 } as const;
 
 export const HealthResponse = z.object({

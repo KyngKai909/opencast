@@ -11,6 +11,13 @@ describe("the admin gate", () => {
     expect(gateFor({ ready: true, signedIn: true, me: { isAdmin: true } })).toBe("desk");
   });
 
+  it("opens for a rights reviewer or a market lead too (desk roles, 2026-09-29)", () => {
+    const market = { id: "00000000-0000-4000-8000-000000090003", slug: "high-desert", name: "High Desert", timezone: "America/Los_Angeles", open: true };
+    expect(gateFor({ ready: true, signedIn: true, me: { isAdmin: false, deskRoles: [{ role: "rights_reviewer", market: null }] } })).toBe("desk");
+    expect(gateFor({ ready: true, signedIn: true, me: { isAdmin: false, deskRoles: [{ role: "market_lead", market }] } })).toBe("desk");
+    expect(gateFor({ ready: true, signedIn: true, me: { isAdmin: false, deskRoles: [] } })).toBe("not-admin");
+  });
+
   it("reads the API's refusals", () => {
     expect(gateFor({ ready: true, signedIn: true, me: undefined, meError: 401 })).toBe("sign-in");
     expect(gateFor({ ready: true, signedIn: true, me: undefined, meError: 403 })).toBe("not-admin");
