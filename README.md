@@ -69,6 +69,7 @@ catalog station. Network desk (`/desk`) works the middle of this chart.
 flowchart TD
   WL["Waitlist<br/><i>a call sign and number held</i>"] -->|"invited"| IND["Independent station<br/><i>run by its creator; spots and earnings</i>"]
   FOUND["A creator Opencast would like on the dial"] --> PIPE["Creator pipeline"]
+  IPTV["Public IPTV lists<br/><i>e.g. iptv-org</i>"] -->|"imported as leads,<br/>never straight to the dial"| PIPE
   PIPE -->|"permission asked, with a preview<br/>of the schedule from titles"| YES{"Yes, or already<br/>licensed (e.g. CC BY)"}
   YES -->|"set up from a recipe"| CL["Claimable station<br/><i>run by Opencast; earnings held in escrow</i>"]
   CL -->|"creator claims: identity proven,<br/>verifiers approve, 72 hours in public"| IND
