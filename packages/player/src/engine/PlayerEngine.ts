@@ -26,6 +26,7 @@ import { isLive, Prefetch, type Fetch } from "./playlist";
 import { onScreenKey, type OnScreen } from "./timeline";
 
 export type CaptionMode = "off" | "on" | "muted_only";
+
 export type CaptionSize = "small" | "medium" | "large";
 export type Status = "idle" | "tuning" | "playing" | "paused" | "off_air" | "embed" | "error" | "stopped";
 
@@ -338,13 +339,31 @@ export class PlayerEngine {
     }
     if (seq !== this.tuneSeq) return; // A newer tune took over.
     for (const d of this.decks.values()) if (d !== deck && d.role === "active") d.warm(this.o.warm === "play" ? "play" : "buffer");
+    // A browser that only allows sound after a click on the page doesn't refuse the unmute: Chrome
+    // just pauses the picture. That pause is undone: it plays on muted, with the "tap for sound"
+    // prompt. (TVs' web views allow sound, so they're never muted for this.)
     deck.show(this.state.muted || this.state.mutedByBrowser);
     this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
     this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm } });
     this.settle(stationId, previous, "playing");
+    if (!deck.video.muted) this.keepPlayingIfUnmutePaused(deck);
     this.watchOnScreen();
     this.mediaSession();
+  }
+
+  /** If unmuting paused it (no click on the page yet), play on muted with the prompt. */
+  private keepPlayingIfUnmutePaused(deck: Deck) {
+    const v = deck.video;
+    const check = () => {
+      if (!v.paused || v.muted || this.state.status === "paused" || this.active() !== deck) return;
+      v.muted = true;
+      void v.play().catch(() => {});
+      this.patch({ mutedByBrowser: true });
+    };
+    v.addEventListener("pause", check, { once: true });
+    setTimeout(() => v.removeEventListener("pause", check), 2000);
+    check();
   }
 
   private settle(stationId: string, previous: string | null, status: Status) {

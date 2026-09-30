@@ -504,3 +504,33 @@ describe("evening out the sound", () => {
     expect(samplesReachWebAudio(mse)).toBe(true);
   });
 });
+
+describe("sound before the viewer has clicked", () => {
+  it("plays on muted with the tap-for-sound prompt when unmuting pauses the picture (Chrome)", async () => {
+    // Chrome's rule: unmuting a video with no click on the page yet pauses it, and says nothing else.
+    const desc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "muted")!;
+    Object.defineProperty(HTMLMediaElement.prototype, "muted", {
+      configurable: true,
+      get() { return desc.get!.call(this); },
+      set(this: HTMLVideoElement & { _paused?: boolean }, value: boolean) {
+        desc.set!.call(this, value);
+        if (!value && this._paused === false) {
+          this._paused = true;
+          this.dispatchEvent(new Event("pause"));
+        }
+      }
+    });
+    try {
+      const done = engine.tune(CIVC.station.id);
+      await flush(50);
+      await done;
+      const v = host.querySelector("video.is-on") as HTMLVideoElement;
+      expect(engine.getState().status).toBe("playing");
+      expect(v.paused).toBe(false);
+      expect(v.muted).toBe(true);
+      expect(engine.getState().mutedByBrowser).toBe(true);
+    } finally {
+      Object.defineProperty(HTMLMediaElement.prototype, "muted", desc);
+    }
+  });
+});
