@@ -9,7 +9,7 @@ import { ControlTitle } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
-import { FolderRail, LibrarySummary, LibraryTable, RightsPane, UploadDrop } from "../../components/live/LibraryParts";
+import { FolderRail, GeneratedStationIdRow, LibrarySummary, LibraryTable, RightsPane, UploadDrop } from "../../components/live/LibraryParts";
 import { Quiet } from "../common";
 import "./Library.css";
 
@@ -63,6 +63,10 @@ export default function Library() {
           hrefFor={(i) => `${s.base}/library/items/${i.id}${folder ? `?folder=${folder.id}` : ""}`}
           empty={special?.empty ?? (folder ? "Nothing in this folder yet." : "The library is empty. Drop files here, or import from a link.")}
         />
+        {/* The generated station ID (added 2026-09-29): with all items, read-only. */}
+        {!folder && !special && data.generatedStationId && (
+          <GeneratedStationIdRow generated={data.generatedStationId} callSign={callSign} colour={s.station.colour ?? "#8C3B7A"} radio={s.station.band === "radio"} phone={phone} />
+        )}
       </div>
       <RightsPane item={rightsItem} callSign={callSign} phone={phone} onClose={closeRights} />
     </div>

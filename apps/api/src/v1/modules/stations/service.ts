@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
@@ -8,6 +8,7 @@ import { createLivepeerStream, hasLivepeerApiKey } from "../../../livepeer.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackground.js";
+import { cadenceOf, type BreakCadence } from "../playout/engine/cadence.js";
 
 export type StationKind = "station" | "studio" | "claimable" | "listed" | "catalog";
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
@@ -23,6 +24,8 @@ export interface BreakRuleView {
   blockedCategories: string[];
   /** "Ads from partners" (the programmatic backfill): off by default, and only a switch until it's built. */
   adsFromPartners: boolean;
+  /** How often the station ID, bumpers and credit air in breaks (added 2026-09-29): every break by default. */
+  cadence: BreakCadence;
 }
 
 /** What an ad request for ads from partners would carry about a station (nothing sends one yet). */
@@ -117,6 +120,8 @@ export interface StationsService {
     /** The band it's on (TV unless it has a radio channel): what it's prepared and assembled for. */
     band: Band;
   } | null>;
+  /** Added 2026-09-29: stations that air (a station or a claimable one, setting up or on air, not signed off for good). */
+  airingStationIds(): Promise<string[]>;
   /** Stations that take orders, and studios. */
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key (and a radio station's background, once prepared). */
@@ -137,7 +142,7 @@ export interface StationsService {
   availableChannels(marketId: string, band: Band): Promise<Array<{ channel: string; state: "open" | "taken" | "held" }>>;
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string }): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
-  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners"> & { adsFromPartners?: boolean }): Promise<BreakRuleView>;
+  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: BreakCadence }): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -479,7 +484,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         fillOrder: (rule?.fillOrder as LogCode[] | undefined) ?? ["SPT", "UND", "BMP", "SID"],
         openTimeTo: rule?.openTimeTo ?? "spot_market",
         blockedCategories: blocked.map((b) => b.category).sort(),
-        adsFromPartners: rule?.adsFromPartners ?? false
+        adsFromPartners: rule?.adsFromPartners ?? false,
+        cadence: cadenceOf(rule?.cadence)
       };
     },
 
@@ -579,6 +585,14 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         logoUrl: found.station.logoUrl,
         band: found.channel?.band ?? "tv"
       };
+    },
+
+    async airingStationIds() {
+      const rows = await db
+        .select({ id: S.id })
+        .from(S)
+        .where(and(inArray(S.kind, ["station", "claimable"]), sql`${S.status} <> 'signed_off'`));
+      return rows.map((r) => r.id);
     },
 
     async makers() {
@@ -732,6 +746,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async setBreakRule(stationId, rule) {
       if (rule.mode === "every_n_minutes" && !rule.everyMinutes) throw badRequest("Say how often.", { everyMinutes: "Required" });
       const fillOrder = [...rule.fillOrder.filter((c) => c !== "SID"), "SID" as const];
+      // How often each part airs (added 2026-09-29): left out, what's set stays.
+      let cadence: BreakCadence | undefined;
+      if (rule.cadence) {
+        if ((rule.cadence.stationId.every as string) === "never") throw badRequest("The station ID can't be turned off. Choose how often it airs.", { "cadence.stationId": "Required" });
+        for (const [part, c] of Object.entries(rule.cadence)) {
+          if (c.every === "n_programs" && !c.n) throw badRequest("Say after how many programs.", { [`cadence.${part}.n`]: "Required" });
+        }
+        cadence = cadenceOf(rule.cadence);
+      }
       await db.transaction(async (tx) => {
         await tx
           .insert(schema.breakRules)
@@ -745,6 +768,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
             fillOrder,
             openTimeTo: rule.openTimeTo,
             adsFromPartners: rule.adsFromPartners ?? false,
+            cadence: cadence ?? null,
             updatedAt: deps.clock.now()
           })
           .onConflictDoUpdate({
@@ -758,6 +782,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
               fillOrder,
               openTimeTo: rule.openTimeTo,
               ...(rule.adsFromPartners !== undefined ? { adsFromPartners: rule.adsFromPartners } : {}),
+              ...(cadence ? { cadence } : {}),
               updatedAt: deps.clock.now()
             }
           });

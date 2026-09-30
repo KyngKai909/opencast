@@ -1,7 +1,8 @@
 // The arithmetic behind Settings, Breaks (station-settings 02.1): what fills every break, in
-// order, with the station ID always last; how long each part runs; the hourly cap against TV.
+// order, with the station ID always last when it airs; how long each part runs; the hourly cap
+// against TV; and how often the station ID, bumpers and credit air (the cadence, added 2026-09-29).
 
-import type { BreakRule, LogCode } from "@opencast/contracts";
+import type { BreakCadence, BreakCadences, BreakRule, LogCode } from "@opencast/contracts";
 import { duration } from "@opencast/ui";
 
 /** The parts of a break a station can put in order. The station ID is always last. */
@@ -109,4 +110,62 @@ export function ruleLabel(mode: BreakRule["mode"], everyMinutes: number | null):
   if (mode === "after_every_program") return "After every program";
   if (mode === "every_n_minutes") return `Every ${everyMinutes ?? 30} min`;
   return "None";
+}
+
+// ---- How often (the cadence, added 2026-09-29) ----
+
+/** The parts whose cadence a station sets, in the order the section lists them. */
+export const CADENCE_PARTS = [
+  { part: "stationId", code: "SID", title: "Station ID" },
+  { part: "bumpers", code: "BMP", title: "Bumpers" },
+  { part: "underwriting", code: "UND", title: "Thank-you credit" }
+] as const;
+export type CadencePart = (typeof CADENCE_PARTS)[number]["part"];
+
+/** Every part in every break: today's breaks, and what a rule without a cadence means. */
+export const DEFAULT_CADENCE: BreakCadences = { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } };
+
+/** The rule's cadence, the default filled in. */
+export function cadenceOf(rule: Pick<BreakRule, "cadence">): BreakCadences {
+  return { ...DEFAULT_CADENCE, ...(rule.cadence ?? {}) };
+}
+
+/** "In every break", "After every program", "After every 3 programs", "Once an hour", "Never". */
+export function cadenceWords(c: BreakCadence): string {
+  switch (c.every) {
+    case "break":
+      return "In every break";
+    case "program":
+      return "After every program";
+    case "n_programs":
+      return `After every ${c.n ?? 2} programs`;
+    case "hour":
+      return "Once an hour";
+    case "never":
+      return "Never";
+  }
+}
+
+/** A cadence as one select value: "break", "program", "n:3", "hour", "never". */
+export function cadenceKey(c: BreakCadence): string {
+  return c.every === "n_programs" ? `n:${c.n ?? 2}` : c.every;
+}
+
+export function cadenceFromKey(key: string): BreakCadence {
+  if (key.startsWith("n:")) return { every: "n_programs", n: Number(key.slice(2)) };
+  return { every: key as BreakCadence["every"] };
+}
+
+/** The "How often" choices: every break, after programs (every one, 2, 3 or 4), once an hour, and never (not the station ID). */
+export function cadenceOptions(part: CadencePart): Array<{ value: string; label: string }> {
+  const list: BreakCadence[] = [{ every: "break" }, { every: "program" }, ...[2, 3, 4].map((n) => ({ every: "n_programs" as const, n })), { every: "hour" }];
+  if (part !== "stationId") list.push({ every: "never" });
+  return list.map((c) => ({ value: cadenceKey(c), label: cadenceWords(c) }));
+}
+
+/** The line under a part: when it airs, in the station's words. */
+export function cadenceDetail(part: CadencePart, c: BreakCadence): string {
+  if (part === "stationId") return c.every === "break" ? "Last in every break" : c.every === "hour" ? "Last in the first break after the top of the hour" : "Last in the break, when it airs";
+  if (c.every === "never") return part === "bumpers" ? "Breaks hold on the station ID slate instead" : "Sponsors and members aren't thanked in breaks";
+  return part === "bumpers" ? "In their place in the order above" : "In its place in the order above";
 }

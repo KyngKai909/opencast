@@ -6,6 +6,7 @@ import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
+import { breakPartsFor } from "../playout/engine/cadence.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
 
@@ -165,6 +166,7 @@ const DAY = 24 * HOUR;
 export function createLogService(ctx: ModuleContext): LogService {
   const { deps, services } = ctx;
   const { db } = deps;
+  const moduleCtx = ctx;
   const templates = createTemplateOps(ctx);
 
   /**
@@ -553,13 +555,17 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!slots.length) return result;
       const stored = slots.map((s) => s.id).filter((v): v is string => Boolean(v));
       const entryIds = [...new Set(slots.map((s) => s.logEntryId).filter((v): v is string => Boolean(v)))];
-      const [placed, rotations, credits, entries] = await Promise.all([
+      const [placed, rotations, credits, entries, stationIdMs] = await Promise.all([
         services.spots.breakAirings(stored),
         services.spots.rotations(stationId),
         services.spots.creditsFor(stationId),
-        entryIds.length ? db.select().from(E).where(inArray(E.id, entryIds)) : Promise.resolve([] as Row[])
+        entryIds.length ? db.select().from(E).where(inArray(E.id, entryIds)) : Promise.resolve([] as Row[]),
+        // Ten seconds for a station airing its generated station ID.
+        services.playout.stationIdMs(stationId)
       ]);
       const ctx = await context(entries);
+      // How often the station ID, bumpers and credit air (the break rule's cadence).
+      const partsOf = await breakPartsFor(moduleCtx, stationId, { breaks: slots });
       const main = new Set(rotations.main.spots.map((s) => s.spotId));
       const backup = new Set(rotations.backup.spots.map((s) => s.spotId));
       for (const slot of slots) {
@@ -581,16 +587,18 @@ export function createLogService(ctx: ModuleContext): LogService {
           const rotation = main.has(a.spotId) ? "main" : backup.has(a.spotId) ? "backup" : "main";
           rows.push({ id: a.airingId, kind: "spot", title: a.title, lengthMs: a.lengthSec * 1000, spotId: a.spotId, business: a.business, shortName: a.shortName, rotation, note: rotation === "backup" ? "Backup rotation" : null });
         }
-        // What playout adds when it airs the break: the credit, bumpers or the slate, the station ID last.
+        // What playout adds when it airs the break: the credit, bumpers or the slate, the station ID
+        // last, each as often as the break rule's cadence says.
+        const parts = partsOf(slot);
         let left = Math.max(0, slot.lengthMs - rows.reduce((sum, r) => sum + r.lengthMs, 0));
-        const sidMs = Math.min(left, STATION_ID_MS);
+        const sidMs = parts.stationId ? Math.min(left, stationIdMs) : 0;
         left -= sidMs;
-        if (credits.length && left >= CREDIT_MS) {
+        if (parts.underwriting && credits.length && left >= CREDIT_MS) {
           rows.push({ id: `${slot.startsAt}:credit`, kind: "underwriting", title: credits.map((c) => c.business).join(", "), lengthMs: CREDIT_MS, spotId: null, business: null, shortName: null, rotation: null, note: "Made possible by" });
           left -= CREDIT_MS;
         }
         if (left > 0) {
-          rows.push({ id: `${slot.startsAt}:open`, kind: slot.id ? "bumper" : "open", title: slot.id ? "Bumpers and station ID slate" : "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: slot.id ? null : "Filled from the rotation about 20 minutes before" });
+          rows.push({ id: `${slot.startsAt}:open`, kind: slot.id && parts.bumpers ? "bumper" : "open", title: slot.id ? (parts.bumpers ? "Bumpers and station ID slate" : "Station ID slate") : "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: slot.id ? null : "Filled from the rotation about 20 minutes before" });
         }
         if (sidMs > 0) rows.push({ id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null });
         result.set(slot.startsAt, rows);

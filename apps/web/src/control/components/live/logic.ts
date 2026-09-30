@@ -140,11 +140,6 @@ export function librarySummary(items: { code: string; durationMs: number | null;
   };
 }
 
-/** A.2: signing on needs at least one program and a station ID. */
-export function canContinueSetup(items: { code: string }[]): boolean {
-  return items.some((i) => i.code === "PGM") && items.some((i) => i.code === "SID");
-}
-
 /** A library row's status line: "720p, stereo" (the picture's height and the sound). */
 export function readyLine(i: { picture: { height: number } | null; mediaKind: string; audioLayout?: string | null }): string {
   const sound = i.audioLayout ?? null;

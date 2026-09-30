@@ -7,12 +7,15 @@ import { publicUrl } from "../../lib/url.js";
 import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
 import { objectKey } from "../../storage.js";
-import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
+import { BAND_RENDITIONS, LADDER, REFERENCE, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
 import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
 import { captionSources } from "./engine/captions.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
-import { logReadiness, summariseReadiness } from "./engine/readiness.js";
+import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
 import { refKey } from "./engine/prepare.js";
+import { breakPartsFor } from "./engine/cadence.js";
+import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
+import { STATION_ID_MS } from "./engine/fill.js";
 
 type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared";
 
@@ -46,6 +49,15 @@ export interface PlayoutStatusView {
     preparing?: number;
     firstNotReady: { itemId: string; title: string; airsAt: string; status: "queued" | "preparing" | "failed" | "not_asked"; entryId?: string } | null;
   } | null;
+}
+
+export interface GeneratedStationIdView {
+  code: "SID";
+  durationMs: number;
+  sound: "bed" | "silence";
+  status: "preparing" | "ready" | "failed";
+  look: { callSign: string | null; channel: string | null; name: string; city: string | null; colour: string | null };
+  playbackUrl: string | null;
 }
 
 export interface AsRunView {
@@ -105,11 +117,29 @@ export interface PlayoutService {
   replan(stationId: string): Promise<void>;
   /** Where an item's preparation for air stands, for a band (the library's item history). */
   preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null }>;
+  /**
+   * Added 2026-09-29: the station's generated station ID, for the library: null once a station ID
+   * of its own can air (it wins).
+   */
+  generatedStationId(stationId: string): Promise<GeneratedStationIdView | null>;
+  /**
+   * What a break keeps for the station ID: five seconds, or ten for a station airing its generated
+   * one (it has none of its own, and the generated one is prepared; the slate's five until then).
+   */
+  stationIdMs(stationId: string): Promise<number>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 }
 
 const HOUR = 3_600_000;
+
+/** "1 hr 30 min", "2 hr", "45 min". */
+export function hoursAndMinutes(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return [h ? `${h} hr` : "", m || !h ? `${m} min` : ""].filter(Boolean).join(" ");
+}
 
 /**
  * The rest of the `items_prepared` detail after "N of M in the next 24 hours" (G14): what failed
@@ -236,22 +266,32 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       ]);
       const rule = await services.stations.breakRule(stationId);
 
-      // A station ID at least once an hour: every break ends with one, so breaks must come hourly.
+      // A station ID at least once an hour. Breaks must come hourly (blocking, as before), and the
+      // break rule's cadence (added 2026-09-29) must air one in them at least hourly: if the breaks
+      // come often enough but the cadence leaves more than an hour, it's a warning, not a block.
       // Planned off air time doesn't count against it: the station signs off and back on with its ID.
-      const breakTimes = breaks.map((b) => Date.parse(b.startsAt)).sort((a, b) => a - b);
+      const partsOf = await breakPartsFor({ deps, services }, stationId, { breaks, entries: { rows: entries, from: now, to: day }, cadence: rule.cadence });
       const sidEntries = entries.filter((e) => e.code === "SID").map((e) => e.startsAt.getTime());
       const offAirMarks = offAir.flatMap((o) => [Math.max(now.getTime(), Date.parse(o.startsAt)), Math.min(day.getTime(), Date.parse(o.endsAt))]);
-      const marks = [...breakTimes, ...sidEntries, ...offAirMarks].sort((a, b) => a - b);
-      let longest = 0;
-      let cursor = now.getTime();
       const inOffAir = (a: number, b: number) => offAir.some((o) => Date.parse(o.startsAt) <= a && Date.parse(o.endsAt) >= b);
-      for (const mark of marks) {
-        if (!inOffAir(cursor, mark)) longest = Math.max(longest, mark - cursor);
-        cursor = mark;
-      }
-      if (!inOffAir(cursor, day.getTime())) longest = Math.max(longest, day.getTime() - cursor);
-      const idsPerDay = marks.length;
-      const hourly = rule.mode !== "none" || sidEntries.length > 0 ? longest <= HOUR : false;
+      const longestWithout = (breakTimes: number[]) => {
+        const marks = [...breakTimes, ...sidEntries, ...offAirMarks].sort((a, b) => a - b);
+        let longest = 0;
+        let cursor = now.getTime();
+        for (const mark of marks) {
+          if (!inOffAir(cursor, mark)) longest = Math.max(longest, mark - cursor);
+          cursor = mark;
+        }
+        if (!inOffAir(cursor, day.getTime())) longest = Math.max(longest, day.getTime() - cursor);
+        return { longest, marks: marks.length };
+      };
+      const everyBreak = longestWithout(breaks.map((b) => Date.parse(b.startsAt)));
+      const withCadence = longestWithout(breaks.filter((b) => partsOf(b).stationId).map((b) => Date.parse(b.startsAt)));
+      const idsPerDay = withCadence.marks;
+      const breaksHourly = rule.mode !== "none" || sidEntries.length > 0 ? everyBreak.longest <= HOUR : false;
+      const hourly = breaksHourly && withCadence.longest <= HOUR;
+      // The breaks would do, but how often the station ID airs in them leaves an hour or more without one.
+      const cadenceGap = breaksHourly && !hourly;
 
       const liveEntries = entries.filter((e) => e.kind === "live");
       // By item, not by entry (G13); failed told apart from on its way (G14).
@@ -270,8 +310,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           key: "station_id_hourly",
           label: "A station ID at least once an hour",
           passed: hourly,
-          blocking: true,
-          detail: `${idsPerDay} times a day`
+          blocking: !cadenceGap,
+          detail: cadenceGap ? `Up to ${hoursAndMinutes(withCadence.longest)} without one, from how often it airs in breaks. ${idsPerDay} times a day` : `${idsPerDay} times a day`
         },
         {
           key: "rights_confirmed",
@@ -592,6 +632,30 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         renditions: done,
         preparedAt: item?.preparedAt?.toISOString() ?? null
       };
+    },
+
+    async generatedStationId(stationId) {
+      // A station ID of its own that can air (prepared, rights confirmed) wins.
+      const [{ stationIds }, look] = await Promise.all([services.library.fillers(stationId), services.stations.look(stationId)]);
+      if (stationIds.length || !look) return null;
+      const key = generatedStationIdKey(look, look.band);
+      const { ready, status } = await readyKeys({ deps, services }, [key], look.band);
+      const done = ready.has(key);
+      // Its own playlist, beside its segments (the API passes them through when storage has no public domain).
+      const playlist = `${objectKey.prepared(key, REFERENCE[look.band])}/index.m3u8`;
+      return {
+        code: "SID",
+        durationMs: GENERATED_SID_MS,
+        sound: "bed",
+        status: done ? "ready" : status.get(key) === "failed" ? "failed" : "preparing",
+        look: { callSign: look.callSign, channel: look.channel, name: look.name, city: look.homeCity, colour: look.colour },
+        playbackUrl: done ? (deps.storage.objects.publicUrl?.(playlist) ?? publicUrl(deps, `/hls/${playlist}`)) : null
+      };
+    },
+
+    async stationIdMs(stationId) {
+      const generated = await service.generatedStationId(stationId);
+      return generated?.status === "ready" ? GENERATED_SID_MS : STATION_ID_MS;
     },
 
     async carriedAirings(agreementIds, from, to) {

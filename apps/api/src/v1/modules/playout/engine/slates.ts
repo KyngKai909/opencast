@@ -81,6 +81,30 @@ export class Slates {
   }
 
   /**
+   * The generated station ID's picture (added 2026-09-29): the call sign large, the channel under
+   * it, then the station's name and city, full screen in the station's colour, inside title safe.
+   * A station without a call sign yet shows its name large.
+   */
+  stationIdCard(station: StationLook): Promise<string> {
+    const cx = FRAME.width / 2;
+    const big = station.callSign ?? station.name;
+    const size = big.length > 8 ? Math.max(72, Math.round(1100 / (big.length * 0.62))) : 190;
+    const below = [station.callSign ? station.name : null, station.homeCity].filter(Boolean).join(" · ");
+    const { callSign, channel, name, homeCity, colour } = station;
+    return this.cached("sidcard", { callSign, channel, name, homeCity, colour, v: 1 }, (file) =>
+      this.svgToPng(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
+          <rect width="100%" height="100%" fill="${background(station)}"/>
+          <text x="${cx}" y="${FRAME.height / 2 + 10}" font-family="${DISPLAY}" font-size="${size}" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-4">${esc(big)}</text>
+          ${station.channel ? `<text x="${cx}" y="${FRAME.height / 2 + 100}" font-family="${MONO}" font-size="64" font-weight="600" fill="#FFFFFF" text-anchor="middle">${esc(station.channel)}</text>` : ""}
+          ${below ? `<text x="${cx}" y="${SAFE.y + SAFE.h - 40}" font-family="${TEXT}" font-size="38" fill="#FFFFFF" fill-opacity="0.9" text-anchor="middle">${esc(below)}</text>` : ""}
+        </svg>`,
+        file
+      )
+    );
+  }
+
+  /**
    * The underwriting credit: "Beat Tape Live is made possible by", each sponsor's
    * name and one line, then the members who asked to be named.
    */

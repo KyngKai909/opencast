@@ -2,6 +2,7 @@ import { z } from "zod";
 import { endpoint } from "./core.js";
 import { Band, CallSign, ChannelNumber, Colour, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CreatorStage } from "./states.js";
+import { BreakCadence, StationIdCadence } from "./stations.js";
 
 export const SlotState = z.enum(["station", "claimable", "listed", "catalog", "held", "open"]);
 export const SLOT_STATE_LABELS = {
@@ -164,7 +165,9 @@ export const RecipeBreakRule = z
     everyMinutes: z.number().int().positive().optional(),
     lengthMs: z.number().int().positive().optional(),
     fillFrom: z.enum(["market", "house"]).optional(),
-    blockedCategories: z.array(z.string()).optional()
+    blockedCategories: z.array(z.string()).optional(),
+    /** Added 2026-09-29: how often the station ID, bumpers and credit air, as `BreakRule.cadence`. */
+    cadence: z.object({ stationId: StationIdCadence, bumpers: BreakCadence, underwriting: BreakCadence }).optional()
   })
   .loose();
 

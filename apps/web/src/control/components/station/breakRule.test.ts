@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capCells, capMinutes, fillOrder, ladder, moveFill, placeFill, ruleLabel, spotMsPerBreak } from "./breakRule";
+import { cadenceDetail, cadenceFromKey, cadenceKey, cadenceOf, cadenceOptions, cadenceWords, capCells, capMinutes, fillOrder, ladder, moveFill, placeFill, ruleLabel, spotMsPerBreak } from "./breakRule";
 
 describe("what fills every break (station-settings 02.1)", () => {
   it("keeps the station ID last, whatever it's given", () => {
@@ -53,5 +53,29 @@ describe("how much advertising", () => {
     expect(ruleLabel("every_n_minutes", null)).toBe("Every 30 min");
     expect(ruleLabel("after_every_program", null)).toBe("After every program");
     expect(ruleLabel("none", null)).toBe("None");
+  });
+});
+
+describe("how often the station ID, bumpers and credit air (added 2026-09-29)", () => {
+  it("reads a rule without a cadence as every break, and says each choice in words", () => {
+    expect(cadenceOf({})).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } });
+    expect(cadenceOf({ cadence: { stationId: { every: "hour" }, bumpers: { every: "never" }, underwriting: { every: "n_programs", n: 3 } } }).underwriting).toEqual({ every: "n_programs", n: 3 });
+    expect(cadenceWords({ every: "break" })).toBe("In every break");
+    expect(cadenceWords({ every: "program" })).toBe("After every program");
+    expect(cadenceWords({ every: "n_programs", n: 3 })).toBe("After every 3 programs");
+    expect(cadenceWords({ every: "hour" })).toBe("Once an hour");
+    expect(cadenceWords({ every: "never" })).toBe("Never");
+  });
+
+  it("offers never for bumpers and the credit, not the station ID", () => {
+    expect(cadenceOptions("stationId").map((o) => o.label)).toEqual(["In every break", "After every program", "After every 2 programs", "After every 3 programs", "After every 4 programs", "Once an hour"]);
+    expect(cadenceOptions("bumpers").at(-1)).toEqual({ value: "never", label: "Never" });
+    expect(cadenceOptions("underwriting").at(-1)).toEqual({ value: "never", label: "Never" });
+  });
+
+  it("goes to a select's value and back", () => {
+    for (const c of [{ every: "break" }, { every: "program" }, { every: "n_programs", n: 4 }, { every: "hour" }, { every: "never" }] as const) expect(cadenceFromKey(cadenceKey(c))).toEqual(c);
+    expect(cadenceDetail("stationId", { every: "hour" })).toBe("Last in the first break after the top of the hour");
+    expect(cadenceDetail("bumpers", { every: "never" })).toBe("Breaks hold on the station ID slate instead");
   });
 });

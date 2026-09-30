@@ -32,6 +32,7 @@ import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
 import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
 import { TranslatorRelay } from "./translator.js";
+import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
 const FILL_EVERY_MS = 30_000;
@@ -103,7 +104,11 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     log
   });
   const bands = new Map<string, Band>();
-  const planner = createPlanner(ctx, { isReady: (ref, stationId) => preparer.isReady(ref, bands.get(stationId) ?? "tv") });
+  const planner = createPlanner(ctx, {
+    isReady: (ref, stationId) => preparer.isReady(ref, bands.get(stationId) ?? "tv"),
+    // A generated station ID that isn't prepared (a new station, or its look changed): queued now.
+    wantGenerated: (spec) => preparer.generated(spec)
+  });
   const filler = createFiller(ctx);
   const assemblers = new Map<string, ChannelAssembler>();
   const looks = new Map<string, ChannelLook>();
@@ -169,6 +174,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     for (const stationId of stationIds) {
       // Station IDs and bumpers can air any time; so can what fills dead air, a little later.
       const { stationIds: ids, bumpers } = await services.library.fillers(stationId);
+      // No station ID of its own: its generated one.
+      if (!ids.length) await queueGeneratedIds([stationId]);
       for (const f of [...ids, ...bumpers]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
       for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
@@ -243,6 +250,33 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       const item = items.get(i.itemId)!;
       return { contentId: item.contentId, location: item.location, mediaKind: item.mediaKind, band: band(i.stationId), durationMs: item.durationMs, neededAt: i.startsAt };
     }));
+  }
+
+  /**
+   * Generated station IDs (stationId.ts) for stations with no station ID of their own that can air
+   * (every station setting up or on air, unless `stationIds` names them): queued unless prepared,
+   * so the library can show one ready before the station signs on.
+   */
+  async function queueGeneratedIds(stationIds?: string[]) {
+    let ids = stationIds;
+    if (!ids) {
+      const airing = await services.stations.airingStationIds();
+      const own = await services.library.withOwnStationId(airing);
+      ids = airing.filter((id) => !own.has(id));
+    }
+    if (!ids.length) return;
+    const idents = await services.stations.idents(ids);
+    for (const id of ids) {
+      const ident = idents.get(id);
+      if (!ident) continue;
+      const band: Band = ident.band ?? "tv";
+      bands.set(id, band);
+      const look = { callSign: ident.callSign, channel: ident.channel, name: ident.name, homeCity: ident.homeCity ?? null, colour: ident.colour ?? null };
+      const key = generatedStationIdKey(look, band);
+      if (preparer.isReady(key, band)) continue;
+      const png = band === "radio" ? null : await planner.slates.stationIdCard(look);
+      await preparer.generated({ key, png, band, seconds: GENERATED_SID_MS / 1000 });
+    }
   }
 
   /** Items whose rights were confirmed (or files replaced) lately: prepared before anyone schedules them. */
@@ -437,6 +471,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
 
     /** The readiness check now (tests; the tick runs it hourly). */
     sweep,
+    queueGeneratedIds,
     warnNotReady,
 
     async tick() {
@@ -457,6 +492,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       if (now - lastRights >= RIGHTS_EVERY_MS) {
         lastRights = now;
         await queueConfirmed().catch((error) => log(`[prepare] queueing confirmed items failed: ${(error as Error).message}`));
+        await queueGeneratedIds().catch((error) => log(`[prepare] queueing generated station IDs failed: ${(error as Error).message}`));
       }
       if (now - lastSweep >= READY_EVERY_MS) {
         lastSweep = now;

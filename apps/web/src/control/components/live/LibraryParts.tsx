@@ -1,10 +1,11 @@
 // The library's parts, shared by setup step 2 (master-control A.2), the station's Library and the
 // item page (live-listings 04.1): the folder rail, the drop zone with Import from a link, the
-// summary, the table of items, and the rights pane (A.3, "Can BEAT air Crate Session 03?").
+// summary, the table of items, the generated station ID's read-only row (added 2026-09-29; no
+// frame draws it), and the rights pane (A.3, "Can BEAT air Crate Session 03?").
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { libraryApi, type Folder, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
-import { Button, ChoiceList, CodeSelect, Field, Icon, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
+import { libraryApi, type Folder, type GeneratedStationId, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
+import { Button, ChoiceList, CodeSelect, Field, Icon, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { useAuth } from "../../../auth/AuthProvider";
@@ -299,6 +300,55 @@ export function ItemStatus({ item, onRights }: { item: Item; onRights?: () => vo
       Ready for air
       <small>{readyLine(item)}</small>
     </span>
+  );
+}
+
+// ---- The generated station ID (added 2026-09-29) ----
+
+const GENERATED_STATUS: Record<GeneratedStationId["status"], string> = { ready: "Ready for air", preparing: "Being prepared", failed: "Couldn't be prepared" };
+
+/**
+ * The station ID Opencast makes while the station has none of its own that can air: a read-only
+ * row beside the library's items, laid out like theirs (picture, item, type, runs, status), with
+ * Preview. Any station ID the station uploads replaces it.
+ */
+export function GeneratedStationIdRow({ generated, callSign, colour, radio, phone }: { generated: GeneratedStationId; callSign: string; colour: string; radio: boolean; phone: boolean }) {
+  const [open, setOpen] = useState(false);
+  const Dialog = phone ? Sheet : Modal;
+  const look = generated.look;
+  return (
+    <div className="cc-gensid" role="group" aria-label="Generated station ID">
+      <TitleCard colour={look.colour ?? colour} title={look.callSign ?? look.name} size="library" decorative />
+      <div className="cc-gensid__item">
+        <b className="cc-lib-row__title">Generated station ID</b>
+        <small>Made for {callSign}. Replaced by any station ID you upload</small>
+      </div>
+      <span className="cc-gensid__code">
+        <LogCode code="SID" />
+      </span>
+      <span className="cc-lib-row__d">{duration(generated.durationMs)}</span>
+      <span className={cx("cc-lib-status", generated.status === "failed" && "cc-lib-status--warn")}>
+        {GENERATED_STATUS[generated.status]}
+        <span className="cc-gensid__preview">
+          <Button variant="text" size="sm" onClick={() => setOpen(true)}>
+            Preview
+          </Button>
+        </span>
+      </span>
+      <Dialog open={open} onClose={() => setOpen(false)} eyebrow="Made for you" title="Generated station ID" footer={<Button onClick={() => setOpen(false)}>Done</Button>}>
+        <div className="cc-gensid__card" style={{ background: look.colour ?? colour }} role="img" aria-label={`${[look.callSign ?? look.name, look.channel].filter(Boolean).join(" ")} in ${callSign}'s colour`}>
+          <b>{look.callSign ?? look.name}</b>
+          {look.channel && <span className="oc-mono">{look.channel}</span>}
+          <small>{[look.callSign ? look.name : null, look.city].filter(Boolean).join(" · ")}</small>
+        </div>
+        <p className="cc-gensid__note">
+          {radio
+            ? `Ten seconds of a soft sound bed, where ${callSign} needs a station ID. Relays show ${callSign}'s colour with its call sign and channel over it.`
+            : `Ten seconds over a soft sound bed, where ${callSign} needs a station ID: in breaks, in open time and when it signs back on.`}{" "}
+          It's made again when {callSign}'s name, call sign, channel or colour changes, and any station ID you upload replaces it.
+        </p>
+      </Dialog>
+    </div>
   );
 }
 

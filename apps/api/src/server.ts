@@ -149,11 +149,12 @@ app.get("/hls/:stationId/:file", async (req, res, next) => {
 // Prepared segments when object storage has no public domain (local disk, or R2 without one): passed through.
 app.get("/hls/prepared/:key/:rendition/:file", async (req, res, next) => {
   const { key, rendition, file } = req.params;
-  if (!/^[\w-]+$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !/^seg_\d{5}\.(ts|vtt)$/.test(file) || !v1.deps.storage.objects.open) return next();
+  // A prepared item's own playlist too (index.m3u8: the library previews the generated station ID with it).
+  if (!/^[\w-]+$/.test(key) || !/^[a-z0-9]+$/.test(rendition) || !/^(seg_\d{5}\.(ts|vtt)|index\.m3u8)$/.test(file) || !v1.deps.storage.objects.open) return next();
   try {
     const stream = await v1.deps.storage.objects.open(`prepared/${key}/${rendition}/${file}`);
     // Caption segments (X2) are WebVTT.
-    res.setHeader("Content-Type", file.endsWith(".vtt") ? "text/vtt" : "video/mp2t");
+    res.setHeader("Content-Type", file.endsWith(".vtt") ? "text/vtt" : file.endsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/mp2t");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     stream.on("error", () => res.destroy());

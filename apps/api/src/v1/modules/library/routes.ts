@@ -11,7 +11,9 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
 
   r.handle(api.getLibrary, async ({ user, params, query }) => {
     await canEditStation(user, params.stationId);
-    return library.library(params.stationId, query);
+    // The generated station ID (added 2026-09-29), while the station has none of its own that can air.
+    const [view, generatedStationId] = await Promise.all([library.library(params.stationId, query), services.playout.generatedStationId(params.stationId)]);
+    return { ...view, generatedStationId };
   });
   r.handle(api.upload, async ({ user, params, body, file }) => {
     await canEditStation(user, params.stationId);

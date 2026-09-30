@@ -65,8 +65,37 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     openTimeTo: "spot_market",
     blockedCategories: [],
     adsFromPartners: false,
+    // Added 2026-09-29: the station ID, bumpers and credit in every break (as before).
+    cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } },
     ...o
   };
+}
+
+/** A station's break rule as the mock keeps it (the default until it's set). */
+export function breakRuleOf(stationId: string): BreakRule {
+  const rule = stationState().breakRules[stationId];
+  return rule ? { ...defaultBreakRule(), ...rule, cadence: rule.cadence ?? defaultBreakRule().cadence } : defaultBreakRule();
+}
+
+/**
+ * Which of a station's breaks (in order) air a part, by the rule's cadence (added 2026-09-29), as
+ * the API decides it for breaks nothing has aired in yet: every break; the break after a program
+ * (one "After …"); the first after-program break, then every Nth; or the first break in each hour.
+ */
+export function breaksAiring<B extends { startsAt: string; context: string }>(breaks: B[], part: "stationId" | "bumpers" | "underwriting", rule: Pick<BreakRule, "cadence">): B[] {
+  const c = rule.cadence?.[part] ?? { every: "break" as const };
+  const after = (b: B) => b.context.startsWith("After");
+  if (c.every === "break") return breaks;
+  if (c.every === "never") return [];
+  if (c.every === "program") return breaks.filter(after);
+  if (c.every === "n_programs") return breaks.filter(after).filter((_, i) => i % (c.n ?? 2) === 0);
+  const hours = new Set<number>();
+  return breaks.filter((b) => {
+    const h = Math.floor(Date.parse(b.startsAt) / 3_600_000);
+    if (hours.has(h)) return false;
+    hours.add(h);
+    return true;
+  });
 }
 
 /** Everything is on except "Signed on, signed off" (station-settings 05.1). */

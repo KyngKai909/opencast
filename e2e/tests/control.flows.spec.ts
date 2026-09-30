@@ -37,8 +37,16 @@ test("someone new signs on for the first time", async ({ page }) => {
   await page.getByRole("button", { name: "Continue to library" }).click();
 
   // 2. Library (A.2): a program and a station ID, each prepared for air and its rights confirmed.
+  // Continue works with nothing in it (only signing on checks what's needed), and until TAPE has a
+  // station ID of its own it has a generated one, read-only (both 2026-09-29).
   await expect(page.getByRole("heading", { name: "Library" })).toBeVisible();
   await expect(page.getByText("Nothing here yet. Drop your first programs and a station ID above.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to program log" })).toBeEnabled();
+  const generated = page.getByRole("group", { name: "Generated station ID" });
+  await expect(generated.getByText("Made for TAPE. Replaced by any station ID you upload")).toBeVisible();
+  await generated.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("img", { name: "TAPE 13.1 in TAPE's colour" })).toBeVisible();
+  await page.getByRole("button", { name: "Done" }).click();
   await page.locator('input[type="file"]').setInputFiles([
     { name: "Tape Talks, ep. 1.mp4", mimeType: "video/mp4", buffer: Buffer.alloc(9_000_000) },
     { name: "TAPE station ID.mp4", mimeType: "video/mp4", buffer: Buffer.alloc(1_000) }
@@ -55,6 +63,8 @@ test("someone new signs on for the first time", async ({ page }) => {
   }
   await expect(page.getByText(/need rights confirmed/)).toHaveCount(0);
   await expect(page.getByText(/Preparing for air/)).toHaveCount(0, { timeout: 45_000 });
+  // TAPE's own station ID replaces the generated one.
+  await expect(generated).toHaveCount(0);
   await page.getByRole("button", { name: "Continue to program log" }).click();
 
   // 3. Program log (A.4): 24 hours of dead air, filled by repeating the library.

@@ -1,10 +1,12 @@
 // Settings, Breaks (station-settings 02.1): when breaks come and how long they run, what fills
-// every break in order (the station ID fixed last), the hourly cap against broadcast TV, the same
-// spot's limit, categories BEAT never airs, the backup rotation, and "Ads from partners" (a
-// backfill for time still open: only a flag until the backend supports it). Owners and operators change it.
+// every break in order (the station ID fixed last), how often the station ID, bumpers and credit
+// air (the cadence, added 2026-09-29; no frame draws it: rows like the frame's "Length"), the
+// hourly cap against broadcast TV, the same spot's limit, categories BEAT never airs, the backup
+// rotation, and "Ads from partners" (a backfill for time still open: only a flag until the backend
+// supports it). Owners and operators change it.
 
 import { useState, type DragEvent, type KeyboardEvent } from "react";
-import { SPOT_CATEGORIES, spotsApi, stationsApi, type BreakRule } from "@opencast/contracts";
+import { SPOT_CATEGORIES, spotsApi, stationsApi, type BreakCadences, type BreakRule } from "@opencast/contracts";
 import { Button, ChipRow, LogCode, Segmented, Toggle } from "@opencast/ui";
 import { duration } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -12,7 +14,22 @@ import { useApi, useApiMutation, keyFor } from "../../../../api/hooks";
 import { ApiError } from "../../../../api/client";
 import type { StationState } from "../../../station/StationContext";
 import { Quiet } from "../../../pages/common";
-import { capCells, capMinutes, ladderWithPartners, moveFill, placeFill, ruleLabel, TV_MINUTES_PER_HOUR, type FillCode } from "../breakRule";
+import {
+  CADENCE_PARTS,
+  cadenceDetail,
+  cadenceFromKey,
+  cadenceKey,
+  cadenceOf,
+  cadenceOptions,
+  capCells,
+  capMinutes,
+  ladderWithPartners,
+  moveFill,
+  placeFill,
+  ruleLabel,
+  TV_MINUTES_PER_HOUR,
+  type FillCode
+} from "../breakRule";
 import { noMoreThan, perHour } from "../format";
 import { ValueSelect } from "../ValueSelect";
 import "./common.css";
@@ -62,6 +79,7 @@ export function BreaksSection({ s }: { s: StationState }) {
   };
 
   const rows = ladderWithPartners(r);
+  const cadence = cadenceOf(r);
   const fills = rows.filter((x) => !x.partner);
   const every = r.everyMinutes ?? 30;
   const modes: { value: Mode; label: string }[] = [
@@ -161,6 +179,29 @@ export function BreaksSection({ s }: { s: StationState }) {
         <span className="oc-sr-only" aria-live="polite">
           {said}
         </span>
+
+        <div className="cc-sec-top cc-sec-top--gap">
+          <h4 className="cc-sec-top__h">How often</h4>
+          <span className="cc-sec-top__sub">Open time always airs your station ID and bumpers</span>
+        </div>
+        {CADENCE_PARTS.map(({ part, title }) => {
+          const c = cadence[part];
+          return (
+            <div className="cc-row" key={part}>
+              <div>
+                <b>{title}</b>
+                <small>{cadenceDetail(part, c)}</small>
+              </div>
+              <ValueSelect
+                label={`How often: ${title}`}
+                value={cadenceKey(c)}
+                options={cadenceOptions(part)}
+                disabled={!canEdit}
+                onChange={(key) => change({ cadence: { ...cadence, [part]: cadenceFromKey(key) } as BreakCadences })}
+              />
+            </div>
+          );
+        })}
       </div>
 
       <div className="cc-breaks__col">

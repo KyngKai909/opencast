@@ -10,7 +10,10 @@ import { tzOffsetMinutes } from "../../../lib/time.js";
 import type { BreakSlotView } from "../../log/service.js";
 
 const HOUR = 3_600_000;
-/** Kept free in every break: the station ID (:05) and, when there are sponsors, the credit (:15). */
+/**
+ * Kept free in every break: the station ID (:05; :10 for a station airing its generated one, once
+ * it's prepared) and, when there are sponsors, the credit (:15).
+ */
 export const STATION_ID_MS = 5_000;
 export const CREDIT_MS = 15_000;
 
@@ -41,11 +44,12 @@ export function createFiller({ services }: ModuleContext) {
   async function fillOne(stationId: string, slot: BreakSlotView, tz: string, hasCredits: boolean): Promise<FillResult> {
     const result: FillResult = { breakId: slot.id!, placed: [], skipped: [] };
     const startsAt = new Date(slot.startsAt);
-    const [rule, profile, already, entry] = await Promise.all([
+    const [rule, profile, already, entry, stationIdMs] = await Promise.all([
       services.stations.breakRule(stationId),
       services.stations.profiles([stationId]).then((m) => m.get(stationId)),
       services.spots.placedOnStation(stationId, new Date(startsAt.getTime() - HOUR), startsAt),
-      slot.logEntryId ? services.log.entries(stationId, new Date(startsAt.getTime() - 6 * HOUR), new Date(startsAt.getTime() + 1)) : Promise.resolve([])
+      slot.logEntryId ? services.log.entries(stationId, new Date(startsAt.getTime() - 6 * HOUR), new Date(startsAt.getTime() + 1)) : Promise.resolve([]),
+      services.playout.stationIdMs(stationId)
     ]);
     const blocked = new Set((profile?.blockedCategories ?? []).map((c) => c.toLowerCase()));
     let hourMs = already.reduce((s, a) => s + a.lengthSec * 1000, 0);
@@ -98,7 +102,9 @@ export function createFiller({ services }: ModuleContext) {
 
     // The station's own time, keeping room for the credit and the station ID.
     if (rule.openTimeTo === "spot_market") {
-      const stationMs = slot.lengthMs - slot.producerShareMs - STATION_ID_MS - (hasCredits ? CREDIT_MS : 0);
+      // A station whose credit never airs in breaks (its cadence, added 2026-09-29) keeps no room for it.
+      const credit = hasCredits && rule.cadence.underwriting.every !== "never";
+      const stationMs = slot.lengthMs - slot.producerShareMs - stationIdMs - (credit ? CREDIT_MS : 0);
       if (stationMs > 0) {
         const used = await tryPlace(await services.spots.rotationFor(stationId, "main"), stationMs);
         if (used < stationMs) await tryPlace(await services.spots.rotationFor(stationId, "backup"), stationMs - used);

@@ -97,6 +97,15 @@ describe("the break rule (station-settings 02.1)", () => {
   it("normalises the order", () => {
     expect(normaliseFillOrder(["SPT", "SID", "SPT", "UND"])).toEqual(["SPT", "UND", "SID"]);
   });
+  it("answers how often the station ID, bumpers and credit air, and keeps it when it's left out (added 2026-09-29)", async () => {
+    const r = await api("marcus", "GET", `/stations/${BEAT.id}/break-rule`);
+    expect(r.json.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } });
+    const cadence = { stationId: { every: "n_programs", n: 2 }, bumpers: { every: "never" }, underwriting: { every: "hour" } };
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence })).json.cadence).toEqual(cadence);
+    const { cadence: _left, ...rest } = r.json;
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, lengthMs: 90_000 })).json).toMatchObject({ lengthMs: 90_000, cadence });
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence: { ...cadence, stationId: { every: "never" } } })).status).toBe(400);
+  });
 });
 
 describe("translators (master-control A.5)", () => {

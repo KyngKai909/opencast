@@ -18,6 +18,8 @@ import { breakSlot, type DbBreak, type DbFill, type DbLogEntry } from "../fixtur
 import { DEFAULT_BREAK_MS, MOCK_STREAMS, PREVIEW_CARDS, TEST_SIGNAL, coverageUntil, deadAirWarnings, onAirState, placeRepeat, rowsOfBreak, saveOnAirState } from "../fixtures/onair";
 import { itemsPreparedCheck, readinessOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
+import { breakRuleOf, breaksAiring } from "../fixtures/station";
+import { GENERATED_SID_MS, GENERATED_SID_TITLE } from "./library";
 import { createTemplate, generateWindow, logDays, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
 const HOUR = 3_600_000;
@@ -140,13 +142,19 @@ function libraryItem(id: string) {
 const MIN = 60_000;
 const ceilMinute = (t: number) => Math.ceil(t / MIN) * MIN;
 
-/** A break after a program, as the rule places it: its bumper, then the station ID last. */
+/**
+ * A break after a program, as the rule places it: its bumper, then the station ID last. Without a
+ * station ID of its own, the generated one (added 2026-09-29). The rule's cadence leaves out the
+ * station ID or the bumper where it says (after every program: only in an "After …" break; never).
+ */
 function ruleBreak(stationId: string, startsAt: string, lengthMs: number, context: string, origin: DbBreak["origin"] = "rule"): DbBreak {
   const lib = getDb().library.items.filter((i) => i.stationId === stationId && i.status === "ready" && i.rights);
-  const sid = lib.find((i) => i.code === "SID");
+  const cadence = breakRuleOf(stationId).cadence;
+  const here = (part: "stationId" | "bumpers") => breaksAiring([{ startsAt, context }], part, { cadence }).length > 0;
+  const sid = lib.find((i) => i.code === "SID") ?? { id: null, title: GENERATED_SID_TITLE, durationMs: GENERATED_SID_MS };
   const bmp = lib.find((i) => i.code === "BMP");
-  const fill = (kind: DbFill["kind"], it: { id: string; title: string; durationMs: number | null }): DbFill => ({ id: uuid(), kind, title: it.title, lengthMs: it.durationMs ?? 0, itemId: it.id });
-  return { id: uuid(), stationId, startsAt, lengthMs, context, origin, producerShareMs: 0, fills: [...(bmp ? [fill("bumper", bmp)] : []), ...(sid ? [fill("station_id", sid)] : [])] };
+  const fill = (kind: DbFill["kind"], it: { id: string | null; title: string; durationMs: number | null }): DbFill => ({ id: uuid(), kind, title: it.title, lengthMs: it.durationMs ?? 0, itemId: it.id });
+  return { id: uuid(), stationId, startsAt, lengthMs, context, origin, producerShareMs: 0, fills: [...(bmp && here("bumpers") ? [fill("bumper", bmp)] : []), ...(here("stationId") ? [fill("station_id", sid)] : [])] };
 }
 
 function entry(stationId: string, o: Partial<LogEntry> & Pick<LogEntry, "startsAt" | "endsAt" | "title">): DbLogEntry {
@@ -162,7 +170,6 @@ export function signOnChecks(st: DbStation) {
   const to = new Date(t.getTime() + 24 * HOUR).toISOString();
   const entries = stationLog(id, from, to);
   const breaks = stationBreaks(id, from, to);
-  const lib = getDb().library.items.filter((i) => i.stationId === id);
   const checks: SignOnCheck[] = [];
 
   if (!st.ident.callSign) checks.push({ key: "call_sign_chosen", label: "Choose a call sign", passed: false, blocking: true, detail: "Three to five capital letters, on the Your station step" });
@@ -177,23 +184,33 @@ export function signOnChecks(st: DbStation) {
       : { key: "log_covers_24h", label: "The log covers the next 24 hours", passed: true, blocking: true, detail: until ? `Through ${timeOn(until, from)}` : null }
   );
 
-  // A station ID at least once an hour: in every break, and a break every hour.
-  const ids = breaks.reduce((a, b) => a + b.fills.filter((f) => f.kind === "station_id").length, 0);
-  const everyBreak = breaks.length > 0 && breaks.every((b) => b.fills.some((f) => f.kind === "station_id"));
-  let hourly = everyBreak;
+  // A station ID at least once an hour: a break every hour, with one in it as often as the rule's
+  // cadence says. Without a station ID of its own, the generated one airs (added 2026-09-29), so
+  // the library needn't have one. Breaks that don't come hourly block; a cadence that leaves an
+  // hour without one is a warning.
   const plannedOff = offAirFor(id, from, to);
-  for (let h = t.getTime(); hourly && h < t.getTime() + 24 * HOUR - HOUR; h += HOUR) {
-    const a = new Date(h).toISOString();
-    const z = new Date(h + HOUR).toISOString();
-    // Time off air doesn't need a station ID.
-    const offAir = stationLog(id, a, z).every((e) => e.kind === "off_air") || plannedOff.some((o) => o.startsAt <= a && o.endsAt >= z);
-    if (!offAir && !breaks.some((b) => b.startsAt >= a && b.startsAt < z)) hourly = false;
-  }
-  const hasSid = lib.some((i) => i.code === "SID" && i.status === "ready" && i.rights);
+  const withSid = breaksAiring(breaks, "stationId", breakRuleOf(id));
+  const ids = withSid.length;
+  const hourlyIn = (list: DbBreak[]) => {
+    if (!list.length) return false;
+    for (let h = t.getTime(); h < t.getTime() + 24 * HOUR - HOUR; h += HOUR) {
+      const a = new Date(h).toISOString();
+      const z = new Date(h + HOUR).toISOString();
+      // Time off air doesn't need a station ID.
+      const offAir = stationLog(id, a, z).every((e) => e.kind === "off_air") || plannedOff.some((o) => o.startsAt <= a && o.endsAt >= z);
+      if (!offAir && !list.some((b) => b.startsAt >= a && b.startsAt < z)) return false;
+    }
+    return true;
+  };
+  const breaksHourly = hourlyIn(breaks);
+  const hourly = breaksHourly && hourlyIn(withSid);
+  const label = "A station ID airs at least once an hour";
   checks.push(
-    hasSid && hourly
-      ? { key: "station_id_hourly", label: "A station ID airs at least once an hour", passed: true, blocking: true, detail: `In every break, ${ids} times a day` }
-      : { key: "station_id_hourly", label: "A station ID airs at least once an hour", passed: false, blocking: true, detail: hasSid ? "Some hours have no break with a station ID" : "Add a station ID to your library" }
+    hourly
+      ? { key: "station_id_hourly", label, passed: true, blocking: true, detail: ids === breaks.length ? `In every break, ${ids} times a day` : `${ids} times a day` }
+      : breaksHourly
+        ? { key: "station_id_hourly", label, passed: false, blocking: false, detail: `Some hours have no station ID, from how often it airs in breaks. ${ids} times a day` }
+        : { key: "station_id_hourly", label, passed: false, blocking: true, detail: "Some hours have no break with a station ID" }
   );
 
   // Rights confirmed for everything on the log.

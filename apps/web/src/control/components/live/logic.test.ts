@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { airedLabel, blockDetail, blockPhase, canContinueSetup, countdown, dayLabel, descriptionCount, elapsed, librarySummary, nextBlock, readyLine, relativeLabel, signalWords, whenLabel } from "./logic";
+import { airedLabel, blockDetail, blockPhase, countdown, dayLabel, descriptionCount, elapsed, librarySummary, nextBlock, readyLine, relativeLabel, signalWords, whenLabel } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 8:42:12 pm in Redlands.
@@ -94,10 +94,6 @@ describe("listings and the library", () => {
       { code: "BMP", durationMs: 10_000, rights: {} }
     ]);
     expect(s).toEqual({ count: 4, programs: "1 hr 28 min", shorts: ":15", needRights: 1 });
-  });
-  it("needs a program and a station ID to go on", () => {
-    expect(canContinueSetup([{ code: "PGM" }])).toBe(false);
-    expect(canContinueSetup([{ code: "PGM" }, { code: "SID" }])).toBe(true);
   });
   it("writes a ready item's line", () => {
     expect(readyLine({ picture: { height: 720 }, mediaKind: "video", audioLayout: "stereo" })).toBe("720p, stereo");

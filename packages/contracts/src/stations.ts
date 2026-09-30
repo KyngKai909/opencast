@@ -123,6 +123,21 @@ export const StationSetup = z.object({
   iabCategories: z.array(z.string()).optional()
 });
 
+/**
+ * Added 2026-09-29: how often a part of the break airs. `break`: in every break. `program`: in
+ * the break after every program (the break that ends a program's slot). `n_programs`: in the break
+ * after every `n` programs (counted from the last break it aired in). `hour`: once an hour, in the
+ * first break after the top of the hour (the station's time). `never`: not at all.
+ */
+export const BreakCadenceEvery = z.enum(["break", "program", "n_programs", "hour", "never"]);
+export const BreakCadence = z.object({
+  every: BreakCadenceEvery,
+  /** With `n_programs`: after every this many programs (2 to 12). */
+  n: z.number().int().min(2).max(12).optional()
+});
+/** The station ID can't be `never`. */
+export const StationIdCadence = BreakCadence.extend({ every: BreakCadenceEvery.exclude(["never"]) });
+
 export const BreakRule = z.object({
   mode: z.enum(["after_every_program", "every_n_minutes", "none"]),
   everyMinutes: z.number().int().positive().nullable(),
@@ -131,7 +146,11 @@ export const BreakRule = z.object({
   spotMsPerHour: Millis,
   /** Same spot, at most this many times an hour. */
   sameSpotPerHour: z.number().int().min(1),
-  /** After SPT. SID is always last and can't be removed. */
+  /**
+   * After SPT. SID is always last when it airs and can't be removed (how often it airs is
+   * `cadence.stationId`). The order is what master control shows; playout airs the credit, then
+   * bumpers, then the station ID after the spots.
+   */
   fillOrder: z.array(LogCode),
   openTimeTo: z.enum(["spot_market", "station_id_and_bumpers"]),
   blockedCategories: z.array(z.string()),
@@ -139,7 +158,21 @@ export const BreakRule = z.object({
    * "Ads from partners" (added 2026-09-28): a programmatic backfill for time still open after
    * the rotation, backups and thank-you credit. Only a flag until the backend supports it; off by default.
    */
-  adsFromPartners: z.boolean().optional()
+  adsFromPartners: z.boolean().optional(),
+  /**
+   * Added 2026-09-29: how often the station ID, bumpers and the thank-you credit air in breaks.
+   * Always in `getBreakRule`; left out of `setBreakRule`, what's set stays. The default is every
+   * break for all three (as before). Bumpers keep their place when they air (after the credit,
+   * filling what's left before the station ID); a break without them holds on the station ID slate.
+   * Open time, sign-on and dead-air fill still air the station ID and bumpers.
+   */
+  cadence: z
+    .object({
+      stationId: StationIdCadence,
+      bumpers: BreakCadence,
+      underwriting: BreakCadence
+    })
+    .optional()
 });
 
 export const Translator = z.object({
@@ -604,6 +637,9 @@ export type StationPage = z.infer<typeof StationPage>;
 export type SearchResult = z.infer<typeof SearchResult>;
 export type StationSetup = z.infer<typeof StationSetup>;
 export type BreakRule = z.infer<typeof BreakRule>;
+export type BreakCadence = z.infer<typeof BreakCadence>;
+export type BreakCadenceEvery = z.infer<typeof BreakCadenceEvery>;
+export type BreakCadences = NonNullable<BreakRule["cadence"]>;
 export type Translator = z.infer<typeof Translator>;
 export type LiveSource = z.infer<typeof LiveSource>;
 export type RelayBackground = z.infer<typeof RelayBackground>;

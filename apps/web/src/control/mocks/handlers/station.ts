@@ -7,7 +7,7 @@ import { ClaimsX, ClaimX } from "../../api/ext/station";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { PEOPLE, type MockPerson } from "../fixtures/people";
-import { ALWAYS_ON, DEAD_AIR_AT, defaultBreakRule, defaultPrefs, newId, saveStationState, stationState, type StationInvite } from "../fixtures/station";
+import { ALWAYS_ON, DEAD_AIR_AT, breakRuleOf, defaultPrefs, newId, saveStationState, stationState, type StationInvite } from "../fixtures/station";
 import { fail, needsUser, path, personOf, reply } from "../respond";
 import { offAirFor } from "../schedule";
 
@@ -232,10 +232,6 @@ export function normaliseFillOrder(order: LogCode[]): LogCode[] {
   return [...rest, "SID"];
 }
 
-function breakRuleOf(stationId: string): BreakRule {
-  return stationState().breakRules[stationId] ?? defaultBreakRule();
-}
-
 const breakHandlers = [
   http.get(path(stationsApi.getBreakRule), ({ request, params }) => {
     const p = needsUser(request);
@@ -254,8 +250,10 @@ const breakHandlers = [
     if (r instanceof Response) return r;
     const body = stationsApi.setBreakRule.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "invalid", "That break rule can't be saved.");
-    const rule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder) };
+    // Left out, the cadence stays as it was (added 2026-09-29).
+    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence: body.data.cadence ?? breakRuleOf(id).cadence };
     if (rule.mode === "every_n_minutes" && !rule.everyMinutes) return fail(400, "invalid", "Say how often breaks come.");
+    if (rule.cadence && Object.values(rule.cadence).some((c) => c.every === "n_programs" && !c.n)) return fail(400, "bad_request", "Say after how many programs.");
     if (rule.mode !== "every_n_minutes") rule.everyMinutes = null;
     stationState().breakRules[id] = rule;
     saveStationState();

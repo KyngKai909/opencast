@@ -28,11 +28,22 @@ import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
 import { captionRendition, languageTag, segmentVtt, vttContentId } from "../../../lib/captions.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
+import { isGeneratedStationId } from "./stationId.js";
 import { BAND_RENDITIONS, EDGE_FADE_MS, FPS, LADDER, REFERENCE, SEGMENT_MS, TARGET_LUFS, type Band, type Ladder, type Rendition, type RenditionName } from "./ladder.js";
 
 const PI = schema.preparedItems;
 const PR = schema.preparedRenditions;
 const PC = schema.preparedCaptions;
+
+/**
+ * The generated station ID's sound (added 2026-09-29): a soft bed, no voice. An A major chord of
+ * sine tones that swells in over 1.5 s, breathes slowly and fades over the last 2.5 s, about
+ * -30 LUFS (programs are levelled to -24), so it sits under whatever follows. An FFmpeg aevalsrc
+ * expression for a bed `seconds` long.
+ */
+export function soundBed(seconds: number): string {
+  return `(0.03*sin(2*PI*220*t)+0.022*sin(2*PI*277.18*t)+0.018*sin(2*PI*329.63*t)+0.01*sin(2*PI*440*t))*(0.85+0.15*sin(2*PI*0.5*t))*min(1,t/1.5)*min(1,max(0,${seconds}-t)/2.5)`;
+}
 
 /** Where FFmpeg's MPEG-TS muxer starts an item's timestamps (1.4 s at 90 kHz), when a segment can't be read. */
 export const DEFAULT_START_PTS = 126_000;
@@ -83,7 +94,8 @@ export function refKey(ref: MediaRef): string | null {
 
 export interface TranscodeJob {
   key: string;
-  source: { kind: "file"; path: string } | { kind: "slate"; png: string | null; seconds: number };
+  /** A slate is a picture held (or nothing, for sound only) over silence, or over the soft bed (`bed`, the generated station ID's). */
+  source: { kind: "file"; path: string } | { kind: "slate"; png: string | null; seconds: number; bed?: boolean };
   mediaKind: "video" | "audio";
   /** Known length (the library's), if any. The transcoder measures it anyway. */
   durationMs: number | null;
@@ -175,7 +187,7 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
         else inputs.push("-f", "lavfi", "-t", seconds, "-i", `color=c=0x101010:s=1280x720:r=${FPS}`);
         videoIn = "0:v";
       }
-      inputs.push("-f", "lavfi", "-t", seconds, "-i", "anullsrc=r=48000:cl=stereo");
+      inputs.push("-f", "lavfi", "-t", seconds, "-i", src.bed ? `aevalsrc=exprs='${soundBed(src.seconds)}':c=stereo:s=48000` : "anullsrc=r=48000:cl=stereo");
       audioIn = `${wantsVideo ? 1 : 0}:a`;
       levelled = false;
     } else {
@@ -346,7 +358,10 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
       let result: TranscodeResult | null = null;
       let source: TranscodeJob["source"] | null = null;
       if (wanted.length) {
-        source = row.kind === "slate" ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)) } : { kind: "file", path: await sourceFile(row, dir) };
+        source =
+          row.kind === "slate"
+            ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)), bed: isGeneratedStationId(key) }
+            : { kind: "file", path: await sourceFile(row, dir) };
         const out = path.join(dir, "out");
         result = await transcode({ key, source, mediaKind: row.mediaKind, durationMs: row.durationMs, renditions: wanted, outDir: out });
         if (typeof result.startPts === "number") {
@@ -415,7 +430,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
   /** Caption tracks uploaded to the items whose current file is this one. */
   async function uploadedTracks(key: string): Promise<CaptionInput[]> {
     // Files from before content IDs (`loc-…`) have no uploaded captions prepared with them.
-    if (key.startsWith("loc-") || key.startsWith("slate-")) return [];
+    if (key.startsWith("loc-") || key.startsWith("slate-") || isGeneratedStationId(key)) return [];
     const tracks = await services.library.captionTracksForContent(key);
     return tracks.map((t) => ({ vtt: t.vtt, language: t.language, source: "uploaded" as const }));
   }
@@ -449,7 +464,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
    * is prepared for TV. Returns how many tracks were prepared.
    */
   async function prepareCaptions(key: string, extra: CaptionInput[] = []): Promise<number> {
-    if (key.startsWith("slate-")) return 0;
+    if (key.startsWith("slate-") || isGeneratedStationId(key)) return 0;
     const lengths = await preparer.segmentMs(key, REFERENCE.tv);
     if (!lengths?.length) return 0;
     const tracks = [...extra, ...(await uploadedTracks(key))];
@@ -610,6 +625,30 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
       }
       if (!preparer.isReady(key, band)) throw new Error("the slate couldn't be prepared");
       return key;
+    },
+
+    /**
+     * A station's generated station ID (stationId.ts): queued to be prepared like any item (the
+     * picture, `png`, for the TV band; the bed alone on the radio band), unless it's ready. Doesn't
+     * wait. `png` is the picture on this worker's disk (the planner draws it).
+     */
+    async generated(spec: { key: string; png: string | null; band: Band; seconds: number; neededAt?: Date | null }): Promise<void> {
+      if (preparer.isReady(spec.key, spec.band)) return;
+      await refresh([spec.key]);
+      if (preparer.isReady(spec.key, spec.band)) return;
+      const picture = spec.band === "radio" ? null : spec.png;
+      await db
+        .insert(PI)
+        .values({ key: spec.key, kind: "slate", sourceLocation: picture, mediaKind: "video", status: "queued", renditions: [...BAND_RENDITIONS[spec.band]].sort(), durationMs: spec.seconds * 1000, neededAt: spec.neededAt ?? deps.clock.now() })
+        .onConflictDoUpdate({
+          target: PI.key,
+          set: {
+            // The picture is on this worker's disk: where it is now.
+            sourceLocation: sql`coalesce(excluded.source_location, ${PI.sourceLocation})`,
+            renditions: sql`array(select distinct unnest(${PI.renditions} || excluded.renditions) order by 1)`,
+            status: sql`case when ${PI.status} = 'ready' and not (excluded.renditions <@ ${PI.renditions}) then 'queued' else ${PI.status} end`
+          }
+        });
     },
 
     /** Prepares an item's caption tracks now (it must be prepared for TV already). */

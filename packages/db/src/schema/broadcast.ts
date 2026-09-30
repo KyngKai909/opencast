@@ -367,6 +367,12 @@ export const rightsConfirmations = broadcast.table(
   ]
 );
 
+/** How often a part of the break airs (`break_rules.cadence`). */
+export interface BreakCadenceRow {
+  every: "break" | "program" | "n_programs" | "hour" | "never";
+  n?: number;
+}
+
 export const breakRules = broadcast.table(
   "break_rules",
   {
@@ -381,13 +387,18 @@ export const breakRules = broadcast.table(
     /** Spot time per hour. Broadcast TV runs about 16 minutes; the default is 3:00. */
     spotMsPerHour: millis("spot_ms_per_hour").notNull().default(180_000),
     sameSpotPerHour: smallint("same_spot_per_hour").notNull().default(2),
-    /** Fill order after SPT: codes in order. SID is always last and can't be removed. */
+    /** Fill order after SPT: codes in order. SID is always last when it airs and can't be removed (how often it airs: `cadence`). */
     fillOrder: jsonb("fill_order").$type<string[]>().notNull().default(["SPT", "UND", "BMP", "SID"]),
     openTimeTo: text("open_time_to", { enum: ["spot_market", "station_id_and_bumpers"] })
       .notNull()
       .default("spot_market"),
     /** "Ads from partners": a programmatic backfill for time still open. Off by default; only a switch until it's built. */
     adsFromPartners: boolean("ads_from_partners").notNull().default(false),
+    /**
+     * Added 2026-09-29 (migration 0024): how often the station ID, bumpers and credit air in breaks,
+     * `{ stationId, bumpers, underwriting }`, each `{ every, n? }`. Null: every break for all three.
+     */
+    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow }>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [

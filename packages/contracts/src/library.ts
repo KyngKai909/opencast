@@ -113,13 +113,39 @@ export const Program = z.object({
     .optional()
 });
 
+/**
+ * Added 2026-09-29: a station's generated station ID. Ten seconds, full screen in the station's
+ * colour, with its call sign, channel, name and city, over a soft sound bed (the radio band: the
+ * bed alone). Prepared once like any item; made again (a new one, prepared again) when the
+ * station's name, call sign, channel, city or colour changes.
+ */
+export const GeneratedStationId = z.object({
+  code: z.literal("SID"),
+  durationMs: Millis,
+  /** What it sounds like: a soft sound bed (no voice). */
+  sound: z.enum(["bed", "silence"]),
+  /** `preparing` until it's prepared for the station's band (or not asked for yet); `failed` if it couldn't be. */
+  status: z.enum(["preparing", "ready", "failed"]),
+  /** What it shows (the station's own, as it is now). */
+  look: z.object({ callSign: z.string().nullable(), channel: z.string().nullable(), name: z.string(), city: z.string().nullable(), colour: z.string().nullable() }),
+  /** The prepared ID's own HLS playlist (VOD, the band's reference rendition), once ready; null before. */
+  playbackUrl: z.string().nullable()
+});
+export type GeneratedStationId = z.infer<typeof GeneratedStationId>;
+
 export const Library = z.object({
   items: z.array(LibraryItem),
   folders: z.array(Folder),
   programs: z.array(Program),
   /** The computed lists beside the station's folders. */
   needsAttention: z.object({ rightsToConfirm: z.number().int(), preparing: z.number().int() }),
-  importedFromLinks: z.number().int()
+  importedFromLinks: z.number().int(),
+  /**
+   * Added 2026-09-29: the station ID Opencast makes for a station that has none of its own that
+   * can air (none of type SID prepared with its rights confirmed). Null once one can: an uploaded
+   * station ID always wins. It isn't a library item (no id; it can't be edited, moved or removed).
+   */
+  generatedStationId: GeneratedStationId.nullable().optional()
 });
 
 export const ImportJob = z.object({

@@ -169,6 +169,13 @@
       "when": 1790713138371,
       "tag": "0023_radio_live_and_relay_backgrounds",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790726580049,
+      "tag": "0024_break_cadence",
+      "breakpoints": true
     }
   ]
 }

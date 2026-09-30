@@ -36,6 +36,7 @@ import { Quiet } from "../../pages/common";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "./data";
 import { FillOptions, useFill, type Gap } from "./Fill";
 import { offAirSource } from "./offAir";
+import { cadenceOf, cadenceWords } from "../station/breakRule";
 import { OffAirHoursSection } from "./OffAirHours";
 import { DayOrigin, RepeatDaySection } from "./RepeatDay";
 import { entrySource } from "./rundown";
@@ -222,7 +223,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
           <KeyValueList
             items={[
               { label: "Length", value: duration(rule.data.lengthMs) },
-              { label: "Station ID", value: "In every break" },
+              { label: "Station ID", value: cadenceWords(cadenceOf(rule.data).stationId) },
               { label: "Open time goes to", value: rule.data.openTimeTo === "spot_market" ? "The spot market" : "Your station ID and bumpers" }
             ]}
           />

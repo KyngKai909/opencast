@@ -2,13 +2,30 @@
 // history (L5) and replacing its file (L6). The Live and programming area owns this file.
 
 import { http } from "msw";
-import { libraryApi, type LibraryItem, type Program } from "@opencast/contracts";
+import { libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
 import type { MockPerson } from "../fixtures/people";
 import { preparationOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
+
+/** The generated station ID (added 2026-09-29): ten seconds over a soft sound bed. */
+export const GENERATED_SID_MS = 10_000;
+/** How the mock's breaks name it. */
+export const GENERATED_SID_TITLE = "Generated station ID";
+
+/**
+ * A station's generated station ID, while it has none of its own that can air (a station ID
+ * prepared, with its rights confirmed). The mock's is always prepared; it has no stream to preview.
+ */
+function generatedStationIdOf(stationId: string, items: LibraryItem[]): GeneratedStationId | null {
+  if (items.some((i) => i.code === "SID" && i.status === "ready" && i.rights)) return null;
+  const st = dbStation(stationId);
+  if (!st) return null;
+  const s = st.ident;
+  return { code: "SID", durationMs: GENERATED_SID_MS, sound: "bed", status: "ready", look: { callSign: s.callSign, channel: s.channel, name: s.name, city: s.homeCity ?? null, colour: s.colour }, playbackUrl: null };
+}
 
 type Role = "owner" | "operator" | "host";
 
@@ -106,6 +123,7 @@ export const libraryHandlers = [
     if (q.get("code")) items = items.filter((i) => i.code === q.get("code"));
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
     return reply(libraryApi.getLibrary.response, {
+      generatedStationId: generatedStationIdOf(id, all),
       items: items.map(withProbe),
       folders: lib.folders.map((f) => ({ ...f, itemCount: all.filter((i) => i.folderId === f.id).length })),
       programs: programsOf(id),

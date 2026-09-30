@@ -85,6 +85,11 @@ export interface LibraryService {
   hasLinkImports(programId: string): Promise<boolean>;
   /** A station's own station IDs and bumpers, ready for air with rights confirmed. */
   fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[] }>;
+  /**
+   * Added 2026-09-29: which of these stations have a station ID of their own ready with its rights
+   * confirmed (the rest air a generated one).
+   */
+  withOwnStationId(stationIds: string[]): Promise<Set<string>>;
   /** Programs ready to repeat (for filling dead air), most recent first. */
   repeatable(stationId: string, limit: number): Promise<ItemRef[]>;
   /** A claimable station's import of a covered creator work (the file comes later). */
@@ -624,6 +629,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .orderBy(asc(A.createdAt));
       const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs);
       return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
+    },
+
+    async withOwnStationId(stationIds) {
+      if (!stationIds.length) return new Set();
+      const rows = await db
+        .selectDistinct({ stationId: A.stationId })
+        .from(A)
+        .innerJoin(R, eq(R.assetId, A.id))
+        .where(and(inArray(A.stationId, stationIds), eq(A.code, "SID"), eq(A.status, "ready"), isNull(A.archivedAt)));
+      return new Set(rows.map((r) => r.stationId));
     },
 
     async repeatable(stationId, limit) {

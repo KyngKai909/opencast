@@ -1,7 +1,13 @@
 // The run sheet: what airs, second by second, from the program log. Programs play
 // at their times, split around the breaks inside them; each break airs its spots
 // (already placed and paid for), then the credit, bumpers and the station ID,
-// which is always last. Open time airs station ID and bumpers, never nothing.
+// which is always last when it airs. How often the station ID, bumpers and credit
+// air in breaks is the break rule's cadence (cadence.ts; every break by default).
+// Open time airs station ID and bumpers, never nothing.
+//
+// A station with no station ID of its own that can air airs its generated one (stationId.ts):
+// wherever a station ID airs (breaks, open time, dead-air fill, back from off air) once it's
+// prepared, the station ID slate before. An uploaded station ID always wins.
 //
 // Planned off air time (off air hours, a sign-off on the log) airs the sign-off slate for a minute,
 // then nothing: the channel's playlist ends and waits. The station ID airs in the last seconds
@@ -18,6 +24,12 @@ import type { BreakSlotView } from "../../log/service.js";
 import { clockTime } from "../../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
 import { Slates, type StationLook } from "./slates.js";
+import { breakPartsFor } from "./cadence.js";
+import type { Band } from "./ladder.js";
+import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
+
+/** A station ID or bumper to air: the library's, or the generated station ID. */
+type FillerRef = Pick<ItemRef, "id" | "title" | "contentId" | "location" | "mediaKind" | "durationMs"> & { generated?: boolean };
 
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
 export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
@@ -71,6 +83,11 @@ export interface PlannerOptions {
   /** Is the item prepared for this station's band? Without it, everything counts as ready. */
   isReady?: (ref: { contentId: string | null; location: string | null }, stationId: string) => boolean;
   slatesDir?: string;
+  /**
+   * Asks for a station's generated station ID to be prepared (it isn't yet). `png` is its picture
+   * (TV), drawn here. Without it, nothing is asked.
+   */
+  wantGenerated?: (spec: { stationId: string; key: string; band: Band; png: string | null; seconds: number }) => Promise<void>;
 }
 
 export function createPlanner({ deps, services }: ModuleContext, options: PlannerOptions = {}) {
@@ -83,25 +100,47 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
     return ref.contentId ? `cid:${ref.contentId}` : ref.location!;
   }
 
-  async function look(stationId: string): Promise<StationLook & { bug: { mode: string; opacity: number } }> {
+  async function look(stationId: string): Promise<StationLook & { bug: { mode: string; opacity: number }; band: Band }> {
     const l = await services.stations.look(stationId);
-    return l ?? { callSign: null, channel: null, name: "Opencast", homeCity: null, colour: null, bug: { mode: "off", opacity: 78 } };
+    return l ?? { callSign: null, channel: null, name: "Opencast", homeCity: null, colour: null, bug: { mode: "off", opacity: 78 }, band: "tv" };
   }
 
-  /** Station IDs and bumpers to fill `ms`, the station ID last. */
+  /**
+   * The station's generated station ID, when it's prepared (it's asked for when it isn't, if
+   * `ask`: the station has no station ID of its own that can air).
+   */
+  async function generatedId(stationId: string, station: StationLook & { band: Band }, ask: boolean): Promise<FillerRef | null> {
+    const key = generatedStationIdKey(station, station.band);
+    if (fileAt(stationId, { contentId: key, location: null })) {
+      return { id: "", title: `${station.callSign ?? station.name} ${station.channel ?? ""}`.trim(), contentId: key, location: null, mediaKind: "video", durationMs: GENERATED_SID_MS, generated: true };
+    }
+    if (ask && options.wantGenerated) {
+      const png = station.band === "radio" ? null : await slates.stationIdCard(station);
+      await options.wantGenerated({ stationId, key, band: station.band, png, seconds: GENERATED_SID_MS / 1000 }).catch(() => undefined);
+    }
+    return null;
+  }
+
+  /**
+   * Station IDs and bumpers to fill `ms`, the station ID last. A break's cadence may leave out the
+   * station ID or the bumpers (`parts`); what's left holds on the station ID slate.
+   */
   async function filler(
     stationId: string,
     startsAt: Date,
     ms: number,
     context: { key: string; reason: AsRunReason; inBreak: boolean; breakId?: string },
-    fillers: { stationIds: ItemRef[]; bumpers: ItemRef[] },
+    fillers: { stationIds: FillerRef[]; bumpers: FillerRef[] },
     station: StationLook,
-    withBumpers = true
+    parts: { bumpers: boolean; stationId: boolean } = { bumpers: true, stationId: true }
   ): Promise<Segment[]> {
     const out: Segment[] = [];
     if (ms <= 0) return out;
-    const sid = fillers.stationIds[0];
-    const sidMs = Math.min(ms, sid?.durationMs ?? STATION_ID_MS);
+    const withBumpers = parts.bumpers;
+    let sid: FillerRef | undefined = fillers.stationIds[0];
+    // The generated station ID airs whole (ten seconds); with less room, the station ID slate.
+    if (sid?.generated && ms < sid.durationMs!) sid = undefined;
+    const sidMs = parts.stationId ? Math.min(ms, sid?.durationMs ?? STATION_ID_MS) : 0;
     let cursor = startsAt.getTime();
     let left = ms - sidMs;
     let n = 0;
@@ -121,6 +160,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       out.push({ key: `${context.key}:open`, startsAt: new Date(cursor), endsAt: new Date(cursor + left), code: "OPEN", label: "Station ID slate", source: { kind: "image", path: await slates.stationId(station) }, slate: "station_id", reason: context.reason, inBreak: context.inBreak, breakId: context.breakId });
       cursor += left;
     }
+    if (!parts.stationId) return out;
     out.push({
       key: `${context.key}:sid`,
       startsAt: new Date(cursor),
@@ -132,7 +172,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       reason: context.reason,
       inBreak: context.inBreak,
       breakId: context.breakId,
-      itemId: sid?.id
+      itemId: sid?.id || undefined
     });
     return out;
   }
@@ -156,7 +196,14 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       const offAirBlocks = offAirStretches(offAirSpans).map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.backAt), logEntryId: o.logEntryId }));
       const entries = allEntries.filter((e) => e.kind !== "off_air");
       // Only station IDs and bumpers that are prepared.
-      const fillers = { stationIds: allFillers.stationIds.filter((f) => fileAt(stationId, f)), bumpers: allFillers.bumpers.filter((f) => fileAt(stationId, f)) };
+      const fillers: { stationIds: FillerRef[]; bumpers: FillerRef[] } = { stationIds: allFillers.stationIds.filter((f) => fileAt(stationId, f)), bumpers: allFillers.bumpers.filter((f) => fileAt(stationId, f)) };
+      // No station ID of its own ready: the generated one (asked for when there's none that could be).
+      if (!fillers.stationIds.length) {
+        const generated = await generatedId(stationId, station, !allFillers.stationIds.length);
+        if (generated) fillers.stationIds.push(generated);
+      }
+      // How often the station ID, bumpers and credit air in each break (every break by default).
+      const partsOf = await breakPartsFor({ deps, services }, stationId, { breaks, entries: { rows: allEntries, from: lookback, to } });
       const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
       const [items, airings, programs, offAir] = await Promise.all([
         services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v))),
@@ -202,8 +249,11 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const entry = entries.find((e) => e.id === entryId);
         const programId = entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
         const sponsors = credits.filter((c) => c.programId === null || c.programId === programId);
-        if ((sponsors.length || members.named.length) && end - cursor >= STATION_ID_MS + 10_000) {
-          const len = Math.min(CREDIT_MS, end - cursor - STATION_ID_MS);
+        const parts = partsOf(slot);
+        // Room for the station ID after it (the generated one is ten seconds).
+        const sidRoom = parts.stationId ? (fillers.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
+        if (parts.underwriting && (sponsors.length || members.named.length) && end - cursor >= sidRoom + 10_000) {
+          const len = Math.min(CREDIT_MS, end - cursor - sidRoom);
           const programSponsors = sponsors.some((c) => c.programId && c.programId === programId);
           const subject = programSponsors && programId ? (programs.get(programId)?.title ?? station.name) : station.name;
           out.push({
@@ -220,7 +270,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
           });
           cursor += len;
         }
-        out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station)));
+        out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station, parts)));
         // Reported when the break airs; if the file arrives first, the break is planned again with it.
         const firstAfterSpots = out.findIndex((s) => s.code !== "SPT");
         if (missing && firstAfterSpots >= 0) out[firstAfterSpots] = { ...out[firstAfterSpots], missing };
@@ -246,7 +296,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         segments.push({ ...base, key: `off:${block.s}`, startsAt: new Date(block.s), endsAt: new Date(block.s + SIGN_OFF_SLATE_MS), source: slate });
         segments.push({ ...base, key: `off:${block.s}:dark`, startsAt: new Date(block.s + SIGN_OFF_SLATE_MS), endsAt: new Date(block.e - sidMs), source: { kind: "off", backAt: new Date(block.e) } });
         // Back on: the station ID first.
-        segments.push(...(await filler(stationId, new Date(block.e - sidMs), sidMs, { key: `on:${block.e}`, reason: "planned", inBreak: false }, fillers, station, false)));
+        segments.push(...(await filler(stationId, new Date(block.e - sidMs), sidMs, { key: `on:${block.e}`, reason: "planned", inBreak: false }, fillers, station, { bumpers: false, stationId: true })));
       };
 
       const blocks = [
