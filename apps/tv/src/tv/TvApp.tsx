@@ -16,6 +16,7 @@ import { useNotForMeFlag } from "../components/watching/notForMe";
 import { now, MARKET_TZ } from "../lib/clock";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
+import { useAccountMotion } from "./motion";
 import { getDevice, setDevice, useDevice } from "./device";
 import { startFocus } from "./focus";
 import { queryClient } from "./queryClient";
@@ -118,6 +119,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   const { presets } = usePresets();
   // A signed-in TV picks up settings changed on the account (another TV, the phone) as it starts.
   useAccountSettingsSync();
+  useAccountMotion();
 
   ui.current = {
     path: () => path.current,
