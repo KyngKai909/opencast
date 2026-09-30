@@ -2,8 +2,8 @@
 // now, the most the API gives in one call), the heading for the day on screen, the grid's rows,
 // and which button a listing leads with.
 
-import { createElement } from "react";
-import type { GuideProgram, GuideStation } from "@opencast/ui";
+import { createElement, Fragment } from "react";
+import { LiveText, type GuideProgram, type GuideStation } from "@opencast/ui";
 import type { AiringX, GuideX } from "../../api/ext";
 import { BackAt } from "../watch/lines";
 import { isOffAir, zoned } from "../watch/logic";
@@ -67,6 +67,25 @@ export function airingKey(a: Pick<AiringX, "logEntryId" | "listedAiringId" | "st
   return a.logEntryId ?? a.listedAiringId ?? `${stationId}@${a.startsAt}`;
 }
 
+/** The shortest gap an external station's row fills with "Live, nothing listed". */
+const NOTHING_LISTED_MIN_MS = 15 * 60_000;
+
+/** An external station's airings with its gaps in the window filled: its own stream, nothing listed. */
+export function withNothingListed(airings: AiringX[], name: string, from: string, to: string): Array<AiringX | { title: string; startsAt: string; endsAt: string; nothingListed: true }> {
+  const out: Array<AiringX | { title: string; startsAt: string; endsAt: string; nothingListed: true }> = [];
+  let at = Date.parse(from);
+  const gap = (end: number) => {
+    if (end - at >= NOTHING_LISTED_MIN_MS) out.push({ title: name, startsAt: new Date(at).toISOString(), endsAt: new Date(end).toISOString(), nothingListed: true });
+  };
+  for (const a of [...airings].sort((x, y) => x.startsAt.localeCompare(y.startsAt))) {
+    gap(Date.parse(a.startsAt));
+    out.push(a);
+    at = Math.max(at, Date.parse(a.endsAt));
+  }
+  gap(Date.parse(to));
+  return out;
+}
+
 /** The guide's rows as the grid draws them, optionally only the given stations (the Presets filter). */
 export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> | null, timeZone?: string): GuideStation[] {
   return (guide?.rows ?? [])
@@ -75,7 +94,11 @@ export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> |
       id: r.station.id,
       channel: r.station.channel ?? "",
       callSign: r.station.callSign ?? r.station.handle ?? "",
-      programs: r.airings.map((a): GuideProgram => {
+      external: r.station.kind === "listed",
+      // An external station is on between what its source lists (follow-up Phase 6): its name,
+      // "Live, nothing listed", never a made-up title.
+      programs: (r.station.kind === "listed" && guide ? withNothingListed(r.airings, r.station.name, guide.from, guide.to) : r.airings).map((a): GuideProgram => {
+        if ("nothingListed" in a) return { id: `${r.station.id}@live@${a.startsAt}`, title: a.title, start: a.startsAt, end: a.endsAt, listed: true, detail: createElement(Fragment, null, createElement(LiveText), ", nothing listed") };
         const id = airingKey(a, r.station.id);
         // Planned off air (G9): one block from sign-off to sign-on, "Off air, Signs on at 6:00 am".
         if (isOffAir(a)) return { id, title: a.title, start: a.startsAt, end: a.endsAt, detail: createElement(BackAt, { at: a.backAt ?? a.endsAt, timeZone }) };

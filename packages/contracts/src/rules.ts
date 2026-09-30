@@ -298,6 +298,23 @@ export const RULES = {
     fallback: { viewers: 20, carriedAirings: 2 },
     display: (v) => `${v.viewers} ${v.viewers === 1 ? "viewer" : "viewers"}, other stations' airings ${v.carriedAirings} or more together`
   }),
+  // External stations (added 2026-09-30, follow-up Phase 6; Open, A200 and A201). No first version: the fallback holds until one is set.
+  "external.other_markets": def({
+    group: "external",
+    title: "Other markets' streams",
+    detail: "Whether a source from outside a market can be an external station on its dial, for example a county meeting that covers two markets. Off: such a listing is saved but waits",
+    schema: z.object({ allowed: z.boolean() }),
+    fallback: { allowed: false },
+    display: (v) => (v.allowed ? "Allowed" : "Not allowed")
+  }),
+  "external.dash_stream_links": def({
+    group: "external",
+    title: "DASH stream links",
+    detail: "Opencast's player plays HLS everywhere. DASH needs a player library on the web and some TVs. Off: a DASH-only stream link is saved but waits, and the source's official embed or HLS address is listed instead",
+    schema: z.object({ played: z.boolean() }),
+    fallback: { played: false },
+    display: (v) => (v.played ? "Played" : "Not played yet")
+  }),
   "features.not_for_me": def({
     group: "features",
     title: "\"Not for me\" in the player",

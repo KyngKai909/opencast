@@ -13,6 +13,7 @@ import { call, setAuthHandlers, setTokenSource } from "../api/client";
 import { useAccountSettingsSync } from "../components/settings/useTvSettings";
 import { hintsFor, keyHintsHidden, readFirstUse } from "../components/watching/hintRow";
 import { useNotForMeFlag } from "../components/watching/notForMe";
+import { config } from "../config";
 import { now, MARKET_TZ } from "../lib/clock";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
@@ -87,6 +88,13 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
     [mode]
   );
   const engineRef = useRef<import("@opencast/player").PlayerEngine | null>(null);
+  // Mock mode: the console's mock controls (mocks/browser.ts) change the mock world; what's open reads it again.
+  useEffect(() => {
+    if (!config.mock) return;
+    const again = () => void queryClient.invalidateQueries();
+    window.addEventListener("oc-mock-changed", again);
+    return () => window.removeEventListener("oc-mock-changed", again);
+  }, []);
   const Router = mode === "tv" ? BrowserRouter : MemoryRouter;
   return (
     <QueryClientProvider client={queryClient}>
@@ -185,6 +193,10 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   useEffect(() => {
     if (!started.current || !state.currentId || !channels.length) return;
     if (channels.some((c) => c.station.id === state.currentId)) return;
+    // An external station of this market that left the dial because its stream is down (follow-up
+    // Phase 6) isn't another market: the player stands by on it until it's back.
+    const held = engine.getState().channels.find((c) => c.station.id === state.currentId);
+    if (held?.station.kind === "listed" && held.station.marketSlug === channels[0]?.station.marketSlug) return;
     const first = channels.find((c) => c.station.band === "tv") ?? channels[0];
     void engine.tune(first.station.id, { input: "app" });
   }, [channels, engine, state.currentId]);

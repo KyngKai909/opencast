@@ -46,7 +46,7 @@ export interface Db {
   seq: number;
 }
 
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 export const DB_KEY = "oc-mock-desk-db";
 
 export function seed(): Db {
@@ -253,7 +253,9 @@ export function creatorView(c: DbCreator): Creator {
     claimedAt: c.claimedAt,
     licenceName: c.licenceName,
     pronoun: c.pronoun,
-    setup
+    setup,
+    lead: c.lead ?? null,
+    listedSourceId: c.listedSourceId ?? null
   };
 }
 

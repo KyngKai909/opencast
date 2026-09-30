@@ -130,7 +130,8 @@ export function stationTimeline({ n, items, slateSegments }) {
 
 /** DATERANGE lines for an item starting at segment `k0` (the contract's dateRangeTag). */
 function tagsFor({ station, it, k0, pdt, seg, backAt, host, breakSegments }) {
-  if (!contracts) return [];
+  // An external station's stream (follow-up Phase 6) is the source's own: none of Opencast's tags.
+  if (!contracts || station.external) return [];
   const { dateRangeTag, HLS_CLASS } = contracts;
   const g = GRAPHICS[station.slug] ?? {};
   const tv = !station.audioOnly;

@@ -30,8 +30,6 @@ export interface NetworkService extends DeskPart {
   listedAiringsByIds(ids: string[]): Promise<Map<string, ListedAiringRef>>;
   listedAiringsInWindow(stationIds: string[], from: Date, to: Date): Promise<Map<string, ListedAiringRef[]>>;
   searchListedAirings(q: string, after: Date): Promise<ListedAiringRef[]>;
-  /** A listed station plays in the source's own player. */
-  listedPlayback(stationIds: string[]): Promise<Map<string, string>>;
   /** For a claimable station: who it's run for, and whether it's been claimed. */
   claimableInfo(stationId: string): Promise<{ runFor: string; claimed: boolean } | null>;
   /** Added 2026-09-29: the market a creator is in (a market lead works only in theirs). */
@@ -182,16 +180,6 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
         .orderBy(asc(schema.listedAirings.startsAt))
         .limit(20);
       return rows.map(({ airing, source }) => listedRef(airing, source.stationId));
-    },
-
-    async listedPlayback(stationIds) {
-      if (!stationIds.length) return new Map();
-      const rows = await db
-        .select({ stationId: schema.listedSources.stationId, url: schema.listedSources.streamUrl, embed: schema.listedSources.embedTerms })
-        .from(schema.listedSources)
-        .where(inArray(schema.listedSources.stationId, stationIds));
-      // "Terms unclear" means we link to the source rather than embed it; both play in the source's player.
-      return new Map(rows.map((r) => [r.stationId, r.url]));
     },
 
     async claimableInfo(stationId) {

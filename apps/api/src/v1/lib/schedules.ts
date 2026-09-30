@@ -1,0 +1,128 @@
+// An external station's "what's on" (follow-up Phase 6): the source's own calendar or schedule
+// feed, in whichever of the four shapes sources publish: iCalendar, RSS (with the RSS event
+// module's start and end, else each item's date), JSON (an array of events, or `events` / `items`)
+// or XMLTV (guide data). Titles are the source's own; nothing is made up, and an entry without a
+// title or a start time is left out.
+
+import { parseIcs, type CalendarEvent } from "./ics.js";
+
+export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv";
+
+/** The format from the address, then the answer's type, then the text itself. */
+export function detectScheduleFormat(url: string, contentType: string | null, text: string): ScheduleFormat {
+  const path = url.split(/[?#]/)[0].toLowerCase();
+  if (path.endsWith(".ics") || /text\/calendar/i.test(contentType ?? "")) return "ical";
+  const head = text.trimStart().slice(0, 400);
+  if (head.startsWith("BEGIN:VCALENDAR")) return "ical";
+  if (head.startsWith("{") || head.startsWith("[") || /json/i.test(contentType ?? "")) return "json";
+  if (/<tv[\s>]/i.test(text.slice(0, 2000)) || path.endsWith(".xmltv")) return "xmltv";
+  return "rss";
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+/** Text inside an element, with CDATA unwrapped and entities decoded. */
+function textOf(xml: string): string {
+  const cdata = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(xml);
+  const raw = cdata ? cdata[1] : xml.replace(/<[^>]+>/g, "");
+  return raw
+    .replace(/&(#x?[0-9a-f]+|\w+);/gi, (m, e: string) => {
+      if (e[0] === "#") {
+        const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      }
+      return ENTITIES[e.toLowerCase()] ?? m;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function element(block: string, names: string[]): string | null {
+  for (const name of names) {
+    const found = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i").exec(block);
+    if (found) return textOf(found[1]);
+  }
+  return null;
+}
+
+function date(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const t = Date.parse(value);
+  return Number.isNaN(t) ? null : new Date(t);
+}
+
+function parseRss(text: string): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+  for (const [, block] of text.matchAll(/<(?:item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/(?:item|entry)>/gi)) {
+    const summary = element(block, ["title"]);
+    // The RSS event module's start, else a feed's own start field, else the item's date.
+    const start = date(element(block, ["ev:startdate", "startdate", "start", "dtstart", "pubDate", "published", "updated"]));
+    if (!summary || !start) continue;
+    const end = date(element(block, ["ev:enddate", "enddate", "end", "dtend"]));
+    events.push({ uid: element(block, ["guid", "id"]), summary, start, end: end && end > start ? end : null });
+  }
+  return events;
+}
+
+function parseJson(text: string): CalendarEvent[] {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const list = Array.isArray(data) ? data : ((data as { events?: unknown[]; items?: unknown[] })?.events ?? (data as { items?: unknown[] })?.items ?? []);
+  const pick = (o: Record<string, unknown>, keys: string[]) => {
+    for (const k of keys) if (typeof o[k] === "string" && (o[k] as string).trim()) return (o[k] as string).trim();
+    return null;
+  };
+  const events: CalendarEvent[] = [];
+  for (const item of list) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const summary = pick(o, ["title", "name", "summary"]);
+    const start = date(pick(o, ["start", "startsAt", "start_time", "startTime", "startDate", "dtstart"]));
+    if (!summary || !start) continue;
+    const end = date(pick(o, ["end", "endsAt", "end_time", "endTime", "endDate", "dtend"]));
+    const id = o.id ?? o.uid;
+    events.push({ uid: id === undefined || id === null ? null : String(id), summary, start, end: end && end > start ? end : null });
+  }
+  return events;
+}
+
+/** XMLTV's time: `20260926190000 -0700` (the offset optional: UTC). */
+function xmltvDate(value: string | null): Date | null {
+  const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4})?/.exec(value?.trim() ?? "");
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s = "00", off] = m;
+  const utc = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s);
+  if (!off) return new Date(utc);
+  const sign = off[0] === "-" ? -1 : 1;
+  const minutes = sign * (Number(off.slice(1, 3)) * 60 + Number(off.slice(3, 5)));
+  return new Date(utc - minutes * 60_000);
+}
+
+function parseXmltv(text: string, channel: string | null): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+  for (const [, attrs, block] of text.matchAll(/<programme\s([^>]*)>([\s\S]*?)<\/programme>/gi)) {
+    const attr = (name: string) => new RegExp(`\\b${name}="([^"]*)"`, "i").exec(attrs)?.[1] ?? null;
+    if (channel && attr("channel") !== channel) continue;
+    const summary = element(block, ["title"]);
+    const start = xmltvDate(attr("start"));
+    if (!summary || !start) continue;
+    const end = xmltvDate(attr("stop"));
+    events.push({ uid: `${attr("channel") ?? ""}@${attr("start")}`, summary, start, end: end && end > start ? end : null });
+  }
+  return events;
+}
+
+/**
+ * The feed's events. An XMLTV file with several channels is read for the one the address's
+ * fragment names (`…/guide.xml#channel=NASA.us`); without one, every programme in it.
+ */
+export function parseSchedule(text: string, format: ScheduleFormat, url = ""): CalendarEvent[] {
+  if (format === "ical") return parseIcs(text);
+  if (format === "json") return parseJson(text);
+  if (format === "xmltv") return parseXmltv(text, /#channel=([^&]+)/.exec(url)?.[1] ? decodeURIComponent(/#channel=([^&]+)/.exec(url)![1]) : null);
+  return parseRss(text);
+}

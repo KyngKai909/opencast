@@ -63,6 +63,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
   notifications: ["notify.*"],
   waitlist: ["network.waitlist_signups", "network.call_sign_reservations", "network.channel_holds"],
   network: [
+    // External stations (follow-up Phase 6): written permissions for stream links, and outages.
+    "network.stream_permissions",
+    "network.external_outages",
     "network.markets",
     "network.zip_markets",
     "network.creators",

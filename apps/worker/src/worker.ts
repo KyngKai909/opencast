@@ -17,6 +17,7 @@ import { gzipSync } from "node:zlib";
 import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
 import { STORAGE_ROOT } from "./config.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
+import { startExternalChecks } from "./externalChecks.js";
 
 const TICK_MS = 1_000;
 // This replica's name in the leadership lease.
@@ -33,6 +34,8 @@ const jobs = createJobs(deps, services);
 let leader = false;
 let lastJobs = 0;
 let ticking = false;
+// External stations' streams, checked every minute on the leader (follow-up Phase 6).
+const stopExternalChecks = startExternalChecks(services, () => leader);
 
 async function tick() {
   if (ticking) return;
@@ -129,6 +132,7 @@ async function shutdown(signal: NodeJS.Signals) {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(interval);
+  stopExternalChecks();
   health.close();
   console.log(`[worker] ${signal}: signing stations off the worker`);
   await engine.stopAll();

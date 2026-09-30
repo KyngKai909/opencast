@@ -2,7 +2,8 @@
 // still playing in a window at the top right, and six stations by two hours below. Arrows move
 // through the grid (▲ ▼ keep the time), CH pages six stations, numbers jump to a channel, OK on
 // what's on now tunes and closes, OK on a later program opens its options (nested, so Back comes
-// back to the same cell), Back closes the guide.
+// back to the same cell), Back closes the guide. An external station's cells (follow-up Phase 6)
+// say whose stream it is; its time with nothing listed tunes in, and has no options.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
@@ -16,7 +17,9 @@ import { getDevice } from "../../tv/device";
 import { heldReminderKey } from "../../components/guide/optionsLogic";
 import { useDescriptions, useGuideData } from "../../components/guide/data";
 import {
+  cellTitle,
   describe,
+  externalLine,
   focusedCell,
   focusOn,
   guideCommand,
@@ -143,6 +146,7 @@ export default function Guide() {
   const current = player.channels.find((c) => c.station.id === player.currentId);
   const description = cell ? describe(cell.airing, cell.airing?.programId ? descriptions.get(cell.airing.programId) : null) : null;
   const offAir = cell && row ? offAirLine(cell, row.station, MARKET_TZ) : null;
+  const external = cell && row ? externalLine(cell, row.station, player.channels.find((c) => c.station.id === row.station.id)?.external?.source) : null;
   const hint = cell ? okHint(cell, now) : null;
 
   let body;
@@ -175,7 +179,7 @@ export default function Guide() {
           {cell && row ? (
             <>
               <div className="tvg__when oc-mono">{whenLine(cell, row.station, MARKET_TZ)}</div>
-              <h2 className="tvg__title">{cell.airing?.title ?? "Off air"}</h2>
+              <h2 className="tvg__title">{cellTitle(cell, row.station)}</h2>
               {description ? (
                 <p className="tvg__desc">
                   {description.liveLead ? (
@@ -189,6 +193,8 @@ export default function Guide() {
                 </p>
               ) : offAir ? (
                 <p className="tvg__desc">{offAir}</p>
+              ) : external ? (
+                <p className="tvg__desc">{external}</p>
               ) : null}
               <div className="tvg__hint">
                 {hint && (

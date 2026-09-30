@@ -143,7 +143,7 @@ function Options({ cellKey, found }: { cellKey: string; found: NonNullable<Retur
             <TvButton
               focusKey="tvg-tune"
               label={`Tune to ${call} now`}
-              detail={tuneDetail(dialRow?.now?.title, dialRow?.onAir)}
+              detail={tuneDetail(dialRow?.now?.title, dialRow?.onAir, dialRow?.station.kind === "listed" ? dialRow.external?.source : null)}
               onSelect={() => {
                 if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
                 navigate("/", { replace: true });

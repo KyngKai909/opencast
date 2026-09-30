@@ -1,17 +1,17 @@
 // Network desk: Opencast's own view of each market's dial, the creator pipeline,
 // permission and licence records, claimable stations set up from recipes, held
-// earnings, and listed city streams.
+// earnings, and external stations (external.ts).
 
 import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { formatChannelNumber, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
-import { RecipeBreakRule, type ClaimPage, type Creator, type CreatorWork, type HeldEarnings, type ListedSource, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
+import { RecipeBreakRule, type ClaimPage, type Creator, type CreatorWork, type HeldEarnings, type Market, type MarketBoard, type PermissionPage, type Recipe } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, notFound, refused } from "../../errors.js";
-import { parseIcs } from "../../lib/ics.js";
 import { clockTime, localDay, localDate } from "../../lib/time.js";
+import { createExternal, type ExternalPart } from "./external.js";
 
 type Stage = Creator["stage"];
 type Pronoun = "she" | "he" | "they";
@@ -42,7 +42,8 @@ function handoverStatus(h: { approvedAt: Date | null; payableAfter: Date | null;
   return "verifying";
 }
 
-export interface DeskPart {
+/** External stations (follow-up Phase 6) are in external.ts. */
+export interface DeskPart extends ExternalPart {
   board(marketSlug: string, band: Band): Promise<MarketBoard>;
   createMarket(input: { slug: string; name: string; timezone: string; zips: string[] }): Promise<Market>;
   creators(filter: { marketId?: string; stage?: Stage }): Promise<Creator[]>;
@@ -100,9 +101,6 @@ export interface DeskPart {
   onEscrowEvent(stationId: string, event: import("../../chain/index.js").EscrowEvent): Promise<void>;
   /** N10: the creator's claim page, by their permission link's token. */
   claimPage(token: string): Promise<ClaimPage>;
-  listedSources(marketId?: string): Promise<ListedSource[]>;
-  addListedSource(input: { marketId: string; band: Band; channel: string; callSign: string; name: string; description?: string; streamUrl: string; embedTerms: "allowed" | "unclear"; calendarUrl?: string }): Promise<ListedSource>;
-  syncListedSource(sourceId: string): Promise<ListedSource>;
 }
 
 const CR = schema.creators;
@@ -113,7 +111,6 @@ const PW = schema.permissionRecordWorks;
 const LR = schema.licenceRecords;
 const RE = schema.recipes;
 const LS = schema.listedSources;
-const LA = schema.listedAirings;
 const HO = schema.handovers;
 const WAITING_PERIOD_MS = 72 * 3_600_000;
 
@@ -134,7 +131,7 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
     if (!rows.length) return [];
     const ids = rows.map((r) => r.id);
     const stationIds = rows.map((r) => r.stationId).filter((v): v is string => Boolean(v));
-    const [counts, idents, asked, answered, claimed, licences, profiles, signOns, imports, operators] = await Promise.all([
+    const [counts, idents, asked, answered, claimed, licences, profiles, signOns, imports, operators, externals] = await Promise.all([
       db
         .select({ creatorId: W.creatorId, n: sql<number>`count(*)::int`, ms: sql<number>`coalesce(sum(${W.durationMs}), 0)::bigint` })
         .from(W)
@@ -165,7 +162,9 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       services.stations.profiles(stationIds),
       services.playout.nextSignOn(stationIds),
       services.library.creatorWorkImports(stationIds),
-      services.accounts.displayNames(rows.map((r) => r.operatorUserId).filter((v): v is string => Boolean(v)))
+      services.accounts.displayNames(rows.map((r) => r.operatorUserId).filter((v): v is string => Boolean(v))),
+      // Phase 6: the external station a lead became.
+      db.select({ id: LS.id, creatorId: LS.creatorId }).from(LS).where(inArray(LS.creatorId, ids))
     ]);
     const dateOf = (list: Array<{ creatorId: string; at: Date | string | null }>, id: string) => {
       const at = list.find((x) => x.creatorId === id)?.at;
@@ -218,7 +217,20 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         claimedAt: dateOf(claimed, r.id),
         licenceName: licence ? licenceName(licence.licence, licence.url) : null,
         ...(r.pronoun ? { pronoun: r.pronoun } : {}),
-        setup
+        setup,
+        lead:
+          r.leadSource === "iptv_list" && r.streamUrl
+            ? {
+                from: "iptv_list" as const,
+                streamUrl: r.streamUrl,
+                listUrl: r.leadListUrl,
+                tvgId: r.leadDetails?.tvgId ?? null,
+                group: r.leadDetails?.group ?? null,
+                country: r.leadDetails?.country ?? null,
+                logoUrl: r.leadDetails?.logoUrl ?? null
+              }
+            : null,
+        listedSourceId: externals.find((x) => x.creatorId === r.id)?.id ?? null
       };
     });
   }
@@ -386,37 +398,9 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
     return request;
   }
 
-  async function listedViews(rows: Array<typeof LS.$inferSelect>): Promise<ListedSource[]> {
-    if (!rows.length) return [];
-    const idents = await services.stations.idents(rows.map((r) => r.stationId));
-    const counts = await db
-      .select({ sourceId: LA.listedSourceId, n: sql<number>`count(*)::int` })
-      .from(LA)
-      .where(and(inArray(LA.listedSourceId, rows.map((r) => r.id)), sql`${LA.startsAt} >= ${deps.clock.now()}`))
-      .groupBy(LA.listedSourceId);
-    return rows.flatMap((r) => {
-      const station = idents.get(r.stationId);
-      return station
-        ? [
-            {
-              id: r.id,
-              station,
-              name: r.name,
-              description: r.description,
-              streamUrl: r.streamUrl,
-              embedTerms: r.embedTerms,
-              calendarUrl: r.calendarUrl,
-              calendarSync: r.calendarSync,
-              listingState: r.listingState,
-              lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
-              upcoming: counts.find((c) => c.sourceId === r.id)?.n ?? 0
-            }
-          ]
-        : [];
-    });
-  }
-
   const part: DeskPart = {
+    ...createExternal({ deps, services }, { creatorViews }),
+
     async board(marketSlug, band) {
       const market = await services.network.marketBySlug(marketSlug);
       if (!market) throw notFound("That market");
@@ -1050,55 +1034,6 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
           : null
       };
     },
-
-    async listedSources(marketId) {
-      const rows = await db.select().from(LS).orderBy(asc(LS.name));
-      if (!marketId) return listedViews(rows);
-      const inMarket = new Set((await services.stations.inMarkets([marketId])).map((s) => s.id));
-      return listedViews(rows.filter((r) => inMarket.has(r.stationId)));
-    },
-
-    async addListedSource(input) {
-      const number = parseChannelNumber(input.band, input.channel);
-      if (!number) throw badRequest("That channel isn't in the band.");
-      const sourceId = await db.transaction(async (tx) => {
-        const stationId = await services.stations.createManaged(tx, { kind: "listed", name: input.name, callSign: input.callSign, marketId: input.marketId, band: input.band, tenths: number.tenths, description: input.description });
-        // Listed means on the dial: the station row is public from now.
-        await services.stations.markSignedOn(tx, stationId);
-        const [row] = await tx
-          .insert(LS)
-          .values({ stationId, name: input.name, description: input.description ?? null, streamUrl: input.streamUrl, embedTerms: input.embedTerms, calendarUrl: input.calendarUrl ?? null, listingState: input.embedTerms === "allowed" ? "listed" : "checking" })
-          .returning();
-        return row.id;
-      });
-      if (input.calendarUrl) return part.syncListedSource(sourceId);
-      return (await listedViews(await db.select().from(LS).where(eq(LS.id, sourceId))))[0];
-    },
-
-    async syncListedSource(sourceId) {
-      const [source] = await db.select().from(LS).where(eq(LS.id, sourceId));
-      if (!source) throw notFound("That listed source");
-      if (!source.calendarUrl) throw refused("no_calendar", "Add the source's agenda calendar first.");
-      let events;
-      try {
-        const response = await fetch(source.calendarUrl, { signal: AbortSignal.timeout(15_000) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        events = parseIcs(await response.text());
-      } catch {
-        await db.update(LS).set({ calendarSync: "calendar_not_found" }).where(eq(LS.id, sourceId));
-        return (await listedViews(await db.select().from(LS).where(eq(LS.id, sourceId))))[0];
-      }
-      const now = deps.clock.now();
-      await db.transaction(async (tx) => {
-        await tx.delete(LA).where(and(eq(LA.listedSourceId, sourceId), sql`${LA.startsAt} >= ${now}`));
-        const upcoming = events.filter((e) => e.start >= now);
-        if (upcoming.length) {
-          await tx.insert(LA).values(upcoming.map((e) => ({ listedSourceId: sourceId, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
-        }
-        await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now }).where(eq(LS.id, sourceId));
-      });
-      return (await listedViews(await db.select().from(LS).where(eq(LS.id, sourceId))))[0];
-    }
   };
   return part;
 }

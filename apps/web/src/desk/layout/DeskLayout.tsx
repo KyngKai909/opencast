@@ -52,10 +52,11 @@ export function DeskLayout() {
   const reserved = useApi(waitlistApi.listReservations, { query: { marketId: market?.id } }, { enabled: !!market });
 
   const yeses = creators.data?.filter((c) => c.stage === "said_yes" && !c.station).length;
-  const notListed = listed.data?.filter((l) => l.listingState !== "listed").length;
+  // External stations off the dial: waiting for their evidence, held by a rule, or hidden while down (Phase 6).
+  const notListed = listed.data?.filter((l) => (l.onDial ?? l.listingState === "listed") === false).length;
   const items: ShellItems<DeskPage> = {
     "creator-pipeline": yeses ? { count: String(yeses), countLabel: `${yeses} ${yeses === 1 ? "yes" : "yeses"} to set up` } : {},
-    "listed-sources": notListed ? { count: String(notListed), countLabel: `${notListed} not on the dial yet` } : {},
+    "listed-sources": notListed ? { count: String(notListed), countLabel: `${notListed} not on the dial` } : {},
     "held-earnings": held.data ? { count: railAmount(held.data.totalHeldMicros), countLabel: `${money(held.data.totalHeldMicros)} held` } : {},
     "reserved-call-signs": reserved.data?.length ? { count: String(reserved.data.length), countLabel: `${reserved.data.length} reserved` } : {}
   };

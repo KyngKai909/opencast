@@ -951,3 +951,75 @@ The reference's words, final (not new): "Tuning in" under the program's name ove
 | The same on the TV app (tv 05.2's layout, with its buttons "Tune to {REEL 24.1}" and "Open the guide") | "The signal from {BEAT 12.1} isn't coming through. Trying again. {REEL 24.1} is on now." (the dial's own Stand by keeps "{CIVC 7.1} is waiting for its signal.") |
 | The corner number (spoken, polite) | "Tuning to {BEAT 12.1}" |
 | "Tuning in" with no program on the dial | the station's name in place of the program's |
+
+### External stations (follow-up Phase 6, 2026-09-30)
+
+The External sources page follows network-desk 05.1 ("External sources", "Stations on the {Inland Empire} dial that play the source's own stream. No playout, no spots.", "List a source", the columns Source, Channel, How it plays, What's on, Right now, and its rows' words: "Official embed", "Stream link", "Their agenda calendar", "Guide data" / "Checked, from their published schedule", "No schedule found" / "Banner shows name and Live", "Down {14} min" / "Hidden from the dial", "Waiting", "Not on the dial", "Up"). What the reference doesn't draw is below. Internal names stay `listed`.
+
+**Viewer (web, phone), TV mode and the TV app**
+
+| Where | Words |
+|---|---|
+| The banner, an external station (every size) | the dashed "External" tag, then "**Live** from {City of Colton}" in the source line; with nothing scheduled the title is the station's name ("City of Colton") and there's no progress bar |
+| Dial row, an external station with nothing scheduled | "{City of Colton}", "Live", "External", line "From {City of Colton}'s own stream" |
+| Tuned-in page (web, phone), nothing scheduled | title the station's name; "**Live** from {City of Colton}" and the External tag |
+| Tuned-in page, the stream down | "{City of Colton}'s stream is down. Stand by." |
+| Guide (web), the station column | the dashed "External" tag under an external station's channel |
+| Guide (web and TV), time an external station's source lists nothing | a cell titled with the station's name, "**Live**, nothing listed" (web: gaps of 15 minutes or more; the TV fills every gap, since its focus follows the time) |
+| Station page, On now, nothing scheduled | the station's name, "External **Live** from {City of Colton}." |
+| Station page, On now, the stream down | "External {City of Colton}'s stream is down. It's off the dial until it's back." |
+| Station page, About | "External {City of Colton}'s own stream. No Opencast playout, spots or breaks." (was "External, the city's own stream") |
+| TV guide header, an external cell | "{City of Colton}'s own stream." |
+| TV About | "External" by the ident; "{source}'s own stream. No Opencast playout, spots or breaks."; On now "Live from {source}" (nothing scheduled) or "Stand by" with "{source}'s stream is down. It's off the dial until it's back."; the main button "Open the guide" while it's down and you're not on it |
+| TV, Stand by over the picture (the stream down) | "{City of Colton}'s stream is down. Stand by." then " {PREP 31.1} is on now." when there's a station to offer |
+| TV presets strip, nothing scheduled | "**Live** from {source}" |
+| TV guide options, under "Tune to {COLT} now" | "Live from {source}" (nothing scheduled), "Stand by" (down) |
+
+**Network desk: notices** (push and email, on by default)
+
+| Where | Words |
+|---|---|
+| A station off the dial | "{COLT 9.2} is off the dial" / "{City of Colton}'s stream has been down since {8:43 pm}. It's off the dial, the guide and the swipe order until it's back. Anyone watching sees Stand by." |
+| Back on the dial | "{COLT 9.2} is back on the dial" / "{City of Colton}'s stream is back after {19} minutes down. It's on the dial again." |
+
+**Network desk: External sources (table)**
+
+| Where | Words |
+|---|---|
+| How it plays, small lines | "Their own player, embedding allowed (checked {Sept 21})", "Their written permission, {Sept 24}", the public basis ("US government, public"), "Terms unclear, {asked Sept 22}", "Terms page not recorded", "Needs their permission. In the creator pipeline", "DASH stream, not played yet", "Outside this market" |
+| What's on | "Their schedule feed" (a feed that isn't a calendar), "Calendar not found", "Guide data not found" |
+| Right now | "Not checked yet", "Down {1} hr {12} min", "Still on the dial" |
+| Source line, from a lead | "From an IPTV list. {description}" |
+| The rail's count | "{2} not on the dial" (was "… not on the dial yet") |
+
+**Network desk: a listing's details** (a click on a row)
+
+| Where | Words |
+|---|---|
+| Subtitle | "{9.1 RDLS}. {description}", or "Not on the dial. {description}" |
+| Sections | "How it plays", "What's on", "Right now", "History" |
+| Rows | "Their terms" ("Allow embedding" / "Unclear"), "Terms page" ("{link}, checked {Sept 21}", "…, not checked yet", "Not recorded yet"), "Their written permission", "Where it's kept", "The stream it covers", "Recorded" ("By {Dee A.}, {September 26 at 8:42 pm}. Recorded once, never edited"), "Clearly public", "Their permission" ("Not recorded yet"), "Their player's address", "Stream address", "Checked against", "Guide data address", "Feed address" |
+| Right now | "Last checked {September 26 at 8:42 pm}. {HTTP 503}", "Checked every minute once it's on the dial", "Not checked while it's off the dial" |
+| Held by a rule | "It waits until Settings allows DASH stream links." / "… allows other markets' streams." with "Open the rules" |
+| History | "Down {8:43 pm} to {9:02 pm}, {19 minutes}, hidden from the dial at {8:48 pm}. {HTTP 503}", "Down {2 minutes}, back before it left the dial. {detail}", "Down since {8:28 pm}, hidden from the dial at {8:33 pm}" / "…, still on the dial", "No outages in the last 90 days." |
+| Buttons | "Close", "Record evidence" |
+
+**Network desk: Record evidence, and List a source**
+
+| Where | Words |
+|---|---|
+| Record evidence | title "Record evidence", subtitle "{name}. It goes on the dial once the evidence is complete.", "Both are needed before it goes on the dial.", "Nothing new to record yet.", "Save" |
+| Toasts | "{name} is on the dial at {9.2}." / "{name} is on the dial." / "Saved. It goes on the dial once {…}." / "{name} is saved. It goes on the dial once {…}.", where {…} is "their terms allow embedding", "the terms page and the day it was checked are recorded", "they say yes in writing, or it's confirmed public", "Settings allows DASH stream links", "Settings allows other markets' streams", "its stream is back", "its evidence is recorded" |
+| Evidence fields | "Terms page", "Checked on", "Why it can play" ("Their written permission" / "Clearly public" / "Not yet"), "It's saved but not on the dial until they say yes in writing, or it's confirmed public.", "Who said yes" (help "“Maria Lopez, City Clerk, City of Colton”."), "Said yes on", "Where it's kept" (help "“Email to network@opencast.tv, Sept 18”."), "Document" (Optional), "Recorded once and never edited. It covers {stream} only.", "The basis" (help "“US government, public”, “Public body, stream published for the public”."), "Note" (Optional, help "What's being waited on: “Asked Sept 22”.") |
+| Evidence errors | "Paste the link to their terms page.", "The day you read them.", "Say who said yes, and for whom.", "The day they said yes.", "Say where the written yes is kept.", "That doesn't look like a link.", "Say why it's clearly public.", "Keep it under 120 characters." |
+| List a source | "How it plays" ("Official embed" / "Stream link"), "Their player's address", "Without the terms page and the day it was checked, it's saved but not on the dial.", "Stream address" (help "An HLS address (.m3u8). Viewers' players fetch it from the source directly." or "A DASH address (.mpd). It's saved, but waits until Settings allows DASH stream links."), "What's on" ("Their calendar or schedule feed" / "Guide data" / "None"), "The banner shows the station's name, External, Live and the source. Nothing is made up.", "Calendar or feed" (help "iCal, RSS, JSON or XMLTV. Their real titles and times become the listings."), "Guide data address", "Checked against" (help "Their published schedule."), "Date checked", "The source is outside the {Inland Empire}" (helper "It waits unless Settings allows other markets' streams.") |
+| List a source errors | "Paste the address of their player.", "Paste the stream's address.", "Paste the link to their calendar or feed.", "Paste the guide data's address.", "Paste the link to their published schedule.", "The day you checked it." |
+| API errors | `external_station`: "{COLT} is an external station: its video is the source's own stream, with no playout, spots, sponsor credits, partner ads or earnings, and it can't be carried or offered in the market."; `permission_recorded`: "Their written permission is already recorded. It's never edited."; `already_external`: "{name} is already an external station."; a subchannel alone: "Start at {14}.1. Subchannels go beside other external stations."; an embed without its terms: "Say whether their terms allow embedding."; permission for an embed: "Written permission is for stream links. An embed needs its terms page."; `list_unavailable`: "The list answered HTTP {404}." / "The list couldn't be read. Try again, or paste it."; `no_channels`: "No channels with a stream address were found in that list."; a list from elsewhere: "Use a list from iptv-org (iptv-org.github.io), or paste the list itself." |
+
+**Network desk: the pipeline and IPTV lists**
+
+| Where | Words |
+|---|---|
+| Pipeline | the button "Import from an IPTV list"; a lead's source cell "From an IPTV list, {group}" with its stream address; its Next "Ask for permission, or confirm it's public", then "External station {9.3 ICTV}" or "External station, not on the dial yet"; buttons "List as external station", "Open" |
+| Import from an IPTV list | title "Import from an IPTV list"; subtitle "Channels on public IPTV lists are leads, not listings. They go in the pipeline with their stream noted, and never on the dial until they say yes or are confirmed public."; "The list" ("Paste or upload" / "An iptv-org address"), "M3U or JSON", "Or upload the file", "List address" (help "iptv-org's published lists only. Only the list is read, never a stream."), "Read the list", "Back", "Cancel", "{3} channels. {1} entries skipped: no stream address.", "Filter" (placeholder "Name, group or country"), "Select all", "Select none", "Already a lead", "Already an external station", "No channels match.", "Import {2} as leads" / "Import 1 as a lead", "Up to 100 at a time."; errors "Paste the list, or upload it.", "Give the list's iptv-org address."; toast "{2} leads added to the pipeline. {1} already on the desk." |
+| Settings, Rules | the group "External stations"; "Other markets' streams" ("Whether a source from outside a market can be an external station on its dial, for example a county meeting that covers two markets. Off: such a listing is saved but waits"; "Allowed" / "Not allowed"); "DASH stream links" ("Opencast's player plays HLS everywhere. DASH needs a player library on the web and some TVs. Off: a DASH-only stream link is saved but waits, and the source's official embed or HLS address is listed instead"; "Played" / "Not played yet"); the edit form's fields "Allowed", "Played" |

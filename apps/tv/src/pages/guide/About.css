@@ -6,7 +6,9 @@
   background: color-mix(in srgb, var(--screen) 94%, transparent);
   border-radius: var(--r-screen); box-shadow: 0 0 0 1px var(--line);
 }
-.tvg-about__id { font-size: 26px; font-weight: 500; color: var(--ink-70); }
+.tvg-about__id { font-size: 26px; font-weight: 500; color: var(--ink-70); display: flex; align-items: center; gap: 14px; }
+/* An external station's dashed tag at ten feet (the guide's size; nothing under 21px). */
+.tvg-about__id .tvg-tag.oc-tag { height: 30px; padding: 0 10px; font-size: 21px; border-width: 1.5px; font-family: var(--font-text); }
 .tvg-about__name { margin: 6px 0 14px; font: 800 50px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
 .tvg-about__desc { margin: 0 0 24px; font-size: 27px; line-height: 1.4; color: var(--ink-70); }
 .tvg-about__sched { border-top: 1px solid var(--hair); }

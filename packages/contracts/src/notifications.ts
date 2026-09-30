@@ -42,7 +42,12 @@ export const NoticeKind = z.enum([
    * stops): a relay stopped or is back, a platform restart the station has to do, paid promotion to
    * mark on a destination Opencast can't mark.
    */
-  "relay"
+  "relay",
+  /**
+   * External stations (added 2026-09-30, follow-up Phase 6), the Network desk: an external station
+   * left the dial because its stream was down 5 minutes, or it's back on the dial.
+   */
+  "external_station"
 ]);
 
 export const Notice = z.object({

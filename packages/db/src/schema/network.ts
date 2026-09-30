@@ -149,7 +149,16 @@ export const creators = network.table("creators", {
   /** "On air with credit. Claim invite sent Sept 24", then the claim link itself. */
   claimInviteSentAt: at("claim_invite_sent_at"),
   claimLinkSentAt: at("claim_link_sent_at"),
-  createdAt: createdAt()
+  createdAt: createdAt(),
+  // ---- Added 2026-09-30 (follow-up Phase 6, migration 0039) ----
+  /** A lead found on a public IPTV list: never on the dial from here, until they say yes or are confirmed public. */
+  leadSource: text("lead_source", { enum: ["iptv_list"] }),
+  /** The lead's stream address, as the list gave it (noted, never played or checked from here). */
+  streamUrl: text("stream_url"),
+  /** The list it was found on (an iptv-org address); null when pasted or uploaded. */
+  leadListUrl: text("lead_list_url"),
+  /** The list's own details: `{ tvgId, group, country, logoUrl }`. */
+  leadDetails: jsonb("lead_details").$type<{ tvgId: string | null; group: string | null; country: string | null; logoUrl: string | null }>()
 });
 
 /** A work found on the creator's source, catalogued from its title and length only. */
@@ -281,8 +290,78 @@ export const listedSources = network.table("listed_sources", {
     .notNull()
     .default("not_listed"),
   lastSyncedAt: at("last_synced_at"),
-  createdAt: createdAt()
+  createdAt: createdAt(),
+  // ---- External stations (added 2026-09-30, follow-up Phase 6, migration 0039) ----
+  /** How it plays: the source's official embed (`stream_url` is the embed) or its raw stream link, in Opencast's player. */
+  plays: text("plays", { enum: ["embed", "stream_link"] }).notNull().default("embed"),
+  /** A stream link's format. Null for an embed. */
+  streamFormat: text("stream_format", { enum: ["hls", "dash"] }),
+  /** Why it may play that way; null until the evidence is in (it isn't on the dial until then). */
+  basis: text("basis", { enum: ["embed_terms", "written_permission", "public_source"] }),
+  /** An embed's terms page, and the day it was read. */
+  termsUrl: text("terms_url"),
+  termsCheckedOn: date("terms_checked_on"),
+  /** A clearly public source's basis, in words ("US government, public"). */
+  publicBasis: text("public_basis"),
+  /** A stream link's written permission (recorded once, never edited). */
+  streamPermissionId: uuid("stream_permission_id").references(() => streamPermissions.id),
+  /** What's being waited on: "Asked Sept 22". */
+  waitingNote: text("waiting_note"),
+  /** The source is outside the market it's listed in (rule `external.other_markets`). */
+  outsideMarket: boolean("outside_market").notNull().default(false),
+  /** Where "what's on" comes from: its feed (`calendar_url`), guide data checked against its published schedule, or neither. */
+  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "none"] }).notNull().default("none"),
+  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv"] }),
+  guideCheckedAgainst: text("guide_checked_against"),
+  guideCheckedOn: date("guide_checked_on"),
+  /** The stream, checked every minute: unchecked, up, down (still on the dial), hidden (down 5 minutes: off the dial). */
+  health: text("health", { enum: ["unchecked", "up", "down", "hidden"] }).notNull().default("unchecked"),
+  healthSince: at("health_since"),
+  lastCheckedAt: at("last_checked_at"),
+  lastCheckDetail: text("last_check_detail"),
+  /** The pipeline lead (an IPTV-list channel) it came from. */
+  creatorId: uuid("creator_id").references(() => creators.id)
 });
+
+/**
+ * A source's written permission for its stream link, kept like a claimable station's permission
+ * record: recorded once with who said yes, when, where the writing is kept and exactly which
+ * stream address it covers. Never edited (added 2026-09-30, follow-up Phase 6).
+ */
+export const streamPermissions = network.table("stream_permissions", {
+  id: id(),
+  grantedBy: text("granted_by").notNull(),
+  grantedOn: date("granted_on").notNull(),
+  evidence: text("evidence").notNull(),
+  documentUrl: text("document_url"),
+  streamUrl: text("stream_url").notNull(),
+  creatorId: uuid("creator_id").references(() => creators.id),
+  recordedBy: uuid("recorded_by").references(() => users.id),
+  recordedAt: at("recorded_at").notNull().defaultNow()
+});
+
+/**
+ * An external station's stream being down: from the first failed check, off the dial 5 minutes
+ * later (`hidden_at`), until it's back (added 2026-09-30, follow-up Phase 6). The desk's history.
+ */
+export const externalOutages = network.table(
+  "external_outages",
+  {
+    id: id(),
+    listedSourceId: uuid("listed_source_id")
+      .notNull()
+      .references(() => listedSources.id),
+    downSince: at("down_since").notNull(),
+    hiddenAt: at("hidden_at"),
+    backAt: at("back_at"),
+    detail: text("detail"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    index("external_outages_source").on(t.listedSourceId, t.downSince),
+    uniqueIndex("external_outages_open").on(t.listedSourceId).where(sql`${t.backAt} is null`)
+  ]
+);
 
 /** A meeting pulled from a listed source's agenda calendar. Viewers can set reminders on it. */
 export const listedAirings = network.table("listed_airings", {

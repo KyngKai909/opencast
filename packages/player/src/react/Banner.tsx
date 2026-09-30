@@ -29,7 +29,22 @@ function ident(c: Channel) {
 export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, onAirHere }: BannerProps) {
   const air = c.now;
   const next = c.next;
-  const source: ReactNode = air?.carriedFrom ? `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}` : air?.live ? (size === "tv" ? <LiveFrom note={(air as { note?: string | null }).note} /> : "Live") : null;
+  // An external station (follow-up Phase 6): the "External" tag, Live and whose stream it is. With
+  // nothing scheduled, the station's name and no progress bar: never a made-up title.
+  const external = c.station.kind === "listed" ? (c.external ?? null) : null;
+  const source: ReactNode =
+    c.station.kind === "listed" ? (
+      <ExternalFrom source={external?.source ?? null} />
+    ) : air?.carriedFrom ? (
+      `Carried from ${[air.carriedFrom.callSign, air.carriedFrom.channel].filter(Boolean).join(" ")}`
+    ) : air?.live ? (
+      size === "tv" ? (
+        <LiveFrom note={(air as { note?: string | null }).note} />
+      ) : (
+        "Live"
+      )
+    ) : null;
+  const title = air ? air.title : c.station.kind === "listed" && c.onAir ? c.station.name : "Off air";
   // Casting or mirroring, the hint row says where the controls are, and Back isn't a key there.
   // Casting and mirroring show only a chip: the phone has the controls, so there's no Back hint.
   // The TV app keeps its key hints beside a phone's chip, and Back still works there.
@@ -45,7 +60,7 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
       </div>
       <div className="oc-banner__now">
         {source && <span className="oc-banner__src">{source}</span>}
-        <h3>{air ? air.title : "Off air"}</h3>
+        <h3>{title}</h3>
         {air && air.kind !== "off_air" && <ProgressBar start={air.startsAt} end={air.endsAt} now={now} timeZone={timeZone} size={size === "tv" ? "tv" : "sm"} />}
         {next && (
           <div className="oc-banner__nx">
@@ -89,6 +104,19 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
         </div>
       )}
     </div>
+  );
+}
+
+/** An external station's line: the dashed "External" tag, then "Live from City of Colton" (the source's own stream). */
+function ExternalFrom({ source }: { source: string | null }) {
+  return (
+    <>
+      <Tag variant="listed" onPicture>
+        External
+      </Tag>{" "}
+      <span className="oc-banner__live">Live</span>
+      {source ? ` from ${source}` : null}
+    </>
   );
 }
 

@@ -36,7 +36,9 @@ function st(n: number, market: string, kind: Kind, band: "tv" | "radio", channel
 
 export const STATION_IDS = {
   CIVC: U(101), RDLS: U(102), COLT: U(103), SBCO: U(104), RUSD: U(105), BEAT: U(106), SAZN: U(107), REEL: U(108), PREP: U(109),
-  LUPE: U(110), OCAT: U(111), NITE: U(112), HALL: U(113), FLDR: U(114), CRAT: U(115), VOZE: U(116), MOJV: U(117)
+  LUPE: U(110), OCAT: U(111), NITE: U(112), HALL: U(113), FLDR: U(114), CRAT: U(115), VOZE: U(116), MOJV: U(117),
+  // Follow-up Phase 6: NASA on 61.1, and Inland Community TV waiting for its permission.
+  NASA: U(118), ICTV: U(119)
 };
 
 /** Monday, September 28, 6:00 am in the Inland Empire: LUPE's first sign-on. */
@@ -61,7 +63,11 @@ export function seedStations(): DbStation[] {
     st(114, IE.id, "claimable", "radio", "92.0", "FLDR", "Mojave Field Recordings", "#3D6547", { firstSignedOnAt: "2026-09-20T13:00:00.000Z", escrowId: 91 }, "Joshua Tree"),
     st(115, IE.id, "claimable", "radio", "102.0", "CRAT", "Marcus Reyes", "#5B3F8C", { firstSignedOnAt: "2026-08-12T13:00:00.000Z", escrowId: 101 }, "San Bernardino"),
     st(116, IE.id, "station", "radio", "104.4", "VOZE", "Voz del Inland", "#1D6A70", {}, "Ontario"),
-    st(117, HD.id, "station", "tv", "14.1", "MOJV", "Mojave Community TV", "#7A4B1F", {}, "Victorville")
+    st(117, HD.id, "station", "tv", "14.1", "MOJV", "Mojave Community TV", "#7A4B1F", {}, "Victorville"),
+    // External stations added in follow-up Phase 6: NASA's public stream, and an IPTV-list channel
+    // waiting for their permission (no channel yet, like RUSD).
+    st(118, IE.id, "listed", "tv", "61.1", "NASA", "NASA", null),
+    st(119, IE.id, "listed", "tv", null, "ICTV", "Inland Community TV", null, { public: false, firstSignedOnAt: null }, "Riverside")
   ];
 }
 

@@ -149,7 +149,8 @@ test("Add a creator: found, with nothing to ask about until their works are cata
   await signedInAsAdmin(page);
   await useGround(page, "light");
   await page.goto(`${IE}/pipeline`);
-  await expect(stage(page, "Found")).toHaveText(/^6\s*Found$/);
+  // Six of the frame's, and Rialto Community Access, an IPTV-list lead (follow-up Phase 6).
+  await expect(stage(page, "Found")).toHaveText(/^7\s*Found$/);
   await page.getByRole("button", { name: "Add a creator" }).click();
   const dialog = page.getByRole("dialog", { name: "Add a creator" });
   await expect(dialog).toContainText("Someone making things in the Inland Empire. Nothing is asked or copied yet.");
@@ -165,7 +166,7 @@ test("Add a creator: found, with nothing to ask about until their works are cata
   await dialog.getByRole("button", { name: "Add them" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText("Banning Rodeo Films is on the pipeline, as Found.")).toBeVisible();
-  await expect(stage(page, "Found")).toHaveText(/^7\s*Found$/);
+  await expect(stage(page, "Found")).toHaveText(/^8\s*Found$/);
   await stage(page, "Found").click();
   await expect(page.getByRole("row", { name: /Banning Rodeo Films/ })).toContainText("Rodeo nights, Banning");
   await page.getByRole("button", { name: "Ask: Banning Rodeo Films" }).click();
@@ -196,7 +197,7 @@ test("External sources: the rail, the page and the board's key (network-desk 01.
   await expect(page).toHaveURL(new RegExp(`${IE}/listed$`));
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("External sources");
   await expect(page.getByText("Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.")).toBeVisible();
-  await expect(page.getByRole("table", { name: "External sources" })).toContainText("Not on the dial");
+  await expect(page.getByRole("grid", { name: "External sources" })).toContainText("Not on the dial");
 });
 
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from

@@ -5,7 +5,7 @@
 import type { DialRowX } from "../../api/ext";
 
 /** S13's `signal` is on the contract's dial row now. */
-export type Row = Pick<DialRowX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowX["signal"]; backAt?: string };
+export type Row = Pick<DialRowX, "station" | "onAir" | "now" | "next" | "playback"> & { signal?: DialRowX["signal"]; backAt?: string; external?: DialRowX["external"] };
 
 /** "REEL 24.1", kept on one line (a no-break space). */
 export function identText(s: Pick<Row["station"], "callSign" | "channel" | "name">): string {
@@ -54,10 +54,12 @@ export function backTime(r: Row, playerOffAir: { stationId: string; backAt: stri
 /**
  * Which screen shows over the picture on "/": off air, stand by, or none. Stand by is the dial's
  * (the station waiting for its signal, S13) or the player's (a channel change with no picture in
- * 8 s, follow-up Phase 5).
+ * 8 s, follow-up Phase 5). An external station is never off air (follow-up Phase 6): on with
+ * nothing scheduled, it plays; its stream down (the player keeps it, not playable), it stands by.
  */
 export function airState(r: Row | undefined, status: string): "off_air" | "standby" | null {
   if (!r) return null;
+  if (r.station.kind === "listed") return status === "standby" || status === "off_air" || !r.onAir || !r.playback || r.signal === "standby" ? "standby" : null;
   if (status === "off_air" || !r.onAir) return "off_air";
   if (r.signal === "standby" || status === "standby") return "standby";
   return null;

@@ -91,7 +91,11 @@ const MOCK_STATIONS = [
   { slug: "nite", callSign: "NITE", channel: "88.4", name: "Night Desk", colour: "#33507A", band: "radio", title: "Radio dramas from the 1940s", tone: 262, captions: ["The Hollow Door, part 2.", "A radio drama from 1946.", "Stay tuned for part 3."] },
   { slug: "hall", callSign: "HALL", channel: "90.8", name: "Study Hall", colour: "#56508A", band: "radio", title: "Slow beats for late work", tone: 294, captions: ["Slow beats for late work.", "Study Hall, 90.8.", "All night."] },
   { slug: "crat", callSign: "CRAT", channel: "102.0", name: "Crate", colour: "#7E2F35", band: "radio", title: "The Producers’ Hour", tone: 349, captions: ["Live from the Crate studio.", "Producers play unreleased tapes.", "The Producers’ Hour."] },
-  { slug: "voze", callSign: "VOZE", channel: "104.4", name: "La Voz", colour: "#1D6A70", band: "radio", title: "Noche de oldies", tone: 311, captions: ["Noche de oldies.", "La Voz, 104.4.", "Hasta la medianoche."] }
+  { slug: "voze", callSign: "VOZE", channel: "104.4", name: "La Voz", colour: "#1D6A70", band: "radio", title: "Noche de oldies", tone: 311, captions: ["Noche de oldies.", "La Voz, 104.4.", "Hasta la medianoche."] },
+  // An external station's stream (follow-up Phase 6): a city's own raw HLS, as its stream link
+  // would serve it. The whole loop is the city's picture (no spot, no station ID) and the live
+  // server writes none of Opencast's tags for it (no bug, no breaks).
+  { slug: "colt", callSign: "COLT", channel: "9.2", name: "City of Colton", colour: "#3F5A6E", band: "tv", title: "City Council, regular meeting", tone: 370, external: true, captions: ["The council will come to order.", "Item four, the consent calendar.", "Public comment is next."] }
 ];
 
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -126,7 +130,7 @@ function frameSvg(s, item, second) {
     );
   }
   return svg(
-    `${topStrip("program", second)}
+    `${topStrip(s.external ? "the source's own stream" : "program", second)}
   <text x="48" y="220" font-family="Helvetica Neue, Arial" font-weight="800" font-size="110" fill="#FFFFFF" letter-spacing="-4">${esc(s.callSign)}</text>
   <text x="48" y="282" font-family="Menlo, monospace" font-size="40" fill="#FFFFFF" opacity=".92">${esc(s.channel)}  ${esc(s.name)}</text>
   <text x="48" y="342" font-family="Helvetica Neue, Arial" font-weight="700" font-size="32" fill="#ECE9E1">${esc(s.title)}</text>`,
@@ -163,7 +167,7 @@ async function encodeItem(s, dir, { item, seconds, firstSecond, tone, prefix, fi
   const ladder = LADDERS[s.band];
   if (ladder.some((r) => r.kind === "video")) {
     for (let i = 0; i < seconds; i++) {
-      await sharp(Buffer.from(frameSvg(s, item, firstSecond + i))).png().toFile(path.join(work, "frames", `f_${String(i).padStart(3, "0")}.png`));
+      await sharp(Buffer.from(frameSvg(s, s.external && item !== "OFF" ? "PGM" : item, firstSecond + i))).png().toFile(path.join(work, "frames", `f_${String(i).padStart(3, "0")}.png`));
     }
   }
   for (const r of ladder) {
@@ -198,7 +202,7 @@ const manifest = { version: 2, segmentSeconds: SEGMENT, loopSeconds: LOOP, segme
 
 const only = process.argv.slice(2);
 for (const s of MOCK_STATIONS) {
-  const entry = { slug: s.slug, callSign: s.callSign, channel: s.channel, name: s.name, colour: s.colour, title: s.title, band: s.band, audioOnly: s.band === "radio", renditions: LADDERS[s.band].map(variantOf) };
+  const entry = { slug: s.slug, callSign: s.callSign, channel: s.channel, name: s.name, colour: s.colour, title: s.title, band: s.band, audioOnly: s.band === "radio", ...(s.external ? { external: true } : {}), renditions: LADDERS[s.band].map(variantOf) };
   if (only.length && !only.includes(s.slug)) {
     manifest.stations.push(entry);
     continue;
@@ -218,6 +222,7 @@ for (const s of MOCK_STATIONS) {
   const ref = LADDERS[s.band][0].name;
   const captionFor = (i) => {
     const code = ITEMS.find((it) => i >= it.from && i < it.from + it.count)?.code;
+    if (s.external) return s.captions[i % s.captions.length];
     if (code === "SPT") return null;
     if (code === "SID") return `${s.callSign} ${s.channel}, ${s.name}.`;
     return s.captions[i % s.captions.length];

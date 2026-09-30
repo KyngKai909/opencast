@@ -15,7 +15,8 @@ beforeEach(async () => {
   localStorage.clear();
   const db = await import("../../mocks/db");
   db.resetDb();
-  all = db.getDb().creators.filter((c) => c.marketId === "00000000-0000-4000-8000-000000090001").map(db.creatorView);
+  // The frame's creators; Phase 6's IPTV leads have their own rows (pipeline.page.test.tsx).
+  all = db.getDb().creators.filter((c) => c.marketId === "00000000-0000-4000-8000-000000090001" && !c.lead).map(db.creatorView);
 });
 
 describe("the stage strip", () => {

@@ -4,11 +4,13 @@
 // now) where the TV frame writes "Until 9:00" and "External, until 9:15", stacks the call sign over
 // the channel where the TV puts the channel first, and takes pointer clicks with a selected
 // state, not a focus that follows time. Placement and the now line are the package's
-// (guideCells, NowLine).
+// (guideCells, NowLine). An external station (follow-up Phase 6) has the dashed "External" tag
+// under its call sign, and its time with nothing listed reads its name and "Live, nothing listed".
 
 import { useEffect, useRef } from "react";
-import { clock, cx, guideCells, guideSlots, LiveText, NowLine } from "@opencast/ui";
-import { cellLine, SPAN, type Cell, type GuideRow } from "./guideLogic";
+import { clock, cx, guideCells, guideSlots, LiveText, NowLine, Tag } from "@opencast/ui";
+import type { StationIdentX } from "../../api/ext";
+import { cellLine, cellTitle, isExternal, SPAN, type Cell, type GuideRow } from "./guideLogic";
 import "./TvGuideGrid.css";
 
 export interface TvGuideGridProps {
@@ -28,7 +30,7 @@ function heads(from: number, timeZone?: string): string[] {
   return slots.map((d, i) => clock(d, { timeZone, suffix: i === 0 || period(d) !== period(slots[i - 1]!) }));
 }
 
-function CellView({ cell, colStart, colEnd, now, timeZone, focused, onClick }: { cell: Cell; colStart: number; colEnd: number; now: number; timeZone?: string; focused: boolean; onClick?: () => void }) {
+function CellView({ cell, station, colStart, colEnd, now, timeZone, focused, onClick }: { cell: Cell; station: StationIdentX; colStart: number; colEnd: number; now: number; timeZone?: string; focused: boolean; onClick?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // The DOM follows focus too, for screen readers.
@@ -36,14 +38,14 @@ function CellView({ cell, colStart, colEnd, now, timeZone, focused, onClick }: {
   }, [focused]);
   const isNow = cell.start <= now && now < cell.end;
   const line = cellLine(cell, now, timeZone);
-  const title = cell.airing?.title ?? "Off air";
+  const title = cellTitle(cell, station);
   return (
     <div
       ref={ref}
       role="gridcell"
       tabIndex={-1}
       aria-selected={focused}
-      className={cx("tvg-cell", isNow && "tvg-cell--now", !cell.airing && "tvg-cell--off", focused && "tv-focus")}
+      className={cx("tvg-cell", isNow && "tvg-cell--now", !cell.airing && !cell.nothingListed && "tvg-cell--off", focused && "tv-focus")}
       style={{ gridColumn: `${colStart} / ${colEnd}` }}
       onClick={onClick}
     >
@@ -78,13 +80,22 @@ export function TvGuideGrid({ rows, from, now, timeZone, focusedKey, onCell }: T
         ))}
       </div>
       {rows.map((r, ri) => {
-        const programs = r.cells.map((c) => ({ id: c.key, title: c.airing?.title ?? "", start: c.start, end: c.end }));
+        const programs = r.cells.map((c) => ({ id: c.key, title: c.airing?.title ?? (c.nothingListed ? r.station.name : ""), start: c.start, end: c.end }));
         const placed = guideCells(programs, from, to, now);
         return (
           <div key={r.station.id} className="tvg-grid__row" role="row" aria-label={[r.station.channel, r.station.callSign].filter(Boolean).join(" ")}>
             <div className="tvg-grid__st" role="rowheader">
               <span className="tvg-grid__ch oc-mono">{r.station.channel}</span>
-              <span className="tvg-grid__cs oc-cs">{r.station.callSign ?? r.station.name}</span>
+              {isExternal(r.station) ? (
+                <span className="tvg-grid__id">
+                  <span className="tvg-grid__cs oc-cs">{r.station.callSign ?? r.station.name}</span>
+                  <Tag variant="listed" className="tvg-tag">
+                    External
+                  </Tag>
+                </span>
+              ) : (
+                <span className="tvg-grid__cs oc-cs">{r.station.callSign ?? r.station.name}</span>
+              )}
             </div>
             {placed
               .filter((p) => p.colEnd > p.colStart)
@@ -94,6 +105,7 @@ export function TvGuideGrid({ rows, from, now, timeZone, focusedKey, onCell }: T
                   <CellView
                     key={cell.key}
                     cell={cell}
+                    station={r.station}
                     colStart={p.colStart}
                     colEnd={p.colEnd}
                     now={now}

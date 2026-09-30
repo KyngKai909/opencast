@@ -3,7 +3,10 @@ import type { AiringX, StationIdentX } from "../../api/ext";
 import {
   buildModel,
   cellLine,
+  cellTitle,
   describe as describeAiring,
+  externalLine,
+  isExternal,
   focusedCell,
   focusOn,
   guideCommand,
@@ -318,5 +321,60 @@ describe("the guide's command layer", () => {
     expect(guideCommand({ type: "focus", dir: "down" }, null, null)).toEqual({ handled: true });
     expect(guideCommand({ type: "channel", dir: "up" }, null, null)).toEqual({ handled: true });
     expect(guideCommand({ type: "back" }, null, null)).toEqual({ handled: false });
+  });
+});
+
+describe("an external station's row (follow-up Phase 6)", () => {
+  const COLT: StationIdentX = { ...station("COLT", "9.2"), kind: "listed", name: "City of Colton" };
+  const meeting = airing("18:00", "21:30", "City Council, regular meeting", { kind: "listed", live: true, logEntryId: null, listedAiringId: "listed-colt" });
+
+  it("is on between what the source lists: its name and Live, nothing listed, never off air", () => {
+    expect(isExternal(COLT)).toBe(true);
+    expect(isExternal(station("BEAT", "12.1"))).toBe(false);
+    const cells = rowCells(row(COLT, [meeting]), FROM, at("22:30"));
+    expect(cells.map((c) => [c.airing?.title ?? cellTitle(c, COLT), c.start, c.end, !!c.nothingListed])).toEqual([
+      ["City Council, regular meeting", at("18:00"), at("21:30"), false],
+      ["City of Colton", at("21:30"), at("22:30"), true]
+    ]);
+    // The same ids as the web's guide.
+    expect(cells[1]!.key).toBe(`st-COLT@live@${iso("21:30")}`);
+    expect(cellLine(cells[1]!, NOW, TZ)).toEqual({ live: true, text: "nothing listed" });
+    expect(cells[1]!.signOnAt).toBeNull();
+    expect(offAirLine(cells[1]!, COLT, TZ)).toBeNull();
+  });
+
+  it("with nothing in the window, is one cell for the whole of it", () => {
+    const cells = rowCells(row(COLT, []), FROM, TO);
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toMatchObject({ start: FROM, end: TO, airing: null, nothingListed: true });
+    expect(cellTitle(cells[0]!, COLT)).toBe("City of Colton");
+  });
+
+  it("fills the gaps before and between listed airings too", () => {
+    const cells = rowCells(row(COLT, [airing("21:00", "21:30", "A", { kind: "listed" }), airing("22:00", "22:30", "B", { kind: "listed" })]), FROM, at("23:00"));
+    expect(cells.map((c) => c.airing?.title ?? (c.nothingListed ? "nothing listed" : "off"))).toEqual(["nothing listed", "A", "nothing listed", "B", "nothing listed"]);
+  });
+
+  it("tunes in on what's on now; later, nothing to set: no options, no reminders", () => {
+    const model = buildModel([row(COLT, [])], [], FROM, TO);
+    const cell = model.rows[0]!.cells[0]!;
+    expect(okAction(cell, NOW)).toBe("tune");
+    expect(okHint(cell, NOW)).toBe("Tune in");
+    const later = rowCells(row(COLT, [meeting]), FROM, at("23:00"))[1]!;
+    expect(okAction(later, at("20:40"))).toBe("none");
+    expect(okHint(later, at("20:40"))).toBeNull();
+    expect(describeAiring(later.airing, null)).toBeNull();
+  });
+
+  it("keeps the scheduled cell's line, and says whose stream it is in the header", () => {
+    const listed = airing("19:00", "21:15", "City Council, Sept 16", { kind: "listed", logEntryId: null, listedAiringId: "listed-1" });
+    const cells = rowCells(row(COLT, [listed]), FROM, at("22:30"));
+    expect(cellLine(cells[0]!, NOW, TZ)).toEqual({ live: false, text: "External, until 9:15" });
+    expect(externalLine(cells[0]!, COLT, "City of Colton")).toBe("City of Colton's own stream.");
+    expect(externalLine(cells[1]!, COLT, "City of Colton")).toBe("City of Colton's own stream.");
+    expect(externalLine(cells[1]!, COLT, null)).toBeNull();
+    const beat = rowCells(row(station("BEAT", "12.1"), []), FROM, at("22:30"));
+    expect(externalLine(beat[0]!, station("BEAT", "12.1"), "Anyone")).toBeNull();
+    expect(cellTitle(beat[0]!, station("BEAT", "12.1"))).toBe("Off air");
   });
 });

@@ -33,6 +33,11 @@ export interface Cell {
   airing: AiringX | null;
   /** Off air: when the station is back, if the guide knows. */
   signOnAt: number | null;
+  /**
+   * An external station's time with nothing listed (follow-up Phase 6): it's still on, so the cell
+   * is its name and "Live, nothing listed", never a made-up title (and no options: no airing).
+   */
+  nothingListed?: true;
 }
 
 export interface GuideRow {
@@ -66,18 +71,30 @@ export function airingKey(stationId: string, a: AiringX): string {
   return a.logEntryId ?? a.listedAiringId ?? `${stationId}~${ms(a.startsAt)}`;
 }
 
+/** An external station (follow-up Phase 6): the source's own stream, on while it's up. */
+export function isExternal(s: Pick<StationIdentX, "kind">): boolean {
+  return s.kind === "listed";
+}
+
 /**
  * A row's cells across [from, to): its airings in time order, and off air wherever there's a gap.
  * Planned off air (G9: an `off_air` airing) is an off air cell too, back at its `backAt`; a gap
- * that runs into it joins it.
+ * that runs into it joins it. An external station's gaps aren't off air: it's on with nothing
+ * listed (the guide only has it while its stream is up). The web's guide draws only gaps of 15
+ * minutes or more (withNothingListed); here a row has no holes, since focus follows the time.
  */
 export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
   const id = row.station.id;
+  const external = isExternal(row.station);
   const airings = row.airings.filter((a) => ms(a.endsAt) > from && ms(a.startsAt) < to).sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
   const cells: Cell[] = [];
   let cursor = from;
   const offAir = (start: number, end: number, signOnAt: number | null) =>
-    cells.push({ key: `${id}~off~${start}`, stationId: id, start, end, airing: null, signOnAt });
+    cells.push(
+      external
+        ? { key: `${id}@live@${new Date(start).toISOString()}`, stationId: id, start, end, airing: null, signOnAt: null, nothingListed: true }
+        : { key: `${id}~off~${start}`, stationId: id, start, end, airing: null, signOnAt }
+    );
   for (const a of airings) {
     const s = ms(a.startsAt);
     const e = ms(a.endsAt);
@@ -217,10 +234,11 @@ const until = (t: number, now: number, timeZone?: string) => clock(t, { timeZone
 /**
  * The line under a cell's title: "Live, until 9:30", "External, until 9:15", "From REEL", "Until
  * 9:00" (or "Until 6:00 am" past midnight) for what's on now; "Live, 9:00 – 10:00", "From CIVC" or "9:00" for later; "Signs on at
- * 6:00 am" off air. `live` puts "Live" first in red.
+ * 6:00 am" off air; "Live, nothing listed" for an external station with nothing listed. `live` puts "Live" first in red.
  */
 export function cellLine(c: Cell, now: number, timeZone?: string): { live: boolean; text: string } {
   const a = c.airing;
+  if (c.nothingListed) return { live: true, text: "nothing listed" };
   if (!a) return { live: false, text: c.signOnAt ? `Signs on at ${clock(c.signOnAt, { timeZone })}` : "" };
   const isNow = onNow(c, now);
   if (a.live) return { live: true, text: isNow ? `until ${until(c.end, now, timeZone)}` : `${short(c.start, timeZone)} – ${short(c.end, timeZone)}` };
@@ -228,6 +246,11 @@ export function cellLine(c: Cell, now: number, timeZone?: string): { live: boole
   if (a.carriedFrom?.callSign) return { live: false, text: `From ${a.carriedFrom.callSign}` };
   if (isNow) return { live: false, text: `Until ${until(c.end, now, timeZone)}` };
   return { live: false, text: short(c.start, timeZone) };
+}
+
+/** A cell's title: the airing's, an external station's name when nothing's listed, else "Off air". */
+export function cellTitle(c: Cell, s: Pick<StationIdentX, "name">): string {
+  return c.airing?.title ?? (c.nothingListed ? s.name : "Off air");
 }
 
 export function identText(s: StationIdentX): string {
@@ -262,6 +285,15 @@ export function describe(a: AiringX | null, programDescription: string | null | 
   } else text = note ? `${note}.` : desc;
   if (!text) return null;
   return { text, liveLead: a.live && /^Live\b/.test(text) };
+}
+
+/**
+ * The header's line for an external station's cell (follow-up Phase 6), which has no description:
+ * whose stream it is ("City of Colton's own stream."), when the dial says. Null otherwise.
+ */
+export function externalLine(c: Cell, s: Pick<StationIdentX, "kind">, source: string | null | undefined): string | null {
+  if (!isExternal(s) || !source || (!c.airing && !c.nothingListed)) return null;
+  return `${source}'s own stream.`;
 }
 
 /** The OK hint in the header: "Options" for later programs, "Tune in" for what's on now. */

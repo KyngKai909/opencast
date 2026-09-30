@@ -209,6 +209,7 @@ export const STATION_EXTRA: Record<string, StationExtra> = {
     searchLine: "Public affairs. Town halls and council meetings"
   },
   RDLS: { searchLine: "Public affairs. External, the city's own stream" },
+  COLT: { searchLine: "Public affairs. External, the city's own stream" },
   SAZN: {
     carries: [{ from: "REEL", program: "saturday-reel", slot: "Sundays 9:00 am" }],
     madeHere: [{ program: "tamales", carriers: 3 }],

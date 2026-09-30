@@ -32,8 +32,10 @@ export function resolveStation(channels: DialRowX[], ref: string | undefined): D
  * A station from outside the market's dial (a nearby market's, linked from a thin dial), as a dial
  * row the player can tune: what's on, what's next and where its picture comes from.
  */
-export function rowFromPage(p: Pick<StationPageX, "station" | "onAir" | "now" | "upNext" | "playback">): DialRowX {
-  return { station: p.station, onAir: p.onAir, now: p.now, next: p.upNext[0] ?? null, playback: p.playback };
+export function rowFromPage(p: Pick<StationPageX, "station" | "onAir" | "now" | "upNext" | "playback" | "external">): DialRowX {
+  // An external station keeps what it is (follow-up Phase 6); while it's down, the player stands by.
+  const external = p.external ? { source: p.external.source, plays: p.external.plays, schedule: p.external.schedule } : undefined;
+  return { station: p.station, onAir: p.onAir, now: p.now, next: p.upNext[0] ?? null, playback: p.playback, ...(external ? { external } : {}) };
 }
 
 /** The player's dial with an outside station added (once), or null when it's already there. */

@@ -137,8 +137,11 @@ export function createWatchData({ deps, services }: ModuleContext): WatchData {
   const keyOf = (row: ProgramRow) => (row.logEntryId ? `entry:${row.logEntryId}` : `as_run:${row.id}`);
 
   async function compute(rows: ProgramRow[]): Promise<AiringNumbers> {
-    const stationId = rows[0].stationId;
-    const segments = rows.map((r) => ({ start: r.startedAt.getTime(), end: r.endedAt.getTime() }));
+    return computeSegments(rows[0].stationId, rows.map((r) => ({ start: r.startedAt.getTime(), end: r.endedAt.getTime() })), rows[0].logEntryId);
+  }
+
+  /** One airing's numbers from its segments (ms) on a station; votes only for a log entry's. */
+  async function computeSegments(stationId: string, segments: Array<{ start: number; end: number }>, entryId: string | null): Promise<AiringNumbers> {
     const first = Math.floor(Math.min(...segments.map((s) => s.start)) / MINUTE) * MINUTE;
     const last = Math.max(...segments.map((s) => s.end));
     // Bot filtering first: a session ever flagged is left out altogether.
@@ -153,9 +156,143 @@ export function createWatchData({ deps, services }: ModuleContext): WatchData {
       set.add(m.minute.getTime());
       presence.set(m.sessionId, set);
     }
-    const entryId = rows[0].logEntryId;
     const voters = entryId ? (await db.select({ sessionId: V.sessionId }).from(V).where(and(eq(V.logEntryId, entryId), eq(V.stationId, stationId)))).map((v) => v.sessionId) : [];
     return airingNumbers(segments, presence, voters);
+  }
+
+  /** Program airings in the as-run log that ended since `since`. */
+  async function aggregatePrograms(now: Date, since: Date): Promise<{ computed: number; finalized: number; votesDeleted: number }> {
+    const recent = await services.playout.programRows({ endedFrom: since, endedTo: now });
+    // Each log entry's rows, all of them (a long program's first rows may have ended earlier).
+    const entryIds = [...new Set(recent.map((r) => r.logEntryId).filter((v): v is string => !!v))];
+    const all = [...recent.filter((r) => !r.logEntryId), ...(entryIds.length ? await services.playout.programRows({ logEntryIds: entryIds }) : [])];
+    const groups = new Map<string, ProgramRow[]>();
+    for (const row of all) groups.set(keyOf(row), [...(groups.get(keyOf(row)) ?? []), row]);
+    if (!groups.size) return { computed: 0, finalized: 0, votesDeleted: 0 };
+
+    const done = new Set((await db.select({ key: A.airingKey }).from(A).where(and(inArray(A.airingKey, [...groups.keys()]), eq(A.final, true)))).map((r) => r.key));
+    const pending = [...groups].filter(([key]) => !done.has(key));
+    if (!pending.length) return { computed: 0, finalized: 0, votesDeleted: 0 };
+    const stationIds = [...new Set(pending.map(([, rows]) => rows[0].stationId))];
+    const programIds = [...new Set(pending.flatMap(([, rows]) => rows.map((r) => r.programId)).filter((v): v is string => !!v))];
+    const [idents, programs] = await Promise.all([services.stations.idents(stationIds), services.library.programsByIds(programIds)]);
+
+    let computed = 0;
+    let finalized = 0;
+    let votesDeleted = 0;
+    for (const [key, rows] of pending) {
+      rows.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
+      const head = rows[0];
+      const lastEnd = Math.max(...rows.map((r) => r.endedAt.getTime()));
+      // Still on (by the log), or just over: not yet.
+      const span = head.logEntryId ? await services.log.entrySpan(head.logEntryId) : null;
+      const ends = Math.max(lastEnd, span && span.startsAt.getTime() <= lastEnd ? span.endsAt.getTime() : 0);
+      if (now.getTime() < ends + SETTLE_MS) continue;
+      const numbers = await compute(rows);
+      const final = now.getTime() >= ends + FINAL_MS;
+      const ident = idents.get(head.stationId);
+      const programId = rows.find((r) => r.programId)?.programId ?? null;
+      const values = {
+        airingKey: key,
+        stationId: head.stationId,
+        logEntryId: head.logEntryId,
+        asRunId: head.id,
+        programId,
+        makerStationId: programId ? (programs.get(programId)?.stationId ?? null) : null,
+        carried: rows.some((r) => r.carried),
+        band: ident?.band ?? "tv",
+        // Phase 6's external stations come in as `listed` stations; labelled, never paid from.
+        external: ident?.kind === "listed",
+        startedAt: head.startedAt,
+        endedAt: new Date(lastEnd),
+        ...numbers,
+        final,
+        computedAt: now
+      };
+      await db.transaction(async (tx) => {
+        await tx.insert(A).values(values).onConflictDoUpdate({ target: A.airingKey, set: { ...values } });
+        if (final && head.logEntryId) {
+          // Counted: the votes (tied to sessions) go now, not in 30 days.
+          const gone = await tx.delete(V).where(and(eq(V.logEntryId, head.logEntryId), eq(V.stationId, head.stationId))).returning({ sessionId: V.sessionId });
+          votesDeleted += gone.length;
+        }
+      });
+      computed++;
+      if (final) finalized++;
+    }
+    return { computed, finalized, votesDeleted };
+  }
+
+  /**
+   * External stations (follow-up Phase 6) have no as-run log: each scheduled airing from the
+   * source's own schedule (`listed:<airing>`), and each hour outside them (`external:<station>:<hour>`),
+   * worked out from the tuned-in minutes Opencast's player sent. Labelled external; nothing that
+   * pays reads them. Only what someone watched gets a row.
+   */
+  async function aggregateExternal(now: Date, since: Date): Promise<{ computed: number; finalized: number }> {
+    const external = await services.stations.idsOfKinds(["listed"]);
+    if (!external.length) return { computed: 0, finalized: 0 };
+    const watched = await db
+      .selectDistinct({ stationId: SM.stationId })
+      .from(SM)
+      .where(and(gte(SM.minute, since), lt(SM.minute, now), inArray(SM.stationId, external)));
+    if (!watched.length) return { computed: 0, finalized: 0 };
+    const stationIds = watched.map((w) => w.stationId);
+    const [airings, idents, minutes] = await Promise.all([
+      services.network.listedAiringsInWindow(stationIds, since, now),
+      services.stations.idents(stationIds),
+      db.select({ stationId: SM.stationId, minute: SM.minute }).from(SM).where(and(inArray(SM.stationId, stationIds), gte(SM.minute, since), lt(SM.minute, now)))
+    ]);
+    type Piece = { key: string; stationId: string; segments: Array<{ start: number; end: number }> };
+    const pieces: Piece[] = [];
+    for (const stationId of stationIds) {
+      const seen = minutes.filter((m) => m.stationId === stationId).map((m) => m.minute.getTime());
+      const watchedIn = (segments: Piece["segments"]) => seen.some((t) => segments.some((g) => t + MINUTE > g.start && t < g.end));
+      const scheduled = (airings.get(stationId) ?? []).map((a) => ({ id: a.id, start: Date.parse(a.startsAt), end: a.endsAt ? Date.parse(a.endsAt) : Date.parse(a.startsAt) + HOUR }));
+      for (const a of scheduled) {
+        const segments = [{ start: a.start, end: a.end }];
+        if (a.end > since.getTime() && now.getTime() >= a.end + SETTLE_MS && watchedIn(segments)) pieces.push({ key: `listed:${a.id}`, stationId, segments });
+      }
+      // The hours around them, whatever the source showed (no title: it's "Live").
+      for (let h = Math.floor(since.getTime() / HOUR) * HOUR; h + HOUR + SETTLE_MS <= now.getTime(); h += HOUR) {
+        let segments = [{ start: h, end: h + HOUR }];
+        for (const a of scheduled) {
+          segments = segments.flatMap((g) => (a.end <= g.start || a.start >= g.end ? [g] : [...(a.start > g.start ? [{ start: g.start, end: a.start }] : []), ...(a.end < g.end ? [{ start: a.end, end: g.end }] : [])]));
+        }
+        if (segments.length && watchedIn(segments)) pieces.push({ key: `external:${stationId}:${new Date(h).toISOString()}`, stationId, segments });
+      }
+    }
+    if (!pieces.length) return { computed: 0, finalized: 0 };
+    const done = new Set((await db.select({ key: A.airingKey }).from(A).where(and(inArray(A.airingKey, pieces.map((p) => p.key)), eq(A.final, true)))).map((r) => r.key));
+    let computed = 0;
+    let finalized = 0;
+    for (const piece of pieces) {
+      if (done.has(piece.key)) continue;
+      const numbers = await computeSegments(piece.stationId, piece.segments, null);
+      const start = Math.min(...piece.segments.map((g) => g.start));
+      const end = Math.max(...piece.segments.map((g) => g.end));
+      const final = now.getTime() >= end + FINAL_MS;
+      const values = {
+        airingKey: piece.key,
+        stationId: piece.stationId,
+        logEntryId: null,
+        asRunId: null,
+        programId: null,
+        makerStationId: null,
+        carried: false,
+        band: idents.get(piece.stationId)?.band ?? "tv",
+        external: true,
+        startedAt: new Date(start),
+        endedAt: new Date(end),
+        ...numbers,
+        final,
+        computedAt: now
+      };
+      await db.insert(A).values(values).onConflictDoUpdate({ target: A.airingKey, set: { ...values } });
+      computed++;
+      if (final) finalized++;
+    }
+    return { computed, finalized };
   }
 
   const service: WatchData = {
@@ -174,67 +311,10 @@ export function createWatchData({ deps, services }: ModuleContext): WatchData {
       const retention = (await services.settings.valueAt("watch_data.retention", now)).days * DAY;
       // Never earlier than the sessions still kept: numbers from purged minutes would be zeros.
       const since = new Date(Math.max(options.since?.getTime() ?? now.getTime() - LOOKBACK_MS, now.getTime() - retention + DAY));
-      const recent = await services.playout.programRows({ endedFrom: since, endedTo: now });
-      // Each log entry's rows, all of them (a long program's first rows may have ended earlier).
-      const entryIds = [...new Set(recent.map((r) => r.logEntryId).filter((v): v is string => !!v))];
-      const all = [...recent.filter((r) => !r.logEntryId), ...(entryIds.length ? await services.playout.programRows({ logEntryIds: entryIds }) : [])];
-      const groups = new Map<string, ProgramRow[]>();
-      for (const row of all) groups.set(keyOf(row), [...(groups.get(keyOf(row)) ?? []), row]);
-      if (!groups.size) return { computed: 0, finalized: 0, votesDeleted: 0 };
-
-      const done = new Set((await db.select({ key: A.airingKey }).from(A).where(and(inArray(A.airingKey, [...groups.keys()]), eq(A.final, true)))).map((r) => r.key));
-      const pending = [...groups].filter(([key]) => !done.has(key));
-      if (!pending.length) return { computed: 0, finalized: 0, votesDeleted: 0 };
-      const stationIds = [...new Set(pending.map(([, rows]) => rows[0].stationId))];
-      const programIds = [...new Set(pending.flatMap(([, rows]) => rows.map((r) => r.programId)).filter((v): v is string => !!v))];
-      const [idents, programs] = await Promise.all([services.stations.idents(stationIds), services.library.programsByIds(programIds)]);
-
-      let computed = 0;
-      let finalized = 0;
-      let votesDeleted = 0;
-      for (const [key, rows] of pending) {
-        rows.sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
-        const head = rows[0];
-        const lastEnd = Math.max(...rows.map((r) => r.endedAt.getTime()));
-        // Still on (by the log), or just over: not yet.
-        const span = head.logEntryId ? await services.log.entrySpan(head.logEntryId) : null;
-        const ends = Math.max(lastEnd, span && span.startsAt.getTime() <= lastEnd ? span.endsAt.getTime() : 0);
-        if (now.getTime() < ends + SETTLE_MS) continue;
-        const numbers = await compute(rows);
-        const final = now.getTime() >= ends + FINAL_MS;
-        const ident = idents.get(head.stationId);
-        const programId = rows.find((r) => r.programId)?.programId ?? null;
-        const values = {
-          airingKey: key,
-          stationId: head.stationId,
-          logEntryId: head.logEntryId,
-          asRunId: head.id,
-          programId,
-          makerStationId: programId ? (programs.get(programId)?.stationId ?? null) : null,
-          carried: rows.some((r) => r.carried),
-          band: ident?.band ?? "tv",
-          // Phase 6's external stations come in as `listed` stations; labelled, never paid from.
-          external: ident?.kind === "listed",
-          startedAt: head.startedAt,
-          endedAt: new Date(lastEnd),
-          ...numbers,
-          final,
-          computedAt: now
-        };
-        await db.transaction(async (tx) => {
-          await tx.insert(A).values(values).onConflictDoUpdate({ target: A.airingKey, set: { ...values } });
-          if (final && head.logEntryId) {
-            // Counted: the votes (tied to sessions) go now, not in 30 days.
-            const gone = await tx.delete(V).where(and(eq(V.logEntryId, head.logEntryId), eq(V.stationId, head.stationId))).returning({ sessionId: V.sessionId });
-            votesDeleted += gone.length;
-          }
-        });
-        computed++;
-        if (final) finalized++;
-      }
-      return { computed, finalized, votesDeleted };
+      const programs = await aggregatePrograms(now, since);
+      const external = await aggregateExternal(now, since);
+      return { computed: programs.computed + external.computed, finalized: programs.finalized + external.finalized, votesDeleted: programs.votesDeleted };
     },
-
     async purge() {
       const now = deps.clock.now();
       const days = (await services.settings.valueAt("watch_data.retention", now)).days;

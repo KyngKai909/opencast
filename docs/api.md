@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-343 endpoints in 22 modules.
+347 endpoints in 22 modules.
 
 ## accounts (35)
 
@@ -304,7 +304,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `suggestCallSign` | POST | `/admin/reservations/:reservationId/suggest` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Not allowed: hold `callSign` for them instead, in the same place in line, and tell them why (with up to three other free names) |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
-## network (25)
+## network (29)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -330,7 +330,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `startHandover` | POST | `/stations/:stationId/claim` | signed in | Claim (or stop) a claimable station: connect the source account to prove it's you |
 | `approveHandover` | POST | `/admin/handovers/:handoverId/approve` | Opencast admin | Record the desk's check of the claimant. With the escrow contract live, the verifiers then approve on-chain (what they sign is in `onChain`) and the 72 hours start there |
 | `listListedSources` | GET | `/admin/listed-sources` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | City and county streams |
-| `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a city stream on the dial. Viewers get the source's own player. |
+| `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations. |
+| `recordListedEvidence` | POST | `/admin/listed-sources/:sourceId/evidence` | Opencast admin | Phase 6: record the evidence a listing was waiting for (terms checked, written permission, a public basis, or a note). It goes on the dial once the evidence is complete. A permission is recorded once and never edited. |
+| `listExternalOutages` | GET | `/admin/listed-sources/:sourceId/outages` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: an external station's outages, newest first (the last 90 days) |
+| `previewIptvList` | POST | `/admin/creators/iptv/preview` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: read a public IPTV list (a pasted or uploaded M3U, or an iptv-org address: M3U or JSON) and list its channels, each with whether it's already a lead or an external station. Nothing is saved. Only the list is fetched, never a stream. |
+| `importIptvLeads` | POST | `/admin/creators/iptv/import` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: import IPTV-list channels into the creator pipeline as leads (stage `found`), with their stream addresses noted. Never on the dial from here. A channel already a lead or an external station (by its stream address) is skipped. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |
 | `getClaimPage` | GET | `/claim/:token` | anyone | N10: the creator's claim page, by the link we sent them (their permission link's token), and the claim's status once started. 404 when there's no station to claim from it. |
 

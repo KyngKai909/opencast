@@ -10,6 +10,7 @@ import { STATIONS, inMarket, playbackFor, stationById, stationByRef } from "../f
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { fail, path, reply } from "../respond";
 import { airingX, identX } from "../view";
+import { hiddenExternal } from "../external";
 
 function nowNextIn(list: MockAiring[], t: string) {
   return { now: list.find((x) => x.start <= t && t < x.end) ?? null, next: list.find((x) => x.start > t) ?? null };
@@ -25,6 +26,7 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   const nn = nowNextIn(mine, iso);
   const x = STATION_EXTRA[s.ident.callSign ?? ""] ?? {};
   const listed = s.ident.kind === "listed";
+  const down = hiddenExternal(s.ident.id, t);
   const lo = from ?? new Date(t.getTime() - 12 * 3600e3).toISOString();
   const hi = to ?? new Date(t.getTime() + 24 * 3600e3).toISOString();
   const programs = [...new Set(mine.map((a) => a.programId).filter(Boolean))]
@@ -35,14 +37,16 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
   return {
     station: identX(s),
     description: x.line ?? s.description,
-    // Planned off air (G9) is its `off_air` airing on now: not on air.
-    onAir: !!nn.now && !nn.now.offAir,
+    // Planned off air (G9) is its `off_air` airing on now: not on air. An external station is on
+    // while its stream is up, whatever its schedule says (follow-up Phase 6).
+    onAir: s.external ? !down : !!nn.now && !nn.now.offAir,
     now: nn.now ? airingX(nn.now) : null,
     upNext: mine.filter((a) => a.start > iso).slice(0, 3).map(airingX),
     programs,
     claimable: s.ident.kind === "claimable" ? { runFor: "Marcus Reyes", claimed: false, escrowContract: "0x5ee2000000000000000000000000000000a41d", escrowStationId: 101 } : null,
     pledgesTaxDeductible: s.ident.callSign === "CIVC" ? true : null,
-    playback: nn.now && !nn.now.offAir ? playbackFor(s) : null,
+    playback: s.external ? (down ? null : playbackFor(s)) : nn.now && !nn.now.offAir ? playbackFor(s) : null,
+    ...(s.external ? { external: { ...s.external, down } } : {}),
     about: x.about ?? s.about ?? null,
     members,
     onDialSince: x.onDialSince ?? s.onDialSince ?? null,

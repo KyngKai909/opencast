@@ -1,7 +1,7 @@
 // The stations, markets and programs in the reference files (viewer/opencast-home.html and the
 // rest): the Inland Empire at 8:42 pm on a Saturday. Illustrations, used as mock data.
 
-import type { StationIdent } from "@opencast/contracts";
+import type { ExternalInfo, StationIdent } from "@opencast/contracts";
 
 export interface MockStation {
   ident: StationIdent;
@@ -14,6 +14,8 @@ export interface MockStation {
   hours?: string;
   /** Which mock stream plays it (packages/player/mock), or an embed for a listed city stream. */
   stream: { kind: "hls"; slug: string } | { kind: "embed"; url: string } | null;
+  /** An external station (follow-up Phase 6): whose stream it is, how it plays, where its schedule comes from. */
+  external?: ExternalInfo;
 }
 
 const uid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -30,7 +32,9 @@ const HD = "high-desert";
 
 export const STATIONS: MockStation[] = [
   station(7, "CIVC", "7.1", "Inland Civic", "#2E6B5A", "tv", IE, { category: "Public affairs", description: "Town halls and council meetings, unedited.", about: "Inland Civic airs every public meeting in the Inland Empire in full, with questions from viewers.", members: 188, onDialSince: "2026-06-02", hours: "On air 6:00 am to 1:00 am.", stream: { kind: "hls", slug: "civc" } }),
-  station(9, "RDLS", "9.1", "Redlands Public Access", "#4F5B2A", "tv", IE, { category: "Public affairs", description: "The City of Redlands' own channel.", stream: { kind: "embed", url: "/mock-embed/rdls.html" } }, "listed"),
+  station(9, "RDLS", "9.1", "Redlands Public Access", "#4F5B2A", "tv", IE, { category: "Public affairs", description: "The City of Redlands' own channel.", stream: { kind: "embed", url: "/mock-embed/rdls.html" }, external: { source: "City of Redlands", plays: "embed", schedule: "feed" } }, "listed"),
+  // An external station's stream link (follow-up Phase 6): the city's own HLS, played in Opencast's player (packages/player/mock's "colt").
+  station(92, "COLT", "9.2", "City of Colton", "#3F5A6E", "tv", IE, { category: "Public affairs", description: "Colton's council meetings, from the city's own stream.", stream: { kind: "hls", slug: "colt" }, external: { source: "City of Colton", plays: "stream_link", schedule: "feed" } }, "listed", "Colton"),
   station(12, "BEAT", "12.1", "Inland Beat", "#8C3B7A", "tv", IE, { category: "Music", description: "Beat makers, crate diggers and the Inland Empire's producers.", about: "Inland Beat is run by a collective of producers in Redlands. Live from the studio on Saturdays.", members: 214, onDialSince: "2026-07-18", hours: "On air all day.", stream: { kind: "hls", slug: "beat" } }),
   station(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", IE, { category: "Food", description: "Home cooking from Inland Empire kitchens.", members: 96, stream: { kind: "hls", slug: "sazn" } }, "station", "Fontana"),
   station(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", IE, { category: "Classic", description: "Restored public-domain films, cartoons and newsreels.", members: 301, stream: { kind: "hls", slug: "reel" } }, "station", "Riverside"),

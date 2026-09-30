@@ -59,9 +59,13 @@ export function optionsWhen(startsAt: TimeInput, s: StationIdentX, now: TimeInpu
   return `${capital(dayWord(startsAt, now, timeZone))}, ${clock(startsAt, { timeZone })}, ${identText(s)}`;
 }
 
-/** Under "Tune to BEAT now": what's on there ("Saturday Reel is on"), or that it's off air. */
-export function tuneDetail(nowTitle: string | null | undefined, onAir: boolean | undefined): string | null {
-  if (onAir === false) return "Off air now";
+/**
+ * Under "Tune to BEAT now": what's on there ("Saturday Reel is on"), or that it's off air. An
+ * external station with nothing scheduled (follow-up Phase 6): "Live from City of Colton".
+ */
+export function tuneDetail(nowTitle: string | null | undefined, onAir: boolean | undefined, externalSource?: string | null): string | null {
+  if (onAir === false) return externalSource ? "Stand by" : "Off air now";
+  if (!nowTitle && externalSource) return `Live from ${externalSource}`;
   return nowTitle ? `${nowTitle} is on` : null;
 }
 

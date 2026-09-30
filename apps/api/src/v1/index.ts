@@ -34,6 +34,7 @@ import { createWaitlistService } from "./modules/waitlist/service.js";
 import { waitlistRoutes } from "./modules/waitlist/routes.js";
 import { createNetworkService } from "./modules/network/service.js";
 import { networkRoutes } from "./modules/network/routes.js";
+import { externalGuards } from "./modules/network/externalGuard.js";
 import { createTvService } from "./modules/tv/service.js";
 import { tvRoutes } from "./modules/tv/routes.js";
 import { createSettingsService } from "./modules/settings/service.js";
@@ -82,6 +83,8 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   localUploadPartRoute(router, ctx);
   router.use(express.json({ limit: "2mb" }));
   const registrar = new RouteRegistrar(router, deps, services);
+  // External stations (follow-up Phase 6) refuse playout, spots and money, before any handler.
+  externalGuards(registrar, ctx);
   accountsRoutes(registrar, ctx);
   stationsRoutes(registrar, ctx);
   libraryRoutes(registrar, ctx);

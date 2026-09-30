@@ -11,6 +11,7 @@ import { carriedPick, homeAirings, homeNowNext } from "../fixtures/home";
 import { path, reply, fail } from "../respond";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { airingX, identX, marketOf, milesBetween, rowOf } from "../view";
+import { hiddenExternal } from "../external";
 
 const THIN = 3; // Fewer stations than this and the dial shows the nearest market too.
 
@@ -48,11 +49,13 @@ export const dialHandlers = [
     if (!market) return fail(404, "not_found", "That market wasn't found.");
     const band = (new URL(request.url).searchParams.get("band") ?? "tv") as "tv" | "radio";
     const t = now();
-    const rows = inMarket(slug, band).map((s) => dialRow(s, t));
+    // External stations down 5 minutes are off the dial (follow-up Phase 6).
+    const onDial = (s: MockStation) => !hiddenExternal(s.ident.id, t);
+    const rows = inMarket(slug, band).filter(onDial).map((s) => dialRow(s, t));
     const all = inMarket(slug);
     const thin = all.length < THIN;
     const nearest = MARKETS.filter((m) => m.slug !== slug).sort((a, b) => milesBetween(slug, a.slug) - milesBetween(slug, b.slug))[0];
-    const nearby = thin && nearest ? [{ market: marketOf(nearest.slug)!, miles: milesBetween(slug, nearest.slug), rows: inMarket(nearest.slug, band).map((s) => dialRow(s, t)) }] : [];
+    const nearby = thin && nearest ? [{ market: marketOf(nearest.slug)!, miles: milesBetween(slug, nearest.slug), rows: inMarket(nearest.slug, band).filter(onDial).map((s) => dialRow(s, t)) }] : [];
 
     // Carried widely: programs made here that other stations carry (counts are illustrations).
     const carriedCounts: Record<string, number> = { "saturday-reel": 12, "council-watch": 6, "producers-hour": 9, "night-desk": 4 };

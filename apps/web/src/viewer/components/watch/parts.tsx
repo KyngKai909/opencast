@@ -19,6 +19,20 @@ export function NowTitle({ w, size = "web" }: { w: WatchData; size?: "web" | "ph
   const row = w.row;
   const now = w.now;
   if (!row) return null;
+  // An external station with nothing scheduled (follow-up Phase 6): its name, Live and the source.
+  const external = row.station.kind === "listed" ? (row.external ?? w.page.data?.external ?? null) : null;
+  const down = !!external && (!row.onAir || !!w.page.data?.external?.down);
+  if (external && (!now || down)) {
+    return (
+      <>
+        <h2 className={cx("vw-w-title", size === "phone" && "vw-w-title--phone")}>{row.station.name}</h2>
+        <div className="vw-w-meta">
+          {down ? <span>{external.source}'s stream is down. Stand by.</span> : <span><LiveText /> from {external.source}</span>}
+          <Tag variant="listed">External</Tag>
+        </div>
+      </>
+    );
+  }
   if (!now) {
     // When it's back: the stream's sign-off or the dial's off air (G9), else its next airing.
     const back = w.backAt ?? (row.next ?? w.page.data?.upNext.find((x) => x.kind !== "off_air") ?? null)?.startsAt ?? null;

@@ -1,0 +1,12 @@
+/* Import from an IPTV list: the file picker, the filter bar, and the channels as a ruled checklist
+   with each stream's address in mono, cut to one line. */
+.nd-iptv__file { display: block; font-size: 13px; }
+.nd-iptv__sum { margin: 0; font-size: 13px; color: var(--ink-70); }
+.nd-iptv__bar { display: flex; gap: 8px; align-items: flex-end; }
+.nd-iptv__bar .oc-field { flex: 1; }
+.nd-iptv__list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow: auto; border-top: 1px solid var(--hair); }
+.nd-iptv__list li { padding: 8px 0; border-bottom: 1px solid var(--hair); min-width: 0; }
+.nd-iptv__addr { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.nd-iptv__none { color: var(--ink-70); font-size: 13px; }
+.nd-iptv__list .oc-check { min-width: 0; }
+.nd-iptv__list .oc-check__words { min-width: 0; }

@@ -260,6 +260,13 @@
       "when": 1790787741523,
       "tag": "0037_direct_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790797836427,
+      "tag": "0039_external_stations",
+      "breakpoints": true
     }
   ]
 }

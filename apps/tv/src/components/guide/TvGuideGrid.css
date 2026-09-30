@@ -15,6 +15,10 @@
 .tvg-grid__ch { font-size: 28px; font-weight: 500; color: var(--ink-70); width: 70px; flex: none; }
 .tvg-grid--wide .tvg-grid__ch { width: 88px; }
 .tvg-grid__cs { font-size: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* An external station: the call sign over the dashed "External" tag (nothing under 21px). */
+.tvg-grid__id { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.tvg-grid__id .tvg-grid__cs { line-height: 1.1; max-width: 100%; }
+.tvg-tag.oc-tag { height: 30px; padding: 0 10px; font-size: 21px; border-width: 1.5px; }
 
 .tvg-cell {
   margin: 4px; padding: 8px 16px; border-radius: var(--r-control);

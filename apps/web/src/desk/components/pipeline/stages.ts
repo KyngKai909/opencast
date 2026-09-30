@@ -19,9 +19,10 @@ export const STRIP: ReadonlyArray<{ stage: CreatorStage; label: string }> = [
   { stage: "claimed", label: CREATOR_STAGE_LABELS.claimed.desk }
 ];
 
-export function stageCounts(creators: ReadonlyArray<Pick<Creator, "stage">>): Record<CreatorStage, number> {
+export function stageCounts(creators: ReadonlyArray<Pick<Creator, "stage" | "listedSourceId">>): Record<CreatorStage, number> {
   const counts = { found: 0, already_licensed: 0, asked: 0, said_yes: 0, setting_up: 0, on_air: 0, claimed: 0, declined: 0, no_answer: 0 } as Record<CreatorStage, number>;
-  for (const c of creators) counts[c.stage] += 1;
+  // A lead that became an external station (follow-up Phase 6) isn't a claimable station on air: not counted.
+  for (const c of creators) if (!c.listedSourceId) counts[c.stage] += 1;
   return counts;
 }
 

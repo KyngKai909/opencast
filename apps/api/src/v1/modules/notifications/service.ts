@@ -33,7 +33,8 @@ type Kind =
   | "signed_on_off"
   | "spot_added"
   | "station_account"
-  | "relay";
+  | "relay"
+  | "external_station";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -86,7 +87,9 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     // Pay-as-you-go (2026-09-29): always on, to the owners.
     station_account: { push: true, email: true },
     // Relays (2026-09-30): a relay stopped or came back, a restart the station has to do, paid promotion to mark.
-    relay: { push: true, email: false }
+    relay: { push: true, email: false },
+    // External stations (2026-09-30): the Network desk, when one leaves the dial for a stream that's down and when it's back.
+    external_station: { push: true, email: true }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -512,6 +515,20 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       title: e.title,
       body: e.body,
       link: `/stations/${e.stationId}/settings?section=translators`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: e.dedupeKey
+    });
+  });
+
+  // External stations (added 2026-09-30, follow-up Phase 6): the Network desk, when one leaves the
+  // dial for a stream that's down and when it's back. The link opens External sources.
+  deps.bus.on("external.station", async (e) => {
+    const ident = (await services.stations.idents([e.stationId])).get(e.stationId);
+    await service.notify(await services.accounts.adminIds(), {
+      kind: "external_station",
+      title: e.title,
+      body: e.body,
+      link: `/desk/markets/${ident?.marketSlug ?? ""}/listed`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: e.dedupeKey
     });

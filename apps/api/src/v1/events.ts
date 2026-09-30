@@ -66,6 +66,19 @@ export interface Events {
     /** The Network desk hears too (a relay that stopped). */
     desk: boolean;
   };
+  /**
+   * External stations (added 2026-09-30, follow-up Phase 6): one left the dial after its stream was
+   * down 5 minutes (`hidden`), or is back on it (`back`). The Network desk hears. Worded where it
+   * happens; one notice per `dedupeKey`.
+   */
+  "external.station": {
+    stationId: string;
+    sourceId: string;
+    step: "hidden" | "back";
+    title: string;
+    body: string;
+    dedupeKey: string;
+  };
 }
 
 type Handler<K extends keyof Events> = (payload: Events[K]) => Promise<void> | void;

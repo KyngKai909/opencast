@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Band, CallSign, ChannelNumber, Colour, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
+import { Band, CallSign, ChannelNumber, Colour, DateOnly, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CreatorStage } from "./states.js";
-import { BreakCadence, StationIdCadence } from "./stations.js";
+import { BreakCadence, ExternalPlays, ExternalSchedule, StationIdCadence } from "./stations.js";
 
 export const SlotState = z.enum(["station", "claimable", "listed", "catalog", "held", "open"]);
 export const SLOT_STATE_LABELS = {
@@ -97,7 +97,27 @@ export const Creator = z.object({
   /** N12: how the desk refers to them ("Her videos"). Absent: "their". */
   pronoun: z.enum(["she", "he", "they"]).optional(),
   /** N5: the claimable station's setup, read back once it exists. */
-  setup: CreatorSetup.nullable().optional()
+  setup: CreatorSetup.nullable().optional(),
+  /**
+   * Follow-up Phase 6 (added 2026-09-30): a lead found on a public IPTV list, with its stream
+   * address noted. Never on the dial from here: it becomes an external station (with their written
+   * permission, or once confirmed public) or a full one (asked like any creator). Null otherwise.
+   */
+  lead: z
+    .object({
+      from: z.literal("iptv_list"),
+      streamUrl: z.string(),
+      /** The list it was found on (an iptv-org address), or null when pasted or uploaded. */
+      listUrl: z.string().nullable(),
+      tvgId: z.string().nullable(),
+      group: z.string().nullable(),
+      country: z.string().nullable(),
+      logoUrl: z.string().nullable()
+    })
+    .nullable()
+    .optional(),
+  /** Phase 6: the external station it became, once listed. */
+  listedSourceId: Id.nullable().optional()
 });
 
 export const CreatorWork = z.object({
@@ -236,6 +256,64 @@ export const HeldEarnings = z.object({
   chain: z.object({ name: z.string(), explorerUrl: z.url() }).nullable().optional()
 });
 
+// ---- External stations (follow-up Phase 6, added 2026-09-30) ----
+
+/**
+ * Why an external station may play the way it does. `embed_terms`: the source's terms allow
+ * embedding its player (the terms page and the date checked are recorded). `written_permission`:
+ * the source said yes in writing to its stream link (a `StreamPermission`). `public_source`: a
+ * clearly public source (a government body, public access, a public agency), with the basis.
+ */
+export const ExternalBasis = z.enum(["embed_terms", "written_permission", "public_source"]);
+export type ExternalBasis = z.infer<typeof ExternalBasis>;
+
+/** A calendar or schedule feed's format. */
+export const ScheduleFormat = z.enum(["ical", "rss", "json", "xmltv"]);
+export type ScheduleFormat = z.infer<typeof ScheduleFormat>;
+
+/**
+ * An external station's stream, checked every minute: `unchecked` (not yet), `up`, `down` (failing,
+ * still on the dial for its first 5 minutes) and `hidden` (down 5 minutes or more: off the dial, the
+ * guide and the swipe order until it's back).
+ */
+export const ExternalHealth = z.enum(["unchecked", "up", "down", "hidden"]);
+export type ExternalHealth = z.infer<typeof ExternalHealth>;
+
+/**
+ * A source's written permission for its stream link, kept like a claimable station's permission
+ * record: recorded once, never edited, naming exactly the stream address it covers.
+ */
+export const StreamPermission = z.object({
+  id: Id,
+  /** Who said yes, and for whom: "Maria Lopez, City Clerk, City of Colton". */
+  grantedBy: z.string(),
+  grantedOn: DateOnly,
+  /** Where the written yes is kept: "Email to network@opencast.tv, Sept 18". */
+  evidence: z.string(),
+  documentUrl: z.string().nullable(),
+  /** The stream address the yes covers. */
+  streamUrl: z.string(),
+  recordedAt: Timestamp,
+  recordedBy: z.string().nullable(),
+  /** The pipeline lead it came from, when there was one. */
+  creatorId: Id.nullable()
+});
+export type StreamPermission = z.infer<typeof StreamPermission>;
+
+/** One stretch of an external station's stream being down, for the history on External sources. */
+export const ExternalOutage = z.object({
+  id: Id,
+  /** The first failed check. */
+  downSince: Timestamp,
+  /** When it came off the dial (5 minutes down); null for a blip that was back sooner. */
+  hiddenAt: Timestamp.nullable(),
+  /** When it was back; null while it's still down. */
+  backAt: Timestamp.nullable(),
+  /** What the last failed check saw: "HTTP 404", "No answer in 5 seconds", "Not a stream playlist". */
+  detail: z.string().nullable()
+});
+export type ExternalOutage = z.infer<typeof ExternalOutage>;
+
 export const ListedSource = z.object({
   id: Id,
   station: StationIdent,
@@ -247,8 +325,83 @@ export const ListedSource = z.object({
   calendarSync: z.enum(["synced", "calendar_not_found", "not_set"]),
   listingState: z.enum(["not_listed", "checking", "listed"]),
   lastSyncedAt: Timestamp.nullable(),
-  upcoming: z.number().int()
+  upcoming: z.number().int(),
+  // ---- Added 2026-09-30 (follow-up Phase 6) ----
+  /** How it plays: the source's official embed (`streamUrl` is the embed's address) or its stream link. */
+  plays: ExternalPlays.optional(),
+  /** A stream link's format, from its address or its playlist; null for an embed. */
+  streamFormat: z.enum(["hls", "dash"]).nullable().optional(),
+  /** The evidence it may play that way. `basis` null: not established yet (it's not on the dial). */
+  evidence: z
+    .object({
+      basis: ExternalBasis.nullable(),
+      termsUrl: z.string().nullable(),
+      termsCheckedOn: DateOnly.nullable(),
+      /** A public source's basis: "US government, public", "Public body, stream published for the public". */
+      publicBasis: z.string().nullable(),
+      permission: StreamPermission.nullable(),
+      /** What's being waited on, in the desk's words: "Asked Sept 22". */
+      note: z.string().nullable()
+    })
+    .optional(),
+  /** Where "what's on" comes from. `url`: the feed; `checkedAgainst`: the published schedule guide data is checked against. */
+  schedule: z
+    .object({
+      source: ExternalSchedule,
+      format: ScheduleFormat.nullable(),
+      url: z.string().nullable(),
+      checkedAgainst: z.string().nullable(),
+      checkedOn: DateOnly.nullable()
+    })
+    .optional(),
+  /** On the dial now: evidence in place, in its market, and not hidden for being down. */
+  onDial: z.boolean().optional(),
+  /**
+   * Why it isn't on the dial, when it isn't: `terms_unclear`, `needs_permission`, `needs_terms`
+   * (an embed with no terms page recorded), `dash_not_played` (a DASH-only stream link, A201),
+   * `other_market` (A200), `down` (hidden while its stream is down). Null when it's on the dial.
+   */
+  waiting: z.enum(["terms_unclear", "needs_terms", "needs_permission", "dash_not_played", "other_market", "down"]).nullable().optional(),
+  /** The stream's checks: the state, since when, the last check and what it saw. */
+  health: z
+    .object({
+      state: ExternalHealth,
+      since: Timestamp.nullable(),
+      lastCheckedAt: Timestamp.nullable(),
+      detail: z.string().nullable()
+    })
+    .optional(),
+  /** The latest outages, newest first (up to 5; `listExternalOutages` has the rest). */
+  outages: z.array(ExternalOutage).optional(),
+  /** The pipeline lead it came from (an IPTV-list channel), if any. */
+  creatorId: Id.nullable().optional()
 });
+
+/** The evidence a listing is added with, or recorded later (`recordListedEvidence`). */
+export const ListedEvidenceInput = z.object({
+  /** An embed: the terms page that allows embedding, and the day it was read. */
+  termsUrl: z.url().optional(),
+  termsCheckedOn: DateOnly.optional(),
+  /** A clearly public source: the basis, in words. */
+  publicBasis: z.string().min(3).max(120).optional(),
+  /** The source's written permission for its stream link. */
+  permission: z
+    .object({ grantedBy: z.string().min(3).max(160), grantedOn: DateOnly, evidence: z.string().min(3).max(300), documentUrl: z.url().optional() })
+    .optional(),
+  /** What's being waited on: "Asked Sept 22". */
+  note: z.string().max(160).optional()
+});
+
+/** A channel found on a public IPTV list (an M3U or iptv-org's JSON), before it's imported. */
+export const IptvChannel = z.object({
+  name: z.string().min(1).max(160),
+  streamUrl: z.url(),
+  tvgId: z.string().max(120).nullable(),
+  group: z.string().max(120).nullable(),
+  country: z.string().max(8).nullable(),
+  logoUrl: z.string().max(500).nullable()
+});
+export type IptvChannel = z.infer<typeof IptvChannel>;
 
 const CreatorParams = z.object({ creatorId: Id });
 
@@ -529,7 +682,8 @@ export const networkApi = {
     method: "POST",
     path: "/admin/listed-sources",
     auth: "admin",
-    summary: "List a city stream on the dial. Viewers get the source's own player.",
+    summary:
+      "List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations.",
     body: z.object({
       marketId: Id,
       band: Band,
@@ -537,11 +691,67 @@ export const networkApi = {
       callSign: CallSign,
       name: z.string().min(1),
       description: z.string().max(160).optional(),
+      /** The embed's address, or the stream link. */
       streamUrl: z.url(),
-      embedTerms: z.enum(["allowed", "unclear"]),
-      calendarUrl: z.url().optional()
+      /** An embed's terms. Required for an embed (Phase 6 made it optional for stream links). */
+      embedTerms: z.enum(["allowed", "unclear"]).optional(),
+      calendarUrl: z.url().optional(),
+      // ---- Added 2026-09-30 (follow-up Phase 6) ----
+      /** Default `embed`. */
+      plays: ExternalPlays.optional(),
+      /** The feed's format (`calendarUrl`); worked out from the address when absent. */
+      calendarFormat: ScheduleFormat.optional(),
+      /** Guide data instead of a feed: the published schedule it was checked against, and when. */
+      guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }).optional(),
+      evidence: ListedEvidenceInput.optional(),
+      /** A pipeline lead (an IPTV-list channel) becoming this external station. */
+      creatorId: Id.optional(),
+      /** The source is outside this market (a county meeting that covers two). Waits unless `external.other_markets` allows it (A200). */
+      outsideMarket: z.boolean().optional()
     }),
     response: ListedSource,
+    status: 201
+  }),
+  recordListedEvidence: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/:sourceId/evidence",
+    auth: "admin",
+    summary:
+      "Phase 6: record the evidence a listing was waiting for (terms checked, written permission, a public basis, or a note). It goes on the dial once the evidence is complete. A permission is recorded once and never edited.",
+    params: z.object({ sourceId: Id }),
+    body: ListedEvidenceInput.extend({ embedTerms: z.enum(["allowed", "unclear"]).optional() }),
+    response: ListedSource
+  }),
+  listExternalOutages: endpoint({
+    method: "GET",
+    path: "/admin/listed-sources/:sourceId/outages",
+    auth: "desk",
+    summary: "Phase 6: an external station's outages, newest first (the last 90 days)",
+    params: z.object({ sourceId: Id }),
+    response: z.array(ExternalOutage)
+  }),
+  previewIptvList: endpoint({
+    method: "POST",
+    path: "/admin/creators/iptv/preview",
+    auth: "desk",
+    summary:
+      "Phase 6: read a public IPTV list (a pasted or uploaded M3U, or an iptv-org address: M3U or JSON) and list its channels, each with whether it's already a lead or an external station. Nothing is saved. Only the list is fetched, never a stream.",
+    body: z.object({ m3u: z.string().max(5_000_000).optional(), url: z.url().optional() }).refine((b) => Boolean(b.m3u) !== Boolean(b.url), "Paste a list or give its address"),
+    response: z.object({
+      listUrl: z.string().nullable(),
+      channels: z.array(IptvChannel.extend({ already: z.enum(["lead", "external"]).nullable() })),
+      /** Entries that weren't channels with an http(s) address. */
+      skipped: z.number().int()
+    })
+  }),
+  importIptvLeads: endpoint({
+    method: "POST",
+    path: "/admin/creators/iptv/import",
+    auth: "desk",
+    summary:
+      "Phase 6: import IPTV-list channels into the creator pipeline as leads (stage `found`), with their stream addresses noted. Never on the dial from here. A channel already a lead or an external station (by its stream address) is skipped.",
+    body: z.object({ marketId: Id, listUrl: z.url().optional(), channels: z.array(IptvChannel).min(1).max(100) }),
+    response: z.object({ imported: z.array(Creator), skipped: z.number().int() }),
     status: 201
   }),
   syncListedSource: endpoint({

@@ -12,40 +12,55 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   const { stations, accounts, network, log, playout } = services;
   const staff = ["owner", "operator"] as const;
 
-  async function dialRows(profiles: StationProfile[]) {
+  /** An external station's scheduled meeting or program, as the dial and guide show it. */
+  const externalAiring = (a: { title: string; startsAt: string; endsAt: string | null }): Airing => ({
+    logEntryId: null,
+    title: a.title,
+    episodeTitle: null,
+    code: "PGM",
+    kind: "listed",
+    startsAt: a.startsAt,
+    endsAt: a.endsAt ?? new Date(Date.parse(a.startsAt) + 3_600_000).toISOString(),
+    live: true,
+    carriedFrom: null,
+    programId: null
+  });
+
+  /**
+   * External stations (follow-up Phase 6) are on the dial, the guide and the swipe order only while
+   * their evidence holds and their stream isn't down: the rest are left out here.
+   */
+  async function onTheDial(profiles: StationProfile[]) {
+    const external = await network.externalDial(profiles.filter((p) => p.kind === "listed").map((p) => p.id));
+    return { profiles: profiles.filter((p) => p.kind !== "listed" || external.get(p.id)?.onDial), external };
+  }
+
+  async function dialRows(profiles: StationProfile[], known?: Awaited<ReturnType<typeof network.externalDial>>) {
     const ids = profiles.map((p) => p.id);
     const listedIds = profiles.filter((p) => p.kind === "listed").map((p) => p.id);
     const now = deps.clock.now();
-    const [nowNext, status, listed, listedAirings] = await Promise.all([
+    const [nowNext, status, external, listedAirings] = await Promise.all([
       log.nowNext(ids, now),
       playout.statusFor(ids),
-      network.listedPlayback(listedIds),
+      known ?? network.externalDial(listedIds),
       // City meetings are often weeks apart: look a month ahead for the next one.
       network.listedAiringsInWindow(listedIds, now, new Date(now.getTime() + 30 * 24 * 3_600_000))
     ]);
     return profiles.map((p) => {
       if (p.kind === "listed") {
         const airings = listedAirings.get(p.id) ?? [];
-        const toAiring = (a: (typeof airings)[number]): Airing => ({
-          logEntryId: null,
-          title: a.title,
-          episodeTitle: null,
-          code: "PGM",
-          kind: "listed",
-          startsAt: a.startsAt,
-          endsAt: a.endsAt ?? new Date(Date.parse(a.startsAt) + 3_600_000).toISOString(),
-          live: true,
-          carriedFrom: null,
-          programId: null
-        });
-        const current = airings.find((a) => Date.parse(a.startsAt) <= now.getTime() && Date.parse(a.endsAt ?? a.startsAt) > now.getTime());
+        const current = airings.find((a) => Date.parse(a.startsAt) <= now.getTime() && Date.parse(a.endsAt ?? new Date(Date.parse(a.startsAt) + 3_600_000).toISOString()) > now.getTime());
         const next = airings.find((a) => Date.parse(a.startsAt) > now.getTime());
+        const x = external.get(p.id);
+        // On air whenever its stream is on the dial: what's on is the source's own schedule, or
+        // nothing named at all (the banner says Live and the source), never a made-up title.
         return {
           station: p.ident,
-          onAir: Boolean(current),
-          now: current ? toAiring(current) : null,
-          next: next ? toAiring(next) : null,
-          playback: listed.has(p.id) ? { kind: "embed" as const, url: listed.get(p.id)! } : null
+          onAir: Boolean(x?.onDial && x.playback),
+          now: current ? externalAiring(current) : null,
+          next: next ? externalAiring(next) : null,
+          playback: x?.playback ?? null,
+          ...(x ? { external: x.info } : {})
         };
       }
       const s = status.get(p.id);
@@ -87,11 +102,15 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   r.handle(api.getDial, async ({ params, query }) => {
     const market = await network.marketBySlug(params.marketSlug);
     if (!market) throw notFound("That market");
-    const rows = await dialRows(await stations.onDial(market.id, query.band));
+    const here = await onTheDial(await stations.onDial(market.id, query.band));
+    const rows = await dialRows(here.profiles, here.external);
     const nearby =
       rows.length < THIN_DIAL
         ? await Promise.all(
-            (await network.nearbyMarkets(market.id)).map(async (n) => ({ ...n, rows: await dialRows(await stations.onDial(n.market.id, query.band)) }))
+            (await network.nearbyMarkets(market.id)).map(async (n) => {
+              const there = await onTheDial(await stations.onDial(n.market.id, query.band));
+              return { ...n, rows: await dialRows(there.profiles, there.external) };
+            })
           )
         : [];
     return { market, band: query.band, rows, nearby: nearby.filter((n) => n.rows.length) };
@@ -103,7 +122,7 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     const from = new Date(query.from);
     const to = new Date(query.to);
     if (to <= from || to.getTime() - from.getTime() > 24 * 3_600_000) throw badRequest("Ask for up to 24 hours.");
-    const profiles = await stations.onDial(market.id, query.band);
+    const { profiles } = await onTheDial(await stations.onDial(market.id, query.band));
     const listedIds = profiles.filter((p) => p.kind === "listed").map((p) => p.id);
     const [window, listed] = await Promise.all([
       log.window(profiles.map((p) => p.id), from, to),
@@ -116,20 +135,7 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
       rows: profiles.map((p) => ({
         station: p.ident,
         airings:
-          p.kind === "listed"
-            ? (listed.get(p.id) ?? []).map((a) => ({
-                logEntryId: null,
-                title: a.title,
-                episodeTitle: null,
-                code: "PGM" as const,
-                kind: "listed" as const,
-                startsAt: a.startsAt,
-                endsAt: a.endsAt ?? new Date(Date.parse(a.startsAt) + 3_600_000).toISOString(),
-                live: true,
-                carriedFrom: null,
-                programId: null
-              }))
-            : (window.get(p.id) ?? [])
+          p.kind === "listed" ? (listed.get(p.id) ?? []).map(externalAiring) : (window.get(p.id) ?? [])
       }))
     };
   });
@@ -137,8 +143,9 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   r.handle(api.getStation, async ({ params }) => {
     const profile = await stations.byRef(params.stationRef);
     if (!profile || !profile.public) throw notFound("That station");
+    const external = profile.kind === "listed" ? (await network.externalDial([profile.id])).get(profile.id) : undefined;
     const [[row], programs, claimable, upcoming] = await Promise.all([
-      dialRows([profile]),
+      dialRows([profile], external ? new Map([[profile.id, external]]) : undefined),
       services.library.programsForStation(profile.id),
       profile.kind === "claimable" ? network.claimableInfo(profile.id) : Promise.resolve(null),
       log.window([profile.id], deps.clock.now(), new Date(deps.clock.now().getTime() + 24 * 3_600_000))
@@ -148,7 +155,12 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
       description: profile.description,
       onAir: row.onAir,
       now: row.now,
-      upNext: (upcoming.get(profile.id) ?? []).filter((a) => !(a.logEntryId === (row.now?.logEntryId ?? null) && a.startsAt === row.now?.startsAt)).slice(0, 8),
+      upNext:
+        profile.kind === "listed"
+          ? row.next
+            ? [row.next]
+            : []
+          : (upcoming.get(profile.id) ?? []).filter((a) => !(a.logEntryId === (row.now?.logEntryId ?? null) && a.startsAt === row.now?.startsAt)).slice(0, 8),
       programs: programs.map((p) => ({ id: p.id, title: p.title, description: p.description, live: p.live })),
       claimable: claimable
         ? {
@@ -159,7 +171,8 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
           }
         : null,
       pledgesTaxDeductible: profile.pledgesTaxDeductible,
-      playback: row.playback
+      playback: row.playback,
+      ...(external ? { external: { ...external.info, down: external.down } } : {})
     };
   });
 
@@ -175,6 +188,12 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     const airings = await log.airingsByIds(upcoming.map((u) => u.id));
     const windowed = await log.window([...new Set(upcoming.map((u) => u.stationId))], now, new Date(now.getTime() + 14 * 86_400_000));
     const profiles = await stations.profiles([...upcoming.map((u) => u.stationId), ...listed.map((l) => l.stationId)]);
+    // External stations off the dial (waiting for evidence, or down) aren't found.
+    const offDial = new Set(
+      [...(await network.externalDial([...found.stations.filter((s) => s.kind === "listed").map((s) => s.id), ...listed.map((l) => l.stationId), ...(found.tuneTo?.kind === "listed" ? [found.tuneTo.id] : [])])).entries()]
+        .filter(([, x]) => !x.onDial)
+        .map(([id]) => id)
+    );
     const results: Array<{ station: StationIdent; airing: Airing; listed: boolean }> = [];
     for (const u of upcoming) {
       const p = profiles.get(u.stationId);
@@ -183,26 +202,12 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     }
     for (const l of listed) {
       const p = profiles.get(l.stationId);
-      if (!p?.public || (market && p.marketId !== market.id)) continue;
-      results.push({
-        station: p.ident,
-        airing: {
-          logEntryId: null,
-          title: l.title,
-          episodeTitle: null,
-          code: "PGM",
-          kind: "listed",
-          startsAt: l.startsAt,
-          endsAt: l.endsAt ?? new Date(Date.parse(l.startsAt) + 3_600_000).toISOString(),
-          live: true,
-          carriedFrom: null,
-          programId: null
-        },
-        listed: true
-      });
+      if (!p?.public || offDial.has(l.stationId) || (market && p.marketId !== market.id)) continue;
+      results.push({ station: p.ident, airing: externalAiring(l), listed: true });
     }
     results.sort((a, b) => a.airing.startsAt.localeCompare(b.airing.startsAt));
-    return { tuneTo: found.tuneTo?.ident ?? null, stations: found.stations.map((s) => s.ident), airings: results.slice(0, 30) };
+    const tuneTo = found.tuneTo && !offDial.has(found.tuneTo.id) ? found.tuneTo.ident : null;
+    return { tuneTo, stations: found.stations.filter((s) => !offDial.has(s.id)).map((s) => s.ident), airings: results.slice(0, 30) };
   });
 
   r.handle(api.createStation, ({ user, body }) => stations.create(user, body));

@@ -114,13 +114,13 @@ describe("Network desk", () => {
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const port = (server.address() as { port: number }).port;
     const listed = await dee
-      .post("/v1/admin/listed-sources", { marketId, band: "tv", channel: "9.1", callSign: "RDLS", name: "City of Redlands", streamUrl: "https://redlands.example/live", embedTerms: "allowed", calendarUrl: `http://127.0.0.1:${port}/agenda.ics` })
+      .post("/v1/admin/listed-sources", { marketId, band: "tv", channel: "9.1", callSign: "RDLS", name: "City of Redlands", streamUrl: "https://redlands.example/live", embedTerms: "allowed", calendarUrl: `http://127.0.0.1:${port}/agenda.ics`, evidence: { termsUrl: "https://redlands.example/terms", termsCheckedOn: "2026-09-21" } })
       .expect(201);
     server.close();
-    expect(listed.body).toMatchObject({ calendarSync: "synced", listingState: "listed", upcoming: 1 });
+    expect(listed.body).toMatchObject({ calendarSync: "synced", listingState: "listed", upcoming: 1, plays: "embed", onDial: true, schedule: { source: "feed", format: "ical" }, evidence: { basis: "embed_terms" } });
     const dial = await anon(h).get("/v1/markets/inland-empire/dial").expect(200);
     const rdls = dial.body.rows.find((r: { station: { callSign: string } }) => r.station.callSign === "RDLS");
-    expect(rdls).toMatchObject({ playback: { kind: "embed", url: "https://redlands.example/live" }, next: { title: "City Council, regular meeting", startsAt: "2026-10-07T01:00:00.000Z" } });
+    expect(rdls).toMatchObject({ playback: { kind: "embed", url: "https://redlands.example/live" }, next: { title: "City Council, regular meeting", startsAt: "2026-10-07T01:00:00.000Z" }, external: { source: "City of Redlands", plays: "embed", schedule: "feed" } });
   });
 });
 

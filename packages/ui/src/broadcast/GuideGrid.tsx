@@ -3,6 +3,7 @@ import { cx } from "../lib/cx";
 import type { TimeInput } from "../lib/format";
 import { NowLine } from "./NowLine";
 import { LiveText } from "./LiveText";
+import { Tag } from "../primitives/Tag";
 import { clockColumn, fraction, ms, shortClock, shortSpan } from "./time";
 
 export interface GuideProgram {
@@ -25,6 +26,8 @@ export interface GuideStation {
   channel: string;
   callSign: string;
   programs: GuideProgram[];
+  /** An external station (follow-up Phase 6): the dashed External tag under its channel. */
+  external?: boolean;
 }
 
 export interface GuideGridProps {
@@ -139,6 +142,11 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
       <div className="oc-guide__st">
         <span className="oc-cs">{r.callSign}</span>
         <span className="oc-ch">{r.channel}</span>
+        {r.external && !compact && (
+          <Tag variant="listed" className="oc-guide__ext">
+            External
+          </Tag>
+        )}
       </div>
       {guideCells(r.programs, from, to, now).map((c) => {
         const p = c.program;

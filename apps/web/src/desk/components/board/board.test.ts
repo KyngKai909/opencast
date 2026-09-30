@@ -20,12 +20,13 @@ const boards = (slug = "inland-empire") => {
 };
 
 describe("coverage", () => {
+  // Phase 6 added NASA on 61.1: four external stations on the board.
   it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.8", () => {
     const c = coverage(...boards());
-    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 3, catalog: 1, claimable: 3 });
+    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 4, catalog: 1, claimable: 3 });
     expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.8"]);
     expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.8");
-    expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 3 external city streams and the catalog station. 26 people on the waitlist here.");
+    expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 4 external city streams and the catalog station. 26 people on the waitlist here.");
   });
 
   it("adds the bands' counts when the API sends no market-wide stats, and takes the TV band's share", () => {

@@ -1,6 +1,8 @@
 // 02.1 The creator pipeline: every creator in the market, where they are, where their work lives,
 // and the next thing to do. A to-do list, not a funnel: sorted by what needs doing first
-// (components/pipeline/stages.ts). The strip's counts filter the list.
+// (components/pipeline/stages.ts). The strip's counts filter the list. Follow-up Phase 6: channels
+// imported from a public IPTV list are leads with their stream noted (?import=1 opens the import);
+// a lead is listed as an external station from here (External sources' form, filled in).
 
 import { lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -9,6 +11,8 @@ import { Button, ControlTitle, Lines, Table, useToast, type Column } from "@open
 import { call } from "../../api/client";
 import { useApi, useApiMutation } from "../../api/hooks";
 import { AddCreator } from "../components/pipeline/AddCreator";
+import { ImportIptv } from "../components/pipeline/ImportIptv";
+import { isLead, leadAction, leadNext, leadSource } from "../components/pipeline/leads";
 import { StageStrip } from "../components/pipeline/StageStrip";
 import { StageTag } from "../components/pipeline/StageTag";
 import { actionFor, nextLine, pipelineOrder, PLATFORM_LABELS, stageCounts, stationCell, type Ctx } from "../components/pipeline/stages";
@@ -47,7 +51,14 @@ export default function Pipeline() {
   const rows = pipelineOrder(stage ? all.filter((c) => c.stage === stage) : all, ctx);
   const base = deskPath(`/markets/${market.slug}/pipeline`);
 
+  const listed = deskPath(`/markets/${market.slug}/listed`);
   const act = async (c: Creator) => {
+    if (isLead(c)) {
+      const l = leadAction(c);
+      if (l?.kind === "list") navigate(`${listed}?add=1&lead=${c.id}`);
+      else if (l?.kind === "open-external") navigate(`${listed}?source=${l.sourceId}`);
+      return;
+    }
     const a = actionFor(c, ctx);
     if (!a) return;
     try {
@@ -71,13 +82,31 @@ export default function Pipeline() {
 
   const columns: Column<Creator>[] = [
     { key: "creator", header: "Creator", width: "minmax(0,1.2fr)", cell: (c) => <Lines title={c.displayName} detail={c.description} /> },
-    { key: "platform", header: "Their work lives on", width: "150px", cell: (c) => PLATFORM_LABELS[c.sourcePlatform] },
+    {
+      key: "platform",
+      header: "Their work lives on",
+      width: "150px",
+      cell: (c) =>
+        isLead(c) ? (
+          <Lines
+            title={leadSource(c)}
+            detail={
+              <span className="nd-mono nd-pp__stream" title={c.lead.streamUrl}>
+                {c.lead.streamUrl}
+              </span>
+            }
+          />
+        ) : (
+          PLATFORM_LABELS[c.sourcePlatform]
+        )
+    },
     { key: "stage", header: "Stage", width: "130px", cell: (c) => <StageTag stage={c.stage} /> },
     { key: "station", header: "Station", width: "150px", kind: "mono", cell: (c) => stationCell(c, held) },
     {
       key: "next",
       header: "Next",
       cell: (c) => {
+        if (isLead(c)) return <span className="nd-pp__next">{leadNext(c)}</span>;
         const n = nextLine(c, ctx);
         return <span className={n.due ? "nd-pp__next nd-pp__next--due" : "nd-pp__next"}>{n.text}</span>;
       }
@@ -85,10 +114,11 @@ export default function Pipeline() {
     {
       key: "action",
       header: <span className="oc-sr-only">Action</span>,
-      width: "110px",
+      // Wider when a lead's "List as external station" is in the list.
+      width: rows.some((c) => isLead(c) && !c.listedSourceId) ? "180px" : "110px",
       align: "end",
       cell: (c) => {
-        const a = actionFor(c, ctx);
+        const a = isLead(c) ? leadAction(c) : actionFor(c, ctx);
         return a ? (
           <Button size="sm" onClick={() => void act(c)} disabled={remind.isPending || update.isPending} aria-label={`${a.label}: ${c.displayName}`}>
             {a.label}
@@ -101,6 +131,8 @@ export default function Pipeline() {
   const setStage = (s: CreatorStage | null) => setParams((p) => (s ? p.set("stage", s) : p.delete("stage"), p), { replace: true });
   const adding = params.get("add") === "1";
   const closeAdd = () => setParams((p) => (p.delete("add"), p), { replace: true });
+  const importing = params.get("import") === "1";
+  const closeImport = () => setParams((p) => (p.delete("import"), p), { replace: true });
 
   return (
     <>
@@ -108,9 +140,14 @@ export default function Pipeline() {
         title="Creator pipeline"
         description={`${market.name}. Sorted by what needs doing first.`}
         end={
-          <Button variant="primary" size="sm" icon="plus" onClick={() => setParams((p) => (p.set("add", "1"), p))}>
-            Add a creator
-          </Button>
+          <>
+            <Button size="sm" onClick={() => setParams((p) => (p.set("import", "1"), p))}>
+              Import from an IPTV list
+            </Button>
+            <Button variant="primary" size="sm" icon="plus" onClick={() => setParams((p) => (p.set("add", "1"), p))}>
+              Add a creator
+            </Button>
+          </>
         }
       />
       <StageStrip counts={stageCounts(all)} selected={stage} onSelect={setStage} />
@@ -125,6 +162,7 @@ export default function Pipeline() {
         </Suspense>
       )}
       {adding && <AddCreator market={market} onClose={closeAdd} />}
+      {importing && <ImportIptv market={market} onClose={closeImport} />}
     </>
   );
 }

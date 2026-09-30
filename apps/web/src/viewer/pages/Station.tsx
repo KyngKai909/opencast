@@ -77,6 +77,22 @@ function OnNow({ page, t }: { page: Page; t: Date }) {
       {next.live && <> <LiveText /></>}
     </p>
   );
+  // An external station (follow-up Phase 6) with nothing scheduled is still on: Live, from the
+  // source's own stream, never a made-up title. Down, it's off the dial until it's back.
+  const external = page.station.kind === "listed" ? page.external : undefined;
+  if (!a && external && !isOffAir(page.now))
+    return (
+      <div className="vw-now vw-now--off">
+        <div>
+          <b className="vw-now__title">{page.station.name}</b>
+          <p className="vw-now__line">
+            <Tag variant="listed">External</Tag>{" "}
+            {external.down ? `${external.source}'s stream is down. It's off the dial until it's back.` : <><LiveText /> from {external.source}.</>}
+          </p>
+          {nextLine}
+        </div>
+      </div>
+    );
   if (!a)
     return (
       <div className="vw-now vw-now--off">
@@ -99,7 +115,8 @@ function OnNow({ page, t }: { page: Page; t: Date }) {
         // Radio has no picture: its card in the station's colour, as the player shows it.
         <TitleCard size="lg" colour={page.station.colour ?? "#33507A"} title={<span className="oc-mono">{page.station.channel}</span>} bottom={page.station.callSign} className="vw-now__radio" decorative />
       ) : (
-        <PictureFrame bug={{ callSign: page.station.callSign ?? "", channel: page.station.channel ?? "" }} label={`${a.title}, on ${page.station.callSign ?? page.station.name}`}>
+        // An external station's picture is the source's own: no Opencast bug on it.
+        <PictureFrame bug={page.station.kind === "listed" ? undefined : { callSign: page.station.callSign ?? "", channel: page.station.channel ?? "" }} label={`${a.title}, on ${page.station.callSign ?? page.station.name}`}>
           {page.station.category === "Public affairs" ? <PicturePlaceholder scene="podium" /> : <PicturePlaceholder scene="reel" title={a.title} />}
         </PictureFrame>
       )}

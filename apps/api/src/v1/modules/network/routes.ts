@@ -69,6 +69,21 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await inMarket(user, query.marketId);
     return network.listedSources(query.marketId);
   });
-  r.handle(api.addListedSource, ({ body }) => network.addListedSource(body));
+  r.handle(api.addListedSource, ({ user, body }) => network.addListedSource(user, body));
   r.handle(api.syncListedSource, ({ params }) => network.syncListedSource(params.sourceId));
+
+  // External stations (added 2026-09-30, follow-up Phase 6).
+  r.handle(api.recordListedEvidence, ({ user, params, body }) => network.recordListedEvidence(user, params.sourceId, body));
+  r.handle(api.listExternalOutages, async ({ user, params }) => {
+    const source = (await network.listedSources()).find((s) => s.id === params.sourceId);
+    if (!source) throw notFound("That external station");
+    if (!user.isAdmin) await inMarket(user, (await network.marketBySlug(source.station.marketSlug ?? ""))?.id ?? null);
+    return network.externalOutages(params.sourceId);
+  });
+  // IPTV lists are leads: anyone on the desk can read one; importing is for the market's lead or an admin.
+  r.handle(api.previewIptvList, ({ body }) => network.previewIptvList(body));
+  r.handle(api.importIptvLeads, async ({ user, body }) => {
+    await inMarket(user, body.marketId);
+    return network.importIptvLeads(body);
+  });
 }

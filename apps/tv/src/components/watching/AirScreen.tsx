@@ -2,13 +2,15 @@
 // and always a way out, with "Tune to REEL 24.1" focused and "Open the guide" beside it. ▲ ▼
 // still flip the dial (Watching's command layer). Stand by is the same layout with the colour
 // bars, shown when the dial says the station is waiting for its signal (S13), or when a channel
-// change got no picture in 8 s (the player's Stand by, which keeps trying).
+// change got no picture in 8 s (the player's Stand by, which keeps trying), or an external
+// station's stream is down (follow-up Phase 6: it left the dial, and is back by itself).
 
 import { useEffect } from "react";
 import { usePlayer } from "@opencast/player";
 import { Slate, clock } from "@opencast/ui";
 import { MARKET_TZ } from "../../lib/clock";
 import { FocusContext, focusKey, useTvFocusable } from "../../tv/focus";
+import { externalOf, externalStandbyLine } from "./external";
 import { backTime, identText, signOnDay, type Row } from "./offAir";
 import { TvButton } from "./TvButton";
 import "./AirScreen.css";
@@ -36,8 +38,11 @@ export function AirScreen({ kind, row, suggest, now, onTune, onGuide }: AirScree
   const other = suggest ? ` ${identText(suggest.station)} is on now.` : "";
   // The player's Stand by (no picture 8 s after changing channel) says what it's doing about it.
   const playerStandby = kind === "standby" && row.signal !== "standby" && ps.status === "standby" && ps.currentId === row.station.id;
+  const external = externalOf(row);
   const line =
-    kind === "standby" ? (
+    kind === "standby" && external?.down ? (
+      <>{`${externalStandbyLine(external)}${other}`}</>
+    ) : kind === "standby" ? (
       <>{playerStandby ? `The signal from ${here} isn't coming through. Trying again.${other}` : `${here} is waiting for its signal.${other}`}</>
     ) : back ? (
       <>

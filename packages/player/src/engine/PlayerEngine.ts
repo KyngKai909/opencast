@@ -221,6 +221,11 @@ export class PlayerEngine {
   private tuneSeq = 0;
   /** A tune asked for before the surface attached: it runs on attach. */
   private queuedTune: { stationId: string; source?: CommandSource } | null = null;
+  /**
+   * An external station on screen whose stream went down (follow-up Phase 6): it left the dial, or
+   * its row says it isn't playable. It's on Stand by until it's back, then it tunes in again.
+   */
+  private downId: string | null = null;
   private volume = 1;
   private audio = new AudioLevels();
 
@@ -320,11 +325,31 @@ export class PlayerEngine {
   }
 
   setChannels(channels: Channel[]) {
-    this.patch({ channels });
     const id = this.state.currentId;
+    const showing = this.channel(id);
+    const watching = this.state.status !== "idle" && this.state.status !== "stopped";
+    if (id && showing && watching && showing.station.kind === "listed" && !channels.some((c) => c.station.id === id)) {
+      // An external station left the dial while it's on (its stream is down): it stays on the
+      // player's list only while you're on it (for its Stand by, and to change channel from), and
+      // is on Stand by until the dial has it again.
+      this.patch({ channels: [...channels, { ...showing, onAir: false, playback: null }] });
+      this.externalDown(id);
+      return;
+    }
+    this.patch({ channels });
     if (!id) return;
     // Off air by the dial, and the dial now says it's on: tune back in.
     const c = this.channel(id);
+    if (c?.station.kind === "listed") {
+      const playable = c.onAir && !!c.playback;
+      if (!playable && watching) return this.externalDown(id);
+      if (playable && this.downId === id) {
+        // Back: it tunes in again, as a station coming back does (no static).
+        this.downId = null;
+        void this.tune(id, { input: "return" }, true);
+        return;
+      }
+    }
     if (this.state.status === "off_air" && !this.state.offAir && !this.state.pendingId && c?.onAir && c.playback?.kind === "hls") {
       void this.tune(id, { input: "return" }, true);
       return;
@@ -402,6 +427,7 @@ export class PlayerEngine {
     const c = this.channel(stationId);
     if (!c) return;
     this.clearEntry();
+    if (stationId !== this.downId) this.downId = null;
     if (source?.who) this.patch({ changedBy: source.who });
     // After stop() (the sleep timer), the same station tunes again from scratch; `again` is a
     // station coming back on air (or Stand by trying again).
@@ -434,7 +460,11 @@ export class PlayerEngine {
     }
 
     if (!c.onAir || !c.playback) {
-      this.settle(stationId, previous, "off_air");
+      // An external station whose stream is down is on Stand by, never "off air" (Phase 6).
+      if (c.station.kind === "listed") {
+        this.downId = stationId;
+        this.settle(stationId, previous, "standby");
+      } else this.settle(stationId, previous, "off_air");
       return this.endWithoutPicture(seq);
     }
     if (c.playback.kind === "embed") {
@@ -572,6 +602,15 @@ export class PlayerEngine {
       });
       deck.firstFrame(REBUILD_AFTER_MS).then(() => resolve("frame"), reject);
     });
+  }
+
+  /** An external station on screen whose stream is down: Stand by, until the dial has it back. */
+  private externalDown(stationId: string) {
+    if (this.downId === stationId && this.state.status === "standby") return;
+    this.downId = stationId;
+    this.bannerAfterChange = false;
+    this.hideBanner();
+    this.settle(stationId, this.state.lastId, "standby");
   }
 
   /** 8 s without a picture: Stand by for this station (the old picture goes), still trying. */

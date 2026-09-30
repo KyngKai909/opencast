@@ -39,9 +39,13 @@ export function saveOnDevice(presets: Record<number, string>, key: number, stati
   return next;
 }
 
-/** The line under a key: what's on now ("Live" is drawn before it), or "Off air". */
+/**
+ * The line under a key: what's on now ("Live" is drawn before it), or "Off air". An external
+ * station with nothing scheduled (follow-up Phase 6): "Live from City of Colton".
+ */
 export function nowLine(row: DialRowX | null): { live: boolean; text: string } | null {
   if (!row) return null;
+  if (row.station.kind === "listed" && row.onAir && !row.now) return { live: true, text: row.external ? `from ${row.external.source}` : "" };
   if (!row.onAir || !row.now || row.now.kind === "off_air") return { live: false, text: "Off air" };
   return { live: row.now.live, text: row.now.title };
 }

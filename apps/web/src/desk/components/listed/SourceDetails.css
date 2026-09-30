@@ -1,0 +1,10 @@
+/* An external station's details: sections of ruled rows, addresses in mono, the outage history. */
+.nd-src__sec + .nd-src__sec { margin-top: 18px; }
+.nd-src__h { margin: 0 0 4px; font: 700 13px var(--font-text); }
+.nd-src__addr { font-size: 12.5px; overflow-wrap: anywhere; }
+.nd-src__link { color: var(--ink); overflow-wrap: anywhere; }
+.nd-src__note { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }
+.nd-src__note a { color: var(--ink); }
+.nd-src__history { list-style: none; margin: 0; padding: 0; }
+.nd-src__history li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); }
+.nd-src__when { font: 500 12.5px var(--font-mono); color: var(--ink); }

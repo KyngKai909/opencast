@@ -85,6 +85,17 @@ describe("the Rules page's groups (watch data and features added 2026-09-29)", (
     expect(valueFrom(RULES["watch_data.minimum_audience"].fallback, [{ ...min[0]!, text: "25" }, min[1]!])).toEqual({ value: { viewers: 25, carriedAirings: 2 } });
   });
 
+  it("asks yes or no for other markets' streams and DASH stream links (Phase 6)", () => {
+    expect(GROUPS.find((g) => g.id === "external")?.label).toBe("External stations");
+    const other = fieldsFor(RULES["external.other_markets"].fallback);
+    expect(other.map((x) => [x.name, x.label, x.kind, x.text])).toEqual([["allowed", "Allowed", "choice", "false"]]);
+    expect(other[0]!.options?.map((o) => o.label)).toEqual(["Yes", "No"]);
+    expect(valueFrom({ allowed: false }, [{ ...other[0]!, text: "true" }])).toEqual({ value: { allowed: true } });
+    const dash = fieldsFor(RULES["external.dash_stream_links"].fallback);
+    expect(dash.map((x) => [x.name, x.label, x.kind, x.text])).toEqual([["played", "Played", "choice", "false"]]);
+    expect(valueFrom({ played: false }, [{ ...dash[0]!, text: "true" }])).toEqual({ value: { played: true } });
+  });
+
   it("switches \"Not for me\" on or off", () => {
     const f = fieldsFor(RULES["features.not_for_me"].fallback);
     expect(f.map((x) => [x.name, x.label, x.kind, x.text])).toEqual([["enabled", "In the apps", "choice", "false"]]);

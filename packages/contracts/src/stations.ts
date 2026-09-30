@@ -39,6 +39,31 @@ export const Airing = z.object({
 });
 export type Airing = z.infer<typeof Airing>;
 
+/**
+ * Follow-up Phase 6 (added 2026-09-30): how an external station plays. `embed`: the source's own
+ * embeddable player, where its terms allow it. `stream_link`: its raw HLS (or DASH) address, played
+ * in Opencast's player straight from the source (never proxied, cached or re-served).
+ */
+export const ExternalPlays = z.enum(["embed", "stream_link"]);
+export type ExternalPlays = z.infer<typeof ExternalPlays>;
+
+/**
+ * Where an external station's "what's on" comes from: the source's own calendar or schedule feed
+ * (`feed`), guide data checked against its published schedule (`guide_data`), or neither (`none`:
+ * the banner shows the station, "External", "Live" and the source, with no progress bar).
+ */
+export const ExternalSchedule = z.enum(["feed", "guide_data", "none"]);
+export type ExternalSchedule = z.infer<typeof ExternalSchedule>;
+
+/** Phase 6: what the dial, the banner and the station page say about an external station. */
+export const ExternalInfo = z.object({
+  /** Whose stream it is: "City of Colton". */
+  source: z.string(),
+  plays: ExternalPlays,
+  schedule: ExternalSchedule
+});
+export type ExternalInfo = z.infer<typeof ExternalInfo>;
+
 export const DialRow = z.object({
   station: StationIdent,
   /** Lit only when something is actually on air. */
@@ -56,7 +81,13 @@ export const DialRow = z.object({
    * Added 2026-09-29: while the station is off air on a schedule (its off air hours or a sign-off
    * on its log), when it's back. `now` is then the `off_air` airing and `onAir` is false. Absent otherwise.
    */
-  backAt: Timestamp.optional()
+  backAt: Timestamp.optional(),
+  /**
+   * Follow-up Phase 6 (added 2026-09-30), external stations only: whose stream it is, how it plays
+   * and where its schedule comes from. An external station is on the dial while its stream is up;
+   * `onAir` is true then, with `now` null when nothing is scheduled (never a made-up title).
+   */
+  external: ExternalInfo.optional()
 });
 
 export const Dial = z.object({
@@ -87,7 +118,12 @@ export const StationPage = z.object({
     })
     .nullable(),
   pledgesTaxDeductible: z.boolean().nullable(),
-  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable()
+  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable(),
+  /**
+   * Follow-up Phase 6 (added 2026-09-30), external stations only: as on the dial, and `down` while
+   * it's off the dial because its stream is down (the page stays; `playback` is null then).
+   */
+  external: ExternalInfo.extend({ down: z.boolean() }).optional()
 });
 
 export const SearchResult = z.object({

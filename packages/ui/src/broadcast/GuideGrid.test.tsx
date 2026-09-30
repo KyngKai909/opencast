@@ -64,3 +64,13 @@ describe("GuideGrid", () => {
     expect(onSelect).toHaveBeenCalledWith(ROWS[0].programs[1], ROWS[0]);
   });
 });
+
+describe("external stations (follow-up Phase 6)", () => {
+  it("carry the dashed External tag under their channel, and nowhere else", () => {
+    const rows: GuideStation[] = [{ ...ROWS[1], external: true }, ROWS[0]];
+    const { container } = render(<GuideGrid rows={rows} from={at(20)} to={at(23)} now={at(20, 42)} timeZone={TZ} />);
+    const tags = container.querySelectorAll(".oc-guide__st .oc-tag--listed");
+    expect([...tags].map((t) => t.textContent)).toEqual(["External"]);
+    expect(tags[0].closest(".oc-guide__row")?.getAttribute("aria-label")).toBe("RDLS 9.1");
+  });
+});

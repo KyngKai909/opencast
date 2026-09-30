@@ -2,12 +2,15 @@
 // like Pledge (tv 05.4), with the picture playing beside it: the station's name, call sign and
 // channel, its description, what's on now and next, "Tune to BEAT now" (focused) and "Pledge to
 // Inland Beat" (/pledge/:stationRef). Back returns to where it opened from (a program's options).
+// An external station (follow-up Phase 6) has the dashed "External" tag and whose stream it is;
+// with nothing scheduled it's "Live from City of Colton"; its stream down, it's off the dial until
+// it's back, and the way out is the guide.
 
 import { useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { stationsApi } from "@opencast/contracts";
 import { usePlayer } from "@opencast/player";
-import { clock, LiveText } from "@opencast/ui";
+import { clock, LiveText, Tag } from "@opencast/ui";
 import { StationPageX, type AiringX, type StationIdentX } from "../../api/ext";
 import type { ApiError } from "../../api/client";
 import { useApi } from "../../api/hooks";
@@ -17,6 +20,7 @@ import { useChannels } from "../../tv/data";
 import { focusKey, FocusContext, useTvFocusable } from "../../tv/focus";
 import { TvButton } from "../../components/guide/TvButton";
 import { cellLine, identText, type Cell } from "../../components/guide/guideLogic";
+import { externalDownLine, externalOf, externalStreamLine } from "../../components/watching/external";
 import { signOnAt } from "../../components/watching/offAir";
 import "./About.css";
 
@@ -56,7 +60,8 @@ export default function About() {
   const row = station ? channels.find((c) => c.station.id === station.id) : undefined;
   const onNow = row ? row.now : (page.data?.now ?? null);
   const next = row ? row.next : (page.data?.upNext[0] ?? null);
-  const onAir = row ? row.onAir && row.now?.kind !== "off_air" : !!page.data?.onAir;
+  const external = externalOf(row, page.data);
+  const onAir = external ? !external.down : row ? row.onAir && row.now?.kind !== "off_air" : !!page.data?.onAir;
   // Off air: when it's back (G9's back time), else its next airing.
   const signOn = row ? signOnAt(row) : page.data?.now?.kind === "off_air" ? (page.data.now.backAt ?? page.data.now.endsAt) : (next?.startsAt ?? null);
 
@@ -75,11 +80,19 @@ export default function About() {
     const nowLine = onNow ? cellLine(asCell(station.id, onNow), now, MARKET_TZ) : null;
     body = (
       <>
-        <div className="tvg-about__id oc-mono">{identText(station)}</div>
+        <div className="tvg-about__id oc-mono">
+          {identText(station)}
+          {external && (
+            <Tag variant="listed" className="tvg-tag">
+              External
+            </Tag>
+          )}
+        </div>
         <h3 id="tvg-about-title" className="tvg-about__name">
           {station.name}
         </h3>
         {page.data?.description && <p className="tvg-about__desc">{page.data.description}</p>}
+        {external && <p className="tvg-about__desc">{external.down ? externalDownLine(external) : externalStreamLine(external)}</p>}
         <div className="tvg-about__sched">
           <div className="tvg-about__slot">
             <small>On now</small>
@@ -98,6 +111,15 @@ export default function About() {
                   </span>
                 )}
               </>
+            ) : external && !external.down ? (
+              <>
+                <b>{station.name}</b>
+                <span>
+                  <LiveText className="tvg-live" /> from {external.source}
+                </span>
+              </>
+            ) : external ? (
+              <b>Stand by</b>
             ) : (
               <>
                 <b>Off air</b>
@@ -118,15 +140,20 @@ export default function About() {
           )}
         </div>
         <div className="tvg-about__actions">
-          <TvButton
-            focusKey="tvg-about-tune"
-            primary
-            label={`Tune to ${station.callSign ?? station.name} now`}
-            onSelect={() => {
-              if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
-              navigate("/", { replace: true });
-            }}
-          />
+          {external?.down && station.id !== player.currentId ? (
+            // Off the dial: nothing to tune to until it's back.
+            <TvButton focusKey="tvg-about-tune" primary label="Open the guide" onSelect={() => navigate("/guide", { replace: true })} />
+          ) : (
+            <TvButton
+              focusKey="tvg-about-tune"
+              primary
+              label={`Tune to ${station.callSign ?? station.name} now`}
+              onSelect={() => {
+                if (station.id !== player.currentId) void engine.tune(station.id, { input: "app" });
+                navigate("/", { replace: true });
+              }}
+            />
+          )}
           {takesPledges(station) && (
             <TvButton
               focusKey="tvg-about-pledge"

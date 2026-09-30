@@ -35,6 +35,10 @@ export interface DbCreator {
   licenceName: string | null;
   pronoun: "she" | "he" | "they";
   createdAt: string;
+  /** Follow-up Phase 6: a lead from a public IPTV list, with its stream noted. */
+  lead?: { from: "iptv_list"; streamUrl: string; listUrl: string | null; tvgId: string | null; group: string | null; country: string | null; logoUrl: string | null } | null;
+  /** The external station a lead became. */
+  listedSourceId?: string | null;
   /** The setup, once setUpClaimable has run: the rest is read from the station. */
   setup: { recipeId: string; operatorId: string; importTotal: number; setupAt: string; importDone?: number; /** A new setup's import runs on with the clock; the seed's stay as drawn. */ running?: boolean } | null;
 }
@@ -58,12 +62,19 @@ export interface DbRequest {
 export const CREATOR_IDS = {
   lupe: U(201), skate: U(202), mojave: U(203), poetry: U(204), gospel: U(205), marcus: U(206), sazon: U(207), jazz: U(208),
   bowl: U(209), lowriders: U(210), wrestling: U(211), birding: U(212), stories: U(213), oral: U(214), robotics: U(215),
-  spotters: U(216), mariachi: U(217), garden: U(218), fiddlers: U(219), prep: U(220), nite: U(221), hdMine: U(222)
+  spotters: U(216), mariachi: U(217), garden: U(218), fiddlers: U(219), prep: U(220), nite: U(221), hdMine: U(222),
+  // Follow-up Phase 6: leads from a public IPTV list.
+  ictv: U(223), rialto: U(224)
 };
+
+/** Inland Community TV's stream, as its IPTV list gave it (the lead and its external station share it). */
+export const ICTV_STREAM = "https://ictv.example.net/live/index.m3u8";
+/** The iptv-org list the seed's leads were found on. */
+export const IPTV_US_LIST = "https://iptv-org.github.io/iptv/countries/us.m3u";
 
 const at = (iso: string) => new Date(iso).toISOString();
 
-function c(id: string, displayName: string, description: string, sourcePlatform: DbCreator["sourcePlatform"], stage: CreatorStage, extra: Partial<DbCreator> = {}): DbCreator {
+function c(id: string, displayName: string, description: string | null, sourcePlatform: DbCreator["sourcePlatform"], stage: CreatorStage, extra: Partial<DbCreator> = {}): DbCreator {
   const slug = displayName.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "");
   const host = { youtube: "https://www.youtube.com/@", vimeo: "https://vimeo.com/", internet_archive: "https://archive.org/details/", instagram: "https://www.instagram.com/", facebook: "https://www.facebook.com/", soundcloud: "https://soundcloud.com/", bandcamp: "https://bandcamp.com/", other: "https://example.com/" }[sourcePlatform];
   return {
@@ -144,6 +155,17 @@ export function seedCreators(): DbCreator[] {
     // Claimed
     c(I.prep, "Prep Sports Weekly", "High school games, Riverside", "youtube", "claimed", { stationId: STATION_IDS.PREP, answeredAt: at("2026-05-10T18:00:00Z"), claimedAt: at("2026-07-14T18:00:00Z"), createdAt: at("2026-05-01T17:00:00Z") }),
     c(I.nite, "Night Shift Radio", "Late-night call-in", "soundcloud", "claimed", { stationId: STATION_IDS.NITE, answeredAt: at("2026-04-20T18:00:00Z"), claimedAt: at("2026-06-30T18:00:00Z"), createdAt: at("2026-04-10T17:00:00Z") }),
+    // Leads from an IPTV list (follow-up Phase 6). Inland Community TV became an external station that
+    // waits for their permission (still Found: a converted lead is On air once its evidence holds);
+    // Rialto Community Access is still a lead.
+    c(I.ictv, "Inland Community TV", "A community channel's raw stream", "other", "found", {
+      sourceUrl: ICTV_STREAM, stationId: STATION_IDS.ICTV, listedSourceId: U(706), createdAt: at("2026-09-23T17:00:00Z"),
+      lead: { from: "iptv_list", streamUrl: ICTV_STREAM, listUrl: IPTV_US_LIST, tvgId: "InlandCommunityTV.us", group: "General", country: "US", logoUrl: null }
+    }),
+    c(I.rialto, "Rialto Community Access", null, "other", "found", {
+      sourceUrl: "https://rialto-access.example.net/hls/live.m3u8", nextAction: "Ask for permission, or confirm it's public", createdAt: at("2026-09-23T17:00:00Z"),
+      lead: { from: "iptv_list", streamUrl: "https://rialto-access.example.net/hls/live.m3u8", listUrl: IPTV_US_LIST, tvgId: "RialtoCommunityAccess.us", group: "Public", country: "US", logoUrl: null }
+    }),
     // High Desert
     c(I.hdMine, "Barstow Rail Films", "Trains through the Mojave", "youtube", "found", { marketId: HD.id, proposedOptions: { band: "tv", channels: ["21.1"] }, nextAction: "Ask", createdAt: at("2026-09-19T17:00:00Z") })
   ];

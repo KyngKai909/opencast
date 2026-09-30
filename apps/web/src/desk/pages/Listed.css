@@ -1,4 +1,5 @@
-/* network-desk 05.1 .src-row: 14px rows, the channel in mono. */
+/* network-desk 05.1 .src-row: 14px rows, the channel in mono; .src-h's columns (source, 96px channel,
+   180px how it plays, 190px what's on, 150px right now). A row opens its details. */
 .nd-listed .oc-table__row { font-size: 14px; }
 .nd-listed__ch { font-size: 14px; }
 .nd-listed__empty { margin: 0; padding: 12px 0; border-bottom: 1px solid var(--hair); color: var(--ink-70); font-size: 14px; }

@@ -104,8 +104,15 @@ export type StreamHandler<E extends EndpointDef> = (ctx: HandlerContext<E>, open
 
 const SSE_HEARTBEAT_MS = 25_000;
 
+/**
+ * A check that runs before an endpoint's handler, once its input is parsed (added 2026-09-30:
+ * external stations refuse playout, spots and money, externalGuard.ts). Throws to refuse.
+ */
+export type Guard = (input: { params: Record<string, unknown>; query: Record<string, unknown>; body: unknown }) => Promise<void>;
+
 export class RouteRegistrar {
   private upload: multer.Multer;
+  private guards = new Map<EndpointDef, Guard[]>();
 
   constructor(
     readonly router: Router,
@@ -113,6 +120,11 @@ export class RouteRegistrar {
     private services: Services
   ) {
     this.upload = multer({ dest: path.join(deps.config.storageRoot, "uploads", "tmp"), limits: { fileSize: 8 * 1024 ** 3 } });
+  }
+
+  /** Runs `check` before each of these endpoints' handlers (whenever they're registered). */
+  guard(endpoints: EndpointDef[], check: Guard) {
+    for (const endpoint of endpoints) this.guards.set(endpoint, [...(this.guards.get(endpoint) ?? []), check]);
   }
 
   handle<E extends EndpointDef>(endpoint: E, handler: Handler<E>) {
@@ -127,6 +139,7 @@ export class RouteRegistrar {
         const file = req.file
           ? { path: req.file.path, originalName: req.file.originalname, size: req.file.size, mimeType: req.file.mimetype }
           : null;
+        for (const check of this.guards.get(endpoint) ?? []) await check({ params: params as Record<string, unknown>, query: query as Record<string, unknown>, body });
         const result = await handler({ params, query, body, user: callers.user as never, device: callers.device as never, phone: callers.phone, file, req });
         const output = endpoint.response.parse(result);
         res.status(endpoint.status ?? 200).json(output);

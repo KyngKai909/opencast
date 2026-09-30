@@ -89,6 +89,9 @@ export const AIRINGS: MockAiring[] = [
   a("RDLS", "21:45", "23:45", "Council Watch", "council-watch", { listed: true, carriedFrom: "CIVC" }),
   a("RDLS", "23:45", "26:00", "Slide loop", null, { listed: true }),
   a("RDLS", "+2 18:00", "+2 21:00", "City Council, regular meeting", "city-council", { listed: true, live: true }),
+  // COLT 9.2 (external, the city's own stream link), from the city's agenda calendar.
+  a("COLT", "18:00", "21:30", "City Council, regular meeting", null, { listed: true, live: true }),
+  a("COLT", "+3 18:00", "+3 20:00", "Planning Commission", null, { listed: true, live: true }),
   // BEAT 12.1 (the station page's schedule)
   a("BEAT", "18:00", "20:00", "Crate Session 02", "crate-session", { note: "From the library" }),
   a("BEAT", "20:00", "20:30", "Late Crate, ep. 14", "late-crate", { episodeTitle: "ep. 14", note: "Beat showcase" }),

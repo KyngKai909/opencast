@@ -12,6 +12,8 @@ export const GROUPS: Array<{ id: RuleView["group"]; label: string }> = [
   { id: "sponsors", label: "Catalog sponsors" },
   // Added 2026-09-29 (follow-up Phase 1): how long watch data is kept and when it shows; the apps' switches.
   { id: "watch_data", label: "Watch data" },
+  // Added 2026-09-30 (follow-up Phase 6): other markets' streams and DASH stream links (A200, A201).
+  { id: "external", label: "External stations" },
   { id: "features", label: "Features" }
 ];
 
@@ -77,7 +79,7 @@ const ON_OFF = [
 ];
 
 /** Rules whose value has a yes-or-no part, in words. `enabled` is a feature's switch, on or off. */
-const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters", enabled: "In the apps" };
+const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters", enabled: "In the apps", allowed: "Allowed", played: "Played" };
 const ON_OFF_FIELDS = new Set(["enabled"]);
 
 const trimZeros = (s: string) => (s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s);

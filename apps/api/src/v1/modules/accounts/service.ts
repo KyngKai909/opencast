@@ -34,7 +34,9 @@ const second = (d: Date) => Math.floor(d.getTime() / 1000);
 /** Unset counts as on, as the settings show it. */
 export const keepsWatchHistory = (settings: unknown) => (settings as { privacy?: { keepWatchHistory?: boolean } } | null)?.privacy?.keepWatchHistory !== false;
 /** Station kinds Opencast runs itself: admins act as their owner. */
-const OPENCAST_RUN_KINDS = new Set(["claimable", "catalog", "listed"]);
+// External stations ("listed") aren't run from master control (follow-up Phase 6): no playout,
+// spots or earnings; the Network desk's External sources page has them.
+const OPENCAST_RUN_KINDS = new Set(["claimable", "catalog"]);
 
 export interface AccountsService {
   userForToken(token: string): Promise<CurrentUser>;
@@ -407,11 +409,11 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         db.select().from(schema.advertiserMemberships).where(eq(schema.advertiserMemberships.userId, userId)),
         service.clearLink(userId)
       ]);
-      // Opencast admins run every station Opencast runs (network, claimable, listed) as its owner
+      // Opencast admins run every station Opencast runs (network, claimable, catalog) as its owner
       // (stationRole), so master control lists those too, after their own.
       if (user.isAdmin) {
         const own = new Set(stationRows.map((r) => r.stationId));
-        const run = await services.stations.idsOfKinds([...OPENCAST_RUN_KINDS] as Array<"claimable" | "catalog" | "listed">);
+        const run = await services.stations.idsOfKinds([...OPENCAST_RUN_KINDS] as Array<"claimable" | "catalog">);
         for (const id of run) if (!own.has(id)) stationRows.push({ stationId: id, role: "owner" } as (typeof stationRows)[number]);
       }
       const [idents, businesses, markets] = await Promise.all([

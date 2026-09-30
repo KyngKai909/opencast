@@ -15,6 +15,8 @@ import "./MarketDial.css";
  * air's back time (G9: `backAt` on the row or its `off_air` airing), else its next airing.
  */
 export function dialNow(r: DialRowX, detail?: ReactNode): DialNow {
+  // An external station with nothing scheduled (follow-up Phase 6): its name, Live, External, the source.
+  if (r.onAir && !r.now && r.external) return { title: r.station.name, live: true, listed: true, detail: detail ?? `From ${r.external.source}'s own stream` };
   if (!r.onAir || !r.now || isOffAir(r.now)) return { title: "", offAir: true, until: backAtOf(r) ?? undefined, detail };
   return {
     title: r.now.title,

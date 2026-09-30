@@ -162,9 +162,11 @@ describe("a creator, found to claimed", () => {
 
 describe("listed sources and held earnings", () => {
   it("lists a source on the dial, and finds its calendar or doesn't", async () => {
-    const ok = await api("POST", "/admin/listed-sources", { body: { marketId: IE, band: "tv", channel: "9.4", callSign: "RIAL", name: "City of Rialto", streamUrl: "https://rialto.example.gov/live", embedTerms: "allowed", calendarUrl: "https://rialto.example.gov/agenda.ics" } });
+    // Phase 6: an embed goes on the dial with its terms page and the day it was checked.
+    const evidence = { termsUrl: "https://rialto.example.gov/terms", termsCheckedOn: "2026-09-25" };
+    const ok = await api("POST", "/admin/listed-sources", { body: { marketId: IE, band: "tv", channel: "9.4", callSign: "RIAL", name: "City of Rialto", streamUrl: "https://rialto.example.gov/live", embedTerms: "allowed", calendarUrl: "https://rialto.example.gov/agenda.ics", evidence } });
     expect(ok.status).toBe(201);
-    expect(ok.json).toMatchObject({ listingState: "listed", calendarSync: "synced", station: { channel: "9.4", kind: "listed" } });
+    expect(ok.json).toMatchObject({ listingState: "listed", onDial: true, calendarSync: "synced", station: { channel: "9.4", kind: "listed" } });
     const unclear = await api("POST", "/admin/listed-sources", { body: { marketId: IE, band: "tv", channel: "9.5", callSign: "FONT", name: "City of Fontana", streamUrl: "https://fontana.example.gov/live", embedTerms: "unclear", calendarUrl: "https://fontana.example.gov/agenda" } });
     expect(unclear.json).toMatchObject({ listingState: "checking", calendarSync: "calendar_not_found" });
     expect((await api("POST", "/admin/listed-sources", { body: { marketId: IE, band: "tv", channel: "12.1", callSign: "XXXX", name: "Taken", streamUrl: "https://x.example/live", embedTerms: "allowed" } })).status).toBe(409);

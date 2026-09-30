@@ -101,7 +101,11 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
       // The first heartbeat never counts, so the second always does; after that, once a minute.
       if (counts && (existing.beats === 1 || minuteOf(existing.lastBeatAt).getTime() !== minuteOf(now).getTime())) {
         const key = ({ phone: "phone", cast: "cast", web: "web", tv_app: "tvApp", mirror: "mirror" } as const)[input.platform];
+        // An external station's minutes (follow-up Phase 6) are watch data only, labelled external:
+        // never in the tuned-in counts the pool and per-thousand billing read.
+        const external = (await services.stations.kindOf(input.stationId)) === "listed";
         const count = async (minute: Date) => {
+          if (external) return recordSessionMinute(db, { sessionId: input.sessionId, stationId: input.stationId, minute });
           await db
             .insert(M)
             .values({ stationId: input.stationId, minute, tunedIn: 1, [key]: 1 })
@@ -132,7 +136,9 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         .from(M)
         .where(and(gte(M.minute, from), lt(M.minute, to)))
         .groupBy(M.stationId);
-      return new Map(rows.map((r) => [r.stationId, Number(r.minutes)]));
+      // Never an external station's (they're not counted into minute_samples; this keeps it so).
+      const external = new Set(await services.stations.idsOfKinds(["listed"]));
+      return new Map(rows.filter((r) => !external.has(r.stationId)).map((r) => [r.stationId, Number(r.minutes)]));
     },
 
     async averageTunedIn(stationId, from, to) {

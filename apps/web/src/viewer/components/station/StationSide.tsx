@@ -4,7 +4,7 @@
 // the schedule, what it carries first, with the carried slots shortened to "From REEL".
 
 import type { ReactNode } from "react";
-import { KeyValueList } from "@opencast/ui";
+import { KeyValueList, Tag } from "@opencast/ui";
 import type { StationPageFull } from "../../api/ext/station";
 import { useLink } from "./actions";
 import { carriedByText } from "./program";
@@ -37,7 +37,11 @@ export function StationSide({ page, marketName, phone }: { page: StationPageFull
     <section aria-labelledby="vw-about">
       <SecTop title={<span id="vw-about">About</span>} />
       {page.claimable && !page.claimable.claimed && <p className="vw-side__p vw-side__run">Run by Opencast for {page.claimable.runFor}</p>}
-      {listed && <p className="vw-side__p">External, the city's own stream</p>}
+      {listed && (
+        <p className="vw-side__p">
+          <Tag variant="listed">External</Tag> {page.external ? `${page.external.source}'s own stream` : "The city's own stream"}. No Opencast playout, spots or breaks.
+        </p>
+      )}
       {page.about && <p className="vw-side__p">{page.about}</p>}
       {facts.length > 0 && <KeyValueList className="vw-side__kv" items={facts} />}
     </section>
