@@ -59,6 +59,30 @@ from its log: the playlist ends after a sign-off slate, the dial says when it's 
 warns. Any other gap in the next 24 hours raises warnings, and the worker fills it from the
 library if nobody acts.
 
+### How a station gets on the dial
+
+A number on the dial is held for a waitlist reservation, run by a creator, run by Opencast for a
+creator who hasn't joined yet, played from a public source's own stream, or filled by Opencast's
+catalog station. Network desk (`/desk`) works the middle of this chart.
+
+```mermaid
+flowchart TD
+  WL["Waitlist<br/><i>a call sign and number held</i>"] -->|"invited"| IND["Independent station<br/><i>run by its creator; spots and earnings</i>"]
+  FOUND["A creator Opencast would like on the dial"] --> PIPE["Creator pipeline"]
+  PIPE -->|"permission asked, with a preview<br/>of the schedule from titles"| YES{"Yes, or already<br/>licensed (e.g. CC BY)"}
+  YES -->|"set up from a recipe"| CL["Claimable station<br/><i>run by Opencast; earnings held in escrow</i>"]
+  CL -->|"creator claims: identity proven,<br/>verifiers approve, 72 hours in public"| IND
+  CL -.->|"unclaimed after 3 years"| FUND[("CreatorFund<br/><i>grants to new stations</i>")]
+  YES -->|"stream only, or a clearly<br/>public source"| EXT["External station<br/><i>the source's own stream;<br/>no spots, no earnings</i>"]
+  EXT -.->|"can become"| IND
+```
+
+- A claimable station's works each point at a permission or licence record; nothing is copied from
+  a creator's source before one exists. Its earnings can only go to the verified creator or, after
+  the unclaimed period, to the fund. There is no code path that sends them to Opencast.
+- A held channel can't be given to any other station, and every kind of station follows the same
+  channel number and call sign rules.
+
 ---
 
 ## Repository layout
