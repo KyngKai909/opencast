@@ -1,12 +1,16 @@
-// Translators: relays of a channel to YouTube, Twitch or any RTMP address. The one place a
-// continuous encode can be needed, and only while a translator is on. It reads the channel's own
-// timeline (the segments its playlist publishes, 720p on the TV band), joins them into one stream
-// (tsretime.ts), and pushes it over RTMP with FFmpeg:
+// A station's relay sender (follow-up Phase 3; it was the worker's per-destination translator):
+// one continuous stream per station, made by the relay service (apps/relay), never by the worker.
+// It reads the channel's own timeline (the segments its playlist publishes, 720p on the TV band,
+// prepared once), joins them into one stream (tsretime.ts) and hands it to the fan-out (fanout.ts),
+// which pushes it to the station's Livepeer relay stream (or to each platform, in direct mode):
 //
-//   - stream-copied when nothing has to be drawn (the station's bug is off, or the break handling
-//     needs no picture change);
+//   - stream-copied when nothing has to be drawn (the station bug is off on relays, or off for the
+//     station), so nothing is re-encoded;
 //   - re-encoded when the bug is drawn on (players draw it themselves; here the picture leaves
-//     Opencast's players, so the worker composites it);
+//     Opencast's players, so the relay composites it);
+//   - live blocks from Livepeer's playback (the segments the channel's playlist points at while
+//     they air) go through the same sender, so platforms see one stream with no interruption when
+//     a live block starts or ends;
 //   - on the radio band, the station's sound over its relay background (background.ts: prepared
 //     once at upload into a loop, drawn once more with the bug when the relay starts), or without
 //     one a picture in the station's colour with its call sign and channel. Nothing is encoded
@@ -15,14 +19,16 @@
 //     them: on the TV band drawn into the segments it shows in (each re-encoded on its own, its
 //     timestamps kept, like captions); on the radio band a loop of its own, prepared once per
 //     code, switched to at the keyframe nearest the code's start and back after;
-//   - a station that chose "Station ID slate" for breaks gets the prepared station ID slate in
-//     place of every segment in a break;
-//   - captions are drawn into the picture only if the station chose that for the translator
-//     (`burnCaptions`, off by default; X2): each segment with cues is re-encoded on its own, with
-//     its timestamps kept, before it's relayed. Segments without cues pass as they are.
+//   - breaks follow the station's one setting for all relays (relayBreaks.ts): its spots, or the
+//     prepared station ID slate in place of every segment in a break; time ads from partners would
+//     fill always shows the slate. Spots and credits aired are reported (`onPaidPromotion`) so the
+//     platforms can be marked as carrying paid promotion;
+//   - captions are drawn into the picture only if the station chose that (`burnCaptions`, off by
+//     default; X2): each segment with cues is re-encoded on its own, with its timestamps kept.
+//   - "Live shows only" (`relayMode: live_only`, a radio station's): only live rows are sent.
 //
-// Each session's egress (bytes sent) is recorded in `translator_sessions`: relaying a full channel
-// around the clock is the largest per-station cost.
+// Each session is recorded in `translator_sessions` (the station's ID as its translator ID, one
+// sender per station), with its egress and what it relayed, for billing and the health endpoint.
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -44,15 +50,22 @@ import type { Preparer } from "./prepare.js";
 import { publishedCount } from "./playlist.js";
 import { captionPng, type Slates } from "./slates.js";
 import { firstPts, TsRetimer } from "./tsretime.js";
+import type { RelayOutput } from "./fanout.js";
+import { isPaidPromotion, relayPicture, type RelayBreakHandling } from "./relayBreaks.js";
 
 const CI = schema.channelItems;
 const TS = schema.translatorSessions;
 
-export interface TranslatorTarget {
-  id: string;
-  rtmpUrl: string;
-  streamKey: string;
-  breakHandling: "air_spots" | "station_id_slate";
+/** What a station's relay is set to (the relays module reads it; a change to `signature` starts a new session). */
+export interface SenderSettings {
+  /** `everything` (billed per hour) or `live_only` (free: only live rows are sent). */
+  relayMode: "everything" | "live_only";
+  /** "During breaks, relays show". */
+  breakHandling: RelayBreakHandling;
+  /** "Station bug on relays" (on by default). Off, nothing is drawn: stream-copied. */
+  bugOnRelays: boolean;
+  /** The station's "Ads from partners" switch: their time shows the station ID slate. */
+  partnerAds: boolean;
   /** Draw captions into the picture (X2). Off unless the station chose it. */
   burnCaptions?: boolean;
   /** A radio station's relay background, prepared (its loop's storage prefix and frames); none: the picture in its colour. */
@@ -93,13 +106,19 @@ export function codeInSegment(code: CodeWindow, segmentStart: number, segmentMs:
   return { from: firstSeconds + (from - segmentStart) / 1000, to: firstSeconds + (to - segmentStart) / 1000 };
 }
 
-export interface TranslatorOptions {
+export interface SenderOptions {
   look: ChannelLook;
   preparer: Preparer;
   slates: Slates;
   log?(line: string): void;
-  /** Scratch space for drawing captions in (the worker's). */
+  /** Scratch space for drawing captions and the radio picture in. */
   scratchDir?: string;
+  /** A spot or credit went out on the relay as aired (paid promotion). */
+  onPaidPromotion?(row: { id: string; code: string; startsAt: Date }): void;
+  /** Where the platforms are counted from: how many it goes to (recorded on the session). */
+  platforms?(): number;
+  /** The worker's HLS origin (HLS_PUBLIC_URL): prepared segments are read there when storage doesn't have them. */
+  segmentBase?: string | null;
 }
 
 /**
@@ -163,10 +182,11 @@ async function bytesOf(stream: Readable): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-export class TranslatorRelay {
+export class StationSender {
   private child?: ChildProcess;
   private sessionId?: string;
-  private bytes = 0;
+  /** The output's byte count when this session started (its egress is what's sent since). */
+  private bytesAtStart = 0;
   private nextSeq: number | null = null;
   private retimer = new TsRetimer();
   private stopped = false;
@@ -186,13 +206,23 @@ export class TranslatorRelay {
   constructor(
     private ctx: ModuleContext,
     readonly stationId: string,
-    readonly target: TranslatorTarget,
-    private options: TranslatorOptions
+    private settings: SenderSettings,
+    private out: RelayOutput,
+    private options: SenderOptions
   ) {}
 
-  /** A signature of what the relay was started with (a change restarts it). */
-  static signature(t: TranslatorTarget) {
-    return `${t.rtmpUrl}|${t.streamKey}|${t.breakHandling}${t.burnCaptions ? "|captions" : ""}${t.background ? `|bg:${t.background.loopKey}` : ""}`;
+  /** What the sender was started with that needs a new session to change (the picture's making, the mode). */
+  static signature(s: SenderSettings, look: Pick<ChannelLook, "band" | "bug">) {
+    return `${s.relayMode}|${senderPicture(s, look)}${s.burnCaptions ? "|captions" : ""}${s.background ? `|bg:${s.background.loopKey}` : ""}`;
+  }
+
+  /** Settings that apply from the next segment (what breaks show, partner time). */
+  update(settings: SenderSettings) {
+    this.settings = { ...settings, relayMode: this.settings.relayMode, bugOnRelays: this.settings.bugOnRelays, burnCaptions: this.settings.burnCaptions, background: this.settings.background };
+  }
+
+  get current(): SenderSettings {
+    return this.settings;
   }
 
   /** Each row's captions, looked up once (rows are relayed in order, a few at a time). */
@@ -208,18 +238,17 @@ export class TranslatorRelay {
     const source = this.captions.get(row.id);
     const n = row.firstSegment + index;
     if (!source || n >= source.segments) return [];
-    const stream = await this.ctx.deps.storage.objects.open?.(`${objectKey.prepared(source.key, source.rendition)}/seg_${String(n).padStart(5, "0")}.vtt`).catch(() => null);
-    if (!stream) return [];
-    const vtt = parseVtt((await bytesOf(stream)).toString("utf8"));
+    const bytes = await this.object(`${objectKey.prepared(source.key, source.rendition)}/seg_${String(n).padStart(5, "0")}.vtt`);
+    if (!bytes) return [];
+    const vtt = parseVtt(bytes.toString("utf8"));
     const map = vtt.timestampMap ?? { mpegts: 0, localMs: 0 };
     const at = (ms: number) => (map.mpegts + (ms - map.localMs) * 90) / 90_000;
     return vtt.cues.map((c) => ({ text: c.text, from: at(c.startMs), to: at(c.endMs) }));
   }
 
-  /** `composite` when the relay re-encodes the picture (the TV band's bug); `copy` otherwise (radio: the picture is prepared). */
+  /** `composite` when the relay re-encodes the picture (the TV band's bug, on for relays); `copy` otherwise (radio: the picture is prepared). */
   get mode(): "copy" | "composite" {
-    const look = this.options.look;
-    return look.band === "tv" && look.bug.mode !== "off" ? "composite" : "copy";
+    return senderPicture(this.settings, this.options.look);
   }
 
   get rendition(): RenditionName {
@@ -227,7 +256,7 @@ export class TranslatorRelay {
   }
 
   private log(line: string) {
-    this.options.log?.(`[translator ${this.options.look.callSign ?? this.stationId.slice(0, 8)}] ${line}`);
+    this.options.log?.(`[relay ${this.options.look.callSign ?? this.stationId.slice(0, 8)}] ${line}`);
   }
 
   start() {
@@ -240,27 +269,24 @@ export class TranslatorRelay {
     await this.close();
   }
 
-  private destination() {
-    return `${this.target.rtmpUrl.replace(/\/+$/, "")}/${this.target.streamKey}`;
-  }
-
   private async open() {
     const look = this.options.look;
-    const out = ["-f", "flv", "-flvflags", "no_duration_filesize", this.destination()];
-    const common = ["-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:1", "-re", "-f", "mpegts", "-i", "pipe:0"];
+    // One MPEG-TS stream on stdout, in real time, to the fan-out (which pushes it over RTMP).
+    const out = ["-muxdelay", "0", "-muxpreload", "0", "-f", "mpegts", "pipe:1"];
+    const common = ["-hide_banner", "-loglevel", "error", "-nostats", "-re", "-f", "mpegts", "-i", "pipe:0"];
     let args: string[];
     if (look.band === "radio") {
       // The picture is prepared (the loop, with the bug); the sound is the channel's. Both copied.
       if (!this.picture) {
         this.picture = await this.preparePicture(true).catch(async (error) => {
           // A background that can't be read or drawn: the station's colour instead.
-          if (this.target.background) this.log(`the background couldn't be used (${(error as Error).message.slice(0, 200)}): the station's colour instead`);
+          if (this.settings.background) this.log(`the background couldn't be used (${(error as Error).message.slice(0, 200)}): the station's colour instead`);
           return this.preparePicture(false);
         });
       }
       this.picture.track = new PictureTrack((await this.loopFor([])) ?? []);
       this.muxer = new RelayMuxer();
-      args = [...common, "-map", "0:v", "-map", "0:a", "-c", "copy", "-bsf:a", "aac_adtstoasc", ...out];
+      args = [...common, "-map", "0:v", "-map", "0:a", "-c", "copy", ...out];
     } else if (this.mode === "composite") {
       const r = this.options.preparer.ladder[this.rendition];
       const bug = await this.options.slates.bug(look, look.bug.opacity);
@@ -269,39 +295,52 @@ export class TranslatorRelay {
         // The picture fitted to the relay's size first: a live block's source may arrive at another size.
         "-filter_complex", `[0:v]scale=w=${r.width}:h=${r.height}:force_original_aspect_ratio=decrease,pad=${r.width}:${r.height}:(ow-iw)/2:(oh-ih)/2,setsar=1[m];[1:v]scale=${r.width}:${r.height},format=rgba[b];[m][b]overlay=0:0:shortest=1,format=yuv420p[out]`,
         "-map", "[out]", "-map", "0:a", "-c:v", "libx264", "-preset", "veryfast", "-b:v", `${r.videoKbps}k`, "-maxrate", `${Math.round(r.videoKbps * 1.1)}k`, "-bufsize", `${r.videoKbps * 2}k`, "-g", "60", "-r", "30",
-        "-c:a", "copy", "-bsf:a", "aac_adtstoasc", ...out
+        "-c:a", "copy", ...out
       ];
     } else {
-      args = [...common, "-map", "0:v?", "-map", "0:a?", "-c", "copy", "-bsf:a", "aac_adtstoasc", ...out];
+      args = [...common, "-map", "0:v?", "-map", "0:a?", "-c", "copy", ...out];
     }
     const child = spawn("ffmpeg", args, { stdio: ["pipe", "pipe", "pipe"] });
     this.child = child;
-    this.bytes = 0;
+    this.bytesAtStart = this.out.bytes();
     this.retimer = new TsRetimer();
     child.stdin?.on("error", () => undefined);
-    let progress = "";
-    child.stdout?.on("data", (d) => {
-      progress += String(d);
-      const lines = progress.split("\n");
-      progress = lines.pop() ?? "";
-      for (const line of lines) {
-        const m = /^total_size=(\d+)/.exec(line);
-        if (m) this.bytes = Number(m[1]);
-      }
-    });
+    child.stdout?.on("data", (d: Buffer) => this.out.write(d));
     let lastError = "";
     child.stderr?.on("data", (d) => (lastError = String(d).trim().slice(-300)));
     child.on("close", (code) => {
       if (this.child === child) this.child = undefined;
-      if (code && !this.stopped) this.log(`ffmpeg exited ${code}: ${lastError}`);
+      if (code && !this.stopped) {
+        this.errors++;
+        this.lastError = lastError || `ffmpeg exited ${code}`;
+        this.log(`ffmpeg exited ${code}: ${lastError}`);
+      }
       this.ending = this.save(true, code ? lastError : null);
     });
     const [session] = await this.ctx.deps.db
       .insert(TS)
-      .values({ translatorId: this.target.id, stationId: this.stationId, mode: this.mode, swapsBreaks: this.target.breakHandling === "station_id_slate", startedAt: this.ctx.deps.clock.now() })
+      .values({
+        // One sender per station: the station's ID stands for its relay.
+        translatorId: this.stationId,
+        stationId: this.stationId,
+        mode: this.mode,
+        swapsBreaks: this.settings.breakHandling === "station_id_slate",
+        relayMode: this.settings.relayMode,
+        platforms: this.options.platforms?.() ?? this.out.destinations,
+        startedAt: this.ctx.deps.clock.now()
+      })
       .returning({ id: TS.id });
     this.sessionId = session.id;
-    this.log(`relaying (${this.mode}${look.band === "radio" ? (this.target.background ? ", over the station's background" : ", over the station's colour") : ""}${this.target.breakHandling === "station_id_slate" ? ", station ID slate in breaks" : ""}${this.target.burnCaptions ? ", captions drawn in" : ""})`);
+    this.log(`relaying ${this.settings.relayMode === "live_only" ? "live shows" : "everything"} (${this.mode}${look.band === "radio" ? (this.settings.background ? ", over the station's background" : ", over the station's colour") : ""}${this.settings.breakHandling === "station_id_slate" ? ", station ID slate in breaks" : ""}${this.settings.burnCaptions ? ", captions drawn in" : ""})`);
+  }
+
+  /** FFmpeg failures this sender has had (the health endpoint). */
+  errors = 0;
+  lastError: string | null = null;
+
+  /** Whether the encoder is running (a session is open). */
+  get running() {
+    return Boolean(this.child);
   }
 
   // --- The radio band's picture ---
@@ -319,7 +358,7 @@ export class TranslatorRelay {
     await fs.mkdir(dir, { recursive: true });
     let base: string;
     let frames: number;
-    const bg = withBackground ? this.target.background : null;
+    const bg = withBackground ? this.settings.background : null;
     const stored = bg ? await this.ctx.deps.storage.objects.open?.(`${bg.loopKey}/loop.mp4`).catch(() => null) : null;
     if (bg && stored) {
       base = path.join(dir, `bg-${createHash("sha256").update(bg.loopKey).digest("hex").slice(0, 16)}.mp4`);
@@ -339,7 +378,7 @@ export class TranslatorRelay {
       base = made.loop;
       frames = made.frames;
     }
-    const overlays = look.bug.mode !== "off" ? [await this.options.slates.bug(look, look.bug.opacity)] : [];
+    const overlays = look.bug.mode !== "off" && this.settings.bugOnRelays ? [await this.options.slates.bug(look, look.bug.opacity)] : [];
     const picture = { track: null as PictureTrack | null, base, frames, overlays, size };
     // Drawn once now with the bug: a background that can't be drawn fails here, not mid-relay.
     this.picture = picture;
@@ -398,7 +437,7 @@ export class TranslatorRelay {
     this.lastSaved = Date.now();
     await this.ctx.deps.db
       .update(TS)
-      .set({ bytesSent: this.bytes, updatedAt: this.ctx.deps.clock.now(), ...(ended ? { endedAt: this.ctx.deps.clock.now() } : {}), ...(error ? { lastError: error } : {}) })
+      .set({ bytesSent: Math.max(0, this.out.bytes() - this.bytesAtStart), updatedAt: this.ctx.deps.clock.now(), ...(ended ? { endedAt: this.ctx.deps.clock.now() } : {}), ...(error ? { lastError: error } : {}) })
       .where(eq(TS.id, id))
       .catch(() => undefined);
   }
@@ -427,12 +466,29 @@ export class TranslatorRelay {
     if (!stdin.write(buf)) await new Promise<void>((resolve) => stdin.once("drain", () => resolve()));
   }
 
+  /**
+   * An object prepared for air, from storage; or, where this relay has no access to it (a relay on
+   * another host with only the channel's address), from the worker's HLS origin (`segmentBase`,
+   * HLS_PUBLIC_URL), which serves prepared segments at `/hls/prepared/…`.
+   */
+  private async object(key: string): Promise<Buffer | null> {
+    const stream = await this.ctx.deps.storage.objects.open?.(key).catch(() => null);
+    if (stream) {
+      const bytes = await bytesOf(stream).catch(() => null);
+      if (bytes) return bytes;
+    }
+    const base = this.options.segmentBase;
+    if (!base || !key.startsWith("prepared/")) return null;
+    const response = await fetch(`${base.replace(/\/+$/, "")}/hls/${key}`, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+    return response?.ok ? Buffer.from(await response.arrayBuffer()) : null;
+  }
+
   /** Reads a live segment: the worker's own from storage, Livepeer's over HTTP. */
   private async liveBytes(uri: string): Promise<Buffer | null> {
     const own = /(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.ts)(?:$|\?)/.exec(uri);
-    if (own && this.ctx.deps.storage.objects.open) {
-      const stream = await this.ctx.deps.storage.objects.open(own[1]).catch(() => null);
-      if (stream) return bytesOf(stream);
+    if (own) {
+      const bytes = await this.object(own[1]);
+      if (bytes) return bytes;
     }
     if (!/^https?:\/\//.test(uri)) return null;
     const response = await fetch(uri, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
@@ -443,29 +499,37 @@ export class TranslatorRelay {
   private async segment(row: typeof CI.$inferSelect, index: number): Promise<{ buf: Buffer; item: string; ms: number; code: CodeWindow | null; startsAt: number } | null> {
     const ms = row.segmentMs[index];
     const startsAt = row.startsAt.getTime() + row.segmentMs.slice(0, index).reduce((a, b) => a + b, 0);
-    if (row.inBreak && this.target.breakHandling === "station_id_slate") {
-      // The station ID slate in place of the break, a slate per segment (and not the spot's code).
+    const picture = relayPicture(row, this.settings);
+    if (picture.show === "station_id_slate") {
+      // The station ID slate in place of the break (the station's choice, or partner time), a slate
+      // per segment (and not the spot's code).
       const seconds = Math.max(1, Math.min(4, Math.round(ms / 1000)));
       const key = await this.options.preparer.slate(await this.options.slates.stationId(this.options.look), seconds, this.options.look.band);
-      const stream = await this.ctx.deps.storage.objects.open?.(`${objectKey.prepared(key, this.rendition)}/seg_00000.ts`);
-      return stream ? { buf: await bytesOf(stream), item: `${row.id}:${index}`, ms, code: null, startsAt } : null;
+      const slate = await this.object(`${objectKey.prepared(key, this.rendition)}/seg_00000.ts`);
+      if (slate) this.slateSegments++;
+      return slate ? { buf: slate, item: `${row.id}:${index}`, ms, code: null, startsAt } : null;
+    }
+    if (isPaidPromotion(row, this.settings) && this.lastPaid !== row.id) {
+      this.lastPaid = row.id;
+      this.options.onPaidPromotion?.({ id: row.id, code: row.code, startsAt: row.startsAt });
     }
     const code = codeWindow(row.tags);
     if (row.kind === "live") {
       const uri = row.liveUris?.[this.rendition]?.[index];
       const buf = uri ? await this.liveBytes(uri) : null;
+      if (buf) this.liveSegments++;
       return buf ? { buf, item: row.id, ms, code, startsAt } : null;
     }
     if (!row.preparedKey) return null;
     const name = `seg_${String(row.firstSegment + index).padStart(5, "0")}.ts`;
-    const stream = await this.ctx.deps.storage.objects.open?.(`${objectKey.prepared(row.preparedKey, this.rendition)}/${name}`).catch(() => null);
-    if (!stream) return null;
-    let buf = await bytesOf(stream);
+    const found = await this.object(`${objectKey.prepared(row.preparedKey, this.rendition)}/${name}`);
+    if (!found) return null;
+    let buf = found;
     if (this.options.look.band === "tv") {
       const r = this.options.preparer.ladder[this.rendition];
       const size = { width: r.width, height: r.height, videoKbps: r.videoKbps };
       // Captions drawn in, only if the station chose it.
-      if (this.target.burnCaptions) {
+      if (this.settings.burnCaptions) {
         const cues = await this.cuesFor(row, index).catch(() => []);
         if (cues.length) buf = (await burnCaptionsIn(buf, cues, size, this.scratch())) ?? buf;
       }
@@ -483,6 +547,12 @@ export class TranslatorRelay {
 
   /** TV: segments the code was drawn into this session. */
   codeSegments = 0;
+  /** Segments sent as the station ID slate (breaks, or partner time). */
+  slateSegments = 0;
+  /** The last row reported as paid promotion (once per row). */
+  private lastPaid: string | null = null;
+  /** Live segments sent (from Livepeer's playback, or the worker's radio ingest). */
+  liveSegments = 0;
 
   /** Codes on rows about to air: their loops prepared before they're needed (radio). */
   private async lookahead(now: Date) {
@@ -529,6 +599,11 @@ export class TranslatorRelay {
             break;
           }
           const published = publishedCount(row, now.getTime());
+          if (this.settings.relayMode === "live_only" && row.kind !== "live") {
+            // Live shows only: everything else stays on Opencast.
+            this.nextSeq = Math.max(this.nextSeq, row.seq + published);
+            continue;
+          }
           for (let i = Math.max(0, this.nextSeq - row.seq); i < published; i++) {
             if (!this.child) {
               // The destination dropped: try again every few seconds, skipping what airs meanwhile.
@@ -552,8 +627,13 @@ export class TranslatorRelay {
     }
   }
 
-  /** Bytes sent in this session so far. */
+  /** Bytes sent (egress) in this session so far. */
   get bytesSent() {
-    return this.bytes;
+    return this.child ? Math.max(0, this.out.bytes() - this.bytesAtStart) : 0;
   }
+}
+
+/** How the relay makes its picture: `composite` (the TV band's bug drawn in) or `copy` (nothing re-encoded). */
+export function senderPicture(s: Pick<SenderSettings, "bugOnRelays">, look: Pick<ChannelLook, "band" | "bug">): "copy" | "composite" {
+  return look.band === "tv" && look.bug.mode !== "off" && s.bugOnRelays ? "composite" : "copy";
 }

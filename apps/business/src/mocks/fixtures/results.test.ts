@@ -117,7 +117,11 @@ describe("statements", () => {
     expect(sept!.openingMicros).toBe($(175.6));
     const line = (kind: string) => sept!.lines.find((l) => l.kind === kind)!;
     expect(line("added").amountMicros).toBe($(500));
-    expect(line("aired").amountMicros).toBe(-$(248.9));
+    // BEAT's relay viewers on YouTube (relayed from the 14th; Orange is local: the share in its area) are their own line; together, $248.90.
+    expect(line("aired").amountMicros + line("relay_viewers").amountMicros).toBe(-$(248.9));
+    expect(line("relay_viewers")).toMatchObject({ label: "Relay viewers, as reported by YouTube", relay: { platform: "youtube" } });
+    expect(line("relay_viewers").amountMicros).toBeLessThan(0);
+    expect(line("relay_waiting")).toMatchObject({ label: "Relay viewers, waiting for YouTube's location data", includedAbove: true });
     expect(line("returned")).toMatchObject({ amountMicros: $(1.86), detail: "2 airings cut short, included above" });
     expect(line("fees").amountMicros).toBe(0);
     expect(sept!.closingMicros).toBe($(426.7));

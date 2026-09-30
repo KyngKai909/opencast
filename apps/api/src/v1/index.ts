@@ -42,6 +42,10 @@ import { createShelfService } from "./modules/shelf/service.js";
 import { shelfRoutes } from "./modules/shelf/routes.js";
 import { createMaintenanceService } from "./modules/maintenance/service.js";
 import { maintenanceRoutes } from "./modules/maintenance/routes.js";
+import { createRelaysService } from "./modules/relays/service.js";
+import { relaysRoutes } from "./modules/relays/routes.js";
+import { createPlatformsService } from "./modules/platforms/service.js";
+import { platformsRoutes } from "./modules/platforms/routes.js";
 
 export function createV1(deps: Deps): { router: Router; services: Services; deps: Deps } {
   const services = {} as Services;
@@ -64,6 +68,8 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   services.settings = createSettingsService(ctx);
   services.shelf = createShelfService(ctx);
   services.maintenance = createMaintenanceService(ctx);
+  services.relays = createRelaysService(ctx);
+  services.platforms = createPlatformsService(ctx);
 
   const router = express.Router();
   // Webhooks first: they need the raw body, before anything reads it as JSON.
@@ -89,6 +95,8 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   settingsRoutes(registrar, ctx);
   shelfRoutes(registrar, ctx);
   maintenanceRoutes(registrar, ctx);
+  relaysRoutes(registrar, ctx);
+  platformsRoutes(registrar, ctx);
   router.use(errorHandler(deps.config.production));
   return { router, services, deps };
 }

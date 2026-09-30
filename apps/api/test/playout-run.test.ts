@@ -85,7 +85,7 @@ beforeAll(async () => {
   await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:06:00.000Z", endsAt: "2026-10-02T03:07:00.000Z", itemId: crate.id }).expect(201);
   await h.db.insert(schema.playoutState).values({ stationId: beat.id, onAir: true });
 
-  engine = createEngine({ deps: h.deps, services: h.services }, { ladderScale: 0.1, preset: "ultrafast", translators: false, log: () => undefined });
+  engine = createEngine({ deps: h.deps, services: h.services }, { ladderScale: 0.1, preset: "ultrafast", log: () => undefined });
   await engine.tick();
   await prepareQueued(h, engine.preparer);
 }, 120_000);

@@ -9,7 +9,9 @@ import { liveHandlers } from "./live";
 import { logHandlers } from "./log";
 import { marketHandlers } from "./market";
 import { onairHandlers } from "./onair";
+import { platformHandlers } from "./platforms";
 import { relayBackgroundHandlers } from "./relayBackground";
+import { relayHandlers } from "./relay";
 import { spotsHandlers } from "./spots";
 import { stationHandlers } from "./station";
 import { stationsHandlers } from "./stations";
@@ -28,5 +30,7 @@ export const handlers = [
   ...earningsHandlers,
   ...accountHandlers,
   ...stationHandlers,
-  ...relayBackgroundHandlers
+  ...relayBackgroundHandlers,
+  ...relayHandlers,
+  ...platformHandlers
 ];

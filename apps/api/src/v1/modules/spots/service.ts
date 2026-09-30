@@ -34,6 +34,7 @@ import { createCatalogSponsors, monthOf as catalogMonthOf, type CatalogSponsorsP
 import { createOrders, type OrdersPart } from "./orders.js";
 import { createCodes, type CodesPart } from "./codes.js";
 import { createBusinessPart, type BusinessPart } from "./business.js";
+import { createRelayViewers } from "./relayViewers.js";
 
 type Targeting = Spot["targeting"];
 
@@ -107,6 +108,14 @@ export interface SpotsService extends SponsorshipsPart, CatalogSponsorsPart, Ord
   settleAiring(input: { airingId: string; asRunId: string; startedAt: Date; endedAt: Date; barter?: { producerStationId: string; producerShare: number; agreementId: string } }): Promise<{ costMicros: number; working: string }>;
   /** Resumes spots paused for their daily cap. Run at each market's midnight. */
   resumeDailyCaps(): Promise<number>;
+  /**
+   * Relay viewers (added 2026-09-30, follow-up Phase 3): settles each airing's relay part per
+   * platform as its numbers come in (online businesses) or YouTube's location data arrives (local
+   * ones); not billed, or returned after `relays.location_wait`. Run every minute.
+   */
+  settleRelayViewers(): Promise<{ settled: number; notBilled: number; returned: number }>;
+  /** What's still held for a business's relay viewers waiting for location data, per platform. */
+  relayWaiting(businessId: string): Promise<Array<{ platform: "youtube" | "twitch"; heldMicros: number; airings: number }>>;
 }
 
 export interface BusinessInput {
@@ -678,6 +687,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     }
     return stories;
   }
+
+  const relay = createRelayViewers(ctx);
 
   const parts = {
     sponsorships: createSponsorships(ctx),
@@ -1268,9 +1279,11 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const since = new Date(cutoff.getTime() - 7 * 86_400_000);
       const past = await db.select({ id: AI.id, holdId: AI.holdId }).from(AI).where(and(gte(AI.scheduledAt, since), lt(AI.scheduledAt, cutoff)));
       const open = await services.ledger.openHolds(past.map((a) => a.holdId));
+      // Aired, with relay parts still waiting for their numbers (2026-09-30): held for those, not unaired.
+      const waiting = await relay.openAirings(past.filter((a) => (open.get(a.holdId) ?? 0) > 0).map((a) => a.id));
       let released = 0;
       for (const airing of past) {
-        if (!(open.get(airing.holdId) ?? 0)) continue;
+        if (!(open.get(airing.holdId) ?? 0) || waiting.has(airing.id)) continue;
         await db.transaction((tx) => services.ledger.release(tx, airing.holdId, undefined, { sourceType: "airing", sourceId: airing.id, memo: "Returned: didn't air" }));
         released++;
       }
@@ -1351,6 +1364,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (row.status !== "listed") throw refused("not_listed", "Only spots in the market are placed.");
       const spent = (await services.ledger.spotSpend([spotId], await dayStartFor(row.advertiserId))).get(spotId) ?? { used: 0, usedToday: 0 };
       let holdMicros: number;
+      let relayEstimateMicros = 0;
       if (row.rateKind === "per_airing") {
         holdMicros = row.rateMicros;
       } else {
@@ -1358,6 +1372,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         const tunedIn = (await services.audience.typicalTunedIn([stationId], scheduledAt)).get(stationId) ?? 0;
         holdMicros = Math.max(1, Math.round((tunedIn * row.rateMicros) / 1000));
         if (row.perAiringMaxMicros) holdMicros = Math.min(holdMicros, row.perAiringMaxMicros);
+        // Relay viewers (2026-09-30): plus an estimate for the viewers connected YouTube and Twitch report, inside the same maximum.
+        const relayEstimate = await relay.holdEstimate(row, stationId, scheduledAt);
+        relayEstimateMicros = row.perAiringMaxMicros ? Math.max(0, Math.min(relayEstimate, row.perAiringMaxMicros - holdMicros)) : relayEstimate;
+        holdMicros += relayEstimateMicros;
       }
       if (spent.used + holdMicros > row.totalBudgetMicros) {
         await pauseFor(row, "budget_spent");
@@ -1380,7 +1398,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           });
           const [airing] = await tx
             .insert(AI)
-            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros, carriageAgreementId: carriageAgreementId ?? null, createdAt: deps.clock.now() })
+            .values({ spotId, stationId, breakId, holdId, scheduledAt, rateKind: row.rateKind, rateMicros: row.rateMicros, carriageAgreementId: carriageAgreementId ?? null, createdAt: deps.clock.now(), relayEstimateMicros })
             .returning({ id: AI.id });
           return airing.id;
         })
@@ -1405,11 +1423,19 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         cost = Math.round(airing.airing.rateMicros * fraction);
         working = `${fmt(airing.airing.rateMicros)} an airing${fraction < 1 ? ` × ${Math.round(airedMs / 1000)}/${airing.spot.lengthSec}s` : ""} = ${fmt(cost)}`;
       } else {
-        const tunedIn = await services.audience.averageTunedIn(airing.airing.stationId, startedAt, endedAt);
-        const full = (tunedIn * airing.airing.rateMicros) / 1000;
+        // Online businesses: every viewer. Local ones (2026-09-30): the viewers placed inside the area.
+        const viewers = await relay.opencastViewers(airing.spot, airing.airing.stationId, startedAt, endedAt);
+        const full = (viewers.billed * airing.airing.rateMicros) / 1000;
         cost = Math.round(Math.min(full, airing.spot.perAiringMaxMicros ?? Number.MAX_SAFE_INTEGER) * fraction);
-        working = `${Math.round(tunedIn)} × ${fmt(airing.airing.rateMicros)} ÷ 1,000${fraction < 1 ? ` × ${Math.round(airedMs / 1000)}/${airing.spot.lengthSec}s` : ""} = ${fmt(cost)}`;
+        const who = Math.round(viewers.billed) === Math.round(viewers.tunedIn) ? `${Math.round(viewers.billed)}` : `${Math.round(viewers.billed)} in your area (of ${Math.round(viewers.tunedIn)} tuned in)`;
+        working = `${who} × ${fmt(airing.airing.rateMicros)} ÷ 1,000${fraction < 1 ? ` × ${Math.round(airedMs / 1000)}/${airing.spot.lengthSec}s` : ""} = ${fmt(cost)}`;
       }
+      // Relay viewers (2026-09-30): each counted platform's part stays held until its numbers are in.
+      const openHold = (await services.ledger.openAmount([airing.airing.holdId])).get(airing.airing.holdId) ?? 0;
+      const keepHeldMicros =
+        airing.airing.rateKind === "per_thousand"
+          ? await relay.open({ airing: airing.airing, spot: airing.spot, startedAt, endedAt, fraction, opencastCostMicros: cost, openHoldMicros: openHold })
+          : 0;
       const station = (await services.stations.idents([airing.airing.stationId])).get(airing.airing.stationId);
       if (!barter && airing.airing.carriageAgreementId) {
         // It filled the producer's barter share: the producer is paid.
@@ -1423,12 +1449,16 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
           costMicros: cost,
           kind: "airing",
           source: { sourceType: "as_run", sourceId: asRunId, memo: `Aired on ${station?.callSign ?? station?.name ?? "a station"}${station?.channel ? ` ${station.channel}` : ""}`, idempotencyKey: `settle:${airingId}` },
-          barter
+          barter,
+          keepHeldMicros
         })
       );
       await services.ledger.checkRunway(airing.spot.advertiserId);
       return { costMicros: cost, working };
     },
+
+    settleRelayViewers: () => relay.settleDue(),
+    relayWaiting: (businessId) => relay.waiting(businessId),
 
     async resumeDailyCaps() {
       const rows = await db.select().from(SP).where(and(eq(SP.status, "paused"), eq(SP.pauseReason, "daily_cap")));

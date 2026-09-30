@@ -445,7 +445,7 @@ export function createBillingService({ deps, services }: ModuleContext): Billing
     const to = new Date(Math.min(from.getTime() + DAY_MS, until.getTime()));
     const [storage, sessions, live] = await Promise.all([services.library.storageUse(), services.playout.relaySessions(from, to), services.playout.liveAired(from, to)]);
     const prepared = await services.playout.preparedBytes([...new Set([...storage.values()].flatMap((s) => s.contentIds))]);
-    const modes = await services.stations.relayModes([...new Set(sessions.map((s) => s.translatorId))]);
+    const modes = await services.stations.relayModes([...new Set(sessions.filter((s) => !s.relayMode).map((s) => s.translatorId))]);
     const stationIds = [...new Set([...storage.keys(), ...sessions.map((s) => s.stationId), ...live.map((l) => l.stationId)])];
     const idents = await services.stations.idents(stationIds);
     const out = new Map<string, Partial<Record<UsageType, { quantity: number; detail?: Record<string, number> }>>>();
@@ -459,8 +459,10 @@ export function createBillingService({ deps, services }: ModuleContext): Billing
         m.storage = { quantity: (st.originalBytes + preparedBytes) / 1e9, detail: { originalBytes: st.originalBytes, preparedBytes } };
       }
       const mine = sessions.filter((s) => s.stationId === id);
-      const everything = unionHours(mine.filter((s) => modes.get(s.translatorId) !== "live_only"));
-      const liveOnly = unionHours(mine.filter((s) => modes.get(s.translatorId) === "live_only"));
+      // What the session says it relayed (the relay service's), else the translator's mode (before Phase 3).
+      const modeOf = (s: (typeof sessions)[number]) => s.relayMode ?? modes.get(s.translatorId);
+      const everything = unionHours(mine.filter((s) => modeOf(s) !== "live_only"));
+      const liveOnly = unionHours(mine.filter((s) => modeOf(s) === "live_only"));
       if (everything > 0) m.relay_everything = { quantity: everything };
       if (liveOnly > 0) m.relay_live_only = { quantity: liveOnly };
       const liveHours = unionHours(live.filter((l) => l.stationId === id));

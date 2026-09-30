@@ -51,6 +51,21 @@ export interface Events {
     body: string;
     dedupeKey: string;
   };
+  /**
+   * Relays (added 2026-09-30, follow-up Phase 3): a station's relay stopped (the station and the
+   * Network desk hear; Opencast's own channel is never affected) or is back; a restart for a
+   * platform's limit is due for the station to do, or failed; spots aired on a destination Opencast
+   * can't mark as paid promotion. Worded where it happens; one notice per `dedupeKey`.
+   */
+  "station.relay": {
+    stationId: string;
+    step: "stopped" | "back" | "restart_due" | "restart_failed" | "paid_promotion";
+    title: string;
+    body: string;
+    dedupeKey: string;
+    /** The Network desk hears too (a relay that stopped). */
+    desk: boolean;
+  };
 }
 
 type Handler<K extends keyof Events> = (payload: Events[K]) => Promise<void> | void;

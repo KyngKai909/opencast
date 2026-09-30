@@ -39,7 +39,7 @@ beforeAll(async () => {
   await owner.post(`/v1/stations/${stationId}/log`, { kind: "off_air", startsAt: "2026-10-02T06:01:00.000Z", endsAt: "2026-10-02T06:10:00.000Z" }).expect(201);
   await owner.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-02T06:10:00.000Z", endsAt: "2026-10-02T06:11:00.000Z", itemId: show.id }).expect(201);
   await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), translators: false });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder() });
   await engine.tick();
   await prepareQueued(h, engine.preparer);
 }, 60_000);

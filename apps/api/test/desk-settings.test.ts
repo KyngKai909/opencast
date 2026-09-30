@@ -151,7 +151,8 @@ describe("the rules registry", () => {
     expect(byKey["rights.public_domain_us"]).toMatchObject({ display: "1930" });
     expect(byKey["rights.claim_dates"]).toMatchObject({ display: "14 days, 10 business days" });
     expect(byKey["escrow.unclaimed_period"]).toMatchObject({ display: "3 years" });
-    expect(byKey["relays.platform_limits"]).toMatchObject({ display: "3 platforms" });
+    // Phase 3 added Kick (and when restarts happen) from September 30, 2026 (migration 0034).
+    expect(byKey["relays.platform_limits"]).toMatchObject({ display: "4 platforms" });
   });
 
   it("answers the value at a moment, with past and future versions kept", async () => {

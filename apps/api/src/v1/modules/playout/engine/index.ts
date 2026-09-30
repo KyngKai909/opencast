@@ -11,7 +11,8 @@
 //   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
 //   - takes radio stations' live pushes on its own RTMP ingest (rtmp.ts, radiolive.ts) while it's
 //     the leader: the radio band never goes through Livepeer;
-//   - runs the translators that are on (translator.ts);
+//   - (relays moved out: the relay service, apps/relay, sends each station's relay stream, from
+//     sender.ts; the worker no longer pushes to any platform);
 //   - every hour, the storage sweep: what was prepared from files that are gone (left while a
 //     channel still pointed at it), and the separate previews made before previews played the
 //     prepared segments.
@@ -35,7 +36,6 @@ import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
 import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
-import { TranslatorRelay } from "./translator.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
@@ -50,7 +50,6 @@ const READY_WARN_MS = 3_600_000;
 const READY_WARN_EVERY_MS = 60_000;
 /** Items whose rights were just confirmed are queued this often. */
 const RIGHTS_EVERY_MS = 5 * 60_000;
-const TRANSLATORS_EVERY_MS = 10_000;
 /** Caption tracks uploaded since are cut this often (X2). */
 const CAPTIONS_EVERY_MS = 30_000;
 const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepeercdn.studio/hls").replace(/\/+$/, "");
@@ -71,8 +70,6 @@ export interface EngineOptions {
   liveUrl?: (liveSourceId: string) => Promise<string | null>;
   /** Captions from speech (X2): none by default, until a provider is chosen. */
   captionGenerator?: CaptionGenerator;
-  /** Translators on (default) or off. */
-  translators?: boolean;
   /** How far ahead the channel's rows are written. */
   leadMs?: number;
   /**
@@ -116,7 +113,6 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   const filler = createFiller(ctx);
   const assemblers = new Map<string, ChannelAssembler>();
   const looks = new Map<string, ChannelLook>();
-  const translators = new Map<string, Map<string, { relay: TranslatorRelay; signature: string }>>();
   const lastFill = new Map<string, number>();
   const warned = new Set<string>();
   let initialized = false;
@@ -124,7 +120,6 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let lastWarn = 0;
   let lastRights = 0;
   let lastPrune = 0;
-  let lastTranslators = 0;
   let lastCaptions = 0;
   let rightsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
   let captionsSince = new Date(deps.clock.now().getTime() - 7 * 86_400_000);
@@ -417,39 +412,6 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     }
   }
 
-  async function stopTranslators(stationId: string) {
-    const running = translators.get(stationId);
-    if (!running) return;
-    translators.delete(stationId);
-    await Promise.all([...running.values()].map((t) => t.relay.stop()));
-  }
-
-  /** Relays for translators that are on, for stations on air. */
-  async function syncTranslators(onAir: Set<string>) {
-    for (const stationId of [...translators.keys()]) if (!onAir.has(stationId)) await stopTranslators(stationId);
-    if (options.translators === false) return;
-    for (const stationId of onAir) {
-      const look = looks.get(stationId);
-      if (!look) continue;
-      const targets = await services.stations.relays(stationId);
-      const running = translators.get(stationId) ?? new Map();
-      for (const [id, t] of running) {
-        const target = targets.find((x) => x.id === id);
-        if (!target || TranslatorRelay.signature(target) !== t.signature) {
-          running.delete(id);
-          await t.relay.stop();
-        }
-      }
-      for (const target of targets) {
-        if (running.has(target.id)) continue;
-        const relay = new TranslatorRelay(ctx, stationId, target, { look, preparer, slates: planner.slates, log, scratchDir });
-        relay.start();
-        running.set(target.id, { relay, signature: TranslatorRelay.signature(target) });
-      }
-      translators.set(stationId, running);
-    }
-  }
-
   const engine = {
     assemblers,
     planner,
@@ -457,19 +419,13 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     preparer,
     /** The radio ingest, when the worker runs one. */
     ingest,
-    /** A running relay (tests read what it drew). */
-    relay(stationId: string, translatorId: string): TranslatorRelay | null {
-      return translators.get(stationId)?.get(translatorId)?.relay ?? null;
-    },
-
     /** For the worker's health endpoint. */
-    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; live: LiveCpu; translators: Array<{ stationId: string; translatorId: string; bytesThisSession: number }> }> {
+    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; live: LiveCpu }> {
       return {
         stationsOnAir: assemblers.size,
         preparation: await preparer.stats(),
         readiness,
-        live: { sessions: liveCpu.sessions, liveSeconds: Math.round(liveCpu.ms / 1000), cpuSeconds: Math.round(liveCpu.cpuSeconds * 10) / 10, cpuSecondsPerLiveHour: liveCpu.ms ? Math.round((liveCpu.cpuSeconds * 3_600_000) / liveCpu.ms) : null },
-        translators: [...translators].flatMap(([stationId, running]) => [...running].map(([translatorId, t]) => ({ stationId, translatorId, bytesThisSession: t.relay.bytesSent })))
+        live: { sessions: liveCpu.sessions, liveSeconds: Math.round(liveCpu.ms / 1000), cpuSeconds: Math.round(liveCpu.cpuSeconds * 10) / 10, cpuSecondsPerLiveHour: liveCpu.ms ? Math.round((liveCpu.cpuSeconds * 3_600_000) / liveCpu.ms) : null }
       };
     },
 
@@ -555,15 +511,10 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
           ?.tick()
           .catch((error) => log(`[assemble] ${stationId}: ${(error as Error).message}`));
       }
-      if (now - lastTranslators >= TRANSLATORS_EVERY_MS || [...translators.keys()].some((id) => !onAir.has(id))) {
-        lastTranslators = now;
-        await syncTranslators(onAir).catch((error) => log(`[translator] ${(error as Error).message}`));
-      }
     },
 
     /** Stops everything without ending the playlists (shutdown, or leadership lost). */
     async stopAll() {
-      for (const stationId of [...translators.keys()]) await stopTranslators(stationId);
       for (const assembler of assemblers.values()) await assembler.stop({ signOff: false });
       assemblers.clear();
       if (ingest && ingestListening) {

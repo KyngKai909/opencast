@@ -16,7 +16,7 @@ import { parseVtt, vttContentId } from "../src/v1/lib/captions.js";
 import { createEngine, type Engine } from "../src/v1/modules/playout/engine/index.js";
 import { scaledLadder } from "../src/v1/modules/playout/engine/ladder.js";
 import { createPreparer, DEFAULT_START_PTS, ffmpegTranscoder, startPtsOf, type CaptionGenerator } from "../src/v1/modules/playout/engine/prepare.js";
-import { burnCaptionsIn } from "../src/v1/modules/playout/engine/translator.js";
+import { burnCaptionsIn } from "../src/v1/modules/playout/engine/sender.js";
 import { createHarness, dummyFile, fakeTranscoder, itemFixture, market, prepareQueued, stationFixture, testClip, type Harness, type User } from "./harness.js";
 
 let h: Harness;
@@ -81,7 +81,7 @@ beforeAll(async () => {
   await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:00:12.000Z", endsAt: "2026-10-02T03:00:20.000Z", itemId: tape.id }).expect(201);
   await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:01:00.000Z", endsAt: "2026-10-02T03:01:08.000Z", itemId: tape.id }).expect(201);
   await h.db.insert(schema.playoutState).values({ stationId: beat.id, onAir: true });
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, translators: false, log: () => undefined });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, log: () => undefined });
 }, 60_000);
 
 afterAll(async () => {

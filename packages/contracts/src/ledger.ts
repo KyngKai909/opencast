@@ -58,7 +58,7 @@ export const Statement = z.object({
       /** Station statements use the first seven; business statements (2026-09-29) use `balance` and `spent`. */
       group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other", "balance", "spent", "usage"]).optional(),
       /** Business statements (added 2026-09-29): what the line is. `spot_station` lines are one spot on one station. */
-      kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station"]).optional(),
+      kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station", "relay_viewers", "relay_waiting"]).optional(),
       /** Shown, not added in (money returned from holds, fees paid on top). */
       includedAbove: z.boolean().optional(),
       /** How many airings the line is for (spot lines). */
@@ -83,7 +83,14 @@ export const Statement = z.object({
           /** The price per unit (the period's last; null: not set yet). */
           priceMicros: Micros.nullable()
         })
-        .optional()
+        .optional(),
+      /**
+       * Relay viewers (added 2026-09-30, follow-up Phase 3): lines "Relay viewers, as reported by
+       * YouTube" (or Twitch) on business statements (`kind` `relay_viewers`, added in) and station
+       * statements (group `spots`), and on business statements "Relay viewers, waiting for YouTube's
+       * location data" (`kind` `relay_waiting`, still held: shown, `includedAbove`).
+       */
+      relay: z.object({ platform: z.enum(["youtube", "twitch"]) }).optional()
     })
   ),
   issuedAt: Timestamp,
@@ -137,7 +144,13 @@ export const StationEarnings = z.object({
      * Ads from partners (programmatic backfill, added 2026-09-28): paid when the partner pays,
      * 30 to 90 days after airing; never held, never escrowed. `on` mirrors the break rule's switch.
      */
-    partnerAds: z.object({ on: z.boolean(), micros: Micros, pendingMicros: Micros }).optional()
+    partnerAds: z.object({ on: z.boolean(), micros: Micros, pendingMicros: Micros }).optional(),
+    /**
+     * Relay viewers (added 2026-09-30, follow-up Phase 3): per-thousand spots paid for viewers on
+     * YouTube and Twitch, one line per platform ("Relay viewers, as reported by YouTube"), apart
+     * from `spots` (Opencast's own viewers). Absent with none.
+     */
+    relayViewers: z.array(z.object({ platform: z.enum(["youtube", "twitch"]), label: z.string(), micros: Micros, airings: z.number().int() })).optional()
   }),
   totalMicros: Micros,
   /** "Held for airings… Tonight 9 airings in 4 breaks". Becomes the station's when each airing runs. */

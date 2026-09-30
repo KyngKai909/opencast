@@ -2,9 +2,10 @@
 // engine, which prepares items for air (FFmpeg, once per content ID, into object storage),
 // assembles every station on air into its playlists (pointing at prepared segments, at Livepeer's
 // during a TV station's live blocks, and at its own during a radio station's: the leader takes
-// radio encoders' RTMP pushes on WORKER_INGEST_PORT, 1935 by default), runs translators that are
-// on, and the minute tick (reminders, dead-air warnings, deadlines). Followers wait. The worker
-// needs only scratch space (WORKER_SCRATCH_DIR) for preparation, radio live and translators.
+// radio encoders' RTMP pushes on WORKER_INGEST_PORT, 1935 by default), and runs the minute tick
+// (reminders, dead-air warnings, deadlines). Followers wait. The worker needs only scratch space
+// (WORKER_SCRATCH_DIR) for preparation and radio live. Relays to other platforms are the relay
+// service's (apps/relay, follow-up Phase 3), never the worker's.
 //
 // GET /health reports leadership, stations on air, preparation (items prepared, waiting, and the
 // time preparing takes) and readiness; GET /hls/<station>/master.m3u8 (and <rendition>.m3u8) serves
@@ -75,9 +76,9 @@ const health = http.createServer((req, res) => {
   if (url === "/health") {
     engine
       .stats()
-      .then(({ stationsOnAir, preparation, readiness, live, translators }) => {
+      .then(({ stationsOnAir, preparation, readiness, live }) => {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, preparation, readiness, live, translators, at: new Date().toISOString() }));
+        res.end(JSON.stringify({ ok: true, service: "opencast-worker", instance: workerInstanceId, leader, stationsOnAir, preparation, readiness, live, at: new Date().toISOString() }));
       })
       .catch((error) => res.writeHead(500, { "content-type": "application/json" }).end(JSON.stringify({ ok: false, error: (error as Error).message })));
     return;

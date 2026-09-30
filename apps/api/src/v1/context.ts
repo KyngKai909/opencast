@@ -24,6 +24,8 @@ import type { TvService } from "./modules/tv/service.js";
 import type { SettingsService } from "./modules/settings/service.js";
 import type { ShelfService } from "./modules/shelf/service.js";
 import type { MaintenanceService } from "./modules/maintenance/service.js";
+import type { RelaysService } from "./modules/relays/service.js";
+import type { PlatformDeps, PlatformsService } from "./modules/platforms/service.js";
 import type { PinataAccount } from "./storageMaintenance.js";
 import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
@@ -72,6 +74,12 @@ export interface Deps {
    * unpin). Null or absent: Pinata isn't connected here. Added 2026-09-29.
    */
   pinata?: PinataAccount | null;
+  /**
+   * Platform connections (added 2026-09-30, follow-up Phase 3): YouTube and Twitch sign-in and APIs
+   * (GOOGLE_CLIENT_ID/SECRET, TWITCH_CLIENT_ID/SECRET), and the key stream keys and tokens are sealed
+   * with (PLATFORM_SECRETS_KEY). Absent: read from the environment. Tests pass fakes.
+   */
+  platforms?: PlatformDeps;
   config: {
     /** Where uploads and working files go. */
     storageRoot: string;
@@ -129,6 +137,10 @@ export interface Services {
   maintenance: MaintenanceService;
   /** Pay-as-you-go for stations (added 2026-09-29, follow-up Phase 2): metering, bills, the Station account. Part of the ledger module. */
   billing: BillingService;
+  /** Relays (added 2026-09-30, follow-up Phase 3): one setting for all of a station's relays, what the Translators page shows. The relay service runs them. */
+  relays: RelaysService;
+  /** Platform connections for relays (added 2026-09-30, follow-up Phase 3), the relay service's seam, and relay viewers. */
+  platforms: PlatformsService;
 }
 
 export interface ModuleContext {

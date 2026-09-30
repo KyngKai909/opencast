@@ -2,13 +2,30 @@ import { audienceApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest } from "../../errors.js";
+import { clientIp, isPrivateAddress } from "../../geo.js";
 import { HEARTBEAT_MS } from "./service.js";
 
 export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) {
-  r.handle(api.heartbeat, async ({ body, user }) => {
+  r.handle(api.heartbeat, async ({ body, user, req }) => {
     // The tuned-in session stays anonymous: the person (if signed in) only feeds their own watch
     // history (A2), kept by accounts while their setting is on, never linked to the session.
-    const { offAirUntil } = await services.audience.heartbeat(body);
+    // Where the viewer is, asked only when their session starts (2026-09-30): their chosen market when
+    // signed in, else a coarse location from the connection (GEOIP_URL). Only the market is kept.
+    const place = async () => {
+      if (user) {
+        const market = (await services.accounts.me(user.id)).market;
+        if (market) return market.id;
+      }
+      const ip = clientIp(req);
+      if (!ip || isPrivateAddress(ip) || !deps.geo.configured) return null;
+      const found = await deps.geo.lookup(ip);
+      if (found?.zip) {
+        const market = await services.network.marketForZip(found.zip);
+        if (market) return market.id;
+      }
+      return found?.point ? ((await services.network.marketNear(found.point)).market?.id ?? null) : null;
+    };
+    const { offAirUntil } = await services.audience.heartbeat(body, { place });
     if (offAirUntil) {
       // Off air on a schedule: not counted, not kept in watch history; the next beat can wait until it's back.
       return { ok: true as const, nextInMs: Math.max(HEARTBEAT_MS, Date.parse(offAirUntil) - deps.clock.now().getTime()), offAirUntil };

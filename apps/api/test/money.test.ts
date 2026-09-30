@@ -13,6 +13,7 @@ let beat: { id: string };
 let bankId: string;
 let cardId: string;
 let spotId: string;
+let marketId: string;
 
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
 
@@ -34,13 +35,15 @@ async function asRun(stationId: string, airingId: string, startedAt: string, sec
   return row;
 }
 
-/** Tuned-in samples for a station: `n` people for every minute of a window. */
+/**
+ * Tuned-in samples for a station: `n` people for every minute of a window, all placed in the
+ * station's market (a local business is billed for the viewers placed in its area; 2026-09-30).
+ */
 async function audience(stationId: string, from: string, minutes: number, n: number) {
   for (let i = 0; i < minutes; i++) {
-    await h.db
-      .insert(schema.minuteSamples)
-      .values({ stationId, minute: new Date(Date.parse(from) + i * 60_000), tunedIn: n, web: n })
-      .onConflictDoNothing();
+    const minute = new Date(Date.parse(from) + i * 60_000);
+    await h.db.insert(schema.minuteSamples).values({ stationId, minute, tunedIn: n, web: n }).onConflictDoNothing();
+    await h.db.insert(schema.minuteMarkets).values({ stationId, minute, marketId, tunedIn: n }).onConflictDoNothing();
   }
 }
 
@@ -48,6 +51,7 @@ beforeAll(async () => {
   h = await createHarness();
   h.clock.set("2026-09-21T19:00:00.000Z"); // Monday noon in Los Angeles.
   const m = await market(h);
+  marketId = m.id;
   kai = await h.signIn("Kai");
   jess = await h.signIn("Jess Lin");
   admin = await h.signIn("Dee", { admin: true });
@@ -257,6 +261,7 @@ describe("when the money runs low", () => {
     const available = await balanceOfKind("advertiser_available", { advertiserId: businessId });
     await jess.post(`/v1/businesses/${businessId}/withdrawals`, { amountMicros: available, fundingSourceId: bankId }).expect(201);
     await h.db.update(schema.minuteSamples).set({ tunedIn: 5000 }).where(eq(schema.minuteSamples.stationId, beat.id));
+    await h.db.update(schema.minuteMarkets).set({ tunedIn: 5000 }).where(eq(schema.minuteMarkets.stationId, beat.id));
     const before = await balanceOfKind("station_earnings", { stationId: beat.id });
     const run = await asRun(beat.id, placed.airingId, "2026-09-22T03:29:30.000Z", 30);
     const settled = await h.services.spots.settleAiring({ airingId: placed.airingId, asRunId: run.id, startedAt: run.startedAt, endedAt: run.endedAt });

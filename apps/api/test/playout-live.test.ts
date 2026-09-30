@@ -78,7 +78,7 @@ beforeAll(async () => {
   await h.services.stations.setLowerThird(stationId, liveEntryId, program.id, kai.id, { hidden: false, speakerId: null, name: "Dana Whitfield", title: "Chair, Planning Commission" });
   await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
   // Livepeer's playback address for the source, pointed at the fake.
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), translators: false, liveUrl: async (id) => (id === sourceId ? `${origin}/hls/fake/index.m3u8` : null) });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), liveUrl: async (id) => (id === sourceId ? `${origin}/hls/fake/index.m3u8` : null) });
 }, 60_000);
 
 afterAll(async () => {

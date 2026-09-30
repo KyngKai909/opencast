@@ -37,6 +37,7 @@ import {
   type MockStatement
 } from "../fixtures/results";
 import { STATIONS } from "../fixtures/stations";
+import { relayLines, relayOf } from "../fixtures/relay";
 import { fail, needsUser, path, personOf, reply } from "../respond";
 
 const DAY = 86_400_000;
@@ -93,8 +94,10 @@ const inRange = (r: Range, iso: string, at: Date) => {
 
 // ---------------------------------------------------------------- results
 
-export function asResultsAiring(a: AsRun): ResultsAiring {
+export function asResultsAiring(a: AsRun, at: Date = now()): ResultsAiring {
   const s = stationOf(a.stationId)!;
+  // Relayed on BEAT (follow-up Phase 3): Opencast's viewers here, each platform's relay viewers apart.
+  const relay = relayOf(a, at);
   const spot = getDb().spots.find((x) => x.id === a.spotId);
   const title = spot?.title ?? "A spot";
   const started = Date.parse(a.startedAt);
@@ -107,9 +110,10 @@ export function asResultsAiring(a: AsRun): ResultsAiring {
     programContext: a.programContext,
     airedMs: a.airedSec * 1000,
     inFull: a.airedSec >= a.lengthSec,
-    tunedIn: a.tunedIn,
-    costMicros: a.costMicros,
-    working: working(a),
+    tunedIn: relay ? relay.opencastTunedIn : a.tunedIn,
+    costMicros: relay ? relay.opencastCostMicros : a.costMicros,
+    working: relay ? working({ ...a, tunedIn: relay.opencastTunedIn, costMicros: relay.opencastCostMicros }) : working(a),
+    ...(relay ? { relayViewers: relay.parts } : {}),
     proofFrameUrl: proofFrame({ id: a.spotId, title }, s),
     scansNextHour: a.scans + extraScans(a),
     shortReason: a.shortReason,
@@ -189,11 +193,14 @@ export function buildResults(businessId: string, r: Range, at: Date = now()) {
     };
   });
 
+  const relays = airings.map((a) => relayOf(a, at)).filter((v): v is NonNullable<typeof v> => v !== null);
+  const relayViewers = relayLines(relays);
   return {
     month: r.month,
     period: r.period,
     from: r.from,
     to: r.to,
+    ...(relayViewers.length ? { relayViewers } : {}),
     totals: {
       airings: airings.length,
       tunedInAddedUp: airings.reduce((s, a) => s + a.tunedIn, 0),
@@ -201,13 +208,15 @@ export function buildResults(businessId: string, r: Range, at: Date = now()) {
       scans: codes.reduce((s, c) => s + c.scans, 0),
       saves: saves.length,
       uses: uses.length,
-      customers: customers.length
+      customers: customers.length,
+      // Relay viewers: included in `spentMicros` (the airings' costs are Opencast's viewers and the relay viewers together).
+      ...(relays.length ? { relaySpentMicros: relays.reduce((s, v) => s + v.relayCostMicros, 0), relayWaitingMicros: relays.reduce((s, v) => s + v.waitingMicros, 0) } : {})
     },
     byStation,
     byDaypart,
     bySpot,
     codes,
-    airings: [...airings].reverse().map(asResultsAiring)
+    airings: [...airings].reverse().map((a) => asResultsAiring(a, at))
   };
 }
 
@@ -222,7 +231,7 @@ function asStatement(businessId: string, s: MockStatement) {
     periodEnd: s.periodEnd,
     openingMicros: s.openingMicros,
     closingMicros: s.closingMicros,
-    lines: s.lines.map((l) => ({ label: l.label, detail: l.detail, amountMicros: l.amountMicros, notSetYet: false, group: l.group, kind: l.kind, airings: l.airings, includedAbove: l.includedAbove })),
+    lines: s.lines.map((l) => ({ label: l.label, detail: l.detail, amountMicros: l.amountMicros, notSetYet: false, group: l.group, kind: l.kind, airings: l.airings, includedAbove: l.includedAbove, ...(l.relay ? { relay: l.relay } : {}) })),
     issuedAt: s.issuedAt,
     csvUrl: `/v1/statements/${s.id}/csv`,
     pdfUrl: statementPdf(name, s),
@@ -287,7 +296,7 @@ export const resultsHandlers: HttpHandler[] = [
       aired: airingsOf(spot.businessId)
         .filter((a) => a.spotId === spot.id && Date.parse(a.startedAt) <= at.getTime())
         .reverse()
-        .map(asResultsAiring)
+        .map((a) => asResultsAiring(a))
     });
   }),
 

@@ -25,6 +25,8 @@ import { catalogShelfApi } from "./catalogShelf.js";
 import { catalogSponsorsApi } from "./catalogSponsors.js";
 import { configApi } from "./config.js";
 import { billingApi } from "./billing.js";
+import { relayApi } from "./relay.js";
+import { platformsApi } from "./platforms.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -53,6 +55,8 @@ export * from "./callSigns.js";
 export * from "./config.js";
 export * from "./storageMaintenance.js";
 export * from "./billing.js";
+export * from "./relay.js";
+export * from "./platforms.js";
 
 export const API_PREFIX = "/v1";
 
@@ -78,7 +82,11 @@ export const api = {
   /** Added 2026-09-29 (follow-up Phase 1): the apps' public switches. */
   config: configApi,
   /** Added 2026-09-29 (follow-up Phase 2): pay-as-you-go, the Station account. */
-  billing: billingApi
+  billing: billingApi,
+  /** Added 2026-09-30 (follow-up Phase 3): platform connections for relays (YouTube, Twitch, any RTMP address). */
+  platforms: platformsApi,
+  /** Added 2026-09-30 (follow-up Phase 3): relays, set once for all of a station's translators (modes, breaks, the bug, restarts). */
+  relay: relayApi
 } as const;
 
 export const HealthResponse = z.object({

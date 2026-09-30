@@ -68,8 +68,8 @@ Prepare once, then assemble (the platform prompt, Phase 5): prerecorded material
 
 ```
 engine tick (1 s)   commands → prepare what's queued → readiness check (hourly, 48 hours ahead) →
-                    fill breaks 20 min ahead → fill dead air → assemble every station on air →
-                    translators; hourly, the storage sweep
+                    fill breaks 20 min ahead → fill dead air → assemble every station on air;
+                    hourly, the storage sweep
 prepare.ts          once per content ID, from the original: FFmpeg to the ladder (TV 1080/720/480/360
                     and audio-only 128k; radio 128k and 64k), 4 s segments with aligned keyframes,
                     loudness levelled to -24 LUFS, captions cut to the segments (uploaded, embedded or
@@ -95,8 +95,14 @@ playlist.ts         renders a channel's master and media playlists from its time
 live.ts, radiolive.ts, rtmp.ts
                     live blocks: TV through Livepeer (same ladder; the audio-only rendition made here),
                     radio through the worker's own RTMP ingest, packaged to 128k and 64k
-translator.ts       relays to YouTube, Twitch or RTMP, only while on: the channel's own segments joined
-                    (tsretime.ts), stream-copied, or re-encoded where the bug or a slate is drawn in
+sender.ts, fanout.ts, relayBreaks.ts
+                    relays (follow-up Phase 3; run by the relay service, apps/relay, never the worker):
+                    one continuous stream per station from the channel's own segments, live blocks
+                    included (tsretime.ts), stream-copied, or re-encoded where the bug is drawn in;
+                    breaks as the station chose (its spots or the station ID slate); pushed to the
+                    station's Livepeer relay stream (no transcoding), which multistreams to every
+                    platform. The relays module (modules/relays) holds the setting, restarts for
+                    platform limits and the runner the relay service ticks (docs/relay.md)
 slates.ts           station ID, credit, off-air, stand-by, bug, code + QR: SVG rendered with sharp
 ```
 
@@ -158,7 +164,9 @@ usage paid     station earnings (before each payout, and at month end) or extern
                  → Opencast usage (the treasury); usage owed and billed settle
 ```
 
-**Pay-as-you-go** (follow-up Phase 2; `modules/ledger/billing.ts`, docs/pricing.md). Being on air is free. The jobs measure each station's storage, relay hours (per station, platforms at the same time counted once) and live hours every hour, close each UTC day into a `usage` entry (after the free allowance, at that day's price from the rules registry, never past the station's cap), and close each month's bill: earnings first, then the owner's Clear wallet with full access (the owner approves the transfer) or the station's card (an off-session Stripe charge). What can't be charged starts the grace period (`billing.grace`); after it, relays and live hours pause (the translators' relays drop out of `stations.relays`, live blocks plan as open time), never the channel. A cap reached pauses its usage the same way (a storage cap stops new uploads). The Stripe side, kept apart from Clear's use of ClearLabs Inc's account, is docs/stripe.md.
+**Pay-as-you-go** (follow-up Phase 2; `modules/ledger/billing.ts`, docs/pricing.md). Being on air is free. The jobs measure each station's storage, relay hours (per station, platforms at the same time counted once) and live hours every hour, close each UTC day into a `usage` entry (after the free allowance, at that day's price from the rules registry, never past the station's cap), and close each month's bill: earnings first, then the owner's Clear wallet with full access (the owner approves the transfer) or the station's card (an off-session Stripe charge). What can't be charged starts the grace period (`billing.grace`); after it, relays and live hours pause ("Everything I air" falls back to live shows only in the relay service, live blocks plan as open time), never the channel. A cap reached pauses its usage the same way (a storage cap stops new uploads). The Stripe side, kept apart from Clear's use of ClearLabs Inc's account, is docs/stripe.md.
+
+**Platform connections and relay viewers** (follow-up Phase 3; `modules/platforms/`, `modules/spots/relayViewers.ts`, docs/platforms.md). YouTube and Twitch connect by signing in (OAuth; the real clients are behind an interface, with fakes for tests), anything else by address and key; keys and tokens are sealed with AES-256-GCM (PLATFORM_SECRETS_KEY) and opened only in memory. The platforms module is the relay service's seam (`PlatformsSeam`, relay.ts): destinations with their keys, YouTube's next broadcast, ending one, paid promotion. Every minute the jobs read each signed-in platform's concurrent viewers; per-thousand spots bill them (online businesses every relay viewer, local ones only YouTube's share inside their area, from YouTube Analytics a day or two late), each platform's part settling on its own from the airing's hold.
 
 Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments/` (adapters: `clear`, `stripe_only`, `fake`, chosen by `PAYMENTS_PROVIDER`).
 

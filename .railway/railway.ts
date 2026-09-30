@@ -52,7 +52,7 @@ export default defineRailway((ctx) => {
   const origin = (name: string) => `https://\${{${name}.RAILWAY_PUBLIC_DOMAIN}}`;
   // The web apps are on Vercel (team Deed3Labs: opencast-web, opencast-business, opencast-site,
   // opencast-tv), on their free vercel.app addresses until a domain is bought. Railway runs only
-  // the API, the worker, Postgres and Redis. Staging's API allows the Vercel apps and links to
+  // the API, the worker, the relay service, Postgres and Redis. Staging's API allows the Vercel apps and links to
   // opencast-web; production's addresses are set at the cutover, when its domains are decided.
   const vercel = { web: "opencast-web", business: "opencast-business", site: "opencast-site", tv: "opencast-tv" } as const;
   const webOrigin = (name: keyof typeof vercel) => `https://${vercel[name]}.vercel.app`;
@@ -133,8 +133,32 @@ export default defineRailway((ctx) => {
     }
   });
 
+  // The relay service (follow-up Phase 3, docs/relay.md): each station's relays to other platforms,
+  // one push per station to its Livepeer relay stream. Its own Docker image (apps/relay/Dockerfile),
+  // configured only by these variables, so it can move to a host with cheap bandwidth by
+  // redeploying the same image there. It reads the database and object storage, never writes the
+  // channel; one replica (the Redis lease keeps a second one waiting during a redeploy).
+  const relay = service("relay", {
+    source,
+    build: { builder: "DOCKERFILE" as const, dockerfilePath: "apps/relay/Dockerfile", watchPatterns: ["apps/relay/**", "apps/api/**", ...shared] },
+    deploy: { healthcheckPath: "/health", healthcheckTimeout: 120, numReplicas: 1, ...restart },
+    env: {
+      NODE_ENV: "production",
+      PORT: "8080",
+      DATABASE_URL: Postgres.env.DATABASE_URL,
+      REDIS_URL: Redis.env.REDIS_URL,
+      LIVEPEER_API_KEY: secret(),
+      // One push per station, split by Livepeer; `direct` pushes to each platform (docs/relay.md).
+      RELAY_FAN_OUT: "livepeer",
+      // The channel playlist base: prepared segments are read there when storage isn't reachable.
+      HLS_PUBLIC_URL: origin("worker"),
+      // The same bucket as the worker, read directly.
+      ...storage
+    }
+  });
+
   return project("opencast", {
     environments: ["production", "staging"],
-    resources: [Postgres, Redis, redisVolume, postgresVolume, workerCache, ...(media ? [media] : []), api, worker]
+    resources: [Postgres, Redis, redisVolume, postgresVolume, workerCache, ...(media ? [media] : []), api, worker, relay]
   });
 });

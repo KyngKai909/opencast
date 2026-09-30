@@ -21,9 +21,21 @@ const MINUTE = 60_000;
 
 export interface AudienceService {
   /** Not counted during the station's planned off air time: then it says when the station is back. */
-  heartbeat(input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean }): Promise<{ offAirUntil: string | null }>;
+  heartbeat(
+    input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean },
+    /**
+     * Added 2026-09-30 (follow-up Phase 3): where the viewer is, asked once when their session
+     * starts: their chosen market, or a coarse location from the connection. Only the market is kept.
+     */
+    options?: { place?: () => Promise<string | null> }
+  ): Promise<{ offAirUntil: string | null }>;
   /** Tuned in, averaged over a window (e.g. one airing of a spot). */
   averageTunedIn(stationId: string, from: Date, to: Date): Promise<number>;
+  /**
+   * Added 2026-09-30 (follow-up Phase 3): tuned in over a window, counting only viewers placed in
+   * these markets (a local business's area). Viewers Opencast can't place aren't in it.
+   */
+  placedTunedIn(stationId: string, from: Date, to: Date, marketIds: string[]): Promise<number>;
   /** People tuned in, added up minute by minute, per station (the pool's watch-time share). */
   watchMinutes(from: Date, to: Date): Promise<Map<string, number>>;
   /** The usual tuned in for a station at this hour, from the last week: for estimates and holds. */
@@ -37,19 +49,22 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
   const { db } = deps;
   const S = schema.sessions;
   const M = schema.minuteSamples;
+  const MM = schema.minuteMarkets;
 
   const minuteOf = (at: Date) => new Date(Math.floor(at.getTime() / MINUTE) * MINUTE);
 
   const service: AudienceService = {
     watch: createWatchData({ deps, services }),
 
-    async heartbeat(input) {
+    async heartbeat(input, options = {}) {
       const now = deps.clock.now();
       // Planned off air (off air hours, a sign-off on the log): nothing's on, so nobody's tuned in.
       const off = await services.log.offAirAt(input.stationId, now);
       if (off) return { offAirUntil: off.backAt };
       const [existing] = await db.select().from(S).where(eq(S.id, input.sessionId));
       if (!existing) {
+        // Placed once, by market only: the address it came from is never kept.
+        const marketId = options.place ? await options.place().catch(() => null) : null;
         await db.insert(S).values({
           id: input.sessionId,
           stationId: input.stationId,
@@ -57,7 +72,8 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           startedAt: now,
           lastBeatAt: now,
           beats: 1,
-          lastMediaTimeMs: input.mediaTimeMs
+          lastMediaTimeMs: input.mediaTimeMs,
+          marketId
         });
         return { offAirUntil: null };
       }
@@ -90,6 +106,13 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
             .insert(M)
             .values({ stationId: input.stationId, minute, tunedIn: 1, [key]: 1 })
             .onConflictDoUpdate({ target: [M.stationId, M.minute], set: { tunedIn: sql`${M.tunedIn} + 1`, [key]: sql`${M[key]} + 1` } });
+          // Where they are (2026-09-30): the same minute by market, for local businesses' spots.
+          if (existing.marketId) {
+            await db
+              .insert(MM)
+              .values({ stationId: input.stationId, minute, marketId: existing.marketId, tunedIn: 1 })
+              .onConflictDoUpdate({ target: [MM.stationId, MM.minute, MM.marketId], set: { tunedIn: sql`${MM.tunedIn} + 1` } });
+          }
           // Watch data: the same minute, for this session, kept 30 days (watch.ts).
           await recordSessionMinute(db, { sessionId: input.sessionId, stationId: input.stationId, minute });
         };
@@ -130,6 +153,24 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
       }
       const span = to.getTime() - from.getTime();
       return span > 0 ? weighted / span : covered ? weighted / covered : 0;
+    },
+
+    async placedTunedIn(stationId, from, to, marketIds) {
+      if (!marketIds.length) return 0;
+      const rows = await db
+        .select({ minute: MM.minute, tunedIn: sql<number>`sum(${MM.tunedIn})::int` })
+        .from(MM)
+        .where(and(eq(MM.stationId, stationId), inArray(MM.marketId, marketIds), gte(MM.minute, minuteOf(from)), lt(MM.minute, to)))
+        .groupBy(MM.minute);
+      // Weighted as averageTunedIn is: each minute by how much of the window it covers.
+      let weighted = 0;
+      for (const row of rows) {
+        const start = Math.max(row.minute.getTime(), from.getTime());
+        const end = Math.min(row.minute.getTime() + MINUTE, to.getTime());
+        if (end > start) weighted += Number(row.tunedIn) * (end - start);
+      }
+      const span = to.getTime() - from.getTime();
+      return span > 0 ? weighted / span : 0;
     },
 
     async typicalTunedIn(stationIds, at) {
@@ -258,11 +299,15 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         stayedToTheEnd: [...stayed].flatMap(([programId, v]) =>
           v.first > 0 ? [{ programId, title: titles.programs.get(programId) ?? "", percent: Math.round((v.last / v.first) * 100) }] : []
         ),
-        translators: translators.map((t) => ({
-          translatorId: t.id,
-          name: t.name,
-          viewers: translatorCounts.find((c) => c.translatorId === t.id)?.viewers ?? 0
-        })),
+        translators: [
+          ...translators.map((t) => ({
+            translatorId: t.id,
+            name: t.name,
+            viewers: translatorCounts.find((c) => c.translatorId === t.id)?.viewers ?? 0
+          })),
+          // Connected YouTube and Twitch (2026-09-30): the viewers each reported last, shown apart from Opencast's.
+          ...(await services.platforms.latestViewers(stationId)).map((p) => ({ translatorId: p.platformId, name: p.name, viewers: p.viewers }))
+        ],
         byProgram: byProgramWithWatch,
         // U3: the same window a week earlier, the whole way (minutes with anyone tuned in), and every break.
         comparison: lastWeek

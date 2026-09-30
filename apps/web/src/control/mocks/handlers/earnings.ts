@@ -6,12 +6,13 @@
 // download a statement's CSV; hosts see none of it. A station sees only its own numbers.
 
 import { http } from "msw";
-import { audienceApi, ledgerApi, networkApi } from "@opencast/contracts";
+import { audienceApi, ledgerApi, networkApi, relayViewersLabel } from "@opencast/contracts";
 import { money } from "@opencast/ui";
 import { dbStation, getDb, membership } from "../db";
 import { audienceReport, hasAudience, heldEarnings, moveToBank, payoutAccount, setPayoutTo, stationEarnings, stationStatements, statementCsv, statementOwner } from "../fixtures/earnings";
 import type { MockPerson } from "../fixtures/people";
 import { stationState } from "../fixtures/station";
+import { BEAT } from "../fixtures/stations";
 import { makerWatchData } from "../fixtures/watch";
 import { fail, needsUser, path, reply } from "../respond";
 
@@ -27,6 +28,13 @@ function guard(person: MockPerson, stationId: string, need: Need): Response | nu
   return null;
 }
 
+const RELAY = (youtube: [number, number], twitch: [number, number]) => [
+  { platform: "youtube" as const, label: relayViewersLabel("youtube"), micros: youtube[0], airings: youtube[1] },
+  { platform: "twitch" as const, label: relayViewersLabel("twitch"), micros: twitch[0], airings: twitch[1] }
+];
+/** BEAT's relay viewers by period: YouTube (online businesses, and local ones for the share in their area) and Twitch (online businesses only). */
+const RELAY_VIEWERS = { week: RELAY([3_200_000, 8], [800_000, 2]), month: RELAY([12_400_000, 31], [3_100_000, 9]), year: RELAY([12_400_000, 31], [3_100_000, 9]) };
+
 export const earningsHandlers = [
   http.get(path(ledgerApi.getStationEarnings), ({ request, params }) => {
     const p = needsUser(request);
@@ -40,7 +48,13 @@ export const earningsHandlers = [
     if (!e) return fail(404, "not_found", "There are no earnings for this station yet.");
     // Ads from partners: the switch in Breaks settings; nothing earned until the backfill exists.
     const on = !!stationState().breakRules[id]?.adsFromPartners;
-    return reply(ledgerApi.getStationEarnings.response, { ...e, lines: { ...e.lines, partnerAds: { on, micros: 0, pendingMicros: 0 } } });
+    // Relay viewers (follow-up Phase 3): BEAT relays to YouTube and Twitch since September 14. Their
+    // lines are carved out of the spots line, so the total stays the ledger's.
+    const relay = id === BEAT.id ? RELAY_VIEWERS[period] : null;
+    const lines = relay
+      ? { ...e.lines, spots: { ...e.lines.spots, micros: e.lines.spots.micros - relay.reduce((s, l) => s + l.micros, 0) }, relayViewers: relay }
+      : e.lines;
+    return reply(ledgerApi.getStationEarnings.response, { ...e, lines: { ...lines, partnerAds: { on, micros: 0, pendingMicros: 0 } } });
   }),
 
   http.get(path(ledgerApi.listStationStatements), ({ request, params }) => {

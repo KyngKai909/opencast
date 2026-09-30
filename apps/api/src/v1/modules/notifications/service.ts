@@ -32,7 +32,8 @@ type Kind =
   | "station_news"
   | "signed_on_off"
   | "spot_added"
-  | "station_account";
+  | "station_account"
+  | "relay";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -83,7 +84,9 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     weekly_summary: { push: false, email: true },
     signed_on_off: { push: true, email: false },
     // Pay-as-you-go (2026-09-29): always on, to the owners.
-    station_account: { push: true, email: true }
+    station_account: { push: true, email: true },
+    // Relays (2026-09-30): a relay stopped or came back, a restart the station has to do, paid promotion to mark.
+    relay: { push: true, email: false }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -495,6 +498,20 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       title: e.title,
       body: e.body,
       link: `/stations/${e.stationId}/settings?section=account`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: e.dedupeKey
+    });
+  });
+
+  // Relays (added 2026-09-30, follow-up Phase 3): the station team; the Network desk too when a relay stops.
+  deps.bus.on("station.relay", async (e) => {
+    const team = await stationTeam(e.stationId);
+    const recipients = e.desk ? [...new Set([...team, ...(await services.accounts.adminIds())])] : team;
+    await service.notify(recipients, {
+      kind: "relay",
+      title: e.title,
+      body: e.body,
+      link: `/stations/${e.stationId}/settings?section=translators`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: e.dedupeKey
     });

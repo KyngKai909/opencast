@@ -94,7 +94,7 @@ describe("a radio live block with no encoder connected", () => {
     await h.db.insert(schema.playoutState).values({ stationId: radioId, onAir: true });
     calls.length = 0;
     // The worker's ingest is listening (on a free port); nobody pushes to it.
-    engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), translators: false, ingest: { port: 0 }, log: () => undefined });
+    engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), ingest: { port: 0 }, log: () => undefined });
     let during = "";
     const end = Date.parse("2026-10-01T20:01:30.000Z");
     while (h.clock.now().getTime() < end) {

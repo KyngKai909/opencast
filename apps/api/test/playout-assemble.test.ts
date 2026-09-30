@@ -77,7 +77,7 @@ beforeAll(async () => {
   brokenEntryId = (await kai.post(`/v1/stations/${beat.id}/log`, { kind: "program", startsAt: "2026-10-02T03:40:00.000Z", endsAt: "2026-10-02T03:41:00.000Z", itemId: broken.id }).expect(201)).body.id;
   await h.db.insert(schema.playoutState).values({ stationId: beat.id, onAir: true });
 
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, translators: false, log: (l) => logs.push(l) });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, log: (l) => logs.push(l) });
 }, 60_000);
 
 afterAll(async () => {

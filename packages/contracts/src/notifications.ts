@@ -36,7 +36,13 @@ export const NoticeKind = z.enum([
    * failed, the grace period starting and ending soon, relays and live hours paused and resumed,
    * a cap reached, a payment to approve in Clear.
    */
-  "station_account"
+  "station_account",
+  /**
+   * Relays (added 2026-09-30, follow-up Phase 3), station team (and the Network desk when a relay
+   * stops): a relay stopped or is back, a platform restart the station has to do, paid promotion to
+   * mark on a destination Opencast can't mark.
+   */
+  "relay"
 ]);
 
 export const Notice = z.object({

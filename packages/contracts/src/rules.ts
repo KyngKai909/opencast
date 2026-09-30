@@ -161,6 +161,9 @@ export const RULES = {
     fallback: { days: 1095 },
     display: (v) => (v.days % 365 === 0 ? `${v.days / 365} ${v.days === 365 ? "year" : "years"}` : `${v.days} days`)
   }),
+  // Extended 2026-09-30 (follow-up Phase 3), additively: when YouTube rolls to keep broadcasts saved
+  // (`rollEveryHours`), which restarts need a signed-in account (`restartNeedsSignIn`), Kick, and how
+  // restarts are timed (`restart`). Versions without the new fields read them from the fallback.
   "relays.platform_limits": def({
     group: "relays",
     title: "Platform limits",
@@ -174,16 +177,46 @@ export const RULES = {
         })
         .join(", "),
     schema: z.object({
-      platforms: z.array(z.object({ platform: z.string().regex(/^[a-z][a-z0-9_]*$/), maxHours: z.number().positive().nullable(), savesUnderHours: z.number().positive().nullable() })).max(20)
+      platforms: z
+        .array(
+          z.object({
+            platform: z.string().regex(/^[a-z][a-z0-9_]*$/),
+            /** One broadcast can't run longer: restarting before it is required. */
+            maxHours: z.number().positive().nullable(),
+            /** Only broadcasts shorter than this are saved as videos (YouTube). */
+            savesUnderHours: z.number().positive().nullable(),
+            /** Added 2026-09-30: when the station saves broadcasts as videos, roll to a new one about this often (YouTube 11). */
+            rollEveryHours: z.number().positive().nullable().optional(),
+            /** Added 2026-09-30: a restart needs the account signed in (Facebook: a pasted key can't be restarted; the station is told when it's due). */
+            restartNeedsSignIn: z.boolean().optional()
+          })
+        )
+        .max(20),
+      /** Added 2026-09-30: restarts aim for the last break in this many hours before the limit (less `marginMinutes`). */
+      restart: z.object({ windowHours: z.number().positive().max(12), marginMinutes: z.number().int().min(1).max(120) }).optional()
     }),
     fallback: {
       platforms: [
-        { platform: "twitch", maxHours: 48, savesUnderHours: null },
-        { platform: "youtube", maxHours: null, savesUnderHours: 12 },
-        { platform: "facebook", maxHours: 8, savesUnderHours: null }
-      ]
+        { platform: "twitch", maxHours: 48, savesUnderHours: null, rollEveryHours: null, restartNeedsSignIn: false },
+        { platform: "youtube", maxHours: null, savesUnderHours: 12, rollEveryHours: 11, restartNeedsSignIn: true },
+        { platform: "facebook", maxHours: 8, savesUnderHours: null, rollEveryHours: null, restartNeedsSignIn: true },
+        { platform: "kick", maxHours: null, savesUnderHours: null, rollEveryHours: null, restartNeedsSignIn: false }
+      ],
+      restart: { windowHours: 2, marginMinutes: 15 }
+    } as {
+      platforms: Array<{ platform: string; maxHours: number | null; savesUnderHours: number | null; rollEveryHours?: number | null; restartNeedsSignIn?: boolean }>;
+      restart?: { windowHours: number; marginMinutes: number };
     },
     display: (v) => `${v.platforms.length} ${v.platforms.length === 1 ? "platform" : "platforms"}`
+  }),
+  // Added 2026-09-30 (follow-up Phase 3; Open, no first version: the fallback is the value until one is set).
+  "relays.location_wait": def({
+    group: "relays",
+    title: "Waiting for relay viewers' location",
+    detail: "How long a local business's relay part stays held for YouTube's viewer geography. If none arrives, it isn't charged and goes back to the business's balance",
+    schema: z.object({ days: z.number().int().min(1).max(30) }),
+    fallback: { days: 7 },
+    display: (v) => `${v.days} ${v.days === 1 ? "day" : "days"}`
   }),
   "numbering.channels": def({
     group: "numbering",

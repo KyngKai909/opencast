@@ -9,6 +9,7 @@ import type { Results, ResultsCode, StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { conflict, notFound } from "../../errors.js";
 import { localDate, localDay } from "../../lib/time.js";
+import { createRelayViewers } from "./relayViewers.js";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -54,8 +55,10 @@ const daypartOf = (at: Date, tz: string) => {
   return hour >= 6 && hour < 12 ? "Mornings" : hour >= 12 && hour < 18 ? "Afternoons" : hour >= 18 && hour < 23 ? "Evenings" : "Late night";
 };
 
-export function createCodes({ deps, services }: ModuleContext): CodesPart {
+export function createCodes(ctx: ModuleContext): CodesPart {
+  const { deps, services } = ctx;
   const { db } = deps;
+  const relay = createRelayViewers(ctx);
   const C = schema.codes;
   const EV = schema.codeEvents;
   const AI = schema.airings;
@@ -329,7 +332,7 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
       const { from, to, shownFrom } = await rangeOf(period, spots);
       const spotIds = spots.map((s) => s.id);
       const aired = await airedAirings(spotIds, from, to);
-      const [costs, idents, contexts, events] = await Promise.all([
+      const [costs, idents, contexts, events, relayParts] = await Promise.all([
         services.ledger.costsOfAsRun(aired.map((a) => a.run.id)),
         services.stations.idents(aired.map((a) => a.airing.stationId)),
         services.log.breakContexts(aired.map((a) => a.airing.breakId)),
@@ -339,7 +342,9 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
               .from(EV)
               .innerJoin(C, eq(C.id, EV.codeId))
               .where(and(inArray(C.spotId, spotIds), gte(EV.occurredAt, from), lt(EV.occurredAt, to)))
-          : Promise.resolve([])
+          : Promise.resolve([]),
+        // Relay viewers (2026-09-30): each airing's parts on YouTube and Twitch.
+        relay.parts(aired.map((a) => a.airing.id))
       ]);
       const tz = "America/Los_Angeles";
       const airings: Results["airings"] = [];
@@ -348,13 +353,17 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
         const station = idents.get(airing.stationId);
         if (!station) continue;
         const airedMs = Math.min(run.endedAt.getTime() - run.startedAt.getTime(), spot.lengthSec * 1000);
-        const tunedIn = await services.audience.averageTunedIn(airing.stationId, run.startedAt, run.endedAt);
+        // Per thousand: online businesses pay for every viewer; local ones (2026-09-30) for those placed in their area.
+        const viewers = airing.rateKind === "per_thousand" ? await relay.opencastViewers(spot, airing.stationId, run.startedAt, run.endedAt) : null;
+        const tunedIn = viewers ? viewers.tunedIn : await services.audience.averageTunedIn(airing.stationId, run.startedAt, run.endedAt);
         const cost = costs.get(run.id) ?? 0;
         const partial = airedMs < spot.lengthSec * 1000 - 500;
+        const who = viewers && Math.round(viewers.billed) !== Math.round(viewers.tunedIn) ? `${Math.round(viewers.billed)} in your area (of ${Math.round(viewers.tunedIn)} tuned in)` : `${Math.round(tunedIn)}`;
         const working =
           airing.rateKind === "per_thousand"
-            ? `${Math.round(tunedIn)} × ${fmt(airing.rateMicros)} ÷ 1,000${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`
+            ? `${who} × ${fmt(airing.rateMicros)} ÷ 1,000${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`
             : `${fmt(airing.rateMicros)} an airing${partial ? ` × ${Math.round(airedMs / 1000)}/${spot.lengthSec}s` : ""} = ${fmt(cost)}`;
+        const relayViewers = relayParts.get(airing.id);
         airings.push({
           asRunId: run.id,
           station,
@@ -371,6 +380,7 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
           // P15: why it ran short, and when the proof frame was captured.
           shortReason: partial ? "The break was cut short" : null,
           proofCapturedAt: run.proofFrameAt?.toISOString() ?? null,
+          ...(relayViewers?.length ? { relayViewers } : {}),
           scansNextHour: events.filter(
             (e) =>
               e.event.kind === "scan" &&
@@ -380,13 +390,15 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
         });
       }
       airings.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+      const relaySpent = (a: Results["airings"][number]) => (a.relayViewers ?? []).reduce((sum, p) => sum + p.costMicros, 0);
+      const relayLines = relay.lines(airings.flatMap((a) => (a.relayViewers ? [a.relayViewers] : [])));
       const customers = events.filter((e) => e.event.kind === "use" && e.event.countsAsCustomer);
       const byStation = new Map<string, { airings: number; tunedIn: number; spent: number; customers: number }>();
       for (const a of airings) {
         const row = byStation.get(a.station.id) ?? { airings: 0, tunedIn: 0, spent: 0, customers: 0 };
         row.airings++;
         row.tunedIn += a.tunedIn;
-        row.spent += a.costMicros;
+        row.spent += a.costMicros + relaySpent(a);
         byStation.set(a.station.id, row);
       }
       for (const c of customers) {
@@ -415,11 +427,15 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
           airings: airings.length,
           // People tuned in, added up across airings: never reach or unique viewers.
           tunedInAddedUp: airings.reduce((s, a) => s + a.tunedIn, 0),
-          spentMicros: airings.reduce((s, a) => s + a.costMicros, 0),
+          // Opencast viewers and relay viewers together (relay viewers added 2026-09-30).
+          spentMicros: airings.reduce((s, a) => s + a.costMicros + relaySpent(a), 0),
           scans: events.filter((e) => e.event.kind === "scan").length,
           saves: events.filter((e) => e.event.kind === "save").length,
           uses: events.filter((e) => e.event.kind === "use").length,
-          customers: customers.length
+          customers: customers.length,
+          ...(relayLines.length
+            ? { relaySpentMicros: relayLines.reduce((sum, l) => sum + l.spentMicros, 0), relayWaitingMicros: relayLines.reduce((sum, l) => sum + l.waitingMicros, 0) }
+            : {})
         },
         byStation: [...byStation].flatMap(([id, r]) => {
           const station = stationIdents.get(id);
@@ -433,11 +449,12 @@ export function createCodes({ deps, services }: ModuleContext): CodesPart {
             spotId: s.id,
             title: s.title,
             airings: airings.filter((a) => a.spot.id === s.id).length,
-            spentMicros: airings.filter((a) => a.spot.id === s.id).reduce((sum, a) => sum + a.costMicros, 0),
+            spentMicros: airings.filter((a) => a.spot.id === s.id).reduce((sum, a) => sum + a.costMicros + relaySpent(a), 0),
             customers: customers.filter((c) => c.spotId === s.id).length
           }))
           .filter((s) => s.airings || s.customers),
-        airings
+        airings,
+        ...(relayLines.length ? { relayViewers: relayLines } : {})
       };
     },
 

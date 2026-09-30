@@ -172,7 +172,8 @@ export interface PlayoutService {
 
   // ---- Pay-as-you-go metering (added 2026-09-29, follow-up Phase 2) ----
   /** Translator sessions overlapping [from, to), each clipped to it; a running one counts to its last update. */
-  relaySessions(from: Date, to: Date): Promise<Array<{ stationId: string; translatorId: string; startedAt: Date; endedAt: Date }>>;
+  /** `relayMode` (added 2026-09-30): what the session relayed, when it says (the relay service's sessions); null for a worker translator's. */
+  relaySessions(from: Date, to: Date): Promise<Array<{ stationId: string; translatorId: string; startedAt: Date; endedAt: Date; relayMode?: "everything" | "live_only" | null }>>;
   /** What aired live (the as-run log's `live` rows) overlapping [from, to), clipped to it. */
   liveAired(from: Date, to: Date): Promise<Array<{ stationId: string; startedAt: Date; endedAt: Date }>>;
   /** The bytes stored for each content ID's prepared segments (every band's renditions, ready or not yet swept). */
@@ -637,7 +638,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return rows.flatMap((r) => {
         const startedAt = new Date(Math.max(r.startedAt.getTime(), from.getTime()));
         const endedAt = new Date(Math.min((r.endedAt ?? r.updatedAt).getTime(), to.getTime()));
-        return endedAt > startedAt ? [{ stationId: r.stationId, translatorId: r.translatorId, startedAt, endedAt }] : [];
+        return endedAt > startedAt ? [{ stationId: r.stationId, translatorId: r.translatorId, startedAt, endedAt, relayMode: r.relayMode }] : [];
       });
     },
 

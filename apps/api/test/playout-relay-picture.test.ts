@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { dateRangeTag, HLS_CLASS } from "@opencast/contracts";
 import { accessUnits, PictureTrack, RelayMuxer, type AccessUnit, type VideoFrame } from "../src/v1/modules/playout/engine/background.js";
 import { liveObjectPrefixes } from "../src/v1/modules/playout/engine/assemble.js";
-import { codeInSegment, codeWindow } from "../src/v1/modules/playout/engine/translator.js";
+import { codeInSegment, codeWindow } from "../src/v1/modules/playout/engine/sender.js";
 
 const FRAME = 3_000; // 90 kHz ticks at 30 fps
 

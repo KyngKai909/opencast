@@ -41,7 +41,7 @@ beforeAll(async () => {
   h = await createHarness();
   h.clock.set("2026-10-02T02:58:00.000Z");
   // The worker is already running (its readiness check done) before the station exists.
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, translators: false, log: (line) => logs.push(line) });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fake, log: (line) => logs.push(line) });
   await engine.tick();
 
   const m = await market(h);

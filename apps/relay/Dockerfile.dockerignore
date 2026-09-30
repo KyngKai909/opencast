@@ -1,0 +1,12 @@
+# The build context is the repository root (docker build -f apps/relay/Dockerfile .).
+**/node_modules
+**/dist
+**/.turbo
+.git
+.env
+.env.*
+storage
+e2e/test-results
+e2e/playwright-report
+apps/*/storage
+contracts

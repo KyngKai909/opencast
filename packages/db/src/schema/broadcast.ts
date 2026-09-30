@@ -726,8 +726,14 @@ export const translators = broadcast.table("translators", {
   service: text("service", { enum: ["youtube", "twitch", "rtmp"] }).notNull(),
   name: text("name").notNull(),
   rtmpUrl: text("rtmp_url").notNull(),
-  /** Secret. Never returned by the API. */
-  streamKey: text("stream_key").notNull(),
+  /**
+   * Secret. Never returned by the API. Since 2026-09-30 (migration 0036) null once the key has
+   * moved, sealed, to the platform connection `platform_id` (the platforms module's storage); a
+   * plain key is left only where no PLATFORM_SECRETS_KEY is set to seal it with.
+   */
+  streamKey: text("stream_key"),
+  /** Added 2026-09-30 (migration 0036): the manual platform connection holding this translator's key (no foreign key: the platforms module owns it). */
+  platformId: uuid("platform_id"),
   breakHandling: text("break_handling", { enum: ["air_spots", "station_id_slate"] })
     .notNull()
     .default("air_spots"),
@@ -1042,7 +1048,118 @@ export const translatorSessions = broadcast.table(
     endedAt: at("ended_at"),
     bytesSent: bigint("bytes_sent", { mode: "number" }).notNull().default(0),
     lastError: text("last_error"),
-    updatedAt: at("updated_at").notNull().defaultNow()
+    updatedAt: at("updated_at").notNull().defaultNow(),
+    /**
+     * Added 2026-09-30 (migration 0034, follow-up Phase 3): what the session relayed, for billing.
+     * `everything` (billed per hour, per station) or `live_only` (free). Null: a session from before
+     * relay modes (a worker translator), which relayed everything. Sessions of the relay service
+     * (apps/relay) carry the station's ID as `translatorId`: one sender per station.
+     */
+    relayMode: text("relay_mode", { enum: ["everything", "live_only"] }),
+    /** Added 2026-09-30 (migration 0034): the platforms the session's stream went to. */
+    platforms: integer("platforms")
   },
   (t) => [index("translator_sessions_translator").on(t.translatorId, t.startedAt)]
+);
+
+/**
+ * Added 2026-09-30 (migration 0034, follow-up Phase 3): a station's relays, one setting for all of
+ * them. `live_only` (the default, free): only live blocks go to the connected platforms, through
+ * Livepeer's multistream on the live source's own stream (radio: the relay service relays just the
+ * live block). `everything` (pay as you go): the whole schedule as one continuous stream from the
+ * relay service (apps/relay) to a per-station Livepeer relay stream with no transcoding, which
+ * Livepeer sends on to every platform. Owned by the relays module.
+ */
+export const stationRelays = broadcast.table("station_relays", {
+  stationId: uuid("station_id")
+    .primaryKey()
+    .references(() => stations.id),
+  mode: text("mode", { enum: ["live_only", "everything"] }).notNull().default("live_only"),
+  /** "During breaks, relays show": the station's spots or the station ID slate. Replaces translators' own `break_handling`. */
+  breakHandling: text("break_handling", { enum: ["air_spots", "station_id_slate"] }).notNull().default("air_spots"),
+  /** "Station bug on relays": on by default. Off, the relay stream-copies (nothing is re-encoded). */
+  bugOnRelays: boolean("bug_on_relays").notNull().default(true),
+  /** "Save relays as YouTube videos": off by default; on, YouTube broadcasts roll about every 11 hours. */
+  saveYoutubeVideos: boolean("save_youtube_videos").notNull().default(false),
+  /** The per-station Livepeer relay stream (`profiles: []`), made the first time it's needed. */
+  livepeerStreamId: text("livepeer_stream_id"),
+  /** Secret. Never returned by the API. */
+  livepeerStreamKey: text("livepeer_stream_key"),
+  livepeerPlaybackId: text("livepeer_playback_id"),
+  /** What the relay service last saw: `off` (nothing to relay), `relaying`, `stopped` (it failed; the station and desk were told), `paused` (pay-as-you-go). */
+  status: text("status", { enum: ["off", "relaying", "stopped", "paused"] }).notNull().default("off"),
+  lastError: text("last_error"),
+  stoppedAt: at("stopped_at"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  updatedAt: at("updated_at").notNull().defaultNow()
+});
+
+/**
+ * Added 2026-09-30 (migration 0034): each platform's Livepeer multistream target, per Livepeer
+ * stream it's on (`relay`, the station's relay stream; `live:<source ID>`, a live source's own
+ * stream in "Live shows only"). Keys stay with the platforms module: only a hash of the address
+ * is kept, to notice a change. The current broadcast's start is what platform limits count from.
+ */
+export const relayTargets = broadcast.table(
+  "relay_targets",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** The platforms module's ID for the destination (no foreign key: it owns them). */
+    platformId: text("platform_id").notNull(),
+    kind: text("kind", { enum: ["youtube", "twitch", "facebook", "kick", "custom"] }).notNull(),
+    stream: text("stream").notNull(),
+    livepeerStreamId: text("livepeer_stream_id"),
+    livepeerTargetId: text("livepeer_target_id"),
+    urlHash: text("url_hash"),
+    disabled: boolean("disabled").notNull().default(true),
+    /** When the current broadcast on the platform began (our push to it started, or the last restart). */
+    broadcastStartedAt: at("broadcast_started_at"),
+    /** A connected account's current broadcast (from the platforms module), ended after the next one is made. */
+    broadcastId: text("broadcast_id"),
+    /** Paid promotion: marked on this broadcast (connected YouTube, Twitch), or a reminder for a pasted key. */
+    paidPromotionMarkedAt: at("paid_promotion_marked_at"),
+    paidPromotionReminderAt: at("paid_promotion_reminder_at"),
+    paidPromotionDismissedAt: at("paid_promotion_dismissed_at"),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [uniqueIndex("relay_targets_station_platform_stream").on(t.stationId, t.platformId, t.stream)]
+);
+
+/**
+ * Added 2026-09-30 (migration 0034): restarts for platform limits (the rules registry's
+ * `relays.platform_limits`). Each is planned for the station ID in a break, logged when it's done,
+ * and shown ("Twitch restarts Saturday at 11:59 pm, during a break").
+ */
+export const relayRestarts = broadcast.table(
+  "relay_restarts",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    platformId: text("platform_id").notNull(),
+    kind: text("kind").notNull(),
+    /** `limit`: the platform's cap on one broadcast; `save_video`: YouTube rolls so each broadcast is saved. */
+    reason: text("reason", { enum: ["limit", "save_video"] }).notNull(),
+    /**
+     * `scheduled`; `done`; `failed`; `due` (the station has to do it: a pasted key the platform
+     * can't restart on its own); `cancelled` (the broadcast ended first, or the plan changed).
+     */
+    status: text("status", { enum: ["scheduled", "done", "failed", "due", "cancelled"] }).notNull().default("scheduled"),
+    at: at("at").notNull(),
+    /** The broadcast's limit: the restart is always before it. */
+    deadline: at("deadline").notNull(),
+    duringBreak: boolean("during_break").notNull().default(false),
+    breakId: uuid("break_id"),
+    automatic: boolean("automatic").notNull().default(true),
+    /** `toggle` (the Livepeer target off and on), `new_broadcast` (a connected account's next broadcast first), `pusher` (the relay's own push, direct fan-out), `remind`. */
+    method: text("method", { enum: ["toggle", "new_broadcast", "pusher", "remind"] }).notNull(),
+    doneAt: at("done_at"),
+    detail: text("detail"),
+    createdAt: createdAt()
+  },
+  (t) => [index("relay_restarts_station_at").on(t.stationId, t.at)]
 );

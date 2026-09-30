@@ -8,6 +8,9 @@
 //     a real destination), and draw a spot's code, offer and QR for its last 10 s.
 //   - A TV relay draws the code into the segments it shows in.
 //
+// The relays are the relay service's (the relay runner, pushing to each sink directly), since
+// follow-up Phase 3; the worker's engine only airs the channels.
+//
 // Real FFmpeg and real time, about two minutes.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
@@ -17,17 +20,28 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import type { PlatformsSeam, RelayDestination } from "@opencast/contracts";
 import { createEngine, type Engine } from "../src/v1/modules/playout/engine/index.js";
+import type { StationSender } from "../src/v1/modules/playout/engine/sender.js";
+import { createRelayRunner, type RelayRunner } from "../src/v1/modules/relays/runner.js";
 import { relayFrame } from "../src/v1/modules/stations/relayBackground.js";
 import { createHarness, itemFixture, market, prepareQueued, radioTenths, stationFixture, type Harness, type User } from "./harness.js";
 
 let h: Harness;
 let engine: Engine;
+let runner: RelayRunner;
 let kai: User;
 let dir: string;
 let t0: number;
 const ids: Record<"wave" | "nite" | "tube", string> = { wave: "", nite: "", tube: "" };
-const translators: Record<string, string> = {};
+/** Each station's one destination (the platforms seam, stubbed): its local sink. */
+const destinations = new Map<string, RelayDestination[]>();
+const platforms: PlatformsSeam = {
+  destinationsFor: async (stationId) => destinations.get(stationId) ?? [],
+  prepareNextBroadcast: async () => null,
+  endBroadcast: async () => undefined,
+  setPaidPromotion: async () => ({ applied: false })
+};
 const sinks: Array<{ name: string; file: string; child: ChildProcess; done: Promise<void> }> = [];
 const $ = (d: number) => Math.round(d * 1_000_000);
 const at = (s: number) => new Date(t0 + s * 1000).toISOString();
@@ -85,6 +99,7 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
+  await runner?.stopAll();
   await engine?.stopAll();
   for (const s of sinks) s.child.kill("SIGKILL");
   await h.close();
@@ -160,30 +175,35 @@ describe("relays of radio and TV stations", () => {
       await kai.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: at(0), endsAt: at(32), itemId: show.id }).expect(201);
       await kai.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: at(32), endsAt: at(56), itemId: show.id }).expect(201);
       sink(name, ports[name]);
-      const [t] = await h.db.insert(schema.translators).values({ stationId, service: "rtmp", name, rtmpUrl: `rtmp://127.0.0.1:${ports[name]}/live`, streamKey: name, breakHandling: "air_spots" }).returning();
-      translators[name] = t.id;
+      destinations.set(stationId, [{ platformId: name, kind: "custom", rtmpUrl: `rtmp://127.0.0.1:${ports[name]}/live`, streamKey: name, connected: false }]);
+      await kai.patch(`/v1/stations/${stationId}/relay`, { mode: "everything" }).expect(200);
       await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
     }
     engine = createEngine({ deps: h.deps, services: h.services }, { ladderScale: 0.25, preset: "ultrafast", log: () => undefined });
+    runner = createRelayRunner({ deps: h.deps, services: h.services }, { platforms, livepeer: null, fanOut: "direct", ladderScale: 0.25, preset: "ultrafast", log: () => undefined });
     await engine.tick();
     await engine.sweep();
     await prepareQueued(h, engine.preparer);
 
     while (Date.now() < t0 + 50_000) {
       await engine.tick();
+      await runner.tick();
       await prepareQueued(h, engine.preparer);
       await new Promise((r) => setTimeout(r, 1_000 - (Date.now() % 1_000)));
     }
+    const sender = (id: string) => runner.sender(id) as StationSender | null;
     const drew = {
-      wave: new Map(engine.relay(ids.wave, translators.wave)?.pictureFrames ?? []),
-      nite: new Map(engine.relay(ids.nite, translators.nite)?.pictureFrames ?? []),
-      tube: engine.relay(ids.tube, translators.tube)?.codeSegments ?? 0
+      wave: new Map(sender(ids.wave)?.pictureFrames ?? []),
+      nite: new Map(sender(ids.nite)?.pictureFrames ?? []),
+      tube: sender(ids.tube)?.codeSegments ?? 0
     };
+    await runner.stopAll();
     await engine.stopAll();
     await Promise.race([Promise.all(sinks.map((x) => x.done)), new Promise((r) => setTimeout(r, 10_000))]);
 
     const sessions = await h.db.select().from(schema.translatorSessions);
-    const by = (name: string) => sessions.filter((x) => x.translatorId === translators[name]);
+    // One sender per station: its sessions carry the station's ID.
+    const by = (name: string) => sessions.filter((x) => x.translatorId === ids[name as keyof typeof ids]);
     // Radio relays: nothing encoded while relaying (the picture is prepared), so stream-copied.
     expect(by("wave")[0]).toMatchObject({ mode: "copy" });
     expect(by("nite")[0]).toMatchObject({ mode: "copy" });

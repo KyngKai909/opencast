@@ -11,7 +11,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Receipt, Statement } from "@opencast/contracts";
+import { relayViewersLabel, relayWaitingLabel, type Receipt, type Statement } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { conflict, notFound } from "../../errors.js";
 import { publicUrl } from "../../lib/url.js";
@@ -80,7 +80,7 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
   }
 
   /** One period of a business statement: its lines, opening and closing, and the closing split. */
-  async function period(businessId: string, from: Date, to: Date) {
+  async function period(businessId: string, from: Date, to: Date, options: { waiting?: boolean } = {}) {
     const { holds, entries } = await flows(businessId, to);
     const before = entries.filter((e) => e.entry.occurredAt < from);
     const inside = entries.filter((e) => e.entry.occurredAt >= from);
@@ -95,7 +95,15 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
     }
     const aired = inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "as_run");
     push({ group: "balance", kind: "aired", label: "Spent on airings", detail: plural(aired.length, "airing"), amountMicros: aired.reduce((s, e) => s + e.net, 0), airings: aired.length });
-    const returned = inside.filter((x) => x.entry.kind === "release" && x.entry.sourceType === "as_run");
+    // Relay viewers (2026-09-30): each platform's settled relay part is its own line, added in.
+    for (const platform of ["youtube", "twitch"] as const) {
+      const label = relayViewersLabel(platform);
+      const settled = inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "relay_viewers" && x.entry.memo === label);
+      if (settled.length) {
+        push({ group: "balance", kind: "relay_viewers", label, detail: plural(settled.length, "airing"), amountMicros: settled.reduce((s, e) => s + e.net, 0), airings: settled.length, relay: { platform } });
+      }
+    }
+    const returned = inside.filter((x) => x.entry.kind === "release" && (x.entry.sourceType === "as_run" || x.entry.sourceType === "relay_viewers"));
     const returnedMicros = returned.reduce((s, e) => s + e.toAvailable, 0);
     push({
       group: "balance",
@@ -117,6 +125,13 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
     for (const e of inside.filter((x) => x.entry.kind === "reversal" && x.net !== 0)) {
       push({ group: "balance", kind: "refund", label: "Refunds", detail: e.entry.memo, amountMicros: e.net });
     }
+    // Still held for relay viewers until YouTube's location data arrives: shown, already in the closing.
+    if (options.waiting) {
+      const waiting = await services.spots.relayWaiting(businessId);
+      for (const w of waiting) {
+        push({ group: "balance", kind: "relay_waiting", label: relayWaitingLabel(w.platform), detail: plural(w.airings, "airing"), amountMicros: w.heldMicros, includedAbove: true, airings: w.airings, relay: { platform: w.platform } });
+      }
+    }
     // Card fees are paid on top, never from the balance.
     const deposits = await db.select().from(D).where(and(eq(D.advertiserId, businessId), eq(D.status, "arrived")));
     const inPeriod = new Set(inside.map((e) => e.entry.id));
@@ -125,13 +140,14 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
 
     // Spent, by spot and station: the biggest first.
     const bySpotStation = new Map<string, { spotId: string; stationId: string; micros: number; airings: number }>();
-    for (const e of aired) {
+    for (const e of [...aired, ...inside.filter((x) => x.entry.kind === "settle" && x.entry.sourceType === "relay_viewers")]) {
       const hold = e.holdId ? holds.get(e.holdId) : undefined;
       if (!hold?.spotId || !hold.stationId) continue;
       const key = `${hold.spotId}:${hold.stationId}`;
       const row = bySpotStation.get(key) ?? { spotId: hold.spotId, stationId: hold.stationId, micros: 0, airings: 0 };
       row.micros += -e.net;
-      row.airings++;
+      // Relay viewers are part of an airing already counted.
+      if (e.entry.sourceType === "as_run") row.airings++;
       bySpotStation.set(key, row);
     }
     const rows = [...bySpotStation.values()].sort((a, b) => b.micros - a.micros);
@@ -173,7 +189,7 @@ export function createBusinessMoney({ deps, services }: ModuleContext, ledger: L
       if (!issued.some((s) => s.periodStart === thisMonth)) {
         // This month so far: its id is the business's balance account (the CSV reads it).
         const from = monthStart(now);
-        const p = await period(businessId, from, new Date(now.getTime() + 1));
+        const p = await period(businessId, from, new Date(now.getTime() + 1), { waiting: true });
         out.push({
           id: available,
           period: "month",

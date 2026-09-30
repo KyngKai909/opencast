@@ -82,5 +82,16 @@ export const MODULE_TABLES: Record<string, string[]> = {
   // Added 2026-09-29: the catalog's shelf. (The catalog module's `catalog.*` is the syndication market's.)
   // Added 2026-09-30: storage maintenance runs from desk Settings.
   maintenance: ["network.storage_runs"],
+  // Added 2026-09-30 (follow-up Phase 3): relays, set once per station; each platform's Livepeer target; restarts for platform limits.
+  relays: ["broadcast.station_relays", "broadcast.relay_targets", "broadcast.relay_restarts"],
+  // Added 2026-09-30 (follow-up Phase 3): platform connections for relays, and the viewers they report.
+  platforms: [
+    "broadcast.platform_connections",
+    "broadcast.platform_sign_ins",
+    "broadcast.platform_events",
+    "broadcast.platform_viewer_samples",
+    "broadcast.platform_geography",
+    "broadcast.platform_geography_checks"
+  ],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };

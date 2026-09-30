@@ -191,6 +191,10 @@ export const Translator = z.object({
   rtmpUrl: z.string(),
   /** Never returned; only whether one is set. */
   hasStreamKey: z.boolean(),
+  /**
+   * Superseded 2026-09-30 (follow-up Phase 3) by the station's one setting for all its relays
+   * (relay.ts, `RelayView.breakHandling`), which the relay reads first. Kept, and still accepted.
+   */
   breakHandling: z.enum(["air_spots", "station_id_slate"]),
   prerecordedLabel: z.boolean(),
   enabled: z.boolean(),

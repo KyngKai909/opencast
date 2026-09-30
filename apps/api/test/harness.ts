@@ -78,6 +78,8 @@ export async function createHarness(
     sseHeartbeatMs?: number;
     /** The API's public origin (A117): paths it serves come back as full URLs. */
     publicBase?: string;
+    /** Platform connections (follow-up Phase 3): fake YouTube and Twitch, and the secrets key. */
+    platforms?: Deps["platforms"];
   } = {}
 ): Promise<Harness> {
   const database = await freshDatabase();
@@ -129,6 +131,7 @@ export async function createHarness(
     geo: options.geo ?? noGeoLookup,
     places: options.places,
     relay: options.relay ?? memoryRelayBus(),
+    platforms: options.platforms,
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",

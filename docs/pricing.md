@@ -31,6 +31,7 @@ These prices are the rules registry's first set versions, from **October 1, 2026
 - Memory: 0.25 GB × $10 a GB-month ÷ 730 = **$0.0034**.
 - Egress: 2.93 Mbps nominal is 1.32 GB an hour × $0.05 = **$0.066**, for each platform (the picture is composited once and sent to each).
 - So $0.085 to one platform, $0.15 to two, $0.22 to three. The price is per station however many platforms (the prompt's rule), so three or more platforms lose money at $0.20 (for review). A radio station's relay is a still picture at 400 kbps: about $0.017 an hour to one platform.
+- **Phase 3 (2026-09-30)**: the relay service sends **one** push per station, and Livepeer's multistream splits it to every platform, so on Railway a relay costs about **$0.085 an hour whatever the number of platforms**, *if* Livepeer doesn't charge a stream with no transcoding profiles (not confirmed: docs/relay.md). If it does ($0.33 an hour, like transcoding), about **$0.415**, a loss at $0.20; the fallback (`RELAY_FAN_OUT=direct`, the relay pushing to each platform) is the table above. On a Hetzner US server, about **$0.013 to $0.016** an hour either way with `direct` (for review).
 
 **Live hours, $0.48 an hour** (for review):
 

@@ -232,6 +232,27 @@
       "when": 1790749866709,
       "tag": "0033_pay_as_you_go",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790756273900,
+      "tag": "0034_relays",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790757014170,
+      "tag": "0035_platforms",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790758606468,
+      "tag": "0036_translator_keys_sealed",
+      "breakpoints": true
     }
   ]
 }

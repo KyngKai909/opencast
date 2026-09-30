@@ -290,8 +290,7 @@ describe("the generated station ID on air", () => {
         transcoder: Object.assign(async (job: Parameters<typeof transcoder>[0]) => {
           if (job.source.kind === "slate" && job.source.bed) beds.push(job.key);
           return transcoder(job);
-        }, transcoder),
-        translators: false
+        }, transcoder)
       }
     );
     await engine.tick();

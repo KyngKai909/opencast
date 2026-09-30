@@ -3,6 +3,7 @@ import { bigint, boolean, check, index, integer, primaryKey, text, uniqueIndex, 
 import { at, createdAt, id } from "./columns.js";
 import { audience } from "./namespaces.js";
 import { asRun, programs, stations, translators } from "./broadcast.js";
+import { markets } from "./network.js";
 
 /** `mirror`: the iPhone's second screen (TV mode mirrored to a TV). */
 export const platform = audience.enum("platform", ["phone", "cast", "web", "tv_app", "mirror"]);
@@ -21,7 +22,13 @@ export const sessions = audience.table(
     beats: integer("beats").notNull().default(0),
     lastMediaTimeMs: integer("last_media_time_ms"),
     flaggedBot: boolean("flagged_bot").notNull().default(false),
-    flagReason: text("flag_reason")
+    flagReason: text("flag_reason"),
+    /**
+     * Added 2026-09-30 (follow-up Phase 3, migration 0035): the market the viewer is placed in,
+     * their chosen market when signed in, else a coarse location from the connection (GEOIP_URL),
+     * looked up once and forgotten. Null: Opencast can't place them (not billed to local businesses).
+     */
+    marketId: uuid("market_id").references(() => markets.id)
   },
   (t) => [index("sessions_station_beat").on(t.stationId, t.lastBeatAt)]
 );
@@ -42,6 +49,26 @@ export const minuteSamples = audience.table(
     mirror: integer("mirror").notNull().default(0)
   },
   (t) => [primaryKey({ columns: [t.stationId, t.minute] })]
+);
+
+/**
+ * Added 2026-09-30 (follow-up Phase 3, migration 0035): tuned in per station per minute, by the
+ * market viewers are placed in (sessions with a market only). A local business's per-thousand spot
+ * is billed for the viewers placed inside its area.
+ */
+export const minuteMarkets = audience.table(
+  "minute_markets",
+  {
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    minute: at("minute").notNull(),
+    marketId: uuid("market_id")
+      .notNull()
+      .references(() => markets.id),
+    tunedIn: integer("tuned_in").notNull()
+  },
+  (t) => [primaryKey({ columns: [t.stationId, t.minute, t.marketId] })]
 );
 
 /** Viewers on a translator (YouTube, Twitch). Shown to the station apart; never billed. */

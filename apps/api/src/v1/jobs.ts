@@ -40,6 +40,15 @@ export interface JobResults {
    * closed (UTC midnight), grace steps, Clear payments checked again.
    */
   billing?: import("./modules/ledger/billing.js").BillingTickResult | null;
+  /**
+   * Platform connections (added 2026-09-30, follow-up Phase 3): each connected YouTube and Twitch's
+   * viewers this minute, YouTube's viewer geography (hourly), keys re-sealed after a rotation (daily).
+   */
+  platforms?: import("./modules/platforms/service.js").PlatformsTick | null;
+  /** Relay viewers' parts of airings settled, not billed or returned this minute (added 2026-09-30). */
+  relayViewers?: { settled: number; notBilled: number; returned: number } | null;
+  /** The old translators' plain stream keys moved to sealed storage (added 2026-09-30; hourly, and at the first tick). Null in other minutes. */
+  translatorKeys?: { moved: number; waiting: number; failed: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -47,6 +56,7 @@ export function createJobs(deps: Deps, services: Services) {
   let lastMonth = "";
   let lastHour = "";
   let lastWatch = 0;
+  let lastTranslatorKeys = 0;
 
   async function tick(): Promise<JobResults> {
     const now = deps.clock.now();
@@ -111,6 +121,25 @@ export function createJobs(deps: Deps, services: Services) {
       console.error("[jobs] pay-as-you-go failed", error);
       return null;
     });
+    // Relays (follow-up Phase 3): the viewers each connected platform reports this minute, then the
+    // relay parts of airings settled as their numbers (and YouTube's location data) come in.
+    const platforms = await services.platforms.tick().catch((error) => {
+      console.error("[jobs] platform viewers failed", error);
+      return null;
+    });
+    const relayViewers = await services.spots.settleRelayViewers().catch((error) => {
+      console.error("[jobs] relay viewers failed", error);
+      return null;
+    });
+    // The old translators' stream keys, out of plain text into the platforms module's sealed storage.
+    let translatorKeys: JobResults["translatorKeys"] = null;
+    if (now.getTime() - lastTranslatorKeys >= 3_600_000) {
+      lastTranslatorKeys = now.getTime();
+      translatorKeys = await services.stations.moveTranslatorKeys().catch((error) => {
+        console.error("[jobs] moving translator keys failed", (error as Error).message);
+        return null;
+      });
+    }
     // Last: whatever the ledger wrote this minute goes to the provider.
     const moves = await services.ledger.sendMoves();
 
@@ -172,7 +201,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing, platforms, relayViewers, translatorKeys };
   }
 
   let timer: NodeJS.Timeout | undefined;

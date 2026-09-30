@@ -81,7 +81,7 @@ beforeAll(async () => {
   await h.db.update(schema.spotsTable).set({ status: "listed" }).where(eq(schema.spotsTable.id, s.body.id));
   await kai.put(`/v1/stations/${stationId}/rotations/main`, { spotIds: [s.body.id] }).expect(200);
 
-  engine = createEngine({ deps: h.deps, services: h.services }, { translators: false, ingest: { port: 0 }, log: (line) => logs.push(line) });
+  engine = createEngine({ deps: h.deps, services: h.services }, { ingest: { port: 0 }, log: (line) => logs.push(line) });
   await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
   await engine.tick();
   await engine.sweep();

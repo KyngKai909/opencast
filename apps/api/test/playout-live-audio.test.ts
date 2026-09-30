@@ -86,7 +86,7 @@ beforeAll(async () => {
   await kai.post(`/v1/stations/${stationId}/log`, { kind: "program", startsAt: "2026-10-01T20:00:00.000Z", endsAt: "2026-10-01T20:00:40.000Z", itemId: show.id }).expect(201);
   await kai.post(`/v1/stations/${stationId}/log`, { kind: "live", startsAt: "2026-10-01T20:00:40.000Z", endsAt: "2026-10-01T20:01:40.000Z", liveSourceId: sourceId, programId: program.id }).expect(201);
   await h.db.insert(schema.playoutState).values({ stationId, onAir: true });
-  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), translators: false, scratchDir: dir, liveUrl: async (id) => (id === sourceId ? `${origin}/hls/fake/index.m3u8` : null) });
+  engine = createEngine({ deps: h.deps, services: h.services }, { transcoder: fakeTranscoder(), scratchDir: dir, liveUrl: async (id) => (id === sourceId ? `${origin}/hls/fake/index.m3u8` : null) });
 }, 60_000);
 
 afterAll(async () => {

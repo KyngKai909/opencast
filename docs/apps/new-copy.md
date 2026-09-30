@@ -859,3 +859,35 @@ No frame draws them (docs/apps/open-questions.md A185 to A191). Amounts, months,
 | Payouts (the pane's existing part, now headed) | heading "Payouts" with "Where {BEAT}'s earnings go" |
 | The banner (Monitor and Earnings, grace or paused) | "Relays and live shows pause on {October 4}" with "{$96.40} is due for {August}'s usage. Your channel stays on air."; "Relays and live shows are paused" with "{$96.40} is still due for {August}'s usage. Your channel is still on air."; the button "Station account" |
 | A statement's usage section (Earnings) | heading "Usage" with "Taken from earnings before the payout"; each type's line "{38.50 GB-months}, {10.00} free, at {$0.04} a GB-month", "{168 hours}, at {$0.20} an hour", "{3 hours}, free", "{42 hours}, price not set yet"; the note "Each type is shown with its units and price. Only what was taken from earnings counts in the total."; a monthly statement's title "{August}" and "{August 1} to {31}." |
+
+### Platform connections and relay viewers (follow-up Phase 3, 2026-09-30)
+
+No frame draws most of these beyond step A4's Translators page (`control/opencast-master-control.html`); the words below are the API's and the mocks'. Names, counts and amounts are filled in.
+
+| Where | Words |
+|---|---|
+| Translators, a connected platform | "{YouTube}" with "{Inland Beat channel}, signed in. Opencast starts each broadcast for you"; "{Twitch}" with "{inlandbeat}, signed in"; a manual one: "{Facebook}" with "Added with its address and key. Viewers there can't be counted"; "Remove" |
+| Translators, needs signing in again | "{YouTube} needs you to sign in again" with "It stopped accepting Opencast's sign-in, so viewers there aren't counted and paid promotion isn't marked. Relays keep going with its key." and "Sign in again" |
+| Add a platform | "Sign in to YouTube", "Sign in to Twitch", "Add another service"; the form's fields "Name", "RTMP or RTMPS address", "Stream key" with "Stream keys are encrypted and never shown again."; signing in isn't set up on the server: "Signing in to {YouTube} isn't set up here yet. Add it with its address and stream key instead." (409 `sign_in_not_set_up`); "Use an rtmp:// or rtmps:// address." |
+| Back from signing in (the callback's `?platform=…`) | connected: "{YouTube} is connected."; `error=denied`: "{YouTube} wasn't connected: the sign-in was cancelled."; `expired`: "That sign-in took too long. Try again."; `scopes`: "{YouTube} needs every permission Opencast asked for. Try again and leave them all on."; `failed`: "{YouTube} didn't connect. Try again in a moment."; `secrets_key_missing`: "Stream keys can't be stored until PLATFORM_SECRETS_KEY is set on the server." |
+| Paid promotion, a manual destination | "Spots are airing on {Facebook}. Mark the stream as containing paid promotion there." |
+| Business results, an airing's relay line | "Relay viewers, as reported by YouTube" with "{200} × {60%} in your area × {$8.00} ÷ 1,000 = {$0.96}" (online: "{200} × {$8.00} ÷ 1,000 = {$1.60}"); "Relay viewers, waiting for YouTube's location data" with "{$1.60} held until it arrives"; "Relay viewers, as reported by Twitch" with "Twitch doesn't report where viewers are, so they aren't billed to local businesses"; "YouTube had no location data for these viewers, so they aren't billed"; "YouTube's location data didn't arrive in time, so this wasn't charged"; "No viewers were reported during the spot" |
+| Business results, Opencast's viewers for a local business | "{70} in your area (of {100} tuned in) × {$8.00} ÷ 1,000 = {$0.56}" |
+| Business statements | "Relay viewers, as reported by YouTube" (and Twitch) with "{1 airing}"; "Relay viewers, waiting for YouTube's location data" with "{3 airings}" (shown, included above); the ledger's returns: "Returned: no location data from YouTube in time", "Returned: Twitch relay viewers not billed" |
+| Station earnings and statements | "Relay viewers, as reported by YouTube", "Relay viewers, as reported by Twitch" |
+
+### Relays: modes, breaks, the bug, restarts and alerts (follow-up Phase 3, the relay half, 2026-09-30)
+
+Step A4 (`control/opencast-master-control.html`) draws the Translators page's relay mode ("Live shows only", "Everything {BEAT} airs"), "During breaks, relays show: Your spots / Station ID slate", "Station bug on relays" and "Relayed this month"; those words are the frame's. The API and the mocks (`apps/web/src/control/mocks/handlers/relay.ts`) add these. Names, times and amounts are filled in.
+
+| Where | Words |
+|---|---|
+| Translators, a platform's next restart (`RelayRestart.label`) | "{Twitch} restarts {Saturday} at {11:59 pm}, during a break" (the weekday within a week, else "{October 9}"); with no break inside the limit: "{Twitch} restarts {Saturday} at {11:59 pm}"; a restart the station has to do (a pasted Facebook key): "{Facebook} needs a restart by {Saturday} at {11:59 pm}. Restart it there, during a break"; the log: "{Twitch} restarted {Friday} at {12:59 am}, during a break", "{Twitch} couldn't restart {Saturday} at {11:59 pm}" |
+| Translators, "Save relays as YouTube videos" (the switch; no frame) | "Save relays as YouTube videos" with "YouTube saves only broadcasts under 12 hours. With this on, Opencast starts a new broadcast about every 11 hours, during a break." |
+| Translators, the relay's state (no frame) | stopped: "Relays stopped" with "Your channel is still on air on Opencast. The relay keeps trying and starts again on its own."; paused: "Relays of everything you air are paused" with "{The cap for relays is reached for this month / A bill is unpaid}. Live shows still go out, and your channel stays on air." |
+| Notice (kind `relay`), a relay stopped (station team and the Network desk) | "{BEAT}'s relays stopped" with "The relay to your other platforms stopped ({Connection refused}). Your channel is still on air on Opencast. The relay keeps trying and starts again on its own." |
+| Notice, back | "{BEAT}'s relays are back" with "The relay to your other platforms is sending again." |
+| Notice, a restart due (a pasted key) | "Restart your stream on {Facebook}" with "{Facebook} needs a restart by {Saturday} at {11:59 pm}. Restart it there, during a break: it can't run longer than its limit, and Opencast can't restart a stream added with a key." |
+| Notice, a restart failed | "{Twitch} couldn't restart" with "Opencast tried to restart your stream on {Twitch} before its limit and couldn't ({reason}). It tries again at the next break." |
+| Notice, paid promotion on a pasted key | "Mark your stream on {Facebook} as paid promotion" with "Spots are airing on your relay to {Facebook}. Opencast can't mark that stream for you, so turn on its paid promotion setting there." |
+| Translators, the paid-promotion reminder's button (no frame) | "Done, it's marked" (dismisses `dismissPaidPromotionReminder`) |

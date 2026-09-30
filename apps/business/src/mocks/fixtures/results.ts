@@ -26,7 +26,7 @@
 // ":30 spot, 262 tuned in, $8.00 per 1,000"). Scans, saves and redemptions made in the mock are
 // kept in this file's own saved state.
 
-import type { Movement, Spot, StationIdent } from "@opencast/contracts";
+import { relayViewersLabel, relayWaitingLabel, type Movement, type Spot, type StationIdent } from "@opencast/contracts";
 import { money } from "@opencast/ui";
 import { MARKET_TZ, now } from "../../lib/clock";
 import { balanceOf, dbBusiness, getDb, move } from "../db";
@@ -35,6 +35,7 @@ import { uid } from "./people";
 import * as settingsFixture from "./settings";
 import { STATIONS, stationByRef } from "./stations";
 import { at } from "./time";
+import { relayOf } from "./relay";
 
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
 const CENT = 10_000;
@@ -779,12 +780,14 @@ export function recordSave(code: string, stationId: string | null, customerRef: 
 
 export interface StatementLine {
   group: "balance" | "spent";
-  kind: "added" | "aired" | "returned" | "fees" | "sponsorship" | "order" | "withdrawn" | "refund" | "spot_station";
+  kind: "added" | "aired" | "returned" | "fees" | "sponsorship" | "order" | "withdrawn" | "refund" | "spot_station" | "relay_viewers" | "relay_waiting";
   label: string;
   detail: string | null;
   amountMicros: number;
   airings?: number;
   includedAbove?: boolean;
+  /** Relay viewers' lines (follow-up Phase 3). */
+  relay?: { platform: "youtube" | "twitch" };
 }
 
 export interface MockStatement {
@@ -890,8 +893,28 @@ export function statementsOf(businessId: string, at: Date = now()): MockStatemen
     const returnedSeed = entered.reduce((s, a) => s + (airingCost(a.rate, a.tunedIn, a.lengthSec, a.lengthSec) - a.costMicros), 0);
     const shortCount = entered.filter((a) => a.airedSec < a.lengthSec).length;
     const returnedAfter = month === residualMonth ? residual : 0;
-    const spent = -airings.reduce((s, a) => s + a.costMicros, 0) + returnedAfter;
+    // Relay viewers (follow-up Phase 3): what YouTube's relay viewers cost is its own line, out of the airings' costs.
+    const relays = airings.map((a) => relayOf(a, at)).filter((v): v is NonNullable<typeof v> => v !== null);
+    const relayMicros = relays.reduce((s, v) => s + v.relayCostMicros, 0);
+    const relayAirings = relays.filter((v) => v.relayCostMicros > 0).length;
+    const spent = -airings.reduce((s, a) => s + a.costMicros, 0) + returnedAfter + relayMicros;
     lines.push({ group: "balance", kind: "aired", label: "Spent on airings", detail: `${airings.length.toLocaleString("en-US")} ${airings.length === 1 ? "airing" : "airings"}`, amountMicros: spent, airings: airings.length });
+    if (relayMicros > 0) {
+      lines.push({ group: "balance", kind: "relay_viewers", label: relayViewersLabel("youtube"), detail: `${relayAirings} ${relayAirings === 1 ? "airing" : "airings"}`, amountMicros: -relayMicros, airings: relayAirings, relay: { platform: "youtube" } });
+    }
+    const waiting = relays.filter((v) => v.waitingMicros > 0);
+    if (month === nowMonth && waiting.length) {
+      lines.push({
+        group: "balance",
+        kind: "relay_waiting",
+        label: relayWaitingLabel("youtube"),
+        detail: `${waiting.length} ${waiting.length === 1 ? "airing" : "airings"}`,
+        amountMicros: waiting.reduce((s, v) => s + v.waitingMicros, 0),
+        airings: waiting.length,
+        includedAbove: true,
+        relay: { platform: "youtube" }
+      });
+    }
     const returned = returnedSeed + returnedAfter;
     lines.push({
       group: "balance",

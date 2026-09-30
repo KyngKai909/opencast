@@ -23,6 +23,7 @@ import { agreements } from "./catalog.js";
 import { markets } from "./network.js";
 import { users } from "./accounts.js";
 import { holds } from "./ledger.js";
+import { platformConnections } from "./platforms.js";
 
 export const advertisers = spots.table("advertisers", {
   id: id(),
@@ -272,9 +273,68 @@ export const airings = spots.table(
     /** The rate as it was at placement. */
     rateKind: text("rate_kind", { enum: ["per_thousand", "per_airing"] }).notNull(),
     rateMicros: micros("rate_micros").notNull(),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /**
+     * Added 2026-09-30 (migration 0035): the part of the hold that's an estimate for relay viewers
+     * (per-thousand spots on a station relaying to signed-in YouTube or Twitch). It stays held after
+     * the airing settles for Opencast's viewers, until each platform's relay part settles.
+     */
+    relayEstimateMicros: micros("relay_estimate_micros").notNull().default(0)
   },
   (t) => [index("airings_station_time").on(t.stationId, t.scheduledAt)]
+);
+
+/**
+ * Added 2026-09-30 (follow-up Phase 3, migration 0035): one airing's relay viewers on one platform
+ * (signed-in YouTube or Twitch), billed apart from Opencast's viewers: online businesses once the
+ * platform's counts are in; local businesses only for the share YouTube's viewer geography places
+ * inside their area, when it arrives (never Twitch). No data by `due_by`: not charged, returned.
+ */
+export const relayCharges = spots.table(
+  "relay_charges",
+  {
+    id: id(),
+    airingId: uuid("airing_id")
+      .notNull()
+      .references(() => airings.id),
+    platformId: uuid("platform_id")
+      .notNull()
+      .references(() => platformConnections.id),
+    platform: text("platform", { enum: ["youtube", "twitch"] }).notNull(),
+    /** Who it's billed as: `online` on every relay viewer; `local` on those placed inside the area. */
+    audience: text("audience", { enum: ["online", "local"] }).notNull(),
+    /** As aired (the as-run log): the relay viewers are read over this window. */
+    startedAt: at("started_at").notNull(),
+    endedAt: at("ended_at").notNull(),
+    /** How much of the spot aired (a short airing is prorated). */
+    fraction: real("fraction").notNull(),
+    /** The most it can cost: the per-airing maximum left after Opencast's viewers. Null: no maximum. */
+    capMicros: micros("cap_micros"),
+    status: text("status", { enum: ["counting", "waiting_location", "settled", "not_billed", "returned"] }).notNull().default("counting"),
+    /** Why it isn't billed: `twitch_no_location`, `no_location_data`, `no_viewers`, `not_connected`. */
+    reason: text("reason"),
+    viewers: real("viewers"),
+    broadcastRef: text("broadcast_ref"),
+    /** The share YouTube placed inside the area (local businesses). */
+    shareInArea: real("share_in_area"),
+    billedViewers: real("billed_viewers"),
+    costMicros: micros("cost_micros").notNull().default(0),
+    /** Its share of the airing's relay estimate, still held while it waits (0 once it's resolved). */
+    heldMicros: micros("held_micros").notNull().default(0),
+    /** Returned to the balance when no location data came in time. */
+    returnedMicros: micros("returned_micros").notNull().default(0),
+    working: text("working"),
+    /** No location data by then: it's returned (relays.location_wait, 7 days). */
+    dueBy: at("due_by").notNull(),
+    resolvedAt: at("resolved_at"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    uniqueIndex("relay_charges_airing_platform").on(t.airingId, t.platformId),
+    index("relay_charges_open").on(t.status, t.dueBy),
+    check("relay_charges_fraction", sql`${t.fraction} >= 0 and ${t.fraction} <= 1`),
+    check("relay_charges_cost", sql`${t.costMicros} >= 0 and ${t.heldMicros} >= 0`)
+  ]
 );
 
 /** Minimum a month, and the most sponsors, for the whole station or one program. */

@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-329 endpoints in 19 modules.
+337 endpoints in 21 modules.
 
 ## accounts (35)
 
@@ -427,3 +427,21 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `payUsageNow` | POST | `/stations/:stationId/account/pay` | signed in | Pay what's due now (owner only): from earnings first, then the card. Paid, relays and live hours resume. 409 `nothing_due`; 409 `pay_from_clear` when the source is Clear (use the Clear payment); 422 `card_declined` with the card's reason. |
 | `quoteClearUsagePayment` | POST | `/stations/:stationId/account/clear-payment/quote` | signed in | Paying what's due from the owner's linked Clear wallet (owner only, full access): where to send it. The app asks Clear to send it (the person confirms on Clear's page), then confirms with the transaction hash. 409 `nothing_due`, `clear_read_only`, `clear_not_linked`, `clear_unavailable`. |
 | `confirmClearUsagePayment` | POST | `/stations/:stationId/account/clear-payment` | signed in | The transfer from Clear was sent (owner only): checked on chain (from the owner's linked wallet, to Opencast's account, at least what's due), then what's due is paid and relays and live hours resume. Waits while it isn't mined yet. 422 `transfer_not_valid`; 409 `transfer_already_used`. |
+
+## platforms (4)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `listPlatforms` | GET | `/stations/:stationId/platforms` | signed in | The station's relay destinations: YouTube and Twitch signed in, anything else by address and key (owner, operator) |
+| `startPlatformSignIn` | POST | `/stations/:stationId/platforms/oauth/:provider/start` | signed in | Where to send the owner to sign in to YouTube or Twitch. The platform returns to /v1/platforms/oauth/:provider/callback, which connects it and goes back to master control's Translators page (owner) |
+| `addManualPlatform` | POST | `/stations/:stationId/platforms` | signed in | Add any destination by its RTMP or RTMPS address and stream key. Its viewers can't be counted (owner) |
+| `removePlatform` | DELETE | `/stations/:stationId/platforms/:platformId` | signed in | Remove a destination in one click: its key and tokens are erased, and signed-in tokens revoked where the platform allows (owner) |
+
+## relay (4)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getRelay` | GET | `/stations/:stationId/relay` | signed in | The station's relays: mode, what breaks show, the station bug, hours and cost this month, each platform's next restart (owners, operators) |
+| `updateRelay` | PATCH | `/stations/:stationId/relay` | signed in | Change the relay mode, what breaks show, the station bug on relays, or saving YouTube videos (owners, operators) |
+| `listRelayRestarts` | GET | `/stations/:stationId/relay/restarts` | signed in | Every restart for platform limits, latest first: planned, done, failed, or due for the station to do |
+| `dismissPaidPromotionReminder` | POST | `/stations/:stationId/relay/platforms/:platformId/paid-promotion-reminder/dismiss` | signed in | The station marked paid promotion on a destination Opencast can't mark: stop reminding it for this broadcast |

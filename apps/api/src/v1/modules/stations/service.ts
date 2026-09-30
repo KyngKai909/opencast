@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { blockedIabAdProducts, formatChannelNumber, iabContentCategories, isSubchannel, isValidStationColour, parseChannelNumber, radioBandTenths, type Band } from "@opencast/domain";
 import type { StationIdent } from "@opencast/contracts";
@@ -9,6 +9,7 @@ import type { CurrentUser } from "../../http.js";
 import { badRequest, notFound, refused } from "../../errors.js";
 import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackground.js";
 import { cadenceOf, type BreakCadence } from "../playout/engine/cadence.js";
+import { kindOfTranslator } from "../relays/platforms.js";
 
 export type StationKind = "station" | "studio" | "claimable" | "listed" | "catalog";
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
@@ -131,11 +132,30 @@ export interface StationsService {
   /** For playout: every enabled relay, with its key (and a radio station's background, once prepared). */
   relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate"; burnCaptions: boolean; background: { loopKey: string; frames: number } | null }>>;
   /**
-   * Pay-as-you-go (added 2026-09-29): what each translator relays. Every translator relays the
-   * whole channel today, so each is `everything` (billed per hour, per station); Phase 3 adds
-   * "Live shows only" (`live_only`, free), a translator's own setting, read here.
+   * Pay-as-you-go (added 2026-09-29): what each relay session's translator relayed, for sessions
+   * that don't say (`translator_sessions.relay_mode` is null: a worker translator, before relay
+   * modes, which relayed everything). Since 2026-09-30 (Phase 3) the relay service records the mode
+   * on each session, and its sessions carry the station's ID: a station ID here reads the station's
+   * relay mode (the relays module's setting).
    */
   relayModes(translatorIds: string[]): Promise<Map<string, "everything" | "live_only">>;
+  /**
+   * Added 2026-09-30 (Phase 3): old translators whose key hasn't moved to the platforms module yet
+   * (no PLATFORM_SECRETS_KEY to seal it with), enabled, as relay destinations. Moved ones are
+   * platform connections (`platform_id`) and come from the platforms module.
+   */
+  translatorDestinations(stationId: string): Promise<Array<{ id: string; service: "youtube" | "twitch" | "rtmp"; name: string; rtmpUrl: string; streamKey: string }>>;
+  /** Added 2026-09-30: the platform connections of translators turned off (the relay leaves them out). */
+  disabledTranslatorPlatforms(stationId: string): Promise<Set<string>>;
+  /**
+   * Added 2026-09-30: moves every translator's plain stream key into the platforms module's sealed
+   * storage (a manual connection, linked by `platform_id`), checks the sealed copy, then nulls the
+   * plain one; carries the station's break setting (and "Everything I air", which translators did)
+   * to its relay setting. Idempotent. Without PLATFORM_SECRETS_KEY nothing moves (a warning).
+   */
+  moveTranslatorKeys(): Promise<{ moved: number; waiting: number; failed: number }>;
+  /** Added 2026-09-30 (Phase 3): the station's live sources that send through Livepeer, with their Livepeer stream (for "Live shows only" multistream). */
+  liveSourceStreams(stationId: string): Promise<Array<{ id: string; livepeerStreamId: string }>>;
   /** A radio station's relay background (added 2026-09-29). */
   getRelayBackground(stationId: string): Promise<RelayBackgroundView | null>;
   setRelayBackground(stationId: string, file: import("../../http.js").UploadedFile | null): Promise<RelayBackgroundView>;
@@ -329,19 +349,51 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     };
   }
 
-  function translatorView(row: typeof schema.translators.$inferSelect, onAir: boolean): TranslatorView {
+  /** `sealed`: its key is stored, sealed, in the platforms module (the translator's `platform_id`). */
+  function translatorView(row: typeof schema.translators.$inferSelect, onAir: boolean, sealed: boolean): TranslatorView {
+    const hasKey = Boolean(row.streamKey) || sealed;
     return {
       id: row.id,
       service: row.service,
       name: row.name,
       rtmpUrl: row.rtmpUrl,
-      hasStreamKey: row.streamKey.length > 0,
+      hasStreamKey: hasKey,
       breakHandling: row.breakHandling,
       prerecordedLabel: row.prerecordedLabel,
       enabled: row.enabled,
-      status: !row.enabled || !row.streamKey ? "not_connected" : onAir ? "relaying" : "connected",
+      status: !row.enabled || !hasKey ? "not_connected" : onAir ? "relaying" : "connected",
       burnCaptions: row.burnCaptions
     };
+  }
+
+  // ---- The old translators' keys, in the platforms module's sealed storage (2026-09-30) ----
+
+  /** A configured PLATFORM_SECRETS_KEY (the development key doesn't count for moving keys). */
+  const secretsConfigured = () => deps.platforms?.secrets.configured ?? Boolean(process.env.PLATFORM_SECRETS_KEY?.trim());
+  let warnedNoSecretsKey = false;
+
+  /** Who the connection says added it: the station's owner (the translator doesn't record who did). */
+  async function connectedBy(stationId: string): Promise<string> {
+    const [owner] = await services.accounts.stationMemberIds(stationId, ["owner"]);
+    // The column is nullable: a station with no owner (a claimable one) has none.
+    return owner ?? (null as unknown as string);
+  }
+
+  /** Seals a translator's key as a manual platform connection; its ID. 409 `secrets_key_missing` when keys can't be stored. */
+  async function sealTranslator(row: typeof schema.translators.$inferSelect, streamKey: string): Promise<string> {
+    const connection = await services.platforms.addManual(row.stationId, await connectedBy(row.stationId), { kind: kindOfTranslator(row.service, row.rtmpUrl), name: row.name, rtmpUrl: row.rtmpUrl, streamKey });
+    return connection.id;
+  }
+
+  /** The key the platforms module holds for a connection, opened in memory only. */
+  async function sealedKey(stationId: string, platformId: string): Promise<string | null> {
+    const found = (await services.platforms.destinationsFor(stationId)).find((d) => d.platformId === platformId);
+    return found?.streamKey ?? null;
+  }
+
+  async function sealedIds(stationId: string): Promise<Set<string>> {
+    const { platforms } = await services.platforms.list(stationId);
+    return new Set(platforms.filter((p) => p.hasStreamKey).map((p) => p.id));
   }
 
   const preview = (key: string | null) => (key ? `${key.slice(0, 8)}…` : null);
@@ -636,8 +688,35 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     },
 
     async relayModes(translatorIds) {
-      // The seam for Phase 3's modes: until translators have one, they relay everything.
-      return new Map(translatorIds.map((id) => [id, "everything" as const]));
+      // A station's ID (the relay service's sessions): the station's relay mode. A translator's
+      // (a worker translator's session, before relay modes): it relayed everything.
+      const stations = translatorIds.length ? await db.select({ id: S.id }).from(S).where(inArray(S.id, translatorIds)) : [];
+      const modes = stations.length ? await services.relays.modes(stations.map((s) => s.id)) : new Map<string, "everything" | "live_only">();
+      return new Map(translatorIds.map((id) => [id, modes.get(id) ?? ("everything" as const)]));
+    },
+
+    async translatorDestinations(stationId) {
+      const rows = await db
+        .select()
+        .from(schema.translators)
+        .where(and(eq(schema.translators.stationId, stationId), eq(schema.translators.enabled, true)));
+      return rows.filter((r) => r.streamKey && !r.platformId).map((r) => ({ id: r.id, service: r.service, name: r.name, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey! }));
+    },
+
+    async disabledTranslatorPlatforms(stationId) {
+      const rows = await db
+        .select({ platformId: schema.translators.platformId })
+        .from(schema.translators)
+        .where(and(eq(schema.translators.stationId, stationId), eq(schema.translators.enabled, false)));
+      return new Set(rows.flatMap((r) => (r.platformId ? [r.platformId] : [])));
+    },
+
+    async liveSourceStreams(stationId) {
+      const rows = await db
+        .select({ id: schema.liveSources.id, livepeerStreamId: schema.liveSources.livepeerStreamId })
+        .from(schema.liveSources)
+        .where(eq(schema.liveSources.stationId, stationId));
+      return rows.flatMap((r) => (r.livepeerStreamId ? [{ id: r.id, livepeerStreamId: r.livepeerStreamId }] : []));
     },
 
     async relays(stationId) {
@@ -651,7 +730,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       const modes = paused ? await service.relayModes(all.map((r) => r.id)) : null;
       const rows = modes ? all.filter((r) => modes.get(r.id) === "live_only") : all;
       const background = rows.length && (await bandOfStation(stationId)) === "radio" ? await service.relayBackground(stationId) : null;
-      return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions, background }));
+      // Keys moved to the platforms module are opened there (in memory only).
+      const sealed = rows.some((r) => r.platformId) ? new Map((await services.platforms.destinationsFor(stationId)).map((d) => [d.platformId, d.streamKey])) : new Map<string, string>();
+      return rows.flatMap((r) => {
+        const streamKey = r.streamKey ?? (r.platformId ? sealed.get(r.platformId) : undefined);
+        return streamKey ? [{ id: r.id, rtmpUrl: r.rtmpUrl, streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions, background }] : [];
+      });
     },
 
     async createManaged(tx, input) {
@@ -859,35 +943,104 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     },
 
     async translators(stationId) {
-      const [list, status] = await Promise.all([
+      const [list, status, sealed] = await Promise.all([
         db.select().from(schema.translators).where(eq(schema.translators.stationId, stationId)).orderBy(asc(schema.translators.createdAt)),
-        services.playout.statusFor([stationId])
+        services.playout.statusFor([stationId]),
+        sealedIds(stationId)
       ]);
       const onAir = status.get(stationId)?.onAir ?? false;
-      return list.map((t) => translatorView(t, onAir));
+      return list.map((t) => translatorView(t, onAir, Boolean(t.platformId && sealed.has(t.platformId))));
     },
 
+    // Since 2026-09-30 a translator's key is written only to the platforms module, sealed (a manual
+    // connection the translator points at); the translator keeps its name, break setting and switches.
     async addTranslator(stationId, input) {
-      const [row] = await db.insert(schema.translators).values({ stationId, ...input }).returning();
-      return translatorView(row, false);
+      const { streamKey, ...rest } = input;
+      const [row] = await db.insert(schema.translators).values({ stationId, ...rest, streamKey: null }).returning();
+      try {
+        const platformId = await sealTranslator(row, streamKey);
+        const [linked] = await db.update(schema.translators).set({ platformId }).where(eq(schema.translators.id, row.id)).returning();
+        return translatorView(linked, false, true);
+      } catch (error) {
+        await db.delete(schema.translators).where(eq(schema.translators.id, row.id));
+        throw error;
+      }
     },
 
     async updateTranslator(stationId, translatorId, input) {
-      const [row] = await db
-        .update(schema.translators)
-        .set(input)
-        .where(and(eq(schema.translators.id, translatorId), eq(schema.translators.stationId, stationId)))
-        .returning();
-      if (!row) throw notFound("That relay");
-      return translatorView(row, false);
+      const [current] = await db
+        .select()
+        .from(schema.translators)
+        .where(and(eq(schema.translators.id, translatorId), eq(schema.translators.stationId, stationId)));
+      if (!current) throw notFound("That relay");
+      const { streamKey, ...rest } = input;
+      const [row] = Object.keys(rest).length ? await db.update(schema.translators).set(rest).where(eq(schema.translators.id, translatorId)).returning() : [current];
+      // A new key or address (or a key still in plain text): sealed into a new connection, the old one removed after.
+      const moves = streamKey !== undefined || (rest.rtmpUrl !== undefined && rest.rtmpUrl !== current.rtmpUrl) || (rest.service !== undefined && rest.service !== current.service) || (current.streamKey !== null && !current.platformId);
+      if (!moves) return translatorView(row, false, Boolean(row.platformId && (await sealedIds(stationId)).has(row.platformId)));
+      const key = streamKey ?? current.streamKey ?? (current.platformId ? await sealedKey(stationId, current.platformId) : null);
+      if (!key) return translatorView(row, false, false);
+      const platformId = await sealTranslator(row, key);
+      const [linked] = await db.update(schema.translators).set({ platformId, streamKey: null }).where(eq(schema.translators.id, translatorId)).returning();
+      if (current.platformId && current.platformId !== platformId) await services.platforms.remove(stationId, current.platformId).catch(() => undefined);
+      return translatorView(linked, false, true);
     },
 
     async removeTranslator(stationId, translatorId) {
       const removed = await db
         .delete(schema.translators)
         .where(and(eq(schema.translators.id, translatorId), eq(schema.translators.stationId, stationId)))
-        .returning({ id: schema.translators.id });
+        .returning({ id: schema.translators.id, platformId: schema.translators.platformId });
       if (!removed.length) throw notFound("That relay");
+      // Its sealed key goes too (erased, in one click).
+      if (removed[0].platformId) await services.platforms.remove(stationId, removed[0].platformId).catch(() => undefined);
+    },
+
+    async moveTranslatorKeys() {
+      const rows = await db.select().from(schema.translators).where(isNotNull(schema.translators.streamKey));
+      if (!rows.length) return { moved: 0, waiting: 0, failed: 0 };
+      if (!secretsConfigured()) {
+        if (!warnedNoSecretsKey) {
+          warnedNoSecretsKey = true;
+          console.warn(`[stations] ${rows.length} translator ${rows.length === 1 ? "key is" : "keys are"} still in plain text: set PLATFORM_SECRETS_KEY to seal ${rows.length === 1 ? "it" : "them"}.`);
+        }
+        return { moved: 0, waiting: rows.length, failed: 0 };
+      }
+      let moved = 0;
+      let failed = 0;
+      const stations = new Set<string>();
+      for (const row of rows) {
+        const plain = row.streamKey!;
+        try {
+          let platformId = row.platformId;
+          if (!platformId || (await sealedKey(row.stationId, platformId)) !== plain) {
+            platformId = await sealTranslator(row, plain);
+            await db.update(schema.translators).set({ platformId }).where(eq(schema.translators.id, row.id));
+          }
+          // Checked before the plain key goes: the sealed copy opens to the same key.
+          if ((await sealedKey(row.stationId, platformId)) !== plain) throw new Error("the sealed copy didn't match");
+          await db
+            .update(schema.translators)
+            .set({ streamKey: null })
+            .where(and(eq(schema.translators.id, row.id), eq(schema.translators.streamKey, plain)));
+          stations.add(row.stationId);
+          moved++;
+        } catch (error) {
+          failed++;
+          // Never the key.
+          console.error(`[stations] translator ${row.id}'s key couldn't be moved: ${(error as Error).message}`);
+        }
+      }
+      // The station's one relay setting from its translators: the slate if any showed it (spots never
+      // go where the station said not), and "Everything I air", which the worker's translators relayed.
+      for (const stationId of stations) {
+        const mine = await db.select().from(schema.translators).where(eq(schema.translators.stationId, stationId));
+        await services.relays.adoptTranslatorSettings(stationId, {
+          breakHandling: mine.some((t) => t.breakHandling === "station_id_slate") ? "station_id_slate" : "air_spots",
+          mode: mine.some((t) => t.enabled) ? "everything" : "live_only"
+        });
+      }
+      return { moved, waiting: 0, failed };
     },
 
     async liveSources(stationId) {

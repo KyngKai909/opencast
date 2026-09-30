@@ -12,6 +12,7 @@ import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { stripeCardFeeMicros, walletDestination, type FundingKind, type Owner, type PaymentEvent } from "../../payments/index.js";
+import { relayViewersLabel } from "@opencast/contracts";
 import { accountDirectory, recordMoves, sendMoves } from "./moves.js";
 import { createBusinessMoney, type BusinessMoney } from "./business.js";
 
@@ -73,7 +74,22 @@ export interface LedgerService extends BusinessMoney {
    * (topped up from available, then absorbed by Opencast), less Opencast's share and the
    * pool; the rest of the hold goes back. A barter split sends part to the producer.
    */
-  settle(db: Executor, input: { holdId: string; stationId: string; costMicros: number; kind: "airing" | "sponsorship" | "production"; source: Source; barter?: { producerStationId: string; producerShare: number; agreementId: string } }): Promise<{ paidMicros: number; absorbedMicros: number; returnedMicros: number }>;
+  settle(
+    db: Executor,
+    input: {
+      holdId: string;
+      stationId: string;
+      costMicros: number;
+      kind: "airing" | "sponsorship" | "production";
+      source: Source;
+      barter?: { producerStationId: string; producerShare: number; agreementId: string };
+      /**
+       * Added 2026-09-30 (relay viewers): this much of the hold stays held after settling (not paid
+       * from, not released): the relay part still waiting for its numbers. Default: nothing stays.
+       */
+      keepHeldMicros?: number;
+    }
+  ): Promise<{ paidMicros: number; absorbedMicros: number; returnedMicros: number }>;
   chargeCarriageFee(db: Executor, input: { agreementId: string; carrierStationId: string; makerStationId: string; micros: number; source: Source }): Promise<void>;
   carriagePaid(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 
@@ -207,7 +223,7 @@ type StatementGroup = "spots" | "sponsors_pledges" | "carriage" | "shared" | "ca
 /** E3: the group a statement line belongs to, from its label (statements issued before this carry no group). */
 function statementGroup(label: string, accountKind: string): StatementGroup {
   if (accountKind === "advertiser_available") return /^Spent/.test(label) ? "spots" : /fee/i.test(label) ? "card_fees" : "other";
-  if (label === "Spots") return "spots";
+  if (label === "Spots" || label.startsWith("Relay viewers")) return "spots";
   if (label === "Sponsors" || label === "Pledges") return "sponsors_pledges";
   if (label === "Your programs on other stations" || label === "Programs you carry") return "carriage";
   if (label === "The pool" || label === "Opencast's share") return "shared";
@@ -230,6 +246,7 @@ export interface StationEarningsView {
     pool: { micros: number; notSetYet: boolean };
     /** "Ads from partners, paid when received": its own line, never held or escrowed. 0 until the backfill exists. */
     partnerAds: { on: boolean; micros: number; pendingMicros: number };
+    relayViewers?: Array<{ platform: "youtube" | "twitch"; label: string; micros: number; airings: number }>;
   };
   totalMicros: number;
   held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number; tonightBreaks?: number };
@@ -260,11 +277,16 @@ const BPS = 10_000;
 const dollars = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
 const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
+/** Relay viewers' settlements and returns (2026-09-30): `source_type` on their entries. */
+export const RELAY_VIEWERS = "relay_viewers";
+
 /** Pay-as-you-go's line on a station's statement: usage paid from its earnings. */
 const USAGE_FROM_EARNINGS = "Usage, taken from earnings";
 
 /** How a ledger entry reads on a statement. */
-function statementLabel(kind: string, sourceType: string | null, amount: number, accountKind: string): string {
+function statementLabel(kind: string, sourceType: string | null, amount: number, accountKind: string, memo: string | null = null): string {
+  // Relay viewers (2026-09-30): their own line, "Relay viewers, as reported by YouTube" (the entry's memo).
+  if (kind === "settle" && sourceType === RELAY_VIEWERS && accountKind !== "advertiser_available") return memo?.startsWith("Relay viewers") ? memo : "Relay viewers";
   if (accountKind === "advertiser_available") {
     const labels: Record<string, string> = { deposit: "Added", withdrawal: "Taken out", hold: "Held for airings and orders", release: "Returned from holds", settle: "Spent (beyond what was held)", reversal: "Reversed" };
     return labels[kind] ?? kind;
@@ -306,17 +328,18 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     // Spent: what left this business's holds and balance to pay for airings (settle entries).
     const available = await service.account(db, "advertiser_available", { advertiserId: businessId });
     const rows = await db
-      .select({ entryId: E.id, amount: P.amountMicros, holdAdvertiser: H.advertiserId, accountId: P.accountId })
+      .select({ entryId: E.id, sourceType: E.sourceType, amount: P.amountMicros, holdAdvertiser: H.advertiserId, accountId: P.accountId })
       .from(E)
       .innerJoin(P, eq(P.entryId, E.id))
       .leftJoin(H, eq(H.id, P.holdId))
-      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), eq(E.sourceType, "as_run")));
+      .where(and(eq(E.kind, "settle"), gte(E.occurredAt, from), lt(E.occurredAt, to), inArray(E.sourceType, ["as_run", RELAY_VIEWERS])));
     let micros = 0;
     const entries = new Set<string>();
     for (const r of rows) {
       if ((r.holdAdvertiser === businessId || r.accountId === available) && r.amount < 0) {
         micros += -r.amount;
-        entries.add(r.entryId);
+        // Relay viewers are part of an airing already counted.
+        if (r.sourceType === "as_run") entries.add(r.entryId);
       }
     }
     return { micros, airings: entries.size };
@@ -615,7 +638,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .select({ open: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
         .from(P)
         .where(eq(P.holdId, input.holdId));
-      const open = Number(row.open);
+      // What stays held for a part still waiting (relay viewers) is neither paid from nor returned.
+      const keep = Math.max(0, Math.min(Number(row.open), Math.round(input.keepHeldMicros ?? 0)));
+      const open = Number(row.open) - keep;
       const available = await service.account(tx, "advertiser_available", { advertiserId: hold.advertiserId });
       const [bal] = await tx.select({ sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` }).from(P).where(eq(P.accountId, available));
 
@@ -660,7 +685,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         );
       }
 
-      const returned = await service.release(tx, input.holdId, undefined, { sourceType: input.source.sourceType, sourceId: input.source.sourceId });
+      const returned = open - fromHold > 0 ? await service.release(tx, input.holdId, open - fromHold, { sourceType: input.source.sourceType, sourceId: input.source.sourceId }) : 0;
       return { paidMicros: cost, absorbedMicros: absorbed, returnedMicros: returned };
     },
 
@@ -800,7 +825,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             label = entry.memo ?? "Returned";
             break;
           case "settle":
-            kind = entry.sourceType === "as_run" ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
+            // Relay viewers (2026-09-30) are part of an airing: "Relay viewers, as reported by YouTube".
+            kind = entry.sourceType === "as_run" || entry.sourceType === RELAY_VIEWERS ? "aired" : entry.sourceType === "production_order" ? "order" : "sponsorship";
             label = entry.memo ?? "Aired";
             break;
           default:
@@ -1105,6 +1131,13 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(P.accountId, account), gte(E.occurredAt, from), lt(E.occurredAt, now)));
       const sum = (pred: (e: typeof E.$inferSelect, amount: number) => boolean) => rows.filter((r) => pred(r.entry, r.amount)).reduce((s, r) => s + r.amount, 0);
       const spots = sum((e) => e.kind === "settle" && e.sourceType === "as_run");
+      // Relay viewers (2026-09-30): their own lines, one per platform.
+      const relayRows = rows.filter((r) => r.entry.kind === "settle" && r.entry.sourceType === RELAY_VIEWERS);
+      const relayViewers = (["youtube", "twitch"] as const).flatMap((platform) => {
+        const label = relayViewersLabel(platform);
+        const mine = relayRows.filter((r) => r.entry.memo === label);
+        return mine.length ? [{ platform, label, micros: mine.reduce((s, r) => s + r.amount, 0), airings: mine.length }] : [];
+      });
       const sponsors = sum((e) => e.kind === "settle" && e.sourceType === "sponsorship_month");
       const production = sum((e) => e.kind === "settle" && e.sourceType === "production_order");
       const pledges = sum((e) => e.kind === "pledge");
@@ -1161,7 +1194,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           opencastShare: { micros: -cut("opencast_share"), notSetYet: config.opencastSpotShareBps === 0 },
           pool: { micros: -cut("pool"), notSetYet: config.poolShareBps === 0 },
           // Paid when the partner pays (30 to 90 days after airing), so nothing is ever held for it.
-          partnerAds: { on: rule.adsFromPartners, micros: 0, pendingMicros: 0 }
+          partnerAds: { on: rule.adsFromPartners, micros: 0, pendingMicros: 0 },
+          ...(relayViewers.length ? { relayViewers } : {})
         },
         totalMicros: rows.reduce((s, r) => s + r.amount, 0),
         held: {
@@ -1599,7 +1633,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         if (!inPeriod.length && opening === 0 && !usageLines.length) continue;
         const lines = new Map<string, { label: string; detail: string | null; amountMicros: number; count: number }>();
         for (const r of inPeriod) {
-          const label = statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind);
+          const label = statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind, r.entry.memo);
           const line = lines.get(label) ?? { label, detail: null, amountMicros: 0, count: 0 };
           line.amountMicros += r.amount;
           line.count++;
@@ -1607,6 +1641,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         }
         const out: StatementView["lines"] = [...lines.values()].map((l) => {
           const group = statementGroup(l.label, account.kind);
+          const relay = l.label.startsWith("Relay viewers, as reported by ") ? (l.label.endsWith("Twitch") ? "twitch" : "youtube") : null;
           return {
             label: l.label,
             detail: `${l.count} ${l.count === 1 ? "entry" : "entries"}`,
@@ -1614,7 +1649,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
             notSetYet: false,
             // E3: each settled spot entry is one airing.
             group,
-            ...(group === "spots" && account.kind !== "advertiser_available" ? { airings: l.count } : {})
+            ...(group === "spots" && account.kind !== "advertiser_available" ? { airings: l.count } : {}),
+            ...(relay ? { relay: { platform: relay as "youtube" | "twitch" } } : {})
           };
         });
         if (account.kind !== "advertiser_available") out.push({ label: "Opencast's share", detail: null, amountMicros: 0, notSetYet: config.opencastSpotShareBps === 0, group: "shared" });
@@ -1663,7 +1699,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       const csv = [
         "date,what,memo,amount_usd,entry_id",
         ...rows.map((r) =>
-          [r.entry.occurredAt.toISOString(), statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind), r.entry.memo ?? "", (r.amount / 1_000_000).toFixed(2), r.entry.id].map((v) => cell(String(v))).join(",")
+          [r.entry.occurredAt.toISOString(), statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind, r.entry.memo), r.entry.memo ?? "", (r.amount / 1_000_000).toFixed(2), r.entry.id].map((v) => cell(String(v))).join(",")
         )
       ].join("\n");
       return { owner: { businessId: account.advertiserId, stationId: account.stationId }, filename: `opencast-${statement.period}-${statement.periodStart}.csv`, csv: `${csv}\n` };

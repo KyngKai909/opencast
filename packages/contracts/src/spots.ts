@@ -3,6 +3,7 @@ import { endpoint } from "./core.js";
 import { DateOnly, Id, Micros, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { OrderState, SponsorshipDeclineReason, SponsorshipState, SpotState } from "./states.js";
 import { PreviewStatus } from "./catalog.js";
+import { RelayViewersLine, RelayViewersPart } from "./platforms.js";
 
 // Businesses ------------------------------------------------------------------
 
@@ -452,7 +453,14 @@ export const ResultsAiring = z.object({
   /** Why it aired short ("The break was cut short"); null when it aired in full. */
   shortReason: z.string().nullable().optional(),
   /** When its proof frame was captured. */
-  proofCapturedAt: Timestamp.nullable().optional()
+  proofCapturedAt: Timestamp.nullable().optional(),
+  // ---- Relay viewers (added 2026-09-30, follow-up Phase 3) ----
+  /**
+   * Per-thousand spots on a station relaying to signed-in YouTube or Twitch: the viewers each
+   * platform reported during the spot, and what they cost (apart from `costMicros`, which is
+   * Opencast's own viewers). Absent when there's nothing relayed to count.
+   */
+  relayViewers: z.array(RelayViewersPart).optional()
 });
 
 /** P13 (added 2026-09-29): one code's scans, saves and uses in the period, and how the uses were counted. */
@@ -490,7 +498,13 @@ export const Results = z.object({
     scans: z.number().int(),
     saves: z.number().int(),
     uses: z.number().int(),
-    customers: z.number().int()
+    customers: z.number().int(),
+    /**
+     * Relay viewers (added 2026-09-30): spent on them (included in `spentMicros`, which is now
+     * Opencast viewers and relay viewers together), and still held waiting for location data.
+     */
+    relaySpentMicros: Micros.optional(),
+    relayWaitingMicros: Micros.optional()
   }),
   byStation: z.array(
     z.object({
@@ -505,7 +519,9 @@ export const Results = z.object({
   ),
   byDaypart: z.array(z.object({ daypart: z.string(), airings: z.number().int(), customers: z.number().int() })),
   bySpot: z.array(z.object({ spotId: Id, title: z.string(), airings: z.number().int(), spentMicros: Micros, customers: z.number().int() })),
-  airings: z.array(ResultsAiring)
+  airings: z.array(ResultsAiring),
+  /** Relay viewers (added 2026-09-30): one line per platform, "Relay viewers, as reported by YouTube". Absent with none. */
+  relayViewers: z.array(RelayViewersLine).optional()
 });
 
 // ---- Added 2026-09-29: the business app's requests ----
