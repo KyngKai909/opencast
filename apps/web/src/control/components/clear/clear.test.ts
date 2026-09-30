@@ -20,15 +20,15 @@ describe("Connect Clear helpers", () => {
 describe("Ads from partners", () => {
   const rule = { lengthMs: 120_000, fillOrder: ["SPT", "UND", "BMP", "SID"] as const, adsFromPartners: false };
 
-  it("sits after the rotation and thank-you credit, before the bumper and station ID", () => {
+  it("sits after the rotation and thank-you credit, before the bumper out of the break and station ID", () => {
     const rows = ladderWithPartners({ ...rule, fillOrder: [...rule.fillOrder] });
-    expect(rows.map((r) => (r.partner ? "partners" : r.code))).toEqual(["SPT", "UND", "partners", "BMP", "SID"]);
-    expect(rows.map((r) => r.n)).toEqual([1, 2, 3, 4, 5]);
-    expect(rows[2]).toMatchObject({ detail: "Off. Only time still open", time: "0:00 – 1:00", fillIndex: null });
+    expect(rows.map((r) => (r.partner ? "partners" : r.code))).toEqual(["BMP", "SPT", "UND", "partners", "BMP", "SID"]);
+    expect(rows.map((r) => r.n)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rows[3]).toMatchObject({ detail: "Off. Only time still open", time: "0:00 – 1:00", fillIndex: null });
   });
 
   it("says on when it's on", () => {
-    expect(ladderWithPartners({ ...rule, fillOrder: [...rule.fillOrder], adsFromPartners: true })[2].detail).toBe("On. Only time still open");
+    expect(ladderWithPartners({ ...rule, fillOrder: [...rule.fillOrder], adsFromPartners: true })[3].detail).toBe("On. Only time still open");
   });
 
   it("reads as the earnings frame draws it", () => {

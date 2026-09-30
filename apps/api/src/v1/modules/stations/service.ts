@@ -24,7 +24,7 @@ export interface BreakRuleView {
   blockedCategories: string[];
   /** "Ads from partners" (the programmatic backfill): off by default, and only a switch until it's built. */
   adsFromPartners: boolean;
-  /** How often the station ID, bumpers and credit air in breaks (added 2026-09-29): every break by default. */
+  /** How often the station ID, bumpers, credit and spots air in breaks (added 2026-09-29): every break by default. */
   cadence: BreakCadence;
 }
 
@@ -94,6 +94,8 @@ export interface StationsService {
   breakRule(stationId: string): Promise<BreakRuleView>;
   /** For ads from partners, once built: the station's IAB categories, blocked IAB ad products and its switch. */
   adProfile(stationId: string): Promise<StationAdProfile>;
+  /** Added 2026-09-29: of these stations, the ones whose break rule never airs spots (`cadence.spots`). */
+  withoutSpots(stationIds: string[]): Promise<Set<string>>;
   liveSourceBelongs(stationId: string, sourceId: string): Promise<boolean>;
   /** For playout: where a live source's signal comes from. */
   liveSourceSignal(sourceId: string): Promise<{ streamKey: string | null; livepeerPlaybackId: string | null } | null>;
@@ -142,7 +144,7 @@ export interface StationsService {
   availableChannels(marketId: string, band: Band): Promise<Array<{ channel: string; state: "open" | "taken" | "held" }>>;
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string }): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
-  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: BreakCadence }): Promise<BreakRuleView>;
+  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] } }): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -497,8 +499,19 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         iabCategories: iabContentCategories({ override: station.iabCategories, category: station.category }),
         blockedIabAdProducts: blockedIabAdProducts(rule.blockedCategories),
         adsFromPartners: rule.adsFromPartners,
-        spotMsPerHour: rule.spotMsPerHour
+        // A station that never airs spots has no spot time to offer.
+        spotMsPerHour: rule.cadence.spots.every === "never" ? 0 : rule.spotMsPerHour
       };
+    },
+
+    async withoutSpots(stationIds) {
+      if (!stationIds.length) return new Set();
+      const R = schema.breakRules;
+      const rows = await db
+        .select({ stationId: R.stationId })
+        .from(R)
+        .where(and(inArray(R.stationId, stationIds), sql`${R.cadence}->'spots'->>'every' = 'never'`));
+      return new Set(rows.map((r) => r.stationId));
     },
 
     async liveSourceBelongs(stationId, sourceId) {
@@ -746,14 +759,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async setBreakRule(stationId, rule) {
       if (rule.mode === "every_n_minutes" && !rule.everyMinutes) throw badRequest("Say how often.", { everyMinutes: "Required" });
       const fillOrder = [...rule.fillOrder.filter((c) => c !== "SID"), "SID" as const];
-      // How often each part airs (added 2026-09-29): left out, what's set stays.
+      // How often each part airs (added 2026-09-29): left out, what's set stays; so does how
+      // often spots air when only they are left out (an app from before they had a choice).
       let cadence: BreakCadence | undefined;
       if (rule.cadence) {
         if ((rule.cadence.stationId.every as string) === "never") throw badRequest("The station ID can't be turned off. Choose how often it airs.", { "cadence.stationId": "Required" });
         for (const [part, c] of Object.entries(rule.cadence)) {
-          if (c.every === "n_programs" && !c.n) throw badRequest("Say after how many programs.", { [`cadence.${part}.n`]: "Required" });
+          if (c && c.every === "n_programs" && !c.n) throw badRequest("Say after how many programs.", { [`cadence.${part}.n`]: "Required" });
         }
-        cadence = cadenceOf(rule.cadence);
+        cadence = cadenceOf({ ...rule.cadence, spots: rule.cadence.spots ?? (await service.breakRule(stationId)).cadence.spots });
       }
       await db.transaction(async (tx) => {
         await tx

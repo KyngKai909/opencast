@@ -148,8 +148,10 @@ export const BreakRule = z.object({
   sameSpotPerHour: z.number().int().min(1),
   /**
    * After SPT. SID is always last when it airs and can't be removed (how often it airs is
-   * `cadence.stationId`). The order is what master control shows; playout airs the credit, then
-   * bumpers, then the station ID after the spots.
+   * `cadence.stationId`). The order is what master control shows. Playout airs (changed
+   * 2026-09-29) a bumper into the break, the spots (the maker's barter time first), the credit, a
+   * bumper out of the break, then the station ID; time none of them takes holds on the station ID
+   * slate just before the station ID. `BMP` stands for both bumpers wherever it's put.
    */
   fillOrder: z.array(LogCode),
   openTimeTo: z.enum(["spot_market", "station_id_and_bumpers"]),
@@ -160,17 +162,24 @@ export const BreakRule = z.object({
    */
   adsFromPartners: z.boolean().optional(),
   /**
-   * Added 2026-09-29: how often the station ID, bumpers and the thank-you credit air in breaks.
-   * Always in `getBreakRule`; left out of `setBreakRule`, what's set stays. The default is every
-   * break for all three (as before). Bumpers keep their place when they air (after the credit,
-   * filling what's left before the station ID); a break without them holds on the station ID slate.
-   * Open time, sign-on and dead-air fill still air the station ID and bumpers.
+   * Added 2026-09-29: how often the station ID, bumpers, the thank-you credit and (added later
+   * that day) spots air in breaks. Always in `getBreakRule`, `spots` included; left out of
+   * `setBreakRule`, what's set stays (the whole cadence, or `spots` alone). The default is every
+   * break for all four (as before). When bumpers air, one opens the break and one closes it (the
+   * same one twice with only one in the library, none without); a break without them has none.
+   * A break without spots airs only the parts that do and is as long as they need (the maker's
+   * barter time stays), except the break that closes a program's slot or one cued live, whose
+   * length the log sets: their time left over holds on the station ID slate. Nothing is placed
+   * (and nothing held) in a break without spots, and its `openMs` is 0. Open time, sign-on and
+   * dead-air fill still air the station ID and bumpers.
    */
   cadence: z
     .object({
       stationId: StationIdCadence,
       bumpers: BreakCadence,
-      underwriting: BreakCadence
+      underwriting: BreakCadence,
+      /** Added 2026-09-29 (later): how often the station's spots air. Left out, every break. */
+      spots: BreakCadence.optional()
     })
     .optional()
 });

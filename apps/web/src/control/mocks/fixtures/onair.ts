@@ -58,9 +58,11 @@ const FILL_CODE: Record<DbFill["kind"], BreakRow["code"]> = {
 };
 
 /**
- * A break in the order it airs: the maker's barter time first, then the station's spots,
- * underwriting and bumpers, then open time (the station ID slate), and the station ID last,
- * as the break settings fix it (open question A8).
+ * A break in the order it airs: a bumper into the break, the maker's barter time, the station's
+ * spots and underwriting, a bumper out of the break, then open time (the station ID slate), and
+ * the station ID last, as the break settings fix it (open question A8; the bumpers at both ends
+ * since 2026-09-29, A143). A break the cadence leaves spots out of has no spot time: what's left
+ * holds on the station ID slate.
  */
 export function rowsOfBreak(b: DbBreak): BreakRow[] {
   const row = (f: DbFill): BreakRow => ({
@@ -70,12 +72,17 @@ export function rowsOfBreak(b: DbBreak): BreakRow[] {
     whose: f.kind === "producer" ? "producer" : /backup/i.test(f.note ?? "") ? "backup" : "station",
     note: f.note ?? null
   });
+  const bumpers = b.fills.filter((f) => f.kind === "bumper").map(row);
+  const [into, ...outOf] = bumpers;
   const producer = b.fills.filter((f) => f.kind === "producer").map(row);
-  const station = b.fills.filter((f) => f.kind !== "producer" && f.kind !== "station_id" && f.kind !== "open").map(row);
+  const station = b.fills.filter((f) => f.kind !== "producer" && f.kind !== "station_id" && f.kind !== "open" && f.kind !== "bumper").map(row);
   const ids = b.fills.filter((f) => f.kind === "station_id").map(row);
-  const filled = [...producer, ...station, ...ids].reduce((a, r) => a + r.lengthMs, 0);
+  const filled = [...bumpers, ...producer, ...station, ...ids].reduce((a, r) => a + r.lengthMs, 0);
   const open = Math.max(0, b.lengthMs - filled);
-  return [...producer, ...station, ...(open >= 1000 ? [{ code: "OPEN" as const, title: "Open", lengthMs: open, whose: "station" as const, note: "Holds on the station ID slate" }] : []), ...ids];
+  const openRow: BreakRow = b.noSpots
+    ? { code: "OPEN", title: "Station ID slate", lengthMs: open, whose: "station", note: null }
+    : { code: "OPEN", title: "Open", lengthMs: open, whose: "station", note: "Holds on the station ID slate" };
+  return [...(into ? [into] : []), ...producer, ...station, ...outOf, ...(open >= 1000 ? [openRow] : []), ...ids];
 }
 
 // ---- Filling a gap (A.4, P.2) ----

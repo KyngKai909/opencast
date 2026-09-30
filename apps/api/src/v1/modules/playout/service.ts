@@ -13,7 +13,7 @@ import { captionSources } from "./engine/captions.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
 import { refKey } from "./engine/prepare.js";
-import { breakPartsFor } from "./engine/cadence.js";
+import { isEveryBreak, partsOf } from "./engine/cadence.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
 import { STATION_ID_MS } from "./engine/fill.js";
 
@@ -270,7 +270,6 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       // break rule's cadence (added 2026-09-29) must air one in them at least hourly: if the breaks
       // come often enough but the cadence leaves more than an hour, it's a warning, not a block.
       // Planned off air time doesn't count against it: the station signs off and back on with its ID.
-      const partsOf = await breakPartsFor({ deps, services }, stationId, { breaks, entries: { rows: entries, from: now, to: day }, cadence: rule.cadence });
       const sidEntries = entries.filter((e) => e.code === "SID").map((e) => e.startsAt.getTime());
       const offAirMarks = offAir.flatMap((o) => [Math.max(now.getTime(), Date.parse(o.startsAt)), Math.min(day.getTime(), Date.parse(o.endsAt))]);
       const inOffAir = (a: number, b: number) => offAir.some((o) => Date.parse(o.startsAt) <= a && Date.parse(o.endsAt) >= b);
@@ -285,7 +284,9 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         if (!inOffAir(cursor, day.getTime())) longest = Math.max(longest, day.getTime() - cursor);
         return { longest, marks: marks.length };
       };
-      const everyBreak = longestWithout(breaks.map((b) => Date.parse(b.startsAt)));
+      // Whether breaks come hourly is the rule's layout: a break the cadence leaves nothing in isn't on the log.
+      const laidOut = isEveryBreak(rule.cadence) ? breaks : await services.log.breaks(stationId, now, day, { everyPart: true });
+      const everyBreak = longestWithout(laidOut.map((b) => Date.parse(b.startsAt)));
       const withCadence = longestWithout(breaks.filter((b) => partsOf(b).stationId).map((b) => Date.parse(b.startsAt)));
       const idsPerDay = withCadence.marks;
       const breaksHourly = rule.mode !== "none" || sidEntries.length > 0 ? everyBreak.longest <= HOUR : false;

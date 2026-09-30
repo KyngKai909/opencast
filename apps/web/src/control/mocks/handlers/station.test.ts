@@ -99,11 +99,14 @@ describe("the break rule (station-settings 02.1)", () => {
   });
   it("answers how often the station ID, bumpers and credit air, and keeps it when it's left out (added 2026-09-29)", async () => {
     const r = await api("marcus", "GET", `/stations/${BEAT.id}/break-rule`);
-    expect(r.json.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } });
-    const cadence = { stationId: { every: "n_programs", n: 2 }, bumpers: { every: "never" }, underwriting: { every: "hour" } };
+    expect(r.json.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } });
+    const cadence = { stationId: { every: "n_programs", n: 2 }, bumpers: { every: "never" }, underwriting: { every: "hour" }, spots: { every: "program" } };
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence })).json.cadence).toEqual(cadence);
     const { cadence: _left, ...rest } = r.json;
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, lengthMs: 90_000 })).json).toMatchObject({ lengthMs: 90_000, cadence });
+    // An app from before spots had a choice leaves them out: they stay.
+    const { spots: _spots, ...older } = cadence;
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, cadence: older })).json.cadence).toEqual(cadence);
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence: { ...cadence, stationId: { every: "never" } } })).status).toBe(400);
   });
 });

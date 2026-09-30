@@ -223,6 +223,8 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
           <KeyValueList
             items={[
               { label: "Length", value: duration(rule.data.lengthMs) },
+              // Spots when they don't air in every break (added 2026-09-29; no frame draws it).
+              ...(cadenceOf(rule.data).spots.every !== "break" ? [{ label: "Spots", value: cadenceWords(cadenceOf(rule.data).spots) }] : []),
               { label: "Station ID", value: cadenceWords(cadenceOf(rule.data).stationId) },
               { label: "Open time goes to", value: rule.data.openTimeTo === "spot_market" ? "The spot market" : "Your station ID and bumpers" }
             ]}

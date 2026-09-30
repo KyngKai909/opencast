@@ -2,12 +2,21 @@
 // Spots come from the station's rotation (then its backup rotation), within the
 // hourly cap, the same-spot limit, blocked categories and dayparts. Inside a
 // carried program under barter, the producer's share is filled from the
-// producer's rotation (the producer is paid for those). What's left is for the
-// credit, bumpers and the station ID, which playout adds when it airs the break.
+// producer's rotation (the producer is paid for those). Room is kept for what
+// playout adds when it airs the break, as far as the break rule's cadence has
+// them in it: a bumper into the break and one out of it, the credit and the
+// station ID.
+//
+// A break spots don't air in (the cadence, added 2026-09-29) gets none of the
+// station's: nothing is placed or held there, and it isn't marked filled (a
+// break marked filled is one spots air in: see cadence.ts). The maker's barter
+// share still is, once. The hourly cap, the same-spot limit and each spot's
+// daily cap apply to the breaks spots do air in, as before.
 
 import type { ModuleContext } from "../../../context.js";
 import { tzOffsetMinutes } from "../../../lib/time.js";
 import type { BreakSlotView } from "../../log/service.js";
+import { partsOf } from "./cadence.js";
 
 const HOUR = 3_600_000;
 /**
@@ -44,12 +53,14 @@ export function createFiller({ services }: ModuleContext) {
   async function fillOne(stationId: string, slot: BreakSlotView, tz: string, hasCredits: boolean): Promise<FillResult> {
     const result: FillResult = { breakId: slot.id!, placed: [], skipped: [] };
     const startsAt = new Date(slot.startsAt);
-    const [rule, profile, already, entry, stationIdMs] = await Promise.all([
+    const parts = partsOf(slot);
+    const [rule, profile, already, entry, stationIdMs, fillers] = await Promise.all([
       services.stations.breakRule(stationId),
       services.stations.profiles([stationId]).then((m) => m.get(stationId)),
       services.spots.placedOnStation(stationId, new Date(startsAt.getTime() - HOUR), startsAt),
       slot.logEntryId ? services.log.entries(stationId, new Date(startsAt.getTime() - 6 * HOUR), new Date(startsAt.getTime() + 1)) : Promise.resolve([]),
-      services.playout.stationIdMs(stationId)
+      services.playout.stationIdMs(stationId),
+      services.library.fillers(stationId)
     ]);
     const blocked = new Set((profile?.blockedCategories ?? []).map((c) => c.toLowerCase()));
     let hourMs = already.reduce((s, a) => s + a.lengthSec * 1000, 0);
@@ -100,11 +111,17 @@ export function createFiller({ services }: ModuleContext) {
       }
     }
 
-    // The station's own time, keeping room for the credit and the station ID.
+    // Spots don't air in this break (the cadence): the maker's share only, and not marked filled.
+    if (!parts.spots) return result;
+
+    // The station's own time, keeping room for what airs with the spots: the station ID, the
+    // credit, and the bumpers into and out of the break, each where the break rule's cadence has
+    // it in this break (a credit or bumper that doesn't air here keeps no room).
     if (rule.openTimeTo === "spot_market") {
-      // A station whose credit never airs in breaks (its cadence, added 2026-09-29) keeps no room for it.
-      const credit = hasCredits && rule.cadence.underwriting.every !== "never";
-      const stationMs = slot.lengthMs - slot.producerShareMs - stationIdMs - (credit ? CREDIT_MS : 0);
+      const credit = hasCredits && parts.underwriting;
+      const [into, outOf] = [fillers.bumpers[0], fillers.bumpers[1] ?? fillers.bumpers[0]];
+      const bumpersMs = parts.bumpers && into ? into.durationMs! + outOf!.durationMs! : 0;
+      const stationMs = slot.lengthMs - slot.producerShareMs - (parts.stationId ? stationIdMs : 0) - (credit ? CREDIT_MS : 0) - bumpersMs;
       if (stationMs > 0) {
         const used = await tryPlace(await services.spots.rotationFor(stationId, "main"), stationMs);
         if (used < stationMs) await tryPlace(await services.spots.rotationFor(stationId, "backup"), stationMs - used);
@@ -124,6 +141,8 @@ export function createFiller({ services }: ModuleContext) {
       const results: FillResult[] = [];
       for (const slot of slots) {
         if (!slot.id || slot.filledAt) continue;
+        // A break without spots is never marked filled: only its barter share is placed, once.
+        if (!partsOf(slot).spots && (slot.producerShareMs === 0 || slot.filledMs > 0)) continue;
         results.push(await fillOne(stationId, slot, tz, credits.length > 0 || members.named.length > 0));
       }
       return results;

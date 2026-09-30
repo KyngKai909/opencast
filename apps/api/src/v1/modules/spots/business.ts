@@ -216,7 +216,10 @@ export function createBusinessPart({ deps, services }: ModuleContext): BusinessP
     async categoryReach(marketId, category) {
       const market = (await services.network.marketsByIds([marketId])).get(marketId);
       if (!market) throw notFound("That market");
-      const stations = (await services.stations.inMarkets([marketId])).filter((s) => s.kind !== "studio" && s.kind !== "listed" && s.status !== "signed_off");
+      const all = (await services.stations.inMarkets([marketId])).filter((s) => s.kind !== "studio" && s.kind !== "listed" && s.status !== "signed_off");
+      // A station whose breaks never air spots (its break rule, added 2026-09-29) carries none.
+      const noSpots = await services.stations.withoutSpots(all.map((s) => s.id));
+      const stations = all.filter((s) => !noSpots.has(s.id));
       const lower = category.trim().toLowerCase();
       const blocking = stations.filter((s) => s.blockedCategories.some((c) => c.toLowerCase() === lower));
       const counts = new Map<string, number>();

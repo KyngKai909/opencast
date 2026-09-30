@@ -250,8 +250,10 @@ const breakHandlers = [
     if (r instanceof Response) return r;
     const body = stationsApi.setBreakRule.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "invalid", "That break rule can't be saved.");
-    // Left out, the cadence stays as it was (added 2026-09-29).
-    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence: body.data.cadence ?? breakRuleOf(id).cadence };
+    // Left out, the cadence stays as it was (added 2026-09-29), and so do spots when only they are.
+    const was = breakRuleOf(id).cadence;
+    const cadence = body.data.cadence ? { ...body.data.cadence, spots: body.data.cadence.spots ?? was?.spots } : was;
+    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence };
     if (rule.mode === "every_n_minutes" && !rule.everyMinutes) return fail(400, "invalid", "Say how often breaks come.");
     if (rule.cadence && Object.values(rule.cadence).some((c) => c.every === "n_programs" && !c.n)) return fail(400, "bad_request", "Say after how many programs.");
     if (rule.mode !== "every_n_minutes") rule.everyMinutes = null;

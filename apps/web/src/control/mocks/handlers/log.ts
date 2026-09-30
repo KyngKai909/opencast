@@ -143,18 +143,21 @@ const MIN = 60_000;
 const ceilMinute = (t: number) => Math.ceil(t / MIN) * MIN;
 
 /**
- * A break after a program, as the rule places it: its bumper, then the station ID last. Without a
- * station ID of its own, the generated one (added 2026-09-29). The rule's cadence leaves out the
- * station ID or the bumper where it says (after every program: only in an "After …" break; never).
+ * A break after a program, as the rule places it: a bumper into the break and one out of it (the
+ * library's first two, or its one bumper twice; since 2026-09-29), then the station ID last.
+ * Without a station ID of its own, the generated one (added 2026-09-29). The rule's cadence leaves
+ * out the station ID, the bumpers or spots where it says (after every program: only in an
+ * "After …" break; never). The mock's breaks close a program, so one without spots keeps its length.
  */
 function ruleBreak(stationId: string, startsAt: string, lengthMs: number, context: string, origin: DbBreak["origin"] = "rule"): DbBreak {
   const lib = getDb().library.items.filter((i) => i.stationId === stationId && i.status === "ready" && i.rights);
   const cadence = breakRuleOf(stationId).cadence;
-  const here = (part: "stationId" | "bumpers") => breaksAiring([{ startsAt, context }], part, { cadence }).length > 0;
+  const here = (part: "stationId" | "bumpers" | "spots") => breaksAiring([{ startsAt, context }], part, { cadence }).length > 0;
   const sid = lib.find((i) => i.code === "SID") ?? { id: null, title: GENERATED_SID_TITLE, durationMs: GENERATED_SID_MS };
-  const bmp = lib.find((i) => i.code === "BMP");
+  const bumpers = lib.filter((i) => i.code === "BMP");
   const fill = (kind: DbFill["kind"], it: { id: string | null; title: string; durationMs: number | null }): DbFill => ({ id: uuid(), kind, title: it.title, lengthMs: it.durationMs ?? 0, itemId: it.id });
-  return { id: uuid(), stationId, startsAt, lengthMs, context, origin, producerShareMs: 0, fills: [...(bmp && here("bumpers") ? [fill("bumper", bmp)] : []), ...(here("stationId") ? [fill("station_id", sid)] : [])] };
+  const ends = bumpers.length && here("bumpers") ? [fill("bumper", bumpers[0]), fill("bumper", bumpers[1] ?? bumpers[0])] : [];
+  return { id: uuid(), stationId, startsAt, lengthMs, context, origin, producerShareMs: 0, fills: [...ends, ...(here("stationId") ? [fill("station_id", sid)] : [])], ...(here("spots") ? {} : { noSpots: true }) };
 }
 
 function entry(stationId: string, o: Partial<LogEntry> & Pick<LogEntry, "startsAt" | "endsAt" | "title">): DbLogEntry {

@@ -297,7 +297,8 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
           audioOnly: r.audioOnly,
           status: r.status,
           declineReason: r.declineReason,
-          carrierSpotMsPerHour: rules.get(r.carrierStationId)?.spotMsPerHour ?? 180_000,
+          // A carrier whose breaks never air spots (its break rule, added 2026-09-29) runs none.
+          carrierSpotMsPerHour: rules.get(r.carrierStationId)?.cadence.spots.every === "never" ? 0 : (rules.get(r.carrierStationId)?.spotMsPerHour ?? 180_000),
           createdAt: r.createdAt.toISOString(),
           decidedAt: r.decidedAt?.toISOString() ?? null,
           agreementId: agreed.find((a) => a.requestId === r.id)?.id ?? null,

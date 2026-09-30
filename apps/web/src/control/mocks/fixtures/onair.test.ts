@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DbBreak } from "./evening";
+import { breakSlot, type DbBreak } from "./evening";
 import { coverageUntil, deadAirWarnings, placeRepeat, rowsOfBreak } from "./onair";
 
 const MIN = 60_000;
@@ -22,14 +22,38 @@ describe("rowsOfBreak (G1)", () => {
     ]
   };
 
-  it("airs the maker's time first, the station's next, open time, and the station ID last", () => {
+  it("airs a bumper into the break, the maker's time, the station's next, open time, and the station ID last", () => {
     expect(rowsOfBreak(b).map((r) => [r.code, r.title, r.lengthMs / 1000, r.whose])).toEqual([
-      ["SPT", "Mission Soda", 30, "producer"],
       ["BMP", "Beat Tape Live, trailer", 10, "station"],
+      ["SPT", "Mission Soda", 30, "producer"],
       ["SPT", "Cypress Dental", 30, "backup"],
       ["OPEN", "Open", 45, "station"],
       ["SID", "BEAT station ID", 5, "station"]
     ]);
+  });
+
+  it("airs a second bumper out of the break, after the spots and the credit (since 2026-09-29)", () => {
+    const both: DbBreak = { ...b, fills: [...b.fills, { id: "5", kind: "underwriting", title: "Made possible by members", lengthMs: 15_000 }, { id: "6", kind: "bumper", title: "Back to the reel", lengthMs: 10_000 }] };
+    expect(rowsOfBreak(both).map((r) => `${r.code} ${r.title}`)).toEqual([
+      "BMP Beat Tape Live, trailer",
+      "SPT Mission Soda",
+      "SPT Cypress Dental",
+      "UND Made possible by members",
+      "BMP Back to the reel",
+      "OPEN Open",
+      "SID BEAT station ID"
+    ]);
+  });
+
+  it("a break spots don't air in holds on the station ID slate, with no spot time", () => {
+    const quiet: DbBreak = { ...b, noSpots: true, fills: [b.fills[0], b.fills[1], { ...b.fills[1], id: "7" }] };
+    expect(rowsOfBreak(quiet).map((r) => [r.code, r.title, r.lengthMs / 1000])).toEqual([
+      ["BMP", "Beat Tape Live, trailer", 10],
+      ["BMP", "Beat Tape Live, trailer", 10],
+      ["OPEN", "Station ID slate", 95],
+      ["SID", "BEAT station ID", 5]
+    ]);
+    expect(breakSlot(quiet).openMs).toBe(0);
   });
 
   it("has no open row when the break is full", () => {

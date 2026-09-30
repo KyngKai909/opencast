@@ -1,8 +1,11 @@
 // The run sheet: what airs, second by second, from the program log. Programs play
-// at their times, split around the breaks inside them; each break airs its spots
-// (already placed and paid for), then the credit, bumpers and the station ID,
-// which is always last when it airs. How often the station ID, bumpers and credit
-// air in breaks is the break rule's cadence (cadence.ts; every break by default).
+// at their times, split around the breaks inside them; each break airs a bumper into
+// the break, its spots (already placed and paid for), the credit, a bumper out of the
+// break and the station ID, which is always last when it airs (the bumpers at both
+// ends since 2026-09-29; before, they filled the time after the credit). Time left
+// over holds on the station ID slate before the station ID. How often each part airs
+// in breaks, spots included, is the break rule's cadence (cadence.ts; every break by
+// default), decided with the log's breaks (`BreakSlotView.parts`).
 // Open time airs station ID and bumpers, never nothing.
 //
 // A station with no station ID of its own that can air airs its generated one (stationId.ts):
@@ -24,7 +27,7 @@ import type { BreakSlotView } from "../../log/service.js";
 import { clockTime } from "../../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
 import { Slates, type StationLook } from "./slates.js";
-import { breakPartsFor } from "./cadence.js";
+import { partsOf } from "./cadence.js";
 import type { Band } from "./ladder.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
 
@@ -202,8 +205,6 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const generated = await generatedId(stationId, station, !allFillers.stationIds.length);
         if (generated) fillers.stationIds.push(generated);
       }
-      // How often the station ID, bumpers and credit air in each break (every break by default).
-      const partsOf = await breakPartsFor({ deps, services }, stationId, { breaks, entries: { rows: allEntries, from: lookback, to } });
       const stored = breaks.filter((b): b is BreakSlotView & { id: string } => Boolean(b.id));
       const [items, airings, programs, offAir] = await Promise.all([
         services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v))),
@@ -215,19 +216,48 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       const segments: Segment[] = [];
 
       const composeBreak = async (slot: BreakSlotView, entryId: string | null): Promise<Segment[]> => {
-        const out: Segment[] = [];
         const start = Date.parse(slot.startsAt);
         const end = start + slot.lengthMs;
-        let cursor = start;
         const key = `brk:${slot.id ?? slot.startsAt}`;
+        const parts = partsOf(slot);
         let missing: Segment["missing"];
         // Spots, producer's share first; already held, so they air even if paused since.
+        const spots: Array<{ airing: NonNullable<ReturnType<typeof airings.get>>[number]; at: string; len: number }> = [];
+        let spotMs = 0;
         for (const airing of slot.id ? (airings.get(slot.id) ?? []) : []) {
           const len = airing.lengthSec * 1000;
           const at = fileAt(stationId, airing);
           // Not prepared: it doesn't air (its hold goes back), and the break fills as usual.
           if (!at && airing.contentId && !missing) missing = { itemId: airing.spotId, title: airing.title, contentId: airing.contentId, airsAt: new Date(start) };
-          if (!at || cursor + len > end) continue;
+          if (!at || start + spotMs + len > end) continue;
+          spots.push({ airing, at, len });
+          spotMs += len;
+        }
+        // The thank-you credit: sponsors of this program, of the station, and members who asked to be named.
+        const entry = entries.find((e) => e.id === entryId);
+        const programId = entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
+        const sponsors = credits.filter((c) => c.programId === null || c.programId === programId);
+        // Room for the station ID after it (the generated one is ten seconds).
+        const sidRoom = parts.stationId ? (fillers.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
+        let left = slot.lengthMs - spotMs;
+        const creditMs = parts.underwriting && (sponsors.length || members.named.length) && left >= sidRoom + 10_000 ? Math.min(CREDIT_MS, left - sidRoom) : 0;
+        left -= creditMs;
+        // A bumper into the break and one out of it (the same one twice when there's one), each
+        // whole or not at all, into the break first; none where the cadence leaves them out.
+        const room = left - sidRoom;
+        const into = parts.bumpers ? fillers.bumpers[0] : undefined;
+        const outOf = parts.bumpers ? (fillers.bumpers[1] ?? fillers.bumpers[0]) : undefined;
+        const bumperIn = into && into.durationMs! <= room ? into : undefined;
+        const bumperOut = outOf && outOf.durationMs! <= room - (bumperIn?.durationMs ?? 0) ? outOf : undefined;
+
+        const out: Segment[] = [];
+        let cursor = start;
+        const bumper = (b: FillerRef, where: "in" | "out") => {
+          out.push({ key: `${key}:bmp:${where}`, startsAt: new Date(cursor), endsAt: new Date(cursor + b.durationMs!), code: "BMP", label: b.title, source: { kind: "file", location: fileAt(stationId, b)!, seekMs: 0, mediaKind: b.mediaKind, contentId: b.contentId ?? undefined }, reason: "planned", inBreak: true, breakId: slot.id ?? undefined, itemId: b.id });
+          cursor += b.durationMs!;
+        };
+        if (bumperIn) bumper(bumperIn, "in");
+        for (const { airing, at, len } of spots) {
           out.push({
             key: `${key}:spt:${airing.airingId}`,
             startsAt: new Date(cursor),
@@ -245,21 +275,14 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
           });
           cursor += len;
         }
-        // The thank-you credit: sponsors of this program, of the station, and members who asked to be named.
-        const entry = entries.find((e) => e.id === entryId);
-        const programId = entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
-        const sponsors = credits.filter((c) => c.programId === null || c.programId === programId);
-        const parts = partsOf(slot);
-        // Room for the station ID after it (the generated one is ten seconds).
-        const sidRoom = parts.stationId ? (fillers.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
-        if (parts.underwriting && (sponsors.length || members.named.length) && end - cursor >= sidRoom + 10_000) {
-          const len = Math.min(CREDIT_MS, end - cursor - sidRoom);
+        const afterSpots = out.length;
+        if (creditMs > 0) {
           const programSponsors = sponsors.some((c) => c.programId && c.programId === programId);
           const subject = programSponsors && programId ? (programs.get(programId)?.title ?? station.name) : station.name;
           out.push({
             key: `${key}:und`,
             startsAt: new Date(cursor),
-            endsAt: new Date(cursor + len),
+            endsAt: new Date(cursor + creditMs),
             code: "UND",
             label: `${subject} is made possible by`,
             source: { kind: "image", path: await slates.credit(station, { subject, sponsors: sponsors.map((s) => ({ business: s.business, creditText: s.creditText })), members: members.named }) },
@@ -268,12 +291,13 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
             inBreak: true,
             breakId: slot.id ?? undefined
           });
-          cursor += len;
+          cursor += creditMs;
         }
-        out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station, parts)));
+        if (bumperOut) bumper(bumperOut, "out");
+        // What's left holds on the station ID slate, then the station ID (when it airs).
+        out.push(...(await filler(stationId, new Date(cursor), end - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station, { bumpers: false, stationId: parts.stationId })));
         // Reported when the break airs; if the file arrives first, the break is planned again with it.
-        const firstAfterSpots = out.findIndex((s) => s.code !== "SPT");
-        if (missing && firstAfterSpots >= 0) out[firstAfterSpots] = { ...out[firstAfterSpots], missing };
+        if (missing && out[afterSpots]) out[afterSpots] = { ...out[afterSpots], missing };
         const breakSpan = { startsAt: new Date(start), lengthMs: slot.lengthMs };
         return out.map((seg) => ({ ...seg, breakSpan }));
       };

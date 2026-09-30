@@ -1,6 +1,7 @@
 // Settings, Breaks (station-settings 02.1): when breaks come and how long they run, what fills
-// every break in order (the station ID fixed last), how often the station ID, bumpers and credit
-// air (the cadence, added 2026-09-29; no frame draws it: rows like the frame's "Length"), the
+// every break in order (a bumper into and out of the break and the station ID fixed; A143), how
+// often spots, the credit, bumpers and the station ID air (the cadence, added 2026-09-29; no frame
+// draws it: rows like the frame's "Length"), the
 // hourly cap against broadcast TV, the same spot's limit, categories BEAT never airs, the backup
 // rotation, and "Ads from partners" (a backfill for time still open: only a flag until the backend
 // supports it). Owners and operators change it.
@@ -23,6 +24,7 @@ import {
   cadenceOptions,
   capCells,
   capMinutes,
+  ladder,
   ladderWithPartners,
   moveFill,
   placeFill,
@@ -92,7 +94,8 @@ export function BreaksSection({ s }: { s: StationState }) {
     const next = moveFill(r.fillOrder, code, delta);
     if (next.join() === r.fillOrder.join()) return;
     change({ fillOrder: next });
-    setSaid(`${fills.find((x) => x.code === code)!.title}, now ${next.indexOf(code) + 1} of ${next.length}`);
+    const moved = ladder({ ...r, fillOrder: next });
+    setSaid(`${fills.find((x) => x.code === code)!.title}, now ${moved.findIndex((x) => x.key === code) + 1} of ${moved.length}`);
   };
   const onKey = (e: KeyboardEvent<HTMLLIElement>, code: FillCode) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -143,12 +146,13 @@ export function BreaksSection({ s }: { s: StationState }) {
         </div>
         <ol className="cc-ladder" aria-label="In every break, in this order">
           {rows.map((row) => {
-            const fixed = row.partner || row.code === "SID" || !canEdit;
+            // The bumpers (into and out of the break) and the station ID have their places.
+            const fixed = row.partner || row.fillIndex === null || !canEdit;
             const code = row.code as FillCode;
             return (
               <li
-                key={row.partner ? "partners" : row.code}
-                id={row.partner ? "cc-fill-partners" : `cc-fill-${row.code}`}
+                key={row.key}
+                id={`cc-fill-${row.key}`}
                 className={[dragging === code && !row.partner ? "cc-lad cc-lad--dragging" : "cc-lad", row.partner && !r.adsFromPartners ? "cc-lad--off" : ""].filter(Boolean).join(" ")}
                 draggable={!fixed}
                 tabIndex={fixed ? undefined : 0}
@@ -158,7 +162,7 @@ export function BreaksSection({ s }: { s: StationState }) {
                   e.dataTransfer.effectAllowed = "move";
                 }}
                 onDragEnd={() => setDragging(null)}
-                onDragOver={(e) => dragging && !row.partner && row.code !== "SID" && e.preventDefault()}
+                onDragOver={(e) => dragging && row.fillIndex !== null && e.preventDefault()}
                 onDrop={(e) => onDrop(e, row.fillIndex)}
                 onKeyDown={fixed ? undefined : (e) => onKey(e, code)}
               >

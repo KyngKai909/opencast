@@ -40,6 +40,8 @@ export interface DbBreak {
   /** Break time the producer fills under barter; the station can't sell it. */
   producerShareMs: number;
   fills: DbFill[];
+  /** The break rule's cadence leaves spots out of it (added 2026-09-29): nothing is sold in it. */
+  noSpots?: boolean;
 }
 
 let n = 0;
@@ -123,6 +125,7 @@ export function breakSlot(b: DbBreak) {
     origin: b.origin,
     producerShareMs: b.producerShareMs,
     filledMs,
-    openMs: Math.max(0, b.lengthMs - Math.max(filledMs, b.producerShareMs + station))
+    // A break spots don't air in has no spot time open.
+    openMs: b.noSpots ? 0 : Math.max(0, b.lengthMs - Math.max(filledMs, b.producerShareMs + station))
   };
 }

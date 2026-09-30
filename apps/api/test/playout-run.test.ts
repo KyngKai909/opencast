@@ -106,7 +106,9 @@ describe("an evening, prepared once and assembled", () => {
     const evening = rows.filter((r) => r.startedAt >= new Date("2026-10-02T03:00:00Z"));
     const at = (iso: string) => evening.find((r) => r.startedAt.toISOString() === iso);
     expect(at("2026-10-02T03:00:00.000Z")).toMatchObject({ code: "PGM", reason: "planned", endedAt: new Date("2026-10-02T03:00:20.000Z") });
-    expect(at("2026-10-02T03:00:20.000Z")).toMatchObject({ code: "SPT", endedAt: new Date("2026-10-02T03:00:35.000Z") });
+    // The break: a bumper into it (since 2026-09-29), then the spot.
+    expect(at("2026-10-02T03:00:20.000Z")).toMatchObject({ code: "BMP", endedAt: new Date("2026-10-02T03:00:28.000Z") });
+    expect(at("2026-10-02T03:00:28.000Z")).toMatchObject({ code: "SPT", endedAt: new Date("2026-10-02T03:00:43.000Z") });
     expect(at("2026-10-02T03:01:00.000Z")).toMatchObject({ code: "PGM", carriageAgreementId: agreementId });
     // The carried episode's barter break: the producer's spot first.
     const reelSpot = evening.find((r) => r.code === "SPT" && r.startedAt > new Date("2026-10-02T03:01:00Z"))!;
@@ -117,7 +119,9 @@ describe("an evening, prepared once and assembled", () => {
     expect(evening.filter((r) => r.startedAt >= new Date("2026-10-02T03:03:00Z")).map((r) => `${r.startedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual([
       "03:03:00 OPEN slate",
       "03:05:56 SID planned",
-      "03:06:00 PGM planned"
+      "03:06:00 PGM planned",
+      // Its break opens with a bumper (since 2026-09-29), published by 3:06:30.
+      "03:06:20 BMP planned"
     ]);
     // Never silent otherwise.
     const before = evening.filter((r) => r.startedAt < new Date("2026-10-02T03:03:00Z"));

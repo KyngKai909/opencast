@@ -396,9 +396,10 @@ export const breakRules = broadcast.table(
     adsFromPartners: boolean("ads_from_partners").notNull().default(false),
     /**
      * Added 2026-09-29 (migration 0024): how often the station ID, bumpers and credit air in breaks,
-     * `{ stationId, bumpers, underwriting }`, each `{ every, n? }`. Null: every break for all three.
+     * `{ stationId, bumpers, underwriting, spots? }`, each `{ every, n? }`. Null: every break for all
+     * of them. `spots` was added later the same day, in the same column (no migration); without it, every break.
      */
-    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow }>(),
+    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow }>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [

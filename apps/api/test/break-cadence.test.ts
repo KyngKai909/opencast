@@ -40,7 +40,7 @@ describe("the cadence, worked out", () => {
   it("every break (the default), and a stored rule without one reads as the default", () => {
     expect(run({ every: "break" })).toHaveLength(8);
     expect(cadenceOf(null)).toEqual(DEFAULT_CADENCE);
-    expect(cadenceOf({ stationId: { every: "never" }, bumpers: { every: "n_programs" } })).toEqual({ stationId: { every: "break" }, bumpers: { every: "n_programs", n: 2 }, underwriting: { every: "break" } });
+    expect(cadenceOf({ stationId: { every: "never" }, bumpers: { every: "n_programs" } })).toEqual({ stationId: { every: "break" }, bumpers: { every: "n_programs", n: 2 }, underwriting: { every: "break" }, spots: { every: "break" } });
   });
 
   it("after every program: only the breaks that close a program", () => {
@@ -120,8 +120,8 @@ describe("the break rule's cadence", () => {
   it("defaults to every break, keeps what's set when left out, and refuses a station ID that never airs", async () => {
     const id = await station("BEAT", 121);
     const got = await kai.get(`/v1/stations/${id}/break-rule`).expect(200);
-    expect(got.body.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } });
-    const cadence = { stationId: { every: "hour" }, bumpers: { every: "n_programs", n: 3 }, underwriting: { every: "never" } };
+    expect(got.body.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } });
+    const cadence = { stationId: { every: "hour" }, bumpers: { every: "n_programs", n: 3 }, underwriting: { every: "never" }, spots: { every: "break" } };
     const set = await kai.put(`/v1/stations/${id}/break-rule`, rule({ cadence })).expect(200);
     expect(set.body.cadence).toEqual(cadence);
     // An app that doesn't know the field leaves it alone.

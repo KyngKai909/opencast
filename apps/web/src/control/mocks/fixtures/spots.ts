@@ -99,6 +99,8 @@ export function placeRotation(breaks: DbBreak[], nowIso: string, main: PlaceSpot
     }
     const kept = b.fills.filter((f) => f.kind !== "spot");
     const base = { ...b, fills: kept };
+    // The break rule's cadence leaves spots out of it: nothing is placed.
+    if (b.noSpots) return base;
     let room = freeMs(base);
     const placed: DbFill[] = [];
     const seen = new Map<string, number>();

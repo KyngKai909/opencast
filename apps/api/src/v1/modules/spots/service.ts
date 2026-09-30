@@ -178,6 +178,8 @@ export interface RotationView {
 const SP = schema.spotsTable;
 const AD = schema.advertisers;
 const AI = schema.airings;
+/** Why a station whose break rule never airs spots is left out of a spot's stations (added 2026-09-29). */
+const NO_SPOTS = "doesn't air spots";
 const EMPTY_TARGETING: Targeting = { withinMiles: null, locationIds: [], marketIds: [], stationCategories: [], dayparts: [], excludedStationIds: [] };
 
 export function createSpotsService(ctx: ModuleContext): SpotsService {
@@ -526,7 +528,11 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const markets = await services.network.allMarkets();
       candidates = await services.stations.inMarkets(markets.map((m) => m.id));
     }
-    const typical = await services.audience.typicalTunedIn(candidates.map((c) => c.id), deps.clock.now());
+    const [typical, noSpots] = await Promise.all([
+      services.audience.typicalTunedIn(candidates.map((c) => c.id), deps.clock.now()),
+      // Stations whose breaks never air spots (their break rule, added 2026-09-29) aren't promised.
+      services.stations.withoutSpots(candidates.map((c) => c.id))
+    ]);
     const reach = targeting.withinMiles ?? null;
     const results: Array<TargetMatch & { stationId: string }> = [];
     for (const station of candidates) {
@@ -557,6 +563,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (station.blockedCategories.map((c) => c.toLowerCase()).includes(row.category.toLowerCase())) {
         included = false;
         reason = "doesn't carry this category";
+      }
+      if (noSpots.has(station.id)) {
+        included = false;
+        reason = NO_SPOTS;
       }
       if (included && !station.public) {
         reason = "Not on air yet";
@@ -1098,7 +1108,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const stories = await pauseStories(stationId, listed);
       for (const row of listed) {
         const matched = (await match(row, await targetingFor(row))).find((m) => m.stationId === stationId);
-        if (!matched?.included) continue;
+        // A station that doesn't air spots now still sees what's listed for it (its rotations stay).
+        if (!matched || (!matched.included && matched.reason !== NO_SPOTS)) continue;
         if (row.status === "paused" && !inMain.has(row.id) && !inBackup.has(row.id)) continue;
         if (filter.category && row.category !== filter.category) continue;
         if (filter.withinMiles && matched.miles !== null && matched.miles > filter.withinMiles) continue;

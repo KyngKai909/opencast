@@ -49,7 +49,8 @@ beforeAll(async () => {
     .put(`/v1/stations/${beat.id}/break-rule`, { mode: "after_every_program", everyMinutes: null, lengthMs: 120_000, spotMsPerHour: 180_000, sameSpotPerHour: 4, fillOrder: ["SPT", "UND", "BMP", "SID"], openTimeTo: "spot_market", blockedCategories: [] })
     .expect(200);
   await itemFixture(h, beat.id, { title: "BEAT ident", code: "SID", durationMs: 4_000, location: await dummyFile() });
-  await itemFixture(h, beat.id, { title: "Back to the reel", code: "BMP", durationMs: 8_000, location: await dummyFile() });
+  // A 4-second bumper: one opens the break and one closes it (since 2026-09-29), with room for the spot between.
+  await itemFixture(h, beat.id, { title: "Back to the reel", code: "BMP", durationMs: 4_000, location: await dummyFile() });
   const show = await itemFixture(h, beat.id, { title: "Late Crate", durationMs: 36_000, location: await dummyFile() });
   programCid = (await h.services.library.currentContent([show.id])).get(show.id)!;
   // An 80-second slot: 36 s of program, then a 44-second break. Then a 40-second slot (a 4-second break).
@@ -127,13 +128,14 @@ describe("the channel's playlists", () => {
     const ranges = parseDateRanges(text);
     for (const r of ranges) expect(HLS_ATTRIBUTES[r.class as keyof typeof HLS_ATTRIBUTES].safeParse(r.attributes).success).toBe(true);
 
-    // The items from 3:00, in log order: program, the break (spot, credit, bumper, station ID), program, station ID.
+    // The items from 3:00, in log order: program, the break (bumper in, spot, credit, bumper out, station ID), program, station ID.
     const items = ranges.filter((r) => r.class === HLS_CLASS.item && r.start >= Date.parse("2026-10-02T03:00:00Z") && r.start < Date.parse("2026-10-02T03:02:00Z"));
     expect(items.map((r) => `${new Date(r.start).toISOString().slice(11, 19)} ${r.attributes.code} ${(r.end! - r.start) / 1000}`)).toEqual([
       "03:00:00 PGM 36",
-      "03:00:36 SPT 15",
-      "03:00:51 UND 15",
-      "03:01:06 BMP 8",
+      "03:00:36 BMP 4",
+      "03:00:40 SPT 15",
+      "03:00:55 UND 15",
+      "03:01:10 BMP 4",
       "03:01:16 SID 4",
       "03:01:20 PGM 36",
       "03:01:56 SID 4"
@@ -160,9 +162,9 @@ describe("the channel's playlists", () => {
     // The bug over the program (not over the credit or station ID); the spot's code for its last 10 s.
     const bugs = ranges.filter((r) => r.class === HLS_CLASS.bug);
     expect(bugs.some((r) => r.start === Date.parse("2026-10-02T03:00:00Z") && r.attributes.callSign === "BEAT" && r.attributes.channel === "12.1" && r.attributes.position === "bottom_right")).toBe(true);
-    expect(bugs.some((r) => r.start === Date.parse("2026-10-02T03:00:51Z"))).toBe(false);
+    expect(bugs.some((r) => r.start === Date.parse("2026-10-02T03:00:55Z"))).toBe(false);
     const code = ranges.find((r) => r.class === HLS_CLASS.code)!;
-    expect(new Date(code.start).toISOString()).toBe("2026-10-02T03:00:41.000Z");
+    expect(new Date(code.start).toISOString()).toBe("2026-10-02T03:00:45.000Z");
     expect(code.attributes).toMatchObject({ spotId, code: "ORANGE10", offer: "10% off", qrUrl: `https://app.opencast.test/c/ORANGE10?s=${beat.id}` });
 
     // The audio-only rendition points at its own segments, the same way.
@@ -173,16 +175,17 @@ describe("the channel's playlists", () => {
     const rows = (await asRun()).filter((r) => r.startedAt >= new Date("2026-10-02T03:00:00Z") && r.startedAt < new Date("2026-10-02T03:02:00Z"));
     expect(rows.map((r) => `${r.startedAt.toISOString().slice(11, 19)}-${r.endedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual([
       "03:00:00-03:00:36 PGM planned",
-      "03:00:36-03:00:51 SPT rotation",
-      "03:00:51-03:01:06 UND planned",
-      "03:01:06-03:01:14 BMP planned",
+      "03:00:36-03:00:40 BMP planned",
+      "03:00:40-03:00:55 SPT rotation",
+      "03:00:55-03:01:10 UND planned",
+      "03:01:10-03:01:14 BMP planned",
       "03:01:14-03:01:16 OPEN planned",
       "03:01:16-03:01:20 SID planned",
       "03:01:20-03:01:56 PGM planned",
       "03:01:56-03:02:00 SID planned"
     ]);
     // Billing reads it: the spot was paid for from its as-run entry.
-    expect(rows[1].airingId).toBeTruthy();
+    expect(rows[2].airingId).toBeTruthy();
     expect((await h.services.ledger.stationEarnings(beat.id, "month")).account.availableMicros).toBe($(4));
     // Before 3:00 nothing was on the log: station ID and bumpers, never nothing.
     expect((await asRun()).filter((r) => r.startedAt < new Date("2026-10-02T03:00:00Z")).every((r) => r.reason === "station_id_fill")).toBe(true);

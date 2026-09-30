@@ -65,8 +65,8 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     openTimeTo: "spot_market",
     blockedCategories: [],
     adsFromPartners: false,
-    // Added 2026-09-29: the station ID, bumpers and credit in every break (as before).
-    cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" } },
+    // Added 2026-09-29: the station ID, bumpers, credit and spots in every break (as before).
+    cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } },
     ...o
   };
 }
@@ -74,7 +74,8 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
 /** A station's break rule as the mock keeps it (the default until it's set). */
 export function breakRuleOf(stationId: string): BreakRule {
   const rule = stationState().breakRules[stationId];
-  return rule ? { ...defaultBreakRule(), ...rule, cadence: rule.cadence ?? defaultBreakRule().cadence } : defaultBreakRule();
+  const cadence = rule?.cadence ? { ...rule.cadence, spots: rule.cadence.spots ?? { every: "break" as const } } : defaultBreakRule().cadence;
+  return rule ? { ...defaultBreakRule(), ...rule, cadence } : defaultBreakRule();
 }
 
 /**
@@ -82,7 +83,7 @@ export function breakRuleOf(stationId: string): BreakRule {
  * the API decides it for breaks nothing has aired in yet: every break; the break after a program
  * (one "After …"); the first after-program break, then every Nth; or the first break in each hour.
  */
-export function breaksAiring<B extends { startsAt: string; context: string }>(breaks: B[], part: "stationId" | "bumpers" | "underwriting", rule: Pick<BreakRule, "cadence">): B[] {
+export function breaksAiring<B extends { startsAt: string; context: string }>(breaks: B[], part: "stationId" | "bumpers" | "underwriting" | "spots", rule: Pick<BreakRule, "cadence">): B[] {
   const c = rule.cadence?.[part] ?? { every: "break" as const };
   const after = (b: B) => b.context.startsWith("After");
   if (c.every === "break") return breaks;

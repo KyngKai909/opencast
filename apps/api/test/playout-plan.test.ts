@@ -70,31 +70,24 @@ describe("filling breaks", () => {
 });
 
 describe("the run sheet", () => {
-  it("covers the hour with no gaps: program, then each break's spot, credit, bumpers and station ID last", async () => {
+  it("covers the hour with no gaps: program, then each break's bumper in, spot, credit, bumper out and station ID last", async () => {
     const segments = await planner.plan(beat.id, new Date("2026-10-02T03:00:00Z"), new Date("2026-10-02T04:00:00Z"));
     for (let i = 1; i < segments.length; i++) expect(segments[i].startsAt.getTime()).toBe(segments[i - 1].endsAt.getTime());
+    // Since 2026-09-29 a bumper opens the break and one closes it; what's left holds on the slate.
     expect(shape(segments)).toEqual([
       "03:00:00 PGM 1800s",
-      "03:30:00 SPT 30s",
-      "03:30:30 UND 15s",
-      "03:30:45 BMP 10s",
+      "03:30:00 BMP 10s",
+      "03:30:10 SPT 30s",
+      "03:30:40 UND 15s",
       "03:30:55 BMP 10s",
-      "03:31:05 BMP 10s",
-      "03:31:15 BMP 10s",
-      "03:31:25 BMP 10s",
-      "03:31:35 BMP 10s",
-      "03:31:45 BMP 10s",
+      "03:31:05 OPEN 50s",
       "03:31:55 SID 5s",
       "03:32:00 PGM 1560s",
-      "03:58:00 SPT 30s",
-      "03:58:30 UND 15s",
-      "03:58:45 BMP 10s",
+      "03:58:00 BMP 10s",
+      "03:58:10 SPT 30s",
+      "03:58:40 UND 15s",
       "03:58:55 BMP 10s",
-      "03:59:05 BMP 10s",
-      "03:59:15 BMP 10s",
-      "03:59:25 BMP 10s",
-      "03:59:35 BMP 10s",
-      "03:59:45 BMP 10s",
+      "03:59:05 OPEN 50s",
       "03:59:55 SID 5s"
     ]);
     // The program resumes where it left off.
@@ -102,7 +95,7 @@ describe("the run sheet", () => {
     expect(resumed.source).toMatchObject({ kind: "file", seekMs: 1_800_000 });
     // The spot carries its code for the last :10 when it has one; the credit is a generated slate.
     expect(segments.find((s) => s.code === "UND")!.label).toBe("Inland Beat is made possible by");
-    expect(segments[1]).toMatchObject({ inBreak: true, airingId: expect.any(String) });
+    expect(segments[2]).toMatchObject({ inBreak: true, airingId: expect.any(String) });
   });
 
   it("open time airs station ID and bumpers, never nothing", async () => {

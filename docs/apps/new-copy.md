@@ -558,6 +558,21 @@ Master control's setup lets every step be passed (only signing on checks what's 
 | The generated station ID's preview (a dialog; a sheet on the phone) | eyebrow "Made for you", title "Generated station ID", a picture of it ({BEAT} large, {12.1}, "{Inland Beat} · {Redlands}"; screen readers: "{BEAT 12.1} in {BEAT}'s colour"); TV: "Ten seconds over a soft sound bed, where {BEAT} needs a station ID: in breaks, in open time and when it signs back on." Radio: "Ten seconds of a soft sound bed, where {WAVE} needs a station ID. Relays show {WAVE}'s colour with its call sign and channel over it." Then "It's made again when {BEAT}'s name, call sign, channel or colour changes, and any station ID you upload replaces it."; "Done" |
 | The generated station ID itself (on air, no app words) | {BEAT} (or the station's name before it has a call sign), {12.1}, "{Inland Beat} · {Redlands}", white on the station's colour |
 
+### Spots: how often; bumpers into and out of the break (the user's decisions, 2026-09-29)
+
+Settings, Breaks' "How often" gains spots, and its rows follow the ladder's order; the ladder draws a bumper into the break and one out of it (A143, answered). No frame draws any of it. A150 in open-questions.md.
+
+| Where | Words |
+|---|---|
+| Settings, Breaks, How often: the rows | "Spots", "Thank-you credit", "Bumpers", "Station ID", in that order (was Station ID, Bumpers, Thank-you credit). Spots: the same choices as bumpers and the credit, "Never" included. Screen readers: "How often: Spots" |
+| Settings, Breaks, How often: the line under Spots | "In every break, up to the hourly cap"; "Up to the hourly cap. Other breaks are only as long as the rest needs" (after programs, once an hour); "Breaks are only as long as the rest needs. Nothing is sold in them" (never) |
+| Settings, Breaks, How often: the line under Bumpers | "One into the break and one out of it" in place of "In their place in the order above"; "No bumpers in breaks" (never) in place of "Breaks hold on the station ID slate instead" |
+| Settings, Breaks, the ladder ("In every break, in this order") | a first row, fixed: "A bumper into the break", "Before the spots. With one bumper in your library, it opens and closes the break", ":10". The bumper's row (fixed, before the station ID): "A bumper out of the break", "Before the station ID. Time left over holds on the station ID slate", in place of "A bumper", "Fills any time left over". Spots run "0:00 – {1:20}" (both bumpers taken off). Only the spots and the credit can be dragged; "Ads from partners" sits before the bumper out of the break. Screen readers, after a move: "{Spots from your rotation}, now {3} of {5}" |
+| Program log, the Breaks pane | a "Spots" row, before "Station ID", when spots don't air in every break: "After every program", "After every {3} programs", "Once an hour", "Never" |
+| Program log and the Monitor's rundown, a break's rows (the API's words) | the bumper's own title, with "Into the break" under the first and "Out of the break" under the one after the credit; time left over is "Station ID slate" (`OPEN`, "Holds on the station ID slate" under it) in place of "Bumpers and station ID slate"; a break spots don't air in has no "Open" row |
+| The mock's break rows (a break spots don't air in) | "Station ID slate" in place of "Open" |
+| Business app, a spot's stations (the API's reason, shown as it comes) | "doesn't air spots" for a station whose breaks never air spots |
+
 ### Back to live, on the web, the phone, TV mode and the phone remote (the user's request, 2026-09-29)
 
 "Back to live" is the reference's own words (home 03's "No scrub bar" note; you 01's "Pause holds for"). It now shows whenever the picture is behind live (from a pause until Back to live or a channel change, paused or playing on), not only after the 30-minute hold. No frame draws where; A145 and A146 in open-questions.md. The words below are what's new around it.

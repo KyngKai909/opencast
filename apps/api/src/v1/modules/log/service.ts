@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -6,7 +6,7 @@ import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
-import { breakPartsFor } from "../playout/engine/cadence.js";
+import { cadenceContext, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
 
@@ -37,6 +37,11 @@ export interface BreakSlotView {
   filledMs: number;
   openMs: number;
   logEntryId: string | null;
+  /**
+   * What airs in it: the station ID, bumpers, the credit and spots, each as often as the break
+   * rule's cadence says (added 2026-09-29). Left out: everything (every break).
+   */
+  parts?: BreakParts;
 }
 
 export interface Gap {
@@ -114,8 +119,11 @@ export interface LogService {
   upcomingForProgram(programId: string, limit: number): Promise<AiringRef[]>;
   itemUsage(itemId: string): Promise<{ upcoming: number }>;
   gaps(stationId: string, from: Date, to: Date): Promise<Gap[]>;
-  /** Break slots in a window, generated from the break rule. Stored ones carry their id. */
-  breaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
+  /**
+   * Break slots in a window, generated from the break rule. Stored ones carry their id. With
+   * `everyPart`, as the rule lays them out with every part in every break (its cadence left aside).
+   */
+  breaks(stationId: string, from: Date, to: Date, options?: { everyPart?: boolean }): Promise<BreakSlotView[]>;
   /** Stores the generated breaks for a window (spots are placed into stored breaks). */
   ensureBreaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
   /** Entries within a window, for sign-on checks and playout. */
@@ -398,13 +406,70 @@ export function createLogService(ctx: ModuleContext): LogService {
     };
   }
 
-  async function generateBreaks(stationId: string, from: Date, to: Date): Promise<Array<Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">>> {
+  type GeneratedBreak = Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">;
+
+  /**
+   * The breaks in a window, from the break rule. With a cadence (added 2026-09-29), each break
+   * carries what airs in it, decided in order from an hour before now (or `from`, if earlier) so
+   * any window decides the same; a break without spots is only as long as what airs in it needs,
+   * and the program goes on sooner (the break that closes a program's slot keeps the slot's time).
+   * Breaks cued live are decided in their place too, and come back with the rest.
+   */
+  async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false): Promise<GeneratedBreak[]> {
     const rule = await services.stations.breakRule(stationId);
-    const rows = await load([stationId], new Date(from.getTime() - 6 * HOUR), to);
+    const every = everyPart || isEveryBreak(rule.cadence);
+    const now = deps.clock.now().getTime();
+    const start = every ? from : new Date(Math.min(from.getTime(), now - HOUR));
+    const lookback = new Date(start.getTime() - 6 * HOUR);
+    const rows = await load([stationId], lookback, to);
     const ctx = await context(rows);
-    const slots: Array<Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">> = [];
+    const first = rows[0]?.startsAt && rows[0].startsAt < lookback ? rows[0].startsAt : lookback;
+    const [decided, filled] = every
+      ? [null, new Set<number>()]
+      : await Promise.all([
+          cadenceContext(moduleCtx, stationId, { cadence: rule.cadence, from: first, to, rows, readEntries: (a, b) => load([stationId], a, b) }),
+          // Breaks filled with spots (the filler marks only those): they keep them.
+          db
+            .select({ startsAt: B.startsAt })
+            .from(B)
+            .where(and(eq(B.stationId, stationId), isNotNull(B.filledAt), gte(B.startsAt, first), lt(B.startsAt, to)))
+            .then((r) => new Set(r.map((b) => b.startsAt.getTime())))
+        ]);
+    const cadence = decided && { ...decided, filled };
+    // Breaks cued from a live block, decided where they fall (with the rule alone, withStored adds them).
+    const cued = cadence
+      ? (await db.select().from(B).where(and(eq(B.stationId, stationId), eq(B.origin, "cued_live"), gte(B.startsAt, lookback), lt(B.startsAt, to))).orderBy(asc(B.startsAt))).map((b) => ({
+          startsAt: b.startsAt.toISOString(),
+          lengthMs: b.lengthMs,
+          context: "Cued live",
+          origin: "cued_live" as const,
+          producerShareMs: 0,
+          logEntryId: b.logEntryId
+        }))
+      : [];
+    const slots: GeneratedBreak[] = [];
+    /** What airs in a break (every part without a cadence) and how long it runs. */
+    const decide = (b: { startsAt: number; lengthMs: number; afterProgram: boolean; fixed: boolean; programId: string | null; producerShareMs: number }): { parts: BreakParts | undefined; lengthMs: number } => {
+      if (!cadence) return { parts: undefined, lengthMs: b.lengthMs };
+      const parts = cadence.decider.next({ key: String(b.startsAt), startsAt: b.startsAt, endsAt: b.startsAt + b.lengthMs, afterProgram: b.afterProgram }, { spots: cadence.filled.has(b.startsAt) });
+      // Without spots: only as long as what airs needs, where the program can move up.
+      if (parts.spots || b.fixed || !cadence.needs) return { parts, lengthMs: b.lengthMs };
+      return { parts, lengthMs: Math.min(b.lengthMs, needMs(cadence.needs, parts, b)) };
+    };
+    let c = 0;
+    const cuedBefore = (t: number) => {
+      while (c < cued.length && Date.parse(cued[c].startsAt) < t) {
+        const b = cued[c++];
+        slots.push({ ...b, parts: decide({ startsAt: Date.parse(b.startsAt), lengthMs: b.lengthMs, afterProgram: false, fixed: true, programId: null, producerShareMs: 0 }).parts });
+      }
+    };
     for (const row of rows) {
-      if (row.kind !== "program") continue; // Live programs cue their own; off-air has none.
+      cuedBefore(row.startsAt.getTime());
+      if (row.kind !== "program") {
+        // Live programs cue their own; off-air has none.
+        if (row.kind === "live") cuedBefore(row.endsAt.getTime());
+        continue;
+      }
       const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
       const agreement = row.carriageAgreementId ? ctx.agreements.get(row.carriageAgreementId) : undefined;
       const title = titleOf(row, ctx);
@@ -412,6 +477,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       const slotMs = row.endsAt.getTime() - row.startsAt.getTime();
       const itemMs = Math.min(item?.durationMs ?? slotMs, slotMs);
       const barterPerHour = agreement && (agreement.term === "barter" || agreement.term === "cash_plus_barter") ? (agreement.barterMakerMsPerHour ?? 0) : 0;
+      const programId = row.programId ?? item?.programId ?? null;
 
       // Inside the program, every N minutes (or at the maker's break points).
       if (rule.mode === "every_n_minutes" && rule.everyMinutes) {
@@ -423,25 +489,33 @@ export function createLogService(ctx: ModuleContext): LogService {
           // At the segment boundary nearest the maker's break point.
           const startsAt = new Date(row.startsAt.getTime() + snapToSegment(point) + shift);
           const perBreakShare = barterPerHour ? Math.min(rule.lengthMs, Math.round(barterPerHour / (60 / rule.everyMinutes))) : 0;
-          slots.push({
-            startsAt: startsAt.toISOString(),
-            lengthMs: rule.lengthMs,
-            context: `During ${title}${episode}`,
-            origin: barterPerHour ? "carried_barter" : "rule",
-            producerShareMs: perBreakShare,
-            logEntryId: row.id
-          });
-          shift += rule.lengthMs;
+          const { parts, lengthMs } = decide({ startsAt: startsAt.getTime(), lengthMs: rule.lengthMs, afterProgram: false, fixed: false, programId, producerShareMs: perBreakShare });
+          // Nothing airs in it at all: no break.
+          if (lengthMs > 0) {
+            slots.push({
+              startsAt: startsAt.toISOString(),
+              lengthMs,
+              context: `During ${title}${episode}`,
+              origin: barterPerHour ? "carried_barter" : "rule",
+              producerShareMs: perBreakShare,
+              logEntryId: row.id,
+              ...(parts ? { parts } : {})
+            });
+          }
+          shift += lengthMs;
         }
         const used = itemMs + shift;
         if (slotMs - used > 0) {
+          const startsAt = row.startsAt.getTime() + used;
+          const { parts } = decide({ startsAt, lengthMs: slotMs - used, afterProgram: true, fixed: true, programId, producerShareMs: 0 });
           slots.push({
-            startsAt: new Date(row.startsAt.getTime() + used).toISOString(),
+            startsAt: new Date(startsAt).toISOString(),
             lengthMs: slotMs - used,
             context: `After ${title}${episode}`,
             origin: "rule",
             producerShareMs: 0,
-            logEntryId: row.id
+            logEntryId: row.id,
+            ...(parts ? { parts } : {})
           });
         }
         continue;
@@ -449,20 +523,25 @@ export function createLogService(ctx: ModuleContext): LogService {
       // After every program (and with no rule): the time between the item's end and the slot's end.
       const slack = slotMs - itemMs;
       if (slack > 0) {
+        const startsAt = row.startsAt.getTime() + itemMs;
+        const producerShareMs = barterPerHour ? Math.min(slack, Math.round((barterPerHour * slotMs) / HOUR)) : 0;
+        const { parts } = decide({ startsAt, lengthMs: slack, afterProgram: true, fixed: true, programId, producerShareMs });
         slots.push({
-          startsAt: new Date(row.startsAt.getTime() + itemMs).toISOString(),
+          startsAt: new Date(startsAt).toISOString(),
           lengthMs: slack,
           context: `After ${title}${episode}`,
           origin: barterPerHour ? "carried_barter" : "rule",
-          producerShareMs: barterPerHour ? Math.min(slack, Math.round((barterPerHour * slotMs) / HOUR)) : 0,
-          logEntryId: row.id
+          producerShareMs,
+          logEntryId: row.id,
+          ...(parts ? { parts } : {})
         });
       }
     }
+    cuedBefore(Infinity);
     return slots.filter((s) => Date.parse(s.startsAt) >= from.getTime() && Date.parse(s.startsAt) < to.getTime());
   }
 
-  async function withStored(stationId: string, generatedIn: Awaited<ReturnType<typeof generateBreaks>>, from: Date, to: Date): Promise<BreakSlotView[]> {
+  async function withStored(stationId: string, generatedIn: GeneratedBreak[], from: Date, to: Date): Promise<BreakSlotView[]> {
     let generated = generatedIn;
     const stored = await db
       .select()
@@ -470,15 +549,19 @@ export function createLogService(ctx: ModuleContext): LogService {
       .where(and(eq(B.stationId, stationId), gte(B.startsAt, from), lt(B.startsAt, to)));
     const byTime = new Map(stored.map((b) => [b.startsAt.toISOString(), b]));
     const filled = await services.spots.filledMsByBreak(stored.map((b) => b.id));
-    // Breaks cued from a live block aren't generated from the rule; they're stored as they happen.
+    // Breaks cued from a live block aren't generated from the rule; they're stored as they happen
+    // (with a cadence, they come generated, decided in their place).
+    const have = new Set(generated.map((g) => g.startsAt));
     const cued = stored
-      .filter((b) => b.origin === "cued_live")
+      .filter((b) => b.origin === "cued_live" && !have.has(b.startsAt.toISOString()))
       .map((b) => ({ startsAt: b.startsAt.toISOString(), lengthMs: b.lengthMs, context: "Cued live", origin: "cued_live" as const, producerShareMs: 0, logEntryId: b.logEntryId }));
     generated = [...generated, ...cued].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
     return generated.map((slot) => {
       const row = byTime.get(slot.startsAt);
       const filledMs = row ? (filled.get(row.id) ?? 0) : 0;
-      return { ...slot, id: row?.id ?? null, filledAt: row?.filledAt?.toISOString() ?? null, filledMs, openMs: Math.max(0, slot.lengthMs - slot.producerShareMs - filledMs) };
+      // Spot time: none in a break spots don't air in.
+      const openMs = partsOf(slot).spots ? Math.max(0, slot.lengthMs - slot.producerShareMs - filledMs) : 0;
+      return { ...slot, id: row?.id ?? null, filledAt: row?.filledAt?.toISOString() ?? null, filledMs, openMs };
     });
   }
 
@@ -555,17 +638,20 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!slots.length) return result;
       const stored = slots.map((s) => s.id).filter((v): v is string => Boolean(v));
       const entryIds = [...new Set(slots.map((s) => s.logEntryId).filter((v): v is string => Boolean(v)))];
-      const [placed, rotations, credits, entries, stationIdMs] = await Promise.all([
+      const [placed, rotations, credits, entries, stationIdMs, fillers] = await Promise.all([
         services.spots.breakAirings(stored),
         services.spots.rotations(stationId),
         services.spots.creditsFor(stationId),
         entryIds.length ? db.select().from(E).where(inArray(E.id, entryIds)) : Promise.resolve([] as Row[]),
         // Ten seconds for a station airing its generated station ID.
-        services.playout.stationIdMs(stationId)
+        services.playout.stationIdMs(stationId),
+        services.library.fillers(stationId)
       ]);
       const ctx = await context(entries);
-      // How often the station ID, bumpers and credit air (the break rule's cadence).
-      const partsOf = await breakPartsFor(moduleCtx, stationId, { breaks: slots });
+      // The bumper into the break and the one out of it (changed 2026-09-29): the library's first
+      // two, or its one bumper twice.
+      const bumperIn = fillers.bumpers[0];
+      const bumperOut = fillers.bumpers[1] ?? fillers.bumpers[0];
       const main = new Set(rotations.main.spots.map((s) => s.spotId));
       const backup = new Set(rotations.backup.spots.map((s) => s.spotId));
       for (const slot of slots) {
@@ -587,19 +673,32 @@ export function createLogService(ctx: ModuleContext): LogService {
           const rotation = main.has(a.spotId) ? "main" : backup.has(a.spotId) ? "backup" : "main";
           rows.push({ id: a.airingId, kind: "spot", title: a.title, lengthMs: a.lengthSec * 1000, spotId: a.spotId, business: a.business, shortName: a.shortName, rotation, note: rotation === "backup" ? "Backup rotation" : null });
         }
-        // What playout adds when it airs the break: the credit, bumpers or the slate, the station ID
-        // last, each as often as the break rule's cadence says.
+        // What playout adds when it airs the break, each as often as the break rule's cadence says
+        // (every part in every break by default): a bumper into the break, before the spots; the
+        // credit after them; a bumper out of the break; the station ID last. Time nothing takes
+        // holds on the station ID slate before the station ID. A break spots don't air in has no
+        // spot time (it's only as long as the rest needs, unless it closes its program's slot).
         const parts = partsOf(slot);
         let left = Math.max(0, slot.lengthMs - rows.reduce((sum, r) => sum + r.lengthMs, 0));
         const sidMs = parts.stationId ? Math.min(left, stationIdMs) : 0;
         left -= sidMs;
-        if (parts.underwriting && credits.length && left >= CREDIT_MS) {
-          rows.push({ id: `${slot.startsAt}:credit`, kind: "underwriting", title: credits.map((c) => c.business).join(", "), lengthMs: CREDIT_MS, spotId: null, business: null, shortName: null, rotation: null, note: "Made possible by" });
-          left -= CREDIT_MS;
+        const credit = parts.underwriting && credits.length > 0 && left >= CREDIT_MS;
+        if (credit) left -= CREDIT_MS;
+        // Each bumper airs whole or not at all: into the break first.
+        const into = parts.bumpers && bumperIn && bumperIn.durationMs! <= left ? bumperIn : null;
+        if (into) left -= into.durationMs!;
+        const outOf = parts.bumpers && bumperOut && bumperOut.durationMs! <= left ? bumperOut : null;
+        if (outOf) left -= outOf.durationMs!;
+        const bumper = (b: NonNullable<typeof into>, where: "in" | "out"): BreakContent => ({ id: `${slot.startsAt}:bmp:${where}`, kind: "bumper", title: b.title, lengthMs: b.durationMs!, spotId: null, business: null, shortName: null, rotation: null, note: where === "in" ? "Into the break" : "Out of the break" });
+        if (into) rows.unshift(bumper(into, "in"));
+        // Before spots are placed (up to 20 minutes ahead), the spot time is open.
+        if (!slot.id && parts.spots && left > 0) {
+          rows.push({ id: `${slot.startsAt}:open`, kind: "open", title: "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: "Filled from the rotation about 20 minutes before" });
+          left = 0;
         }
-        if (left > 0) {
-          rows.push({ id: `${slot.startsAt}:open`, kind: slot.id && parts.bumpers ? "bumper" : "open", title: slot.id ? (parts.bumpers ? "Bumpers and station ID slate" : "Station ID slate") : "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: slot.id ? null : "Filled from the rotation about 20 minutes before" });
-        }
+        if (credit) rows.push({ id: `${slot.startsAt}:credit`, kind: "underwriting", title: credits.map((c) => c.business).join(", "), lengthMs: CREDIT_MS, spotId: null, business: null, shortName: null, rotation: null, note: "Made possible by" });
+        if (outOf) rows.push(bumper(outOf, "out"));
+        if (left > 0) rows.push({ id: `${slot.startsAt}:slate`, kind: "open", title: "Station ID slate", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: null });
         if (sidMs > 0) rows.push({ id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null });
         result.set(slot.startsAt, rows);
       }
@@ -849,8 +948,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       return gapsIn(rows, from, to, offAir);
     },
 
-    async breaks(stationId, from, to) {
-      return withStored(stationId, await generateBreaks(stationId, from, to), from, to);
+    async breaks(stationId, from, to, options) {
+      return withStored(stationId, await generateBreaks(stationId, from, to, options?.everyPart), from, to);
     },
 
     async ensureBreaks(stationId, from, to) {
@@ -954,6 +1053,9 @@ export function createLogService(ctx: ModuleContext): LogService {
       // From the next segment boundary.
       const at = new Date(nextSegment(atTime.getTime()));
       const [row] = await db.insert(B).values({ stationId, startsAt: at, lengthMs, logEntryId, origin: "cued_live" }).returning();
+      // What airs in it, as the rest of the log decides (the break rule's cadence).
+      const decided = (await service.breaks(stationId, at, new Date(at.getTime() + 1))).find((b) => b.id === row.id);
+      if (decided) return decided;
       return {
         id: row.id,
         filledAt: null,
