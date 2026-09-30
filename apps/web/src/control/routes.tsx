@@ -18,8 +18,8 @@ export function AppRoutes() {
   const auth = useAuth();
   const loc = useLocation();
   if (!auth.ready) return null;
-  // Claiming a station starts signed out (rights 05.1): it asks for sign-in itself.
-  if (!auth.signedIn && !loc.pathname.startsWith(controlPath("/claim/"))) return <SignIn />;
+  // Claiming a station (rights 05.1) and an invite's link start signed out: they ask for sign-in themselves.
+  if (!auth.signedIn && !loc.pathname.startsWith(controlPath("/claim/")) && !loc.pathname.startsWith(controlPath("/invites/"))) return <SignIn />;
   return (
     <Routes>
       <Route index element={<Home />} />

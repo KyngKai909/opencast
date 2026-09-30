@@ -107,12 +107,15 @@ function bodyOf<T>(schema: { safeParse(v: unknown): { success: true; data: T } |
 /** The balance, with the account USDC from Clear is sent to (E7). */
 const balanceReply = (id: string) => reply(ledgerApi.getBalance.response, { ...(balanceOf(id) satisfies Balance), depositAddress: depositAddressOf(id) });
 
+/** The API's words when a viewer asks for the balance. */
+const VIEWER_NOTE = "Viewers see results, airings and statements.";
+
 export const moneyHandlers: HttpHandler[] = [
   http.get(path(ledgerApi.getBalance), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
-    const r = roleOn(id, p, "see");
+    const r = roleOn(id, p, "money", VIEWER_NOTE);
     if (r instanceof Response) return r;
     settle(id);
     return balanceReply(id);
@@ -122,7 +125,7 @@ export const moneyHandlers: HttpHandler[] = [
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
-    const r = roleOn(id, p, "see");
+    const r = roleOn(id, p, "money", VIEWER_NOTE);
     if (r instanceof Response) return r;
     settle(id);
     const q = ledgerApi.listMovements.query.safeParse(Object.fromEntries(new URL(request.url).searchParams));

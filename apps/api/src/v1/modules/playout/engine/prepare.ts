@@ -6,7 +6,12 @@
 // records what's ready (`prepared_items`, `prepared_renditions`). A carried or catalog program
 // has one content ID, so it's prepared once for every station that airs it.
 //
-// Nothing airs from a file any more: the channel's playlists point at these segments (assemble.ts).
+// It's prepared from the uploaded original (the library and spots keep it, once, by its content
+// ID, in Infrequent Access), so the 1080p rendition is the original's own 1080p and nothing is
+// encoded twice. Nothing airs from a file any more: the channel's playlists point at these
+// segments (assemble.ts), and previews (the catalog, spot review, order deliveries) play them too.
+// When a file's content ID goes (nothing references it, or a takedown), what was prepared from it
+// goes with it (the playout service's `dropPrepared`).
 //
 // Captions (docs/contract-requests.md X2) are prepared here too, once, and never hold an item up:
 // a track uploaded to an item whose file this is (the library keeps it by content ID), or one
@@ -90,6 +95,41 @@ export function refKey(ref: MediaRef): string | null {
   if (ref.contentId) return ref.contentId;
   if (ref.location) return `loc-${createHash("sha256").update(ref.location).digest("hex").slice(0, 40)}`;
   return null;
+}
+
+/** Queues items to be prepared (the preparer's `want`, and previews from the API): an upsert on `prepared_items`. */
+export async function queuePreparation(db: ModuleContext["deps"]["db"], rows: Array<typeof PI.$inferInsert>): Promise<void> {
+  for (let i = 0; i < rows.length; i += 200) {
+    await db
+      .insert(PI)
+      .values(rows.slice(i, i + 200))
+      .onConflictDoUpdate({
+        target: PI.key,
+        set: {
+          renditions: sql`array(select distinct unnest(${PI.renditions} || excluded.renditions) order by 1)`,
+          neededAt: sql`least(${PI.neededAt}, excluded.needed_at)`,
+          // A band's new renditions put a ready item back in the queue (only those are made).
+          status: sql`case when ${PI.status} = 'ready' and not (excluded.renditions <@ ${PI.renditions}) then 'queued' else ${PI.status} end`
+        }
+      });
+  }
+}
+
+/** The row that asks for a file to be prepared for a band. */
+export function wantRow(ref: WantRef, key: string, current?: typeof PI.$inferInsert): typeof PI.$inferInsert {
+  const renditions = [...new Set([...(current?.renditions ?? []), ...BAND_RENDITIONS[ref.band]])].sort();
+  const neededAt = [current?.neededAt, ref.neededAt].filter((d): d is Date => d instanceof Date).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+  return {
+    key,
+    contentId: ref.contentId ?? null,
+    kind: "file",
+    sourceLocation: ref.contentId ? null : (ref.location ?? null),
+    mediaKind: ref.mediaKind,
+    status: "queued",
+    renditions,
+    durationMs: ref.durationMs ?? current?.durationMs ?? null,
+    neededAt
+  };
 }
 
 export interface TranscodeJob {
@@ -317,14 +357,20 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
     for (const r of rows) markReady(r.key, [r.rendition]);
   }
 
-  /** Reads what the database says is ready (another replica may have prepared it). */
-  async function refresh(keys: string[]) {
-    const unknown = [...new Set(keys)].filter((k) => !ready.has(k));
+  /**
+   * Reads what the database says is ready (another replica may have prepared it). With `force`, it
+   * reads keys it thinks it knows too: what was prepared from a file is deleted when the file goes
+   * (garbage collection, a takedown), and the same bytes stored again later must be prepared again.
+   */
+  async function refresh(keys: string[], options: { force?: boolean } = {}) {
+    const unknown = [...new Set(keys)].filter((k) => options.force || !ready.has(k));
     if (!unknown.length) return;
+    if (options.force) for (const k of unknown) ready.delete(k);
     const rows = await db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, unknown));
     for (const r of rows) markReady(r.key, [r.rendition]);
   }
 
+  /** The file to prepare from: the original, by its content ID (or, from before content IDs, its old location). */
   async function sourceFile(row: typeof PI.$inferSelect, dir: string): Promise<string> {
     if (row.contentId) {
       const file = path.join(dir, "source");
@@ -545,41 +591,17 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
      * ready in every rendition the band needs. A band's missing renditions are added to what's there.
      */
     async want(refs: WantRef[]) {
+      // What's ready is read again first: what was prepared from a file that went is gone.
+      await refresh(refs.map((r) => refKey(r)).filter((k): k is string => Boolean(k)), { force: true });
       const merged = new Map<string, typeof PI.$inferInsert>();
       for (const ref of refs) {
         const key = refKey(ref);
         if (!key) continue;
         if (preparer.isReady(key, ref.band)) continue;
-        const current = merged.get(key);
-        const renditions = [...new Set([...(current?.renditions ?? []), ...BAND_RENDITIONS[ref.band]])].sort();
-        const neededAt = [current?.neededAt, ref.neededAt].filter((d): d is Date => d instanceof Date).sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
-        merged.set(key, {
-          key,
-          contentId: ref.contentId ?? null,
-          kind: "file",
-          sourceLocation: ref.contentId ? null : (ref.location ?? null),
-          mediaKind: ref.mediaKind,
-          status: "queued",
-          renditions,
-          durationMs: ref.durationMs ?? current?.durationMs ?? null,
-          neededAt
-        });
+        merged.set(key, wantRow(ref, key, merged.get(key)));
       }
       const rows = [...merged.values()];
-      for (let i = 0; i < rows.length; i += 200) {
-        await db
-          .insert(PI)
-          .values(rows.slice(i, i + 200))
-          .onConflictDoUpdate({
-            target: PI.key,
-            set: {
-              renditions: sql`array(select distinct unnest(${PI.renditions} || excluded.renditions) order by 1)`,
-              neededAt: sql`least(${PI.neededAt}, excluded.needed_at)`,
-              // A band's new renditions put a ready item back in the queue (only those are made).
-              status: sql`case when ${PI.status} = 'ready' and not (excluded.renditions <@ ${PI.renditions}) then 'queued' else ${PI.status} end`
-            }
-          });
-      }
+      await queuePreparation(db, rows);
       return rows.length;
     },
 

@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { audienceApi } from "@opencast/contracts";
-import { PlayerProvider, startHeartbeat, usePlayer, type EngineOptions, type InputAdapter } from "@opencast/player";
+import { PlayerProvider, startHeartbeat, tuningSoundFrom, usePlayer, type EngineOptions, type InputAdapter } from "@opencast/player";
 import { call } from "../../api/client";
 import { setDevice } from "../device/store";
 import { useChannels, usePresets } from "../data/viewer";
@@ -33,6 +33,8 @@ function PlayerSync() {
     // The account's, or this device's when signed out.
     const w = settings?.watching;
     if (w?.captions) engine.setCaptions(w.captions, w.captionSize);
+    // "Tuning sound", per band (on for radio, off for video unless set): kept for Phase 5's tuning.
+    engine.setOptions({ tuningSound: tuningSoundFrom(w) });
   }, [engine, settings?.watching]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), isPhone() ? "phone" : "web"), [engine]);
   return null;

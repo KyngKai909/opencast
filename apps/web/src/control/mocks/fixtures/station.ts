@@ -13,6 +13,8 @@ export interface StationInvite extends Invite {
   stationId: string;
   note: string | null;
   programIds: string[];
+  /** Who joined with it (the API's `accepted_by`). */
+  acceptedBy?: string | null;
 }
 
 export interface Handover {

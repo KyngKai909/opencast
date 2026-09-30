@@ -2,6 +2,43 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: invites that reach people
+
+Invites and every other email now go out through Resend (`RESEND_API_KEY`; without it, the log, as before). Additive: one new endpoint and one new schema; no migration.
+
+- New: `getInvite` (`GET /invites/:inviteId`, auth optional) → `InvitePreview` `{ id, team: { kind: "station" | "business", id, name, callSign }, role, invitedBy, emailHint, state: "open" | "expired" | "accepted", expiresAt, signedInAs, emailMatches, acceptedByYou }`: what an invite's link page shows. `emailHint` is the invited address masked (`j…@example.com`; null for a phone invite); signed in, `signedInAs` is the account's own email and `emailMatches` whether the account has the invited one (null signed out, for a phone invite, or with the check off). 404 for an unknown invite.
+- `acceptInvite` (no shape change): an invite made to an email needs that email on the signed-in account: a verified email sign-in, Google or Apple address, from Privy's linked accounts (read again at accept time, so an address linked since the first sign-in counts). Otherwise 403 `invite_email_mismatch`, "This invite is for j…@example.com; you're signed in as kai@example.com. Sign in with j…@example.com to join." `INVITE_EMAIL_MATCH=off` turns the check off (docs/open-decisions.md). An invite someone else accepted is 409 `invite_used` (it was 404); accepting your own again answers 200 and changes nothing. Expired is 422 `invite_expired`, as before.
+- `resendInvite` (no shape change): it emails the invite again (it only extended it before), and still extends it a week. At most every 10 minutes: 429 `resend_too_soon`, "It went out 4 minutes ago. You can send it again in 6 minutes." 409 `invite_used` once accepted. 502 `email_not_sent` when the email couldn't be sent, and then nothing changes.
+- Invite links: a station invite's email links to `<APP_ORIGIN>/control/invites/:id` (master control's new accept page; the web app sends `/invites/:id` there too), a business invite's to `<BUSINESS_ORIGIN>/invites/:id` (the business app's). `BUSINESS_ORIGIN` is new (docs/deploy.md).
+- Notices' emails link into the app the notice belongs to, as full addresses: a business notice's `/businesses/:id/…`, `/spots/:id` and `/orders/:id` go to the business app's pages, a station notice's `/stations/:id/…` to master control's (`/control/<call sign>/log`, and so on). The notices themselves (`Notice.link`) are unchanged.
+
+## 2026-09-29: Tuning sound, "External" on the board, the business viewer, a creator's wallet at the claim
+
+From the catch-up report's small fixes. Additive: two optional settings fields. No migration (settings are jsonb).
+
+Changed (additive):
+
+- `ViewerSettings.watching.tuningSound` (optional boolean): "Tuning sound", a soft hiss when changing channel on video (Watching settings on the web, Watching in TV settings). Absent: off. `watching.radioTuningSound` (optional boolean): the radio band's own switch, turned off on the radio band itself (Phase 5 draws it). Absent: on. Before, `watching` dropped unknown keys, so neither could be saved. `packages/player` takes both as `EngineOptions.tuningSound` `{ video, radio }` (`tuningSoundFrom(settings.watching)`); nothing plays yet.
+- `SLOT_STATE_LABELS.listed` (copy only): "External city stream", was "Listed city stream". The slot state stays `listed`.
+
+Behaviour (no shape change):
+
+- A business's viewer sees results, airings and statements only (biz-settings 02.1): `getBalance`, `listMovements`, `listSpots`, `getSpot`, `matchStations`, `listBusinessSponsorships`, `listBusinessOrders`, `getOrder` (as the business) and `listMakers` with a `businessId` now answer 403 to a viewer. `getResults`, `listSpotAirings`, `listStatements`, `getStatementCsv`, `listReceipts`, `getBusiness` and `getConnections` stay open to them.
+- A creator's wallet: `claimFromLink` and `startHandover` read the claimant's wallets from Privy (the embedded wallet the claim page makes with `createWallet`) and record them as `wallet` identities; `approveHandover` reads Privy again when none was recorded. `no_wallet` (422) only when there's still none; its message is now "The creator has no wallet yet. It's made when they claim, signed in: ask them to claim again from their link." Needs `PRIVY_APP_SECRET`.
+
+## 2026-09-29: previews play the prepared segments; files kept as their original
+
+Follow-up to the catch-up report (sections 2 and 4). Additive only: one new enum and optional fields beside each `previewUrl`. No migration.
+
+Changed (additive):
+
+- New: `PreviewStatus` (`catalog.ts`): `"ready" | "preparing" | "failed"`.
+- `previewStatus` (optional, nullable `PreviewStatus`) beside `previewUrl` on an offer's `episodes[]` (`getOffer`), on `Spot.file`, and on `ProductionOrder.deliveries[]`. `SpotPreview` (the market's `MarketSpot.spot.preview`) gains `previewUrl` and `previewStatus` (both optional, nullable).
+  - `preparing`: show "Being prepared"; `previewUrl` is null until it's ready. `failed`: the file couldn't be prepared (it needs replacing). Null or absent: no preview (no file yet, a draft spot, or a rights claim holds the file).
+- `previewUrl` keeps its shape (an HLS URL, or null) but now points at `/v1/previews/<content ID>/<rendition>.m3u8` on the API: a VOD playlist, cached 60 seconds, over the file's prepared segments (the ones it airs from): TV's 360p (`v360`), or the radio band's 64k sound (`a64`) for a radio station's episodes and files with no picture. There are no separate low-bitrate previews any more. When they're asked for: an offer's episodes when it's offered (and whenever the offer is opened while offered); a spot when it goes to review (and after, once prepared: a listed spot has its preview too, not only in review); an order's delivery when it's delivered (and while the order is open).
+- `url` on spot files and order deliveries is the original as uploaded (it was a 1280 px copy for uploads before this): it may be any format the business uploaded, so play `previewUrl` and use `url` to download.
+- `LibraryItem.storage.contentId` is the original's content ID for uploads from now on (before, the copy's).
+
 ## 2026-09-29: how often spots air; bumpers into and out of the break
 
 The user's decisions of 2026-09-29, after the entry below: spots get a cadence like the station ID, bumpers and credit; when bumpers air, one opens the break and one closes it; there are no generated bumpers. Additive: one optional field in `BreakRule.cadence` (and the desk's `RecipeBreakRule.cadence`). No migration: it's stored in the same `break_rules.cadence` jsonb.

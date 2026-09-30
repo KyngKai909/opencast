@@ -13,14 +13,14 @@ export function Ok({ children, warn }: { children: string; warn?: boolean }) {
   );
 }
 
-/** The Channel column: "9.1 RDLS", or "Not listed" while it isn't on the dial. */
+/** The Channel column: "9.1 RDLS", or "Not on the dial" while it isn't. */
 export function channelText(s: ListedSource): string | null {
   return s.listingState === "listed" && s.station.channel ? `${s.station.channel} ${s.station.callSign ?? ""}`.trim() : null;
 }
 
 /** The Listings column. One wording for a synced calendar (inventory 11: the frame has two). */
 export function listingsCell(s: ListedSource) {
-  if (s.listingState !== "listed") return <span className="nd-ok__quiet">{s.listingState === "checking" ? "Checking" : "Not listed"}</span>;
+  if (s.listingState !== "listed") return <span className="nd-ok__quiet">{s.listingState === "checking" ? "Checking" : "Not on the dial"}</span>;
   if (s.calendarSync === "synced") return <Ok>Synced from the agenda calendar</Ok>;
   if (s.calendarSync === "calendar_not_found") return <Ok warn>Calendar not found</Ok>;
   return <span className="nd-ok__quiet">No calendar yet</span>;

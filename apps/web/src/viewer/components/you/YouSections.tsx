@@ -19,7 +19,7 @@ export function ReminderRows({ reminders, now, form, onRemove }: { reminders: Re
   return (
     <>
       {reminders.map((r) => {
-        const station = `${identText(r.airing.station)}${r.airing.listed && form === "web" ? ", listed" : ""}`;
+        const station = `${identText(r.airing.station)}${r.airing.listed && form === "web" ? ", external" : ""}`;
         return (
           <div key={r.id} className={`vw-y-rem vw-y-rem--${form}`}>
             <span className="vw-y-rem__when">

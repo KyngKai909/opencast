@@ -1,6 +1,6 @@
 // Every route. Each area adds its routes in its own pages/<area>/routes.tsx.
 
-import { Navigate, Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useLocation } from "react-router";
 import { useAuth } from "./auth/AuthProvider";
 import { BusinessLayout } from "./layout/BusinessLayout";
 import { SetupLayout } from "./layout/SetupLayout";
@@ -16,8 +16,10 @@ import { spotsBusinessRoutes, spotsSetupRoutes } from "./pages/spots/routes";
 
 export function AppRoutes() {
   const auth = useAuth();
+  const loc = useLocation();
   if (!auth.ready) return null;
-  if (!auth.signedIn) return <SignIn />;
+  // An invite's page starts signed out: it says what the invite is, then asks for sign-in itself.
+  if (!auth.signedIn && !loc.pathname.startsWith("/invites/")) return <SignIn />;
   return (
     <Routes>
       <Route index element={<Home />} />

@@ -66,8 +66,8 @@ export default function Statement() {
         <p className="bz-stmt__quiet" role={list.error ? "alert" : undefined}>
           {list.error?.message ?? "That statement wasn't found."}
         </p>
-        <Button size="sm" href={`${b.base}/balance`}>
-          Balance
+        <Button size="sm" href={b.can("money") ? `${b.base}/balance` : `${b.base}/results`}>
+          {b.can("money") ? "Balance" : "Where it aired"}
         </Button>
       </div>
     );

@@ -67,13 +67,17 @@ describe("the team", () => {
     expect(waiting.json.error.message).toMatch(/already has an invite waiting/);
   });
 
-  it("replaces an expired invite, and resending extends one a week", async () => {
+  it("replaces an expired invite, and resending extends one a week, 10 minutes apart at least", async () => {
     vi.setSystemTime(new Date(NOW.getTime() + 8 * 86_400_000));
     const again = await api("POST", `/businesses/${OSC}/team/invites`, { body: { email: "sam@orangestreet.example", role: "manager" } });
     expect(again.status).toBe(201);
     const team = await api("GET", `/businesses/${OSC}/team`);
     expect(team.json.invites).toHaveLength(1);
     expect(team.json.invites[0].role).toBe("manager");
+    const soon = await api("POST", `/invites/${again.json.id}/resend`);
+    expect(soon.status).toBe(429);
+    expect(soon.json.error.message).toBe("It went out less than a minute ago. You can send it again in 10 minutes.");
+    vi.setSystemTime(new Date(Date.now() + 11 * 60_000));
     const resent = await api("POST", `/invites/${again.json.id}/resend`);
     expect(Date.parse(resent.json.expiresAt)).toBe(Date.now() + 7 * 86_400_000);
     expect((await api("POST", `/invites/${again.json.id}/resend`, { as: "tomas" })).status).toBe(403);
@@ -94,9 +98,14 @@ describe("the team", () => {
 
   it("joins the invited person with the invite's role", async () => {
     const inv = await api("POST", `/businesses/${OSC}/team/invites`, { body: { email: "maya@orangestreet.example", role: "viewer" } });
-    expect((await api("POST", `/invites/${inv.json.id}/accept`, { as: "someone@else.example" })).status).toBe(404);
+    const other = await api("POST", `/invites/${inv.json.id}/accept`, { as: "someone@else.example" });
+    expect(other.status).toBe(403);
+    expect(other.json.error.message).toBe("This invite is for m…@orangestreet.example; you're signed in as someone@else.example. Sign in with m…@orangestreet.example to join.");
     const me = await api("POST", `/invites/${inv.json.id}/accept`, { as: "maya@orangestreet.example" });
     expect(me.status).toBe(200);
+    // Again by the same person changes nothing; by anyone else, it's used.
+    expect((await api("POST", `/invites/${inv.json.id}/accept`, { as: "maya@orangestreet.example" })).status).toBe(200);
+    expect((await api("POST", `/invites/${inv.json.id}/accept`, { as: "someone@else.example" })).json.error.code).toBe("invite_used");
     expect(me.json.memberships).toEqual([{ kind: "business", business: { id: OSC, name: "Orange Street Coffee" }, role: "viewer" }]);
     const team = await api("GET", `/businesses/${OSC}/team`);
     expect(team.json.members.map((m: { email: string }) => m.email)).toContain("maya@orangestreet.example");

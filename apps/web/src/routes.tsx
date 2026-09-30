@@ -3,12 +3,13 @@
 //   /            the viewer (viewer/routes.tsx): the dial, tuned in, the guide, You, /permission/:token, /tv, /remote…
 //   /control/…   master control (control/routes.tsx): /control/:callSign/monitor, /control/new, /control/setup/…
 //   /desk/…      Network desk (desk/routes.tsx), for the Opencast team: /desk/markets/:slug/board…
+//   /invites/:id goes to /control/invites/:id, where a station invite is accepted.
 //
 // Master control and the desk load only when someone opens them (their own chunks), so viewers
 // never download them. /control and /desk are matched before the viewer's /:handle.
 
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useParams } from "react-router";
 import ViewerArea from "./viewer/ViewerArea";
 
 const ControlArea = lazy(() => import("./control/ControlArea"));
@@ -33,7 +34,14 @@ export function AppRoutes() {
           </Suspense>
         }
       />
+      {/* A station invite's link lives in master control; /invites/:id is kept for links that say so. */}
+      <Route path="invites/:inviteId" element={<InviteRedirect />} />
       <Route path="*" element={<ViewerArea />} />
     </Routes>
   );
+}
+
+function InviteRedirect() {
+  const { inviteId = "" } = useParams();
+  return <Navigate to={`/control/invites/${inviteId}`} replace />;
 }

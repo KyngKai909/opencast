@@ -141,8 +141,6 @@ export function createBusinessPart({ deps, services }: ModuleContext): BusinessP
       const spots = await db.select({ id: schema.spotsTable.id }).from(schema.spotsTable).where(and(eq(schema.spotsTable.advertiserId, businessId), notInArray(schema.spotsTable.status, ["ended"])));
       for (const spot of spots) {
         await services.spots.end(spot.id);
-        // A spot in review loses its review preview.
-        await services.library.content.dropPreview("review", spot.id);
       }
       await db
         .update(schema.sponsorships)

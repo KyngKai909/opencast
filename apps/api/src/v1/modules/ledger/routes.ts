@@ -5,9 +5,12 @@ import type { RouteRegistrar } from "../../http.js";
 export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const { ledger, accounts } = services;
   const everyone = ["owner", "manager", "viewer"] as const;
+  // The balance and its movements are the owner's and managers': a viewer sees results, airings
+  // and statements only (biz-settings 02.1). Statements, their CSV and receipts stay everyone's.
+  const money = ["owner", "manager"] as const;
 
   r.handle(api.getBalance, async ({ user, params }) => {
-    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    await accounts.requireBusiness(user, params.businessId, [...money]);
     const [balance, depositAddress] = await Promise.all([ledger.balance(params.businessId), ledger.depositAddress(params.businessId)]);
     // E7: where to send USDC from inside Clear.
     return { ...balance, depositAddress };
@@ -41,7 +44,7 @@ export function ledgerRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     }
   });
   r.handle(api.listMovements, async ({ user, params, query }) => {
-    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    await accounts.requireBusiness(user, params.businessId, [...money]);
     return ledger.movements(params.businessId, query);
   });
   r.handle(api.addFundingSource, async ({ user, params, body }) => {

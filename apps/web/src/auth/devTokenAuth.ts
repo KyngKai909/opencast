@@ -49,5 +49,10 @@ export function useDevTokenAuth(): AuthAdapter {
     setEmail(null);
   }, []);
   const getToken = useCallback(async () => read(TOKEN), []);
-  return useMemo(() => ({ available: true, ready: true, signedIn: email !== null, email, sendCode, verifyCode: pickUp, oauth: pickUp, wallet: pickUp, signOut, getToken }), [email, sendCode, pickUp, signOut, getToken]);
+  // No Privy here: the tests give a person a wallet through the API's linked accounts.
+  const creatorWallet = useCallback(async () => null, []);
+  return useMemo(
+    () => ({ available: true, ready: true, signedIn: email !== null, email, sendCode, verifyCode: pickUp, oauth: pickUp, wallet: pickUp, creatorWallet, signOut, getToken }),
+    [email, sendCode, pickUp, creatorWallet, signOut, getToken]
+  );
 }

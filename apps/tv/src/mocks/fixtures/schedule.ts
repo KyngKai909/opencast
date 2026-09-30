@@ -83,7 +83,7 @@ export const AIRINGS: MockAiring[] = [
   a("CIVC", "23:00", "23:30", "Community notices", null),
   a("CIVC", "23:30", "24:30", "Council Watch", "council-watch", { note: "Repeat" }),
   a("CIVC", "+3 19:00", "+3 20:30", "Co-op town hall: members’ questions", "coop-town-hall", { live: true }),
-  // RDLS 9.1 (listed from the city's stream)
+  // RDLS 9.1 (external, the city's own stream)
   a("RDLS", "19:00", "21:15", "City Council, Sept 16 meeting", "city-council", { listed: true }),
   a("RDLS", "21:15", "21:45", "Community calendar", null, { listed: true }),
   a("RDLS", "21:45", "23:45", "Council Watch", "council-watch", { listed: true, carriedFrom: "CIVC" }),

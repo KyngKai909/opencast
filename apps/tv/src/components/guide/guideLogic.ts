@@ -215,7 +215,7 @@ const short = (t: number, timeZone?: string) => clock(t, { timeZone, suffix: fal
 const until = (t: number, now: number, timeZone?: string) => clock(t, { timeZone, suffix: clock(t, { timeZone }).slice(-2) !== clock(now, { timeZone }).slice(-2) });
 
 /**
- * The line under a cell's title: "Live, until 9:30", "Listed, until 9:15", "From REEL", "Until
+ * The line under a cell's title: "Live, until 9:30", "External, until 9:15", "From REEL", "Until
  * 9:00" (or "Until 6:00 am" past midnight) for what's on now; "Live, 9:00 – 10:00", "From CIVC" or "9:00" for later; "Signs on at
  * 6:00 am" off air. `live` puts "Live" first in red.
  */
@@ -224,7 +224,7 @@ export function cellLine(c: Cell, now: number, timeZone?: string): { live: boole
   if (!a) return { live: false, text: c.signOnAt ? `Signs on at ${clock(c.signOnAt, { timeZone })}` : "" };
   const isNow = onNow(c, now);
   if (a.live) return { live: true, text: isNow ? `until ${until(c.end, now, timeZone)}` : `${short(c.start, timeZone)} – ${short(c.end, timeZone)}` };
-  if (isNow && a.kind === "listed") return { live: false, text: `Listed, until ${until(c.end, now, timeZone)}` };
+  if (isNow && a.kind === "listed") return { live: false, text: `External, until ${until(c.end, now, timeZone)}` };
   if (a.carriedFrom?.callSign) return { live: false, text: `From ${a.carriedFrom.callSign}` };
   if (isNow) return { live: false, text: `Until ${until(c.end, now, timeZone)}` };
   return { live: false, text: short(c.start, timeZone) };
@@ -243,7 +243,7 @@ export function whenLine(c: Cell, s: StationIdentX, timeZone?: string): string {
 /**
  * The header's description: the line under the title (S4) leads, then tonight's episode (G5) or the
  * program's description. A sentence the description already has isn't said twice; a description
- * that contains the line only as part of a sentence is said alone. Listed meetings have none.
+ * that contains the line only as part of a sentence is said alone. External meetings have none.
  * `liveLead`: the text starts with "Live", which is drawn in red.
  */
 export function describe(a: AiringX | null, programDescription: string | null | undefined): { text: string; liveLead: boolean } | null {

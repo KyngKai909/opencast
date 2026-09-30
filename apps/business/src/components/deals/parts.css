@@ -9,6 +9,7 @@
 .bz-dl-tag--fill.oc-tag { display: flex; width: 100%; }
 
 .bz-dl-noaccess { display: grid; place-items: start; gap: 14px; padding: 8px 0; }
+.bz-dl-noaccess__to { display: flex; flex-wrap: wrap; gap: 8px; }
 .bz-dl-noaccess__h { margin: 0; font: 700 20px/1.25 var(--font-display); letter-spacing: -.01em; }
 
 .bz-dl-error { margin: 8px 0 0; font-size: 13px; color: var(--standby); }

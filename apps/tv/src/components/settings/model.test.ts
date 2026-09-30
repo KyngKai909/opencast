@@ -74,6 +74,15 @@ describe("where TV settings are kept", () => {
     expect(fromAccount(toAccount(all))).toEqual(kept);
   });
 
+  it("keeps Tuning sound with the watching settings: off for video and on for radio unless set (tv-update 04.1)", () => {
+    expect(DEFAULT_SETTINGS).toMatchObject({ tuningSound: false, radioTuningSound: true });
+    expect(labelOf(OPTIONS.tuningSound, false)).toBe("Off");
+    expect(labelOf(OPTIONS.tuningSound, true)).toBe("On");
+    expect(toAccount({ tuningSound: true }, { watching: { captions: "on" } })).toEqual({ watching: { captions: "on", tuningSound: true } });
+    expect(fromAccount({ watching: { tuningSound: true, radioTuningSound: false } })).toEqual({ tuningSound: true, radioTuningSound: false });
+    expect(fromAccount({ watching: { captions: "on" } })).toEqual({ captions: "on" });
+  });
+
   it("changes only what differs", () => {
     expect(changed({ ...DEFAULT_SETTINGS }, { captions: "on", bannerSeconds: 8 })).toEqual({ bannerSeconds: 8 });
   });

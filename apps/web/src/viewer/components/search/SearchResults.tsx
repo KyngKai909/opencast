@@ -146,7 +146,7 @@ export function SearchResults({ q, onQuery, phone }: SearchResultsProps) {
 
   const programRows = programs.map((r, i) => {
     const onNow = Date.parse(r.airing.startsAt) <= t.getTime();
-    const stationLine = `${cs(r.station)} ${r.station.channel ?? ""}`.trim() + (r.listed ? ", listed from the city's stream" : named[i] ? `, ${r.station.name}` : "");
+    const stationLine = `${cs(r.station)} ${r.station.channel ?? ""}`.trim() + (r.listed ? ", external, the city's own stream" : named[i] ? `, ${r.station.name}` : "");
     const card = <TitleCard colour={r.station.colour ?? "#33507A"} title={r.program?.title ?? r.airing.title} className="vw-res__tc" decorative />;
     const doTune = () => {
       remember();

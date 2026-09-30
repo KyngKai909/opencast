@@ -2,13 +2,14 @@
 // The Station area owns this file.
 
 import { http, type HttpHandler } from "msw";
-import { accountsApi, networkApi, notificationsApi, stationsApi, trustApi, type BreakRule, type LogCode, type TeamMember } from "@opencast/contracts";
+import { accountsApi, Me, networkApi, notificationsApi, stationsApi, trustApi, type BreakRule, type InvitePreview, type LogCode, type TeamMember } from "@opencast/contracts";
 import { ClaimsX, ClaimX } from "../../api/ext/station";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { PEOPLE, type MockPerson } from "../fixtures/people";
 import { ALWAYS_ON, DEAD_AIR_AT, breakRuleOf, defaultPrefs, newId, saveStationState, stationState, type StationInvite } from "../fixtures/station";
 import { fail, needsUser, path, personOf, reply } from "../respond";
+import { meView } from "../../../mocks/me";
 import { offAirFor } from "../schedule";
 
 const DAY = 86_400_000;
@@ -65,6 +66,32 @@ function team(stationId: string, me: MockPerson) {
 }
 
 const OWNER_ONLY_TEAM = "Only the owner can change the team.";
+/** An invite's email goes again at most this often (the API's rule). */
+const RESEND_GAP_MS = 10 * 60_000;
+
+/** An invited address as the invite's page shows it: `d…@example.com`. */
+export function maskEmail(address: string): string {
+  const at = address.lastIndexOf("@");
+  return at <= 0 ? "…" : `${address.slice(0, 1)}…${address.slice(at)}`;
+}
+
+/** An invite as its page shows it (getInvite), for whoever's asking. */
+function invitePreview(i: StationInvite, p: MockPerson | null): InvitePreview {
+  const st = dbStation(i.stationId);
+  const owner = getDb().members.find((m) => m.stationId === i.stationId && m.role === "owner");
+  return {
+    id: i.id,
+    team: { kind: "station", id: i.stationId, name: st?.ident.name ?? "A station", callSign: st?.ident.callSign ?? null },
+    role: i.role,
+    invitedBy: PEOPLE.find((x) => x.id === owner?.personId)?.displayName ?? null,
+    emailHint: i.email ? maskEmail(i.email) : null,
+    state: i.acceptedAt ? "accepted" : Date.parse(i.expiresAt) <= now().getTime() ? "expired" : "open",
+    expiresAt: i.expiresAt,
+    signedInAs: p?.email ?? null,
+    emailMatches: p && i.email ? i.email === p.email : null,
+    acceptedByYou: !!p && i.acceptedBy === p.id
+  };
+}
 
 const teamHandlers = [
   http.get(path(accountsApi.getStationTeam), ({ request, params }) => {
@@ -173,9 +200,47 @@ const teamHandlers = [
     if (!invite) return fail(404, "not_found", "That invite wasn't found.");
     const r = roleOn(invite.stationId, p, ["owner"], OWNER_ONLY_TEAM);
     if (r instanceof Response) return r;
+    if (invite.acceptedAt) return fail(409, "invite_used", "They've already joined.");
+    // Every send sets the expiry a week out, so the last send was a week before it.
+    const lastSent = Date.parse(invite.expiresAt) - WEEK;
+    const wait = lastSent + RESEND_GAP_MS - now().getTime();
+    if (wait > 0) {
+      const ago = Math.max(0, Math.floor((now().getTime() - lastSent) / 60_000));
+      const left = Math.ceil(wait / 60_000);
+      return fail(429, "resend_too_soon", `It went out ${ago === 0 ? "less than a minute" : `${ago} minute${ago === 1 ? "" : "s"}`} ago. You can send it again in ${left} minute${left === 1 ? "" : "s"}.`);
+    }
     invite.expiresAt = new Date(now().getTime() + WEEK).toISOString();
     saveStationState();
     return reply(accountsApi.resendInvite.response, toInvite(invite));
+  }),
+
+  // An invite's page (/control/invites/:inviteId): anyone with the link reads it.
+  http.get(path(accountsApi.getInvite), ({ request, params }) => {
+    const invite = stationState().invites.find((i) => i.id === String(params.inviteId));
+    if (!invite) return fail(404, "not_found", "That invite wasn't found.");
+    return reply(accountsApi.getInvite.response, invitePreview(invite, personOf(request)));
+  }),
+
+  // Joining: the invited email must be the signed-in person's.
+  http.post(path(accountsApi.acceptInvite), ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const invite = stationState().invites.find((i) => i.id === String(params.inviteId));
+    if (!invite) return fail(404, "not_found", "That invite wasn't found.");
+    if (invite.acceptedAt) {
+      if (invite.acceptedBy === p.id) return reply(Me, meView(p));
+      return fail(409, "invite_used", "This invite was already used. Ask for a new one if you still need to join.");
+    }
+    if (Date.parse(invite.expiresAt) <= now().getTime()) return fail(422, "invite_expired", "This invite has expired. Ask for a new one.");
+    if (invite.email && invite.email !== p.email)
+      return fail(403, "invite_email_mismatch", `This invite is for ${maskEmail(invite.email)}; you're signed in as ${p.email}. Sign in with ${maskEmail(invite.email)} to join.`);
+    if (!membership(invite.stationId, p.id))
+      getDb().members.push({ stationId: invite.stationId, personId: p.id, role: invite.role as Role, hosts: null, hostProgramIds: invite.role === "host" ? invite.programIds : [], lastInAt: now().toISOString() });
+    invite.acceptedAt = now().toISOString();
+    invite.acceptedBy = p.id;
+    saveDb();
+    saveStationState();
+    return reply(Me, meView(p));
   })
 ];
 

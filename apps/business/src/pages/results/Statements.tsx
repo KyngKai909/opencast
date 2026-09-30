@@ -20,8 +20,8 @@ export default function Statements() {
       <p className="bz-stmt__quiet" role={list.error ? "alert" : undefined}>
         {list.error?.message ?? "Your first statement starts with the first money you add."}
       </p>
-      <Button size="sm" href={`${b.base}/balance`}>
-        Balance
+      <Button size="sm" href={b.can("money") ? `${b.base}/balance` : `${b.base}/results`}>
+        {b.can("money") ? "Balance" : "Where it aired"}
       </Button>
     </div>
   );

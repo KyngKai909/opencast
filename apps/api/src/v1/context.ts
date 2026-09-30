@@ -24,6 +24,7 @@ import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
 import type { RelayBus } from "./relay.js";
 import type { RouteRegistrar } from "./http.js";
+import type { EmailNotice } from "./email.js";
 
 /** A database handle, or a transaction on it. Service functions take either. */
 export type Executor = Db | Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -32,10 +33,13 @@ export interface Clock {
   now(): Date;
 }
 
-/** Where push notifications and emails go. The default logs them; real providers plug in here. */
+/**
+ * Where push notifications and emails go. Pushes are logged; emails go through Resend with
+ * RESEND_API_KEY, else the log (email.ts). `email` rejects when the email couldn't be sent.
+ */
 export interface Notifier {
   push(userId: string, notice: { title: string; body: string; link: string | null }): Promise<void>;
-  email(to: string, notice: { title: string; body: string; link: string | null }): Promise<void>;
+  email(to: string, notice: EmailNotice): Promise<void>;
 }
 
 export interface Deps {
@@ -63,6 +67,16 @@ export interface Deps {
     storageRoot: string;
     /** Public origin of the viewer app, for links in notices and QR codes. */
     appOrigin: string;
+    /**
+     * Public origin of the business app (BUSINESS_ORIGIN), for business invites and business
+     * notices' email links. Unset: the viewer app's origin.
+     */
+    businessOrigin?: string;
+    /**
+     * Accepting an invite made to an email needs that email on the signed-in account (a verified
+     * email, Google or Apple address). On unless INVITE_EMAIL_MATCH=off (docs/open-decisions.md).
+     */
+    inviteEmailMatch?: boolean;
     /** The escrow contract, shown on station and claim pages. */
     escrowContractAddress: string | null;
     /** USDC on the configured chain (CHAIN_ID, USDC_ADDRESS): what a transfer from a linked Clear wallet sends. Null until set. */

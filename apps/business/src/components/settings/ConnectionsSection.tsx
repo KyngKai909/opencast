@@ -120,8 +120,9 @@ export function ConnectionsSection({ b, heading }: { b: BusinessState; heading: 
   const params = { businessId: b.id };
   const conns = useApi(spotsApi.getConnections, { params });
   const biz = useApi(spotsApi.getBusiness, { params }, { staleTime: 60_000 });
-  const balance = useApi(ledgerApi.getBalance, { params });
-  const spots = useApi(spotsApi.listSpots, { params }, { enabled: b.can("see") });
+  // A viewer reads the connections' status only: the balance and spots aren't theirs to see.
+  const balance = useApi(ledgerApi.getBalance, { params }, { enabled: b.can("money") });
+  const spots = useApi(spotsApi.listSpots, { params }, { enabled: b.can("advertise") });
   const clear = useClear();
   const qc = useQueryClient();
   const toast = useToast();
@@ -169,7 +170,7 @@ export function ConnectionsSection({ b, heading }: { b: BusinessState; heading: 
     </>
   );
 
-  if (conns.isLoading || balance.isLoading || (owner && clear.loading))
+  if (conns.isLoading || (b.can("money") && balance.isLoading) || (owner && clear.loading))
     return (
       <div className="bz-conn">
         {head}

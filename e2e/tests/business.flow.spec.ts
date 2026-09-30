@@ -242,3 +242,52 @@ test("the owner connects an online checkout with its secret, and turns Redeem of
 
   expect(failures, failures.join("\n\n")).toEqual([]);
 });
+
+test("an online business chooses its markets in Settings, and stations see Online", async ({ page }) => {
+  await page.setViewportSize(WIDTHS.web);
+  await reducedMotion(page);
+  await signInAs(page, PEOPLE.owner);
+
+  await page.goto(`${OSC}/settings/business`);
+  const where = page.getByRole("group", { name: "Where your customers are" });
+  await where.getByRole("radio", { name: "Online" }).click();
+  // No fixed market: the picker, with the markets Opencast is open in.
+  const markets = page.getByRole("group", { name: "Markets" });
+  const ie = markets.getByRole("button", { name: "Inland Empire" });
+  await expect(ie).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(`Stations see "Online". Spots reach the whole Inland Empire.`, { exact: false })).toBeVisible();
+  await expect(page.locator(".bz-seen__where")).toHaveText("Coffee and food. Online");
+  // At least one market.
+  await ie.click();
+  await expect(page.getByRole("alert")).toHaveText("Choose at least one market.");
+  await ie.click();
+  await expect(ie).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(`Spots reach the whole Inland Empire.`, { exact: false })).toBeVisible();
+  // Back to a location: the address again.
+  await where.getByRole("radio", { name: "A location" }).click();
+  await expect(page.getByRole("textbox", { name: "Street address" })).toBeVisible();
+});
+
+test("a viewer sees results, airings and statements, not the balance or the spots", async ({ page }) => {
+  await page.setViewportSize(WIDTHS.web);
+  await reducedMotion(page);
+  await signInAs(page, PEOPLE.viewer);
+
+  await page.goto("/");
+  await expect(page).toHaveURL(new RegExp(`${OSC}/results`));
+  await expect(page.getByRole("heading", { name: "Where it aired" })).toBeVisible();
+  // No balance in the header; Spots and Balance are closed on the rail.
+  await expect(page.locator(".oc-business-shell__balance")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Balance", exact: true })).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByRole("link", { name: "Spots", exact: true })).toHaveAttribute("aria-disabled", "true");
+
+  await page.goto(`${OSC}/balance`);
+  await expect(page.getByRole("heading", { name: "Viewers see results, airings and statements." })).toBeVisible();
+  await page.getByRole("link", { name: "Statements" }).click();
+  await expect(page).toHaveURL(/\/balance\/statements\//);
+  await expect(page.locator(".bz-stmt")).toBeVisible();
+  await expect(page.getByText("That statement wasn't found.")).toHaveCount(0);
+
+  await page.goto(`${OSC}/spots`);
+  await expect(page.getByText("Viewers see results, airings and statements", { exact: false }).first()).toBeVisible();
+});

@@ -64,56 +64,78 @@ A TV app registers on first launch (`POST /tv/devices`) and keeps an opaque devi
 
 The engine lives in the playout module (`apps/api/src/v1/modules/playout/engine`) and runs in the worker, on the Redis leader only.
 
+Prepare once, then assemble (the platform prompt, Phase 5): prerecorded material is never encoded live. Each file is transcoded once to a fixed ladder, and each channel is a set of rolling playlists that point at those segments in the order the log says.
+
 ```
-engine tick (1 s)   commands → runners follow who's on air → fill breaks 20 min ahead → fill dead air
+engine tick (1 s)   commands → prepare what's queued → readiness check (hourly, 48 hours ahead) →
+                    fill breaks 20 min ahead → fill dead air → assemble every station on air →
+                    translators; hourly, the storage sweep
+prepare.ts          once per content ID, from the original: FFmpeg to the ladder (TV 1080/720/480/360
+                    and audio-only 128k; radio 128k and 64k), 4 s segments with aligned keyframes,
+                    loudness levelled to -24 LUFS, captions cut to the segments (uploaded, embedded or
+                    generated), stored under `prepared/<cid>/<rendition>/` (`prepared_items`,
+                    `prepared_renditions`, `prepared_captions`). A carried or catalog program is
+                    prepared once for every station. Slates and generated station IDs the same way
+readiness.ts        is everything on the next 48 hours of each log prepared in its band's renditions?
+                    Queues what isn't, warns an hour ahead, and the usual fill airs anything missing
+plan.ts             the run sheet: programs at their times, split around breaks and resumed where they
+                    stopped; each break = bumper in, spots, credit, bumper out, station ID last (each by
+                    the break rule's cadence, cadence.ts); live blocks; off air; open time = station ID
+                    and bumpers, never nothing
 fill.ts             places spots in stored breaks, holding the money first: rotation, then backup rotation,
                     within the hourly cap, same-spot limit, blocked categories and dayparts; the
                     producer's barter share from the producer's rotation (the producer is paid)
-plan.ts             the run sheet: programs at their times, split around breaks and resumed where they
-                    stopped; each break = spots, credit, bumpers, station ID last; live blocks; off air;
-                    open time = station ID and bumpers, never nothing
-runner.ts           per station: one long-running muxer (MPEG-TS in, `-c copy` out) to HLS, Livepeer and
-                    relays; relays set to "Station ID slate" get their own feed with the slate in breaks.
-                    Each segment is encoded in real time with the bug (and a spot's code and QR for its
-                    last :10), timestamps carried on, so outputs never reconnect between items. Spots,
-                    credits, bumpers and IDs air in full; programs are joined late instead. When a segment
-                    ends: an as-run row with its real times, a proof frame for spots, and settlement.
-cache.ts            the worker's file cache on its volume: hourly, the next 48 hours of every station's log
-                    (plus station IDs, bumpers, rotations and dead-air repeats), earliest airtime first,
-                    evicting what airs furthest away; a file due within the hour and not cached tells the
-                    station and Network desk and is fetched at once. Playout reads only from here: a miss
-                    airs the usual fill and is reported. Hit rate, bytes and misses on the worker's /health
-live.ts             a live source read ahead of its block (encoders can connect early or reconnect)
+assemble.ts         per station on air: the run sheet becomes the channel's timeline (`channel_items`):
+                    prepared segments in log order, a discontinuity and program date-time per item, and
+                    DATERANGE tags (bug, lower thirds, codes, SCTE-35 break cues). Nothing is encoded.
+                    As each item's segments are published: an as-run row, a proof frame for spots
+                    (proof.ts), and settlement
+playlist.ts         renders a channel's master and media playlists from its timeline (API and worker,
+                    short cache); the player draws the bug, lower thirds and codes from the DATERANGE tags
+live.ts, radiolive.ts, rtmp.ts
+                    live blocks: TV through Livepeer (same ladder; the audio-only rendition made here),
+                    radio through the worker's own RTMP ingest, packaged to 128k and 64k
+translator.ts       relays to YouTube, Twitch or RTMP, only while on: the channel's own segments joined
+                    (tsretime.ts), stream-copied, or re-encoded where the bug or a slate is drawn in
 slates.ts           station ID, credit, off-air, stand-by, bug, code + QR: SVG rendered with sharp
-scte35.ts           splice_insert cues; the API adds EXT-X-DATERANGE (SCTE35-OUT/IN) to live playlists
 ```
 
-Live blocks read the encoder from Livepeer's playback when the source was made with a Livepeer key, or from a local RTMP listener (`LIVE_LISTEN_PORT`) otherwise. The feed opens a minute before the block; with no signal the stand-by slate airs and the station is told, and it switches to the feed as soon as one arrives (and back, if it drops). The local listener serves one live block at a time, since there's one port; production reads through Livepeer.
+The worker keeps no files of its own: it prepares from object storage into scratch space (`WORKER_SCRATCH_DIR`) and writes the results back. Its `/health` reports items prepared, waiting and the time preparation takes, and the last readiness check.
 
 The money jobs (the worker's minute tick): provider moves sent, the escrow contract's events read, unaired holds returned, deliveries auto-approved; daily: monthly pledge renewals (fake provider); Mondays: the escrow batch and stations' weekly statements; payday (Mondays, or the 1st on a monthly schedule): payouts to stations whose payout account is set up; the 1st: the pool shared out for last month (equal base, watch time, the creator fund on-chain) and businesses' statements. Cash carriage is charged when a carried episode airs (the runner), once per slot.
 
-Held airings that never aired (a file missing from the cache, a station signed off) give their hold back an hour after their slot (`spots.releaseUnaired`, in the jobs tick).
+Held airings that never aired (a file not prepared at air time, a station signed off) give their hold back an hour after their slot (`spots.releaseUnaired`, in the jobs tick).
 
 ## Storage
 
 Files are stored by **content ID**: a CID (v1, raw codec, sha-256) of the bytes. The same file uploaded by twelve stations is stored once.
 
 ```
-storage.ts          the storage interface: an object store (R2 or any S3-compatible store; local disk in
-                    development) and an IPFS publisher (Pinata), keyed by content ID
-library/content.ts  contents (one row per file), content_refs (who points at it), previews and their needs
+storage.ts            the storage interface: an object store (R2 or any S3-compatible store; local disk in
+                      development) and an IPFS publisher (Pinata), keyed by content ID
+library/content.ts    contents (one row per file), content_refs (who points at it), locks, takedowns,
+                      the storage sweep
+playout/service.ts    previews (a playlist over prepared segments), and deleting what was prepared
+storageMaintenance.ts the one-off steps (below)
 ```
 
 | What | Where | Class |
 |---|---|---|
-| The prepared file playout airs (items, spots, deliveries) | `<cid>` | Standard |
-| Original uploads, order briefs | `<cid>` | Infrequent Access |
-| Previews: low-bitrate HLS for the market, spot review and order review | `previews/<cid>/` | Standard, only while an offer, a review or an open order needs it |
+| Originals: every upload (library items, spots, order deliveries and briefs), claim attachments, logos, caption files | `<cid>` | Infrequent Access (files from before 2026-09-29: Standard) |
+| What's prepared from an original: each rendition's playlist and 4 s segments, and its caption tracks | `prepared/<cid>/<rendition>/`, `prepared/<cid>/cc…/` | Standard |
+| Slates and generated station IDs, prepared the same way | `prepared/slate-…/`, `prepared/sid-…/` | Standard |
+| Radio live segments | `prepared/live-…/` | Standard |
+| Proof frames, kept a year | `proof/<station>/<airing>.jpg` | Infrequent Access |
+| Relay backgrounds' loops | `relay-backgrounds/<cid>-<size>/` | Standard |
 
-- **References.** Asset files (prepared and original), spot files and order files each hold a reference. Deleting an item drops its references; the object goes when the last one does. A database trigger refuses to mark content deleted while anything references it or a claim holds it.
-- **Takedowns.** A claim locks the file (kept, never aired, never exported) and pulls every station's item made from it off the log. Answered or withdrawn: unlocked. Resolved against it (removed, upheld, expired): deleted from storage, from previews and from the worker cache, and it can never be stored again.
-- **IPFS** is publishing, not storage: the catalog station's items are pinned when prepared, and an owner can "Export to IPFS" their own upload after accepting that it's public and permanent. The IPFS CID is recorded beside the content ID.
-- **Moving off Pinata**: `npm run storage:move-off-pinata -w @opencast/api` reports; `--copy` copies each pin into storage and verifies it by hash; `--unpin --yes-unpin` then unpins every verified, non-catalog copy.
+- **Prepared from the original.** Uploads are kept as they came; nothing is compressed at upload. Playout prepares from the original, once, so a 1080p source airs a real 1080p. Checks (length, picture, loudness, embedded captions, codecs) read the original. Items stored before 2026-09-29 pointed at a 1280 px copy (`asset_files.original_content_id` held the original); `storage:prepare-from-originals` moves them onto their originals (see `docs/deploy.md`).
+- **Previews play the prepared segments.** The catalog's episodes, spots in review and in the market, and order deliveries get `/v1/previews/<cid>/<rendition>.m3u8`: a short-cache (60 s) VOD playlist over the lowest TV rendition (v360), or a64 on the radio band. Asking for a preview queues the file's preparation if it isn't prepared, soon after what airs within the hour; until then `previewStatus` is `preparing` ("Being prepared"). There are no separate preview renditions; the old `previews/<cid>/` ones are deleted by the storage sweep.
+- **Storage classes stay put.** Storing bytes that are already stored changes nothing, whatever class is asked for: an Infrequent Access object is never moved to Standard. What's read all day (prepared and live segments, relay loops) is written straight to object storage in Standard and never goes through `content.store`.
+- **References.** Asset files, spot files and order files each hold a reference. Deleting an item drops its references; the object goes when the last one does, and with it everything prepared from it (`prepared/<cid>/…` and its `prepared_items`, `prepared_renditions` and `prepared_captions` rows; a caption file that goes takes the tracks cut from it). What a channel pointed at in the last two hours is left for the storage sweep (the worker, hourly), so players still fetching it aren't cut off. The as-run log keeps what aired. A database trigger refuses to mark content deleted while anything references it or a claim holds it.
+- **Takedowns.** A claim locks the file (kept, never aired, never exported, no preview) and pulls every station's item made from it off the log. Answered or withdrawn: unlocked. Resolved against it (removed, upheld, expired): deleted from storage with everything prepared from it, at once, and it can never be stored again.
+- **IPFS** is publishing, not storage: the catalog station's originals are pinned when stored, and an owner can "Export to IPFS" their own upload after accepting that it's public and permanent. The IPFS CID is recorded beside the content ID (`ipfs_cid`): for files over about 1 MiB it differs from the content ID, since IPFS chunks them (see `docs/open-decisions.md`).
+- **Moving off Pinata**: `npm run storage:move-off-pinata -w @opencast/api` reports; `--copy` copies each pin into storage, verifies it by hash and relinks every row that used it to the new content ID; `--unpin --yes-unpin` then unpins every verified, non-catalog copy.
+- **Files keyed by location** (from before content IDs: a disk path or URL, prepared as `loc-…`): `npm run storage:relink-locations -w @opencast/api` reports; `--relink` stores each by content ID and relinks it, carrying its prepared segments over.
 
 ## Money
 

@@ -28,7 +28,7 @@ export interface Option<V> {
 }
 
 /** The settings a row steps through with ◀ ▶ (a switch is two options, off and on). */
-export type StepKey = "captions" | "captionSize" | "channelUp" | "bannerSeconds" | "numberWaitSeconds" | "includeRadioBand" | "quality" | "eveningOut" | "othersOnWifiCanChange";
+export type StepKey = "captions" | "captionSize" | "channelUp" | "bannerSeconds" | "tuningSound" | "numberWaitSeconds" | "includeRadioBand" | "quality" | "eveningOut" | "othersOnWifiCanChange";
 
 const seconds = (n: number) => `${n} ${n === 1 ? "second" : "seconds"}`;
 
@@ -48,6 +48,10 @@ export const OPTIONS: { [K in StepKey]: Array<Option<NonNullable<TvSettingsX[K]>
     { value: "down_the_dial", label: "Down the dial" }
   ],
   bannerSeconds: ([3, 5, 8] as const).map((n) => ({ value: n, label: seconds(n) })),
+  tuningSound: [
+    { value: false, label: "Off" },
+    { value: true, label: "On" }
+  ],
   numberWaitSeconds: ([1, 1.5, 2, 3] as const).map((n) => ({ value: n, label: seconds(n) })),
   includeRadioBand: [
     { value: false, label: "Off" },
@@ -109,6 +113,8 @@ export function fromAccount(s: ViewerSettings | undefined): Partial<TvSettingsX>
   const out: Partial<TvSettingsX> = {};
   if (s.watching?.captions) out.captions = s.watching.captions;
   if (s.watching?.captionSize) out.captionSize = s.watching.captionSize;
+  if (typeof s.watching?.tuningSound === "boolean") out.tuningSound = s.watching.tuningSound;
+  if (typeof s.watching?.radioTuningSound === "boolean") out.radioTuningSound = s.watching.radioTuningSound;
   if (typeof s.tvs?.othersOnWifiCanChange === "boolean") out.othersOnWifiCanChange = s.tvs.othersOnWifiCanChange;
   // A7: the TV-only rows, typed in the contract; a section with a value outside them is ignored.
   const tv = AccountTvSettings.safeParse(s.tv ?? {});
@@ -129,6 +135,8 @@ export function toAccount(patch: Partial<TvSettingsX>, current?: ViewerSettings)
   };
   put("watching", "captions", patch.captions);
   put("watching", "captionSize", patch.captionSize);
+  put("watching", "tuningSound", patch.tuningSound);
+  put("watching", "radioTuningSound", patch.radioTuningSound);
   put("tvs", "othersOnWifiCanChange", patch.othersOnWifiCanChange);
   for (const k of ["channelUp", "bannerSeconds", "numberWaitSeconds", "includeRadioBand", "quality", "eveningOut"] as const) put("tv", k, patch[k]);
   return out as ViewerSettings;

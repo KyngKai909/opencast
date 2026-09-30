@@ -63,7 +63,7 @@ export const spotsHandlers: HttpHandler[] = [
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const id = String(params.businessId);
-    const r = roleOn(id, p, "see");
+    const r = roleOn(id, p, "advertise", "Viewers see results, airings and statements. Spots are for owners and managers.");
     if (r instanceof Response) return r;
     return reply(SpotsX, getDb().spots.filter((s) => s.businessId === id).map(spotOut));
   }),
@@ -115,7 +115,7 @@ export const spotsHandlers: HttpHandler[] = [
   http.get(path(spotsApi.getSpot), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
-    const s = spotFor(String(params.spotId), p, "see");
+    const s = spotFor(String(params.spotId), p, "advertise");
     if (s instanceof Response) return s;
     return reply(SpotX, spotOut(s));
   }),

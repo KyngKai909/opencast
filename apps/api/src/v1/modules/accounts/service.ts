@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AccountExport, ClearLink, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
+import type { AccountExport, ClearLink, InvitePreview, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { ClearLookupUnavailable } from "../../clearLink.js";
 import { badRequest, conflict, forbidden, HttpError, notFound, refused } from "../../errors.js";
+import { maskEmail } from "../../email.js";
 
 export type StationRole = "owner" | "operator" | "host";
 export type BusinessRole = "owner" | "manager" | "viewer";
@@ -12,6 +13,9 @@ export type BusinessRole = "owner" | "manager" | "viewer";
 type PresetInput = { stationId: string; key: number | null };
 
 const INVITE_DAYS = 7;
+const DAY_MS = 86_400_000;
+/** An invite's email goes again at most this often (each send sets the expiry a week out, so the last send is known). */
+const RESEND_GAP_MS = 10 * 60_000;
 /** Watch history is kept this long (the settings say "Kept for 30 days"). */
 const WATCH_HISTORY_DAYS = 30;
 /** Heartbeats closer than this to the last one on the same station extend it, rather than start a new stretch. */
@@ -70,6 +74,12 @@ export interface AccountsService {
   adminIds(): Promise<string[]>;
   /** The wallet a user signed in with or linked (Privy), if any: where the escrow can pay them. */
   walletOf(userId: string): Promise<string | null>;
+  /**
+   * Reads the person's wallets from Privy again and records any new one (the embedded wallet the
+   * claim page makes, since Privy makes none at sign-in), then answers as `walletOf`. Needs
+   * PRIVY_APP_SECRET; without it, what's recorded already.
+   */
+  recordWallets(userId: string): Promise<string | null>;
   businessMemberIds(businessId: string, roles?: BusinessRole[]): Promise<string[]>;
   /** P21: a closed business: everyone on its team loses access, and its open invites expire. */
   closeBusinessAccess(businessId: string): Promise<void>;
@@ -106,8 +116,12 @@ export interface AccountsService {
   updateMember(scope: TeamScope, userId: string, input: { role?: string; note?: string | null }): Promise<void>;
   removeMember(scope: TeamScope, userId: string): Promise<void>;
   transferStationOwnership(stationId: string, fromUserId: string, toUserId: string): Promise<void>;
+  /** Emails the invite again (10 minutes apart at least) and extends it a week. */
   resendInvite(user: CurrentUser, inviteId: string): Promise<InviteRow>;
+  /** Joins the team. An invite to an email needs that email on the account, unless INVITE_EMAIL_MATCH=off. */
   acceptInvite(user: CurrentUser, inviteId: string): Promise<void>;
+  /** An invite as its link's page shows it; signed in, whether the account's email matches. */
+  invitePreview(inviteId: string, user: CurrentUser | null): Promise<InvitePreview>;
 }
 
 export type TeamScope = { kind: "station"; id: string } | { kind: "business"; id: string };
@@ -713,6 +727,20 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       return row?.value ?? null;
     },
 
+    async recordWallets(userId) {
+      const [user] = await db.select({ privyDid: u.privyDid }).from(u).where(eq(u.id, userId));
+      if (user?.privyDid) {
+        const linked = await deps.auth.linkedAccounts(user.privyDid).catch(() => []);
+        for (const account of linked.filter((a) => a.kind === "wallet")) {
+          await db
+            .insert(schema.identities)
+            .values({ userId, kind: "wallet", value: account.value, verifiedAt: deps.clock.now() })
+            .onConflictDoNothing();
+        }
+      }
+      return service.walletOf(userId);
+    },
+
     async adminIds() {
       const rows = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.isAdmin, true));
       return rows.map((r) => r.id);
@@ -803,7 +831,10 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       await deps.notifier.email(email, {
         title: "Your Opencast data",
         body: "Everything your account holds, in one file: presets, reminders, watch history, pledges and receipts, notices, TVs and settings. Sign in to download it.",
-        link: `${deps.config.appOrigin.replace(/\/+$/, "")}/settings/data?download=1`
+        link: `${deps.config.appOrigin.replace(/\/+$/, "")}/settings/data?download=1`,
+        action: "Download your data",
+        footer: "You asked for this in Settings, Your data. The link needs you signed in.",
+        kind: "data"
       });
       return { email, readyBy: now.toISOString() };
     },
@@ -973,11 +1004,7 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           programIds
         })
         .returning();
-      const teamName =
-        scope.kind === "station"
-          ? ((await stationIdents([scope.id])).get(scope.id)?.name ?? "a station")
-          : ((await services.spots.businessNames([scope.id])).get(scope.id) ?? "a business");
-      deps.bus.emit("invite.created", { inviteId: row.id, email: row.email, phone: row.phone, teamName });
+      deps.bus.emit("invite.created", await inviteSend(row));
       return inviteRow(row);
     },
 
@@ -1033,26 +1060,138 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       if (!row) throw notFound("That invite");
       if (row.stationId) await service.requireStation(user, row.stationId, ["owner"]);
       if (row.advertiserId) await service.requireBusiness(user, row.advertiserId, ["owner"]);
+      if (row.acceptedAt) throw conflict("invite_used", "They've already joined.");
+      const now = deps.clock.now();
+      // Every send sets the expiry a week out, so the last send was a week before it.
+      const lastSent = row.expiresAt.getTime() - INVITE_DAYS * DAY_MS;
+      const wait = lastSent + RESEND_GAP_MS - now.getTime();
+      if (wait > 0) {
+        const ago = Math.max(0, Math.floor((now.getTime() - lastSent) / 60_000));
+        const left = Math.ceil(wait / 60_000);
+        throw new HttpError(
+          429,
+          "resend_too_soon",
+          `It went out ${ago === 0 ? "less than a minute" : `${ago} minute${ago === 1 ? "" : "s"}`} ago. You can send it again in ${left} minute${left === 1 ? "" : "s"}.`
+        );
+      }
       const [updated] = await db
         .update(schema.invites)
-        .set({ expiresAt: new Date(deps.clock.now().getTime() + INVITE_DAYS * 86_400_000) })
+        .set({ expiresAt: new Date(now.getTime() + INVITE_DAYS * DAY_MS) })
         .where(eq(schema.invites.id, inviteId))
         .returning();
+      if (updated.email) {
+        const send = await inviteSend(updated);
+        try {
+          await services.notifications.sendInvite({ ...send, email: updated.email });
+        } catch {
+          // Nothing changes when the email didn't go, so trying again isn't held back.
+          await db.update(schema.invites).set({ expiresAt: row.expiresAt }).where(eq(schema.invites.id, inviteId));
+          throw new HttpError(502, "email_not_sent", "The email didn't go out. Try again in a few minutes.");
+        }
+      }
       return inviteRow(updated);
     },
 
     async acceptInvite(user, inviteId) {
       const [row] = await db.select().from(schema.invites).where(eq(schema.invites.id, inviteId));
-      if (!row || row.acceptedAt) throw notFound("That invite");
+      if (!row) throw notFound("That invite");
+      if (row.acceptedAt) {
+        // Accepting your own invite again (a second tap, a reload) changes nothing.
+        if (row.acceptedBy === user.id) return;
+        throw conflict("invite_used", "This invite was already used. Ask for a new one if you still need to join.");
+      }
       if (row.expiresAt.getTime() < deps.clock.now().getTime()) throw refused("invite_expired", "This invite has expired. Ask for a new one.");
+      if (row.email && deps.config.inviteEmailMatch !== false) {
+        const emails = await verifiedEmails(user);
+        if (!emails.includes(row.email.toLowerCase())) {
+          throw new HttpError(
+            403,
+            "invite_email_mismatch",
+            `This invite is for ${maskEmail(row.email)}; you're signed in as ${emails[0] ?? "an account with no email"}. Sign in with ${maskEmail(row.email)} to join.`
+          );
+        }
+      }
       await db.transaction(async (tx) => {
+        // Only one person can use an invite, even two at once.
+        const [taken] = await tx
+          .update(schema.invites)
+          .set({ acceptedAt: deps.clock.now(), acceptedBy: user.id })
+          .where(and(eq(schema.invites.id, inviteId), isNull(schema.invites.acceptedAt)))
+          .returning({ id: schema.invites.id });
+        if (!taken) throw conflict("invite_used", "This invite was already used. Ask for a new one if you still need to join.");
         if (row.stationId) await service.addStationMember(tx, row.stationId, user.id, row.role as StationRole);
         // A4: the programs the invite named, still live programs of the station.
         if (row.stationId && row.role === "host" && row.programIds?.length) await services.stations.addHost(tx, row.stationId, user.id, row.programIds);
         if (row.advertiserId) await service.addBusinessMember(tx, row.advertiserId, user.id, row.role as BusinessRole);
-        await tx.update(schema.invites).set({ acceptedAt: deps.clock.now(), acceptedBy: user.id }).where(eq(schema.invites.id, inviteId));
       });
+    },
+
+    async invitePreview(inviteId, user) {
+      const [row] = await db.select().from(schema.invites).where(eq(schema.invites.id, inviteId));
+      if (!row) throw notFound("That invite");
+      const team = await inviteTeam(row);
+      const [inviter] = await db.select({ displayName: u.displayName }).from(u).where(eq(u.id, row.invitedBy));
+      const state = row.acceptedAt ? "accepted" : row.expiresAt.getTime() < deps.clock.now().getTime() ? "expired" : "open";
+      const emails = user ? await verifiedEmails(user) : [];
+      return {
+        id: row.id,
+        team,
+        role: row.role,
+        invitedBy: inviter?.displayName ?? null,
+        emailHint: row.email ? maskEmail(row.email) : null,
+        state,
+        expiresAt: row.expiresAt.toISOString(),
+        signedInAs: user ? (emails[0] ?? null) : null,
+        emailMatches: user && row.email && deps.config.inviteEmailMatch !== false ? emails.includes(row.email.toLowerCase()) : null,
+        acceptedByYou: Boolean(user && row.acceptedBy === user.id)
+      };
     }
   };
+
+  /** The team an invite is for, as its page names it. */
+  async function inviteTeam(row: typeof schema.invites.$inferSelect): Promise<InvitePreview["team"]> {
+    if (row.stationId) {
+      const ident = (await stationIdents([row.stationId])).get(row.stationId);
+      return { kind: "station", id: row.stationId, name: ident?.name ?? "A station", callSign: ident?.callSign ?? null };
+    }
+    const businessId = row.advertiserId!;
+    return { kind: "business", id: businessId, name: (await services.spots.businessNames([businessId])).get(businessId) ?? "A business", callSign: null };
+  }
+
+  /** What an invite's email needs: the team, the role, who sent it, and this send's time. */
+  async function inviteSend(row: typeof schema.invites.$inferSelect) {
+    const team = await inviteTeam(row);
+    const [inviter] = await db.select({ displayName: u.displayName }).from(u).where(eq(u.id, row.invitedBy));
+    return {
+      inviteId: row.id,
+      email: row.email,
+      phone: row.phone,
+      teamName: team.name,
+      scope: team.kind,
+      role: row.role,
+      invitedByName: inviter?.displayName ?? null,
+      expiresAt: row.expiresAt.toISOString(),
+      sentAt: deps.clock.now().toISOString()
+    };
+  }
+
+  /**
+   * The signed-in person's verified emails (email sign-in, Google, Apple), lower-cased: the ones
+   * recorded, and Privy's linked accounts read again (recorded too), so an address linked since
+   * the first sign-in counts.
+   */
+  async function verifiedEmails(user: CurrentUser): Promise<string[]> {
+    const recorded = await service.emailsOf(user.id);
+    if (!user.privyDid) return recorded;
+    const linked = (await deps.auth.linkedAccounts(user.privyDid).catch(() => [])).filter((a) => a.kind !== "wallet" && a.value.includes("@"));
+    for (const account of linked) {
+      await db
+        .insert(schema.identities)
+        .values({ userId: user.id, kind: account.kind, value: account.value.toLowerCase(), verifiedAt: deps.clock.now() })
+        .onConflictDoNothing();
+    }
+    return [...new Set([...recorded, ...linked.map((a) => a.value.toLowerCase())])];
+  }
+
   return service;
 }

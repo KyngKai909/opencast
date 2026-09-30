@@ -28,12 +28,12 @@ describe("DialRow", () => {
     expect(onTune).not.toHaveBeenCalled();
   });
 
-  it("says live, listed, carried and off air in words", () => {
+  it("says live, external, carried and off air in words", () => {
     const live = render(<DialRow station={BEAT} now={{ title: "Beat Tape Live", live: true, until: at(22) }} timeZone={TZ} />);
     expect(live.container.textContent).toContain("Live");
     expect(live.container.textContent).toContain("Until 10:00 pm");
     const listed = render(<DialRow station={BEAT} now={{ title: "City Council", listed: true }} />);
-    expect(listed.container.querySelector(".oc-tag--listed")?.textContent).toBe("Listed");
+    expect(listed.container.querySelector(".oc-tag--listed")?.textContent).toBe("External");
     const carried = render(<DialRow station={BEAT} now={{ title: "Saturday Reel", carriedFrom: "REEL", until: at(21) }} variant="phone" timeZone={TZ} />);
     expect(carried.container.textContent).toContain("From REEL, until 9:00 pm");
     const off = render(<DialRow station={BEAT} now={{ title: "", offAir: true, until: at(30) }} timeZone={TZ} />);

@@ -23,7 +23,7 @@ export const DESK_RAIL = [
     items: [
       { id: "market-board", label: "Market board" },
       { id: "creator-pipeline", label: "Creator pipeline" },
-      { id: "listed-sources", label: "Listed sources" },
+      { id: "listed-sources", label: "External sources" },
       { id: "catalog", label: "Catalog" }
     ]
   },

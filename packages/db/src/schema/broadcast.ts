@@ -246,7 +246,11 @@ export const contents = broadcast.table(
     cid: text("cid").primaryKey(),
     bytes: bigint("bytes", { mode: "number" }).notNull(),
     contentType: text("content_type").notNull(),
-    /** Standard: the prepared file playout airs. Infrequent: originals. */
+    /**
+     * The class it was stored in. Infrequent: originals (every upload since 2026-09-29, what playout
+     * prepares from). Standard: files from before, and small files read now and then (logos, caption
+     * files). Storing the same bytes again never changes it; prepared segments aren't rows here.
+     */
     storageClass: text("storage_class", { enum: ["standard", "infrequent"] }).notNull(),
     store: text("store", { enum: ["local", "r2"] }).notNull(),
     /** A rights claim is open against it: kept (so it can come back), never deleted, never aired. */
@@ -284,8 +288,9 @@ export const contentRefs = broadcast.table(
 );
 
 /**
- * Low-bitrate HLS previews, kept only while something needs one: an item offered in
- * the syndication market, a spot in review, a production order's delivery.
+ * Retired 2026-09-29: low-bitrate HLS previews rendered separately (`previews/<cid>/`). Previews
+ * play the prepared segments now; the storage sweep deletes what's left of these and their rows.
+ * Kept (not dropped) so the schema only ever grows.
  */
 export const contentPreviews = broadcast.table("content_previews", {
   cid: text("cid")
@@ -317,11 +322,22 @@ export const assetFiles = broadcast.table(
       .notNull()
       .references(() => assets.id),
     version: integer("version").notNull(),
-    /** The prepared file playout airs. */
+    /**
+     * The file, by content ID: since 2026-09-29 the original upload (Infrequent Access), which
+     * playout prepares for air once. Before, a copy capped at 1280 px wide; the one-off
+     * `storage:prepare-from-originals` moves those items to their originals.
+     */
     contentId: text("content_id").references(() => contents.cid),
-    /** The original upload, kept in Infrequent Access. */
+    /**
+     * Before 2026-09-29 only: the original, when `content_id` was the 1280 px copy. Redundant now
+     * (`content_id` is the original) and left empty; kept, since dropping it isn't additive.
+     */
     originalContentId: text("original_content_id").references(() => contents.cid),
-    /** Before content IDs: a disk path or URL. Rows made since point at content IDs instead. */
+    /**
+     * Before content IDs: where the file was (a disk path or URL; `ipfs` for a Pinata pin). Rows
+     * made since point at content IDs instead; the relinks (`storage:relink-locations`,
+     * `storage:move-off-pinata --copy`) give old rows their content ID and set this to the object store.
+     */
     storage: text("storage", { enum: ["local", "r2", "ipfs"] }),
     location: text("location"),
     r2Key: text("r2_key"),

@@ -1,13 +1,14 @@
 // Storage by content ID: stored once, deleted with its last reference, locked by a
-// claim and taken down when it's resolved against; previews only while needed;
-// IPFS only on purpose. And the worker cache that playout reads from.
+// claim and taken down when it's resolved against; IPFS only on purpose. Uploads are kept as
+// their original (Infrequent Access), which playout prepares for air; previews play what's
+// prepared (storage-originals.test.ts covers preparation, previews and the relinks).
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { cidFromSha256, contentIdOf, sha256FromCid } from "../src/v1/storage.js";
+import { cidFromSha256, contentIdOf, isContentId, sha256FromCid } from "../src/v1/storage.js";
 import { createPlanner } from "../src/v1/modules/playout/engine/plan.js";
 import { anon, createHarness, itemFixture, market, stationFixture, testClip, type Harness, type User } from "./harness.js";
 
@@ -48,6 +49,23 @@ describe("content IDs", () => {
     expect(hello.cid).toBe("bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e");
     expect(cidFromSha256(sha256FromCid(hello.cid))).toBe(hello.cid);
   });
+
+  it("only reads our own kind of CID as a sha-256: v1, raw, sha2-256, base32", () => {
+    const good = "bafkreifzjut3te2nhyekklss27nh3k72ysco7y32koao5eei66wof36n5e";
+    expect(isContentId(good)).toBe(true);
+    // An IPFS CID of a chunked file (dag-pb) names a DAG, not the bytes.
+    expect(() => sha256FromCid("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi")).toThrow(/raw sha-256 CIDv1/);
+    // CIDv0, other bases, upper case, a character outside base32, too short, too long.
+    for (const bad of ["QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG", "zb2rhe5P4gXftAwvA4eXQ5HJwsER2owDyS9sKaQRRVQPn93bA", good.toUpperCase(), `${good.slice(0, 30)}1${good.slice(31)}`, good.slice(0, -1), `${good}a`, ""]) {
+      expect(() => sha256FromCid(bad)).toThrow(/content ID/);
+      expect(isContentId(bad)).toBe(false);
+    }
+    // The last character's padding bits must be zero.
+    expect(() => sha256FromCid(`${good.slice(0, -1)}f`)).toThrow(/content ID/);
+    // Right shape, wrong prefix (a CIDv1 with the dag-cbor codec, 0x71).
+    const cbor = cidFromSha256(Buffer.alloc(32)).replace(/^bafkre/, "bafyre");
+    expect(() => sha256FromCid(cbor)).toThrow(/raw sha-256 CIDv1/);
+  });
 });
 
 describe("stored once", () => {
@@ -67,17 +85,18 @@ describe("stored once", () => {
     cid = one.body.storage.contentId;
     expect(two.body.storage.contentId).toBe(cid);
     expect(one.body.storage).toMatchObject({ sharedWith: 1, locked: false, ipfs: null });
-    // The prepared file in Standard, the original in Infrequent Access, one object each.
+    // The original, as uploaded, in Infrequent Access: one object, and no copy made from it.
+    expect(cid).toBe((await contentIdOf(clip)).cid);
     const [file] = await h.db.select().from(schema.assetFiles).where(eq(schema.assetFiles.assetId, beatItem));
-    originalCid = file.originalContentId!;
+    expect(file).toMatchObject({ contentId: cid, originalContentId: null });
+    originalCid = cid;
     const rows = await h.db.select().from(schema.contents);
-    expect(rows.find((r) => r.cid === cid)?.storageClass).toBe("standard");
-    expect(rows.find((r) => r.cid === originalCid)?.storageClass).toBe("infrequent");
+    expect(rows.find((r) => r.cid === cid)?.storageClass).toBe("infrequent");
     expect(await exists(path.join(objectsDir(), cid))).toBe(true);
-    expect(await exists(path.join(objectsDir(), originalCid))).toBe(true);
-    // No stray copies left in uploads.
+    // No stray copies left in uploads, and nothing compressed.
     const leftovers = await fs.readdir(path.join(h.deps.config.storageRoot, "uploads", beatId, "originals")).catch(() => []);
     expect(leftovers).toEqual([]);
+    expect(await exists(path.join(h.deps.config.storageRoot, "uploads", beatId, "ready"))).toBe(false);
   }, 60_000);
 
   it("deletes the object only when the last item pointing at it goes", async () => {
@@ -126,26 +145,6 @@ describe("takedowns", () => {
     expect((await h.services.library.content.info([cid])).get(cid)).toMatchObject({ deleted: true });
     await expect(h.services.library.content.store(clip, { storageClass: "standard" })).rejects.toThrow(/taken down/);
   });
-});
-
-describe("previews", () => {
-  it("renders a low-bitrate preview while a program is offered, and deletes it when the offer goes", async () => {
-    const program = await jess.post(`/v1/stations/${reelId}/programs`, { title: "Saturday Reel", description: "Films from the archive." }).expect(201);
-    const item = await itemFixture(h, reelId, { location: await testClip(9), programId: program.body.id, title: "Saturday Reel, ep. 1" });
-    const cid = (await h.services.library.currentContent([item.id])).get(item.id)!;
-    const offer = await jess
-      .post(`/v1/programs/${program.body.id}/offer`, { termsOffered: ["barter", "cash"], cashPriceMicros: 2_500_000, cashPriceUnit: "per_airing", barterMakerMsPerHour: 120_000, airingsPerEpisode: 2, windowDays: 7, liveOnly: false, noticeDays: 7, approval: "i_approve", radioBandAllowed: true })
-      .expect(201);
-    await h.services.library.settle();
-    const detail = await kai.get(`/v1/catalog/offers/${offer.body.id}`).expect(200);
-    expect(detail.body.episodes[0].previewUrl).toBe(`/objects/previews/${cid}/index.m3u8`);
-    const playlist = await fs.readFile(path.join(objectsDir(), "previews", cid, "index.m3u8"), "utf8");
-    expect(playlist).toContain("#EXT-X-ENDLIST");
-    await jess.patch(`/v1/catalog/offers/${offer.body.id}`, { status: "withdrawn" }).expect(200);
-    expect(await exists(path.join(objectsDir(), "previews", cid))).toBe(false);
-    // The file itself stays: the item still points at it.
-    expect(await exists(path.join(objectsDir(), cid))).toBe(true);
-  }, 60_000);
 });
 
 describe("IPFS", () => {

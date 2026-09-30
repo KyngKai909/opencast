@@ -5,7 +5,7 @@ export type TagVariant =
   | "plain"    /* outlined, ink-70 */
   | "live"     /* red text and border, with the dot: the only red that isn't the tally */
   | "next"     /* standby fill: "Next at 9:30" */
-  | "listed"   /* dashed: a city stream Opencast lists but doesn't restream */
+  | "listed"   /* dashed: an external station, the source's own stream ("External") */
   | "off"      /* dashed, ink-50: "Off air" */
   | "standby"  /* amber outline: waiting, committed, needs attention */
   | "solid";   /* ink fill: done, "Yours", a selected state */
@@ -20,7 +20,7 @@ export interface TagProps {
   className?: string;
 }
 
-/** A small sign: Live, Listed, Next, states. Words, never colour alone. */
+/** A small sign: Live, External, Next, states. Words, never colour alone. */
 export function Tag({ variant = "plain", onPicture, dot, children, className }: TagProps) {
   const showDot = dot ?? variant === "live";
   return (

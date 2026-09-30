@@ -27,7 +27,7 @@ export default function Spot() {
   const { spotId } = useParams();
   const allowed = b.can("advertise");
   const spot = useSpot(allowed ? spotId : undefined, { refetchInterval: 5000 });
-  const balance = useBalance(b.id);
+  const balance = useBalance(b.id, allowed);
   useShellOptions({ title: spot.data?.title ?? "Spot" });
   if (!allowed) return <ViewerBlocked />;
   if (spot.isLoading || balance.isLoading) return <Quiet />;

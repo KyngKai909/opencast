@@ -746,11 +746,11 @@ export const broadcast = specimens([
       { file: MC, anchor: "flow-a", frames: ["A.1"] }
     ],
     notes:
-      "One row per station in channel order: what's on, when it ends and what's next. A click tunes in; the ident opens the station preview. Live, Listed (dashed), Off air and carried say so in words. On the radio band list, the station you're on carries the tally edge, not a lit sign.",
+      "One row per station in channel order: what's on, when it ends and what's next. A click tunes in; the ident opens the station preview. Live, External (dashed), Off air and carried say so in words. On the radio band list, the station you're on carries the tally edge, not a lit sign.",
     stacked: true,
     states: [
       {
-        label: "Web: live, listed, carried, off air",
+        label: "Web: live, external, carried, off air",
         render: () => (
           <Fit w={1224}>
           <Dial header label="Inland Empire, TV band">

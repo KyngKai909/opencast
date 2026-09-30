@@ -61,10 +61,10 @@ export function slotLines(p: SlotDetailProps): KeyValueRow[] {
       return [
         {
           title: heading,
-          detail: slot.stations.length > 1 ? `Listed city streams: ${slot.stations.map((s) => `${s.channel} ${s.callSign}`).join(", ")}` : `Listed city stream. ${first?.name ?? ""}`,
+          detail: slot.stations.length > 1 ? `External city streams: ${slot.stations.map((s) => `${s.channel} ${s.callSign}`).join(", ")}` : `External city stream. ${first?.name ?? ""}`,
           actions: (
             <Button size="sm" href={deskPath(`/markets/${marketSlug}/listed`)}>
-              Listed sources
+              External sources
             </Button>
           )
         },

@@ -30,6 +30,13 @@ function persist(v: string | null) {
   }
 }
 
+/** Mock mode's embedded wallet for an email: the same address every time, as Privy's would be. */
+export function mockWalletFor(email: string): string {
+  let h = 0x811c9dc5;
+  for (const c of email) h = Math.imul(h ^ c.charCodeAt(0), 0x01000193) >>> 0;
+  return `0x${h.toString(16).padStart(8, "0").repeat(5)}`;
+}
+
 /** Where sign-in happened: the desk's page signs in its admin, the rest the reference's Kai. */
 function area() {
   return typeof window === "undefined" ? "viewer" : areaOf(window.location.pathname);
@@ -68,5 +75,13 @@ export function useMockAuth(): AuthAdapter {
     const e = stored();
     return e ? mockTokenFor(e) : null;
   }, []);
-  return useMemo(() => ({ available: true, ready: true, signedIn: !!email, email, sendCode, verifyCode, oauth, wallet, signOut, getToken }), [email, sendCode, verifyCode, oauth, wallet, signOut, getToken]);
+  const creatorWallet = useCallback(async () => {
+    const e = stored();
+    if (!e) throw new Error("Sign in first.");
+    return mockWalletFor(e);
+  }, []);
+  return useMemo(
+    () => ({ available: true, ready: true, signedIn: !!email, email, sendCode, verifyCode, oauth, wallet, creatorWallet, signOut, getToken }),
+    [email, sendCode, verifyCode, oauth, wallet, creatorWallet, signOut, getToken]
+  );
 }

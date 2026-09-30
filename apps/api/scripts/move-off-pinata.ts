@@ -1,9 +1,13 @@
 // Moves files off Pinata. By default it only reports: what's pinned, how many
 // gigabytes, what stays (the Opencast catalog), and what storage costs before and
 // after. With --copy it copies each pin into object storage under its content ID
-// and verifies the copy by hash. With --unpin --yes-unpin it then unpins every
-// verified copy that isn't a catalog item. Unpinning deletes the IPFS copy: it can't
-// be undone, so it's never the default.
+// (Infrequent Access: they're originals), verifies the copy by hash, and then points
+// every row that used the pin (legacy asset files stored on IPFS, and any file row
+// whose location names it) at the new content ID, carrying over what was prepared
+// from the old location. --copy never unpins or deletes anything, and it's safe to run
+// again. With --unpin --yes-unpin it then unpins every verified copy that isn't a
+// catalog item. Unpinning deletes the IPFS copy: it can't be undone, so it's never the
+// default, and it's a separate decision from the copy.
 //
 //   npx tsx scripts/move-off-pinata.ts                   report
 //   npx tsx scripts/move-off-pinata.ts --copy            copy + verify, and write the report
@@ -11,17 +15,13 @@
 //   --keep <ipfsCid>   (repeatable) treat a pin as a catalog item
 //   --pinata-monthly <dollars>   what the Pinata plan costs, for the before-and-after
 
-import { createHash } from "node:crypto";
-import { createWriteStream, promises as fs } from "node:fs";
-import os from "node:os";
+import { promises as fs } from "node:fs";
 import path from "node:path";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import { isNotNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { STORAGE_ROOT } from "../src/config.js";
 import { createDeps, createV1 } from "../src/v1/runtime.js";
-import { contentIdOf, objectKey, sha256FromCid } from "../src/v1/storage.js";
+import { copyPin } from "../src/v1/storageMaintenance.js";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.includes(name);
@@ -132,35 +132,20 @@ const report: Record<string, unknown> = {
 };
 
 if (COPY) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "pinata-move-"));
   for (const pin of moving) {
-    const file = path.join(dir, pin.ipfsCid);
-    const entry: Record<string, unknown> = { ipfsCid: pin.ipfsCid, name: pin.name, bytes: pin.bytes };
-    try {
-      const response = await fetch(`${gateway}/${pin.ipfsCid}`);
-      if (!response.ok || !response.body) throw new Error(`gateway answered ${response.status}`);
-      await pipeline(Readable.fromWeb(response.body as never), createWriteStream(file));
-      const stored = await services.library.content.store(file, { storageClass: "infrequent" });
-      // Verify: read the copy back from storage and hash it.
-      const back = path.join(dir, `${pin.ipfsCid}.back`);
-      await deps.storage.objects.download(objectKey.file(stored.cid), back);
-      const readBack = (await contentIdOf(back)).sha256;
-      entry.contentId = stored.cid;
-      entry.verified = readBack.equals(sha256FromCid(stored.cid)) && readBack.equals(createHash("sha256").update(await fs.readFile(file)).digest());
-      if (entry.verified && UNPIN) {
+    // Copied, verified by hash, and the rows that used it relinked to the content ID (never unpinned here).
+    const entry: Record<string, unknown> = { ...(await copyPin({ deps, services }, pin, gateway)) };
+    if (entry.verified && UNPIN) {
+      try {
         await unpin(pin);
         entry.unpinned = true;
+      } catch (error) {
+        entry.unpinError = (error as Error).message;
       }
-      await fs.rm(back, { force: true });
-    } catch (error) {
-      entry.error = (error as Error).message;
-    } finally {
-      await fs.rm(file, { force: true });
     }
     (report.copies as unknown[]).push(entry);
     console.log(JSON.stringify(entry));
   }
-  await fs.rm(dir, { recursive: true, force: true });
 }
 
 const out = path.join(STORAGE_ROOT, `pinata-move-${Date.now()}.json`);

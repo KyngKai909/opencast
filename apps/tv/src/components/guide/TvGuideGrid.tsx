@@ -1,7 +1,7 @@
 // The guide grid at ten feet (tv 03.1 .gg): six stations, two hours in five-minute columns, the now
 // line, one focused cell. Built here rather than with @opencast/ui's GuideGrid: that grid has no TV
 // size (its type is 12 to 15px), writes its own cell lines ("Began 8:00", a span for what's on
-// now) where the TV frame writes "Until 9:00" and "Listed, until 9:15", stacks the call sign over
+// now) where the TV frame writes "Until 9:00" and "External, until 9:15", stacks the call sign over
 // the channel where the TV puts the channel first, and takes pointer clicks with a selected
 // state, not a focus that follows time. Placement and the now line are the package's
 // (guideCells, NowLine).

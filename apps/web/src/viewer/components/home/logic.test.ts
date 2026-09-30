@@ -127,8 +127,8 @@ describe("wording", () => {
     expect(carriedWhere({ station: beat, airing: airing({ startsAt: "2026-09-27T06:30:00Z" }), onNow: false }, "civc", TZ)).toEqual({ live: false, text: "Next on BEAT at 11:30 pm" });
     expect(carriedWhere(null, "x", TZ)).toBeNull();
   });
-  it("says a listed airing comes from the city's stream", () => {
-    expect(upStationLine({ callSign: "RDLS", channel: "9.1" }, true)).toBe("RDLS 9.1, listed from the city’s stream");
+  it("says an external airing is the city’s own stream", () => {
+    expect(upStationLine({ callSign: "RDLS", channel: "9.1" }, true)).toBe("RDLS 9.1, external, the city’s own stream");
     expect(upStationLine({ callSign: "BEAT", channel: "12.1" }, false)).toBe("BEAT 12.1");
   });
   it("writes a radio row's second line without doubling Live", () => {

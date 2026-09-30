@@ -12,7 +12,7 @@ export interface GuideProgram {
   end: TimeInput;
   /** "Live" in red text. Never the tally: nothing in the guide is on your screen yet. */
   live?: boolean;
-  /** A city's stream Opencast lists: the line says ", listed". */
+  /** An external station, the source's own stream: the line says ", external". */
   listed?: boolean;
   /** "From REEL". */
   carriedFrom?: string;
@@ -101,7 +101,7 @@ function cellLine(c: GuideCell, timeZone: string | undefined): string {
   else if (p.carriedFrom) text = `From ${p.carriedFrom}`;
   else if (c.onNow || p.live) text = shortSpan(p.start, p.end, timeZone);
   else text = shortClock(p.start, timeZone);
-  return p.listed ? `${text}, listed` : text;
+  return p.listed ? `${text}, external` : text;
 }
 
 /**

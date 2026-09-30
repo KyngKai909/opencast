@@ -43,8 +43,8 @@ export interface BusinessShellProps {
   business: ShellBusiness;
   /** Opens the business switcher. */
   onSwitchBusiness?: () => void;
-  /** The available balance, in micros. Shown as "Available $412.50". */
-  available: number;
+  /** The available balance, in micros. Shown as "Available $412.50". Null: not shown (a viewer doesn't see the balance). */
+  available: number | null;
   /** The person signed in. */
   user: { initials: string; name: string; href?: string; onClick?: () => void };
   /** The page on screen. */
@@ -75,9 +75,11 @@ export function BusinessShell({ business, onSwitchBusiness, available, user, act
             <Icon name="down" size={15} />
           </button>
           <ShellHeadEnd>
-            <span className="oc-business-shell__balance">
-              Available <b className="oc-business-shell__amount">{money(available)}</b>
-            </span>
+            {available !== null && (
+              <span className="oc-business-shell__balance">
+                Available <b className="oc-business-shell__amount">{money(available)}</b>
+              </span>
+            )}
             <ShellAvatar {...user} />
           </ShellHeadEnd>
         </ShellHead>

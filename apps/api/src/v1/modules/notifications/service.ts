@@ -4,6 +4,8 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
+import type { EmailNotice } from "../../email.js";
+import type { Events } from "../../events.js";
 import { clockTime } from "../../lib/time.js";
 
 type Kind =
@@ -111,12 +113,79 @@ export interface NotificationsService {
   setPrefs(userId: string, scope: Scope, prefs: Prefs): Promise<{ prefs: Prefs; alwaysOn: Kind[] }>;
   /** A3: the account's notices and their delivery records go. */
   forgetUser(userId: string): Promise<void>;
+  /** Emails an invite (made, or sent again). Rejects when the email couldn't be sent. */
+  sendInvite(invite: InviteEmail): Promise<void>;
+}
+
+export type InviteEmail = Omit<Events["invite.created"], "phone"> & { email: string };
+
+const ROLE_WORDS: Record<InviteEmail["role"], { a: string; does: string }> = {
+  operator: { a: "an operator", does: "Operators run the station day to day, but not money or the team." },
+  host: { a: "a host", does: "Hosts go live on the blocks they're given." },
+  manager: { a: "a manager", does: "Managers can run spots, add money and approve orders; only the owner takes money out." },
+  viewer: { a: "a viewer", does: "Viewers see results and statements, but can't spend or change anything." }
+};
+
+/** An invite's email: where its link goes depends on the team (a station's joins in master control, a business's in the business app). */
+export function inviteEmail(invite: InviteEmail, origins: { app: string; business: string }): { link: string; notice: EmailNotice } {
+  const link = invite.scope === "business" ? `${origins.business}/invites/${invite.inviteId}` : `${origins.app}/control/invites/${invite.inviteId}`;
+  const role = ROLE_WORDS[invite.role];
+  const opening = invite.invitedByName
+    ? `${invite.invitedByName} invited you to ${invite.teamName}'s team on Opencast, as ${role.a}.`
+    : `You're invited to ${invite.teamName}'s team on Opencast, as ${role.a}.`;
+  return {
+    link,
+    notice: {
+      title: `Join ${invite.teamName} on Opencast`,
+      body: [
+        `${opening} ${role.does}`,
+        `Sign in with this email address to join. The invite lasts a week.`
+      ].join("\n\n"),
+      link,
+      action: `Join ${invite.teamName}`,
+      footer: `${invite.invitedByName ?? "Someone"} on ${invite.teamName} typed this address. If you weren't expecting it, ignore this email: nothing happens unless you sign in and join.`,
+      key: `invite:${invite.inviteId}:${invite.sentAt}`,
+      kind: "invite"
+    }
+  };
 }
 
 export function createNotificationsService(ctx: ModuleContext): NotificationsService {
   const { deps, services } = ctx;
   const { db } = deps;
   const N = schema.notices;
+
+  const appOrigin = deps.config.appOrigin.replace(/\/+$/, "");
+  const businessOrigin = (deps.config.businessOrigin ?? deps.config.appOrigin).replace(/\/+$/, "");
+  /** Master control's pages a station notice can open; anything else opens the monitor. */
+  const CONTROL_PAGES: Record<string, string> = { log: "log", "as-run": "log", live: "live", sponsors: "sponsors", rights: "rights", "spot-market": "spot-market", carriage: "market", breaks: "breaks", earnings: "earnings", library: "library", settings: "settings" };
+
+  /**
+   * A notice's link as a full address in the right app, for its email. Notices keep app-neutral
+   * paths (`/stations/:id/log`, `/businesses/:id/balance`, `/spots/:id`); an email needs a page.
+   */
+  async function emailLink(scope: Scope, link: string | null): Promise<string | null> {
+    if (!link || /^https?:\/\//.test(link)) return link;
+    if (scope.kind === "business" && scope.id) {
+      const [path, query = ""] = link.split("?");
+      const parts = path!.split("/").filter(Boolean);
+      const q = query ? `?${query}` : "";
+      if (parts[0] === "businesses" && parts[1]) return `${businessOrigin}/${[parts[1], ...parts.slice(2)].join("/")}${q}`;
+      if (parts[0] === "spots" && parts[1]) return `${businessOrigin}/${scope.id}/spots/${parts[1]}`;
+      if (parts[0] === "orders" && parts[1]) return `${businessOrigin}/${scope.id}/orders/${parts[1]}`;
+      return `${businessOrigin}/${scope.id}`;
+    }
+    if (scope.kind === "station") {
+      const [path, query = ""] = link.split("?");
+      const parts = path!.split("/").filter(Boolean);
+      const stationId = parts[0] === "stations" ? parts[1] : scope.id;
+      const ident = stationId ? (await services.stations.idents([stationId])).get(stationId) : undefined;
+      if (!ident?.callSign) return `${appOrigin}/control`;
+      const page = parts[0] === "stations" ? CONTROL_PAGES[parts[2] ?? ""] : undefined;
+      return `${appOrigin}/control/${ident.callSign.toLowerCase()}/${page ?? "monitor"}${page && query ? `?${query}` : ""}`;
+    }
+    return `${appOrigin}${link.startsWith("/") ? "" : "/"}${link}`;
+  }
 
   async function prefsFor(userId: string, scope: Scope): Promise<Prefs> {
     const saved = await services.accounts.notificationPrefs(userId, scope.kind, scope.id);
@@ -160,7 +229,16 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
         if (always || channel.email) {
           const [email] = await services.accounts.emailsOf(userId);
           if (email) {
-            await deps.notifier.email(email, deliver).then(
+            const letter: EmailNotice = {
+              ...deliver,
+              link: await emailLink(notice.scope, deliver.link),
+              action: notice.scope.kind === "business" ? "Open Opencast for business" : notice.scope.kind === "station" ? "Open master control" : "Open Opencast",
+              footer: always ? "Opencast always sends this one; it can't be turned off." : "You can turn these emails off in Settings, Notifications.",
+              // One email per notice, however many times it's tried.
+              key: `notice:${row.id}`,
+              kind: notice.kind
+            };
+            await deps.notifier.email(email, letter).then(
               () => db.insert(schema.deliveries).values({ noticeId: row.id, channel: "email", sentAt: deps.clock.now() }),
               (error) => db.insert(schema.deliveries).values({ noticeId: row.id, channel: "email", error: String(error) })
             );
@@ -207,6 +285,11 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       await db.delete(N).where(eq(N.userId, userId));
     },
 
+    async sendInvite(invite) {
+      const { notice } = inviteEmail(invite, { app: appOrigin, business: businessOrigin });
+      await deps.notifier.email(invite.email, notice);
+    },
+
     async setPrefs(userId, scope, prefs) {
       // Always-on kinds stay on whatever is sent.
       const cleaned = Object.fromEntries(Object.entries(prefs).filter(([kind]) => !ALWAYS_ON.includes(kind as Kind)));
@@ -223,7 +306,6 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     const ident = (await services.stations.idents([stationId])).get(stationId);
     return ident ? `${ident.callSign ?? ident.name}${ident.channel ? ` ${ident.channel}` : ""}` : "A station";
   };
-  const origin = deps.config.appOrigin;
 
   deps.bus.on("reminder.due", async (e) => {
     await service.notify([e.userId], {
@@ -445,14 +527,9 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     }
   });
 
+  // A new invite by email: its email (resending sends through sendInvite itself). A phone invite sends nothing yet.
   deps.bus.on("invite.created", async (e) => {
-    if (e.email) {
-      await deps.notifier.email(e.email, {
-        title: `You're invited to ${e.teamName} on Opencast`,
-        body: "Sign in with this email to join.",
-        link: `${origin}/invites/${e.inviteId}`
-      });
-    }
+    if (e.email) await service.sendInvite({ ...e, email: e.email });
   });
 
   return service;

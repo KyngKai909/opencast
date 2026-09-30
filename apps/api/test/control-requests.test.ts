@@ -26,7 +26,8 @@ beforeAll(async () => {
   h.clock.set(NOW);
   const m = await market(h);
   kai = await h.signIn("Kai");
-  hana = await h.signIn("Hana");
+  // Accepting an invite needs the invited email on the account.
+  hana = await h.signIn("Hana", { linked: [{ kind: "email", value: "hana@example.com" }] });
   const station = await stationFixture(h, { callSign: "BEAT", name: "Inland Beat", ownerId: kai.id, marketId: m.id, tenths: 121, signedOn: true, colour: "#8C3B7A" });
   stationId = station.id;
 

@@ -119,6 +119,7 @@ export function accountsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   // A5: the station switcher.
   r.handle(api.myStationStatus, ({ user }) => accounts.stationStatus(user.id));
 
+  r.handle(api.getInvite, ({ user, params }) => accounts.invitePreview(params.inviteId, user));
   r.handle(api.resendInvite, ({ user, params }) => accounts.resendInvite(user, params.inviteId));
   r.handle(api.acceptInvite, async ({ user, params }) => {
     await accounts.acceptInvite(user, params.inviteId);

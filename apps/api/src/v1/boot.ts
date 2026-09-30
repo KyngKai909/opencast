@@ -13,6 +13,7 @@ import { chainFromEnv } from "./chain/index.js";
 import { geoFromEnv } from "./geo.js";
 import { placesFromEnv } from "./places.js";
 import { relayFromEnv } from "./relay.js";
+import { emailFromEnv } from "./email.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -29,6 +30,11 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const { db } = createDb(databaseUrl);
   const clock = { now: () => new Date() };
   const appOrigin = env.APP_ORIGIN ?? "http://localhost:5174";
+  // The business app: business invites and business notices link there.
+  const businessOrigin = (env.BUSINESS_ORIGIN?.trim() || (env.NODE_ENV === "production" ? appOrigin : "http://localhost:5177")).replace(/\/+$/, "");
+  if (env.NODE_ENV === "production" && !env.BUSINESS_ORIGIN?.trim()) {
+    console.warn("[v1] BUSINESS_ORIGIN isn't set: business invites link to APP_ORIGIN, which has no business pages.");
+  }
   const chain = chainFromEnv(env);
   const publicBase = publicBaseFromEnv(env);
   return {
@@ -40,7 +46,8 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     chain,
     notifier: {
       push: async (userId, n) => console.log(`[notify] push to ${userId}: ${n.title}`),
-      email: async (to, n) => console.log(`[notify] email to ${to}: ${n.title}`)
+      // Resend with RESEND_API_KEY (EMAIL_FROM, EMAIL_REPLY_TO), else the log.
+      email: emailFromEnv(env)
     },
     payments: paymentsFromEnv(env, clock, appOrigin),
     auth: privyVerifier({
@@ -55,6 +62,8 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     config: {
       storageRoot,
       appOrigin,
+      businessOrigin,
+      inviteEmailMatch: env.INVITE_EMAIL_MATCH?.trim().toLowerCase() !== "off",
       escrowContractAddress: chain?.escrow ?? (env.ESCROW_CONTRACT_ADDRESS || null),
       usdc: env.CHAIN_ID && env.USDC_ADDRESS ? { chainId: Number(env.CHAIN_ID), address: env.USDC_ADDRESS } : null,
       production: env.NODE_ENV === "production",

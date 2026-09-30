@@ -74,6 +74,7 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
       numberWaitMs: settings.numberWaitSeconds * 1000,
       quality: settings.quality,
       eveningOut: settings.eveningOut,
+      tuningSound: { video: settings.tuningSound, radio: settings.radioTuningSound },
       now: () => now().getTime(),
       onCommand: (c: Command, s?: CommandSource) => {
         if (ui.current && engineRef.current) onPictureCommand(c, ui.current, engineRef.current, s);
@@ -144,11 +145,13 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   );
 
   // Settings take effect at once.
-  const { bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut } = device.settings;
+  const { bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut, tuningSound, radioTuningSound } = device.settings;
   useEffect(
     () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand }, quality, eveningOut }),
     [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut]
   );
+  // "Tuning sound", per band: kept for Phase 5's tuning (nothing plays yet).
+  useEffect(() => engine.setOptions({ tuningSound: { video: tuningSound, radio: radioTuningSound } }), [engine, tuningSound, radioTuningSound]);
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);
   useEffect(() => engine.setPresets(Object.fromEntries(presets.map((p) => [p.key, p.stationId]))), [engine, presets]);

@@ -1,6 +1,6 @@
 // The business app's frame for a business's pages (`/:businessId/...`): the business shell on the
 // web (the switcher, "Available $412.50", the avatar, the rail) and a plain phone bar under
-// 768px. A viewer's rail keeps only results, the balance and settings open.
+// 768px. A viewer's rail keeps only results and settings open, and the header has no balance.
 
 import { Outlet, useLocation, useSearchParams } from "react-router";
 import { ledgerApi, spotsApi } from "@opencast/contracts";
@@ -55,7 +55,7 @@ function Frame() {
   const loc = useLocation();
   const [, setParams] = useSearchParams();
   const me = useMe();
-  const balance = useApi(ledgerApi.getBalance, { params: { businessId: b.id } }, { refetchInterval: 30_000 });
+  const balance = useApi(ledgerApi.getBalance, { params: { businessId: b.id } }, { refetchInterval: 30_000, enabled: b.can("money") });
   const badges = useRailBadges(b);
   const segment = loc.pathname.split("/").filter(Boolean)[1] ?? "";
   const active = SEGMENT_PAGE[segment] ?? "spots";
@@ -89,7 +89,7 @@ function Frame() {
     <BusinessShell
       business={{ name: b.business.name, initials: logo.initials, colour: logo.colour }}
       onSwitchBusiness={openSwitcher}
-      available={balance.data?.availableMicros ?? 0}
+      available={b.can("money") ? (balance.data?.availableMicros ?? 0) : null}
       user={{ initials, name, href: `${b.base}/settings/team` }}
       active={active}
       items={items}

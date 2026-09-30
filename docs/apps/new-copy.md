@@ -140,7 +140,7 @@ Settings' undrawn panes (Account, Market, TVs and casting, Appearance, Privacy, 
 
 | Where | Words |
 |---|---|
-| Station page | "In your presets", "Nothing is listed for this day yet.", "Nothing else tonight.", "Off air", "Listed from the city's stream", "Back to the dial" |
+| Station page | "In your presets", "Nothing is listed for this day yet.", "Nothing else tonight.", "Off air", "External, the city's own stream" (was "Listed from the city's stream"; station-pages 03 now says "external, the city's own stream"), "Back to the dial" |
 | Program page | "Not scheduled yet", "Not scheduled in your market yet.", "Aired", "Tonight at {time}" / "Today at {time}", "Program" (phone back bar) |
 | Search | "Type a channel, a call sign or a program."; "Nothing on the dial matches “{x}”. Try a call sign, a channel or a program's name."; "No station on 13", "Nearest: 9.1 RDLS and 12.1 BEAT"; "On now, until {time}"; "live now" / "on now" (phone rows); "Enter" and "Off air" on the Tune to row |
 | Spoken | "Loading the station", "Loading the program", "Searching", "Preset {N}. Open presets", "Remind me: {episode}" |
@@ -382,7 +382,7 @@ The frames' words are used as drawn. Below is what they don't have. Mock-only pa
 | Sign in | "Sign in to Network desk"; foot "Opencast's own tool for building a market. For the Opencast team only." |
 | Not on the team | "This desk is for the Opencast team."; "You're signed in as {email}, but that account isn't on the team. If you run a station, master control is where you run it."; "Sign out"; the API's 403 "Network desk is for the Opencast team." |
 | Couldn't check | "Network desk didn't open."; "We couldn't check who you are just now. Try again in a minute." |
-| Rail (screen readers) | "{4} yeses to set up", "{1} not listed yet", "{$227.00} held", "{26} reserved"; the avatar "{Dee A.}: settings" |
+| Rail (screen readers) | "{4} yeses to set up", "{1} not on the dial yet" (was "not listed yet"), "{$227.00} held", "{26} reserved"; the avatar "{Dee A.}: settings" |
 | Not built yet | "This page isn't designed yet. It comes after the pages the desk needs first."; Catalog "Opencast's own programs: the public-domain catalog every station can carry."; Rights claims "Claims against programs on any station, and the answers."; Catalog sponsors "Businesses that sponsor the catalog station's programs." |
 | Not found | "There's nothing here.", "Back to the market board" |
 | Settings | "Your own settings for Network desk, on this device."; "Appearance", "Ground", "Dark is the default. The system setting decides unless you choose here.", "System", "Dark", "Light"; "You", "Signed in as {email}. On the Opencast team.", "Sign out" |
@@ -406,13 +406,13 @@ The frames' words are used as drawn. Below is what they don't have. Mock-only pa
 | Add a creator | "Add a creator", "Someone making things in the {market}. Nothing is asked or copied yet."; "Name" / "As they call themselves: a channel, a crew, a person."; "The person behind it"; "What they make" / "One line: “Skate films, Joshua Tree”."; "Their work lives on", "Link"; "Email" / "Asking goes to them on their platform, and here too if there's an address."; "Optional"; "Cancel", "Add them"; errors "Say what they're called.", "Paste the link to their channel or page.", "That doesn't look like an email address.", "Keep it under 200 characters."; toast "{name} is on the pipeline, as Found." |
 | Ask | "A radio band station" (band only); a single work's length, "Length not known"; "Nothing found on their {Vimeo} yet. Their works are catalogued from the source, by title and length, before asking."; the preview's empty note "Your note goes here."; "Tick at least one work to ask about."; sent "Sent to {name}." / "If they don't answer in a week, the pipeline says a reminder is due." / "Back to the pipeline"; asked "Asked {September 19}." / "They get one reminder after a week, then it stops."; "No answer after the reminder." / "Nobody asks again."; "Already licensed, under {CC BY 4.0}." / "No need to ask: their station can go on air with credit while they're invited to claim it." / "Set up"; "They said yes {September 25}." / "Set up"; a work unticked when asking "Left out when asking" |
 
-**Desk: setting up, listed sources, held earnings**
+**Desk: setting up, external sources (was "listed sources"), held earnings**
 
 | Where | Words |
 |---|---|
 | Setup | before a yes "A station comes after a yes." / "Ask first. Their station can be set up once they say yes, or straight away if their work is already published under a licence that allows it."; "Already licensed under {CC BY 4.0}. Covers …"; "Their {recordings}" (no pronoun); "No recipe for this band yet"; channel "From the board", "The waitlist holds {95.5} for {GOSP}. Pick another", "{12.1} is {BEAT}'s. Pick another", "The waitlist holds {95.5}, so this is the nearest open one", "None open"; call sign "Choose a call sign.", "Three to five capital letters.", "No K or W at the start: those are US broadcast prefixes.", "{LUPE} is taken. Try another."; rights "Published under a licence, {CC BY 4.0}, for the {15} licensed {recordings}", "Nothing is covered yet: no yes on record, and no licence that allows carriage", "Missing"; import "{48} to import"; held "Given at setup"; run by "Nobody yet"; "Not scheduled", "On air since"; after setup "Sign-on scheduled" / "{Monday, 6:00 am}. {31} of {48} prepared for air so far", "On air, waiting to be claimed" / "Since {date}", "Set up"; toast "{LUPE 33.1} is set up. It signs on {Monday} at {6:00 am}."; the values' labels "Change the channel", "Change the call sign", "Change who runs it", "Change when it signs on" |
-| Listed sources | "No calendar yet"; "Not listed"; one wording for a synced calendar, "Synced from the agenda calendar"; "No public streams listed in the {market} yet."; "No catalog station in the {market} yet." |
-| List a source | "List a source", "A public stream on the {market} dial. Viewers get the source's own player."; "Whose stream" / "“City of Redlands”, “San Bernardino County”."; "What it shows"; "Band", "TV band", "Radio band"; "Channel"; "Call sign"; "Stream"; "Agenda calendar" / "Where they publish meetings. They become listings with their real titles and times."; "Their terms", "Allow embedding", "Unclear" / "It's saved but not listed. Someone asks them first."; "Cancel", "List it"; errors "Say whose stream it is.", "A channel like 9.4.", "A frequency like 89.1.", "Paste the link to their stream.", "That doesn't look like a link.", "Keep it under 160 characters."; toasts "{City of Rialto} is listed on {9.4}.", "{name} is saved. It goes on the dial once their terms allow embedding." |
+| External sources (the frame's title and description since handoff 6) | "No calendar yet"; "Not on the dial" (the frame's words; was "Not listed"); one wording for a synced calendar, "Synced from the agenda calendar"; "No external stations in the {market} yet." (was "No public streams listed in the {market} yet."); "No catalog station in the {market} yet." |
+| List a source | "List a source", "A station on the {market} dial that plays the source's own stream. No playout, no spots." (was "A public stream on the {market} dial. Viewers get the source's own player."); "Whose stream" / "“City of Redlands”, “San Bernardino County”."; "What it shows"; "Band", "TV band", "Radio band"; "Channel"; "Call sign"; "Stream"; "Agenda calendar" / "Where they publish meetings. They become listings with their real titles and times."; "Their terms", "Allow embedding", "Unclear" / "It's saved but not on the dial. Someone asks them first." (was "…but not listed…"); "Cancel", "List it"; errors "Say whose stream it is.", "A channel like 9.4.", "A frequency like 89.1.", "Paste the link to their stream.", "That doesn't look like a link.", "Keep it under 160 characters."; toasts "{City of Rialto} is on the dial at {9.4}." (was "…is listed on {9.4}."), "{name} is saved. It goes on the dial once their terms allow embedding." |
 | Held earnings | statuses "On air, not invited", "Claim being checked", "Claimed", "Stopped"; "Not scheduled to sign on yet"; "Claim invitation out" (one); the unclaimed period unknown "Not set yet"; "Nothing held yet. A claimable station's earnings show here from its first week on air."; no contract yet "Not deployed yet. Earnings are recorded, and move into it when it is" |
 
 **The creator's permission page (viewer `/permission/:token`)**
@@ -598,3 +598,67 @@ No frame draws either. "Watch on" (tv 06.2) keeps its Chromecast and TV app rows
 | The phone remote, the d-pad in the rockers' place while the TV's guide is open | screen readers: "Guide on the TV" (the group), "Up", "Down", "Left", "Right"; "OK"; "Back" |
 | The phone remote, under Guide, Info, Keypad and Last | "Guide on this phone" (text button: the phone's guide, where choosing a program tunes the TV) |
 
+
+### Invites that reach people: the emails and the invite's pages (2026-09-29)
+
+No frame draws an email or an invite's page. The emails are plain text with a simple HTML copy of the same words (the wordmark, the title, the body, one button with the link written out under it, and a line on why it came). The invite's pages are the sign-in card (viewer/you 01.1) with the invite on it. The role lines come from the references: station-settings' "Runs the station day to day, but not money or the team" and "Goes live on the blocks you give them", biz-settings' "Managers can spend, not withdraw" and "Viewers see results and statements but can't spend or change anything".
+
+**The invite's email** (both kinds)
+
+| Part | Words |
+|---|---|
+| Subject and title | "Join {Inland Beat} on Opencast" |
+| Body | "{Kai} invited you to {Inland Beat}'s team on Opencast, as {an operator}. {role line}" (without a display name: "You're invited to {team}'s team on Opencast, as {a viewer}."), then "Sign in with this email address to join. The invite lasts a week." |
+| Role lines | operator: "Operators run the station day to day, but not money or the team." host: "Hosts go live on the blocks they're given." manager: "Managers can run spots, add money and approve orders; only the owner takes money out." viewer: "Viewers see results and statements, but can't spend or change anything." |
+| Button | "Join {Inland Beat}" (and "Or open this link: {link}" under it; the text version: "Join {team}: {link}") |
+| Footer | "{Kai} on {Inland Beat} typed this address. If you weren't expecting it, ignore this email: nothing happens unless you sign in and join." ("Someone" without a display name) |
+
+**Other emails** (their titles and bodies are the notices' and the desk's own words, unchanged)
+
+| Email | Button | Footer |
+|---|---|---|
+| A notice, business | "Open Opencast for business" | "You can turn these emails off in Settings, Notifications." Always-on kinds: "Opencast always sends this one; it can't be turned off." |
+| A notice, station | "Open master control" | the same |
+| A notice, viewer | "Open Opencast" | the same |
+| The desk asks a creator; the reminder | "Answer on the page" | "Opencast's team sent this about your work. Yes or no, one tap on the page." (the reminder: "Opencast's team sent this about your work.") |
+| A copy of the creator's answer | "See your answer" | "A copy of what you answered on Opencast's permission page." |
+| The claim invite; the claim link | "See your station"; "Claim your station" | "Opencast's team sent this about the station made from your work." |
+| Your data (A3) | "Download your data" | "You asked for this in Settings, Your data. The link needs you signed in." |
+| Any other email | "Open Opencast" | "You're getting this because of your Opencast account." |
+
+**The invite's page** (master control `/control/invites/:id`, business `/invites/:id`)
+
+| State | Words |
+|---|---|
+| Open, signed out | kicker "Master control" / "For business"; title "Join {Inland Beat}"; "{Kai M.} invited you to {BEAT, Inland Beat}'s team, as {an operator}. {role line}" (business: "…to {Orange Street Coffee}'s team on Opencast, as {a viewer}."; without a name: "The owner of {team} invited you…"); "Sign in with {d…@example.com} to join." (a phone invite: "Sign in to join."); button "Sign in to join"; foot, master control: "Master control is where stations run their dial. Each person signs in with their own account."; business: "Each person signs in with their own account, from anywhere." |
+| Signed in as someone else | kicker the team; title "This invite is for another email."; "This invite is for {d…@example.com}; you're signed in as {sam@example.com}." and "Sign in with {d…@example.com} to join. If you don't use that address, ask {Kai M.} to invite the one you do."; buttons "Sign in with another email", "Back to master control" / "Opencast for business" |
+| Expired | title "This invite has expired."; master control: "Invites last a week. Ask {Kai M.} to send it again from Settings, Team."; business: "Invites last a week. Ask {Jess Lin} to send it again." |
+| Used by someone else | title "This invite was already used."; "Each invite joins one person. If that wasn't you, ask {Kai M.} for a new one." |
+| Joining failed | title "That invite didn't work."; the API's message; buttons "Try again" and the way back |
+| Couldn't load | title "That invite didn't open."; the error; "Try again" |
+| Unknown invite | the apps' own "There's nothing here." |
+
+**The API's words** (shown as they come: the Team sections' toasts, the invite's pages)
+
+| When | Words |
+|---|---|
+| Accepting with another email (403 `invite_email_mismatch`) | "This invite is for {j…@example.com}; you're signed in as {kai@example.com}. Sign in with {j…@example.com} to join." (no email on the account: "…you're signed in as an account with no email.…") |
+| Someone else used it (409 `invite_used`) | "This invite was already used. Ask for a new one if you still need to join." Resending one: "They've already joined." |
+| Resent too soon (429 `resend_too_soon`) | "It went out {4 minutes} ago. You can send it again in {6 minutes}." ("less than a minute ago" under a minute) |
+| The email didn't go (502 `email_not_sent`) | "The email didn't go out. Try again in a few minutes." |
+
+### Small fixes from the catch-up report (the follow-up, 2026-09-29)
+
+"External" replaces "Listed" wherever viewers and the desk see it, in the references' words (final, not new): the dashed tag "External" (home 01, the tuned-in page, the remote, the dial rows), guide cells "Began 7:00, external" and on the TV "External, until 9:15", station lines "RDLS 9.1, external, the city's own stream" (search results, and the home's coming-up line, which the home frame's data still writes the old way), You's reminders "RDLS 9.1, external", the desk's "External sources" (rail and page, with the frame's description) and the board key "External city stream". "Tuning sound" and its help lines are the frames' words (you 01 settings, tv-update 04.1). The words below are new. Internal names (`kind: "listed"`, the `listed` tag variant, `/admin/listed-sources`, the tables) are unchanged.
+
+| Where | Words |
+|---|---|
+| Station page, About (external stations) | "External, the city's own stream" |
+| Desk, the board | the market line "{3} external city streams"; a selected slot "External city stream. {name}", "External city streams: {9.1 RDLS, 9.2 COLT}"; its button "External sources" |
+| Desk, External sources and List a source | the reworded lines in the desk table above ("Not on the dial", "No external stations in the {market} yet.", the modal's subtitle, the toast and the unclear-terms note); the rail's count for screen readers "{1} not on the dial yet" |
+| TV settings, Watching, Tuning sound | the value "On" beside the frame's "Off" (◀ ▶ step between them) |
+| Business settings, Where your customers are, Online | the market picker "Markets" (chips, as when starting a business); help "Stations see "Online". Spots reach the whole {Inland Empire and High Desert}. A location or a service area targets a distance instead." (the market's name from the chosen markets, no longer fixed), or with none chosen "Stations see "Online". Choose the markets your spots can air across."; error "Choose at least one market." (the start page's words) |
+| Business settings, a service area's city | "Enter a city in the {market}." (the business's real market; was "Enter a city in the Inland Empire, like Riverside.") |
+| Business, a viewer on the Balance page | "Viewers see results, airings and statements." (the rail's reason), buttons "Where it aired" and "Statements"; on a statement page with nothing to show, a viewer's button is "Where it aired" instead of "Balance". No balance in the header ("Available …" isn't shown to viewers) |
+| Network desk, approving a claim with no wallet (the API's `no_wallet`) | "The creator has no wallet yet. It's made when they claim, signed in: ask them to claim again from their link." (was "The creator needs to sign in first: their wallet is where the escrow pays.") |
+| The claim (permission page's Claim now, master control's claim page) | none: the wallet is made without a screen of its own; if it fails, the pages' own errors ("That didn't go through. Try again.", "Something went wrong. Try again.") |

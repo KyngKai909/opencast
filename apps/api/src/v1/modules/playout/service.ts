@@ -6,13 +6,13 @@ import { forbidden, refused } from "../../errors.js";
 import { publicUrl } from "../../lib/url.js";
 import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
-import { objectKey } from "../../storage.js";
+import { isContentId, objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, REFERENCE, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
 import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
 import { captionSources } from "./engine/captions.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
-import { refKey } from "./engine/prepare.js";
+import { queuePreparation, refKey, wantRow } from "./engine/prepare.js";
 import { isEveryBreak, partsOf } from "./engine/cadence.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
 import { STATION_ID_MS } from "./engine/fill.js";
@@ -129,7 +129,48 @@ export interface PlayoutService {
   stationIdMs(stationId: string): Promise<number>;
   /** How many times a carried program aired on a carrier in a window (carriage limits, statements). */
   carriedAirings(agreementIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /**
+   * Added 2026-09-29: previews play the prepared segments (the catalog's episodes, spots in review
+   * and in the market, order deliveries): a short-cache playlist over one rendition, the lowest TV
+   * one (v360), or a64 on the radio band. With `prepare`, a file that isn't prepared (or queued) is
+   * queued now, soon after what airs within the hour; its preview is "preparing" until it's ready.
+   * Keyed by content ID; files locked by a claim or gone have none.
+   */
+  previews(refs: PreviewRef[], options?: { prepare?: boolean }): Promise<Map<string, PreviewView>>;
+  /** A preview's playlist (`/v1/previews/<content ID>/<rendition>.m3u8`), or null when there's none. */
+  previewPlaylist(key: string, rendition: string): Promise<{ body: string; maxAge: number } | null>;
+  /**
+   * Deletes what was prepared from these content IDs (garbage collection, takedowns): every
+   * rendition and caption track under `prepared/<key>/`, their `prepared_items`,
+   * `prepared_renditions` and `prepared_captions` rows, and any caption track made from one of
+   * them (a WebVTT's content ID) on other items. The as-run log keeps what aired (it never pointed
+   * at these rows). Without `evenIfAiring`, a key a channel's playlist pointed at in the last two
+   * hours is left for the storage sweep (players may still be fetching its segments).
+   */
+  dropPrepared(keys: string[], options: { evenIfAiring: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
+  /** The storage sweep: what was prepared from files that are gone, left while it aired (or from before). */
+  sweepPrepared(): Promise<{ dropped: number; deferred: number }>;
 }
+
+export interface PreviewRef {
+  contentId: string | null | undefined;
+  mediaKind: "video" | "audio";
+  /** Radio previews play the 64k sound; TV previews the 360p picture. */
+  band: Band;
+  durationMs?: number | null;
+}
+
+export interface PreviewView {
+  status: "ready" | "preparing" | "failed";
+  url: string | null;
+}
+
+/** The rendition a preview plays: the lowest TV rendition, or the radio band's 64k. */
+export const PREVIEW_RENDITION: Record<Band, RenditionName> = { tv: "v360", radio: "a64" };
+/** A preview asked for is prepared after what airs within the hour, before the rest. */
+const PREVIEW_NEEDED_IN_MS = 3_600_000;
+/** How long after a channel last pointed at a prepared item its segments may still be fetched. */
+const AIRED_GRACE_MS = 2 * 3_600_000;
 
 const HOUR = 3_600_000;
 
@@ -156,6 +197,9 @@ export function preparedTail(failed: number, preparing: number): string {
 export function createPlayoutService({ deps, services }: ModuleContext): PlayoutService {
   const { db } = deps;
   const P = schema.playoutState;
+  const PI = schema.preparedItems;
+  const PR = schema.preparedRenditions;
+  const PC = schema.preparedCaptions;
 
   const ladder = Number(process.env.PREPARE_LADDER_SCALE) > 0 ? scaledLadder(Number(process.env.PREPARE_LADDER_SCALE)) : LADDER;
   const channelUrl = (stationId: string) => publicUrl(deps, `/hls/${stationId}/master.m3u8`);
@@ -169,6 +213,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     const path = `${objectKey.prepared(key, rendition)}/seg_${String(index).padStart(5, "0")}.ts`;
     // The bucket's public domain (R2's custom domain); without one, the API passes them through.
     return deps.storage.objects.publicUrl?.(path) ?? publicUrl(deps, `/hls/${path}`);
+  }
+
+  function previewUrlOf(key: string, rendition: string) {
+    return publicUrl(deps, `/v1/previews/${key}/${rendition}.m3u8`);
   }
 
   function captionUrl(key: string, rendition: string, index: number) {
@@ -668,6 +716,126 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const counts = new Map<string, number>();
       for (const r of rows) counts.set(r.agreementId!, (counts.get(r.agreementId!) ?? 0) + 1);
       return counts;
+    },
+
+    async previews(refs, options = {}) {
+      const wanted = refs.filter((r): r is PreviewRef & { contentId: string } => Boolean(r.contentId && isContentId(r.contentId)));
+      const out = new Map<string, PreviewView>();
+      if (!wanted.length) return out;
+      const keys = [...new Set(wanted.map((r) => r.contentId))];
+      const [info, renditions, items] = await Promise.all([
+        services.library.content.info(keys),
+        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, keys)),
+        db.select({ key: PI.key, status: PI.status, mediaKind: PI.mediaKind }).from(PI).where(inArray(PI.key, keys))
+      ]);
+      // Sound only, as it was asked for before (an order's delivery, a spot with no picture): the radio band's preview.
+      const soundOnly = new Set(items.filter((i) => i.mediaKind === "audio").map((i) => i.key));
+      const have = new Map<string, Set<string>>();
+      for (const r of renditions) have.set(r.key, (have.get(r.key) ?? new Set()).add(r.rendition));
+      const status = new Map(items.map((i) => [i.key, i.status]));
+      const queue = new Map<string, typeof PI.$inferInsert>();
+      for (const asked of wanted) {
+        const key = asked.contentId;
+        const ref = soundOnly.has(key) ? { ...asked, mediaKind: "audio" as const, band: "radio" as const } : asked;
+        const file = info.get(key);
+        // Locked by a claim, or gone: nothing to preview.
+        if (!file || file.locked || file.deleted) continue;
+        const rendition = PREVIEW_RENDITION[ref.band];
+        if (have.get(key)?.has(rendition)) {
+          out.set(key, { status: "ready", url: previewUrlOf(key, rendition) });
+          continue;
+        }
+        // Another ref may have found it ready in the other band's rendition already.
+        if (out.get(key)?.status === "ready") continue;
+        const now = status.get(key);
+        if (now === "failed") {
+          out.set(key, { status: "failed", url: null });
+          continue;
+        }
+        if (options.prepare || now === "queued" || now === "preparing") out.set(key, { status: "preparing", url: null });
+        // Asked for: queued (or this band's renditions added to what's queued), after what airs within the hour.
+        if (options.prepare) {
+          queue.set(key, wantRow({ contentId: key, mediaKind: ref.mediaKind, band: ref.band, durationMs: ref.durationMs ?? null, neededAt: new Date(deps.clock.now().getTime() + PREVIEW_NEEDED_IN_MS) }, key, queue.get(key)));
+        }
+      }
+      if (queue.size) await queuePreparation(db, [...queue.values()]);
+      return out;
+    },
+
+    async previewPlaylist(key, rendition) {
+      if (!isContentId(key) || !Object.values(PREVIEW_RENDITION).includes(rendition as RenditionName)) return null;
+      const file = (await services.library.content.info([key])).get(key);
+      if (!file || file.locked || file.deleted) return null;
+      const [row] = await db.select({ segmentMs: PR.segmentMs }).from(PR).where(and(eq(PR.key, key), eq(PR.rendition, rendition)));
+      if (!row?.segmentMs.length) return null;
+      const target = Math.max(1, ...row.segmentMs.map((ms) => Math.ceil(ms / 1000)));
+      const body = [
+        "#EXTM3U",
+        "#EXT-X-VERSION:3",
+        `#EXT-X-TARGETDURATION:${target}`,
+        "#EXT-X-MEDIA-SEQUENCE:0",
+        "#EXT-X-PLAYLIST-TYPE:VOD",
+        "#EXT-X-INDEPENDENT-SEGMENTS",
+        ...row.segmentMs.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, segmentUrl(key, rendition, i)]),
+        "#EXT-X-ENDLIST",
+        ""
+      ].join("\n");
+      // Short: the file can be taken down, and segment URLs may be presigned one day.
+      return { body, maxAge: 60 };
+    },
+
+    async dropPrepared(keys, { evenIfAiring }) {
+      const unique = [...new Set(keys.filter(Boolean))];
+      const dropped: string[] = [];
+      const deferred: string[] = [];
+      if (!unique.length) return { dropped, deferred };
+      const airing = evenIfAiring
+        ? new Set<string>()
+        : new Set(
+            (
+              await db
+                .selectDistinct({ key: schema.channelItems.preparedKey })
+                .from(schema.channelItems)
+                .where(and(inArray(schema.channelItems.preparedKey, unique), gt(schema.channelItems.endsAt, new Date(deps.clock.now().getTime() - AIRED_GRACE_MS))))
+            ).map((r) => r.key!)
+          );
+      for (const key of unique) {
+        if (airing.has(key)) {
+          deferred.push(key);
+          continue;
+        }
+        // Caption tracks made from this file (a WebVTT's content ID), wherever they were cut.
+        const cut = await db.select({ key: PC.key, rendition: PC.rendition }).from(PC).where(eq(PC.contentId, key));
+        for (const c of cut) await deps.storage.objects.deletePrefix(objectKey.prepared(c.key, c.rendition));
+        await deps.storage.objects.deletePrefix(objectKey.preparedItem(key));
+        await db.transaction(async (tx) => {
+          await tx.delete(PC).where(eq(PC.contentId, key));
+          await tx.delete(PC).where(eq(PC.key, key));
+          await tx.delete(PR).where(eq(PR.key, key));
+          await tx.delete(PI).where(eq(PI.key, key));
+        });
+        for (const k of [...lengths.keys()]) if (k.startsWith(`${key}/`)) lengths.delete(k);
+        dropped.push(key);
+      }
+      return { dropped, deferred };
+    },
+
+    async sweepPrepared() {
+      // Prepared from a content ID (not slates, not old locations), whose file is gone.
+      const [items, captions] = await Promise.all([
+        db.selectDistinct({ key: PI.key }).from(PI).where(sql`${PI.contentId} is not null`),
+        db.selectDistinct({ key: PC.contentId }).from(PC)
+      ]);
+      const keys = [...new Set([...items.map((r) => r.key), ...captions.map((r) => r.key)])].filter(isContentId);
+      let dropped = 0;
+      let deferred = 0;
+      for (let i = 0; i < keys.length; i += 500) {
+        const gone = await services.library.content.deletedAmong(keys.slice(i, i + 500));
+        const result = await service.dropPrepared([...gone], { evenIfAiring: false });
+        dropped += result.dropped.length;
+        deferred += result.deferred.length;
+      }
+      return { dropped, deferred };
     }
   };
   return service;

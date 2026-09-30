@@ -401,9 +401,20 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
     });
   }
 
-  async function previewEpisodes(offerId: string, programId: string) {
-    const episodes = await services.library.episodes(programId);
-    await services.library.content.needPreview(episodes.map((e) => e.contentId).filter((v): v is string => Boolean(v)), "offer", offerId);
+  /**
+   * An offer's episodes preview from their prepared segments (the maker's band: TV's 360p, or the
+   * radio band's 64k sound). With `prepare`, episodes not prepared yet are asked for now.
+   */
+  async function episodePreviews(makerStationId: string, episodes: Array<{ contentId: string | null; mediaKind: "video" | "audio"; durationMs: number | null }>, prepare: boolean) {
+    const band = (await services.stations.idents([makerStationId])).get(makerStationId)?.band ?? "tv";
+    return services.playout.previews(
+      episodes.map((e) => ({ contentId: e.contentId, mediaKind: e.mediaKind, band: e.mediaKind === "audio" ? "radio" : band, durationMs: e.durationMs })),
+      { prepare }
+    );
+  }
+
+  async function previewEpisodes(makerStationId: string, programId: string) {
+    await episodePreviews(makerStationId, await services.library.episodes(programId), true);
   }
 
   const service: CatalogService = {
@@ -514,17 +525,22 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         agreements.length ? db.select({ id: Q.id, slots: Q.slots }).from(Q).where(inArray(Q.id, agreements.map((a) => a.requestId))) : Promise.resolve([])
       ]);
       const idents = await services.stations.idents([...agreements.map((a) => a.carrierStationId), ...[...first.values()].map((f) => f.stationId)]);
+      // Previews play the episodes' prepared segments; while it's offered, any not prepared yet are asked for.
+      const [current] = await db.select({ status: O.status, makerStationId: O.makerStationId }).from(O).where(eq(O.id, offerId));
+      const previews = await episodePreviews(current.makerStationId, episodes, current.status === "offered");
       return {
         ...view,
         episodes: await Promise.all(
           episodes.map(async (e) => {
             const aired = first.get(e.id);
+            const preview = e.contentId ? previews.get(e.contentId) : undefined;
             return {
               id: e.id,
               title: e.title,
               durationMs: e.durationMs,
               breakPointsMs: e.breakPointsMs,
-              previewUrl: await services.library.content.previewUrl(e.contentId),
+              previewUrl: preview?.url ?? null,
+              previewStatus: preview?.status ?? null,
               episodeNumber: e.episodeNumber,
               firstAiredAt: aired?.startedAt.toISOString() ?? null,
               firstAiredOn: aired ? (idents.get(aired.stationId) ?? null) : null,
@@ -586,7 +602,7 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         .insert(O)
         .values({ programId, makerStationId, ...termsColumns(terms), termsOffered: terms.termsOffered, createdAt: deps.clock.now(), updatedAt: deps.clock.now() })
         .returning();
-      await previewEpisodes(row.id, programId);
+      await previewEpisodes(makerStationId, programId);
       return (await offerViews([row]))[0];
     },
 
@@ -607,9 +623,8 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         .set({ ...termsColumns(patch), updatedAt: deps.clock.now() })
         .where(eq(O.id, offerId))
         .returning();
-      // Previews exist only while it's offered in the market.
-      if (patch.status === "withdrawn") await services.library.content.dropPreview("offer", offerId);
-      if (patch.status === "offered" && current.status !== "offered") await previewEpisodes(offerId, current.programId);
+      // Offered: its episodes are prepared for their previews (and for air), if they aren't already.
+      if (patch.status === "offered" && current.status !== "offered") await previewEpisodes(current.makerStationId, current.programId);
       return (await offerViews([row]))[0];
     },
 

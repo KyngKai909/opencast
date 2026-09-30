@@ -3,12 +3,13 @@
 
 import { describe, expect, it } from "vitest";
 import { swapBusiness } from "../overlays/BusinessSwitcher";
-import { addressLine, dayWord, firstName, fundingDetail, fundingTitle, inviteState, invitedLine, lastIn, peopleLine, shortDay, warnLine, websiteShown, websiteToSave, whereLine } from "./format";
+import { addressLine, dayWord, firstName, fundingDetail, fundingTitle, homeMarketName, inviteState, invitedLine, lastIn, marketNames, peopleLine, shortDay, warnLine, websiteShown, websiteToSave, whereLine } from "./format";
 import { CLEAR_ACCESS, clearLinkedLine, clearPayLine } from "./ConnectionsSection";
 import { emailOf } from "./InviteModal";
 import { topUpLine } from "./MoneySection";
 import { addressPlace, cityPlace } from "./place";
 import { accessFor, sectionsFor } from "./rules";
+import { can, PAGE_ABILITY } from "../../business/abilities";
 
 const TZ = "America/Los_Angeles";
 const NOW = new Date("2026-09-27T03:42:00Z"); // Saturday September 26, 8:42 pm
@@ -96,6 +97,27 @@ describe("the profile", () => {
   });
 });
 
+describe("an online business's markets", () => {
+  const IE = { id: "ie", name: "Inland Empire", open: true };
+  const HD = { id: "hd", name: "High Desert", open: true };
+  const LA = { id: "la", name: "Los Angeles", open: false };
+  const markets = [IE, HD, LA];
+
+  it("names the markets it chose, in the markets' order", () => {
+    expect(marketNames(["ie"], markets)).toBe("Inland Empire");
+    expect(marketNames(["hd", "ie"], markets)).toBe("Inland Empire and High Desert");
+    expect(marketNames(["la", "hd", "ie"], markets)).toBe("Inland Empire, High Desert and Los Angeles");
+    expect(marketNames([], markets)).toBe("");
+  });
+
+  it("is the real market, not a fixed one: the online business's first, else the person's, else the first open", () => {
+    expect(homeMarketName({ customersWhere: "online", marketIds: ["hd"] }, markets, IE)).toBe("High Desert");
+    expect(homeMarketName({ customersWhere: "service_area", marketIds: [] }, markets, HD)).toBe("High Desert");
+    expect(homeMarketName({ customersWhere: "location", marketIds: [] }, markets, null)).toBe("Inland Empire");
+    expect(homeMarketName({ customersWhere: "location", marketIds: [] }, [], null)).toBeNull();
+  });
+});
+
 describe("who sees and changes what", () => {
   it("gives the owner everything", () => {
     expect(accessFor("owner")).toEqual({ profile: "edit", team: "edit", funding: "edit", tax: "edit", receipts: "read", notifications: "edit", connections: "edit", close: "edit" });
@@ -107,6 +129,14 @@ describe("who sees and changes what", () => {
   });
   it("shows viewers receipts and their own notifications, and nothing to change", () => {
     expect(accessFor("viewer")).toMatchObject({ profile: "read", team: "read", funding: "hidden", tax: "hidden", receipts: "read", notifications: "edit", connections: "read", close: "hidden" });
+  });
+  it("keeps viewers to results, airings and statements, as the roles table says (biz-settings 02.1)", () => {
+    const opens = (role: "owner" | "manager" | "viewer") => (Object.keys(PAGE_ABILITY) as (keyof typeof PAGE_ABILITY)[]).filter((p) => can(role, PAGE_ABILITY[p]));
+    expect(opens("viewer")).toEqual(["where-it-aired", "settings"]);
+    expect(opens("manager")).toEqual(["spots", "sponsorships", "made-for-you", "where-it-aired", "balance", "settings"]);
+    expect(opens("owner")).toEqual(opens("manager"));
+    expect([can("viewer", "see"), can("viewer", "money"), can("viewer", "advertise"), can("viewer", "spend")]).toEqual([true, false, false, false]);
+    expect([can("manager", "money"), can("owner", "money")]).toEqual([true, true]);
   });
 });
 

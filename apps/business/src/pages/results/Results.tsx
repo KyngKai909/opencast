@@ -30,7 +30,8 @@ export default function Results() {
   const [params, setParams] = useSearchParams();
   const sel = selectionFrom(params, now);
   const res = useResults(b.id, sel);
-  const balance = useApi(ledgerApi.getBalance, { params: { businessId: b.id } });
+  // The week's balance in days (phone): not a viewer's to see.
+  const balance = useApi(ledgerApi.getBalance, { params: { businessId: b.id } }, { enabled: b.can("money") });
   const title = PERIOD_TITLE(sel, now);
   useShellOptions({ title: phone ? title : "Where it aired" });
 

@@ -141,7 +141,7 @@ export const spotFiles = spots.table("spot_files", {
     .references(() => spotsTable.id),
   version: integer("version").notNull(),
   originalFilename: text("original_filename"),
-  /** The prepared spot, by content ID. */
+  /** The spot's file, by content ID: the original upload (since 2026-09-29), which playout prepares for air. */
   contentId: text("content_id").references(() => contents.cid),
   /** Before content IDs: a disk path or URL. */
   location: text("location"),

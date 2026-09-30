@@ -44,7 +44,7 @@ const ROUTES: Route[] = [
   { path: `${IE}/pipeline/${SKATE}/ask`, ready: h1("Ask Desert Skate Films") },
   { path: `${IE}/pipeline/${LUPE}/setup`, ready: async (p) => { await h1("Set up LUPE 33.1")(p); await expect(p.getByText("Sign-on scheduled")).toBeVisible(); } },
   { path: `${IE}/pipeline/${MARIACHI}/setup`, ready: async (p) => { await h1(/^Set up \w+ 27\.1$/)(p); await expect(p.getByRole("button", { name: "Schedule sign-on" })).toBeEnabled(); } },
-  { path: `${IE}/listed`, ready: async (p) => { await h1("Listed sources")(p); await expect(p.getByRole("heading", { name: "Opencast catalog station" })).toBeVisible(); } },
+  { path: `${IE}/listed`, ready: async (p) => { await h1("External sources")(p); await expect(p.getByRole("heading", { name: "Opencast catalog station" })).toBeVisible(); } },
   { path: `${IE}/listed?add=1`, ready: async (p) => { await expect(p.getByRole("dialog", { name: "List a source" })).toBeVisible(); } },
   { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
   { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },

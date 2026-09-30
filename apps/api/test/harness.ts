@@ -44,8 +44,8 @@ export interface Harness {
   services: Services;
   db: Deps["db"];
   clock: { set(iso: string): void; now(): Date; advance(ms: number): void };
-  /** Pushes and emails sent, in order. */
-  sent: Array<{ channel: "push" | "email"; to: string; title: string }>;
+  /** Pushes and emails sent, in order (an email's link, idempotency key and words too). */
+  sent: Array<{ channel: "push" | "email"; to: string; title: string; link?: string | null; key?: string; body?: string }>;
   /** Linked accounts Privy would report for a did. */
   linked: Map<string, LinkedAccount[]>;
   /** Clear cross-app accounts Privy would report for a did, and the access Clear grants. */
@@ -120,7 +120,7 @@ export async function createHarness(
     payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
       push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
-      email: async (to, n) => void sent.push({ channel: "email", to, title: n.title })
+      email: async (to, n) => void sent.push({ channel: "email", to, title: n.title, link: n.link, key: n.key, body: n.body })
     },
     bus: new EventBus(),
     clock,
@@ -132,6 +132,7 @@ export async function createHarness(
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",
+      businessOrigin: "https://business.opencast.test",
       escrowContractAddress: options.chain?.escrow ?? null,
       // Base Sepolia's test USDC: only its address is used here, nothing is sent.
       usdc: { chainId: 84532, address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
@@ -188,7 +189,7 @@ export async function createHarness(
       };
     },
     async close() {
-      // Background work (preparing uploads, rendering previews) finishes before the database goes.
+      // Background work (storing uploads, imports) finishes before the database goes.
       await services.library.settle();
       await deps.bus.settle();
       await deps.relay.close();
@@ -303,8 +304,8 @@ export async function itemFixture(
     await h.db.insert(schema.rightsConfirmations).values({ assetId: item.id, basis: "made_it" });
   }
   if (fields.location) {
-    // A real file: stored by its content ID, as an upload would be.
-    const { cid } = await h.services.library.content.store(fields.location, { storageClass: "standard" });
+    // A real file: stored by its content ID, as an upload's original is.
+    const { cid } = await h.services.library.content.store(fields.location, { storageClass: "infrequent" });
     const [file] = await h.db.insert(schema.assetFiles).values({ assetId: item.id, version: 1, contentId: cid }).returning();
     await h.services.library.content.addRef(h.db, cid, "asset_file", file.id);
   } else {

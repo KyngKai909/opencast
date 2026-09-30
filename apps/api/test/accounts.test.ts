@@ -94,7 +94,7 @@ describe("station teams", () => {
     const invite = await owner.post(`/v1/stations/${station.id}/team/invites`, { email: "dee@example.com", role: "operator" }).expect(200);
     expect(invite.body).toMatchObject({ role: "operator", email: "dee@example.com", acceptedAt: null });
 
-    const dee = await h.signIn("Dee");
+    const dee = await h.signIn("Dee", { linked: [{ kind: "email", value: "dee@example.com" }] });
     const me = await dee.post(`/v1/invites/${invite.body.id}/accept`).expect(200);
     expect(me.body.memberships).toEqual([expect.objectContaining({ kind: "station", role: "operator" })]);
 

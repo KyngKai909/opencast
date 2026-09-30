@@ -233,3 +233,17 @@ test("a phone's commands over the relay change the channel and set the sleep tim
   // The remote session ends with it (POST /tv/remote/end): the phone is told.
   await expect.poll(() => phone.evaluate(() => (window as unknown as { heard: Array<{ ended?: string }> }).heard.some((m) => m.ended === "tv_ended"))).toBe(true);
 });
+
+test("TV settings: Tuning sound, off until turned on, and kept on this TV (tv-update 04.1)", async ({ page }) => {
+  await openTv(page, "/settings/watching");
+  const row = page.locator(".tvs-row--focus");
+  await expect(row).toContainText("Captions");
+  // Captions, Caption size, Channel up goes, Banner stays for, then Tuning sound.
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
+  await expect(row).toContainText("Tuning sound");
+  await expect(row).toContainText("A soft hiss when changing channel");
+  await expect(row.locator(".tvs-row__val")).toContainText("Off");
+  await page.keyboard.press("ArrowRight");
+  await expect(row.locator(".tvs-row__val")).toContainText("On");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("oc-tv-device") ?? "{}").settings?.tuningSound)).toBe(true);
+});

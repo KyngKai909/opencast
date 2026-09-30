@@ -11,9 +11,13 @@
 //   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
 //   - takes radio stations' live pushes on its own RTMP ingest (rtmp.ts, radiolive.ts) while it's
 //     the leader: the radio band never goes through Livepeer;
-//   - runs the translators that are on (translator.ts).
+//   - runs the translators that are on (translator.ts);
+//   - every hour, the storage sweep: what was prepared from files that are gone (left while a
+//     channel still pointed at it), and the separate previews made before previews played the
+//     prepared segments.
 //
-// The old worker cache and continuous encode are gone: the worker needs only scratch space.
+// Items are prepared from their originals, into object storage; nothing airs from a local file,
+// and the worker needs only scratch space.
 
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -514,6 +518,12 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       if (now - lastPrune >= 3_600_000) {
         lastPrune = now;
         await pruneChannelItems(ctx).catch(() => undefined);
+        await services.library.content
+          .sweep()
+          .then((swept) => {
+            if (swept.prepared.dropped || swept.oldPreviews) log(`[storage] swept: ${swept.prepared.dropped} prepared items of files that are gone, ${swept.oldPreviews} old previews`);
+          })
+          .catch((error) => log(`[storage] the sweep failed: ${(error as Error).message}`));
       }
       void preparer.pump().catch((error) => log(`[prepare] ${(error as Error).message}`));
       await applyCommands();

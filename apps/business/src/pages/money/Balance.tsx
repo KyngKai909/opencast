@@ -3,8 +3,9 @@
 // settings column (auto top-up, warnings, funding, statements). 04.1 Take money out
 // (?modal=withdraw; owners only). On the phone (06.1, 06.2): ?sheet=add&amount=250&source=<id>
 // opens straight on Add money, as the low-balance notice does; after adding, what's on its way.
-// Roles: everyone sees it; owners and managers add money; only the owner takes money out or changes
-// funding and auto top-up; viewers change nothing.
+// Roles: the owner and managers see it (biz-settings 02.1: a viewer sees results, airings and
+// statements only, and gets the way to those instead); owners and managers add money; only the
+// owner takes money out or changes funding and auto top-up.
 
 import { useState } from "react";
 import { useSearchParams } from "react-router";
@@ -13,6 +14,7 @@ import { BalanceBar, Button, ControlTitle, KeyValueList, Movements, Runway, Segm
 import { shortAddress, useClear } from "../../auth/clear";
 import { useApi, useApiMutation } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
+import { NoAccess } from "../../components/deals/parts";
 import { AddMoney } from "../../components/money/AddMoney";
 import { ClearTag } from "../../components/money/ClearTag";
 import { PendingDeposits } from "../../components/money/PendingDeposits";
@@ -45,6 +47,17 @@ const FILTERS: { value: Filter; label: string }[] = [
 const PAGE = 50;
 
 export default function Balance() {
+  const b = useBusiness();
+  if (!b.can("money")) return <NotForViewers base={b.base} />;
+  return <BalancePage />;
+}
+
+function NotForViewers({ base }: { base: string }) {
+  useShellOptions({ title: "Balance" });
+  return <NoAccess base={base} statements />;
+}
+
+function BalancePage() {
   const b = useBusiness();
   const phone = useIsPhone();
   useShellOptions({ title: "Balance" });

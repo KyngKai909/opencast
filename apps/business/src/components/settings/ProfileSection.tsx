@@ -1,17 +1,18 @@
 // Settings, Business (biz-settings 01.1): the logo, name, category, where customers are, about and
 // website, each marked with who sees it; more than one location; and how stations see the
-// business. Changes save as each field is left. The owner and managers change it; viewers read it.
+// business. Online businesses choose their markets here, as when starting (each change saves).
+// Changes save as each field is left. The owner and managers change it; viewers read it.
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { accountsApi, spotsApi, type BusinessLocation, type CustomersWhere } from "@opencast/contracts";
-import { Button, Field, Notice, Segmented, SelectField, TitleCard } from "@opencast/ui";
+import { accountsApi, spotsApi, stationsApi, type BusinessLocation, type CustomersWhere } from "@opencast/contracts";
+import { Button, ChipRow, Field, Notice, Segmented, SelectField, TitleCard } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiUrl, call, type CallArgs } from "../../api/client";
 import { useApi } from "../../api/hooks";
 import { logoOf } from "../../business/logo";
-import type { BusinessState } from "../../business/BusinessContext";
+import { useMe, type BusinessState } from "../../business/BusinessContext";
 import { Quiet } from "../../pages/common";
-import { addressLine, websiteShown, websiteToSave, whereLine } from "./format";
+import { addressLine, homeMarketName, marketNames, websiteShown, websiteToSave, whereLine } from "./format";
 import { lookUpPlace, type Place } from "./place";
 import { READ_ONLY, accessFor } from "./rules";
 import "./common.css";
@@ -40,8 +41,6 @@ const WHERE: { value: CustomersWhere; label: string }[] = [
   { value: "online", label: "Online" }
 ];
 
-const MARKET_NAME = "Inland Empire";
-
 type FieldName = "name" | "category" | "where" | "about" | "website" | "logo" | "locations";
 
 function oops(e: unknown): string {
@@ -50,6 +49,8 @@ function oops(e: unknown): string {
 
 export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLocation: () => void }) {
   const q = useApi(spotsApi.getBusiness, { params: { businessId: b.id } });
+  const markets = useApi(stationsApi.listMarkets, {}, { staleTime: 300_000 });
+  const me = useMe();
   const qc = useQueryClient();
   const edit = accessFor(b.role).profile === "edit";
   const [name, setName] = useState("");
@@ -58,6 +59,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [mode, setMode] = useState<CustomersWhere>("location");
+  const [marketIds, setMarketIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ field: FieldName; message: string } | null>(null);
   const [recategorised, setRecategorised] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
     setAbout(data.about ?? "");
     setWebsite(websiteShown(data.website));
     setMode(data.customersWhere);
+    setMarketIds(data.marketIds);
     const l = data.locations[0];
     setAddress(l ? addressLine(l) : "");
     setCity(l?.city ?? "");
@@ -102,6 +105,9 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
   const update = (body: CallArgs["body"]) => () => call(spotsApi.updateBusiness, { params, body });
   const updateLocation = (l: BusinessLocation, body: CallArgs["body"]) => () => call(spotsApi.updateLocation, { params: { ...params, locationId: l.id }, body });
   const errorFor = (f: FieldName) => (error?.field === f ? error.message : undefined);
+  const allMarkets = markets.data ?? [];
+  const openMarkets = allMarkets.filter((m) => m.open || data.marketIds.includes(m.id));
+  const marketName = homeMarketName(data, allMarkets, me.data?.market) ?? "market";
 
   const saveName = () => {
     const v = name.trim();
@@ -144,7 +150,7 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
   const saveServiceArea = async (miles: number, cityText = city) => {
     const place = await find(cityText, true);
     if (place === undefined) return;
-    if (!place) return setError({ field: "where", message: `Enter a city in the ${MARKET_NAME}, like Riverside.` });
+    if (!place) return setError({ field: "where", message: `Enter a city in the ${marketName}.` });
     if (first && first.kind === "service_area" && first.city === place.city && first.radiusMiles === miles && data.customersWhere === "service_area") return;
     void run("where", [
       first
@@ -153,10 +159,19 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
       ...(data.customersWhere !== "service_area" ? [update({ customersWhere: "service_area" })] : [])
     ]);
   };
+  /** Online: the markets it serves, saved with each change; at least one. */
+  const saveMarkets = (ids: string[]) => {
+    setMarketIds(ids);
+    if (!ids.length) return setError({ field: "where", message: "Choose at least one market." });
+    void run("where", [update({ customersWhere: "online", marketIds: ids })]);
+  };
   const chooseMode = (v: CustomersWhere) => {
     setError(null);
     setMode(v);
-    if (v === "online") void run("where", [update({ customersWhere: "online" })]);
+    // Online needs its markets: saved now when it has them, otherwise once one is chosen.
+    if (v === "online") {
+      if (data.marketIds.length) void run("where", [update({ customersWhere: "online", marketIds: data.marketIds })]);
+    }
     else if (v === "service_area" && first) void saveServiceArea(first.radiusMiles ?? 10, first.city);
     else if (v === "location" && first?.kind === "location") void run("where", [update({ customersWhere: "location" })]);
     // A location from a service area needs its street first: saved when the address is entered.
@@ -183,7 +198,9 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
   const currentMiles = first?.kind === "service_area" ? (first.radiusMiles ?? 10) : 10;
   const whereHelp =
     mode === "online"
-      ? `Stations see "Online". Spots reach the whole ${MARKET_NAME}. A location or a service area targets a distance instead.`
+      ? marketIds.length
+        ? `Stations see "Online". Spots reach the whole ${marketNames(marketIds, allMarkets)}. A location or a service area targets a distance instead.`
+        : `Stations see "Online". Choose the markets your spots can air across.`
       : mode === "service_area"
         ? `Stations see ${first?.city ?? "your city"}, ${currentMiles} miles. A location targets a distance from your door; online businesses choose markets instead.`
         : `Private. Stations see ${first?.city ?? "your city"}. A service area targets a radius from a city; online businesses choose markets instead.`;
@@ -265,7 +282,16 @@ export function ProfileSection({ b, onAddLocation }: { b: BusinessState; onAddLo
               </SelectField>
             </div>
           )}
-          {mode === "online" && <Field aria-label="Market" value={MARKET_NAME} readOnly disabled />}
+          {mode === "online" && (
+            <ChipRow
+              multiple
+              layout="wrap"
+              label="Markets"
+              options={openMarkets.map((m) => ({ value: m.id, label: m.name, disabled: !edit || busy }))}
+              value={marketIds}
+              onChange={saveMarkets}
+            />
+          )}
           {errorFor("where") ? (
             <p className="bz-error" role="alert">
               {errorFor("where")}

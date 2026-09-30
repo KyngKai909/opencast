@@ -1,6 +1,6 @@
 // Network desk's frame: DeskShell (the raised header with the amber Internal sign, "Opencast team"
 // and the avatar; the fixed rail with its mono counts) around every page. The rail's counts:
-// Creator pipeline, the yeses not set up yet (the board's figure); Listed sources, sources not on
+// Creator pipeline, the yeses not set up yet (the board's figure); External sources, sources not on
 // the dial yet; Held earnings, the total held; Reserved call signs, the market's reservations.
 
 import { useEffect } from "react";
@@ -55,7 +55,7 @@ export function DeskLayout() {
   const notListed = listed.data?.filter((l) => l.listingState !== "listed").length;
   const items: ShellItems<DeskPage> = {
     "creator-pipeline": yeses ? { count: String(yeses), countLabel: `${yeses} ${yeses === 1 ? "yes" : "yeses"} to set up` } : {},
-    "listed-sources": notListed ? { count: String(notListed), countLabel: `${notListed} not listed yet` } : {},
+    "listed-sources": notListed ? { count: String(notListed), countLabel: `${notListed} not on the dial yet` } : {},
     "held-earnings": held.data ? { count: railAmount(held.data.totalHeldMicros), countLabel: `${money(held.data.totalHeldMicros)} held` } : {},
     "reserved-call-signs": reserved.data?.length ? { count: String(reserved.data.length), countLabel: `${reserved.data.length} reserved` } : {}
   };

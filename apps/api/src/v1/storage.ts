@@ -9,7 +9,7 @@ import { createReadStream, createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { CreateBucketCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, CreateBucketCommand, DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export type StorageClass = "standard" | "infrequent";
@@ -19,10 +19,15 @@ export interface ObjectStore {
   /** Stores a file. The store checks the bytes against the sha-256 it's given. */
   put(key: string, file: string, options: { contentType: string; storageClass: StorageClass; sha256: Buffer }): Promise<void>;
   has(key: string): Promise<boolean>;
-  /** Copies an object to a local file (the worker cache), checking its sha-256 on the way. */
+  /** Copies an object to a local file (preparation's scratch space), checking its sha-256 on the way. */
   download(key: string, dest: string, sha256?: Buffer): Promise<void>;
+  /**
+   * Copies an object to another key inside the store (no download: R2 copies it server side), in
+   * Standard. The relinks use it to carry a file's prepared segments over to its content ID.
+   */
+  copy(from: string, to: string): Promise<void>;
   delete(key: string): Promise<void>;
-  /** Stores every file in a directory under a prefix (a preview rendition's playlist and segments). */
+  /** Stores every file in a directory under a prefix (a prepared rendition's playlist and segments). */
   putDir(prefix: string, dir: string, storageClass: StorageClass): Promise<void>;
   deletePrefix(prefix: string): Promise<void>;
   /** A URL an app can fetch the object from. */
@@ -73,18 +78,41 @@ export function cidFromSha256(digest: Buffer): string {
   return `b${base32(Buffer.concat([Buffer.from([0x01, 0x55, 0x12, 0x20]), digest]))}`;
 }
 
+/** A content ID's shape: "b", then 58 base32 characters (36 bytes: the 4-byte prefix and the digest). */
+const CONTENT_ID = /^b[a-z2-7]{58}$/;
+const CID_PREFIX = [0x01, 0x55, 0x12, 0x20];
+
+export const isContentId = (cid: string) => {
+  try {
+    sha256FromCid(cid);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The sha-256 a content ID names. Only our own kind of CID: v1, raw codec, a sha2-256 multihash of
+ * 32 bytes, in lowercase base32 ("b"). Anything else (an IPFS CID of a chunked file, `bafybei…`,
+ * which names a DAG and not the bytes; a CIDv0 `Qm…`; a typo) throws, rather than reading the
+ * wrong 32 bytes as a digest.
+ */
 export function sha256FromCid(cid: string): Buffer {
+  if (!CONTENT_ID.test(cid)) throw new Error(`not a content ID: ${cid.slice(0, 80)}`);
   let bits = 0;
   let value = 0;
   const out: number[] = [];
   for (const char of cid.slice(1)) {
-    value = (value << 5) | BASE32.indexOf(char);
+    value = ((value << 5) | BASE32.indexOf(char)) & 0xffff;
     bits += 5;
     if (bits >= 8) {
       out.push((value >>> (bits - 8)) & 255);
       bits -= 8;
     }
   }
+  // 58 characters are 290 bits: 36 bytes and 2 bits of padding, which must be zero.
+  if (out.length !== 36 || (value & ((1 << bits) - 1)) !== 0) throw new Error(`not a content ID: ${cid}`);
+  if (CID_PREFIX.some((byte, i) => out[i] !== byte)) throw new Error(`not a raw sha-256 CIDv1: ${cid}`);
   return Buffer.from(out.slice(4));
 }
 
@@ -153,6 +181,12 @@ export function localObjectStore(root: string, publicBase = "/objects"): ObjectS
         throw new Error(`sha-256 mismatch reading ${key}`);
       }
       await fs.rename(temp, dest);
+    },
+    async copy(from, to) {
+      await fs.mkdir(path.dirname(at(to)), { recursive: true });
+      const temp = `${at(to)}.${randomUUID()}.part`;
+      await fs.copyFile(at(from), temp);
+      await fs.rename(temp, at(to));
     },
     async delete(key) {
       await fs.rm(at(key), { force: true });
@@ -239,6 +273,11 @@ export function s3ObjectStore(config: S3Config): ObjectStore {
       }
       await fs.rename(temp, dest);
     },
+    async copy(from, to) {
+      await ensureBucket();
+      const source = `${Bucket}/${from.split("/").map(encodeURIComponent).join("/")}`;
+      await client.send(new CopyObjectCommand({ Bucket, Key: to, CopySource: source, MetadataDirective: "COPY", ...(config.storageClasses === false ? {} : { StorageClass: cls("standard") }) }));
+    },
     async delete(key) {
       await client.send(new DeleteObjectCommand({ Bucket, Key: key }));
     },
@@ -317,12 +356,18 @@ export function storageFromEnv(env: NodeJS.ProcessEnv, storageRoot: string, publ
   return { objects, ipfs };
 }
 
-/** Object keys. Files are keyed by their content ID; previews sit under the ID they preview. */
+/** Object keys. Files (originals) are keyed by their content ID; what's prepared from them sits under it. */
 export const objectKey = {
   file: (cid: string) => cid,
+  /**
+   * Retired 2026-09-29: the separate 360p previews (previews play the prepared segments now). Only
+   * the storage sweep uses it, to delete the ones made before.
+   */
   preview: (cid: string) => `previews/${cid}`,
   /** A prepared item's rendition (playlist and segments), under its content ID (or slate key). Added 2026-09-29. */
   prepared: (key: string, rendition: string) => `prepared/${key}/${rendition}`,
+  /** Everything prepared from a file: every rendition and caption track. */
+  preparedItem: (key: string) => `prepared/${key}`,
   /** A spot's proof frame, with the station's bug, kept a year. */
   proof: (stationId: string, airingId: string) => `proof/${stationId}/${airingId}.jpg`
 };

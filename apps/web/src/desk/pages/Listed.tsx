@@ -30,7 +30,7 @@ export default function Listed() {
   const catalog = tv.data?.slots.find((s) => s.state === "catalog")?.stations[0];
   const columns: Column<ListedSource>[] = [
     { key: "source", header: "Source", cell: (s) => <Lines title={s.name} detail={s.description} /> },
-    { key: "channel", header: "Channel", width: "150px", cell: (s) => (channelText(s) ? <span className="nd-mono nd-listed__ch">{channelText(s)}</span> : <span className="nd-ok__quiet">Not listed</span>) },
+    { key: "channel", header: "Channel", width: "150px", cell: (s) => (channelText(s) ? <span className="nd-mono nd-listed__ch">{channelText(s)}</span> : <span className="nd-ok__quiet">Not on the dial</span>) },
     { key: "listings", header: "Listings", width: "170px", cell: listingsCell },
     { key: "embedding", header: "Embedding", width: "110px", cell: embeddingCell }
   ];
@@ -38,8 +38,8 @@ export default function Listed() {
   return (
     <>
       <ControlTitle
-        title="Listed sources"
-        description={`Public streams on the ${market.name} dial. Viewers get the source's own player.`}
+        title="External sources"
+        description={`Stations on the ${market.name} dial that play the source's own stream. No playout, no spots.`}
         end={
           <Button variant="primary" size="sm" icon="plus" onClick={() => setParams((p) => (p.set("add", "1"), p))}>
             List a source
@@ -47,9 +47,9 @@ export default function Listed() {
         }
       />
       {sources.data?.length ? (
-        <Table label="Listed sources" columns={columns} rows={listedOrder(sources.data)} rowKey={(s) => s.id} rowPadding={11} className="nd-listed" />
+        <Table label="External sources" columns={columns} rows={listedOrder(sources.data)} rowKey={(s) => s.id} rowPadding={11} className="nd-listed" />
       ) : (
-        <p className="nd-listed__empty">No public streams listed in the {market.name} yet.</p>
+        <p className="nd-listed__empty">No external stations in the {market.name} yet.</p>
       )}
       <SecTop title="Opencast catalog station" />
       {catalog ? (

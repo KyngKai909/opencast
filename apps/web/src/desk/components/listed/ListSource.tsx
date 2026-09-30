@@ -43,7 +43,7 @@ export function ListSource({ market, onClose }: { market: Market; onClose: () =>
           calendarUrl: f.calendarUrl.trim() || undefined
         }
       });
-      toast.show({ message: f.embedTerms === "allowed" ? `${f.name.trim()} is listed on ${f.channel.trim()}.` : `${f.name.trim()} is saved. It goes on the dial once their terms allow embedding.` });
+      toast.show({ message: f.embedTerms === "allowed" ? `${f.name.trim()} is on the dial at ${f.channel.trim()}.` : `${f.name.trim()} is saved. It goes on the dial once their terms allow embedding.` });
       onClose();
     } catch (err) {
       if (err instanceof ApiError && err.fields) setErrors(Object.fromEntries(Object.entries(err.fields).map(([k]) => [k, err.message])));
@@ -56,7 +56,7 @@ export function ListSource({ market, onClose }: { market: Market; onClose: () =>
       onClose={onClose}
       width={540}
       title="List a source"
-      subtitle={`A public stream on the ${market.name} dial. Viewers get the source's own player.`}
+      subtitle={`A station on the ${market.name} dial that plays the source's own stream. No playout, no spots.`}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -84,7 +84,7 @@ export function ListSource({ market, onClose }: { market: Market; onClose: () =>
         <div>
           <span className="nd-form__label">Their terms</span>
           <Segmented label="Their terms" value={f.embedTerms} onChange={(v) => set("embedTerms")(v)} options={[{ value: "allowed", label: "Allow embedding" }, { value: "unclear", label: "Unclear" }]} />
-          {f.embedTerms === "unclear" && <p className="nd-form__note">It's saved but not listed. Someone asks them first.</p>}
+          {f.embedTerms === "unclear" && <p className="nd-form__note">It's saved but not on the dial. Someone asks them first.</p>}
         </div>
         {add.error && !(add.error instanceof ApiError && add.error.fields) ? <p className="nd-form__error">{errorText(add.error)}</p> : null}
       </form>

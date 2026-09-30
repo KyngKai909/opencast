@@ -22,7 +22,7 @@ function useNoAuth(): AuthAdapter {
   const fail = async () => {
     throw new Error("Signing in isn't set up here.");
   };
-  return { available: false, ready: true, signedIn: false, email: null, sendCode: fail, verifyCode: fail, oauth: fail, wallet: fail, signOut: async () => {}, getToken: async () => null };
+  return { available: false, ready: true, signedIn: false, email: null, sendCode: fail, verifyCode: fail, oauth: fail, wallet: fail, creatorWallet: fail, signOut: async () => {}, getToken: async () => null };
 }
 
 // Chosen once, at start: hooks must be called the same way on every render.

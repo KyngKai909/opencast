@@ -32,7 +32,7 @@ export interface ItemRef {
   captions: "none" | "generated" | "uploaded";
   source: "upload" | "link" | "creator_work" | "library";
   mediaKind: "video" | "audio";
-  /** The current file's content ID: what playout airs, from the worker's cache. */
+  /** The current file's content ID: the original, which playout prepares for air once. */
   contentId: string | null;
   /** Before content IDs: a disk path or URL playout reads directly. */
   location: string | null;
@@ -56,7 +56,7 @@ export interface ProgramRef {
 }
 
 export interface LibraryService {
-  /** Files by content ID: storing, references, locks, previews, IPFS. */
+  /** Files by content ID: storing, references, locks, IPFS. */
   content: Content;
   /** Every content ID an item's files point at (all versions, originals too). */
   contentOfItems(itemIds: string[]): Promise<string[]>;
@@ -310,16 +310,17 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         breakPointsMs: pointsBy.get(r.id) ?? [],
         storage: (() => {
           const file = files.get(r.id);
-          const prepared = file?.contentId ? info.get(file.contentId) : undefined;
-          if (!file?.contentId || !prepared) return null;
+          const stored = file?.contentId ? info.get(file.contentId) : undefined;
+          if (!file?.contentId || !stored) return null;
+          // Files from before 2026-09-29 point at a 1280 px copy, with the original beside it.
           const original = file.originalContentId ? info.get(file.originalContentId) : undefined;
           return {
-            contentId: prepared.cid,
-            bytes: prepared.bytes,
+            contentId: stored.cid,
+            bytes: stored.bytes,
             // Stations whose items point at the same file (it's stored once).
-            sharedWith: Math.max(0, prepared.references - 1),
-            locked: prepared.locked,
-            ipfs: original?.ipfs ?? prepared.ipfs ?? null
+            sharedWith: Math.max(0, stored.references - 1),
+            locked: stored.locked,
+            ipfs: original?.ipfs ?? stored.ipfs ?? null
           };
         })(),
         audioLayout: audioLayoutOf(r.audioChannels),
@@ -397,21 +398,23 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     }
   }
 
-  async function prepareInBackground(itemId: string, stationId: string, file: string, mediaKind: "video" | "audio", replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
+  /**
+   * Keeps the upload: the original, stored once by its content ID in Infrequent Access. Playout
+   * prepares it for air from this original (the fixed ladder, loudness levelled, captions), once;
+   * nothing else is made from it here. Its loudness is measured from it for the library.
+   */
+  async function storeInBackground(itemId: string, stationId: string, file: string, replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
     try {
       await db.update(A).set({ prepProgress: 10 }).where(eq(A.id, itemId));
-      const [prepared, loudness] = await Promise.all([deps.media.prepare(file, { scope: stationId, itemId, mediaKind }), deps.media.loudness(file).catch(() => null)]);
-      // Stored by content ID: the file playout airs in Standard, the original in Infrequent Access.
-      const [ready, original] = await Promise.all([content.store(prepared.file, { storageClass: "standard" }), content.store(file, { storageClass: "infrequent" })]);
+      const [original, loudness] = await Promise.all([content.store(file, { storageClass: "infrequent" }), deps.media.loudness(file).catch(() => null)]);
       await db.transaction(async (tx) => {
         const [{ version }] = await tx.select({ version: max(F.version) }).from(F).where(eq(F.assetId, itemId));
+        // `content_id` is the original. (`original_content_id` was for when it pointed at a copy; left empty now.)
         const [row] = await tx
           .insert(F)
-          .values({ assetId: itemId, version: (version ?? 0) + 1, contentId: ready.cid, originalContentId: original.cid, compression: prepared.compression })
+          .values({ assetId: itemId, version: (version ?? 0) + 1, contentId: original.cid })
           .returning();
-        await content.addRef(tx, ready.cid, "asset_file", row.id);
-        await content.addRef(tx, original.cid, "asset_original", row.id);
-        // Prepared for air: levelled to broadcast loudness by the compression profile.
+        await content.addRef(tx, original.cid, "asset_file", row.id);
         await tx.update(A).set({ status: "ready", prepProgress: 100, loudnessLufs: loudness }).where(eq(A.id, itemId));
         // L6: the new file's length and picture take over once it airs, not before.
         if (replacing) {
@@ -422,9 +425,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             .where(eq(A.id, itemId));
         }
       });
-      // The local copies were only for the work; the store has them now.
-      await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(file, { force: true })]);
-      await afterReady(itemId, stationId, ready.cid);
+      // The local copy was only for the work; the store has it now.
+      await fs.rm(file, { force: true });
+      await afterReady(itemId, stationId, original.cid);
     } catch (error) {
       // A replacement that fails leaves the item as it was: the old file still airs.
       await db.update(A).set(replacing ? { status: "ready", prepProgress: 100 } : { status: "failed", prepProgress: null }).where(eq(A.id, itemId));
@@ -432,14 +435,17 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     }
   }
 
-  /** The Opencast catalog is published to IPFS on purpose; items in an open offer get a preview. */
+  /** The Opencast catalog is published to IPFS on purpose (the original); items in an open offer get their preview prepared. */
   async function afterReady(itemId: string, stationId: string, cid: string) {
-    const [row] = await db.select({ title: A.title, programId: A.programId }).from(A).where(eq(A.id, itemId));
+    const [row] = await db.select({ title: A.title, programId: A.programId, mediaKind: A.mediaKind, durationMs: A.durationMs }).from(A).where(eq(A.id, itemId));
     if ((await services.stations.kindOf(stationId)) === "catalog" && deps.storage.ipfs.configured) {
       await content.publishToIpfs(cid, "catalog", row?.title ?? itemId).catch((error) => console.error("[library] catalog publish failed", error));
     }
     const offerId = row?.programId ? await services.catalog.openOfferFor(row.programId) : null;
-    if (offerId) await content.needPreview([cid], "offer", offerId);
+    if (offerId && row) {
+      const band = (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
+      await services.playout.previews([{ contentId: cid, mediaKind: row.mediaKind, band: row.mediaKind === "audio" ? "radio" : band, durationMs: row.durationMs }], { prepare: true });
+    }
   }
 
   async function jobView(row: typeof schema.importJobs.$inferSelect): Promise<ImportJobView> {
@@ -487,7 +493,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           .where(eq(A.id, row.id));
         item.status = "processing";
         await setItems(items, "running");
-        await prepareInBackground(row.id, stationId, file, probe.mediaKind);
+        await storeInBackground(row.id, stationId, file);
         item.status = "completed";
         item.progressPct = 100;
       } catch (error) {
@@ -775,7 +781,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         const [program] = item.programId ? await db.select({ language: P.captionsLanguage }).from(P).where(eq(P.id, item.programId)) : [];
         await service.putCaptionTrack(item.id, null, { language: fields.captionLanguage ?? program?.language ?? "en", text: fields.captions, source: "uploaded" });
       }
-      background(prepareInBackground(item.id, stationId, kept, probe.mediaKind));
+      background(storeInBackground(item.id, stationId, kept));
       return service.item(item.id);
     },
 
@@ -1010,7 +1016,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       await fs.copyFile(file.path, kept);
       // The current file airs until the new one is ready.
       await db.update(A).set({ status: "preparing", prepProgress: 0 }).where(eq(A.id, itemId));
-      background(prepareInBackground(itemId, row.stationId, kept, probe.mediaKind, { probe, originalName: file.originalName }));
+      background(storeInBackground(itemId, row.stationId, kept, { probe, originalName: file.originalName }));
       return service.item(itemId);
     },
 

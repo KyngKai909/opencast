@@ -220,6 +220,11 @@ function WatchingPane() {
         help="The live hero plays with no sound"
         control={({ labelId, helpId }) => <Toggle checked={w.mutedPreviews ?? true} onChange={(v) => void save({ watching: { mutedPreviews: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
+      <SettingRow
+        title="Tuning sound"
+        help="A soft hiss when changing channel. Always on for the radio band unless turned off there"
+        control={({ labelId, helpId }) => <Toggle checked={w.tuningSound ?? false} onChange={(v) => void save({ watching: { tuningSound: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
+      />
       <SettingGroup>Playback</SettingGroup>
       <SettingRow
         title="Quality on mobile data"

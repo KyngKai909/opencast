@@ -45,7 +45,7 @@ async function api(method: string, path: string, o: { as?: string; body?: unknow
 
 describe("the balance", () => {
   it("is the frame's: $412.50 available, $14.20 held for 41 airings, $248.90 spent on 118, about 44 days", async () => {
-    const { json } = await api("GET", `/businesses/${OSC}/balance`, { as: "ana" });
+    const { json } = await api("GET", `/businesses/${OSC}/balance`, { as: "tomas" });
     expect(json.availableMicros).toBe($(412.5));
     expect(json.heldMicros).toBe($(14.2));
     expect(json.heldAirings).toBe(41);
@@ -58,6 +58,9 @@ describe("the balance", () => {
 
   it("is only for the business's team", async () => {
     expect((await api("GET", `/businesses/${OSC}/balance`, { as: "new" })).status).toBe(404);
+    // A viewer sees results, airings and statements, not the balance (biz-settings 02.1).
+    expect((await api("GET", `/businesses/${OSC}/balance`, { as: "ana" })).status).toBe(403);
+    expect((await api("GET", `/businesses/${OSC}/movements`, { as: "ana" })).status).toBe(403);
   });
 });
 

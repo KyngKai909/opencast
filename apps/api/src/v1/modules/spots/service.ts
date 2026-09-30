@@ -2,7 +2,6 @@
 // spot market, rotations, placing spots in breaks (with money held first) and
 // settling what aired. Sponsorships, production orders and codes are in their own files.
 
-import path from "node:path";
 import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { oneDayOfBudgetMicros } from "@opencast/domain";
@@ -162,7 +161,7 @@ export interface BreakAiring {
   business: string;
   shortName: string;
   lengthSec: number;
-  /** The spot's file by content ID (the worker cache has it), or a legacy path. */
+  /** The spot's file (its original) by content ID, which playout prepares for air; or a legacy path. */
   contentId: string | null;
   location: string | null;
   code: { code: string; offer: string } | null;
@@ -173,6 +172,11 @@ export interface BreakAiring {
 export interface RotationView {
   kind: "main" | "backup";
   spots: Array<{ spotId: string; title: string; business: string; lengthSec: number; paused: boolean }>;
+}
+
+/** A spot's preview: the TV band's picture, or the radio band's sound for a spot with no picture. */
+function spotBand(file: { widthPx?: number | null }): { mediaKind: "video" | "audio"; band: "tv" | "radio" } {
+  return file.widthPx ? { mediaKind: "video", band: "tv" } : { mediaKind: "audio", band: "radio" };
 }
 
 const SP = schema.spotsTable;
@@ -308,7 +312,18 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
     ]);
     const stationIdents = await services.stations.idents([...new Set([...rotation.values()].flatMap((set) => [...set]))]);
     const content = services.library.content;
-    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: await content.previewUrl(f.contentId) }] as const)));
+    // Previews play the spot's prepared segments (TV's 360p, or the 64k sound of a spot with no
+    // picture). A spot in review has its preparation asked for; any other shows its preview once it's prepared.
+    const previews = await services.playout.previews(
+      files.map((f) => ({ contentId: f.contentId, ...spotBand(f) })),
+      { prepare: false }
+    );
+    const inReview = new Set(rows.filter((r) => r.status === "in_review").map((r) => r.id));
+    const reviewPreviews = inReview.size
+      ? await services.playout.previews(files.filter((f) => inReview.has(f.spotId)).map((f) => ({ contentId: f.contentId, durationMs: f.durationMs, ...spotBand(f) })), { prepare: true })
+      : new Map();
+    const previewOf = (f: (typeof files)[number]) => (f.contentId ? (reviewPreviews.get(f.contentId) ?? previews.get(f.contentId) ?? null) : null);
+    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), preview: previewOf(f) }] as const)));
     return rows.map((r) => {
       const file = files.find((f) => f.spotId === r.id);
       const code = codes.find((c) => c.spotId === r.id);
@@ -351,7 +366,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         file: file
           ? {
               url: urls.get(file.id)?.url ?? "",
-              previewUrl: urls.get(file.id)?.previewUrl ?? null,
+              previewUrl: urls.get(file.id)?.preview?.url ?? null,
+              previewStatus: urls.get(file.id)?.preview?.status ?? null,
               durationMs: file.durationMs,
               originalFilename: file.originalFilename,
               checks: checks
@@ -933,15 +949,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (!probe?.durationMs) throw refused("unreadable_file", "That file can't be read as video or audio.");
       const durationMs = probe.durationMs;
       const loudness = await deps.media.loudness(file.path).catch(() => null);
-      const kept = path.join(deps.config.storageRoot, "uploads", `business-${row.advertiserId}`, "spots");
-      const { promises: fs } = await import("node:fs");
-      await fs.mkdir(kept, { recursive: true });
-      const copy = path.join(kept, `${spotId}-${Date.now()}${path.extname(file.originalName)}`);
-      await fs.copyFile(file.path, copy);
-      const prepared = await deps.media.prepare(copy, { scope: `business-${row.advertiserId}`, itemId: `${spotId}-${Date.now()}`, mediaKind: probe.mediaKind });
-      // Stored by content ID: the same spot uploaded twice is stored once.
-      const stored = await services.library.content.store(prepared.file, { storageClass: "standard" });
-      await Promise.all([fs.rm(prepared.file, { force: true }), fs.rm(copy, { force: true })]);
+      // The original, kept as it came, by content ID in Infrequent Access (the same spot uploaded
+      // twice is stored once). Playout prepares it for air from this original, once; the checks
+      // below read it too.
+      const stored = await services.library.content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
       // P4: every spot gets its own code as it's checked: Opencast's letters, and its title as the
       // offer until the business names one (nothing is promised for it).
       if (!(await db.select({ id: schema.codes.id }).from(schema.codes).where(eq(schema.codes.spotId, spotId))).length) {
@@ -1033,8 +1044,8 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         .where(and(eq(schema.uploadChecks.spotFileId, file.id), eq(schema.uploadChecks.check, "length")));
       if (lengthCheck[0]?.result === "for_you") throw refused("wrong_length", `It has to be exactly :${row.lengthSec}.`);
       await setStatus(spotId, { status: "in_review" });
-      // The review screen plays a preview, kept only while it's in review.
-      if (file.contentId) await services.library.content.needPreview([file.contentId], "review", spotId);
+      // The review screen plays its prepared segments: asked for now ("Being prepared" until then).
+      if (file.contentId) await services.playout.previews([{ contentId: file.contentId, durationMs: file.durationMs, ...spotBand(file) }], { prepare: true });
       return service.spot(spotId);
     },
 
@@ -1088,7 +1099,6 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         });
         await services.spots.notifyMakerListed(spotId);
       }
-      await services.library.content.dropPreview("review", spotId);
       return service.spot(spotId);
     },
 
@@ -1117,7 +1127,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         const [location] = await db.select().from(schema.advertiserLocations).where(eq(schema.advertiserLocations.advertiserId, row.advertiserId)).limit(1);
         const code = (await db.select().from(schema.codes).where(eq(schema.codes.spotId, row.id)))[0];
         const runway = business.autoTopUp ? null : (await services.ledger.runwayDays([business.id])).get(business.id);
-        const [file] = await db.select({ contentId: schema.spotFiles.contentId, location: schema.spotFiles.location }).from(schema.spotFiles).where(and(eq(schema.spotFiles.spotId, row.id), eq(schema.spotFiles.current, true)));
+        const [file] = await db.select({ contentId: schema.spotFiles.contentId, location: schema.spotFiles.location, widthPx: schema.spotFiles.widthPx, durationMs: schema.spotFiles.durationMs }).from(schema.spotFiles).where(and(eq(schema.spotFiles.spotId, row.id), eq(schema.spotFiles.current, true)));
+        // Its prepared segments, once it's prepared (a listed spot is prepared to air).
+        const preview = file?.contentId ? (await services.playout.previews([{ contentId: file.contentId, durationMs: file.durationMs, ...spotBand(file) }])).get(file.contentId) : undefined;
         const story = stories.get(row.id);
         const back = story?.back && !inMain.has(row.id) ? story.back : null;
         result.push({
@@ -1128,7 +1140,13 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
             category: row.category,
             onScreen: code ? `A code for ${code.offer}` : null,
             // P23: the file itself, and the still's colour and line.
-            preview: { url: file?.contentId ? await services.library.content.url(file.contentId) : (file?.location ?? null), colour: colourFor(business.id), line: code ? code.offer : row.title }
+            preview: {
+              url: file?.contentId ? await services.library.content.url(file.contentId) : (file?.location ?? null),
+              colour: colourFor(business.id),
+              line: code ? code.offer : row.title,
+              previewUrl: preview?.url ?? null,
+              previewStatus: preview?.status ?? null
+            }
           },
           business: {
             id: business.id,

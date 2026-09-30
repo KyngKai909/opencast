@@ -1,10 +1,10 @@
-// The media pipeline the v1 modules use: probe, measure, prepare for air, store.
-// Wraps the ffmpeg and yt-dlp helpers the old API already had.
+// The media pipeline the v1 modules use: probe, measure, import from links.
+// Wraps the ffmpeg and yt-dlp helpers the old API already had. Nothing is compressed here any more:
+// uploads are kept as they came (the original, by content ID) and playout prepares them for air,
+// once, from that original (modules/playout/engine/prepare.ts).
 
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { compressForStreaming, expandExternalUrls, ingestFromExternalUrl, probeDurationSec, probeMediaKind } from "../media.js";
+import { expandExternalUrls, ingestFromExternalUrl, probeDurationSec, probeMediaKind } from "../media.js";
 
 export interface Probe {
   durationMs: number | null;
@@ -15,18 +15,10 @@ export interface Probe {
   audioChannels?: number | null;
 }
 
-export interface Prepared {
-  /** The stream-ready file on local disk, to be stored by its content ID. */
-  file: string;
-  compression: { tool: "ffmpeg"; profile: string; compressedAt: string };
-}
-
 export interface MediaPipeline {
   probe(file: string): Promise<Probe>;
   /** Integrated loudness in LUFS (EBU R128). */
   loudness(file: string): Promise<number | null>;
-  /** Compress to the stream-ready profile. The caller stores the result by content ID. */
-  prepare(file: string, input: { scope: string; itemId: string; mediaKind: "video" | "audio" }): Promise<Prepared>;
   importLink(url: string, outDir: string, baseName: string, signal?: AbortSignal): Promise<string>;
   expandLinks(url: string): Promise<string[]>;
 }
@@ -43,7 +35,7 @@ function run(command: string, args: string[]): Promise<{ code: number; stdout: s
   });
 }
 
-export function ffmpegPipeline(storageRoot: string): MediaPipeline {
+export function ffmpegPipeline(_storageRoot?: string): MediaPipeline {
   return {
     async probe(file) {
       const [durationSec, mediaKind, size, audio] = await Promise.all([
@@ -74,12 +66,6 @@ export function ffmpegPipeline(storageRoot: string): MediaPipeline {
       const result = await run("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", "ebur128", "-f", "null", "-"]);
       const match = [...result.stderr.matchAll(/I:\s+(-?\d+(?:\.\d+)?) LUFS/g)].pop();
       return match ? Number(match[1]) : null;
-    },
-
-    async prepare(file, { scope, itemId, mediaKind }) {
-      const outDir = path.join(storageRoot, "uploads", scope, "ready");
-      const compressed = await compressForStreaming(file, outDir, itemId, mediaKind);
-      return { file: compressed.outputPath, compression: { tool: "ffmpeg", profile: compressed.profile, compressedAt: new Date().toISOString() } };
     },
 
     importLink: (url, outDir, baseName, signal) => ingestFromExternalUrl(url, outDir, baseName, { signal }),

@@ -28,11 +28,14 @@ export function StateTag({ text, tone, fill }: { text: string; tone: TagTone; fi
 }
 
 /** Sponsorships and orders aren't a viewer's (the team frame's permissions): the rail's reason, and the way to results. */
-export function NoAccess({ base }: { base: string }) {
+export function NoAccess({ base, statements }: { base: string; statements?: boolean }) {
   return (
     <main className="bz-dl-noaccess">
       <h1 className="bz-dl-noaccess__h">{VIEWER_REASON}.</h1>
-      <Button href={`${base}/results`}>Where it aired</Button>
+      <div className="bz-dl-noaccess__to">
+        <Button href={`${base}/results`}>Where it aired</Button>
+        {statements && <Button href={`${base}/balance/statements`}>Statements</Button>}
+      </div>
     </main>
   );
 }

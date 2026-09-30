@@ -3,7 +3,7 @@
 // (remove, make default), closing the account. The Settings area owns this file.
 
 import { http, HttpResponse, type HttpHandler } from "msw";
-import { accountsApi, ledgerApi, Me, notificationsApi, spotsApi, type Business, type Connections, type Invite, type NotificationPrefs } from "@opencast/contracts";
+import { accountsApi, ledgerApi, Me, notificationsApi, spotsApi, type Business, type Connections, type Invite, type InvitePreview, type NotificationPrefs } from "@opencast/contracts";
 import { roleOn } from "../access";
 import { balanceOf, dbBusiness, getDb, move, saveDb } from "../db";
 import { LOGOS } from "../fixtures/businesses";
@@ -17,18 +17,20 @@ import {
   emailOf,
   inviteExpiry,
   isClosed,
+  maskEmail,
   mockNow,
   nameOf,
   newId,
   pdfOf,
   prefsFor,
+  RESEND_GAP_MS,
   receiptsFor,
   saveSettings,
   settingsState,
   type MockInvite
 } from "../fixtures/settings";
 import { MARKET } from "../fixtures/stations";
-import { fail, needsUser, path, reply } from "../respond";
+import { fail, needsUser, path, personOf, reply } from "../respond";
 
 const OWNER_ONLY = "Only the owner can do that.";
 
@@ -94,8 +96,26 @@ function teamOf(businessId: string) {
 }
 
 function inviteOut(i: MockInvite): Invite {
-  const { businessId: _b, note: _n, ...rest } = i;
+  const { businessId: _b, note: _n, acceptedBy: _a, ...rest } = i;
   return rest;
+}
+
+/** An invite as its page shows it (getInvite), for whoever's asking. */
+function invitePreview(i: MockInvite, p: MockPerson | null): InvitePreview {
+  const owner = getDb().members.find((m) => m.businessId === i.businessId && m.role === "owner");
+  const state = i.acceptedAt ? "accepted" : Date.parse(i.expiresAt) <= mockNow().getTime() ? "expired" : "open";
+  return {
+    id: i.id,
+    team: { kind: "business", id: i.businessId, name: dbBusiness(i.businessId)?.name ?? "A business", callSign: null },
+    role: i.role,
+    invitedBy: owner ? nameOf(owner.personId) : null,
+    emailHint: i.email ? maskEmail(i.email) : null,
+    state,
+    expiresAt: i.expiresAt,
+    signedInAs: p?.email ?? null,
+    emailMatches: p && i.email ? i.email === p.email : null,
+    acceptedByYou: !!p && i.acceptedBy === p.id
+  };
 }
 
 function meOf(p: MockPerson) {
@@ -328,24 +348,47 @@ export const settingsHandlers: HttpHandler[] = [
     if (!invite || isClosed(invite.businessId)) return fail(404, "not_found", "That invite wasn't found.");
     const r = roleOn(invite.businessId, p, "manage", "Only the owner can invite people.");
     if (r instanceof Response) return r;
-    if (invite.acceptedAt) return fail(409, "accepted", "They've already joined.");
+    if (invite.acceptedAt) return fail(409, "invite_used", "They've already joined.");
+    // Every send sets the expiry a week out, so the last send was a week before it.
+    const lastSent = Date.parse(invite.expiresAt) - 7 * 86_400_000;
+    const wait = lastSent + RESEND_GAP_MS - mockNow().getTime();
+    if (wait > 0) {
+      const ago = Math.max(0, Math.floor((mockNow().getTime() - lastSent) / 60_000));
+      const left = Math.ceil(wait / 60_000);
+      return fail(429, "resend_too_soon", `It went out ${ago === 0 ? "less than a minute" : `${ago} minute${ago === 1 ? "" : "s"}`} ago. You can send it again in ${left} minute${left === 1 ? "" : "s"}.`);
+    }
     invite.expiresAt = inviteExpiry(mockNow());
     saveSettings();
     return reply(accountsApi.resendInvite.response, inviteOut(invite));
+  }),
+
+  // Anyone with the link reads the invite; signed in, whether it's for them.
+  http.get(path(accountsApi.getInvite), ({ request, params }) => {
+    const invite = settingsState().invites.find((i) => i.id === String(params.inviteId));
+    if (!invite) return fail(404, "not_found", "That invite wasn't found.");
+    const preview = invitePreview(invite, personOf(request));
+    // A closed business's invites can't be used.
+    return reply(accountsApi.getInvite.response, isClosed(invite.businessId) && preview.state === "open" ? { ...preview, state: "expired" } : preview);
   }),
 
   http.post(path(accountsApi.acceptInvite), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
     const invite = settingsState().invites.find((i) => i.id === String(params.inviteId));
-    if (!invite || isClosed(invite.businessId) || invite.email !== p.email) return fail(404, "not_found", "That invite wasn't found.");
-    if (invite.acceptedAt) return fail(409, "accepted", "You've already joined.");
+    if (!invite) return fail(404, "not_found", "That invite wasn't found.");
+    if (invite.acceptedAt) {
+      if (invite.acceptedBy === p.id) return reply(Me, meOf(personByEmail(p.email)));
+      return fail(409, "invite_used", "This invite was already used. Ask for a new one if you still need to join.");
+    }
     const now = mockNow();
-    if (Date.parse(invite.expiresAt) <= now.getTime()) return fail(410, "expired", "This invite has expired. Ask for a new one.");
+    if (isClosed(invite.businessId) || Date.parse(invite.expiresAt) <= now.getTime()) return fail(422, "invite_expired", "This invite has expired. Ask for a new one.");
+    if (invite.email && invite.email !== p.email)
+      return fail(403, "invite_email_mismatch", `This invite is for ${maskEmail(invite.email)}; you're signed in as ${p.email}. Sign in with ${maskEmail(invite.email)} to join.`);
     const db = getDb();
     if (!db.members.some((m) => m.businessId === invite.businessId && m.personId === p.id))
       db.members.push({ businessId: invite.businessId, personId: p.id, role: invite.role as "manager" | "viewer", note: invite.note, lastInAt: now.toISOString() });
     invite.acceptedAt = now.toISOString();
+    invite.acceptedBy = p.id;
     if (!emailOf(p.id)) settingsState().joined[p.id] = p.email;
     saveDb();
     saveSettings();

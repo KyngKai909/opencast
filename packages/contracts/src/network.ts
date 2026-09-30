@@ -8,7 +8,7 @@ export const SlotState = z.enum(["station", "claimable", "listed", "catalog", "h
 export const SLOT_STATE_LABELS = {
   station: "Independent station",
   claimable: "Claimable, run by Opencast",
-  listed: "Listed city stream",
+  listed: "External city stream",
   catalog: "Opencast catalog",
   held: "Held for the waitlist",
   open: "Open"

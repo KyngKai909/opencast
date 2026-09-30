@@ -66,7 +66,14 @@ export const ViewerSettings = z
         startOn: z.enum(["dial", "last_channel"]).optional(),
         mutedPreviews: z.boolean().optional(),
         mobileQuality: z.enum(["auto", "data_saver"]).optional(),
-        backgroundPlay: z.boolean().optional()
+        backgroundPlay: z.boolean().optional(),
+        /**
+         * "Tuning sound" (added 2026-09-29): a soft hiss when changing channel, on video. The row in
+         * Watching settings and TV settings. Absent: off.
+         */
+        tuningSound: z.boolean().optional(),
+        /** The radio band's own "Tuning sound" (added 2026-09-29), turned off on the radio band itself. Absent: on. */
+        radioTuningSound: z.boolean().optional()
       })
       .partial()
       .optional(),
@@ -154,6 +161,38 @@ export const Invite = z.object({
 });
 
 export const Team = z.object({ members: z.array(TeamMember), invites: z.array(Invite) });
+
+/**
+ * An invite as its link's page shows it (added 2026-09-29): the team, the role, a hint of the
+ * address it's for, and whether it can still be used. Anyone with the link can read it; the
+ * address itself is never shown.
+ */
+export const InvitePreview = z.object({
+  id: Id,
+  team: z.object({
+    kind: z.enum(["station", "business"]),
+    id: Id,
+    name: z.string(),
+    /** A station's call sign (master control's address for it); null for a business or a station without one yet. */
+    callSign: z.string().nullable()
+  }),
+  role: z.enum(["operator", "host", "manager", "viewer"]),
+  /** Who sent it: their display name, or null. */
+  invitedBy: z.string().nullable(),
+  /** The invited address, masked (`j…@example.com`); null for a phone invite. */
+  emailHint: z.string().nullable(),
+  state: z.enum(["open", "expired", "accepted"]),
+  expiresAt: Timestamp,
+  /** Signed in: the account's own email, for "you're signed in as". Null signed out, or with no email. */
+  signedInAs: z.string().nullable(),
+  /**
+   * Signed in: whether the account has the invited email (a verified email, Google or Apple
+   * address). Null signed out, for a phone invite, or when the check is off.
+   */
+  emailMatches: z.boolean().nullable(),
+  /** Signed in: whether this account is the one that accepted it. */
+  acceptedByYou: z.boolean()
+});
 
 /**
  * Watch history and the last channel (A2, added 2026-09-28). Kept from signed-in heartbeats only
@@ -425,11 +464,21 @@ export const accountsApi = {
     response: Team
   }),
 
+  getInvite: endpoint({
+    method: "GET",
+    path: "/invites/:inviteId",
+    auth: "optional",
+    summary:
+      "Added 2026-09-29: an invite as its link's page shows it: the team, the role, the invited address masked, and whether it's open, expired or accepted. Signed in, it also says whether the account has the invited email. 404 for an unknown invite.",
+    params: z.object({ inviteId: Id }),
+    response: InvitePreview
+  }),
   resendInvite: endpoint({
     method: "POST",
     path: "/invites/:inviteId/resend",
     auth: "user",
-    summary: "Send an invite again and extend it a week",
+    summary:
+      "Send an invite's email again and extend it a week (owner only). Changed 2026-09-29: it emails again. 429 `resend_too_soon` within 10 minutes of the last send; 409 `invite_used` once accepted; 502 `email_not_sent` when the email couldn't go (nothing changes).",
     params: z.object({ inviteId: Id }),
     response: Invite
   }),
@@ -437,7 +486,8 @@ export const accountsApi = {
     method: "POST",
     path: "/invites/:inviteId/accept",
     auth: "user",
-    summary: "Join the team the invite is for",
+    summary:
+      "Join the team the invite is for. Changed 2026-09-29: an invite to an email needs that email on the signed-in account (403 `invite_email_mismatch`; INVITE_EMAIL_MATCH=off turns the check off). 409 `invite_used` when someone else accepted it (accepting your own again changes nothing); 422 `invite_expired`.",
     params: z.object({ inviteId: Id }),
     response: Me
   }),
@@ -516,4 +566,5 @@ export type Preset = z.infer<typeof Preset>;
 export type Reminder = z.infer<typeof Reminder>;
 export type TeamMember = z.infer<typeof TeamMember>;
 export type Invite = z.infer<typeof Invite>;
+export type InvitePreview = z.infer<typeof InvitePreview>;
 export type Team = z.infer<typeof Team>;

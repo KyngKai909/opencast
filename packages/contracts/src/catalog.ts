@@ -3,6 +3,15 @@ import { endpoint } from "./core.js";
 import { Band, DateOnly, Id, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CarriageDeclineReason, CarriageRequestState } from "./states.js";
 
+/**
+ * Added 2026-09-29: where a preview stands. Previews play the file's prepared segments (the ones
+ * it airs from): `preparing` until it's prepared (show "Being prepared"; `previewUrl` is null
+ * until then), `ready` with `previewUrl`, `failed` when it couldn't be prepared. Null or absent:
+ * there's no preview (no file, or a rights claim holds it).
+ */
+export const PreviewStatus = z.enum(["ready", "preparing", "failed"]);
+export type PreviewStatus = z.infer<typeof PreviewStatus>;
+
 export const CarriageTerm = z.enum(["barter", "cash", "cash_plus_barter", "free"]);
 export const CARRIAGE_TERM_LABELS = { barter: "Barter", cash: "Cash", cash_plus_barter: "Cash plus barter", free: "Free" } as const;
 
@@ -191,8 +200,13 @@ export const catalogApi = {
           title: z.string(),
           durationMs: Millis.nullable(),
           breakPointsMs: z.array(Millis),
-          /** A low-bitrate HLS preview, once rendered (added in 2026-09). */
+          /**
+           * An HLS preview (added in 2026-09). Since 2026-09-29 a short-cache playlist over the
+           * episode's prepared segments (360p, or 64k sound on the radio band), once it's prepared.
+           */
           previewUrl: z.string().nullable().optional(),
+          /** Added 2026-09-29: see `PreviewStatus`. */
+          previewStatus: PreviewStatus.nullable().optional(),
           // ---- C5 (added 2026-09-29) ----
           episodeNumber: z.number().int().nullable().optional(),
           /** From the as-run log, anywhere. */

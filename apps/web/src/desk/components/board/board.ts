@@ -13,7 +13,7 @@ export interface Coverage {
   waitlistHere: number;
   /** Independent stations (slot state `station`), subchannels counted. */
   stations: number;
-  /** Listed city streams, subchannels counted. */
+  /** External city streams (slot state `listed`), subchannels counted. */
   listed: number;
   catalog: number;
   claimable: number;
@@ -40,12 +40,12 @@ export function coverage(tv: MarketBoard | undefined, radio: MarketBoard | undef
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** "8 stations, 2 claimable stations on air, 3 listed city streams and the catalog station. 26 people on the waitlist here." */
+/** "8 stations, 2 claimable stations on air, 3 external city streams and the catalog station. 26 people on the waitlist here." */
 export function marketLine(c: Coverage): string {
   const parts: string[] = [];
   if (c.stations) parts.push(plural(c.stations, "station", "stations"));
   if (c.claimableOnAir) parts.push(plural(c.claimableOnAir, "claimable station on air", "claimable stations on air"));
-  if (c.listed) parts.push(plural(c.listed, "listed city stream", "listed city streams"));
+  if (c.listed) parts.push(plural(c.listed, "external city stream", "external city streams"));
   if (c.catalog) parts.push("the catalog station");
   const what = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : (parts[0] ?? "No stations yet");
   const waitlist = c.waitlistHere ? ` ${c.waitlistHere === 1 ? "1 person" : `${c.waitlistHere} people`} on the waitlist here.` : "";

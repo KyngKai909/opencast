@@ -7,7 +7,7 @@ interface ListingProps {
   variant?: "listing";
   /** The station: its thumb, channel and call sign. */
   station: { channel: string; callSign: string; colour: string };
-  /** Signs after the call sign: <Tag variant="live">Live</Tag>, Listed. */
+  /** Signs after the call sign: <Tag variant="live">Live</Tag>, External. */
   tags?: ReactNode;
   /** What's on now. */
   title: ReactNode;

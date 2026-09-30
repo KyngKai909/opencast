@@ -479,7 +479,7 @@ export const primitives = specimens([
       { file: STYLE, anchor: "components" },
       { file: HOME, anchor: "home-desk", frames: ["01.1"] }
     ],
-    notes: "Live is red text with a dot: the only red that isn't the tally. Listed is dashed. Words carry the meaning, never colour alone.",
+    notes: "Live is red text with a dot: the only red that isn't the tally. External is dashed. Words carry the meaning, never colour alone.",
     states: [
       {
         label: "On the ground",
@@ -487,7 +487,7 @@ export const primitives = specimens([
           <div className="gal-row">
             <Tag variant="live">Live</Tag>
             <Tag variant="next">Next at 9:30</Tag>
-            <Tag variant="listed">Listed</Tag>
+            <Tag variant="listed">External</Tag>
             <Tag variant="off">Off air</Tag>
             <Tag>Radio band</Tag>
             <Tag variant="standby">Needs a description</Tag>

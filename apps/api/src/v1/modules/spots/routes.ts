@@ -6,6 +6,8 @@ import { notFound } from "../../errors.js";
 
 export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) {
   const { spots, accounts } = services;
+  // Viewers see results, airings and statements only (biz-settings 02.1's "What each role can do"):
+  // not the spot lists, sponsorships or production orders. Those are the owner's and managers'.
   const everyone = ["owner", "manager", "viewer"] as const;
   const doers = ["owner", "manager"] as const;
   const staff = ["owner", "operator"] as const;
@@ -38,7 +40,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
 
   // Spots
   r.handle(api.listSpots, async ({ user, params }) => {
-    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.spots(params.businessId);
   });
   r.handle(api.createSpot, async ({ user, params, body }) => {
@@ -46,7 +48,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     return spots.createSpot(params.businessId, body);
   });
   r.handle(api.getSpot, async ({ user, params }) => {
-    await spotBusiness(user, params.spotId, everyone);
+    await spotBusiness(user, params.spotId, doers);
     return spots.spot(params.spotId);
   });
   r.handle(api.updateSpot, async ({ user, params, body }) => {
@@ -58,7 +60,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     return spots.uploadSpotFile(params.spotId, file!, body.scaleToFit);
   });
   r.handle(api.matchStations, async ({ user, params, body }) => {
-    await spotBusiness(user, params.spotId, everyone);
+    await spotBusiness(user, params.spotId, doers);
     return { stations: await spots.matches(params.spotId, body) };
   });
   r.handle(api.submitSpot, async ({ user, params }) => {
@@ -135,7 +137,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     return spots.offerSponsorship(params.businessId, body);
   });
   r.handle(api.listBusinessSponsorships, async ({ user, params }) => {
-    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.businessSponsorships(params.businessId);
   });
   r.handle(api.listStationSponsorships, async ({ user, params }) => {
@@ -160,7 +162,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   // Production orders
   r.handle(api.listMakers, async ({ user, query }) => {
     // P18: a maker's history with a business is for that business's team.
-    if (query.businessId) await accounts.requireBusiness(user, query.businessId, [...everyone]);
+    if (query.businessId) await accounts.requireBusiness(user, query.businessId, [...doers]);
     return spots.makers(query.businessId);
   });
   r.handle(api.orderSpot, async ({ user, params, body }) => {
@@ -168,7 +170,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     return spots.orderSpot(params.businessId, body);
   });
   r.handle(api.listBusinessOrders, async ({ user, params }) => {
-    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.businessOrders(params.businessId);
   });
   // P24: the maker asks to be told when the spot it made is listed.
@@ -188,7 +190,7 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   /** Either side of an order can read it; each side does its own steps. */
   const orderSide = async (user: User, orderId: string, side?: "business" | "maker") => {
     const parties = await spots.partiesOfOrder(orderId);
-    const asBusiness = side !== "maker" ? await accounts.requireBusiness(user, parties.businessId, [...(side ? doers : everyone)]).catch(() => null) : null;
+    const asBusiness = side !== "maker" ? await accounts.requireBusiness(user, parties.businessId, [...doers]).catch(() => null) : null;
     if (asBusiness) return "business" as const;
     if (side === "business") throw notFound("That order");
     await accounts.requireStation(user, parties.makerStationId, [...staff]);

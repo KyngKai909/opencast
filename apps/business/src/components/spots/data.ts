@@ -19,8 +19,8 @@ export function useSpot(spotId: string | undefined, opts: { refetchInterval?: nu
   return useApi(spotsApi.getSpot, { params: { spotId: spotId ?? "" } }, { schema: SpotX, enabled: !!spotId, retry: false, ...opts });
 }
 
-export function useBalance(businessId: string) {
-  return useApi(ledgerApi.getBalance, { params: { businessId } });
+export function useBalance(businessId: string, enabled = true) {
+  return useApi(ledgerApi.getBalance, { params: { businessId } }, { enabled });
 }
 
 /** A write that answers with the spot (SpotX), then refreshes everything a spot shows up in. */

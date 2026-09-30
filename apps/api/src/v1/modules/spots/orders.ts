@@ -83,7 +83,15 @@ export function createOrders(
       services.ledger.releasedFromHolds(rows.map((r) => r.holdId).filter((v): v is string => Boolean(v)))
     ]);
     const content = services.library.content;
-    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), previewUrl: f.role === "delivery" ? await content.previewUrl(f.contentId) : null }] as const)));
+    // Deliveries preview from their prepared segments; an open order's are asked for ("Being prepared" until then).
+    const open = new Set(rows.filter((r) => ["delivered", "changes_requested", "disputed"].includes(r.status)).map((r) => r.id));
+    const deliveries = files.filter((f) => f.role === "delivery" && f.contentId);
+    const [asked, others] = await Promise.all([
+      services.playout.previews(deliveries.filter((f) => open.has(f.orderId)).map((f) => ({ contentId: f.contentId, mediaKind: "video" as const, band: "tv" as const, durationMs: f.durationMs })), { prepare: true }),
+      services.playout.previews(deliveries.filter((f) => !open.has(f.orderId)).map((f) => ({ contentId: f.contentId, mediaKind: "video" as const, band: "tv" as const, durationMs: f.durationMs })))
+    ]);
+    const previewOf = (f: (typeof files)[number]) => (f.role === "delivery" && f.contentId ? (asked.get(f.contentId) ?? others.get(f.contentId) ?? null) : null);
+    const urls = new Map(await Promise.all(files.map(async (f) => [f.id, { url: f.contentId ? await content.url(f.contentId) : (f.location ?? ""), preview: previewOf(f) }] as const)));
     return rows.flatMap((r) => {
       const maker = idents.get(r.makerStationId);
       if (!maker) return [];
@@ -108,7 +116,8 @@ export function createOrders(
               id: f.id,
               version: f.version ?? 1,
               url: urls.get(f.id)?.url ?? "",
-              previewUrl: urls.get(f.id)?.previewUrl ?? null,
+              previewUrl: urls.get(f.id)?.preview?.url ?? null,
+              previewStatus: urls.get(f.id)?.preview?.status ?? null,
               createdAt: f.createdAt.toISOString(),
               // P19: left out when it wasn't measured (deliveries from before).
               ...(f.durationMs !== null ? { durationMs: f.durationMs } : {}),
@@ -139,8 +148,9 @@ export function createOrders(
   /** Stores an order's file by content ID and records it on the order. */
   async function keep(orderId: string, file: UploadedFile, role: "brief" | "delivery", version: number | null, checked?: { durationMs: number | null; checksPassed: string[] }) {
     const content = services.library.content;
-    // Briefs are read once or twice: Infrequent Access. A delivery may become the spot that airs.
-    const stored = await content.store(file.path, { storageClass: role === "brief" ? "infrequent" : "standard", contentType: file.mimeType || undefined });
+    // Originals, in Infrequent Access: a brief is read once or twice, and a delivery that becomes
+    // the spot is prepared for air from this original, once (its prepared segments are what's read).
+    const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
     return db.transaction(async (tx) => {
       const [saved] = await tx
         .insert(F)
@@ -187,7 +197,6 @@ export function createOrders(
       category: business?.category ?? "Services",
       file: delivery?.contentId && probe?.durationMs ? { contentId: delivery.contentId, durationMs: probe.durationMs, filename: delivery.filename } : null
     });
-    await services.library.content.dropPreview("order", order.id);
     const [updated] = await db.update(O).set({ status: "approved", approvedAt: deps.clock.now(), spotId }).where(eq(O.id, order.id)).returning();
     emit(updated);
   }
@@ -301,7 +310,9 @@ export function createOrders(
         ...(loudness !== null && Math.abs(loudness + 24) <= 2 ? ["loudness"] : [])
       ];
       const saved = await keep(orderId, file, "delivery", versions.length + 1, { durationMs: probe?.durationMs ?? null, checksPassed });
-      await services.library.content.needPreview([saved.contentId!], "order", orderId);
+      // The business reviews it from its prepared segments: asked for now.
+      const audio = probe?.mediaKind === "audio";
+      await services.playout.previews([{ contentId: saved.contentId, mediaKind: audio ? "audio" : "video", band: audio ? "radio" : "tv", durationMs: probe?.durationMs ?? null }], { prepare: true });
       const [updated] = await db
         .update(O)
         .set({ status: "delivered", deliveredAt: now, autoApproveAt: new Date(now.getTime() + AUTO_APPROVE_DAYS * DAY) })
@@ -357,7 +368,6 @@ export function createOrders(
           if (found.holdId) await services.ledger.release(tx, found.holdId, undefined, { sourceType: "production_order", sourceId: orderId, memo: `Returned after review${input.note ? `: ${input.note}` : ""}` });
           await tx.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId));
         });
-        await services.library.content.dropPreview("order", orderId);
         const updated = await row(orderId);
         emit(updated);
         return (await views([updated]))[0];
@@ -373,7 +383,6 @@ export function createOrders(
       const found = await row(orderId);
       if (["asked", "quoted"].includes(found.status)) {
         const [u] = await db.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId)).returning();
-        await services.library.content.dropPreview("order", orderId);
         emit(u);
         return (await views([u]))[0];
       }
@@ -384,7 +393,6 @@ export function createOrders(
           if (found.holdId) await services.ledger.release(tx, found.holdId, undefined, { sourceType: "production_order", sourceId: orderId, memo: "Returned: order cancelled" });
           await tx.update(O).set({ status: "cancelled" }).where(eq(O.id, orderId));
         });
-        await services.library.content.dropPreview("order", orderId);
         const updated = await row(orderId);
         emit(updated);
         return (await views([updated]))[0];

@@ -21,6 +21,13 @@ export interface AuthAdapter {
   oauth(provider: "apple" | "google"): Promise<void>;
   /** Master control's "Connect a wallet" (docs/apps/open-questions.md, #4). The viewer doesn't offer wallets. */
   wallet(): Promise<void>;
+  /**
+   * A creator's wallet, before a claim: the escrow pays a claim or a stop only to it. Privy makes
+   * none at sign-in (`createOnLogin` is off for everyone), so claiming makes the embedded one here
+   * unless they have a wallet already. Resolves to its address (null where sign-in has no wallets:
+   * the real-API runs' test sign-in). The API then reads it from Privy and records it.
+   */
+  creatorWallet(): Promise<string | null>;
   signOut(): Promise<void>;
   getToken(): Promise<string | null>;
 }

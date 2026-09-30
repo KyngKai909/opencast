@@ -83,7 +83,14 @@ export default function Permission() {
   };
 
   // Claim from the link (B8), before or after the station exists: the link is what proves it's them.
-  const claim = () => auth.requireSignIn({ kind: "general", ...C.claimSignIn }, () => run(() => call(networkApi.claimFromLink, { params: { token } })));
+  // Their wallet is made first (Privy makes none at sign-in), so the escrow has somewhere to pay.
+  const claim = () =>
+    auth.requireSignIn({ kind: "general", ...C.claimSignIn }, () =>
+      run(async () => {
+        await auth.creatorWallet();
+        await call(networkApi.claimFromLink, { params: { token } });
+      })
+    );
 
   if (token.length < 16 || page.error) return <Bad />;
   if (page.isLoading || !page.data) return <main className="vw-perm" aria-busy="true" />;

@@ -30,7 +30,7 @@ export interface DialNow {
   until?: TimeInput;
   /** A live program: the Live tag (red text on the radio rows). */
   live?: boolean;
-  /** A city's own stream Opencast lists but doesn't restream: the dashed Listed tag. */
+  /** A city's own stream Opencast lists but doesn't restream: the dashed External tag. */
   listed?: boolean;
   /** The station it's carried from: "REEL". */
   carriedFrom?: string;
@@ -76,7 +76,7 @@ function untilLine(now: DialNow, timeZone?: string): ReactNode {
 
 /**
  * One station on the dial, in channel order: what's on, when it ends, what's next. A click tunes
- * in; the ident opens the station preview. Live, Listed, Off air and carried say so in words.
+ * in; the ident opens the station preview. Live, External, Off air and carried say so in words.
  */
 export function DialRow({ station, now, next, variant = "web", at, timeZone, watching, onTune, onOpenStation, className }: DialRowProps) {
   const title = now.offAir ? OFF_AIR : now.title;
@@ -142,7 +142,7 @@ export function DialRow({ station, now, next, variant = "web", at, timeZone, wat
               {now.detail ?? (
                 <>
                   {now.live && <Tag variant="live">Live</Tag>}
-                  {now.listed && <Tag variant="listed">Listed</Tag>}
+                  {now.listed && <Tag variant="listed">External</Tag>}
                   {now.carriedFrom && <span>Carried from {now.carriedFrom}</span>}
                   {untilLine(now, timeZone)}
                 </>
@@ -187,7 +187,7 @@ export function DialRow({ station, now, next, variant = "web", at, timeZone, wat
             <span className="oc-dial-row__top">
               <span className="oc-cs">{station.callSign}</span>
               {now.live && <Tag variant="live">Live</Tag>}
-              {now.listed && <Tag variant="listed">Listed</Tag>}
+              {now.listed && <Tag variant="listed">External</Tag>}
             </span>
             <b className={variant === "phone" ? "oc-clamp1" : undefined}>{title}</b>
             {line != null && <small>{line}</small>}

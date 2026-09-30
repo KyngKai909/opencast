@@ -243,7 +243,7 @@ describe("what OK does and what the cells say", () => {
 
   it("writes the lines as the frame does", () => {
     expect(cellLine(civc[0]!, NOW, TZ)).toEqual({ live: true, text: "until 9:30" });
-    expect(cellLine(rdls[0]!, NOW, TZ)).toEqual({ live: false, text: "Listed, until 9:15" });
+    expect(cellLine(rdls[0]!, NOW, TZ)).toEqual({ live: false, text: "External, until 9:15" });
     expect(cellLine(rdls[1]!, NOW, TZ)).toEqual({ live: false, text: "9:15" });
     expect(cellLine(beat[0]!, NOW, TZ)).toEqual({ live: false, text: "From REEL" });
     expect(cellLine(beat[1]!, NOW, TZ)).toEqual({ live: true, text: "9:00 – 10:00" });

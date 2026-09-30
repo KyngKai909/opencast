@@ -47,7 +47,7 @@ describe("GuideGrid", () => {
     const { container } = render(<GuideGrid rows={ROWS} from={at(20)} to={at(23)} now={at(20, 42)} timeZone={TZ} />);
     expect(container.querySelector(".oc-live-text")?.textContent).toBe("Live");
     expect(container.querySelector(".oc-tally")).toBeNull();
-    expect(container.textContent).toContain("Began 7:00, listed");
+    expect(container.textContent).toContain("Began 7:00, external");
     expect(container.textContent).toContain("8:00 pm");
     expect(container.querySelector(".oc-now-line")?.textContent).toBe("8:42");
     expect(container.querySelector(".oc-guide__p--cont")).not.toBeNull();

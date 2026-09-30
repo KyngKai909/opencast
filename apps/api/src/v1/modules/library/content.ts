@@ -1,9 +1,10 @@
 // Files by content ID. Storing a file the platform already has stores nothing new;
 // the last reference to a file going is what deletes it, unless a rights claim has
 // it locked. A claim resolved against it deletes it whatever still points at it.
-// Previews (low-bitrate HLS) exist only while something needs one.
+// Every file here is an original (uploads, spots, deliveries, briefs, attachments): playout
+// prepares from it once, and what it prepares (`prepared/<content ID>/…`) goes when the file does.
+// Previews play those prepared segments (the playout service); there are no separate renditions.
 
-import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,11 +16,11 @@ import { contentIdOf, contentTypeOf, objectKey, sha256FromCid, type StorageClass
 
 const C = schema.contents;
 const REF = schema.contentRefs;
+/** Retired 2026-09-29 (previews play prepared segments): read only to delete what's left. */
 const PV = schema.contentPreviews;
 const NEED = schema.contentPreviewNeeds;
 
 export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background";
-export type PreviewReason = "offer" | "review" | "order";
 
 export interface ContentInfo {
   cid: string;
@@ -31,10 +32,9 @@ export interface ContentInfo {
   ipfs: { cid: string; reason: "catalog" | "export"; url: string } | null;
 }
 
-export function createContent({ deps }: ModuleContext) {
+export function createContent({ deps, services }: ModuleContext) {
   const { db } = deps;
   const objects = deps.storage.objects;
-  const renders = new Set<Promise<unknown>>();
 
   async function gc(cids: string[]) {
     for (const cid of new Set(cids)) {
@@ -42,70 +42,41 @@ export function createContent({ deps }: ModuleContext) {
       if (!row || row.deletedAt || row.lockedAt) continue;
       const [ref] = await db.select().from(REF).where(eq(REF.cid, cid)).limit(1);
       if (ref) continue;
-      await dropPreviewObjects(cid);
+      // What was prepared from it goes too; a channel that aired it lately keeps it until the sweep.
+      await services.playout.dropPrepared([cid], { evenIfAiring: false });
       await objects.delete(objectKey.file(cid));
       await db.update(C).set({ deletedAt: deps.clock.now(), deletedReason: "unreferenced" }).where(eq(C.cid, cid));
     }
-  }
-
-  async function dropPreviewObjects(cid: string) {
-    await objects.deletePrefix(objectKey.preview(cid)).catch(() => undefined);
-    await db.delete(PV).where(eq(PV.cid, cid));
-  }
-
-  async function renderPreview(cid: string) {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencast-preview-"));
-    try {
-      const source = path.join(dir, "source");
-      await objects.download(objectKey.file(cid), source, sha256FromCid(cid));
-      const out = path.join(dir, "hls");
-      await fs.mkdir(out);
-      // Low bitrate: enough to judge a program, a spot or a delivery, not to air it.
-      const code = await new Promise<number>((resolve) => {
-        const child = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", source, "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-b:v", "500k", "-maxrate", "600k", "-bufsize", "1200k", "-c:a", "aac", "-b:a", "64k", "-ac", "2", "-f", "hls", "-hls_time", "6", "-hls_playlist_type", "vod", "-hls_segment_filename", path.join(out, "seg_%04d.ts"), path.join(out, "index.m3u8")]);
-        child.on("close", (c) => resolve(c ?? 1));
-        child.on("error", () => resolve(1));
-      });
-      if (code !== 0) throw new Error(`ffmpeg ${code}`);
-      // Previews are read now and again while they last: Standard.
-      await objects.putDir(objectKey.preview(cid), out, "standard");
-      await db.update(PV).set({ status: "ready" }).where(eq(PV.cid, cid));
-    } catch (error) {
-      console.error(`[content] preview for ${cid} failed`, error);
-      await db.update(PV).set({ status: "failed" }).where(eq(PV.cid, cid));
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-    // It may no longer be needed by the time it's done.
-    const [need] = await db.select().from(NEED).where(eq(NEED.cid, cid)).limit(1);
-    if (!need) await dropPreviewObjects(cid);
   }
 
   const content = {
     /**
      * Stores a file under its content ID (unless it's stored already) and records who
      * points at it. Uploading happens before the transaction; the reference inside it.
+     *
+     * A file stored already keeps its storage class: the same bytes stored again as Standard
+     * don't move an Infrequent Access object to Standard. Nothing stored here needs Standard
+     * for what it is: it's read to prepare it, or now and then by a person (a brief, a logo, a
+     * caption file). What's read all day (prepared and live segments, relay loops) is written
+     * straight to object storage in Standard, never through here. A file stored again after it
+     * was deleted is stored in the class asked for.
      */
-    async store(file: string, input: { storageClass: StorageClass; contentType?: string }): Promise<{ cid: string; bytes: number }> {
+    async store(file: string, input: { storageClass: StorageClass; contentType?: string }): Promise<{ cid: string; bytes: number; storageClass: StorageClass }> {
       const { cid, sha256, bytes } = await contentIdOf(file);
       const [existing] = await db.select().from(C).where(eq(C.cid, cid));
       if (existing?.deletedReason === "takedown") throw refused("taken_down", "That file was taken down after a rights claim and can't be stored again.");
-      const needsPut = !existing || existing.deletedAt || (input.storageClass === "standard" && existing.storageClass === "infrequent") || !(await objects.has(objectKey.file(cid)));
-      if (needsPut) await objects.put(objectKey.file(cid), file, { contentType: input.contentType ?? contentTypeOf(file), storageClass: input.storageClass, sha256 });
+      const needsPut = !existing || existing.deletedAt !== null || !(await objects.has(objectKey.file(cid)));
+      const storageClass: StorageClass = needsPut ? input.storageClass : existing!.storageClass;
+      if (needsPut) await objects.put(objectKey.file(cid), file, { contentType: input.contentType ?? contentTypeOf(file), storageClass, sha256 });
       await db
         .insert(C)
-        .values({ cid, bytes, contentType: input.contentType ?? contentTypeOf(file), storageClass: input.storageClass, store: objects.name })
+        .values({ cid, bytes, contentType: input.contentType ?? contentTypeOf(file), storageClass, store: objects.name })
         .onConflictDoUpdate({
           target: C.cid,
-          // Brought back if it had gone (nothing referenced it); promoted to Standard if playout now airs it.
-          set: {
-            deletedAt: null,
-            deletedReason: null,
-            storageClass: input.storageClass === "standard" ? "standard" : sql`${C.storageClass}`,
-            store: objects.name
-          }
+          // Brought back if it had gone (nothing referenced it), in the class it was stored in now.
+          set: { deletedAt: null, deletedReason: null, storageClass, store: objects.name }
         });
-      return { cid, bytes };
+      return { cid, bytes, storageClass };
     },
 
     async addRef(tx: Executor, cid: string, owner: ContentOwner, ownerId: string) {
@@ -149,7 +120,8 @@ export function createContent({ deps }: ModuleContext) {
       for (const cid of new Set(cids)) {
         const [row] = await db.select().from(C).where(eq(C.cid, cid));
         if (!row || row.deletedReason === "takedown") continue;
-        await dropPreviewObjects(cid);
+        // Everything prepared from it, now, whether or not a channel aired it lately: it's pulled.
+        await services.playout.dropPrepared([cid], { evenIfAiring: true });
         await objects.delete(objectKey.file(cid));
         await db.update(C).set({ deletedAt: deps.clock.now(), deletedReason: "takedown", lockedAt: null, lockReason: null }).where(eq(C.cid, cid));
       }
@@ -183,7 +155,7 @@ export function createContent({ deps }: ModuleContext) {
       );
     },
 
-    /** Copies a stored file to a local path (the worker cache), checking its hash. */
+    /** Copies a stored file to a local path (scratch space), checking its hash. */
     async fetch(cid: string, dest: string) {
       await objects.download(objectKey.file(cid), dest, sha256FromCid(cid));
     },
@@ -192,33 +164,31 @@ export function createContent({ deps }: ModuleContext) {
       return objects.url(objectKey.file(cid));
     },
 
-    // --- Previews ---------------------------------------------------------------
-
-    async needPreview(cids: string[], reason: PreviewReason, subjectId: string) {
-      for (const cid of new Set(cids)) {
-        await db.insert(NEED).values({ cid, reason, subjectId }).onConflictDoNothing();
-        const [created] = await db.insert(PV).values({ cid, status: "rendering" }).onConflictDoNothing().returning();
-        if (created) {
-          const work = renderPreview(cid).finally(() => renders.delete(work));
-          renders.add(work);
-        }
-      }
+    /** Which of these content IDs are gone from storage (the storage sweep). */
+    async deletedAmong(cids: string[]): Promise<Set<string>> {
+      if (!cids.length) return new Set();
+      const rows = await db.select({ cid: C.cid }).from(C).where(and(inArray(C.cid, [...new Set(cids)]), isNotNull(C.deletedAt)));
+      return new Set(rows.map((r) => r.cid));
     },
 
-    async dropPreview(reason: PreviewReason, subjectId: string) {
-      const gone = await db.delete(NEED).where(and(eq(NEED.reason, reason), eq(NEED.subjectId, subjectId))).returning({ cid: NEED.cid });
-      for (const { cid } of gone) {
-        const [still] = await db.select().from(NEED).where(eq(NEED.cid, cid)).limit(1);
-        const [preview] = await db.select().from(PV).where(eq(PV.cid, cid));
-        // One still rendering drops itself when it finishes.
-        if (!still && preview && preview.status !== "rendering") await dropPreviewObjects(cid);
+    /**
+     * The storage sweep (the worker, hourly): what was prepared from files that went while a
+     * channel still pointed at it, and the separate 360p previews made before previews played the
+     * prepared segments (`previews/<cid>/`, and their rows). Safe to run any time.
+     */
+    async sweep(): Promise<{ prepared: { dropped: number; deferred: number }; oldPreviews: number }> {
+      const prepared = await services.playout.sweepPrepared();
+      const old = await db.select({ cid: PV.cid }).from(PV);
+      for (const { cid } of old) {
+        await objects.deletePrefix(objectKey.preview(cid));
+        await db.transaction(async (tx) => {
+          await tx.delete(NEED).where(eq(NEED.cid, cid));
+          await tx.delete(PV).where(eq(PV.cid, cid));
+        });
       }
-    },
-
-    async previewUrl(cid: string | null | undefined): Promise<string | null> {
-      if (!cid) return null;
-      const [row] = await db.select().from(PV).where(eq(PV.cid, cid));
-      return row?.status === "ready" ? objects.url(`${objectKey.preview(cid)}/index.m3u8`) : null;
+      // Needs left without a preview row.
+      await db.delete(NEED);
+      return { prepared, oldPreviews: old.length };
     },
 
     // --- IPFS ---------------------------------------------------------------------
@@ -253,9 +223,8 @@ export function createContent({ deps }: ModuleContext) {
       return { byClass: rows, onIpfs: ipfs.n };
     },
 
-    async settle() {
-      while (renders.size) await Promise.all([...renders]);
-    }
+    /** Nothing runs in the background here any more (previews aren't rendered). */
+    async settle() {}
   };
   return content;
 }

@@ -8,7 +8,7 @@ export interface Events {
   "station.dead_air_filled": { stationId: string; gapStartsAt: string; gapEndsAt: string };
   "station.signed_on": { stationId: string; first: boolean };
   "station.signal_lost": { stationId: string; liveSourceId: string | null };
-  /** A file due within the hour isn't in the worker cache (or wasn't, at air). */
+  /** A file due within the hour isn't prepared for air (or wasn't, at air). */
   "station.file_not_ready": { stationId: string; itemId: string; title: string; airsAt: string; missedAtAir: boolean };
   "station.signed_off": { stationId: string; permanently: boolean };
   "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance" | "by_hand"; stationIds: string[] };
@@ -22,7 +22,18 @@ export interface Events {
   "carriage.decided": { requestId: string; makerStationId: string; carrierStationId: string; approved: boolean };
   "order.updated": { orderId: string; businessId: string; makerStationId: string; state: string };
   "claim.filed": { claimId: string; stationId: string; itemTitle: string; carrierStationIds: string[] };
-  "invite.created": { inviteId: string; email: string | null; phone: string | null; teamName: string };
+  /** An invite was made: its email goes out (resending sends it directly). `sentAt` makes each send its own email. */
+  "invite.created": {
+    inviteId: string;
+    email: string | null;
+    phone: string | null;
+    teamName: string;
+    scope: "station" | "business";
+    role: "operator" | "host" | "manager" | "viewer";
+    invitedByName: string | null;
+    expiresAt: string;
+    sentAt: string;
+  };
   "code.used": { businessId: string; spotId: string; code: string };
 }
 

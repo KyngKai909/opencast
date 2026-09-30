@@ -104,9 +104,39 @@ export interface EngineOptions {
   onCommand?: (command: Command, source?: CommandSource) => void;
   /** AirPlay: the driver a picture on hls.js switches to (the browser's own HLS, by default). */
   airPlayDriver?: MediaDriver;
+  /**
+   * "Tuning sound": a soft hiss while changing channel, per band. On for the radio band and off for
+   * video unless the viewer changes it. Kept here for the tuning work (Phase 5); nothing plays yet.
+   */
+  tuningSound?: Partial<TuningSound>;
+}
+
+/** Whether changing channel makes the soft hiss, on the video (TV) band and on the radio band. */
+export interface TuningSound {
+  video: boolean;
+  radio: boolean;
+}
+
+/** The hiss is on by default for the radio band, off for video (style guide, "Tuning the radio band"). */
+export const TUNING_SOUND_DEFAULTS: Readonly<TuningSound> = Object.freeze({ video: false, radio: true });
+
+/**
+ * The account's watching settings as the player's option: `tuningSound` is the row in Watching
+ * settings and TV settings (video), `radioTuningSound` the radio band's own switch. Absent: the defaults.
+ */
+export function tuningSoundFrom(w: { tuningSound?: boolean; radioTuningSound?: boolean } | null | undefined): TuningSound {
+  return {
+    video: w?.tuningSound ?? TUNING_SOUND_DEFAULTS.video,
+    radio: w?.radioTuningSound ?? TUNING_SOUND_DEFAULTS.radio
+  };
 }
 
 const THIRTY_MINUTES = 30 * 60 * 1000;
+
+/** A partial option without its undefined keys, so they don't overwrite what's set. */
+function definedOnly<T extends object>(o: T | undefined): Partial<T> {
+  return o ? (Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>) : {};
+}
 /** How often what's on screen is checked against the playlist's tags. */
 const ON_SCREEN_TICK_MS = 250;
 /** After the back time, how often to look for the new playlist (doubling up to a minute). */
@@ -134,7 +164,7 @@ export class PlayerEngine {
   private decks = new Map<string, Deck>();
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
-  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver">> & Pick<EngineOptions, "onCommand">;
+  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
   private airPlayDriver: MediaDriver;
   /** A video element with no stream, listening for AirPlay TVs coming and going (Safari). */
   private airPlayProbe: HTMLVideoElement | null = null;
@@ -168,6 +198,7 @@ export class PlayerEngine {
       pauseHoldMs: options.pauseHoldMs ?? THIRTY_MINUTES,
       quality: options.quality ?? "auto",
       eveningOut: options.eveningOut ?? false,
+      tuningSound: { ...TUNING_SOUND_DEFAULTS, ...definedOnly(options.tuningSound) },
       now: options.now ?? (() => Date.now()),
       onCommand: options.onCommand
     };
@@ -252,20 +283,37 @@ export class PlayerEngine {
     this.rewarm(id);
   }
 
+  /**
+   * Whether changing channel to this station makes the tuning hiss: its band's "Tuning sound"
+   * (a station with no band counts as video). Phase 5 plays the sound; nothing does yet.
+   */
+  tuningSoundOn(stationId: string | null = this.state.pendingId ?? this.state.currentId): boolean {
+    const band = this.channel(stationId)?.station.band;
+    return band === "radio" ? this.o.tuningSound.radio : this.o.tuningSound.video;
+  }
+
+  /** The "Tuning sound" settings the player has, per band. */
+  getTuningSound(): TuningSound {
+    return { ...this.o.tuningSound };
+  }
+
   setPresets(presets: Record<number, string>) {
     this.presets = presets;
   }
 
-  setOptions(p: Partial<Pick<EngineOptions, "bannerMs" | "numberWaitMs" | "warm" | "neighbours" | "quality" | "eveningOut">>) {
+  setOptions(p: Partial<Pick<EngineOptions, "bannerMs" | "numberWaitMs" | "warm" | "neighbours" | "quality" | "eveningOut" | "tuningSound">>) {
     const quality = p.quality !== undefined && p.quality !== this.o.quality;
-    Object.assign(this.o, Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined)));
+    const { tuningSound, ...rest } = p;
+    Object.assign(this.o, Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)));
+    if (tuningSound) this.o.tuningSound = { ...this.o.tuningSound, ...definedOnly(tuningSound) };
     // The picture on screen and the warm neighbours at once.
     if (quality) {
       for (const d of this.decks.values()) d.setQuality(this.o.quality);
       for (const p of this.prefetches.values()) p.setQuality(this.o.quality);
     }
     this.audio.setEvenOut(this.o.eveningOut);
-    if (this.state.currentId) this.rewarm(this.state.currentId);
+    // Tuning sound alone changes nothing that's warm.
+    if (this.state.currentId && Object.keys(rest).length) this.rewarm(this.state.currentId);
   }
 
   private channel(id: string | null): Channel | undefined {

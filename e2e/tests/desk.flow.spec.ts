@@ -185,3 +185,16 @@ test("signing in through the page opens the desk without a reload", async ({ pag
   await page.getByLabel("Code").fill("123456");
   await expect(page.getByRole("heading", { level: 1, name: "Inland Empire" })).toBeVisible({ timeout: 8_000 });
 });
+
+test("External sources: the rail, the page and the board's key (network-desk 01.1, 05.1)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await useGround(page, "dark");
+  await page.goto(`${IE}/board`);
+  await expect(page.getByLabel("Key")).toContainText("External city stream");
+  await expect(page.getByLabel("Key")).not.toContainText("Listed");
+  await page.getByRole("link", { name: /^External sources/ }).click();
+  await expect(page).toHaveURL(new RegExp(`${IE}/listed$`));
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("External sources");
+  await expect(page.getByText("Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.")).toBeVisible();
+  await expect(page.getByRole("table", { name: "External sources" })).toContainText("Not on the dial");
+});

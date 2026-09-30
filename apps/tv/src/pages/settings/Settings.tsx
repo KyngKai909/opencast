@@ -181,6 +181,7 @@ function SectionRows({ section, steppers, focusRow }: RowsProps) {
           {stepRow("captionSize", "Caption size")}
           <ChannelUpRow render={(help) => stepRow("channelUp", "Channel up goes", { help })} dir={settings.channelUp} />
           {stepRow("bannerSeconds", "Banner stays for")}
+          {stepRow("tuningSound", "Tuning sound", { help: "A soft hiss when changing channel" })}
           {stepRow("numberWaitSeconds", "After typing a number, tune in", { help: "Or press OK to tune right away" })}
           {stepRow("includeRadioBand", "Include the radio band when changing channel", { asSwitch: true })}
           {err}

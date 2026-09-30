@@ -50,7 +50,7 @@ export function NowTitle({ w, size = "web" }: { w: WatchData; size?: "web" | "ph
         ) : now.live ? (
           <LiveText />
         ) : null}
-        {now.kind === "listed" && <Tag variant="listed">Listed</Tag>}
+        {now.kind === "listed" && <Tag variant="listed">External</Tag>}
       </div>
     </>
   );

@@ -89,6 +89,9 @@ export default function ClaimStation() {
     setBusy(true);
     setError(null);
     try {
+      // The escrow pays a claim or a stop only to the creator's wallet: made now, as Privy makes
+      // none at sign-in (their existing one when they have it). The API records it with the claim.
+      await auth.creatorWallet();
       // The real connect is the source platform's sign-in (request N10); the mock takes its word.
       await call(networkApi.startHandover, { params: { stationId: st.id }, body: { kind, sourceAccountProof: `${p.sourcePlatform}:connected` } });
       await qc.invalidateQueries({ queryKey: [networkApi.getClaimPage.method, networkApi.getClaimPage.path] });

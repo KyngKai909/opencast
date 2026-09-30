@@ -2,6 +2,7 @@ import { z } from "zod";
 import { endpoint } from "./core.js";
 import { DateOnly, Id, Micros, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { OrderState, SponsorshipDeclineReason, SponsorshipState, SpotState } from "./states.js";
+import { PreviewStatus } from "./catalog.js";
 
 // Businesses ------------------------------------------------------------------
 
@@ -166,8 +167,13 @@ export const Spot = z.object({
   file: z
     .object({
       url: z.string(),
-      /** A low-bitrate HLS preview while the spot is in review (added in 2026-09). */
+      /**
+       * An HLS preview (added in 2026-09). Since 2026-09-29 a short-cache playlist over the spot's
+       * prepared segments, once it's prepared: asked for when it goes to review, there after.
+       */
       previewUrl: z.string().nullable().optional(),
+      /** Added 2026-09-29: see `PreviewStatus` ("Being prepared" while `preparing`). */
+      previewStatus: PreviewStatus.nullable().optional(),
       durationMs: Millis,
       originalFilename: z.string().nullable(),
       checks: z.array(UploadCheck)
@@ -208,7 +214,11 @@ export const SpotPreview = z.object({
   /** The still's colour while there's no picture: the business's, derived from its id. */
   colour: z.string(),
   /** The line on the still: its on-screen offer, else its title. */
-  line: z.string().nullable()
+  line: z.string().nullable(),
+  /** Added 2026-09-29: an HLS preview over the spot's prepared segments, once it's prepared. */
+  previewUrl: z.string().nullable().optional(),
+  /** Added 2026-09-29: see `PreviewStatus`. */
+  previewStatus: PreviewStatus.nullable().optional()
 });
 
 /**
@@ -387,8 +397,13 @@ export const ProductionOrder = z.object({
       id: Id,
       version: z.number().int(),
       url: z.string(),
-      /** A low-bitrate HLS preview while the order is open (added in 2026-09). */
+      /**
+       * An HLS preview (added in 2026-09). Since 2026-09-29 a short-cache playlist over the
+       * delivery's prepared segments, once it's prepared (asked for when it's delivered).
+       */
       previewUrl: z.string().nullable().optional(),
+      /** Added 2026-09-29: see `PreviewStatus` ("Being prepared" while `preparing`). */
+      previewStatus: PreviewStatus.nullable().optional(),
       createdAt: Timestamp,
       /** P19 (added 2026-09-29): its length; left out when it couldn't be read (or was delivered before this). */
       durationMs: Millis.optional(),

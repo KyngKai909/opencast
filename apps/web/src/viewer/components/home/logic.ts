@@ -192,9 +192,9 @@ export function carriedWhere(where: { station: Ident & { id: string }; airing: A
   return { live: false, text: `Next on ${cs} at ${clock(where.airing.startsAt, { timeZone })}` };
 }
 
-/** "BEAT 12.1", or "RDLS 9.1, listed from the city’s stream". */
+/** "BEAT 12.1", or "RDLS 9.1, external, the city’s own stream". */
 export function upStationLine(station: Ident, listed: boolean): string {
-  return listed ? `${identText(station)}, listed from the city’s stream` : identText(station);
+  return listed ? `${identText(station)}, external, the city’s own stream` : identText(station);
 }
 
 /**

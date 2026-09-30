@@ -90,6 +90,26 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Closing a business with an order being made (P21) | `spots.closeBusiness` | refused (409 `order_in_progress`) until it's approved, or cancelled after its delivery date |
 | The Redeem tool's default (P12) | `Business.redeemOn` | on, except for online businesses |
 
+## Apps, hosting and sign-in (decided; recorded 2026-09-29)
+
+| Decision | What was decided | Where it lives |
+|---|---|---|
+| Where the four web apps are hosted | The user's decision: `apps/web` (viewer, master control and the desk), `apps/business`, `apps/tv` and `apps/site` are static builds deployed on Vercel, not Railway. Railway keeps the API and the worker | `docs/deploy.md` (to update in the cleanup step); `railway.json` and `nixpacks.toml` cover the API and worker only |
+| What `apps/tv` shares with the viewer | `apps/tv` depends on `packages/ui`, `packages/player` and `packages/contracts` only, never on `apps/web`'s viewer code. What the TV needs from the viewer is copied into `apps/tv` and kept to the TV's own frames (its mocks, its guide logic, its settings) | `apps/tv/package.json`; `apps/tv/src` |
+| Sign-in in `apps/business` | Business has its own copy of the auth layer (`apps/business/src/auth`), the same Privy app as `apps/web` with `createOnLogin` off. Signing in on one origin doesn't sign you in on the other yet: that needs Privy's session cookies (`privy-token`, which the API already reads) set on a shared parent domain, once the real domain exists (e.g. `app.<domain>` and `business.<domain>` under `<domain>`), with the Privy app's allowed origins and cookie domain set to match | `apps/business/src/auth/privyAuth.tsx`, `apps/web/src/auth/privyAuth.tsx`; `tokenFrom` in `apps/api/src/v1/auth.ts` |
+| When a creator gets a wallet | At the claim, not at sign-in (see the design conflict "Stop pays an unclaimed creator" below) | `creatorWallet` in `apps/web/src/auth/privyAuth.tsx`; `recordWallets` in `apps/api/src/v1/modules/accounts/service.ts` |
+
+## Invites and email (added 2026-09-29)
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| Whether accepting an invite made to an email needs that email on the signed-in account (a verified email sign-in, Google or Apple address, from Privy's linked accounts) | `INVITE_EMAIL_MATCH` (api; `deps.config.inviteEmailMatch`), `accounts.acceptInvite` | on: someone else is refused (403 `invite_email_mismatch`) and the invite's page offers "Sign in with another email". `off` lets anyone signed in with the link accept |
+| An invite by phone | `accounts.invite`, `accounts.acceptInvite` | nothing is sent (there's no text-message provider), and with no address to check, anyone signed in with the link can accept it |
+| The sending domain and address | `EMAIL_FROM` (api, worker) | **Open** until a domain is bought: Resend's test sender, which only reaches the Resend account's own email |
+| How often an invite's email can go again | `RESEND_GAP_MS` in `accounts/service.ts` | 10 minutes apart; each send extends the invite a week |
+
+The email provider is decided: Resend (the user's choice, 2026-09-29), through its HTTP API with no new dependency (`apps/api/src/v1/email.ts`).
+
 ## Built with a stand-in, to replace
 
 | What | Now | Replace with |
@@ -101,7 +121,7 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Midnight for daily caps | Los Angeles time | Each market's own time zone |
 | Carried episodes' slot length | Rounded up to the next half hour, which leaves the barter break | The maker's own slot length, if the designs want one |
 | Stations that take production orders | `takesOrders` on the station (studios always do) | Confirm with the design |
-| "Cached for air" on an item's history (L5) | Prepared, no claim on it, and on a log within 24 hours: the API can't see the worker's disk | The worker reporting what it holds (a table the cache sync writes) |
+| "Cached for air" on an item's history (L5) | Prepared in every rendition of its band, with no claim on it (read from `prepared_renditions`; there's no worker cache) | Nothing: settled by prepare once |
 | Live source quality and output bitrate (S14, G2) | Always null | The worker's feeds and muxer reporting resolution and bitrate |
 | Captions (L7) | Tracks are uploaded or edited (WebVTT, SRT converted); nothing generates them, and they aren't in the playout output | Speech-to-text, and a subtitle rendition in the HLS (X2) |
 | A spot's still colour on the market (P23) | Picked from eight colours by the business's id | A colour the business chooses, or a frame of the spot |
@@ -114,12 +134,12 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 
 | Question | Now | Proposal |
 |---|---|---|
-| Content IDs "in the IPFS CID format ... so any file can move to IPFS later without renaming" | Every object is keyed by a CIDv1 (raw codec, sha-256) of the whole file. That's a valid CID and dedupes exactly, but IPFS itself stores files over ~1 MB as chunked UnixFS, so pinning a video gives it a *different* CID (`bafybei…`) | Keep the raw CID as our key (it names the bytes; nothing renames). On publish, record the IPFS CID beside it (`contents.ipfs_cid`), as built. Say so in the Export to IPFS copy: "published as bafybei…" |
+| Content IDs "in the IPFS CID format ... so any file can move to IPFS later without renaming" | Every object is keyed by a CIDv1 (raw codec, sha-256) of the whole file. That's a valid CID and dedupes exactly, but IPFS itself stores a file over about 1 MiB (more than one block; the exact size is the IPFS node's chunker setting) as chunked UnixFS, so pinning a video gives it a *different* CID (`bafybei…`, dag-pb) that names the chunk tree, not the bytes | **Recorded 2026-09-29:** this is why `contents.ipfs_cid` is stored separately from the content ID. The raw CID stays our key (it names the bytes; nothing renames); on publish the IPFS CID is recorded beside it. `sha256FromCid` refuses anything but a raw sha-256 CIDv1, so an IPFS CID can never be read as a content ID. The Pinata move copies each pin under its raw CID and relinks the rows that used the pin. Say so in the Export to IPFS copy: "published as bafybei…" |
 | Which Pinata pins are catalog items | None yet: the catalog station has published nothing, and the migration keeps any `--keep <cid>` or `ipfs_reason = catalog` | Mark catalog pins before running `--unpin` |
 | Pins made through Pinata's legacy API | The old project's key is scoped to the v3 Files API; the legacy pin list answers 403, so only v3 files were counted (1 file, 0.1 GB) | Check the Pinata dashboard's total, or use an admin key, before unpinning |
 | R2 bucket | Decided: development stays on local disk (test uploads never reach a real bucket). No Cloudflare access is set up yet | Phase 7 creates `opencast-media-staging` and `opencast-media`, each with its own keys on api and worker only. At the production cutover, the pinned file is copied in (verified by hash) and unpinned after, since the old app still reads it from the gateway until then |
-| Proof frames and previews on R2's lifecycle rules | Previews are deleted by the API when their need ends | Also a bucket lifecycle rule on `previews/` (30 days) as a backstop |
-| Worker cache size | 100 GB volume, 90% used | Size from real libraries: 48 hours of 24/7 carriage at 2.5 Mbps is ~54 GB per station before deduplication |
+| Proof frames and previews on R2's lifecycle rules | Since 2026-09-29 previews play the prepared segments; the storage sweep deletes the old `previews/` renditions | A one-year lifecycle rule on `proof/`; none needed on `previews/` once the sweep has run |
+| Worker scratch space | There's no worker cache any more: items are prepared from object storage into scratch space and written back | A small volume (or the container's disk) for `WORKER_SCRATCH_DIR`: the largest original being prepared, its renditions, and translators' buffers |
 
 ## Playout, to settle in deploy (Phase 7)
 
@@ -142,4 +162,4 @@ Things that aren't decided yet. Each is built as configuration with a safe defau
 | Hosts go live on their blocks, but the browser source is "Owners and operators" only | Hosts get go-live on their assigned programs (`host_assignments`) |
 | A radio-band station is listed as a station "kind" in spot targeting | Band is its own field; categories stay categories |
 | The waitlist has four roles, Phase 4 lists three | All four: viewer, station, producer, business |
-| Stop pays an unclaimed creator "within a week", but they have no wallet until they sign in | The escrow pays Stop only to an approved creator wallet, after 72 hours in public. A creator signs in first (Privy makes the wallet), then the verifiers approve it |
+| Stop pays an unclaimed creator "within a week", but they have no wallet until they sign in | The escrow pays Stop only to an approved creator wallet, after 72 hours in public. Privy makes no wallet at sign-in (`createOnLogin` is off in the web and business apps, for everyone). Instead, when a signed-in creator claims (or stops) from the permission page's Claim now or master control's claim page, the page makes their Privy embedded wallet first with `createWallet` (unless they already have a wallet: one they signed in with, or one made before), and the claim then reads their wallets from Privy and records it on the account, where approving finds it (`walletOf`). Approving reads Privy again if nothing was recorded, and refuses with `no_wallet` only when there's still none. Updated 2026-09-29 (catch-up report, section 5) |

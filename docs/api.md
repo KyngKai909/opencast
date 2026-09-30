@@ -2,9 +2,9 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-264 endpoints in 14 modules.
+268 endpoints in 14 modules.
 
-## accounts (34)
+## accounts (35)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -32,8 +32,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `inviteToBusiness` | POST | `/businesses/:businessId/team/invites` | signed in | Invite a manager or viewer (owner only). An agency is a manager with a note. |
 | `updateBusinessMember` | PATCH | `/businesses/:businessId/team/:userId` | signed in | Change a member's role or note (owner only) |
 | `removeBusinessMember` | DELETE | `/businesses/:businessId/team/:userId` | signed in | Remove a member (owner only) |
-| `resendInvite` | POST | `/invites/:inviteId/resend` | signed in | Send an invite again and extend it a week |
-| `acceptInvite` | POST | `/invites/:inviteId/accept` | signed in | Join the team the invite is for |
+| `getInvite` | GET | `/invites/:inviteId` | anyone (personal if signed in) | Added 2026-09-29: an invite as its link's page shows it: the team, the role, the invited address masked, and whether it's open, expired or accepted. Signed in, it also says whether the account has the invited email. 404 for an unknown invite. |
+| `resendInvite` | POST | `/invites/:inviteId/resend` | signed in | Send an invite's email again and extend it a week (owner only). Changed 2026-09-29: it emails again. 429 `resend_too_soon` within 10 minutes of the last send; 409 `invite_used` once accepted; 502 `email_not_sent` when the email couldn't go (nothing changes). |
+| `acceptInvite` | POST | `/invites/:inviteId/accept` | signed in | Join the team the invite is for. Changed 2026-09-29: an invite to an email needs that email on the signed-in account (403 `invite_email_mismatch`; INVITE_EMAIL_MATCH=off turns the check off). 409 `invite_used` when someone else accepted it (accepting your own again changes nothing); 422 `invite_expired`. |
 | `signOutEverywhere` | POST | `/me/sign-out-everywhere` | signed in | A1: sign out every phone, computer and TV. Every Privy token issued before now, and every later token of a session seen before now, answers 401 `signed_out`; TVs signed in to the account are signed out and their phones dropped. This device signs out too. |
 | `getWatchHistory` | GET | `/me/watch-history` | signed in, or a TV signed in | A2: the last channel and the last 30 days of watching (empty while keepWatchHistory is off) |
 | `clearWatchHistory` | DELETE | `/me/watch-history` | signed in, or a TV signed in | A2: clear watch history and the last channel |
@@ -43,7 +44,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listOpencastTeam` | GET | `/admin/team` | Opencast admin | A6: the Opencast team (admins), who can run a claimable station |
 | `myStationStatus` | GET | `/me/stations/status` | signed in | A5: each station you're on: on air, and the next dead air within six hours, in the order of your memberships |
 
-## stations (29)
+## stations (32)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -66,6 +67,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `addTranslator` | POST | `/stations/:stationId/translators` | signed in | Add a relay |
 | `updateTranslator` | PATCH | `/stations/:stationId/translators/:translatorId` | signed in | Change a relay, including its break handling |
 | `removeTranslator` | DELETE | `/stations/:stationId/translators/:translatorId` | signed in | Remove a relay |
+| `getRelayBackground` | GET | `/stations/:stationId/relay-background` | signed in | The picture a radio station's translators air under its sound (owner, operator). Null: the generated picture in the station's colour |
+| `setRelayBackground` | PUT | `/stations/:stationId/relay-background` | signed in | Upload or replace a radio station's relay background (owner, operator): a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video up to 30 seconds (its sound is dropped), up to 100 MB. Prepared once into a loop at the relay's size (`status` `preparing`, then `ready`); relays that are on pick it up once it's ready. 409 `not_radio` (a TV station relays its own picture); 422 `wrong_file_type`, `too_big`, `too_long`, `unreadable_file`. |
+| `removeRelayBackground` | DELETE | `/stations/:stationId/relay-background` | signed in | Remove the relay background (owner, operator); relays go back to the picture in the station's colour |
 | `listLiveSources` | GET | `/stations/:stationId/live-sources` | signed in | Encoders and browser sources |
 | `addLiveSource` | POST | `/stations/:stationId/live-sources` | signed in | Add an encoder or browser source; an encoder's key is returned once |
 | `resetLiveSourceKey` | POST | `/stations/:stationId/live-sources/:sourceId/reset-key` | signed in | Reset an encoder's key; the old key stops working |

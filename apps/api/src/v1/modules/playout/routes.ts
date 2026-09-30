@@ -31,4 +31,18 @@ export function playoutRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return playout.asRun(params.stationId, new Date(query.from), new Date(query.to));
   });
+  // Previews (added 2026-09-29): a short-cache playlist over a file's prepared segments, for the
+  // catalog, spot review, the spot market and order deliveries. Public, like the segments it lists:
+  // it's found only through a preview URL, and a file locked by a claim or taken down has none.
+  r.router.get("/previews/:key/:file", async (req, res, next) => {
+    try {
+      const match = /^([a-z0-9]+)\.m3u8$/.exec(req.params.file);
+      const found = match ? await playout.previewPlaylist(req.params.key, match[1]) : null;
+      res.set({ "access-control-allow-origin": "*" });
+      if (!found) return void res.status(404).set({ "cache-control": "no-cache" }).json({ error: { code: "not_found", message: "There's no preview of that yet." } });
+      res.set({ "content-type": "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}` }).send(found.body);
+    } catch (error) {
+      next(error);
+    }
+  });
 }

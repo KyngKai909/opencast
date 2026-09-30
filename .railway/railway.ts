@@ -65,6 +65,13 @@ export default defineRailway((ctx) => {
     API_PUBLIC_URL: origin("api"),
     HLS_PUBLIC_URL: origin("worker"),
     APP_ORIGIN: production ? secret() : webOrigin("web"),
+    // Business invites and business notices' emails link to the business app.
+    BUSINESS_ORIGIN: production ? secret() : webOrigin("business"),
+    // Email through Resend (invites, notices). Unset key: emails only go to the log. The domain is
+    // Open until one is bought; until it's verified in Resend, EMAIL_FROM can be Resend's test sender.
+    RESEND_API_KEY: secret(),
+    EMAIL_FROM: secret(),
+    EMAIL_REPLY_TO: secret(),
     PAYMENTS_PROVIDER: production ? secret() : "fake",
     STRIPE_SECRET_KEY: secret(),
     STRIPE_WEBHOOK_SECRET: secret(),

@@ -2,7 +2,7 @@
 // "Invited Friday", "Sept 24", "5 people on Orange Street Coffee.", "Chase ending 8810. No fee".
 // Calendar days are counted in the market's time zone.
 
-import type { Business, FundingSource } from "@opencast/contracts";
+import type { Business, FundingSource, Market } from "@opencast/contracts";
 
 type T = string | number | Date;
 const ms = (t: T) => (t instanceof Date ? t.getTime() : typeof t === "number" ? t : Date.parse(t));
@@ -111,4 +111,21 @@ export function whereLine(b: Pick<Business, "category" | "customersWhere" | "loc
 /** The address as the field shows it: "204 Orange St, Redlands". */
 export function addressLine(l: { streetAddress: string | null; city: string }): string {
   return l.streetAddress ? `${l.streetAddress}, ${l.city}` : l.city;
+}
+
+/** "Inland Empire", "Inland Empire and High Desert", "Inland Empire, High Desert and Los Angeles", in the markets' order. */
+export function marketNames(ids: readonly string[], markets: readonly Pick<Market, "id" | "name">[]): string {
+  const names = markets.filter((m) => ids.includes(m.id)).map((m) => m.name);
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * The market a business is in, by name: an online business's first chosen market; otherwise the
+ * signed-in person's market (a location's market isn't stored on the business), else the first
+ * open one. Null until the markets are known.
+ */
+export function homeMarketName(b: Pick<Business, "customersWhere" | "marketIds">, markets: readonly Pick<Market, "id" | "name" | "open">[], mine?: Pick<Market, "id"> | null): string | null {
+  const byId = (id: string | undefined) => (id ? markets.find((m) => m.id === id) : undefined);
+  const m = byId(b.customersWhere === "online" ? b.marketIds[0] : undefined) ?? byId(mine?.id) ?? byId(b.marketIds[0]) ?? markets.find((x) => x.open);
+  return m?.name ?? null;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cadenceDetail, cadenceFromKey, cadenceKey, cadenceOf, cadenceOptions, cadenceWords, capCells, capMinutes, fillOrder, ladder, moveFill, placeFill, ruleLabel, spotMsPerBreak } from "./breakRule";
+import { cadenceDetail, cadenceFromKey, cadenceKey, cadenceOf, cadenceOptions, cadenceWords, capCells, capMinutes, fillOrder, ladder, ladderWithPartners, moveFill, placeFill, ruleLabel, spotMsPerBreak } from "./breakRule";
 
 describe("what fills every break (station-settings 02.1)", () => {
   it("keeps the bumper and the station ID last, whatever it's given", () => {
@@ -21,6 +21,19 @@ describe("what fills every break (station-settings 02.1)", () => {
     expect(placeFill(order, "BMP", 0)).toEqual(["SPT", "UND", "BMP", "SID"]);
     expect(placeFill(order, "SPT", 3)).toEqual(["UND", "SPT", "BMP", "SID"]);
     expect(placeFill(order, "UND", 0)).toEqual(["UND", "SPT", "BMP", "SID"]);
+  });
+
+  it("puts ads from partners at step 4 of 6, before the bumper out of the break, as the reference now draws it (A151)", () => {
+    const rows = ladderWithPartners({ lengthMs: 120_000, fillOrder: ["SPT", "UND", "BMP", "SID"], adsFromPartners: false });
+    expect(rows.map((r) => [r.n, r.code, r.title])).toEqual([
+      [1, "BMP", "A bumper into the break"],
+      [2, "SPT", "Spots from your rotation"],
+      [3, "UND", "Thank-you credit"],
+      [4, "SPT", "Ads from partners"],
+      [5, "BMP", "A bumper out of the break"],
+      [6, "SID", "Station ID"]
+    ]);
+    expect(rows[3]).toMatchObject({ partner: true, detail: "Off. Only time still open", time: "0:00 – 1:00" });
   });
 
   it("gives spots what the fixed parts leave of the break (a bumper at each end)", () => {

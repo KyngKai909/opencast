@@ -634,7 +634,7 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       await db.update(CR).set({ stage: "asked", remindedAt: null, nextAction: "Reminder", nextActionDue: new Date(deps.clock.now().getTime() + 7 * 86_400_000).toISOString().slice(0, 10) }).where(eq(CR.id, creatorId));
       const link = `${deps.config.appOrigin}/permission/${token}`;
       if (creator.contactEmail) {
-        await deps.notifier.email(creator.contactEmail, { title: `A station for ${creator.displayName}?`, body: input.note ?? "We'd like to put your work on a local station.", link });
+        await deps.notifier.email(creator.contactEmail, { title: `A station for ${creator.displayName}?`, body: input.note ?? "We'd like to put your work on a local station.", link, action: "Answer on the page", footer: "Opencast's team sent this about your work. Yes or no, one tap on the page.", kind: "desk" });
       }
       return { requestId: request.id, link, preview: await page(request) };
     },
@@ -673,7 +673,7 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
           .where(eq(CR.id, creator.id));
       });
       const copyTo = input.copyTo ?? creator.contactEmail;
-      if (copyTo) await deps.notifier.email(copyTo, { title: "A copy of your answer", body: input.answer === "yes" ? "You said yes. Here's the list of works." : "You said no thanks.", link: `${deps.config.appOrigin}/permission/${token}` });
+      if (copyTo) await deps.notifier.email(copyTo, { title: "A copy of your answer", body: input.answer === "yes" ? "You said yes. Here's the list of works." : "You said no thanks.", link: `${deps.config.appOrigin}/permission/${token}`, action: "See your answer", footer: "A copy of what you answered on Opencast's permission page.", kind: "desk" });
       return page(request);
     },
 
@@ -729,6 +729,9 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       // The link was sent to them, and they're signed in: the desk checks the rest before approving.
       await db.insert(HO).values({ stationId: creator.stationId, requestId: request.id, creatorId: creator.id, kind: "claim", claimantUserId: user.id, sourceAccountVerifiedAt: null, createdAt: deps.clock.now() });
       await db.update(CR).set({ nextAction: "Check the claim", nextActionDue: null }).where(eq(CR.id, creator.id));
+      // The claim page made their wallet in Privy just before (Privy makes none at sign-in): record it,
+      // so approving the claim finds where the escrow pays. Approving looks again if it's missing.
+      await services.accounts.recordWallets(user.id).catch(() => null);
       return page(request);
     },
 
@@ -748,7 +751,10 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         await deps.notifier.email(creator.contactEmail, {
           title: `Still thinking about a station for ${creator.displayName}?`,
           body: "A reminder about the station we'd like to put your work on. Yes or no, one tap on the page. This is the only reminder we'll send.",
-          link: `${deps.config.appOrigin}/permission/${request.linkToken}`
+          link: `${deps.config.appOrigin}/permission/${request.linkToken}`,
+          action: "Answer on the page",
+          footer: "Opencast's team sent this about your work.",
+          kind: "desk"
         });
       }
       return (await creatorViews([row]))[0];
@@ -776,7 +782,10 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
           kind === "invite"
             ? "Your station is on the air, run by Opencast for you. It's yours whenever you want it: claim it to run it yourself and receive what it's earned."
             : "Here's your claim link. Sign in, connect the account your work is on, and the station and what it's earned become yours.",
-        link
+        link,
+        action: kind === "invite" ? "See your station" : "Claim your station",
+        footer: "Opencast's team sent this about the station made from your work.",
+        kind: "desk"
       });
       const [row] = await db
         .update(CR)
@@ -917,6 +926,8 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
         .insert(HO)
         .values({ stationId, creatorId: creator.id, kind: input.kind, claimantUserId: user.id, sourceAccountVerifiedAt: null })
         .returning();
+      // As from the link: the wallet the claim page made is recorded now (a stop pays the creator too).
+      await services.accounts.recordWallets(user.id).catch(() => null);
       return { handoverId: row.id, status: "verifying", payableAfter: null };
     },
 
@@ -926,9 +937,10 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       if (!row.stationId) throw refused("no_station", "Set up their station first: the claim joins it, then it can be approved.");
       const stationId = row.stationId;
       const now = deps.clock.now();
-      // The escrow pays only the creator's own wallet, the one they signed in with.
-      const payee = row.claimantUserId ? await services.accounts.walletOf(row.claimantUserId) : null;
-      if (deps.chain && !payee) throw refused("no_wallet", "The creator needs to sign in first: their wallet is where the escrow pays.");
+      // The escrow pays only the creator's own wallet: the one they signed in with, or the one the
+      // claim page made for them (read from Privy again here if it wasn't recorded at the claim).
+      const payee = row.claimantUserId ? ((await services.accounts.walletOf(row.claimantUserId)) ?? (await services.accounts.recordWallets(row.claimantUserId))) : null;
+      if (deps.chain && !payee) throw refused("no_wallet", "The creator has no wallet yet. It's made when they claim, signed in: ask them to claim again from their link.");
       // The earliest it can be paid; with the contract live, the verifiers' approvals on-chain start the 72 hours.
       const payableAfter = new Date(now.getTime() + WAITING_PERIOD_MS);
       await db.update(HO).set({ approvedAt: now, sourceAccountVerifiedAt: row.sourceAccountVerifiedAt ?? now, payableAfter, payeeAddress: payee }).where(eq(HO.id, handoverId));

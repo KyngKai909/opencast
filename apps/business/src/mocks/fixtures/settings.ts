@@ -20,6 +20,8 @@ export type Role = DbMember["role"];
 export interface MockInvite extends Invite {
   businessId: string;
   note: string | null;
+  /** Who joined with it (the API's `accepted_by`). */
+  acceptedBy?: string | null;
 }
 
 export interface MockStatement {
@@ -128,6 +130,15 @@ export function checkInvite(email: string, businessId: string, members: DbMember
   if (waiting && Date.parse(waiting.expiresAt) > at.getTime())
     return { ok: false, status: 409, code: "already_invited", message: `${e} already has an invite waiting. Resend it from the list.` };
   return { ok: true, replaces: waiting ?? null };
+}
+
+/** An invite's email goes again at most this often (the API's rule). */
+export const RESEND_GAP_MS = 10 * 60_000;
+
+/** An invited address as the invite's page shows it: `s…@orangestreet.example`. */
+export function maskEmail(address: string): string {
+  const at = address.lastIndexOf("@");
+  return at <= 0 ? "…" : `${address.slice(0, 1)}…${address.slice(at)}`;
 }
 
 /** An invite lasts a week from when it's sent (or sent again). */
