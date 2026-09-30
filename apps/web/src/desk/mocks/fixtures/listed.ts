@@ -1,11 +1,12 @@
 // External stations (network-desk 05.1, reworked in follow-up Phase 6): the reference's six rows in
-// the Inland Empire. Redlands (the city's own player, embedding allowed), Colton (a public body's
-// stream link), San Bernardino County (its own player, no schedule found, down 14 minutes and off
-// the dial), NASA on 61.1 (a public stream link with checked guide data), the school district whose
-// terms are unclear, and Inland Community TV, a channel from an IPTV list waiting for its permission.
+// the Inland Empire. Redlands (the city's own player, embedding allowed), Colton (a stream link on
+// the city's written permission; the reference draws a public basis, A215), San Bernardino County
+// (its own player, no schedule found, down 14 minutes and off the dial), NASA on 61.1 (a public
+// stream link with checked guide data), the school district whose terms are unclear, and Inland
+// Community TV, a channel from an IPTV list waiting for its permission.
 // Times are the mock clock's: Saturday, September 26, 8:42:12 pm in the Inland Empire.
 
-import type { ExternalOutage, StreamPermission } from "@opencast/contracts";
+import type { CreatorStage, ExternalOutage, ListedChange, StreamPermission } from "@opencast/contracts";
 import { CREATOR_IDS, ICTV_STREAM } from "./creators";
 import { U } from "./ids";
 import { STATION_IDS } from "./stations";
@@ -38,10 +39,21 @@ export interface DbListed {
   creatorId: string | null;
   /** When the desk added it (a new listing is checked a minute later). */
   addedAt?: string;
+  // ---- A215 (2026-09-30): changing a listing, and taking it off for good ----
+  /** Taken off the dial for good (archived, never deleted): when, by whom, and where it was. */
+  removed?: { at: string; by: string | null; channel: string | null; band: "tv" | "radio" | null; marketId: string } | null;
+  /** Its change history, newest first. */
+  changes?: ListedChange[];
+  /** Written permissions recorded before that don't cover its address now (kept, never edited), newest first. */
+  earlierPermissions?: StreamPermission[];
+  /** Its lead's stage before this listing put it On air. */
+  leadStageBefore?: CreatorStage | null;
+  /** Call signs it had before a change (or has while it's off the dial), held for it. */
+  heldCallSigns?: string[];
 }
 
 /** The ids of the seed's listings, by call sign. */
-export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706) };
+export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706), LOMA: U(797) };
 
 /** The last minute's check, just before the mock clock's 8:42:12 pm. */
 const CHECKED = "2026-09-27T03:42:00.000Z";
@@ -75,9 +87,15 @@ export function seedListed(): DbListed[] {
       schedule: { source: "feed", format: "ical", checkedAgainst: null, checkedOn: null },
       health: { state: "up", since: "2026-09-20T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     }),
+    // A215: Colton's stream link plays on the City Clerk's written permission (the reference draws a
+    // public basis), so changing its address shows a listing waiting for new evidence.
     listing({
       id: LISTED_IDS.COLT, stationId: STATION_IDS.COLT, name: "City of Colton", description: "Council meetings", plays: "stream_link",
-      streamUrl: "https://colton.example.gov/live/council.m3u8", embedTerms: "unclear", publicBasis: "Public body, stream published for the public",
+      streamUrl: "https://colton.example.gov/live/council.m3u8", embedTerms: "unclear",
+      permission: {
+        id: U(7201), grantedBy: "Maria Lopez, City Clerk, City of Colton", grantedOn: "2026-09-24", evidence: "Email to network@opencast.tv, Sept 24", documentUrl: null,
+        streamUrl: "https://colton.example.gov/live/council.m3u8", recordedAt: "2026-09-24T17:10:00.000Z", recordedBy: "Dee A.", creatorId: null
+      },
       calendarUrl: "https://colton.example.gov/agenda/calendar.ics", calendarSync: "synced", lastSyncedAt: "2026-09-27T02:00:00.000Z", upcoming: 2,
       schedule: { source: "feed", format: "ical", checkedAgainst: null, checkedOn: null },
       health: { state: "up", since: "2026-09-26T02:12:00.000Z", lastCheckedAt: CHECKED, detail: null },
@@ -108,6 +126,13 @@ export function seedListed(): DbListed[] {
     listing({
       id: LISTED_IDS.ICTV, stationId: STATION_IDS.ICTV, name: "Inland Community TV", description: "A community channel's raw stream", plays: "stream_link",
       streamUrl: ICTV_STREAM, embedTerms: "unclear", creatorId: CREATOR_IDS.ictv
+    }),
+    // A201: a public-access channel's DASH stream link (.mpd), on the dial now that DASH stream
+    // links are played (Settings, external.dash_stream_links). A mock source, with no schedule.
+    listing({
+      id: LISTED_IDS.LOMA, stationId: STATION_IDS.LOMA, name: "Loma Linda Community Access", description: "Public access: commissions, the school board and community notices", plays: "stream_link",
+      streamUrl: "https://lomalinda.example.gov/live/manifest.mpd", embedTerms: "unclear", publicBasis: "Public access channel, stream published for the public",
+      health: { state: "up", since: "2026-09-26T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     })
   ];
 }

@@ -18,7 +18,7 @@ export function Picture({ w, swipe, className, children }: { w: WatchData; swipe
   const box = useRef<HTMLDivElement>(null);
   const from = s.pendingId ?? s.currentId;
   const heading = drag ? swipePreview(drag.dy, drag.dx) : null;
-  const next: DialRowX | null = heading ? neighbourOf(w.channels, from, heading) : null;
+  const next: DialRowX | null = heading ? neighbourOf(w.channels, from, heading, !w.engine.canPlayDash()) : null;
 
   const handlers = swipe
     ? {

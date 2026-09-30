@@ -60,7 +60,8 @@ describe("the board", () => {
     expect(tv.slots).toHaveLength(68);
     expect(radio.slots).toHaveLength(99);
     const slot = (b: typeof tv, major: number) => b.slots.find((s) => s.major === major)!;
-    expect(slot(tv, 9).stations.map((s) => s.callSign)).toEqual(["RDLS", "COLT", "SBCO"]);
+    // The frame's three city streams, and LOMA 9.7, a DASH stream link (A201).
+    expect(slot(tv, 9).stations.map((s) => s.callSign)).toEqual(["RDLS", "COLT", "SBCO", "LOMA"]);
     expect(slot(tv, 33)).toMatchObject({ state: "claimable", signOnAt: "2026-09-28T13:00:00.000Z", creatorId: LUPE });
     expect([slot(tv, 41).heldFor, slot(tv, 44).heldFor, slot(tv, 52).heldFor, slot(radio, 956).heldFor]).toEqual(["TACO", "SKAT", "HOOP", "GOSP"]);
     expect(slot(tv, 60).state).toBe("catalog");

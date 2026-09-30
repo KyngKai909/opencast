@@ -11,7 +11,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/v1/") || url.pathname.startsWith("/mock-hls/") || /\.(m3u8|ts|vtt)$/.test(url.pathname)) return;
+  if (url.pathname.startsWith("/v1/") || url.pathname.startsWith("/mock-hls/") || url.pathname.startsWith("/mock-dash/") || /\.(m3u8|ts|vtt|mpd|m4s)$/.test(url.pathname)) return;
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).catch(() => caches.match("/")));
     return;

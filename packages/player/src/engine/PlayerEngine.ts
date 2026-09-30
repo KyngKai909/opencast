@@ -21,6 +21,9 @@
 // - Picture quality (auto, data saver, best) and evening out the sound, settings on TV.
 // - AirPlay (Safari): offered while an AirPlay TV is around; the picture on screen plays on the TV
 //   by itself (the stream, not the phone's screen). Only the deck on screen is ever a candidate.
+// - DASH stream links (A201, dash.ts): dash.js, loaded only when one is tuned; never warmed. A
+//   device that can't play DASH skips those stations in the swipe order, and says so on one tuned
+//   directly (status "unplayable").
 //
 // Surfaces read its state (subscribe/getState) and send it commands (handle).
 
@@ -29,6 +32,7 @@ import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, SignedOffError, type WarmMode } from "./Deck";
 import { defaultDriver, nativeDriver, type MediaDriver, type Quality } from "./driver";
+import { dashSupport, defaultDashDriver, isDash, type DashSupport } from "./dash";
 import { AudioLevels } from "./meter";
 import { isLive, Prefetch, type Fetch } from "./playlist";
 import { onScreenKey, type OnScreen } from "./timeline";
@@ -43,9 +47,10 @@ export type CaptionSize = "small" | "medium" | "large";
 /**
  * `standby`: a channel change that got no picture in 8 s (the playlist, the network or the
  * browser), shown as Stand by with the colour bars; the player keeps trying and plays as soon as
- * a picture comes.
+ * a picture comes. `unplayable` (A201): a DASH stream link on a device that can't play DASH (an
+ * iPhone before iOS 17.1); it says so, and nothing loads.
  */
-export type Status = "idle" | "tuning" | "playing" | "paused" | "off_air" | "embed" | "standby" | "error" | "stopped";
+export type Status = "idle" | "tuning" | "playing" | "paused" | "off_air" | "embed" | "standby" | "unplayable" | "error" | "stopped";
 
 export interface TuneRecord {
   stationId: string;
@@ -120,6 +125,10 @@ export interface EngineOptions {
   onCommand?: (command: Command, source?: CommandSource) => void;
   /** AirPlay: the driver a picture on hls.js switches to (the browser's own HLS, by default). */
   airPlayDriver?: MediaDriver;
+  /** DASH stream links (A201): the driver (dash.js loaded on demand, or the browser's own DASH where it truly has it). */
+  dashDriver?: MediaDriver;
+  /** Whether this device can play DASH (detected by default). */
+  dashSupport?: () => DashSupport;
   /**
    * "Tuning sound": a soft hiss while changing channel, per band. On for the radio band and off for
    * video unless the viewer changes it. It plays only after the viewer has interacted, and not while muted.
@@ -192,7 +201,11 @@ export class PlayerEngine {
   private decks = new Map<string, Deck>();
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
-  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
+  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound" | "dashDriver" | "dashSupport">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
+  /** DASH (A201): made the first time a DASH station is tuned, so an HLS viewer never loads it. */
+  private dashDriver: MediaDriver | null;
+  private dashSupportFn: () => DashSupport;
+  private dashSupportNow: DashSupport | null = null;
   /** Changing channel: the static's timing, Stand by at 8 s, and the photosensitivity guard. */
   private change: ChannelChange;
   private hiss: Hiss;
@@ -247,6 +260,8 @@ export class PlayerEngine {
     };
     this.presets = options.presets ?? {};
     this.airPlayDriver = options.airPlayDriver ?? nativeDriver();
+    this.dashDriver = options.dashDriver ?? null;
+    this.dashSupportFn = options.dashSupport ?? dashSupport;
     this.audio.setEvenOut(this.o.eveningOut);
     this.hiss = new Hiss(() => this.audio.context());
     this.change = new ChannelChange({
@@ -394,6 +409,24 @@ export class PlayerEngine {
     return id ? this.state.channels.find((c) => c.station.id === id) : undefined;
   }
 
+  /** Whether this device can play DASH at all (asked once). */
+  canPlayDash(): boolean {
+    this.dashSupportNow ??= this.dashSupportFn();
+    return this.dashSupportNow !== "none";
+  }
+
+  /** The swipe order's options: DASH stations are skipped where they can't play (A226). */
+  private swipe(): NeighbourOptions {
+    return this.canPlayDash() ? this.o.neighbours : { ...this.o.neighbours, skipDash: true };
+  }
+
+  /** The driver for a station's picture: DASH through dash.js (made on first use), else HLS. */
+  private driverFor(c: Channel): MediaDriver {
+    if (!isDash(c)) return this.driver;
+    this.dashDriver ??= defaultDashDriver(this.dashSupportNow ?? this.dashSupportFn());
+    return this.dashDriver;
+  }
+
   private deckFor(c: Channel): Deck | null {
     if (!this.host || c.playback?.kind !== "hls") return null;
     let d = this.decks.get(c.station.id);
@@ -404,7 +437,7 @@ export class PlayerEngine {
         stationId: c.station.id,
         url: c.playback.url,
         host: this.host,
-        driver: this.driver,
+        driver: this.driverFor(c),
         quality: this.o.quality,
         start,
         fetch: this.fetch,
@@ -471,6 +504,11 @@ export class PlayerEngine {
       this.settle(stationId, previous, "embed");
       return this.endWithoutPicture(seq);
     }
+    if (isDash(c) && !this.canPlayDash()) {
+      // A DASH stream link on a device that can't play DASH: it says so, and nothing loads.
+      this.settle(stationId, previous, "unplayable");
+      return this.endWithoutPicture(seq);
+    }
     if (!this.host) {
       // The surface hasn't attached yet (its effect runs after the caller's): tune once it does.
       this.queuedTune = { stationId, source };
@@ -527,7 +565,7 @@ export class PlayerEngine {
   private lookFor(c: Channel, again: boolean): TuningLook {
     if (again) return "none";
     const covering = this.change.state;
-    const playable = c.onAir && c.playback?.kind === "hls";
+    const playable = c.onAir && c.playback?.kind === "hls" && (!isDash(c) || this.canPlayDash());
     if (!covering && !playable) return "none";
     const s = this.state.status;
     if (!this.state.currentId || s === "stopped" || s === "idle") return "none";
@@ -686,7 +724,8 @@ export class PlayerEngine {
     const keep = new Set<string>([currentId]);
     if (this.state.pendingId) keep.add(this.state.pendingId);
     const mode = this.o.warm;
-    const warmable = mode === "none" ? [] : neighbours(this.state.channels, currentId, this.o.neighbours).filter((n) => n.onAir && n.playback?.kind === "hls");
+    // A DASH neighbour is never warmed (A227): no dash.js, no manifest, until it's tuned.
+    const warmable = mode === "none" ? [] : neighbours(this.state.channels, currentId, this.swipe()).filter((n) => n.onAir && n.playback?.kind === "hls" && !isDash(n));
     if (mode === "buffer" || mode === "play") {
       for (const n of warmable) {
         keep.add(n.station.id);
@@ -805,7 +844,7 @@ export class PlayerEngine {
 
   channelStep(dir: "up" | "down", source?: CommandSource) {
     const from = this.state.pendingId ?? this.state.currentId;
-    const next = neighbour(this.state.channels, from, dir, this.o.neighbours);
+    const next = neighbour(this.state.channels, from, dir, this.swipe());
     if (next) void this.tune(next.station.id, source);
   }
 
@@ -977,6 +1016,8 @@ export class PlayerEngine {
   showAirPlayPicker(): boolean {
     const d = this.active();
     if (!d || d.role !== "active" || !this.host) return false;
+    // A DASH stream link has no HLS for the TV to fetch (A201): not offered.
+    if (isDash(this.channel(d.stationId))) return false;
     const deck = d.native && !this.audio.isRouted(d.video) ? d : this.nativeTwin(d);
     deck.setRemote(true);
     const v = deck.video as HTMLVideoElement & { webkitShowPlaybackTargetPicker?: () => void };

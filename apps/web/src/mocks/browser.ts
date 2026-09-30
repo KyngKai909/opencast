@@ -2,7 +2,7 @@ import { setupWorker } from "msw/browser";
 import { handlers } from "./handlers";
 import { setAccountState, type AccountState } from "../control/mocks/fixtures/account";
 import { stationByRef } from "../control/mocks/fixtures/stations";
-import { externalDown, externalUp } from "../viewer/mocks/external";
+import { externalDown, externalUp, setDashPlayed } from "../viewer/mocks/external";
 import { deskExternalDown, deskExternalUp } from "../desk/mocks/external";
 
 declare global {
@@ -13,6 +13,8 @@ declare global {
       /** External stations (follow-up Phase 6): a stream down since `minutesAgo` (5 or more: off the dial), or back. */
       externalDown(station: string, minutesAgo?: number): void;
       externalUp(station: string): void;
+      /** DASH stream links (A201): the rule played (the default) or not, for the viewer's dial. */
+      dashStreamLinks(played: boolean): void;
     };
   }
 }
@@ -38,6 +40,7 @@ export async function startMocks() {
   window.ocMock = {
     setAccountState: (station, state) => setAccountState(stationByRef(station)?.id ?? station, state),
     externalDown: (station, minutesAgo) => (quietly(() => externalDown(station, minutesAgo)), deskExternalDown(station, minutesAgo), changed()),
-    externalUp: (station) => (quietly(() => externalUp(station)), deskExternalUp(station), changed())
+    externalUp: (station) => (quietly(() => externalUp(station)), deskExternalUp(station), changed()),
+    dashStreamLinks: (played) => (setDashPlayed(played), changed())
   };
 }

@@ -4,7 +4,7 @@ import type { AiringX, DialRowX, StationIdentX } from "../api/ext";
 import { now } from "../../lib/clock";
 import { nowNext, toAiring, type MockAiring } from "./fixtures/schedule";
 import { MARKETS, playbackFor, stationById, type MockStation } from "./fixtures/stations";
-import { hiddenExternal } from "./external";
+import { offTheDial } from "./external";
 
 export function identX(s: MockStation): StationIdentX {
   return { ...s.ident, category: s.category };
@@ -28,7 +28,7 @@ export function rowOf(s: MockStation, nn: { now: MockAiring | null; next: MockAi
   if (s.external) {
     // An external station (follow-up Phase 6) is on while its stream is up: what's on is the
     // source's own schedule, or nothing named (the banner says Live and the source).
-    const up = !hiddenExternal(s.ident.id);
+    const up = !offTheDial(s.ident.id);
     return { station: identX(s), onAir: up, now: nn.now ? airingX(nn.now) : null, next: nn.next ? airingX(nn.next) : null, playback: up ? playbackFor(s) : null, external: s.external };
   }
   const planned = !!nn.now?.offAir;

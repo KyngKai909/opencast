@@ -8,7 +8,7 @@ import { syncStreamSignOff } from "../fixtures/signoff";
 import { inMarket } from "../fixtures/stations";
 import { fail, path, reply } from "../respond";
 import { airingX, identX, marketOf } from "../view";
-import { hiddenExternal } from "../external";
+import { offTheDial } from "../external";
 
 export const guideHandlers = [
   http.get(path(stationsApi.getGuide), async ({ params, request }) => {
@@ -24,7 +24,7 @@ export const guideHandlers = [
     if (Date.parse(to) - Date.parse(from) > 24 * 3600e3) return fail(400, "bad_request", "A guide window is at most 24 hours.");
     // External stations down 5 minutes are off the guide too (follow-up Phase 6).
     const rows = inMarket(slug, band)
-      .filter((s) => !hiddenExternal(s.ident.id))
+      .filter((s) => !offTheDial(s.ident.id))
       .map((s) => ({ station: identX(s), airings: inWindow(s.ident.id, from, to).map(airingX) }));
     return reply(GuideX, { market, from, to, rows });
   })

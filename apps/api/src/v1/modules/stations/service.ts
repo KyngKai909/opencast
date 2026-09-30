@@ -165,6 +165,14 @@ export interface StationsService {
   settleRelayBackgrounds(): Promise<void>;
   /** Used by Network desk to set up claimable, listed and catalog stations. */
   createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string }): Promise<string>;
+  /**
+   * A215 (added 2026-09-30): an external station's listing changed on Network desk: its name,
+   * description, call sign (the old one is the caller's to hold) or channel (the old channel row is
+   * released and a new one made: a channel is otherwise fixed after first sign-on). External stations only.
+   */
+  changeManaged(db: Executor, stationId: string, input: { name?: string; description?: string | null; callSign?: string; channel?: { marketId: string; band: Band; tenths: number } }): Promise<void>;
+  /** A215: a station's channel is let go (an external station taken off the dial, 90 days on). */
+  releaseChannel(db: Executor, stationId: string): Promise<void>;
 
   /** `reservationId` (added 2026-09-29): started from a waitlist invite, with the call sign and any channel held. */
   create(user: CurrentUser, input: { kind: "station" | "studio"; name: string; description?: string; colour?: string; handle?: string; reservationId?: string }): Promise<StationSetupView>;
@@ -736,6 +744,26 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         const streamKey = r.streamKey ?? (r.platformId ? sealed.get(r.platformId) : undefined);
         return streamKey ? [{ id: r.id, rtmpUrl: r.rtmpUrl, streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions, background }] : [];
       });
+    },
+
+    async changeManaged(tx, stationId, input) {
+      const [station] = await tx.select().from(S).where(eq(S.id, stationId));
+      if (!station) throw notFound("That station");
+      if (station.kind !== "listed") throw refused("not_external", "Only an external station's listing changes this way.");
+      const patch = {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.callSign !== undefined ? { callSign: input.callSign } : {})
+      };
+      if (Object.keys(patch).length) await tx.update(S).set({ ...patch, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
+      if (input.channel) {
+        await tx.update(C).set({ releasedAt: deps.clock.now() }).where(and(eq(C.stationId, stationId), eq(C.isPrimary, true), isNull(C.releasedAt)));
+        await tx.insert(C).values({ stationId, marketId: input.channel.marketId, band: input.channel.band, tenths: input.channel.tenths });
+      }
+    },
+
+    async releaseChannel(tx, stationId) {
+      await tx.update(C).set({ releasedAt: deps.clock.now() }).where(and(eq(C.stationId, stationId), isNull(C.releasedAt)));
     },
 
     async createManaged(tx, input) {

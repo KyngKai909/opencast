@@ -23,10 +23,10 @@ describe("coverage", () => {
   // Phase 6 added NASA on 61.1: four external stations on the board.
   it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.8", () => {
     const c = coverage(...boards());
-    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 4, catalog: 1, claimable: 3 });
+    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 8, listed: 5, catalog: 1, claimable: 3 });
     expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.8"]);
     expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.8");
-    expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 4 external city streams and the catalog station. 26 people on the waitlist here.");
+    expect(marketLine(c)).toBe("8 stations, 2 claimable stations on air, 5 external city streams and the catalog station. 26 people on the waitlist here.");
   });
 
   it("adds the bands' counts when the API sends no market-wide stats, and takes the TV band's share", () => {
@@ -48,7 +48,8 @@ describe("coverage", () => {
 describe("slots", () => {
   it("write their numbers as the board does", () => {
     const [tv, radio] = boards();
-    expect(slotNumber(tv.slots.find((s) => s.major === 9)!, "tv")).toBe("9.1–3");
+    // 9.1 to 9.3 in the frame, and LOMA 9.7 since A201.
+    expect(slotNumber(tv.slots.find((s) => s.major === 9)!, "tv")).toBe("9.1–7");
     expect(slotNumber(tv.slots.find((s) => s.major === 33)!, "tv")).toBe("33");
     expect(slotNumber(radio.slots.find((s) => s.major === 884)!, "radio")).toBe("88.4");
     expect(slotLabel(tv.slots.find((s) => s.major === 41)!, "tv")).toBe("Channel 41, TACO, Held for the waitlist");

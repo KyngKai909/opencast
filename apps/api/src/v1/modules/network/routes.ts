@@ -67,7 +67,7 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.approveHandover, ({ params }) => network.approveHandover(params.handoverId));
   r.handle(api.listListedSources, async ({ user, query }) => {
     await inMarket(user, query.marketId);
-    return network.listedSources(query.marketId);
+    return network.listedSources(query.marketId, query.show);
   });
   r.handle(api.addListedSource, ({ user, body }) => network.addListedSource(user, body));
   r.handle(api.syncListedSource, ({ params }) => network.syncListedSource(params.sourceId));
@@ -75,11 +75,19 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   // External stations (added 2026-09-30, follow-up Phase 6).
   r.handle(api.recordListedEvidence, ({ user, params, body }) => network.recordListedEvidence(user, params.sourceId, body));
   r.handle(api.listExternalOutages, async ({ user, params }) => {
-    const source = (await network.listedSources()).find((s) => s.id === params.sourceId);
-    if (!source) throw notFound("That external station");
-    if (!user.isAdmin) await inMarket(user, (await network.marketBySlug(source.station.marketSlug ?? ""))?.id ?? null);
+    const marketId = await network.listedSourceMarket(params.sourceId);
+    if (!user.isAdmin) await inMarket(user, marketId);
     return network.externalOutages(params.sourceId);
   });
+  // A215 (added 2026-09-30): changing a listing, its history, taking it off for good and putting it back.
+  r.handle(api.updateListedSource, ({ user, params, body }) => network.updateListedSource(user, params.sourceId, body));
+  r.handle(api.listListedChanges, async ({ user, params }) => {
+    const marketId = await network.listedSourceMarket(params.sourceId);
+    if (!user.isAdmin) await inMarket(user, marketId);
+    return network.listedChanges(params.sourceId, user.isAdmin);
+  });
+  r.handle(api.removeListedSource, ({ user, params }) => network.removeListedSource(user, params.sourceId));
+  r.handle(api.restoreListedSource, ({ user, params, body }) => network.restoreListedSource(user, params.sourceId, body));
   // IPTV lists are leads: anyone on the desk can read one; importing is for the market's lead or an admin.
   r.handle(api.previewIptvList, ({ body }) => network.previewIptvList(body));
   r.handle(api.importIptvLeads, async ({ user, body }) => {

@@ -17,8 +17,8 @@ export function WatchWeb({ w }: { w: WatchData }) {
   // Lit already when the page opens (the player bar had it): no second switch-on.
   const litAtOpen = useRef(w.playing);
   const from = s.pendingId ?? s.currentId;
-  const down = neighbourOf(w.channels, from, "down");
-  const up = neighbourOf(w.channels, from, "up");
+  const down = neighbourOf(w.channels, from, "down", !w.engine.canPlayDash());
+  const up = neighbourOf(w.channels, from, "up", !w.engine.canPlayDash());
   const onChannel = w.channels.find((c) => c.station.id === from);
   const lit = w.playing && !!onChannel?.onAir;
   const paused = s.status === "paused";

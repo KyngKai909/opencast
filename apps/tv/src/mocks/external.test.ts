@@ -69,9 +69,13 @@ describe("external stations on the TV's mock dial", () => {
     m.external.externalDown("COLT", 5);
     const rows = (await dial()).rows;
     expect(callSigns(rows)).not.toContain("COLT");
-    // The swipe order: down from BEAT is RDLS again.
+    // The swipe order: down from BEAT is LOMA 9.7 (the DASH stream link), then RDLS, skipping COLT;
+    // on a Chromecast (skipDash, A225) straight to RDLS.
     const beat = rows.find((r) => r.station.callSign === "BEAT")!;
-    expect(neighbour(rows, beat.station.id, "down")?.station.callSign).toBe("RDLS");
+    const loma = neighbour(rows, beat.station.id, "down")!;
+    expect(loma.station.callSign).toBe("LOMA");
+    expect(neighbour(rows, loma.station.id, "down")?.station.callSign).toBe("RDLS");
+    expect(neighbour(rows, beat.station.id, "down", { skipDash: true })?.station.callSign).toBe("RDLS");
     expect(callSigns((await guide()).rows)).not.toContain("COLT");
     expect(m.search.searchResults("council", "inland-empire").airings.map((a) => a.station.callSign)).not.toContain("COLT");
     expect(m.search.searchResults("9.2", "inland-empire").tuneTo).toBeNull();
@@ -84,6 +88,16 @@ describe("external stations on the TV's mock dial", () => {
     expect(callSigns((await dial()).rows)).toContain("COLT");
     expect(callSigns((await guide()).rows)).toContain("COLT");
     expect(m.station.stationPage("colt")).toMatchObject({ onAir: true, playback: { kind: "hls" }, external: { down: false } });
+  });
+
+  it("play a DASH stream link in Opencast's player while the rule says played (A201), and hold it off the dial otherwise", async () => {
+    const loma = (await dial()).rows.find((r) => r.station.callSign === "LOMA")!;
+    expect(loma).toMatchObject({ onAir: true, now: null, playback: { kind: "hls", format: "dash", url: "/mock-dash/loma/manifest.mpd" }, external: { plays: "stream_link", schedule: "none" } });
+    m.external.setDashPlayed(false);
+    expect(callSigns((await dial()).rows)).not.toContain("LOMA");
+    expect(callSigns((await guide()).rows)).not.toContain("LOMA");
+    m.external.setDashPlayed(true);
+    expect(callSigns((await dial()).rows)).toContain("LOMA");
   });
 
   it("aren't put down by the console unless they're external", () => {

@@ -354,7 +354,7 @@ that carried them.
 ## The API (`apps/api`)
 
 Express, Postgres (Drizzle; rules enforced by triggers) and Redis. `/v1` is built from
-`packages/contracts`: 343 endpoints in 22 modules, listed in [`docs/api.md`](./docs/api.md). How
+`packages/contracts`: 351 endpoints in 22 modules, listed in [`docs/api.md`](./docs/api.md). How
 it's put together — modules, roles, events, how money moves — is in
 [`docs/architecture.md`](./docs/architecture.md), and the schema in
 [`docs/schema.md`](./docs/schema.md).

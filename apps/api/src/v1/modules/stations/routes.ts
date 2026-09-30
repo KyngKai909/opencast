@@ -142,6 +142,11 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
 
   r.handle(api.getStation, async ({ params }) => {
     const profile = await stations.byRef(params.stationRef);
+    // A215: an external station taken off the dial for good is gone like a full station that signed
+    // off for good (not found), and says so.
+    if (profile && !profile.public && profile.kind === "listed" && profile.status === "signed_off") {
+      throw new HttpError(404, "not_found", `${[profile.ident.callSign, profile.ident.name].filter(Boolean).join(", ")} is no longer on the dial.`);
+    }
     if (!profile || !profile.public) throw notFound("That station");
     const external = profile.kind === "listed" ? (await network.externalDial([profile.id])).get(profile.id) : undefined;
     const [[row], programs, claimable, upcoming] = await Promise.all([

@@ -14,11 +14,15 @@
 //   request with a timeout, never a segment. Down 5 minutes, it leaves the dial, the guide and the
 //   swipe order until it's back; the Network desk hears both times (`external.station`).
 // - IPTV lists are leads: their channels go into the creator pipeline with the stream noted.
+// - A215: a listing can be changed (never onto the dial without evidence that covers what now
+//   plays: a written permission names one exact stream address, embed terms were checked for one
+//   player's host, a public basis is about the source) and taken off the dial for good (archived,
+//   like a full station that signs off for good), then put back. Every change is kept.
 
-import { and, asc, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import { isSubchannel, parseChannelNumber, type Band } from "@opencast/domain";
-import type { Creator, ExternalInfo, ExternalOutage, IptvChannel, ListedSource, StreamPermission } from "@opencast/contracts";
+import { formatChannelNumber, isSubchannel, parseChannelNumber, type Band } from "@opencast/domain";
+import type { Creator, CreatorStage, ExternalInfo, ExternalOutage, IptvChannel, ListedChange, ListedField, ListedSource, StreamPermission } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
@@ -38,6 +42,12 @@ const CHECKS_AT_ONCE = 8;
 /** An IPTV list read by its address: its size and patience. */
 const LIST_BYTES = 5_000_000;
 const LIST_TIMEOUT_MS = 15_000;
+/**
+ * A215: taken off the dial for good, a listing's channel stays held for it this long, then it's
+ * freed: the rule for a full station that signs off for good (docs/reference/control, station
+ * settings). Its call sign stays its own, held a year on the waitlist's side like one's.
+ */
+export const REMOVED_CHANNEL_HOLD_MS = 90 * 86_400_000;
 
 export type Fetch = typeof fetch;
 type Row = typeof LS.$inferSelect;
@@ -74,8 +84,10 @@ export interface ExternalDial {
   onDial: boolean;
   /** Off the dial because its stream is down (the station page says so). */
   down: boolean;
+  /** A215: taken off the dial for good (the station page answers 404, "no longer on the dial"). */
+  removed: boolean;
   info: ExternalInfo;
-  playback: { kind: "hls" | "embed"; url: string } | null;
+  playback: { kind: "hls" | "embed"; url: string; format?: "dash" } | null;
 }
 
 export interface ExternalCheckResult {
@@ -86,9 +98,34 @@ export interface ExternalCheckResult {
   back: number;
 }
 
+export interface UpdateListedInput {
+  name?: string;
+  description?: string | null;
+  streamUrl?: string;
+  plays?: "embed" | "stream_link";
+  embedTerms?: "allowed" | "unclear";
+  schedule?:
+    | { source: "feed"; calendarUrl: string; calendarFormat?: ScheduleFormat | null }
+    | { source: "guide_data"; calendarUrl: string; calendarFormat?: ScheduleFormat | null; guideData: { checkedAgainst: string; checkedOn: string } }
+    | { source: "none" };
+  channel?: string;
+  callSign?: string;
+}
+
 export interface ExternalPart {
-  listedSources(marketId?: string): Promise<ListedSource[]>;
+  /** `show` (A215): the listed ones (default), or the ones taken off the dial for good. */
+  listedSources(marketId?: string, show?: "listed" | "removed"): Promise<ListedSource[]>;
   addListedSource(user: CurrentUser | null, input: AddListedInput): Promise<ListedSource>;
+  /** A215: change a listing; never onto the dial without evidence that covers what now plays. */
+  updateListedSource(user: CurrentUser | null, sourceId: string, input: UpdateListedInput, fetchFn?: Fetch): Promise<ListedSource>;
+  /** A215: take a listing off the dial for good (archived, never deleted). */
+  removeListedSource(user: CurrentUser | null, sourceId: string): Promise<ListedSource>;
+  /** A215: put a listing taken off the dial back on the list, on its channel (or another). */
+  restoreListedSource(user: CurrentUser | null, sourceId: string, input?: { channel?: string }, fetchFn?: Fetch): Promise<ListedSource>;
+  /** A215: its change history, newest first; addresses in full for admins. */
+  listedChanges(sourceId: string, fullAddresses: boolean): Promise<ListedChange[]>;
+  /** The market a listing is (or was, when taken off the dial) in; 404 for no such listing. */
+  listedSourceMarket(sourceId: string): Promise<string | null>;
   recordListedEvidence(user: CurrentUser | null, sourceId: string, input: EvidenceInput & { embedTerms?: "allowed" | "unclear" }): Promise<ListedSource>;
   syncListedSource(sourceId: string, fetchFn?: Fetch): Promise<ListedSource>;
   externalOutages(sourceId: string): Promise<ExternalOutage[]>;
@@ -96,8 +133,8 @@ export interface ExternalPart {
   externalDial(stationIds: string[]): Promise<Map<string, ExternalDial>>;
   /** The worker's minute: every listing that could be on the dial, checked. */
   checkExternalStations(options?: { fetch?: Fetch }): Promise<ExternalCheckResult>;
-  /** Hourly: each listing's feed read again. */
-  syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number }>;
+  /** Hourly: each listing's feed read again, and (A215) the channels of listings taken off the dial 90 days ago freed. */
+  syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number }>;
   previewIptvList(input: { m3u?: string; url?: string }, fetchFn?: Fetch): Promise<{ listUrl: string | null; channels: Array<IptvChannel & { already: "lead" | "external" | null }>; skipped: number }>;
   importIptvLeads(input: { marketId: string; listUrl?: string; channels: IptvChannel[] }): Promise<{ imported: Creator[]; skipped: number }>;
 }
@@ -107,6 +144,29 @@ const LA = schema.listedAirings;
 const SP = schema.streamPermissions;
 const OU = schema.externalOutages;
 const CR = schema.creators;
+const LC = schema.listedSourceChanges;
+
+/** An address's host, for a change history read by someone who isn't an admin: "https://colton.example.gov/…". */
+export function hostOnly(url: string | null): string | null {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}/…`;
+  } catch {
+    return "…";
+  }
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return url;
+  }
+};
+
+/** The fields whose values are addresses (shown in full to admins only). */
+const ADDRESS_FIELDS: ReadonlySet<ListedField> = new Set(["streamUrl", "calendarUrl", "guideCheckedAgainst"]);
 
 /** A stream link's format by its address (a DASH manifest is `.mpd`); a check can correct it. */
 export function streamFormatOf(url: string): "hls" | "dash" {
@@ -243,29 +303,35 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         .from(LA)
         .where(and(inArray(LA.listedSourceId, ids), gte(LA.startsAt, deps.clock.now())))
         .groupBy(LA.listedSourceId),
-      permissionIds.length ? db.select().from(SP).where(inArray(SP.id, permissionIds)) : Promise.resolve([]),
+      // Its permission now, and (A215) the ones recorded for it before that no longer cover its address.
+      db
+        .select()
+        .from(SP)
+        .where(permissionIds.length ? or(inArray(SP.id, permissionIds), inArray(SP.listedSourceId, ids)) : inArray(SP.listedSourceId, ids))
+        .orderBy(desc(SP.recordedAt)),
       db.select().from(OU).where(inArray(OU.listedSourceId, ids)).orderBy(desc(OU.downSince)),
       rules()
     ]);
-    const recorders = await services.accounts.displayNames(permissions.map((p) => p.recordedBy).filter((v): v is string => !!v));
+    const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy)].filter((v): v is string => !!v));
+    const permissionView = (p: (typeof permissions)[number]): StreamPermission => ({
+      id: p.id,
+      grantedBy: p.grantedBy,
+      grantedOn: p.grantedOn,
+      evidence: p.evidence,
+      documentUrl: p.documentUrl,
+      streamUrl: p.streamUrl,
+      recordedAt: p.recordedAt.toISOString(),
+      recordedBy: p.recordedBy ? (names.get(p.recordedBy) ?? null) : null,
+      creatorId: p.creatorId
+    });
     return rows.flatMap((r) => {
       const station = idents.get(r.stationId);
       if (!station) return [];
-      const waiting = waitingFor(r, rule);
+      const removed = !!r.removedAt;
+      // Taken off the dial: nothing to wait for but being put back; what its evidence lacks still shows.
+      const waiting = waitingFor({ ...r, health: removed ? "unchecked" : r.health }, rule);
       const p = permissions.find((x) => x.id === r.streamPermissionId);
-      const permission: StreamPermission | null = p
-        ? {
-            id: p.id,
-            grantedBy: p.grantedBy,
-            grantedOn: p.grantedOn,
-            evidence: p.evidence,
-            documentUrl: p.documentUrl,
-            streamUrl: p.streamUrl,
-            recordedAt: p.recordedAt.toISOString(),
-            recordedBy: p.recordedBy ? (recorders.get(p.recordedBy) ?? null) : null,
-            creatorId: p.creatorId
-          }
-        : null;
+      const permission: StreamPermission | null = p ? permissionView(p) : null;
       const view: ListedSource = {
         id: r.id,
         station,
@@ -275,19 +341,29 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         embedTerms: r.embedTerms,
         calendarUrl: r.calendarUrl,
         calendarSync: r.calendarSync,
-        // "listed" while its evidence holds (on the dial, or off it only while it's down).
-        listingState: waiting === null || waiting === "down" ? "listed" : "checking",
+        // "listed" while its evidence holds (on the dial, or off it only while it's down); A215:
+        // "not_listed" once it's taken off the dial for good.
+        listingState: removed ? "not_listed" : waiting === null || waiting === "down" ? "listed" : "checking",
         lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
         upcoming: counts.find((c) => c.sourceId === r.id)?.n ?? 0,
         plays: r.plays,
         streamFormat: r.plays === "stream_link" ? (r.streamFormat ?? streamFormatOf(r.streamUrl)) : null,
         evidence: { basis: r.basis, termsUrl: r.termsUrl, termsCheckedOn: r.termsCheckedOn, publicBasis: r.publicBasis, permission, note: r.waitingNote },
         schedule: { source: r.scheduleSource, format: r.scheduleFormat, url: r.calendarUrl, checkedAgainst: r.guideCheckedAgainst, checkedOn: r.guideCheckedOn },
-        onDial: waiting === null,
+        onDial: !removed && waiting === null,
         waiting,
         health: { state: r.health, since: r.healthSince?.toISOString() ?? null, lastCheckedAt: r.lastCheckedAt?.toISOString() ?? null, detail: r.lastCheckDetail },
         outages: outages.filter((o) => o.listedSourceId === r.id).slice(0, 5).map(outageView),
-        creatorId: r.creatorId
+        creatorId: r.creatorId,
+        removed: r.removedAt
+          ? {
+              at: r.removedAt.toISOString(),
+              by: r.removedBy ? (names.get(r.removedBy) ?? null) : null,
+              channel: r.removedBand && r.removedTenths ? formatChannelNumber({ band: r.removedBand, tenths: r.removedTenths }) : null,
+              channelHeldUntil: new Date(r.removedAt.getTime() + REMOVED_CHANNEL_HOLD_MS).toISOString()
+            }
+          : null,
+        earlierPermissions: permissions.filter((x) => x.listedSourceId === r.id && x.id !== r.streamPermissionId).map(permissionView)
       };
       return [view];
     });
@@ -298,13 +374,15 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     downSince: o.downSince.toISOString(),
     hiddenAt: o.hiddenAt?.toISOString() ?? null,
     backAt: o.backAt?.toISOString() ?? null,
-    detail: o.detail
+    detail: o.detail,
+    // A215: said only when it didn't end with the stream back.
+    ...(o.ended ? { ended: o.ended } : {})
   });
 
   const one = async (sourceId: string) => (await views(await db.select().from(LS).where(eq(LS.id, sourceId))))[0];
 
   /** The same channel rules as a full station, with room for more external stations in one major (9.1, 9.2, 9.3). */
-  async function checkChannel(marketId: string, band: Band, channel: string) {
+  async function checkChannel(marketId: string, band: Band, channel: string, exceptStationId?: string) {
     const number = parseChannelNumber(band, channel);
     if (!number) throw badRequest(band === "tv" ? "TV channels run from 2.1 to 69.9." : "Radio runs from 88.2 to 107.8, in even tenths.", { channel: "Out of range" });
     if (!(await services.network.marketsByIds([marketId])).size) throw notFound("That market");
@@ -314,7 +392,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         ? Math.floor(number.tenths / 10) < range.tv.firstMajor || Math.floor(number.tenths / 10) > range.tv.lastMajor
         : number.tenths < range.radio.firstTenths || number.tenths > range.radio.lastTenths;
     if (outside) throw refused("outside_numbering", `${band === "tv" ? `TV channels here run from ${range.tv.firstMajor}.1 to ${range.tv.lastMajor}.9.` : `Radio here runs from ${(range.radio.firstTenths / 10).toFixed(1)} to ${(range.radio.lastTenths / 10).toFixed(1)}.`} Choose a number in the market's range.`);
-    const [here, held] = await Promise.all([services.stations.inMarkets([marketId]), services.waitlist.heldChannels(marketId, band)]);
+    const [all, held] = await Promise.all([services.stations.inMarkets([marketId]), services.waitlist.heldChannels(marketId, band)]);
+    // A215: a listing changing its own channel (or put back on it) doesn't count against itself.
+    const here = all.filter((s) => s.id !== exceptStationId);
     const major = (t: number) => (band === "tv" ? Math.floor(t / 10) : t);
     const sameMajor = here.filter((s) => s.ident.band === band && s.ident.channel && major(Math.round(Number(s.ident.channel) * 10)) === major(number.tenths));
     const taken = sameMajor.some((s) => s.ident.channel === channel || s.kind !== "listed") || held.some((h) => major(h.tenths) === major(number.tenths));
@@ -324,10 +404,11 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     return number;
   }
 
-  async function checkCallSign(callSign: string) {
-    // The same rules as a full station's: names Opencast won't allow, then taken or held.
+  async function checkCallSign(callSign: string, forStationId?: string) {
+    // The same rules as a full station's: names Opencast won't allow, then taken or held (A215: one
+    // held for this station, its old one, is its own to take back).
     await services.waitlist.requireAllowed(callSign);
-    if (!(await services.waitlist.isAvailable(callSign))) throw conflict("call_sign_taken", `${callSign} is taken or held. Try another.`);
+    if (!(await services.waitlist.isAvailable(callSign, forStationId))) throw conflict("call_sign_taken", `${callSign} is taken or held. Try another.`);
   }
 
   function checkEvidence(plays: "embed" | "stream_link", input: { embedTerms?: "allowed" | "unclear"; evidence?: EvidenceInput }) {
@@ -335,12 +416,33 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     if (input.evidence?.publicBasis && plays !== "stream_link") throw badRequest("A public basis is for stream links. An embed needs its terms page.", { publicBasis: "Stream links only" });
   }
 
-  async function recordPermission(tx: Executor, user: CurrentUser | null, streamUrl: string, creatorId: string | null, p: NonNullable<EvidenceInput["permission"]>) {
+  async function recordPermission(tx: Executor, user: CurrentUser | null, streamUrl: string, creatorId: string | null, p: NonNullable<EvidenceInput["permission"]>, listedSourceId: string | null = null) {
     const [row] = await tx
       .insert(SP)
-      .values({ grantedBy: p.grantedBy.trim(), grantedOn: p.grantedOn, evidence: p.evidence.trim(), documentUrl: p.documentUrl ?? null, streamUrl, creatorId, recordedBy: user?.id ?? null, recordedAt: deps.clock.now() })
+      .values({ grantedBy: p.grantedBy.trim(), grantedOn: p.grantedOn, evidence: p.evidence.trim(), documentUrl: p.documentUrl ?? null, streamUrl, creatorId, recordedBy: user?.id ?? null, recordedAt: deps.clock.now(), listedSourceId })
       .returning({ id: SP.id });
     return row.id;
+  }
+
+  /** A215: one entry in a listing's change history. */
+  async function recordChange(tx: Executor, user: CurrentUser | null, sourceId: string, action: ListedChange["action"], fields: ListedChange["fields"], effects: ListedChange["effects"]) {
+    await tx.insert(LC).values({ listedSourceId: sourceId, at: deps.clock.now(), by: user?.id ?? null, action, fields, effects });
+  }
+
+  /** A215: an open outage ends without the stream being back (the address changed, or it's taken off). */
+  async function endOutage(tx: Executor, sourceId: string, ended: "address_changed" | "removed") {
+    await tx.update(OU).set({ backAt: deps.clock.now(), ended }).where(and(eq(OU.listedSourceId, sourceId), isNull(OU.backAt)));
+  }
+
+  const unchecked = { health: "unchecked" as const, healthSince: null, lastCheckedAt: null, lastCheckDetail: null };
+
+  /** A215: a lead's stage when its listing no longer has it On air: the one it had before, else Found. */
+  async function leadBack(tx: Executor, row: Row, nextAction: string | null) {
+    if (!row.creatorId) return;
+    const [lead] = await tx.select().from(CR).where(eq(CR.id, row.creatorId));
+    if (!lead) return;
+    const stage: CreatorStage = lead.stage === "on_air" ? (row.leadStageBefore ?? "found") : lead.stage;
+    await tx.update(CR).set({ stage, ...(nextAction !== null ? { stationId: null, nextAction, nextActionDue: null } : {}) }).where(eq(CR.id, lead.id));
   }
 
   async function notifyDesk(row: Row, step: "hidden" | "back", outage: { downSince: Date; hiddenAt: Date | null }) {
@@ -420,9 +522,15 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
   }
 
   const part: ExternalPart = {
-    async listedSources(marketId) {
-      const rows = await db.select().from(LS).orderBy(asc(LS.name));
+    async listedSources(marketId, show = "listed") {
+      const rows = await db
+        .select()
+        .from(LS)
+        .where(show === "removed" ? isNotNull(LS.removedAt) : isNull(LS.removedAt))
+        .orderBy(asc(LS.name));
       if (!marketId) return views(rows);
+      // Taken off the dial: the market it was in (its channel may have been freed since).
+      if (show === "removed") return views(rows.filter((r) => r.removedMarketId === marketId));
       const inMarket = new Set((await services.stations.inMarkets([marketId])).map((s) => s.id));
       return views(rows.filter((r) => inMarket.has(r.stationId)));
     },
@@ -434,7 +542,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       if (input.guideData && !input.calendarUrl) throw badRequest("Guide data needs its address as well as the schedule it was checked against.", { calendarUrl: "Required with guide data" });
       const creator = input.creatorId ? (await db.select().from(CR).where(eq(CR.id, input.creatorId)))[0] : null;
       if (input.creatorId && !creator) throw notFound("That lead");
-      if (creator && (await db.select({ id: LS.id }).from(LS).where(eq(LS.creatorId, creator.id))).length) throw conflict("already_external", `${creator.displayName} is already an external station.`);
+      // One listing on the list per lead (A215: one taken off the dial doesn't count; it stays archived).
+      if (creator && (await db.select({ id: LS.id }).from(LS).where(and(eq(LS.creatorId, creator.id), isNull(LS.removedAt)))).length) throw conflict("already_external", `${creator.displayName} is already an external station.`);
       const number = await checkChannel(input.marketId, input.band, input.channel);
       await checkCallSign(input.callSign);
       const outsideMarket = input.outsideMarket ?? false;
@@ -469,9 +578,11 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             guideCheckedAgainst: input.guideData?.checkedAgainst ?? null,
             guideCheckedOn: input.guideData?.checkedOn ?? null,
             creatorId: creator?.id ?? null,
+            leadStageBefore: creator?.stage ?? null,
             listingState: "listed"
           })
           .returning();
+        if (streamPermissionId) await tx.update(SP).set({ listedSourceId: row.id }).where(eq(SP.id, streamPermissionId));
         // The lead became this external station: On air once its evidence holds (recordListedEvidence
         // moves it then); until then it keeps its stage.
         if (creator) await tx.update(CR).set({ stationId, ...(basisFor(evidence) ? { stage: "on_air" as const } : {}), nextAction: null, nextActionDue: null }).where(eq(CR.id, creator.id));
@@ -487,7 +598,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       checkEvidence(row.plays, { evidence: input });
       if (input.permission && row.streamPermissionId) throw conflict("permission_recorded", "Their written permission is already recorded. It's never edited.");
       await db.transaction(async (tx) => {
-        const streamPermissionId = input.permission ? await recordPermission(tx, user, row.streamUrl, row.creatorId, input.permission) : row.streamPermissionId;
+        const streamPermissionId = input.permission ? await recordPermission(tx, user, row.streamUrl, row.creatorId, input.permission, row.id) : row.streamPermissionId;
         const next = {
           plays: row.plays,
           embedTerms: row.plays === "embed" ? (input.embedTerms ?? row.embedTerms) : row.embedTerms,
@@ -500,8 +611,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           .update(LS)
           .set({ ...next, basis: basisFor(next), ...(input.note !== undefined ? { waitingNote: input.note || null } : {}) })
           .where(eq(LS.id, sourceId));
-        // Its lead is On air once the evidence holds.
-        if (row.creatorId && basisFor(next)) await tx.update(CR).set({ stage: "on_air" }).where(eq(CR.id, row.creatorId));
+        // Its lead is On air once the evidence holds (not while the listing is taken off the dial).
+        if (row.creatorId && basisFor(next) && !row.removedAt) await tx.update(CR).set({ stage: "on_air" }).where(eq(CR.id, row.creatorId));
       });
       return one(sourceId);
     },
@@ -509,9 +620,235 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     async syncListedSource(sourceId, fetchFn = publicFetch) {
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That listed source");
+      if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
       if (!row.calendarUrl) throw refused("no_calendar", "Add the source's agenda calendar first.");
       await sync(row, fetchFn);
       return one(sourceId);
+    },
+
+    async updateListedSource(user, sourceId, input, fetchFn = publicFetch) {
+      const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
+      const profile = (await services.stations.profiles([row.stationId])).get(row.stationId);
+      if (!profile) throw notFound("That external station");
+      const ident = profile.ident;
+      const plays = input.plays ?? row.plays;
+      const streamUrl = input.streamUrl ?? row.streamUrl;
+      const addressChanged = streamUrl !== row.streamUrl;
+      const playsChanged = plays !== row.plays;
+      if (plays === "embed" && playsChanged && !input.embedTerms) throw badRequest("Say whether their terms allow embedding.", { embedTerms: "Required for an embed" });
+
+      // The evidence, never stretched to cover what it wasn't recorded for.
+      let embedTerms = row.embedTerms;
+      let termsCheckedOn = row.termsCheckedOn;
+      let publicBasis = row.publicBasis;
+      let streamPermissionId = row.streamPermissionId;
+      if (playsChanged) {
+        // A new way to play needs its own evidence: the old kind's is set aside (and kept in the history).
+        termsCheckedOn = null;
+        publicBasis = null;
+        streamPermissionId = null;
+        embedTerms = plays === "embed" ? input.embedTerms! : "unclear";
+      } else if (plays === "embed") {
+        if (input.embedTerms) embedTerms = input.embedTerms;
+        // Their terms were checked for the old player: another host waits for them to be checked again.
+        if (addressChanged && hostOf(streamUrl) !== hostOf(row.streamUrl)) termsCheckedOn = null;
+      } else if (addressChanged) {
+        // A written permission names one exact address; one recorded before for this address covers it again.
+        const [covering] = await db
+          .select({ id: SP.id })
+          .from(SP)
+          .where(and(eq(SP.streamUrl, streamUrl), or(eq(SP.listedSourceId, row.id), row.streamPermissionId ? eq(SP.id, row.streamPermissionId) : sql`false`)))
+          .orderBy(desc(SP.recordedAt))
+          .limit(1);
+        streamPermissionId = covering?.id ?? null;
+        // A public basis is about the source, so it stays.
+      }
+      const evidence = { plays, embedTerms, termsUrl: row.termsUrl, termsCheckedOn, publicBasis, streamPermissionId };
+      const basis = basisFor(evidence);
+
+      // What's on.
+      const sc = input.schedule;
+      const format = sc && sc.source !== "none" ? sc.calendarFormat : undefined;
+      const schedule = sc
+        ? sc.source === "none"
+          ? { scheduleSource: "none" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null }
+          : {
+              scheduleSource: sc.source,
+              calendarUrl: sc.calendarUrl,
+              scheduleFormat: sc.calendarFormat ?? null,
+              guideCheckedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
+              guideCheckedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null
+            }
+        : null;
+      const scheduleChanged =
+        !!schedule &&
+        (schedule.scheduleSource !== row.scheduleSource ||
+          schedule.calendarUrl !== row.calendarUrl ||
+          (format !== undefined && schedule.scheduleFormat !== row.scheduleFormat) ||
+          schedule.guideCheckedAgainst !== row.guideCheckedAgainst ||
+          schedule.guideCheckedOn !== row.guideCheckedOn);
+
+      // Channel and call sign: the rules for listing.
+      const channel = input.channel && input.channel !== ident.channel ? input.channel : null;
+      const number = channel ? await checkChannel(profile.marketId ?? "", ident.band ?? "tv", channel, row.stationId) : null;
+      const callSign = input.callSign && input.callSign !== ident.callSign ? input.callSign : null;
+      if (callSign) await checkCallSign(callSign, row.stationId);
+
+      const name = input.name !== undefined && input.name.trim() !== row.name ? input.name.trim() : null;
+      const description = input.description !== undefined && (input.description?.trim() || null) !== row.description ? input.description?.trim() || null : undefined;
+
+      const fields: ListedChange["fields"] = [];
+      const note = (field: ListedField, from: string | null, to: string | null) => {
+        if (from !== to) fields.push({ field, from, to });
+      };
+      if (name) note("name", row.name, name);
+      if (description !== undefined) note("description", row.description, description);
+      note("plays", row.plays, plays);
+      note("streamUrl", row.streamUrl, streamUrl);
+      if (plays === "embed") note("embedTerms", row.embedTerms, embedTerms);
+      if (schedule && scheduleChanged) {
+        note("schedule", row.scheduleSource, schedule.scheduleSource);
+        note("calendarUrl", row.calendarUrl, schedule.calendarUrl);
+        if (format !== undefined) note("calendarFormat", row.scheduleFormat, schedule.scheduleFormat);
+        note("guideCheckedAgainst", row.guideCheckedAgainst, schedule.guideCheckedAgainst);
+        note("guideCheckedOn", row.guideCheckedOn, schedule.guideCheckedOn);
+      }
+      if (channel) note("channel", ident.channel, channel);
+      if (callSign) note("callSign", ident.callSign, callSign);
+      if (!fields.length) return one(sourceId);
+
+      const restart = addressChanged || playsChanged;
+      const effects: ListedChange["effects"] = [];
+      if (basisFor(row) && !basis) effects.push("waits_for_evidence");
+      if (restart) effects.push("checks_restart");
+      if (scheduleChanged && schedule?.calendarUrl) effects.push("schedule_reread");
+
+      await db.transaction(async (tx) => {
+        await tx
+          .update(LS)
+          .set({
+            ...(name ? { name } : {}),
+            ...(description !== undefined ? { description } : {}),
+            streamUrl,
+            ...evidence,
+            basis,
+            streamFormat: plays === "stream_link" ? (restart ? streamFormatOf(streamUrl) : (row.streamFormat ?? streamFormatOf(streamUrl))) : null,
+            ...(restart ? unchecked : {}),
+            ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const } : {})
+          })
+          .where(eq(LS.id, sourceId));
+        // A new address starts its health afresh: the old one's outage ends (kept in the history).
+        if (restart) await endOutage(tx, sourceId, "address_changed");
+        // The old feed's airings from now on go; the new feed is read below.
+        if (schedule && scheduleChanged) await tx.delete(LA).where(and(eq(LA.listedSourceId, sourceId), gte(LA.startsAt, deps.clock.now())));
+        if (name || description !== undefined || callSign || number) {
+          await services.stations.changeManaged(tx, row.stationId, {
+            ...(name ? { name } : {}),
+            ...(description !== undefined ? { description } : {}),
+            ...(callSign ? { callSign } : {}),
+            ...(number && profile.marketId && ident.band ? { channel: { marketId: profile.marketId, band: ident.band, tenths: number.tenths } } : {})
+          });
+        }
+        if (callSign) {
+          // The old call sign stays held for it (a year), and a held one it takes back is its own again.
+          await services.waitlist.releaseHeldFor(tx, { callSign, stationId: row.stationId });
+          if (ident.callSign) await services.waitlist.holdCallSign(tx, { callSign: ident.callSign, stationId: row.stationId });
+        }
+        // Its lead leaves On air while the listing waits for evidence (recording it puts the lead back).
+        if (effects.includes("waits_for_evidence")) await leadBack(tx, row, null);
+        await recordChange(tx, user, sourceId, "changed", fields, effects);
+      });
+      const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (effects.includes("schedule_reread") && after) await sync(after, fetchFn);
+      return one(sourceId);
+    },
+
+    async removeListedSource(user, sourceId) {
+      const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      if (row.removedAt) throw conflict("removed", `${row.name} is already off the dial.`);
+      const profile = (await services.stations.profiles([row.stationId])).get(row.stationId);
+      const tenths = profile?.ident.channel && profile.ident.band ? parseChannelNumber(profile.ident.band, profile.ident.channel)?.tenths : null;
+      await db.transaction(async (tx) => {
+        // Archived: its permissions, outages, changes, airings, watch data and lead link all stay.
+        await tx
+          .update(LS)
+          .set({ removedAt: deps.clock.now(), removedBy: user?.id ?? null, removedMarketId: profile?.marketId ?? null, removedBand: profile?.ident.band ?? null, removedTenths: tenths ?? null, channelReleasedAt: null, ...unchecked })
+          .where(eq(LS.id, sourceId));
+        await endOutage(tx, sourceId, "removed");
+        // Like a full station that signs off for good: not public (off the dial, the guide, search and
+        // the swipe order at once; its page is gone), its call sign held a year, its channel 90 days.
+        await services.stations.markSignedOff(tx, row.stationId, true);
+        if (profile?.ident.callSign) await services.waitlist.holdCallSign(tx, { callSign: profile.ident.callSign, stationId: row.stationId });
+        // Its lead is a lead again, at the stage it had before it went on air.
+        const was = [profile?.ident.channel, profile?.ident.callSign].filter(Boolean).join(" ");
+        await leadBack(tx, row, `Was external station ${was || row.name}. Taken off the dial`);
+        await recordChange(tx, user, sourceId, "removed", [], []);
+      });
+      return one(sourceId);
+    },
+
+    async restoreListedSource(user, sourceId, input = {}, fetchFn = publicFetch) {
+      const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      if (!row.removedAt) throw conflict("not_removed", `${row.name} is on the list.`);
+      if (row.creatorId && (await db.select({ id: LS.id }).from(LS).where(and(eq(LS.creatorId, row.creatorId), isNull(LS.removedAt)))).length) {
+        throw conflict("already_external", `Its lead is already another external station.`);
+      }
+      const profile = (await services.stations.profiles([row.stationId])).get(row.stationId);
+      if (!profile) throw notFound("That external station");
+      const marketId = profile.marketId ?? row.removedMarketId;
+      const band = profile.ident.band ?? row.removedBand;
+      if (!marketId || !band) throw conflict("channel_taken", "Its channel isn't known. Choose one.");
+      const old = row.removedTenths ? formatChannelNumber({ band, tenths: row.removedTenths }) : null;
+      const want = input.channel ?? profile.ident.channel ?? old;
+      if (!want) throw badRequest("Choose a channel.", { channel: "Required" });
+      // Still its own (held 90 days) unless another was asked for; after that, it has to be free.
+      const keep = !!profile.ident.channel && want === profile.ident.channel;
+      const number = keep ? null : await checkChannel(marketId, band, want, row.stationId);
+      const callSign = profile.ident.callSign;
+      if (callSign && !(await services.waitlist.isAvailable(callSign, row.stationId))) throw conflict("call_sign_taken", `${callSign} has gone to someone else.`);
+      await db.transaction(async (tx) => {
+        if (number) await services.stations.changeManaged(tx, row.stationId, { channel: { marketId, band, tenths: number.tenths } });
+        await services.stations.markSignedOn(tx, row.stationId);
+        if (callSign) await services.waitlist.releaseHeldFor(tx, { callSign, stationId: row.stationId });
+        const [lead] = row.creatorId ? await tx.select().from(CR).where(eq(CR.id, row.creatorId)) : [];
+        // Back as it was, waiting for its checks.
+        await tx
+          .update(LS)
+          .set({ removedAt: null, removedBy: null, removedMarketId: null, removedBand: null, removedTenths: null, channelReleasedAt: null, ...unchecked, ...(lead ? { leadStageBefore: lead.stage } : {}) })
+          .where(eq(LS.id, sourceId));
+        if (lead) await tx.update(CR).set({ stationId: row.stationId, nextAction: null, nextActionDue: null, ...(basisFor(row) ? { stage: "on_air" as const } : {}) }).where(eq(CR.id, lead.id));
+        await recordChange(tx, user, sourceId, "restored", number ? [{ field: "channel", from: old, to: want }] : [], []);
+      });
+      const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (after?.calendarUrl) await sync(after, fetchFn);
+      return one(sourceId);
+    },
+
+    async listedChanges(sourceId, fullAddresses) {
+      const rows = await db.select().from(LC).where(eq(LC.listedSourceId, sourceId)).orderBy(desc(LC.at), desc(LC.seq));
+      const names = await services.accounts.displayNames(rows.map((r) => r.by).filter((v): v is string => !!v));
+      return rows.map((r) => ({
+        id: r.id,
+        at: r.at.toISOString(),
+        by: r.by ? (names.get(r.by) ?? null) : null,
+        action: r.action,
+        fields: r.fields.map((f) => {
+          const field = f.field as ListedField;
+          const shown = (v: string | null) => (fullAddresses || !ADDRESS_FIELDS.has(field) ? v : hostOnly(v));
+          return { field, from: shown(f.from), to: shown(f.to) };
+        }),
+        effects: r.effects as ListedChange["effects"]
+      }));
+    },
+
+    async listedSourceMarket(sourceId) {
+      const [row] = await db.select({ stationId: LS.stationId, removedMarketId: LS.removedMarketId }).from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      return (await services.stations.profiles([row.stationId])).get(row.stationId)?.marketId ?? row.removedMarketId;
     },
 
     async externalOutages(sourceId) {
@@ -529,13 +866,16 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const [rows, rule] = await Promise.all([db.select().from(LS).where(inArray(LS.stationId, stationIds)), rules()]);
       return new Map(
         rows.map((r) => {
-          const waiting = waitingFor(r, rule);
+          // A215: taken off the dial for good, it's on none of it (the station page is gone too).
+          const waiting = r.removedAt ? "removed" : waitingFor(r, rule);
           const dial: ExternalDial = {
             onDial: waiting === null,
             down: waiting === "down",
+            removed: !!r.removedAt,
             info: { source: r.name, plays: r.plays, schedule: r.scheduleSource },
             // Straight from the source: its embed, or its stream link in Opencast's player.
-            playback: waiting === null ? { kind: r.plays === "embed" ? "embed" : "hls", url: r.streamUrl } : null
+            // A201: a DASH stream link says so (`format: "dash"`); apps before it try it as HLS and stand by.
+            playback: waiting === null ? { kind: r.plays === "embed" ? "embed" : "hls", url: r.streamUrl, ...(r.plays === "stream_link" && (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash" ? { format: "dash" as const } : {}) } : null
           };
           return [r.stationId, dial] as const;
         })
@@ -544,8 +884,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
 
     async checkExternalStations(options = {}) {
       const result: ExternalCheckResult = { checked: 0, up: 0, down: 0, hidden: 0, back: 0 };
-      const [rows, rule] = await Promise.all([db.select().from(LS), rules()]);
-      // Only listings that could be on the dial: evidence in place (a hidden one is still checked).
+      const [rows, rule] = await Promise.all([db.select().from(LS).where(isNull(LS.removedAt)), rules()]);
+      // Only listings that could be on the dial: evidence in place (a hidden one is still checked),
+      // and never one taken off the dial (A215).
       const due = rows.filter((r) => {
         const waiting = waitingFor(r, rule);
         return waiting === null || waiting === "down";
@@ -559,14 +900,26 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     },
 
     async syncExternalSchedules(options = {}) {
-      const rows = await db.select().from(LS).where(sql`${LS.calendarUrl} is not null`);
+      // A215: a listing taken off the dial isn't read any more.
+      const rows = await db.select().from(LS).where(and(isNotNull(LS.calendarUrl), isNull(LS.removedAt)));
       let synced = 0;
       let failed = 0;
       for (const row of rows) {
         if (await sync(row, options.fetch ?? publicFetch)) synced++;
         else failed++;
       }
-      return { synced, failed };
+      // A215: 90 days after a listing was taken off the dial its channel is freed, as a full station's is.
+      const due = await db
+        .select()
+        .from(LS)
+        .where(and(isNotNull(LS.removedAt), isNull(LS.channelReleasedAt), lte(LS.removedAt, new Date(deps.clock.now().getTime() - REMOVED_CHANNEL_HOLD_MS))));
+      for (const row of due) {
+        await db.transaction(async (tx) => {
+          await services.stations.releaseChannel(tx, row.stationId);
+          await tx.update(LS).set({ channelReleasedAt: deps.clock.now() }).where(eq(LS.id, row.id));
+        });
+      }
+      return { synced, failed, released: due.length };
     },
 
     async previewIptvList(input, fetchFn = publicFetch) {

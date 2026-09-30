@@ -67,6 +67,8 @@ export const overlapHandlers: HttpHandler[] = [
 
   http.get(path(stationsApi.getStation), async ({ request }) => {
     const v = await answerOf("viewer", stationsApi.getStation, request);
+    // A215: an external station the desk took off the dial for good is gone, whatever master control's mock knows.
+    if (v?.status === 404 && /no longer on the dial\.$/.test(String(((await json(v)).error as { message?: string } | undefined)?.message ?? ""))) return v;
     if (!found(v)) return (await answerOf("control", stationsApi.getStation, request)) ?? v ?? undefined;
     if (!v.ok) return v;
     const page = await json(v);

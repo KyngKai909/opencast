@@ -41,7 +41,8 @@ import { U } from "./fixtures/ids";
 import { getDb as deskDb, stationById } from "./db";
 
 export const SETTINGS_DB_KEY = "oc-mock-desk-settings";
-const VERSION = 1;
+// 2: A201's rule version (DASH stream links played).
+const VERSION = 2;
 const CATALOG = U(111);
 const FALLBACK_ID = "00000000-0000-4000-8000-000000000000";
 export const DEE_ID = U(900);
@@ -244,9 +245,12 @@ function seed(): SettingsDb {
   // High Desert grows into its numbers: TV 2 to 36 for now.
   rules.push({ id: U(7050), key: "numbering.channels", scope: HD.id, value: { tv: { firstMajor: 2, lastMajor: 36 }, radio: { firstTenths: 882, lastTenths: 1078 } }, effectiveFrom: "2026-09-01T00:00:00.000Z", setBy: DEE_ID, note: "Room to grow later", createdAt: "2026-08-30T17:00:00.000Z" });
   // Catalog sponsors (desk-pages 03): the catalog's credit priced from August.
+  // A201: DASH stream links played (decided 2026-09-30; the API gets the same version as a row).
+  rules.push({ id: U(7092), key: "external.dash_stream_links", scope: "", value: { played: true }, effectiveFrom: "2026-09-26T07:00:00.000Z", setBy: DEE_ID, note: "A201: played in Opencast's player (dash.js, loaded only when a DASH station is tuned)", createdAt: "2026-09-26T07:00:00.000Z" });
   rules.push({ id: U(7091), key: "catalog.sponsor_prices", scope: "", value: { seriesMonthlyMicros: 150_000_000, everySeriesMonthlyMicros: 400_000_000 }, effectiveFrom: "2026-08-01T00:00:00.000Z", setBy: DEE_ID, note: "Launch prices", createdAt: "2026-07-30T17:00:00.000Z" });
   const log: SettingsDb["log"] = [
     { id: U(7060), at: "2026-08-30T17:00:00.000Z", by: DEE_ID, kind: "rule", subject: "numbering.channels", scope: HD.id, summary: "Channel numbering (High Desert): TV 2 to 69, radio 88.2 to 107.8 to TV 2 to 36, radio 88.2 to 107.8", before: null, after: null, effectiveFrom: "2026-09-01T00:00:00.000Z", note: "Room to grow later" },
+    { id: U(7062), at: "2026-09-26T07:00:00.000Z", by: DEE_ID, kind: "rule", subject: "external.dash_stream_links", scope: "", summary: "DASH stream links: Not played yet to Played", before: { played: false }, after: { played: true }, effectiveFrom: "2026-09-26T07:00:00.000Z", note: "A201: played in Opencast's player (dash.js, loaded only when a DASH station is tuned)" },
     { id: U(7061), at: "2026-08-12T17:00:00.000Z", by: DEE_ID, kind: "role", subject: RAE_ID, scope: "", summary: "Made Rae T. a rights reviewer", before: null, after: null, effectiveFrom: null, note: null }
   ];
   return {

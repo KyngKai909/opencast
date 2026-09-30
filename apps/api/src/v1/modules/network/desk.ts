@@ -163,8 +163,8 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       services.playout.nextSignOn(stationIds),
       services.library.creatorWorkImports(stationIds),
       services.accounts.displayNames(rows.map((r) => r.operatorUserId).filter((v): v is string => Boolean(v))),
-      // Phase 6: the external station a lead became.
-      db.select({ id: LS.id, creatorId: LS.creatorId }).from(LS).where(inArray(LS.creatorId, ids))
+      // Phase 6: the external station a lead became (A215: not one taken off the dial; the lead is a lead again).
+      db.select({ id: LS.id, creatorId: LS.creatorId }).from(LS).where(and(inArray(LS.creatorId, ids), isNull(LS.removedAt)))
     ]);
     const dateOf = (list: Array<{ creatorId: string; at: Date | string | null }>, id: string) => {
       const at = list.find((x) => x.creatorId === id)?.at;
@@ -441,7 +441,15 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
           state,
           stations: here.map((s) => s.ident),
           heldFor: hold?.callSign ?? null,
-          status: first && !first.public ? (signOn ? `Signs on ${clockTime(signOn, market.timezone)} ${localDate(signOn, market.timezone)}` : "Setting up") : null,
+          // A215: an external station taken off the dial keeps its number 90 days, like a full station that signs off for good.
+          status:
+            first && !first.public
+              ? first.kind === "listed" && first.status === "signed_off"
+                ? "Taken off the dial"
+                : signOn
+                  ? `Signs on ${clockTime(signOn, market.timezone)} ${localDate(signOn, market.timezone)}`
+                  : "Setting up"
+              : null,
           signOnAt: notYet && signOn ? signOn.toISOString() : null,
           creatorId: state === "claimable" && first ? (creators.find((c) => c.stationId === first.id)?.id ?? null) : null
         };

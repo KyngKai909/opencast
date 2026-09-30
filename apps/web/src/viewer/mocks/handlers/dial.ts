@@ -11,7 +11,7 @@ import { carriedPick, homeAirings, homeNowNext } from "../fixtures/home";
 import { path, reply, fail } from "../respond";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { airingX, identX, marketOf, milesBetween, rowOf } from "../view";
-import { hiddenExternal } from "../external";
+import { offTheDial } from "../external";
 
 const THIN = 3; // Fewer stations than this and the dial shows the nearest market too.
 
@@ -50,7 +50,7 @@ export const dialHandlers = [
     const band = (new URL(request.url).searchParams.get("band") ?? "tv") as "tv" | "radio";
     const t = now();
     // External stations down 5 minutes are off the dial (follow-up Phase 6).
-    const onDial = (s: MockStation) => !hiddenExternal(s.ident.id, t);
+    const onDial = (s: MockStation) => !offTheDial(s.ident.id, t);
     const rows = inMarket(slug, band).filter(onDial).map((s) => dialRow(s, t));
     const all = inMarket(slug);
     const thin = all.length < THIN;

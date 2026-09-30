@@ -22,10 +22,16 @@ export interface NeighbourOptions {
   skipListed?: boolean;
   /** Keep to the current station's band (the default). */
   sameBand?: boolean;
+  /**
+   * Skip DASH stream links (A201): set by the engine where the device can't play DASH (A226: an iPhone
+   * before iOS 17.1), and by the Cast receiver (A225). They stay tunable by number and the guide.
+   */
+  skipDash?: boolean;
 }
 
 function eligible(c: Channel, current: Channel | undefined, o: NeighbourOptions): boolean {
   if (o.skipListed && c.playback?.kind === "embed") return false;
+  if (o.skipDash && c.playback?.format === "dash") return false;
   if ((o.sameBand ?? true) && current && c.station.band && current.station.band && c.station.band !== current.station.band) return false;
   return true;
 }

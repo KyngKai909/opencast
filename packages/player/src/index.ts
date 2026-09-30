@@ -7,6 +7,7 @@ export { readEntry, typeKey, noStationText, type NumberEntry } from "./numberEnt
 export { PlayerEngine, CAPTION_SCALE, captionLineFor, TUNING_SOUND_DEFAULTS, tuningSoundFrom, prefersReducedMotion, type TuningSound, type PlayerState, type EngineOptions, type CaptionMode, type CaptionSize, type Status, type TuneRecord } from "./engine/PlayerEngine";
 export { Deck, SignedOffError, type WarmMode, type DeckWarmMode, type DeckState } from "./engine/Deck";
 export { defaultDriver, hlsDriver, nativeDriver, JOIN_CONFIG, type MediaDriver, type MediaHandle, type AttachOptions, type PlaylistInfo, type Quality } from "./engine/driver";
+export { dashSupport, dashJsDriver, nativeDashDriver, defaultDashDriver, loadDashJs, dashJsLoads, dashAbr, isDash, DASH_EVENTS, type DashSupport, type DashAbr, type DashPlayer, type DashJsModule } from "./engine/dash";
 export { onScreenAt, mergeRanges, signOffIn, CODE_SECONDS, type OnScreen } from "./engine/timeline";
 export { Prefetch, loadMedia, isLive, mediaPlaylist, variants, pictureVariants, startVariant, syncSegment, type Fetch, type MediaPlaylist, type Variant } from "./engine/playlist";
 export * as tuningTimes from "./tuning/constants";

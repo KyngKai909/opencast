@@ -12,8 +12,8 @@ export interface MockStation {
   members?: number;
   onDialSince?: string;
   hours?: string;
-  /** Which mock stream plays it (packages/player/mock), or an embed for a listed city stream. */
-  stream: { kind: "hls"; slug: string } | { kind: "embed"; url: string } | null;
+  /** Which mock stream plays it (packages/player/mock), or an embed for a listed city stream. `dash`: a DASH stream link (A201, live-dash.mjs). */
+  stream: { kind: "hls"; slug: string } | { kind: "dash"; slug: string } | { kind: "embed"; url: string } | null;
   /** An external station (follow-up Phase 6): whose stream it is, how it plays, where its schedule comes from. */
   external?: ExternalInfo;
 }
@@ -35,6 +35,9 @@ export const STATIONS: MockStation[] = [
   station(9, "RDLS", "9.1", "Redlands Public Access", "#4F5B2A", "tv", IE, { category: "Public affairs", description: "The City of Redlands' own channel.", stream: { kind: "embed", url: "/mock-embed/rdls.html" }, external: { source: "City of Redlands", plays: "embed", schedule: "feed" } }, "listed"),
   // An external station's stream link (follow-up Phase 6): the city's own HLS, played in Opencast's player (packages/player/mock's "colt").
   station(92, "COLT", "9.2", "City of Colton", "#3F5A6E", "tv", IE, { category: "Public affairs", description: "Colton's council meetings, from the city's own stream.", stream: { kind: "hls", slug: "colt" }, external: { source: "City of Colton", plays: "stream_link", schedule: "feed" } }, "listed", "Colton"),
+  // A DASH stream link (A201): a public-access channel's own DASH, played in Opencast's player
+  // (packages/player/mock's "loma", served live by live-dash.mjs). A mock station, with no schedule.
+  station(97, "LOMA", "9.7", "Loma Linda Community Access", "#5A4E7A", "tv", IE, { category: "Public affairs", description: "Public access from Loma Linda: commissions, the school board and community notices.", stream: { kind: "dash", slug: "loma" }, external: { source: "Loma Linda Community Access", plays: "stream_link", schedule: "none" } }, "listed", "Loma Linda"),
   station(12, "BEAT", "12.1", "Inland Beat", "#8C3B7A", "tv", IE, { category: "Music", description: "Beat makers, crate diggers and the Inland Empire's producers.", about: "Inland Beat is run by a collective of producers in Redlands. Live from the studio on Saturdays.", members: 214, onDialSince: "2026-07-18", hours: "On air all day.", stream: { kind: "hls", slug: "beat" } }),
   station(18, "SAZN", "18.1", "Sazón", "#A3402A", "tv", IE, { category: "Food", description: "Home cooking from Inland Empire kitchens.", members: 96, stream: { kind: "hls", slug: "sazn" } }, "station", "Fontana"),
   station(24, "REEL", "24.1", "Saturday Reel", "#9A5412", "tv", IE, { category: "Classic", description: "Restored public-domain films, cartoons and newsreels.", members: 301, stream: { kind: "hls", slug: "reel" } }, "station", "Riverside"),
@@ -80,6 +83,7 @@ export function inMarket(slug: string, band?: "tv" | "radio"): MockStation[] {
 
 export function playbackFor(s: MockStation) {
   if (!s.stream) return null;
+  if (s.stream.kind === "dash") return { kind: "hls" as const, url: `/mock-dash/${s.stream.slug}/manifest.mpd`, format: "dash" as const };
   return s.stream.kind === "hls" ? { kind: "hls" as const, url: `/mock-hls/${s.stream.slug}/master.m3u8` } : { kind: "embed" as const, url: s.stream.url };
 }
 

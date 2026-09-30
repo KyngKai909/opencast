@@ -25,7 +25,15 @@ export interface WaitlistService {
   claimCallSign(db: Executor, input: { callSign: string; stationId: string; userId: string }): Promise<void>;
   /** After signing off for good: the call sign stays held for the station for a year. */
   holdAfterSignOff(stationId: string): Promise<void>;
-  isAvailable(callSign: string): Promise<boolean>;
+  /**
+   * A215 (added 2026-09-30): the same hold, inside a transaction, for a call sign a station lets go
+   * (an external station taken off the dial, or its call sign changed): a year, for that station.
+   */
+  holdCallSign(db: Executor, input: { callSign: string; stationId: string }): Promise<Date>;
+  /** A215: the station has its call sign again (an external station put back, or given its old one back): its hold is done. */
+  releaseHeldFor(db: Executor, input: { callSign: string; stationId: string }): Promise<void>;
+  /** `forStationId` (added 2026-09-30): a name held for that station, or its own, counts as available to it. */
+  isAvailable(callSign: string, forStationId?: string): Promise<boolean>;
   countInMarket(marketId: string): Promise<number>;
   join(input: { role: Role; email: string; zip: string; callSign?: string; name?: string; about?: string }): Promise<{ role: Role; market: Market | null; message: string; heldCallSign: string | null }>;
   reservations(marketId?: string): Promise<Reservation[]>;
@@ -266,11 +274,29 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       });
     },
 
-    async isAvailable(callSign) {
+    async holdCallSign(tx, { callSign, stationId }) {
+      const until = new Date(deps.clock.now().getTime() + YEAR);
+      await tx
+        .update(R)
+        .set({ releasedAt: deps.clock.now(), releaseReason: "replaced" })
+        .where(and(eq(R.callSign, callSign), isNull(R.releasedAt)));
+      await tx.insert(R).values({ callSign, stationId, reason: "signed_off", heldUntil: until });
+      return until;
+    },
+
+    async releaseHeldFor(tx, { callSign, stationId }) {
+      await tx
+        .update(R)
+        .set({ releasedAt: deps.clock.now(), releaseReason: "signed_on" })
+        .where(and(eq(R.callSign, callSign), eq(R.stationId, stationId), isNull(R.releasedAt)));
+    },
+
+    async isAvailable(callSign, forStationId) {
       if (!isValidCallSign(callSign)) return false;
-      const [held] = await db.select({ id: R.id }).from(R).where(and(eq(R.callSign, callSign), isNull(R.releasedAt)));
-      if (held) return false;
-      return !(await services.stations.byRef(callSign));
+      const held = await db.select({ stationId: R.stationId }).from(R).where(and(eq(R.callSign, callSign), isNull(R.releasedAt)));
+      if (held.some((h) => !forStationId || h.stationId !== forStationId)) return false;
+      const station = await services.stations.byRef(callSign);
+      return !station || (!!forStationId && station.id === forStationId);
     },
 
     async countInMarket(marketId) {

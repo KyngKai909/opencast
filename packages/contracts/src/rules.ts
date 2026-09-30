@@ -310,7 +310,7 @@ export const RULES = {
   "external.dash_stream_links": def({
     group: "external",
     title: "DASH stream links",
-    detail: "Opencast's player plays HLS everywhere. DASH needs a player library on the web and some TVs. Off: a DASH-only stream link is saved but waits, and the source's official embed or HLS address is listed instead",
+    detail: "Played: a DASH stream link plays in Opencast's player, which loads its DASH library only when one is tuned; a device that can't play DASH skips it. Not played: a DASH-only stream link is saved but waits, and the source's official embed or HLS address is listed instead",
     schema: z.object({ played: z.boolean() }),
     fallback: { played: false },
     display: (v) => (v.played ? "Played" : "Not played yet")

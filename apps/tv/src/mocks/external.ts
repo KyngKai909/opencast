@@ -5,7 +5,7 @@
 // keeps it; the dial reads it on each request.
 
 import { now } from "../lib/clock";
-import { stationByRef } from "./fixtures/stations";
+import { stationById, stationByRef } from "./fixtures/stations";
 
 const KEY = "oc-mock-external-down";
 /** Down this long, off the dial (the API's DOWN_AFTER_MS). */
@@ -33,8 +33,33 @@ export function downSince(stationId: string): Date | null {
   return at ? new Date(at) : null;
 }
 
-/** Off the dial: down 5 minutes or more. */
+const DASH_KEY = "oc-mock-dash-stream-links";
+
+/**
+ * The rule `external.dash_stream_links` (A201) in mock mode: played, as decided on 2026-09-30.
+ * `ocMock.dashStreamLinks(false)` holds DASH stream links (LOMA) off the dial, as the rule's old
+ * default did; `ocMock.dashStreamLinks(true)` puts them back. Kept in localStorage.
+ */
+export function dashPlayed(): boolean {
+  try {
+    return localStorage.getItem(DASH_KEY) !== "not_played";
+  } catch {
+    return true;
+  }
+}
+
+export function setDashPlayed(played: boolean) {
+  try {
+    if (played) localStorage.removeItem(DASH_KEY);
+    else localStorage.setItem(DASH_KEY, "not_played");
+  } catch {
+    // Private mode.
+  }
+}
+
+/** Off the dial: down 5 minutes or more (or a DASH stream link while the rule says not played). */
 export function hiddenExternal(stationId: string, t: Date = now()): boolean {
+  if (stationById(stationId)?.stream?.kind === "dash" && !dashPlayed()) return true;
   const since = downSince(stationId);
   return !!since && t.getTime() - since.getTime() >= DOWN_AFTER_MS;
 }

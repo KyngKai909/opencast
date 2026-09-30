@@ -1,6 +1,6 @@
 import { setupWorker } from "msw/browser";
 import { handlers } from "./handlers";
-import { externalDown, externalUp } from "./external";
+import { externalDown, externalUp, setDashPlayed } from "./external";
 
 declare global {
   interface Window {
@@ -9,6 +9,8 @@ declare global {
       /** External stations (follow-up Phase 6): a stream down since `minutesAgo` (5 or more: off the dial), or back. */
       externalDown(station: string, minutesAgo?: number): void;
       externalUp(station: string): void;
+      /** DASH stream links (A201): the rule played (the default) or not. */
+      dashStreamLinks(played: boolean): void;
     };
   }
 }
@@ -23,6 +25,7 @@ export async function startMocks() {
   window.ocMock = {
     ...window.ocMock,
     externalDown: (station, minutesAgo) => (externalDown(station, minutesAgo), changed()),
-    externalUp: (station) => (externalUp(station), changed())
+    externalUp: (station) => (externalUp(station), changed()),
+    dashStreamLinks: (played) => (setDashPlayed(played), changed())
   };
 }

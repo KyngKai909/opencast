@@ -267,6 +267,20 @@
       "when": 1790797836427,
       "tag": "0039_external_stations",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790804165514,
+      "tag": "0040_external_listing_changes",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790805659590,
+      "tag": "0041_dash_stream_links_played",
+      "breakpoints": true
     }
   ]
 }

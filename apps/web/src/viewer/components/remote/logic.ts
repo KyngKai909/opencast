@@ -6,9 +6,11 @@ import type { DialRowX } from "../../api/ext";
 import type { PresetView } from "../../data/viewer";
 
 /** Up and down the dial from what the TV shows, in the TV's band ("Up: 9.1 RDLS", "Down: 31.1 PREP"). */
-export function rockerNeighbours(channels: DialRowX[], stationId: string | null): { up: DialRowX | null; down: DialRowX | null } {
+/** `skipDash`: casting to a Chromecast, whose up and down skip DASH stream links (A225). */
+export function rockerNeighbours(channels: DialRowX[], stationId: string | null, o: { skipDash?: boolean } = {}): { up: DialRowX | null; down: DialRowX | null } {
   if (!stationId) return { up: null, down: null };
-  return { up: neighbour(channels, stationId, "up", { sameBand: true }) as DialRowX | null, down: neighbour(channels, stationId, "down", { sameBand: true }) as DialRowX | null };
+  const opts = { sameBand: true, skipDash: !!o.skipDash };
+  return { up: neighbour(channels, stationId, "up", opts) as DialRowX | null, down: neighbour(channels, stationId, "down", opts) as DialRowX | null };
 }
 
 export function identText(row: DialRowX | null): string {

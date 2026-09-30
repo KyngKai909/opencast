@@ -6,6 +6,9 @@
 //   npm run mock:streams -w @opencast/player
 //   npm run mock:streams -w @opencast/player -- nite hall   (only these stations, again)
 //
+// It ends by running generate-dash.mjs: the mock DASH stream link (LOMA 9.7, A201), served by
+// live-dash.mjs at /mock-dash.
+//
 // Needs ffmpeg on PATH. Writes packages/player/.mock-streams/ (git-ignored). Frames are drawn with
 // sharp (Homebrew's ffmpeg has no drawtext), one per second, each showing the station and a
 // running counter so it's plain which moment of the loop is on screen.
@@ -246,3 +249,6 @@ for (const s of MOCK_STATIONS) {
 
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 2));
 console.log(`Wrote ${OUT}`);
+
+// The mock DASH station (A201, generate-dash.mjs): made too, or kept when only other stations were asked for.
+execFileSync(process.execPath, [path.join(here, "generate-dash.mjs"), ...only], { stdio: "inherit" });

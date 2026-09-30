@@ -60,8 +60,8 @@ export function WatchPhone({ w }: { w: WatchData }) {
   const onChannel = w.channels.find((c) => c.station.id === from);
   const lit = w.playing && !!onChannel?.onAir;
   const radio = row?.station.band === "radio";
-  const down: DialRowX | null = neighbourOf(w.channels, from, "down");
-  const up: DialRowX | null = neighbourOf(w.channels, from, "up");
+  const down: DialRowX | null = neighbourOf(w.channels, from, "down", !w.engine.canPlayDash());
+  const up: DialRowX | null = neighbourOf(w.channels, from, "up", !w.engine.canPlayDash());
   const paused = s.status === "paused";
   const step = (dir: "up" | "down") => w.engine.handle({ type: "channel", dir });
   // Paused, or playing on from a pause (the lock screen, the space bar): the one way to seek.

@@ -39,8 +39,10 @@ describe("the rules registry", () => {
     const rows = await tx.client.query(`SELECT key, value FROM network.rules ORDER BY key`);
     const byKey = Object.fromEntries(rows.rows.map((r: { key: string; value: unknown }) => [r.key, r.value]));
     // 15 from 0027; the hold and the refused names from 0029 (reserved call signs); radio live and
-    // the grace period from 0033 (pay-as-you-go), which also gives three prices their first set version.
-    expect(Object.keys(byKey)).toHaveLength(19);
+    // the grace period from 0033 (pay-as-you-go), which also gives three prices their first set version;
+    // DASH stream links from 0041 (A201).
+    expect(Object.keys(byKey)).toHaveLength(20);
+    expect(byKey["external.dash_stream_links"]).toEqual({ played: true });
     expect(byKey["billing.grace"]).toEqual({ days: 14, warnDaysBefore: 3 });
     expect(byKey["call_signs.hold"]).toEqual({ days: 120, reminderDays: 14 });
     expect(byKey["call_signs.refused"]).toMatchObject({ refuseKwFourLetters: true, denylist: ["ALERT", "EAS", "SOS"] });

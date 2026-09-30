@@ -173,6 +173,15 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
 
       {current && s.status === "standby" && <StandbyScreen channel={current} size={size} />}
 
+      {current && s.status === "unplayable" && (
+        // A DASH stream link on a device that can't play DASH (A201): what it is, and where it plays.
+        <div className="oc-player__cover" data-testid="unplayable">
+          <Slate kind="off-air" title="Not on this device" size={size === "tv" ? "tv" : "screen"}>
+            {`${ident}'s stream is in a format this device can't play. Watch it on a computer or a TV.`}
+          </Slate>
+        </div>
+      )}
+
       {current && s.status === "off_air" && (
         <div className="oc-player__cover">
           <Slate kind="off-air" callSign={current.station.callSign ?? undefined} name={current.station.name} size={size === "tv" ? "tv" : "screen"}>

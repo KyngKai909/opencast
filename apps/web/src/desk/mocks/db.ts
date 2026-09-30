@@ -46,7 +46,7 @@ export interface Db {
   seq: number;
 }
 
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 export const DB_KEY = "oc-mock-desk-db";
 
 export function seed(): Db {
@@ -197,7 +197,8 @@ export function channelTakenBy(marketId: string, band: "tv" | "radio", channel: 
 
 export function callSignTaken(callSign: string): boolean {
   const d = getDb();
-  return d.stations.some((s) => s.ident.callSign === callSign) || d.reservations.some((r) => r.callSign === callSign);
+  // A215: an external station's old call sign is held for it after a change.
+  return d.stations.some((s) => s.ident.callSign === callSign) || d.reservations.some((r) => r.callSign === callSign) || d.listed.some((l) => l.heldCallSigns?.includes(callSign));
 }
 
 // ---- Views: the contracts' shapes ----
@@ -289,7 +290,8 @@ export function boardView(market: Market, band: "tv" | "radio"): MarketBoard {
       state,
       stations: here.map((s) => s.ident),
       heldFor: hold?.callSign ?? null,
-      status: notYet ? (first.signOnAt ? "Signs on" : "Setting up") : null,
+      // A215: an external station taken off the dial keeps its number 90 days (as the API does).
+      status: notYet ? (first.ident.kind === "listed" && d.listed.some((l) => l.stationId === first.ident.id && l.removed) ? "Taken off the dial" : first.signOnAt ? "Signs on" : "Setting up") : null,
       signOnAt: notYet ? first.signOnAt : null,
       creatorId: state === "claimable" ? (creator?.id ?? null) : null
     };

@@ -64,7 +64,8 @@ describe("the page as drawn", () => {
     await screen.findByText("City of Redlands");
     for (const h of ["Source", "Channel", "How it plays", "What's on", "Right now"]) expect(within(table()).getByRole("columnheader", { name: h })).toBeTruthy();
     has(rowOf(/^City of Redlands/), ["Council and planning meetings", "9.1 RDLS", "Official embed", "Their own player, embedding allowed (checked Sept 21)", "Their agenda calendar", "Up"]);
-    has(rowOf(/^City of Colton/), ["9.2 COLT", "Stream link", "Public body, stream published for the public", "Their agenda calendar", "Up"]);
+    // A215: Colton plays on the City Clerk's written permission here (the reference draws a public basis).
+    has(rowOf(/^City of Colton/), ["9.2 COLT", "Stream link", "Their written permission, Sept 24", "Their agenda calendar", "Up"]);
     has(rowOf(/^San Bernardino County/), ["9.3 SBCO", "Official embed", "No schedule found", "Banner shows name and Live", "Down 14 min", "Hidden from the dial"]);
     has(rowOf(/^NASA/), ["61.1 NASA", "Stream link", "US government, public", "Guide data", "Checked, from their published schedule", "Up"]);
     const rusd = rowOf(/^Riverside Unified School District/);
@@ -75,7 +76,9 @@ describe("the page as drawn", () => {
     expect(within(ictv).getAllByText("Not on the dial")).toHaveLength(2);
     // On the dial first, by channel; then the rest by name.
     const names = within(table()).getAllByRole("row").slice(1).map((r) => r.querySelector(".oc-lines__title")?.textContent);
-    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    expect(names).toEqual(["City of Redlands", "City of Colton", "San Bernardino County", "Loma Linda Community Access", "NASA", "Inland Community TV", "Riverside Unified School District"]);
+    // A201: a DASH stream link, on the dial now that DASH stream links are played.
+    has(rowOf(/^Loma Linda Community Access/), ["9.7 LOMA", "Stream link", "Up"]);
     expect(screen.getByRole("heading", { name: "Opencast catalog station" })).toBeTruthy();
   });
 
@@ -98,7 +101,7 @@ describe("the page as drawn", () => {
     fireEvent.click(await screen.findByText("City of Colton"));
     const d = await screen.findByRole("dialog", { name: "City of Colton" });
     expect(await within(d).findByText("Down 2 minutes, back before it left the dial. No answer in 5 seconds")).toBeTruthy();
-    expect(within(d).getByText("Clearly public")).toBeTruthy();
+    expect(within(d).getByText("Their written permission")).toBeTruthy();
   });
 });
 

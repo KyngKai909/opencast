@@ -3,6 +3,8 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error: a plain .mjs module with no types
 import { mockLiveHls } from "@opencast/player/mock";
+// @ts-expect-error: a plain .mjs module with no types
+import { mockLiveDash } from "@opencast/player/mock-dash";
 
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -52,6 +54,8 @@ export default defineConfig(({ mode }) => {
         configureServer(server) {
           // `npm run dev:mock`: the mock stations play as live HLS (npm run mock:streams -w @opencast/player).
           if (mode === "mock") server.middlewares.use("/mock-hls", mockLiveHls({ latencyMs: 120 }));
+          // The mock DASH stream link (A201): LOMA 9.7's live DASH.
+          if (mode === "mock") server.middlewares.use("/mock-dash", mockLiveDash({ latencyMs: 120 }));
         }
       },
       {

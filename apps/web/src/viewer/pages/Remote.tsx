@@ -56,7 +56,8 @@ function Remote() {
 
   const receiver = receiverOf(session);
   const row = channels.find((c) => c.station.id === receiver?.stationId) ?? null;
-  const { up, down } = rockerNeighbours(channels, row?.station.id ?? null);
+  // A Chromecast's up and down skip DASH stream links (A225): the rocker names what it will tune.
+  const { up, down } = rockerNeighbours(channels, row?.station.id ?? null, { skipDash: session.status === "casting" && session.target.kind === "chromecast" });
   const paused = receiver?.paused ?? false;
   const other = session.status === "casting" ? changedByOther(receiver, session.me) : null;
   const mirroring = session.status === "mirroring";

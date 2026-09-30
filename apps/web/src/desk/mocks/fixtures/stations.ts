@@ -38,7 +38,9 @@ export const STATION_IDS = {
   CIVC: U(101), RDLS: U(102), COLT: U(103), SBCO: U(104), RUSD: U(105), BEAT: U(106), SAZN: U(107), REEL: U(108), PREP: U(109),
   LUPE: U(110), OCAT: U(111), NITE: U(112), HALL: U(113), FLDR: U(114), CRAT: U(115), VOZE: U(116), MOJV: U(117),
   // Follow-up Phase 6: NASA on 61.1, and Inland Community TV waiting for its permission.
-  NASA: U(118), ICTV: U(119)
+  NASA: U(118), ICTV: U(119),
+  // A201: a public-access channel's DASH stream link on 9.7 (a mock station).
+  LOMA: U(197)
 };
 
 /** Monday, September 28, 6:00 am in the Inland Empire: LUPE's first sign-on. */
@@ -67,7 +69,9 @@ export function seedStations(): DbStation[] {
     // External stations added in follow-up Phase 6: NASA's public stream, and an IPTV-list channel
     // waiting for their permission (no channel yet, like RUSD).
     st(118, IE.id, "listed", "tv", "61.1", "NASA", "NASA", null),
-    st(119, IE.id, "listed", "tv", null, "ICTV", "Inland Community TV", null, { public: false, firstSignedOnAt: null }, "Riverside")
+    st(119, IE.id, "listed", "tv", null, "ICTV", "Inland Community TV", null, { public: false, firstSignedOnAt: null }, "Riverside"),
+    // A201: a DASH stream link, played in Opencast's player (a mock station).
+    st(197, IE.id, "listed", "tv", "9.7", "LOMA", "Loma Linda Community Access", null, {}, "Loma Linda")
   ];
 }
 

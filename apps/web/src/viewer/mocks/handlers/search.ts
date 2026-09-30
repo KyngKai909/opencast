@@ -12,7 +12,7 @@ import { STATION_EXTRA, programById, weekAirings } from "../fixtures/station";
 import { STATIONS, stationById } from "../fixtures/stations";
 import { path, reply } from "../respond";
 import { airingX, identX } from "../view";
-import { hiddenExternal } from "../external";
+import { offTheDial } from "../external";
 
 /** At most this many programs. */
 const PROGRAMS_MAX = 12;
@@ -20,7 +20,7 @@ const PROGRAMS_MAX = 12;
 export function searchResults(qRaw: string, market: string | null) {
   const q = qRaw.trim().toLowerCase();
   // External stations down 5 minutes aren't found (follow-up Phase 6).
-  const inMkt = STATIONS.filter((s) => (!market || s.ident.marketSlug === market) && !hiddenExternal(s.ident.id));
+  const inMkt = STATIONS.filter((s) => (!market || s.ident.marketSlug === market) && !offTheDial(s.ident.id));
   const m = matchChannel(q, inMkt.map((s) => s.ident.channel ?? ""));
   const tuneTo = m?.found ? identX(inMkt.find((s) => s.ident.channel === m.channel)!) : null;
 
@@ -37,7 +37,7 @@ export function searchResults(qRaw: string, market: string | null) {
   // not "Planning Commission, Sept 24").
   const numeric = numberQuery(q) !== null;
   const hits = weekAirings()
-    .filter((a) => a.end > iso && !hiddenExternal(a.stationId))
+    .filter((a) => a.end > iso && !offTheDial(a.stationId))
     .filter((a) => {
       const p = a.programId ? programById(a.programId) : undefined;
       if (numeric) return !!p?.title.toLowerCase().startsWith(q) || a.title.toLowerCase().startsWith(q);

@@ -65,7 +65,8 @@ function HeroPicture({ row }: { row: DialRowX }) {
   const allowed = useMutedPreviews();
   const reduced = usePrefersReducedMotion();
   const [failed, setFailed] = useState(false);
-  const url = row.playback?.kind === "hls" ? row.playback.url : null;
+  // A DASH stream link (A201) shows the still: a preview never loads dash.js.
+  const url = row.playback?.kind === "hls" && row.playback.format !== "dash" ? row.playback.url : null;
   useEffect(() => setFailed(false), [url]);
   const s = row.station;
   const live = !!row.now?.live;

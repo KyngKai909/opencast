@@ -31,7 +31,7 @@ const row = (band: "tv" | "radio") => ({
 
 function watch(o: { band?: "tv" | "radio"; status?: string; behindLive?: boolean; airPlay?: { available: boolean; active: boolean } }) {
   const r = row(o.band ?? "tv");
-  const engine = { togglePlay: vi.fn(), backToLive: vi.fn(), handle: vi.fn(), setMuted: vi.fn(), showAirPlayPicker: vi.fn(), stopAirPlay: vi.fn() };
+  const engine = { togglePlay: vi.fn(), backToLive: vi.fn(), handle: vi.fn(), setMuted: vi.fn(), showAirPlayPicker: vi.fn(), stopAirPlay: vi.fn(), canPlayDash: () => true };
   const w = {
     state: { status: o.status ?? "playing", behindLive: o.behindLive ?? false, currentId: r.station.id, pendingId: null, muted: false, airPlay: o.airPlay ?? { available: false, active: false } },
     engine,

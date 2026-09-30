@@ -200,6 +200,46 @@ test("External sources: the rail, the page and the board's key (network-desk 01.
   await expect(page.getByRole("grid", { name: "External sources" })).toContainText("Not on the dial");
 });
 
+// A215 (follow-up Phase 6): a new stream address makes COLT wait for evidence (said before saving),
+// recording it puts COLT back; RDLS taken off the dial for good leaves the viewer's dial (one app, one
+// mock world) and is put back from Taken off the dial.
+test("External sources: change a listing, take one off the dial for good and put it back (A215)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  // The viewer's side of the same app, in the Inland Empire.
+  await page.addInitScript(() => localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null })));
+  await page.goto(`${IE}/listed`);
+  await page.getByText("City of Colton").first().click();
+  await page.getByRole("dialog", { name: "City of Colton" }).getByRole("button", { name: "Change" }).click();
+  const form = page.getByRole("dialog", { name: "Change the listing" });
+  await form.getByLabel("Stream address").fill("https://stream.colton.example.gov/council/index.m3u8");
+  await expect(form).toContainText("Saving takes COLT off the dial until new evidence is recorded for the new address.");
+  await form.getByRole("button", { name: "Save, and wait for evidence" }).click();
+  const rec = page.getByRole("dialog", { name: "Record evidence" });
+  await rec.getByLabel("Who said yes").fill("Maria Lopez, City Clerk, City of Colton");
+  await rec.getByLabel("Said yes on").fill("2026-09-26");
+  await rec.getByLabel("Where it's kept").fill("Email to network@opencast.tv, Sept 26");
+  await rec.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("City of Colton is on the dial at 9.2.")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "City of Colton" }).getByRole("list", { name: "Changes" })).toContainText("It waits for new evidence");
+  await page.getByRole("dialog", { name: "City of Colton" }).getByRole("button", { name: "Close" }).last().click();
+
+  await page.getByText("City of Redlands").first().click();
+  await page.getByRole("dialog", { name: "City of Redlands" }).getByRole("button", { name: "Take off the dial for good" }).click();
+  await page.getByRole("dialog", { name: "Take 9.1 RDLS off the dial for good?" }).getByRole("button", { name: "Take it off the dial" }).click();
+  await expect(page.getByText("City of Redlands is off the dial for good. It's under Taken off the dial.")).toBeVisible();
+
+  await page.goto("/");
+  await expect(page.getByText("COLT").first()).toBeVisible();
+  await expect(page.getByText("RDLS", { exact: true })).toHaveCount(0);
+
+  await page.goto(`${IE}/listed?show=removed`);
+  await page.getByRole("grid", { name: "Taken off the dial" }).getByRole("button", { name: "Put back on the list" }).click();
+  await page.getByRole("dialog", { name: "Put City of Redlands back on the list?" }).getByRole("button", { name: "Put it back" }).click();
+  await expect(page.getByText("City of Redlands is back on the list at 9.1. It's checked from the next minute.")).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByText("RDLS", { exact: true }).first()).toBeVisible();
+});
+
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
 // the catalog station's library, its checklist answered with evidence and sent by Dee, and the
 // second check done by Rae, a rights reviewer: never the first checker.

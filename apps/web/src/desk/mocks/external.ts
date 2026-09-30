@@ -2,6 +2,8 @@
 // here, so time moves it on when the desk asks (a stream down 5 minutes leaves the dial, a new
 // listing is checked after a minute), and mock mode puts a listing down or back up for demos
 // (`ocMock.externalDown("COLT", 6)`, `ocMock.externalUp("COLT")` in the browser console).
+// A215: what the desk does to a listing (changed so it waits for evidence, taken off the dial for
+// good, put back) reaches the viewer's mock dial by call sign ("oc-mock-external-off").
 
 import { now } from "../../lib/clock";
 import type { DbListed } from "./fixtures/listed";
@@ -67,4 +69,28 @@ export function deskExternalUp(callSign: string): boolean {
   l.health = { state: "up", since: at, lastCheckedAt: at, detail: null };
   saveDb();
   return true;
+}
+
+/** The viewer's mock reads this: call signs off the dial for something other than their stream ("removed" or "waiting"). */
+export const EXTERNAL_OFF_KEY = "oc-mock-external-off";
+
+/**
+ * A215: tells the viewer's mock which external stations the desk has taken off the dial for good,
+ * or has waiting for evidence after a change, so the viewer's dial, guide, search and station page
+ * follow. `waitingOf` is the listed handler's (passed in to keep this file free of it).
+ */
+export function publishExternalOff(waiting: (l: DbListed) => string | null): void {
+  const off: Record<string, "removed" | "waiting"> = {};
+  for (const l of getDb().listed) {
+    const cs = stationById(l.stationId)?.ident.callSign;
+    if (!cs) continue;
+    if (l.removed) off[cs] = "removed";
+    else if (waiting(l) && waiting(l) !== "down") off[cs] = "waiting";
+  }
+  try {
+    localStorage.setItem(EXTERNAL_OFF_KEY, JSON.stringify(off));
+    window.dispatchEvent(new Event("oc-mock-changed"));
+  } catch {
+    // Private mode, or no window (unit tests): the viewer's mock keeps its own world.
+  }
 }

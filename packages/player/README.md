@@ -1,6 +1,18 @@
 # @opencast/player
 
-The one HLS player for the viewer app, TV mode and the Cast receiver.
+The one player for the viewer app, TV mode and the Cast receiver: HLS (hls.js, or the browser's
+own), and DASH stream links (A201).
+
+## DASH stream links
+
+An external station whose stream link is a DASH manifest (`playback.format: "dash"`) plays through
+`src/engine/dash.ts`: dash.js, loaded with a dynamic `import()` (its own chunk) the first time such a
+station is tuned, never for HLS and never for a neighbour. It's a `MediaDriver` like hls.js's, so the
+deck's lifecycle (the static, Tuning in, Stand by, retries, teardown) is the same. A device with
+neither Media Source nor its own DASH skips those stations when changing channel and shows "Not on
+this device" if one is tuned (`status: "unplayable"`). The mock DASH station, LOMA 9.7, is made by
+`mock/generate-dash.mjs` (run by `npm run mock:streams`) and served live at `/mock-dash` by
+`mock/live-dash.mjs`.
 
 ## Changing channel
 

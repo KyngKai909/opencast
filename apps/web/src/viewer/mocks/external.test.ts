@@ -59,9 +59,11 @@ describe("external stations on the mock dial", () => {
     m.external.externalDown("COLT", 5);
     const rows = rowsOnDial();
     expect(callSigns(rows)).not.toContain("COLT");
-    // The swipe order: down from BEAT is RDLS again.
+    // The swipe order: down from BEAT is LOMA 9.7 (the DASH stream link), then RDLS, skipping COLT.
     const beat = rows.find((r) => r.station.callSign === "BEAT")!;
-    expect(neighbour(rows, beat.station.id, "down")?.station.callSign).toBe("RDLS");
+    const loma = neighbour(rows, beat.station.id, "down")!;
+    expect(loma.station.callSign).toBe("LOMA");
+    expect(neighbour(rows, loma.station.id, "down")?.station.callSign).toBe("RDLS");
     expect(m.search.searchResults("council", "inland-empire").airings.map((a) => a.station.callSign)).not.toContain("COLT");
     expect(m.search.searchResults("9.2", "inland-empire").tuneTo).toBeNull();
     const page = m.station.stationPage("colt")!;
@@ -69,6 +71,16 @@ describe("external stations on the mock dial", () => {
     expect(page).toMatchObject({ onAir: false, playback: null, external: { source: "City of Colton", down: true } });
     m.external.externalUp("COLT");
     expect(callSigns(rowsOnDial())).toContain("COLT");
+  });
+
+  it("play a DASH stream link in Opencast's player while the rule says played (A201), and hold it off the dial otherwise", () => {
+    const loma = rowsOnDial().find((r) => r.station.callSign === "LOMA")!;
+    expect(DialRowX.safeParse(loma).success).toBe(true);
+    expect(loma).toMatchObject({ onAir: true, now: null, playback: { kind: "hls", format: "dash", url: "/mock-dash/loma/manifest.mpd" }, external: { plays: "stream_link", schedule: "none" } });
+    m.external.setDashPlayed(false);
+    expect(callSigns(rowsOnDial())).not.toContain("LOMA");
+    m.external.setDashPlayed(true);
+    expect(callSigns(rowsOnDial())).toContain("LOMA");
   });
 });
 

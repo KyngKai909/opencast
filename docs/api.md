@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-347 endpoints in 22 modules.
+351 endpoints in 22 modules.
 
 ## accounts (35)
 
@@ -304,7 +304,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `suggestCallSign` | POST | `/admin/reservations/:reservationId/suggest` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Not allowed: hold `callSign` for them instead, in the same place in line, and tell them why (with up to three other free names) |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
-## network (29)
+## network (33)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -329,13 +329,17 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `heldEarnings` | GET | `/admin/held-earnings` | Opencast admin | Held earnings per claimable station |
 | `startHandover` | POST | `/stations/:stationId/claim` | signed in | Claim (or stop) a claimable station: connect the source account to prove it's you |
 | `approveHandover` | POST | `/admin/handovers/:handoverId/approve` | Opencast admin | Record the desk's check of the claimant. With the escrow contract live, the verifiers then approve on-chain (what they sign is in `onChain`) and the 72 hours start there |
-| `listListedSources` | GET | `/admin/listed-sources` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | City and county streams |
+| `listListedSources` | GET | `/admin/listed-sources` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | City and county streams. A215 (added 2026-09-30): the listed ones by default; `show=removed` lists the ones taken off the dial for good |
 | `addListedSource` | POST | `/admin/listed-sources` | Opencast admin | List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations. |
 | `recordListedEvidence` | POST | `/admin/listed-sources/:sourceId/evidence` | Opencast admin | Phase 6: record the evidence a listing was waiting for (terms checked, written permission, a public basis, or a note). It goes on the dial once the evidence is complete. A permission is recorded once and never edited. |
 | `listExternalOutages` | GET | `/admin/listed-sources/:sourceId/outages` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: an external station's outages, newest first (the last 90 days) |
 | `previewIptvList` | POST | `/admin/creators/iptv/preview` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: read a public IPTV list (a pasted or uploaded M3U, or an iptv-org address: M3U or JSON) and list its channels, each with whether it's already a lead or an external station. Nothing is saved. Only the list is fetched, never a stream. |
 | `importIptvLeads` | POST | `/admin/creators/iptv/import` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Phase 6: import IPTV-list channels into the creator pipeline as leads (stage `found`), with their stream addresses noted. Never on the dial from here. A channel already a lead or an external station (by its stream address) is skipped. |
 | `syncListedSource` | POST | `/admin/listed-sources/:sourceId/sync` | Opencast admin | Sync listings from the agenda calendar now |
+| `updateListedSource` | PATCH | `/admin/listed-sources/:sourceId` | Opencast admin | A215: change a listing: its name, description, address, how it plays, the embed terms, the schedule feed or guide data, and its channel and call sign (the rules for listing). An edit never puts anything on the dial without evidence that covers what now plays: a written permission covers one exact stream address, so a new address waits for new evidence; embed terms stay for an address on the same host and wait for one on another; a public basis stays; a new way to play needs its own evidence. A new address or way to play is checked afresh (an open outage ends); a new schedule is read again. Every change is kept in the listing's history. 409 `removed` for a listing taken off the dial. |
+| `listListedChanges` | GET | `/admin/listed-sources/:sourceId/changes` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A215: a listing's change history, newest first: each change (who, when, which fields from → to, and what it did), taking it off the dial and putting it back. Addresses in full to admins, as their host to the rest of the desk |
+| `removeListedSource` | POST | `/admin/listed-sources/:sourceId/remove` | Opencast admin | A215: take a listing off the dial for good. Archived, never deleted: its permission records, outage history, change history, watch data and lead link stay. It leaves the dial, the guide, search and the swipe order at once, its checks and schedule reads stop. Like a full station that signs off for good, its channel is held for it 90 days and then freed, and its call sign stays its own (held a year on the waitlist's side). Its pipeline lead goes back to the stage it had before it went on air (Found when that wasn't recorded) and is a lead again. 409 `removed` when it already is. |
+| `restoreListedSource` | POST | `/admin/listed-sources/:sourceId/restore` | Opencast admin | A215: put a listing taken off the dial back on the list, on its old channel (or `channel`, another free one in its band, by the rules for listing). It comes back with its evidence as recorded and waits for its checks (`health: unchecked`); its lead goes back to On air once the evidence holds. 409 `channel_taken` when the channel has gone to another station or a hold, `call_sign_taken` when its call sign has (after its hold), `not_removed` when it's listed. |
 | `getClaimPage` | GET | `/claim/:token` | anyone | N10: the creator's claim page, by the link we sent them (their permission link's token), and the claim's status once started. 404 when there's no station to claim from it. |
 
 ## tv (17)

@@ -41,9 +41,11 @@ describe("the reference's six rows", () => {
   it("says how each plays, where its schedule comes from, and whether it's on the dial", async () => {
     const rows = await list();
     expect(rows.map((r) => [r.station.callSign, r.plays, r.evidence?.basis ?? null, r.schedule?.source, r.onDial, r.waiting, r.health?.state])).toEqual([
-      ["COLT", "stream_link", "public_source", "feed", true, null, "up"],
+      ["COLT", "stream_link", "written_permission", "feed", true, null, "up"],
       ["RDLS", "embed", "embed_terms", "feed", true, null, "up"],
       ["ICTV", "stream_link", null, "none", false, "needs_permission", "unchecked"],
+      // A201: a DASH stream link on the dial (DASH stream links are played).
+      ["LOMA", "stream_link", "public_source", "none", true, null, "up"],
       ["NASA", "stream_link", "public_source", "guide_data", true, null, "up"],
       ["RUSD", "embed", null, "none", false, "terms_unclear", "unchecked"],
       ["SBCO", "embed", "embed_terms", "none", false, "down", "hidden"]
@@ -83,6 +85,10 @@ describe("listing a source", () => {
   });
 
   it("holds a DASH stream and a source outside the market until Settings allows them", async () => {
+    // A201: DASH stream links are played now; set back to not played, a DASH stream waits.
+    const dashPlayed = await list();
+    expect(dashPlayed.find((l) => l.station.callSign === "LOMA")).toMatchObject({ streamFormat: "dash", onDial: true, waiting: null });
+    await api("POST", "/admin/rules/external.dash_stream_links/versions", { body: { value: { played: false }, effectiveFrom: "2026-09-27" } });
     const dash = await api("POST", "/admin/listed-sources", { body: { ...base, channel: "9.4", callSign: "RIAL", streamUrl: "https://rialto.example.gov/live.mpd", plays: "stream_link", evidence: { publicBasis: "Public body" } } });
     expect(dash.json).toMatchObject({ streamFormat: "dash", waiting: "dash_not_played" });
     const outside = await api("POST", "/admin/listed-sources", { body: { ...base, channel: "9.5", callSign: "LACO", streamUrl: "https://laco.example.gov/live.m3u8", plays: "stream_link", outsideMarket: true, evidence: { publicBasis: "County government, public" } } });

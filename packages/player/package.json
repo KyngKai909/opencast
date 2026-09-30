@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css",
-    "./mock": "./mock/live-hls.mjs"
+    "./mock": "./mock/live-hls.mjs",
+    "./mock-dash": "./mock/live-dash.mjs"
   },
   "sideEffects": [
     "*.css"
@@ -22,6 +23,7 @@
   "dependencies": {
     "@opencast/contracts": "*",
     "@opencast/ui": "*",
+    "dashjs": "^5.2.1",
     "hls.js": "^1.6.13",
     "uqr": "^0.1.3"
   },

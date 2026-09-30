@@ -2,7 +2,9 @@
 // plays and the evidence it may (the terms page and the day it was checked, the written permission
 // as recorded, or the public basis), where "what's on" comes from, the address it plays from, the
 // stream right now, and its outages over the last 90 days. A listing waiting for its evidence offers
-// Record evidence.
+// Record evidence. A215: its changes next to its outages, the permissions recorded before that don't
+// cover its address now, "Change" and "Take off the dial for good"; one taken off offers "Put back
+// on the list".
 import type { ReactNode } from "react";
 import { networkApi, type ListedSource } from "@opencast/contracts";
 import { Button, KeyValueList, Modal, type KeyValueRow } from "@opencast/ui";
@@ -11,7 +13,7 @@ import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
 import { dateAtTime } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
-import { needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, scheduleWords, shortDate, sourceDetail } from "./external";
+import { changeWords, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail } from "./external";
 import { channelText } from "./SourceStatus";
 import "./SourceDetails.css";
 
@@ -49,7 +51,21 @@ function evidenceRows(s: ListedSource, tz: string): KeyValueRow[] {
     ];
   }
   if (e?.publicBasis) return [{ title: "Clearly public", detail: e.publicBasis }];
-  return [{ title: "Their permission", detail: "Not recorded yet" }];
+  return [{ title: "Their permission", detail: s.earlierPermissions?.length ? "Not recorded yet for this address" : "Not recorded yet" }];
+}
+
+/** A215: written permissions recorded before, for another address: kept as they were. */
+function earlierRows(s: ListedSource, tz: string): KeyValueRow[] {
+  return (s.earlierPermissions ?? []).map((p) => ({
+    title: "Earlier permission",
+    detail: (
+      <>
+        {`${p.grantedBy}, ${shortDate(p.grantedOn, tz)}, for `}
+        <span className="nd-mono nd-src__addr">{p.streamUrl}</span>
+        {". Kept, never edited"}
+      </>
+    )
+  }));
 }
 
 function scheduleRows(s: ListedSource, tz: string): KeyValueRow[] {
@@ -72,10 +88,29 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function SourceDetails({ source: s, timeZone: tz, onClose, onRecord }: { source: ListedSource; timeZone: string; onClose: () => void; onRecord: () => void }) {
+export function SourceDetails({
+  source: s,
+  timeZone: tz,
+  onClose,
+  onRecord,
+  onChange,
+  onRemove,
+  onRestore
+}: {
+  source: ListedSource;
+  timeZone: string;
+  onClose: () => void;
+  onRecord: () => void;
+  /** A215: Change, Take off the dial for good, and Put back on the list. */
+  onChange?: () => void;
+  onRemove?: () => void;
+  onRestore?: () => void;
+}) {
   const now = useNow(60_000);
   const outages = useApi(networkApi.listExternalOutages, { params: { sourceId: s.id } });
+  const changes = useApi(networkApi.listListedChanges, { params: { sourceId: s.id } });
   const ch = channelText(s);
+  const gone = removedWords(s, tz, now);
   const right = nowWords({ ...s, waiting: s.waiting === "down" ? null : s.waiting }, now);
   const h = s.health;
   const checked = h?.lastCheckedAt ? `Last checked ${dateAtTime(h.lastCheckedAt, tz)}${h.detail ? `. ${h.detail}` : ""}` : "Checked every minute once it's on the dial";
@@ -86,18 +121,36 @@ export function SourceDetails({ source: s, timeZone: tz, onClose, onRecord }: { 
       onClose={onClose}
       width={560}
       title={s.name}
-      subtitle={[ch ?? "Not on the dial", sourceDetail(s)].filter(Boolean).join(". ")}
+      subtitle={[gone ? `${gone.text}. ${gone.detail}` : (ch ?? "Not on the dial"), sourceDetail(s)].filter(Boolean).join(". ")}
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Close
-          </Button>
-          {needsEvidence(s) && (
-            <Button variant="primary" onClick={onRecord}>
-              Record evidence
+        gone ? (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Close
             </Button>
-          )}
-        </>
+            {onRestore && (
+              <Button variant="primary" onClick={onRestore}>
+                Put back on the list
+              </Button>
+            )}
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+            {onChange && (
+              <Button variant={needsEvidence(s) ? "ghost" : "primary"} onClick={onChange}>
+                Change
+              </Button>
+            )}
+            {needsEvidence(s) && (
+              <Button variant="primary" onClick={onRecord}>
+                Record evidence
+              </Button>
+            )}
+          </>
+        )
       }
     >
       <Section title="How it plays">
@@ -106,7 +159,8 @@ export function SourceDetails({ source: s, timeZone: tz, onClose, onRecord }: { 
           items={[
             { title: PLAYS_LABELS[playsOf(s)], detail: playsDetail(s, tz) || null },
             ...evidenceRows(s, tz),
-            { title: playsOf(s) === "embed" ? "Their player's address" : "Stream address", detail: <span className="nd-mono nd-src__addr">{s.streamUrl}</span> }
+            { title: playsOf(s) === "embed" ? "Their player's address" : "Stream address", detail: <span className="nd-mono nd-src__addr">{s.streamUrl}</span> },
+            ...earlierRows(s, tz)
           ]}
         />
         {held && (
@@ -119,7 +173,11 @@ export function SourceDetails({ source: s, timeZone: tz, onClose, onRecord }: { 
         <KeyValueList variant="rows" items={scheduleRows(s, tz)} />
       </Section>
       <Section title="Right now">
-        <KeyValueList variant="rows" items={[{ title: right.text === "Not on the dial" ? "Not checked while it's off the dial" : right.text, detail: right.detail ? `${right.detail}. ${checked}` : checked }]} />
+        {gone ? (
+          <KeyValueList variant="rows" items={[{ title: "Not checked, and its schedule isn't read", detail: "It's off the dial, the guide, search and the swipe order. Its records are kept" }]} />
+        ) : (
+          <KeyValueList variant="rows" items={[{ title: right.text === "Not on the dial" ? "Not checked while it's off the dial" : right.text, detail: right.detail ? `${right.detail}. ${checked}` : checked }]} />
+        )}
       </Section>
       <Section title="History">
         {outages.error ? (
@@ -140,6 +198,35 @@ export function SourceDetails({ source: s, timeZone: tz, onClose, onRecord }: { 
           </ul>
         )}
       </Section>
+      <Section title="Changes">
+        {changes.error ? (
+          <ErrorLine error={changes.error} />
+        ) : changes.data && !changes.data.length ? (
+          <p className="nd-src__note">No changes since it was listed.</p>
+        ) : (
+          <ul className="nd-src__history" aria-label="Changes">
+            {(changes.data ?? []).map((c) => {
+              const w = changeWords(c, tz);
+              return (
+                <li key={c.id}>
+                  <span className="nd-src__when">{w.when}</span>
+                  <span className="nd-src__change">{w.text}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Section>
+      {!gone && onRemove && (
+        <Section title="Off the dial for good">
+          <p className="nd-src__note nd-src__off">
+            It leaves the dial, the guide and search at once, and its checks stop. Its records are kept, and it can be put back on the list.
+          </p>
+          <Button variant="ghost" size="sm" onClick={onRemove}>
+            Take off the dial for good
+          </Button>
+        </Section>
+      )}
     </Modal>
   );
 }

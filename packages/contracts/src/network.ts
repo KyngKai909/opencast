@@ -310,9 +310,41 @@ export const ExternalOutage = z.object({
   /** When it was back; null while it's still down. */
   backAt: Timestamp.nullable(),
   /** What the last failed check saw: "HTTP 404", "No answer in 5 seconds", "Not a stream playlist". */
-  detail: z.string().nullable()
+  detail: z.string().nullable(),
+  /**
+   * Added 2026-09-30 (A215): how it ended. `back`: the stream answered again (`backAt`). `address_changed`:
+   * the listing's address (or how it plays) was changed while it was down, so checks started afresh on
+   * the new one. `removed`: taken off the dial for good while it was down. Absent: `back`.
+   */
+  ended: z.enum(["back", "address_changed", "removed"]).optional()
 });
 export type ExternalOutage = z.infer<typeof ExternalOutage>;
+
+/** What `updateListedSource` can change, as its change history names it (added 2026-09-30, A215). */
+export const ListedField = z.enum(["name", "description", "streamUrl", "plays", "embedTerms", "calendarUrl", "calendarFormat", "schedule", "guideCheckedAgainst", "guideCheckedOn", "channel", "callSign"]);
+export type ListedField = z.infer<typeof ListedField>;
+
+/**
+ * One entry in an external station's change history (added 2026-09-30, A215): who, when, and each
+ * field from → to. `changed`: an edit (`updateListedSource`). `removed`: taken off the dial for good.
+ * `restored`: put back on the list. Addresses are shown in full to admins, and as their host
+ * (`https://colton.example.gov/…`) to everyone else on the desk.
+ */
+export const ListedChange = z.object({
+  id: Id,
+  at: Timestamp,
+  /** Who made it (their display name), or null for the system. */
+  by: z.string().nullable(),
+  action: z.enum(["changed", "removed", "restored"]),
+  fields: z.array(z.object({ field: ListedField, from: z.string().nullable(), to: z.string().nullable() })),
+  /**
+   * What the change did: `waits_for_evidence` (the evidence no longer covers what plays: a new stream
+   * address, an embed on another host, or a new way to play), `checks_restart` (a new address or way
+   * to play, checked afresh), `schedule_reread` (the feed or guide data read again). Empty for the rest.
+   */
+  effects: z.array(z.enum(["waits_for_evidence", "checks_restart", "schedule_reread"]))
+});
+export type ListedChange = z.infer<typeof ListedChange>;
 
 export const ListedSource = z.object({
   id: Id,
@@ -374,7 +406,21 @@ export const ListedSource = z.object({
   /** The latest outages, newest first (up to 5; `listExternalOutages` has the rest). */
   outages: z.array(ExternalOutage).optional(),
   /** The pipeline lead it came from (an IPTV-list channel), if any. */
-  creatorId: Id.nullable().optional()
+  creatorId: Id.nullable().optional(),
+  // ---- Added 2026-09-30 (A215: changing a listing, and taking it off for good) ----
+  /**
+   * Taken off the dial for good (archived, never deleted): when, by whom, and the channel it had. As
+   * for a full station that signs off for good, the channel stays held for it until `channelHeldUntil`
+   * (90 days) and is freed then ("Put back on the list" after that needs it, or another, still free);
+   * its call sign stays its own, held a year on the waitlist's side too. `listingState` is
+   * `not_listed` and `onDial` false. Null while it's listed.
+   */
+  removed: z
+    .object({ at: Timestamp, by: z.string().nullable(), channel: ChannelNumber.nullable(), channelHeldUntil: Timestamp })
+    .nullable()
+    .optional(),
+  /** Written permissions recorded earlier for this listing that don't cover its address now (kept, never edited), newest first. */
+  earlierPermissions: z.array(StreamPermission).optional()
 });
 
 /** The evidence a listing is added with, or recorded later (`recordListedEvidence`). */
@@ -677,7 +723,14 @@ export const networkApi = {
         .optional()
     })
   }),
-  listListedSources: endpoint({ method: "GET", path: "/admin/listed-sources", auth: "desk", summary: "City and county streams", query: z.object({ marketId: Id.optional() }), response: z.array(ListedSource) }),
+  listListedSources: endpoint({
+    method: "GET",
+    path: "/admin/listed-sources",
+    auth: "desk",
+    summary: "City and county streams. A215 (added 2026-09-30): the listed ones by default; `show=removed` lists the ones taken off the dial for good",
+    query: z.object({ marketId: Id.optional(), show: z.enum(["listed", "removed"]).optional() }),
+    response: z.array(ListedSource)
+  }),
   addListedSource: endpoint({
     method: "POST",
     path: "/admin/listed-sources",
@@ -760,6 +813,67 @@ export const networkApi = {
     auth: "admin",
     summary: "Sync listings from the agenda calendar now",
     params: z.object({ sourceId: Id }),
+    response: ListedSource
+  }),
+
+  // ---- Added 2026-09-30: A215, changing a listing and taking it off for good ----
+
+  updateListedSource: endpoint({
+    method: "PATCH",
+    path: "/admin/listed-sources/:sourceId",
+    auth: "admin",
+    summary:
+      "A215: change a listing: its name, description, address, how it plays, the embed terms, the schedule feed or guide data, and its channel and call sign (the rules for listing). An edit never puts anything on the dial without evidence that covers what now plays: a written permission covers one exact stream address, so a new address waits for new evidence; embed terms stay for an address on the same host and wait for one on another; a public basis stays; a new way to play needs its own evidence. A new address or way to play is checked afresh (an open outage ends); a new schedule is read again. Every change is kept in the listing's history. 409 `removed` for a listing taken off the dial.",
+    params: z.object({ sourceId: Id }),
+    body: z
+      .object({
+        name: z.string().min(1).optional(),
+        description: z.string().max(160).nullable().optional(),
+        /** The embed's address, or the stream link. */
+        streamUrl: z.url().optional(),
+        plays: ExternalPlays.optional(),
+        /** An embed's terms. */
+        embedTerms: z.enum(["allowed", "unclear"]).optional(),
+        /** What's on: a feed (`calendarUrl`, `calendarFormat` or null to work it out), guide data (`calendarUrl` and `guideData`), or none. */
+        schedule: z
+          .discriminatedUnion("source", [
+            z.object({ source: z.literal("feed"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional() }),
+            z.object({ source: z.literal("guide_data"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional(), guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }) }),
+            z.object({ source: z.literal("none") })
+          ])
+          .optional(),
+        /** A new channel, in the same band. */
+        channel: ChannelNumber.optional(),
+        callSign: CallSign.optional()
+      })
+      .refine((b) => Object.values(b).some((v) => v !== undefined), "Change at least one thing"),
+    response: ListedSource
+  }),
+  listListedChanges: endpoint({
+    method: "GET",
+    path: "/admin/listed-sources/:sourceId/changes",
+    auth: "desk",
+    summary: "A215: a listing's change history, newest first: each change (who, when, which fields from → to, and what it did), taking it off the dial and putting it back. Addresses in full to admins, as their host to the rest of the desk",
+    params: z.object({ sourceId: Id }),
+    response: z.array(ListedChange)
+  }),
+  removeListedSource: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/:sourceId/remove",
+    auth: "admin",
+    summary:
+      "A215: take a listing off the dial for good. Archived, never deleted: its permission records, outage history, change history, watch data and lead link stay. It leaves the dial, the guide, search and the swipe order at once, its checks and schedule reads stop. Like a full station that signs off for good, its channel is held for it 90 days and then freed, and its call sign stays its own (held a year on the waitlist's side). Its pipeline lead goes back to the stage it had before it went on air (Found when that wasn't recorded) and is a lead again. 409 `removed` when it already is.",
+    params: z.object({ sourceId: Id }),
+    response: ListedSource
+  }),
+  restoreListedSource: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/:sourceId/restore",
+    auth: "admin",
+    summary:
+      "A215: put a listing taken off the dial back on the list, on its old channel (or `channel`, another free one in its band, by the rules for listing). It comes back with its evidence as recorded and waits for its checks (`health: unchecked`); its lead goes back to On air once the evidence holds. 409 `channel_taken` when the channel has gone to another station or a hold, `call_sign_taken` when its call sign has (after its hold), `not_removed` when it's listed.",
+    params: z.object({ sourceId: Id }),
+    body: z.object({ channel: ChannelNumber.optional() }),
     response: ListedSource
   }),
 

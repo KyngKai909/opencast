@@ -64,14 +64,31 @@ export const ExternalInfo = z.object({
 });
 export type ExternalInfo = z.infer<typeof ExternalInfo>;
 
+/**
+ * Where a station's picture comes from. `kind: "hls"`: Opencast's player plays `url` (a station's
+ * channel, or an external station's stream link); `kind: "embed"`: the source's own player.
+ *
+ * `format` (added 2026-09-30, A201): the stream's format when Opencast's player plays it, `dash`
+ * for a DASH stream link (its `url` is the source's `.mpd`); absent means HLS. It's a new optional
+ * field rather than a new `kind`, so apps built before it still read the dial (their contracts
+ * check `kind` against `hls` and `embed`, and a new value would fail the whole response): they try
+ * a DASH row as HLS, which fails, and show Stand by as for any stream link that won't play.
+ */
+export const Playback = z.object({
+  kind: z.enum(["hls", "embed"]),
+  url: z.string(),
+  format: z.enum(["hls", "dash"]).optional()
+});
+export type Playback = z.infer<typeof Playback>;
+
 export const DialRow = z.object({
   station: StationIdent,
   /** Lit only when something is actually on air. */
   onAir: z.boolean(),
   now: Airing.nullable(),
   next: Airing.nullable(),
-  /** Listed city streams play in the source's own player. */
-  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable(),
+  /** Listed city streams play in the source's own player. A DASH stream link says `format: "dash"` (A201). */
+  playback: Playback.nullable(),
   /**
    * S13 (added 2026-09-28): `standby` while a live block is on the stand-by slate waiting for its
    * signal; `ok` otherwise. Absent when the station isn't on air (and from listed city streams).
@@ -118,7 +135,7 @@ export const StationPage = z.object({
     })
     .nullable(),
   pledgesTaxDeductible: z.boolean().nullable(),
-  playback: z.object({ kind: z.enum(["hls", "embed"]), url: z.string() }).nullable(),
+  playback: Playback.nullable(),
   /**
    * Follow-up Phase 6 (added 2026-09-30), external stations only: as on the dial, and `down` while
    * it's off the dial because its stream is down (the page stays; `playback` is null then).

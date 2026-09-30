@@ -72,7 +72,9 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
       // Neighbours are pre-warmed by their playlists and first segment (no hidden <video>); on a
       // Chromecast only the playlists (memory).
       warm: mode === "cast" ? "playlists" : "prefetch",
-      neighbours: { sameBand: !settings.includeRadioBand },
+      // On a Chromecast, up and down skip DASH stream links (A225): dash.js loads
+      // only for one chosen from the phone or by number.
+      neighbours: { sameBand: !settings.includeRadioBand, skipDash: mode === "cast" },
       bannerMs: settings.bannerSeconds * 1000,
       numberWaitMs: settings.numberWaitSeconds * 1000,
       quality: settings.quality,
@@ -158,8 +160,8 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   // Settings take effect at once.
   const { bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut, tuningSound, radioTuningSound } = device.settings;
   useEffect(
-    () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand }, quality, eveningOut }),
-    [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut]
+    () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand, skipDash: mode === "cast" }, quality, eveningOut }),
+    [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut, mode]
   );
   // "Tuning sound", per band: the soft hiss when changing channel (the player plays it).
   useEffect(() => engine.setOptions({ tuningSound: { video: tuningSound, radio: radioTuningSound } }), [engine, tuningSound, radioTuningSound]);

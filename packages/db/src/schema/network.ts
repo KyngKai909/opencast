@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, jsonb, serial, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, millis } from "./columns.js";
 import { network, band } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -320,8 +320,43 @@ export const listedSources = network.table("listed_sources", {
   lastCheckedAt: at("last_checked_at"),
   lastCheckDetail: text("last_check_detail"),
   /** The pipeline lead (an IPTV-list channel) it came from. */
-  creatorId: uuid("creator_id").references(() => creators.id)
+  creatorId: uuid("creator_id").references(() => creators.id),
+  // ---- A215 (added 2026-09-30, migration 0040): taken off the dial for good, never deleted ----
+  /** The lead's stage before this listing put it On air: where it goes back to if the listing is taken off. */
+  leadStageBefore: creatorStage("lead_stage_before"),
+  /** Taken off the dial for good: when and by whom. Null while it's listed. */
+  removedAt: at("removed_at"),
+  removedBy: uuid("removed_by").references(() => users.id),
+  /** Where it was on the dial when it was taken off (the station keeps its channel 90 days, then it's freed). */
+  removedMarketId: uuid("removed_market_id").references(() => markets.id),
+  removedBand: band("removed_band"),
+  removedTenths: integer("removed_tenths"),
+  /** When its held channel was freed (90 days after it was taken off). */
+  channelReleasedAt: at("channel_released_at")
 });
+
+/**
+ * An external station's change history (added 2026-09-30, A215, migration 0040): each change to a
+ * listing (the fields from → to, and what it did), taking it off the dial and putting it back.
+ */
+export const listedSourceChanges = network.table(
+  "listed_source_changes",
+  {
+    id: id(),
+    /** In the order they happened, when two share a moment. */
+    seq: serial("seq").notNull(),
+    listedSourceId: uuid("listed_source_id")
+      .notNull()
+      .references(() => listedSources.id),
+    at: at("at").notNull(),
+    by: uuid("by").references(() => users.id),
+    action: text("action", { enum: ["changed", "removed", "restored"] }).notNull(),
+    /** [{ field, from, to }], addresses in full. */
+    fields: jsonb("fields").$type<Array<{ field: string; from: string | null; to: string | null }>>().notNull(),
+    effects: jsonb("effects").$type<string[]>().notNull()
+  },
+  (t) => [index("listed_source_changes_source").on(t.listedSourceId, t.at)]
+);
 
 /**
  * A source's written permission for its stream link, kept like a claimable station's permission
@@ -337,7 +372,9 @@ export const streamPermissions = network.table("stream_permissions", {
   streamUrl: text("stream_url").notNull(),
   creatorId: uuid("creator_id").references(() => creators.id),
   recordedBy: uuid("recorded_by").references(() => users.id),
-  recordedAt: at("recorded_at").notNull().defaultNow()
+  recordedAt: at("recorded_at").notNull().defaultNow(),
+  /** The listing it was recorded for (added 2026-09-30, A215): kept when the listing's address changes. */
+  listedSourceId: uuid("listed_source_id")
 });
 
 /**
@@ -355,7 +392,9 @@ export const externalOutages = network.table(
     hiddenAt: at("hidden_at"),
     backAt: at("back_at"),
     detail: text("detail"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /** How it ended (A215): null when the stream was back, or the address changed, or it was taken off the dial. */
+    ended: text("ended", { enum: ["address_changed", "removed"] })
   },
   (t) => [
     index("external_outages_source").on(t.listedSourceId, t.downSince),

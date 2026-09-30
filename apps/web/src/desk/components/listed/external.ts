@@ -2,7 +2,7 @@
 // may, where "what's on" comes from, whether it's up right now, and its outages. Words always,
 // never colour alone. Listings from before Phase 6 (no `plays`) read as official embeds.
 
-import type { ExternalOutage, ListedSource } from "@opencast/contracts";
+import type { ExternalOutage, ListedChange, ListedSource } from "@opencast/contracts";
 import { clock } from "@opencast/ui";
 import { dayMonth } from "../../lib/dates";
 
@@ -121,6 +121,129 @@ export function outageWords(o: ExternalOutage, timeZone: string): { when: string
   const when = dayMonth(o.downSince, timeZone, { short: true });
   if (!o.backAt) return { when, text: `Down since ${t(o.downSince)}${o.hiddenAt ? `, hidden from the dial at ${t(o.hiddenAt)}` : ", still on the dial"}${detail}` };
   const n = Math.max(1, Math.round((Date.parse(o.backAt) - Date.parse(o.downSince)) / 60_000));
+  // A215: it ended because the address changed (checks started afresh) or it was taken off the dial.
+  const why = o.ended === "address_changed" ? ", when the address was changed" : o.ended === "removed" ? ", when it was taken off the dial" : "";
+  if (o.ended && o.ended !== "back") {
+    return { when, text: `Down ${t(o.downSince)} to ${t(o.backAt)}${why}${o.hiddenAt ? `, hidden from the dial at ${t(o.hiddenAt)}` : ""}${detail}` };
+  }
   if (!o.hiddenAt) return { when, text: `Down ${minutes(n)}, back before it left the dial${detail}` };
   return { when, text: `Down ${t(o.downSince)} to ${t(o.backAt)}, ${minutes(n)}, hidden from the dial at ${t(o.hiddenAt)}${detail}` };
+}
+
+// ---- A215 (2026-09-30): changing a listing, and taking it off the dial for good ----
+
+/** A host, for the words: "colton.example.gov". */
+export function hostOf(url: string): string {
+  try {
+    return new URL(url.trim()).host.toLowerCase();
+  } catch {
+    return url.trim();
+  }
+}
+
+/** What a change would do to it, before it's saved: the Change form's warning, or null when it stays as it is. */
+export interface ChangeDraft {
+  plays: Plays;
+  streamUrl: string;
+  embedTerms: "allowed" | "unclear";
+}
+
+/**
+ * Said plainly before saving: when the change takes it off the dial until new evidence is recorded
+ * (a written permission covers one exact address; embed terms were checked for one player's host;
+ * a new way to play needs its own evidence), or what stays (a public basis is about the source).
+ */
+export function changeWarning(s: ListedSource, d: ChangeDraft): { waits: boolean; text: string } | null {
+  const url = d.streamUrl.trim();
+  const who = s.station.callSign ?? s.name;
+  const addressChanged = url !== s.streamUrl;
+  const e = s.evidence;
+  const onEvidence = !!e?.basis;
+  if (d.plays !== playsOf(s)) {
+    return {
+      waits: true,
+      text:
+        d.plays === "embed"
+          ? `An official embed needs its terms page and the day it was checked. Saving takes ${who} off the dial until they're recorded.`
+          : `A stream link needs their written permission, or a clearly public basis. Saving takes ${who} off the dial until one is recorded.`
+    };
+  }
+  if (d.plays === "embed") {
+    if (d.embedTerms === "unclear" && s.embedTerms === "allowed") return { waits: true, text: `Saving takes ${who} off the dial until their terms allow embedding.` };
+    if (addressChanged && onEvidence && hostOf(url) !== hostOf(s.streamUrl)) {
+      return { waits: true, text: `Their terms were checked for ${hostOf(s.streamUrl)}. Saving takes ${who} off the dial until the terms for ${hostOf(url)} are checked.` };
+    }
+    if (addressChanged) return { waits: false, text: `Same host, so their terms stay${e?.termsCheckedOn ? " as checked" : ""}. The new address is checked from the next minute.` };
+    return null;
+  }
+  if (!addressChanged) return null;
+  if (e?.basis === "written_permission") {
+    const earlier = (s.earlierPermissions ?? []).find((p) => p.streamUrl === url);
+    if (earlier) return { waits: false, text: `The written permission recorded before for this address covers it again (${earlier.grantedBy}). It's checked from the next minute.` };
+    return { waits: true, text: `Their written permission covers ${s.streamUrl} only. Saving takes ${who} off the dial until new evidence is recorded for the new address. The permission is kept as it was.` };
+  }
+  if (e?.basis === "public_source") return { waits: false, text: "The public basis stays: it's about the source. The new address is checked from the next minute." };
+  return { waits: false, text: "The new address is checked once its evidence is recorded." };
+}
+
+const FIELD_LABELS: Record<ListedChange["fields"][number]["field"], string> = {
+  name: "Whose stream",
+  description: "What it shows",
+  streamUrl: "Address",
+  plays: "How it plays",
+  embedTerms: "Their terms",
+  calendarUrl: "Feed address",
+  calendarFormat: "Feed format",
+  schedule: "What's on",
+  guideCheckedAgainst: "Checked against",
+  guideCheckedOn: "Date checked",
+  channel: "Channel",
+  callSign: "Call sign"
+};
+
+const VALUE_WORDS: Record<string, string> = {
+  embed: "Official embed",
+  stream_link: "Stream link",
+  allowed: "Allow embedding",
+  unclear: "Unclear",
+  feed: "Their calendar or schedule feed",
+  guide_data: "Guide data",
+  none: "None"
+};
+
+const EFFECT_WORDS: Record<ListedChange["effects"][number], string> = {
+  waits_for_evidence: "It waits for new evidence",
+  checks_restart: "Checked afresh",
+  schedule_reread: "Its schedule read again"
+};
+
+/**
+ * One entry in the change history: "Dee A. changed Address from https://… to https://…. It waits
+ * for new evidence", "Dee A. took it off the dial for good", "Dee A. put it back on the list".
+ */
+export function changeWords(c: ListedChange, timeZone: string): { when: string; text: string } {
+  const when = dayMonth(c.at, timeZone, { short: true });
+  const who = c.by ?? "Opencast";
+  const value = (f: ListedChange["fields"][number], v: string | null) => (v === null || v === "" ? "nothing" : f.field === "plays" || f.field === "embedTerms" || f.field === "schedule" ? (VALUE_WORDS[v] ?? v) : v);
+  const at = clock(c.at, { timeZone });
+  if (c.action === "removed") return { when, text: `${who} took it off the dial for good, ${at}` };
+  if (c.action === "restored") {
+    const ch = c.fields.find((f) => f.field === "channel");
+    return { when, text: `${who} put it back on the list${ch?.to ? ` at ${ch.to}` : ""}, ${at}` };
+  }
+  const parts = c.fields.map((f) => `${FIELD_LABELS[f.field]} from ${value(f, f.from)} to ${value(f, f.to)}`);
+  const effects = c.effects.map((e) => EFFECT_WORDS[e]);
+  return { when, text: `${who} changed ${parts.join("; ")}, ${at}${effects.length ? `. ${effects.join(". ")}` : ""}` };
+}
+
+/** "Taken off the dial Sept 30 by Dee A." and where its channel stands: held for it until a date, or freed. */
+export function removedWords(s: ListedSource, timeZone: string, now: Date): { text: string; detail: string } | null {
+  const r = s.removed;
+  if (!r) return null;
+  const held = Date.parse(r.channelHeldUntil) > now.getTime();
+  const on = dayMonth(r.channelHeldUntil, timeZone, { short: true });
+  return {
+    text: `Taken off the dial ${dayMonth(r.at, timeZone, { short: true })}${r.by ? ` by ${r.by}` : ""}`,
+    detail: r.channel ? (held ? `${r.channel} held for it until ${on}` : `${r.channel} freed ${on}`) : "Its channel was freed"
+  };
 }

@@ -84,9 +84,12 @@ export function swipePreview(dy: number, dx = 0): "up" | "down" | null {
   return dy < 0 ? "up" : "down";
 }
 
-/** The dial's neighbour, the way the player moves: in channel order, within the band, wrapping. */
-export function neighbourOf(channels: DialRowX[], currentId: string | null, dir: "up" | "down"): DialRowX | null {
-  return neighbour(channels, currentId, dir, { sameBand: true }) as DialRowX | null;
+/**
+ * The dial's neighbour, the way the player moves: in channel order, within the band, wrapping.
+ * `skipDash`: this device can't play DASH, so the player skips DASH stream links (A226).
+ */
+export function neighbourOf(channels: DialRowX[], currentId: string | null, dir: "up" | "down", skipDash = false): DialRowX | null {
+  return neighbour(channels, currentId, dir, { sameBand: true, skipDash }) as DialRowX | null;
 }
 
 function channelKey(ch: string | null): number {
