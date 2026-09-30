@@ -303,7 +303,9 @@ describe("the audience (U1, U3)", () => {
       averageTunedIn: 10,
       peakTunedIn: 14,
       stayedToTheEnd: 80,
-      onNow: false
+      onNow: false,
+      // Watch data (follow-up Phase 1): it ended within two hours and hasn't been worked out yet.
+      watch: expect.objectContaining({ status: "counting", timeLabel: "watch_time", watchMinutes: null })
     });
     expect(res.body.comparison).toEqual([{ minute: "2026-10-01T21:00:00.000Z", tunedIn: 6 }]);
     expect(res.body.breaks[0]).toEqual({ startsAt: "2026-10-01T17:28:30.000Z", endsAt: "2026-10-01T17:30:00.000Z" });

@@ -10,5 +10,6 @@ import { reservedHandlers } from "./reserved";
 import { settingsHandlers } from "./settings";
 import { shelfHandlers } from "./shelf";
 import { sponsorsHandlers } from "./sponsors";
+import { storageHandlers } from "./storage";
 
-export const handlers = [...accountsHandlers, ...boardHandlers, ...creatorHandlers, ...listedHandlers, ...heldHandlers, ...settingsHandlers, ...shelfHandlers, ...sponsorsHandlers, ...claimsHandlers, ...reservedHandlers, ...mockHandlers];
+export const handlers = [...accountsHandlers, ...boardHandlers, ...creatorHandlers, ...listedHandlers, ...heldHandlers, ...settingsHandlers, ...storageHandlers, ...shelfHandlers, ...sponsorsHandlers, ...claimsHandlers, ...reservedHandlers, ...mockHandlers];

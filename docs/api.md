@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-312 endpoints in 17 modules.
+320 endpoints in 18 modules.
 
 ## accounts (35)
 
@@ -56,11 +56,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getGuide` | GET | `/markets/:marketSlug/guide` | anyone | The guide for a market and time window (at most 24 hours) |
 | `getStation` | GET | `/stations/:stationRef` | anyone | A station page, by id or call sign |
 | `search` | GET | `/search` | anyone | Search by call sign, channel number and title. A number returns a station to tune to. |
-| `createStation` | POST | `/stations` | signed in | Start a station (or a studio). Nothing is public until it signs on. The creator becomes the owner. |
+| `createStation` | POST | `/stations` | signed in | Start a station (or a studio). Nothing is public until it signs on. The creator becomes the owner. Changed 2026-09-29: `reservationId` starts it from a waitlist invite, with the call sign and channel held. |
 | `getSetup` | GET | `/stations/:stationId/setup` | signed in | Identity and settings, for master control |
 | `updateSetup` | PATCH | `/stations/:stationId/setup` | signed in | Change name, description, colour (4.5:1 on white), bug, logo, legal details (owner) |
 | `availableChannels` | GET | `/markets/:marketSlug/channels` | signed in | Which main channels are open in a market and band (setup step A1) |
-| `chooseChannel` | PUT | `/stations/:stationId/channel` | signed in | Choose market, band and channel before first sign-on. A station gets X.1. |
+| `chooseChannel` | PUT | `/stations/:stationId/channel` | signed in | Choose market, band and channel before first sign-on. A station gets X.1. Changed 2026-09-29: choosing another than the channel held with its waitlist call sign lets the held one go. |
 | `getBreakRule` | GET | `/stations/:stationId/break-rule` | signed in | The station's break rule and blocked categories |
 | `setBreakRule` | PUT | `/stations/:stationId/break-rule` | signed in | Set the break rule (owner, operator) |
 | `listTranslators` | GET | `/stations/:stationId/translators` | signed in | Relays to YouTube, Twitch and any RTMP address |
@@ -255,12 +255,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `makeDefaultFundingSource` | POST | `/businesses/:businessId/funding-sources/:sourceId/default` | signed in | E5: make a funding source the default (owner only): auto top-up and closing the account use it |
 | `pledgeCardSession` | POST | `/me/pledges/:pledgeId/card-session` | signed in | E1: a page to change the card on a monthly pledge (Stripe's), which comes back to `returnTo` (a path in the app; default the pledge's station). 422 `no_card_to_change` for a one-time or ended pledge. |
 
-## audience (2)
+## audience (4)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `heartbeat` | POST | `/heartbeat` | anyone (personal if signed in), or a TV signed in | Players send this every 30 seconds while tuned in |
 | `getAudience` | GET | `/stations/:stationId/audience` | signed in | The station's own numbers (never shown to viewers) |
+| `programWatchData` | GET | `/stations/:stationId/programs/watch-data` | signed in | Offering your programs: each of the maker's programs across every station that aired it, added up |
+| `voteNotForMe` | POST | `/stations/:stationId/not-for-me` | anyone (personal if signed in), or a TV signed in | A viewer's "Not for me" on the program airing now (one per session per airing) |
 
 ## trust (7)
 
@@ -283,12 +285,13 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getPrefs` | GET | `/me/notification-prefs` | signed in | Notification settings for a scope |
 | `setPrefs` | PUT | `/me/notification-prefs` | signed in | Change notification settings. Always-on kinds stay on. |
 
-## waitlist (13)
+## waitlist (14)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `join` | POST | `/waitlist` | anyone | Join the waitlist. A station can ask for a call sign; it's held for 120 days (`call_signs.hold`). 422 `call_sign_refused` for a name Opencast won't allow; someone else asking for the same name is allowed, and the desk decides. |
 | `checkCallSign` | GET | `/call-signs/:callSign` | anyone (personal if signed in) | Whether a call sign is free. Signed in, a name held for you is available to you |
+| `getReservationInvite` | GET | `/waitlist/reservations/:reservationId` | anyone (personal if signed in) | Added 2026-09-29: a waitlist invite's link as master control reads it: the call sign, market, channel held and end, whether it's open, being set up, signed on or ended, and the address masked. Signed in, whether the account has the signup's email. 404 for an unknown one, or a hold that isn't the waitlist's. |
 | `listReservations` | GET | `/admin/reservations` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Reserved call signs and the channels held for them |
 | `holdChannel` | POST | `/admin/reservations/:reservationId/channel` | Opencast admin | Hold a channel number for a reservation; no other station can take it |
 | `reservationsOverview` | GET | `/admin/reservations/overview` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The market's reservations in numbers, the hold's rule, and stations on the dial whose call signs break the rules now |
@@ -353,7 +356,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `phoneRemoteEvents` | GET | `/tv/remote/:tvId/events` | anyone (personal if signed in) (event stream) | A phone's stream for one TV (SSE): `state` and `ended`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |
 | `sendRemoteCommand` | POST | `/tv/remote/:tvId/commands` | anyone (personal if signed in) | Send a command to the TV, with the phone's name ("Kai's phone"). The TV isn't connected: 409 `tv_not_connected`. A phone signed in to the TV's account (its Privy token), or a guest phone paired with this TV (its `phoneToken`). Anyone else: 403 `not_paired`. |
 
-## desk (13)
+## desk (17)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -370,6 +373,10 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `proposeSignerChange` | POST | `/admin/escrow/signer-proposals` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Proposes a change to the verifier keys; every other admin has to approve it (admins only) |
 | `decideSignerChange` | POST | `/admin/escrow/signer-proposals/:proposalId/decision` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Approves or refuses a proposed signer change (the other admins only) |
 | `withdrawSignerChange` | POST | `/admin/escrow/signer-proposals/:proposalId/withdraw` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Withdraws your own open proposal |
+| `getStorageMaintenance` | GET | `/admin/storage` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Each storage job's run going now, last check and last apply; `check` starts a fresh check of one job or all (admins only) |
+| `startStorageRun` | POST | `/admin/storage/runs` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Checks (report only) or applies one storage job, in the background (admins only) |
+| `getStorageRun` | GET | `/admin/storage/runs/:runId` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | One storage run, with its progress (admins only) |
+| `storageRunReport` | GET | `/admin/storage/runs/:runId/report` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | A finished storage run's JSON report, as the script writes it (admins only) |
 
 ## catalogShelf (13)
 
@@ -400,3 +407,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `endCatalogSponsorship` | POST | `/admin/catalog/sponsors/:sponsorshipId/end` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Ends a sponsorship (credited to the end of its paid month, then Clear again), or withdraws an offer |
 | `listBusinessCatalogSponsorships` | GET | `/businesses/:businessId/catalog-sponsorships` | signed in | A business's catalog sponsorships and the offers waiting for its answer (owner or manager) |
 | `answerCatalogOffer` | POST | `/businesses/:businessId/catalog-sponsorships/:sponsorshipId/answer` | signed in | Accepts an offer (its first month is held now if it has started; 422 `insufficient_balance`) or declines it (owner or manager) |
+
+## config (1)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getConfig` | GET | `/config` | anyone | The viewer apps' switches (features on or off), from the rules registry |

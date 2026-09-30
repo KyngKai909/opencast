@@ -12,6 +12,7 @@ import { dbStation, getDb, membership } from "../db";
 import { audienceReport, hasAudience, heldEarnings, moveToBank, payoutAccount, setPayoutTo, stationEarnings, stationStatements, statementCsv, statementOwner } from "../fixtures/earnings";
 import type { MockPerson } from "../fixtures/people";
 import { stationState } from "../fixtures/station";
+import { makerWatchData } from "../fixtures/watch";
 import { fail, needsUser, path, reply } from "../respond";
 
 type Need = "see" | "own";
@@ -114,6 +115,21 @@ export const earningsHandlers = [
     if (!q.success) return fail(422, "invalid", "Ask for a window with a start and an end.");
     if (!hasAudience(id)) return fail(404, "not_found", "There's no audience for this station yet.");
     return reply(audienceApi.getAudience.response, audienceReport(id, q.data.from, q.data.to)!);
+  }),
+
+  // Watch data (follow-up Phase 1), Offering your programs: the maker's programs across every
+  // station that aired them, added up (fixtures/watch.ts). Owners and operators; studios too.
+  http.get(path(audienceApi.programWatchData), ({ request, params }) => {
+    const p = needsUser(request);
+    if (p instanceof Response) return p;
+    const id = String(params.stationId);
+    const no = guard(p, id, "see");
+    if (no) return no;
+    const q = audienceApi.programWatchData.query.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+    if (!q.success) return fail(400, "bad_request", "Ask for a window with a start and an end.");
+    const span = Date.parse(q.data.to) - Date.parse(q.data.from);
+    if (span <= 0 || span > 366 * 86_400_000) return fail(400, "bad_request", "Ask for up to a year.");
+    return reply(audienceApi.programWatchData.response, makerWatchData(id, q.data.from, q.data.to));
   }),
 
   // Admin only in the API. The mock has no admins, so it answers anyone signed in (the network desk

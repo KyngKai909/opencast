@@ -14,6 +14,7 @@ import { geoFromEnv } from "./geo.js";
 import { placesFromEnv } from "./places.js";
 import { relayFromEnv } from "./relay.js";
 import { emailFromEnv } from "./email.js";
+import { pinataFromEnv } from "./storageMaintenance.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -59,6 +60,7 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
     geo: geoFromEnv(env),
     places: placesFromEnv(env),
     relay: relayFromEnv(env),
+    pinata: pinataFromEnv(env),
     config: {
       storageRoot,
       appOrigin,

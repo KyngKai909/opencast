@@ -22,6 +22,8 @@ import type { NetworkService } from "./modules/network/service.js";
 import type { TvService } from "./modules/tv/service.js";
 import type { SettingsService } from "./modules/settings/service.js";
 import type { ShelfService } from "./modules/shelf/service.js";
+import type { MaintenanceService } from "./modules/maintenance/service.js";
+import type { PinataAccount } from "./storageMaintenance.js";
 import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
 import type { RelayBus } from "./relay.js";
@@ -64,6 +66,11 @@ export interface Deps {
   places?: PlaceLookup;
   /** The TV remote's message bus: in-process, or Redis pub/sub when REDIS_URL is set. */
   relay: RelayBus;
+  /**
+   * Pinata (PINATA_JWT), read by the desk's Storage maintenance to copy pins off it (never to
+   * unpin). Null or absent: Pinata isn't connected here. Added 2026-09-29.
+   */
+  pinata?: PinataAccount | null;
   config: {
     /** Where uploads and working files go. */
     storageRoot: string;
@@ -117,6 +124,8 @@ export interface Services {
   settings: SettingsService;
   /** The catalog's shelf (added 2026-09-29): series, items and their rights checks, episodes. */
   shelf: ShelfService;
+  /** Storage maintenance (added 2026-09-29): the one-off storage jobs, run from the desk. */
+  maintenance: MaintenanceService;
 }
 
 export interface ModuleContext {

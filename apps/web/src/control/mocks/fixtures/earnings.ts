@@ -24,6 +24,7 @@ import { dbStation, stationBreaks, stationLog } from "../db";
 import { getSpots, spotById } from "./spots";
 import { BEAT, CRAT, HALL, LAB, stationByRef, uid } from "./stations";
 import { MIN, at } from "./time";
+import { airingWatchOf } from "./watch";
 
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
 const CENT = 10_000;
@@ -806,6 +807,7 @@ export function audienceReport(stationId: string, fromIso: string, toIso: string
     const endM = Math.ceil((Date.parse(e.endsAt) - evening) / MIN);
     const vals = curve.slice(s, Math.min(endM, curve.length));
     const onNow = Date.parse(e.startsAt) <= t.getTime() && t.getTime() < Date.parse(e.endsAt);
+    const stayed = onNow ? null : STAYED[e.title] ?? 70;
     return {
       key: e.id,
       programId: e.programId,
@@ -816,8 +818,10 @@ export function audienceReport(stationId: string, fromIso: string, toIso: string
       carriedFrom: e.carriedFrom,
       averageTunedIn: vals.length ? Math.round(vals.reduce((x, v) => x + v, 0) / vals.length) : 0,
       peakTunedIn: vals.length ? Math.max(...vals) : 0,
-      stayedToTheEnd: onNow ? null : STAYED[e.title] ?? 70,
-      onNow
+      stayedToTheEnd: stayed,
+      onNow,
+      // Watch data (follow-up Phase 1): the airing's own numbers, from the same minutes (fixtures/watch.ts).
+      watch: airingWatchOf(e.title, vals, { onNow, band: dbStation(stationId)?.ident.band ?? null, stayed })
     };
   });
 

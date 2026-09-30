@@ -1,4 +1,4 @@
-import { deskApi as api } from "@opencast/contracts";
+import { configApi, deskApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 
@@ -17,6 +17,9 @@ export function settingsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.changeLog, ({ query }) => settings.changeLog(query));
 
   r.handle(api.listNumbering, () => settings.numbering());
+
+  // The viewer apps' switches (added 2026-09-29, follow-up Phase 1): public, read from the registry.
+  r.handle(configApi.getConfig, async () => ({ features: { notForMe: (await settings.valueAt("features.not_for_me")).enabled } }));
 
   r.handle(api.getSigners, ({ user }) => settings.signers(user));
   r.handle(api.proposeSignerChange, ({ user, body }) => settings.proposeSigner(user, body));

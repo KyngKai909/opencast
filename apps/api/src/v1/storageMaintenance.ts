@@ -12,6 +12,9 @@
 //     verified by hash; every row that used the pin then points at the new content ID.
 //
 // None of them unpins or deletes anything but the 1280 px copies, which the originals replace.
+//
+// Since 2026-09-29 the desk runs them too (Settings, Storage maintenance: modules/maintenance), in
+// the background inside the API, a check (report only) or an apply; the scripts stay for local use.
 
 import { createHash } from "node:crypto";
 import { createWriteStream, promises as fs } from "node:fs";
@@ -33,6 +36,9 @@ const PR = schema.preparedRenditions;
 const PC = schema.preparedCaptions;
 
 const seg = (i: number, ext: string) => `seg_${String(i).padStart(5, "0")}.${ext}`;
+
+/** Told after each row, pin or item: how many are done of how many (the desk shows it while a run goes). */
+export type Progress = (done: number, total: number) => void | Promise<void>;
 
 /** The bands a key is prepared for, in full. */
 async function preparedBands(ctx: ModuleContext, key: string): Promise<Band[]> {
@@ -171,8 +177,9 @@ export interface LocationEntry {
  * row's bytes are read, stored by content ID (Infrequent Access: it's an original) and the row
  * relinked. Rows whose bytes can't be read are reported and left.
  */
-export async function relinkLocations(ctx: ModuleContext, options: { relink: boolean; fetcher?: typeof fetch }): Promise<{ rows: number; relinked: number; unreachable: number; entries: LocationEntry[] }> {
+export async function relinkLocations(ctx: ModuleContext, options: { relink: boolean; fetcher?: typeof fetch; onProgress?: Progress }): Promise<{ rows: number; relinked: number; unreachable: number; entries: LocationEntry[] }> {
   const rows = await locatedRows(ctx);
+  await options.onProgress?.(0, rows.length);
   const entries: LocationEntry[] = [];
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencast-relink-"));
   try {
@@ -201,6 +208,7 @@ export async function relinkLocations(ctx: ModuleContext, options: { relink: boo
         entry.error = (error as Error).message;
       }
       entries.push(entry);
+      await options.onProgress?.(entries.length, rows.length);
     }
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
@@ -279,6 +287,151 @@ export async function copyPin(ctx: ModuleContext, pin: { ipfsCid: string; name: 
   return entry;
 }
 
+/** A pin on Pinata, as listed. */
+export interface Pin {
+  ipfsCid: string;
+  bytes: number;
+  name: string | null;
+  /** How the script unpins it (`--unpin`, never from here): a v3 file id, or the legacy pin (by CID). */
+  unpin: { kind: "v3"; network: "public" | "private"; id: string } | { kind: "legacy" };
+}
+
+/** A Pinata account this API can read (PINATA_JWT): what's pinned, and where to fetch it. It can't unpin. */
+export interface PinataAccount {
+  /** The gateway pins are fetched from (PINATA_GATEWAY_BASE). */
+  gateway: string;
+  /** Every pin the key can list, and which listings it could read ("read", or why not: a scoped key may not read them all). */
+  listPins(): Promise<{ pins: Pin[]; listings: Record<string, string> }>;
+}
+
+/** Pinata by its API (only GETs): the v3 files on both networks, and anything pinned through the legacy pinning API. */
+export function pinataAccount(config: { jwt: string; gatewayBase?: string; apiBase?: string; fetcher?: typeof fetch }): PinataAccount {
+  const api = (config.apiBase ?? "https://api.pinata.cloud").replace(/\/+$/, "");
+  const fetcher = config.fetcher ?? fetch;
+  async function get(url: string) {
+    const response = await fetcher(url, { headers: { Authorization: `Bearer ${config.jwt}` } });
+    if (!response.ok) throw new Error(`GET ${url} answered ${response.status}`);
+    return response.json();
+  }
+  return {
+    gateway: (config.gatewayBase ?? "https://gateway.pinata.cloud/ipfs").replace(/\/+$/, ""),
+    async listPins() {
+      const listings: Record<string, string> = {};
+      const pins = new Map<string, Pin>();
+      // Files uploaded through the v3 API (what the old API used), both networks.
+      for (const network of ["public", "private"] as const) {
+        let token: string | undefined;
+        do {
+          const page = (await get(`${api}/v3/files/${network}?limit=1000${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`).catch((error: Error) => {
+            listings[`v3 ${network}`] = error.message;
+            return null;
+          })) as { data?: { files?: Array<{ id: string; cid: string; size: number; name: string | null }>; next_page_token?: string } } | null;
+          for (const f of page?.data?.files ?? []) pins.set(f.cid, { ipfsCid: f.cid, bytes: f.size, name: f.name, unpin: { kind: "v3", network, id: f.id } });
+          if (page) listings[`v3 ${network}`] ??= "read";
+          token = page?.data?.next_page_token || undefined;
+        } while (token);
+      }
+      // Anything pinned through the legacy pinning API.
+      for (let offset = 0; ; offset += 1000) {
+        const page = (await get(`${api}/data/pinList?status=pinned&pageLimit=1000&pageOffset=${offset}`).catch((error: Error) => {
+          listings.legacy = error.message;
+          return null;
+        })) as { rows: Array<{ ipfs_pin_hash: string; size: number; metadata?: { name?: string } }> } | null;
+        if (!page) break;
+        listings.legacy ??= "read";
+        for (const r of page.rows) if (!pins.has(r.ipfs_pin_hash)) pins.set(r.ipfs_pin_hash, { ipfsCid: r.ipfs_pin_hash, bytes: r.size, name: r.metadata?.name ?? null, unpin: { kind: "legacy" } });
+        if (page.rows.length < 1000) break;
+      }
+      return { pins: [...pins.values()], listings };
+    }
+  };
+}
+
+/** Pinata from the environment (PINATA_JWT, PINATA_GATEWAY_BASE), or null when it isn't connected here. */
+export function pinataFromEnv(env: NodeJS.ProcessEnv): PinataAccount | null {
+  const jwt = env.PINATA_JWT?.trim();
+  return jwt ? pinataAccount({ jwt, gatewayBase: env.PINATA_GATEWAY_BASE || undefined }) : null;
+}
+
+/** Published prices (per GB-month). R2 has no charge for reads (egress); Infrequent Access adds a retrieval fee and a 30-day minimum. */
+const R2 = { standard: 0.015, infrequent: 0.01, infrequentRetrievalPerGb: 0.01 };
+const GB = 1024 ** 3;
+
+export interface PinataMove {
+  at: string;
+  store: string;
+  listings: Record<string, string>;
+  pinned: { files: number; gb: number };
+  moving: { files: number; gb: number };
+  stayingOnIpfs: { files: number; gb: number; cids: string[] };
+  monthly: { pinataBefore: number | string; r2After: number; r2AfterIfAllStandard: number; pinataAfter: number | string };
+  copies: Array<PinCopy & Record<string, unknown>>;
+}
+
+/**
+ * Pinata's pins, and what moving off it costs. Every pin but the catalog's (pinned for good:
+ * `contents.ipfs_reason` "catalog", or `keep`) is moving. With `copy`, each moving pin is copied
+ * in, checked by hash and its rows relinked (`copyPin`); `afterCopy` is the script's hook for
+ * `--unpin`. Nothing here unpins.
+ */
+export async function moveOffPinata(
+  ctx: ModuleContext,
+  pinata: PinataAccount,
+  options: { copy: boolean; keep?: string[]; pinataMonthly?: number; fetcher?: typeof fetch; onProgress?: Progress; afterCopy?: (pin: Pin, entry: PinCopy & Record<string, unknown>) => Promise<void> }
+): Promise<{ report: PinataMove; counts: { pins: number; moving: number; movingBytes: number; staying: number; stayingBytes: number; copied: number; relinked: number; errors: number } }> {
+  const catalog = new Set([
+    ...(options.keep ?? []),
+    ...(await ctx.deps.db.select({ cid: schema.contents.ipfsCid, reason: schema.contents.ipfsReason }).from(schema.contents).where(isNotNull(schema.contents.ipfsCid)))
+      .filter((r) => r.reason === "catalog")
+      .map((r) => r.cid!)
+  ]);
+  const { pins, listings } = await pinata.listPins();
+  const total = pins.reduce((sum, p) => sum + p.bytes, 0);
+  const moving = pins.filter((p) => !catalog.has(p.ipfsCid));
+  const staying = pins.filter((p) => catalog.has(p.ipfsCid));
+  const movingBytes = moving.reduce((sum, p) => sum + p.bytes, 0);
+  const stayingBytes = staying.reduce((sum, p) => sum + p.bytes, 0);
+  const report: PinataMove = {
+    at: ctx.deps.clock.now().toISOString(),
+    store: ctx.deps.storage.objects.name,
+    listings,
+    pinned: { files: pins.length, gb: +(total / GB).toFixed(3) },
+    moving: { files: moving.length, gb: +(movingBytes / GB).toFixed(3) },
+    stayingOnIpfs: { files: staying.length, gb: +(stayingBytes / GB).toFixed(3), cids: staying.map((p) => p.ipfsCid) },
+    monthly: {
+      pinataBefore: options.pinataMonthly ?? "your Pinata plan's price",
+      // Originals move to Infrequent Access until an asset points at them as its prepared file.
+      r2After: +((movingBytes / GB) * R2.infrequent).toFixed(2),
+      r2AfterIfAllStandard: +((movingBytes / GB) * R2.standard).toFixed(2),
+      pinataAfter: staying.length ? "the smallest plan that holds the catalog" : 0
+    },
+    copies: []
+  };
+  if (options.copy) {
+    await options.onProgress?.(0, moving.length);
+    for (const pin of moving) {
+      // Copied, verified by hash, and the rows that used it relinked to the content ID (never unpinned here).
+      const entry: PinCopy & Record<string, unknown> = { ...(await copyPin(ctx, pin, pinata.gateway, options.fetcher)) };
+      await options.afterCopy?.(pin, entry);
+      report.copies.push(entry);
+      await options.onProgress?.(report.copies.length, moving.length);
+    }
+  }
+  return {
+    report,
+    counts: {
+      pins: pins.length,
+      moving: moving.length,
+      movingBytes,
+      staying: staying.length,
+      stayingBytes,
+      copied: report.copies.filter((c) => c.verified).length,
+      relinked: report.copies.reduce((sum, c) => sum + (c.relinked?.length ?? 0), 0),
+      errors: report.copies.filter((c) => c.error || c.verified === false).length
+    }
+  };
+}
+
 // --- Prepared from the copy: prepared again from the original ------------------------------------
 
 export interface OriginalEntry {
@@ -306,7 +459,7 @@ export interface OriginalEntry {
  * gone once nothing else points at it, with what was prepared from it. Run it again until nothing
  * is left waiting.
  */
-export async function prepareFromOriginals(ctx: ModuleContext, options: { apply: boolean }): Promise<{ items: number; toPrepare: number; readyToMove: number; queued: number; moved: number; failed: number; noOriginal: number; copyBytes: number; entries: OriginalEntry[] }> {
+export async function prepareFromOriginals(ctx: ModuleContext, options: { apply: boolean; onProgress?: Progress }): Promise<{ items: number; toPrepare: number; readyToMove: number; queued: number; moved: number; failed: number; noOriginal: number; copyBytes: number; entries: OriginalEntry[] }> {
   const { db } = ctx.deps;
   const content = ctx.services.library.content;
   const rows = await db
@@ -325,7 +478,9 @@ export async function prepareFromOriginals(ctx: ModuleContext, options: { apply:
   const info = await content.info(current.flatMap((r) => [r.file.contentId!, r.file.originalContentId!]));
   const entries: OriginalEntry[] = [];
   let copyBytes = 0;
+  await options.onProgress?.(0, current.length);
   for (const { file, asset } of current) {
+    if (entries.length) await options.onProgress?.(entries.length, current.length);
     const copy = file.contentId!;
     const original = file.originalContentId!;
     const o = info.get(original);
@@ -381,6 +536,7 @@ export async function prepareFromOriginals(ctx: ModuleContext, options: { apply:
     }
     entries.push(entry);
   }
+  await options.onProgress?.(entries.length, current.length);
   return {
     items: entries.length,
     toPrepare: entries.filter((e) => e.state === "to_prepare").length,

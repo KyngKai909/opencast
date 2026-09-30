@@ -228,6 +228,31 @@ export const RULES = {
     fallback: { opencastBps: 0, poolBps: 0, fundBps: 0 },
     display: (v) => (!v.opencastBps && !v.poolBps && !v.fundBps ? "Not set yet" : `${pct(v.opencastBps)} Opencast, ${pct(v.poolBps)} the pool, ${pct(v.fundBps)} the creator fund`),
     isSet: (v) => !!(v.opencastBps || v.poolBps || v.fundBps)
+  }),
+  // Watch data (added 2026-09-29, follow-up Phase 1; no first version: the fallback is the value until one is set).
+  "watch_data.retention": def({
+    group: "watch_data",
+    title: "Viewing sessions are kept for",
+    detail: "Each session's minutes and votes, to work out each airing's numbers. After that only the numbers per airing are kept, with no viewer in them",
+    schema: z.object({ days: z.number().int().min(2).max(90) }),
+    fallback: { days: 30 },
+    display: (v) => `${v.days} days`
+  }),
+  "watch_data.minimum_audience": def({
+    group: "watch_data",
+    title: "Numbers are shown from",
+    detail: "Viewers at once, at some point in an airing, before its numbers show. A maker sees other stations' airings only added together, and only when they add up to this across at least this many airings",
+    schema: z.object({ viewers: z.number().int().min(1).max(10_000), carriedAirings: z.number().int().min(1).max(100) }),
+    fallback: { viewers: 20, carriedAirings: 2 },
+    display: (v) => `${v.viewers} ${v.viewers === 1 ? "viewer" : "viewers"}, other stations' airings ${v.carriedAirings} or more together`
+  }),
+  "features.not_for_me": def({
+    group: "features",
+    title: "\"Not for me\" in the player",
+    detail: "The viewer's vote on what's airing. Votes are taken either way; this shows the control",
+    schema: z.object({ enabled: z.boolean() }),
+    fallback: { enabled: false },
+    display: (v) => (v.enabled ? "On" : "Off")
   })
 } as const;
 

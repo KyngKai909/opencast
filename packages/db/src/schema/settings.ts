@@ -58,7 +58,7 @@ export const rules = network.table(
   (t) => [index("rules_key_scope_from").on(t.key, t.scope, t.effectiveFrom), check("rule_key_format", sql`${t.key} ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$'`)]
 );
 
-/** Every change made in Settings: rules, team roles, escrow signer proposals and approvals. */
+/** Every change made in Settings: rules, team roles, escrow signer proposals and approvals, storage jobs applied. */
 export const changeLog = network.table(
   "change_log",
   {
@@ -68,8 +68,8 @@ export const changeLog = network.table(
     at: at("at").notNull().defaultNow(),
     /** Null: a migration. */
     by: uuid("by").references(() => users.id),
-    kind: text("kind", { enum: ["rule", "role", "signer"] }).notNull(),
-    /** The rule's key, the person's id, or the signer proposal's id. */
+    kind: text("kind", { enum: ["rule", "role", "signer", "storage"] }).notNull(),
+    /** The rule's key, the person's id, the signer proposal's id, or the storage run's id. */
     subject: text("subject").notNull(),
     scope: text("scope").notNull().default(""),
     /** One line, as the change log shows it. */
@@ -79,7 +79,7 @@ export const changeLog = network.table(
     effectiveFrom: at("effective_from"),
     note: text("note")
   },
-  (t) => [check("change_kind", sql`${t.kind} in ('rule', 'role', 'signer')`), index("change_log_at").on(t.at)]
+  (t) => [check("change_kind", sql`${t.kind} in ('rule', 'role', 'signer', 'storage')`), index("change_log_at").on(t.at)]
 );
 
 /**
@@ -133,4 +133,41 @@ export const signerApprovals = network.table(
     at: at("at").notNull().defaultNow()
   },
   (t) => [primaryKey({ columns: [t.proposalId, t.adminId] }), check("signer_decision", sql`${t.decision} in ('approve', 'refuse')`)]
+);
+
+/**
+ * Storage maintenance (added 2026-09-29): each run of a one-off storage job from the desk, a check
+ * (report only) or an apply, run in the background by the API. One running run per job (the
+ * partial unique index); a run that hasn't said anything for 30 minutes is taken as stopped (the
+ * API restarted) and marked failed when the next one starts. `report` is the JSON the scripts write.
+ */
+export const storageRuns = network.table(
+  "storage_runs",
+  {
+    id: id(),
+    /** Order among runs started at the same moment. */
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
+    job: text("job", { enum: ["relinkLocations", "copyPinata", "prepareFromOriginals"] }).notNull(),
+    mode: text("mode", { enum: ["check", "apply"] }).notNull(),
+    status: text("status", { enum: ["running", "done", "failed"] }).notNull().default("running"),
+    /** Null: started some other way. */
+    startedBy: uuid("started_by").references(() => users.id),
+    startedAt: at("started_at").notNull().defaultNow(),
+    /** Last word from the run (each row, pin or item done). */
+    heartbeatAt: at("heartbeat_at").notNull().defaultNow(),
+    finishedAt: at("finished_at"),
+    progressDone: integer("progress_done"),
+    progressTotal: integer("progress_total"),
+    counts: jsonb("counts").$type<Record<string, number>>(),
+    /** Why it stopped (failed). */
+    error: text("error"),
+    report: jsonb("report")
+  },
+  (t) => [
+    check("storage_run_job", sql`${t.job} in ('relinkLocations', 'copyPinata', 'prepareFromOriginals')`),
+    check("storage_run_mode", sql`${t.mode} in ('check', 'apply')`),
+    check("storage_run_status", sql`${t.status} in ('running', 'done', 'failed')`),
+    uniqueIndex("storage_runs_one_running").on(t.job).where(sql`${t.status} = 'running'`),
+    index("storage_runs_job_started").on(t.job, t.startedAt)
+  ]
 );

@@ -23,6 +23,7 @@ import { tvApi } from "./tv.js";
 import { deskApi } from "./desk.js";
 import { catalogShelfApi } from "./catalogShelf.js";
 import { catalogSponsorsApi } from "./catalogSponsors.js";
+import { configApi } from "./config.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -48,6 +49,8 @@ export * from "./publicDomain.js";
 export * from "./rules.js";
 export * from "./catalogSponsors.js";
 export * from "./callSigns.js";
+export * from "./config.js";
+export * from "./storageMaintenance.js";
 
 export const API_PREFIX = "/v1";
 
@@ -69,7 +72,9 @@ export const api = {
   tv: tvApi,
   desk: deskApi,
   catalogShelf: catalogShelfApi,
-  catalogSponsors: catalogSponsorsApi
+  catalogSponsors: catalogSponsorsApi,
+  /** Added 2026-09-29 (follow-up Phase 1): the apps' public switches. */
+  config: configApi
 } as const;
 
 export const HealthResponse = z.object({

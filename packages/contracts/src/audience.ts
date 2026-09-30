@@ -12,6 +12,101 @@ export const Heartbeat = z.object({
   playing: z.boolean()
 });
 
+// ---- Watch data (added 2026-09-29, follow-up Phase 1) ----
+
+/** TV counts watch time; the radio band counts listening time, the same way. */
+export const WatchTimeLabel = z.enum(["watch_time", "listening_time"]);
+export type WatchTimeLabel = z.infer<typeof WatchTimeLabel>;
+
+/**
+ * Whether numbers are shown: `shown`; `not_enough_viewers` (under the rules registry's
+ * `watch_data.minimum_audience`, 20 viewers at once at some point; stored all the same, and every
+ * number is null); `counting` (on now, or ended and not worked out yet: within ten minutes or so).
+ */
+export const WatchStatus = z.enum(["shown", "not_enough_viewers", "counting"]);
+export type WatchStatus = z.infer<typeof WatchStatus>;
+
+/** "Not enough viewers yet", as the API words it, for `not_enough_viewers`. */
+export const NOT_ENOUGH_VIEWERS = "Not enough viewers yet";
+
+/**
+ * Per airing of a program (a log entry's program rows in the station's as-run log), from the
+ * tuned-in sessions after bot filtering. Numbers are null unless `status` is `shown`.
+ */
+export const AiringWatch = z.object({
+  status: WatchStatus,
+  /** "Not enough viewers yet" when there aren't; null otherwise. */
+  note: z.string().nullable(),
+  timeLabel: WatchTimeLabel,
+  /** Minutes watched (listened) in all, to a tenth: each viewer's minutes while the program was on, breaks inside it not counted. */
+  watchMinutes: z.number().nullable(),
+  /** Viewers at once in its first minute, its busiest minute and its last minute. */
+  audienceAtStart: z.number().int().nullable(),
+  peakAudience: z.number().int().nullable(),
+  audienceAtEnd: z.number().int().nullable(),
+  /** Percent of those there in its first minute still there in its last (null with nobody at the start). */
+  stayedToTheEnd: z.number().int().nullable(),
+  /**
+   * Viewers who changed channel or stopped, by the minute of the program they left in: index 0 is
+   * its first minute (always 0), one entry per minute to its last.
+   */
+  tuneAways: z.array(z.number().int()).nullable(),
+  /** "Not for me" votes that counted: one per viewer, from viewers who watched at least 2 minutes of it. */
+  notForMe: z.number().int().nullable()
+});
+export type AiringWatch = z.infer<typeof AiringWatch>;
+
+/**
+ * A maker's program across every station that aired it (its own and its carriers), added up: never
+ * a station's audience per airing. One row per program and band (a TV program carried audio-only
+ * on the radio band has a listening-time row too). Other stations' airings count only together:
+ * at least `carriedAirings` of them (2) reaching the minimum audience between them; until then
+ * they're left out (`notCounted`). The totals show once the airings in them reach the minimum
+ * together (the sum of each airing's busiest minute).
+ */
+export const MakerProgramWatch = z.object({
+  programId: Id,
+  title: z.string(),
+  band: z.enum(["tv", "radio"]),
+  timeLabel: WatchTimeLabel,
+  status: z.enum(["shown", "not_enough_viewers"]),
+  note: z.string().nullable(),
+  /** Stations and airings in the totals (0 while `not_enough_viewers`). */
+  stations: z.number().int(),
+  airings: z.number().int(),
+  /** Other stations' airings not in the totals yet: too few, or too few viewers between them. */
+  notCounted: z.object({ airings: z.number().int() }),
+  totals: z
+    .object({
+      watchMinutes: z.number(),
+      /** Each airing's first-minute, busiest-minute and last-minute audience, added up. */
+      audienceAtStart: z.number().int(),
+      combinedPeak: z.number().int(),
+      audienceAtEnd: z.number().int(),
+      /** Percent of everyone there at an airing's start still there at its end. */
+      stayedToTheEnd: z.number().int().nullable(),
+      /** By minute of the program, every airing's tune-aways added up (as long as its longest airing). */
+      tuneAways: z.array(z.number().int()),
+      notForMe: z.number().int()
+    })
+    .nullable()
+});
+export type MakerProgramWatch = z.infer<typeof MakerProgramWatch>;
+
+export const MakerWatchData = z.object({
+  from: Timestamp,
+  to: Timestamp,
+  /** Programs with an airing in the window, by title. */
+  programs: z.array(MakerProgramWatch)
+});
+export type MakerWatchData = z.infer<typeof MakerWatchData>;
+
+export const NotForMeVote = z.object({
+  /** The player's session (the one its heartbeats carry). A signed-out vote is tied to it; so is a signed-in one: the person is never stored. */
+  sessionId: Id
+});
+export type NotForMeVote = z.infer<typeof NotForMeVote>;
+
 export const AudienceReport = z.object({
   tunedInNow: z.number().int(),
   peak: z.object({ tunedIn: z.number().int(), at: Timestamp }).nullable(),
@@ -50,7 +145,9 @@ export const AudienceReport = z.object({
         averageTunedIn: z.number().int(),
         peakTunedIn: z.number().int(),
         stayedToTheEnd: z.number().nullable(),
-        onNow: z.boolean()
+        onNow: z.boolean(),
+        /** Watch data (added 2026-09-29, follow-up Phase 1): this airing's watch time, audience and tune-aways. */
+        watch: AiringWatch.optional()
       })
     )
     .optional(),
@@ -88,6 +185,30 @@ export const audienceApi = {
     params: z.object({ stationId: Id }),
     query: z.object({ from: Timestamp, to: Timestamp }),
     response: AudienceReport
+  }),
+  // ---- Added 2026-09-29: watch data (follow-up Phase 1) ----
+  programWatchData: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/programs/watch-data",
+    auth: "user",
+    summary: "Offering your programs: each of the maker's programs across every station that aired it, added up",
+    params: z.object({ stationId: Id }),
+    /** Up to a year; airings that started in the window. */
+    query: z.object({ from: Timestamp, to: Timestamp }),
+    response: MakerWatchData
+  }),
+  voteNotForMe: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/not-for-me",
+    /** Signed in or not; the vote is tied to the session, never to the person. Taken whether or not `features.notForMe` is on. */
+    auth: "optional",
+    tvSession: true,
+    summary: "A viewer's \"Not for me\" on the program airing now (one per session per airing)",
+    params: z.object({ stationId: Id }),
+    body: NotForMeVote,
+    status: 200,
+    /** `already_recorded`: this session has voted on this airing already (nothing changes). */
+    response: z.object({ ok: z.literal(true), status: z.enum(["recorded", "already_recorded"]) })
   })
 };
 

@@ -29,12 +29,19 @@ export interface JobResults {
   templates: { stations: number; dates: number } | null;
   /** Reserved call signs, once an hour (added 2026-09-29): reminders sent, holds ended, holds whose station signed on. */
   reservations?: { reminded: number; expired: number; signedOn: number } | null;
+  /**
+   * Watch data (added 2026-09-29, follow-up Phase 1): airings worked out (every ten minutes), and
+   * once a day the sessions, minutes and votes past `watch_data.retention` deleted. Null in other minutes.
+   */
+  watchData?: { computed: number; finalized: number; votesDeleted: number } | null;
+  watchDataPurged?: { sessions: number; minutes: number; votes: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
   let lastDay = "";
   let lastMonth = "";
   let lastHour = "";
+  let lastWatch = 0;
 
   async function tick(): Promise<JobResults> {
     const now = deps.clock.now();
@@ -84,6 +91,15 @@ export function createJobs(deps: Deps, services: Services) {
       console.error("[jobs] checking Clear transfers failed", error);
       return null;
     });
+    // Watch data: each program airing's numbers, every ten minutes (collected only; nothing reads them to pay).
+    let watchData: JobResults["watchData"] = null;
+    if (now.getTime() - lastWatch >= 10 * 60_000) {
+      lastWatch = now.getTime();
+      watchData = await services.audience.watch.aggregate().catch((error) => {
+        console.error("[jobs] watch data failed", error);
+        return null;
+      });
+    }
     // Last: whatever the ledger wrote this minute goes to the provider.
     const moves = await services.ledger.sendMoves();
 
@@ -95,7 +111,13 @@ export function createJobs(deps: Deps, services: Services) {
     let pledgesRenewed = 0;
     let closedSwept = 0;
     let pool: JobResults["pool"] = null;
+    let watchDataPurged: JobResults["watchDataPurged"] = null;
     if (lastDay && day !== lastDay) {
+      // Viewing sessions past the retention rule (30 days) go; each airing's numbers stay.
+      watchDataPurged = await services.audience.watch.purge().catch((error) => {
+        console.error("[jobs] watch data purge failed", error);
+        return null;
+      });
       dailyCapsResumed = await services.spots.resumeDailyCaps();
       // Mondays: claimable stations' earnings go into the escrow contract, in one batch.
       const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short" }).format(now);
@@ -139,7 +161,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged };
   }
 
   let timer: NodeJS.Timeout | undefined;

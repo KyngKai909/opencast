@@ -33,9 +33,9 @@ export interface SettingsService {
   ruleValue(key: string, at?: Date, scope?: string): Promise<RuleValueAt>;
   ruleVersions(key: string, scope?: string): Promise<RuleVersion[]>;
   setRule(user: CurrentUser, key: string, input: { value: unknown; effectiveFrom: string; scope?: string; note?: string }): Promise<RuleView>;
-  changeLog(filter: { kind?: "rule" | "role" | "signer"; limit?: number }): Promise<ChangeLogEntry[]>;
-  /** Records a change made elsewhere (the catalog's rebuilds are not; they have their own record). */
-  logChange(db: Executor, entry: { by: string | null; kind: "rule" | "role" | "signer"; subject: string; scope?: string; summary: string; before?: unknown; after?: unknown; effectiveFrom?: Date | null; note?: string | null }): Promise<void>;
+  changeLog(filter: { kind?: ChangeLogEntry["kind"]; limit?: number }): Promise<ChangeLogEntry[]>;
+  /** Records a change made elsewhere (the catalog's rebuilds are not; they have their own record). Storage maintenance logs each apply (`storage`). */
+  logChange(db: Executor, entry: { by: string | null; kind: ChangeLogEntry["kind"]; subject: string; scope?: string; summary: string; before?: unknown; after?: unknown; effectiveFrom?: Date | null; note?: string | null }): Promise<void>;
 
   numbering(): Promise<MarketNumbering[]>;
   numberingFor(marketId: string, at?: Date): Promise<Numbering>;

@@ -14,6 +14,7 @@ import { STATIONS, stationById, uid } from "../fixtures/stations";
 import { channelsFor, nextChargeFor, receiptsFor } from "../fixtures/you";
 import { fail, needsUser, path, personOf, reply } from "../respond";
 import { marketOf } from "../view";
+import { rememberSession } from "./watch";
 
 const ident = (id: string) => stationById(id)!.ident;
 
@@ -345,7 +346,9 @@ export const meHandlers = [
   // Signed in (and keeping history), it's also the person's watch history (A2). The tuned-in count stays anonymous.
   http.post(path(audienceApi.heartbeat), async ({ request }) => {
     const p = personOf(request);
-    const body = (await request.json().catch(() => null)) as { stationId?: string; playing?: boolean } | null;
+    const body = (await request.json().catch(() => null)) as { stationId?: string; sessionId?: string; playing?: boolean } | null;
+    // Watch data: the session, for its "Not for me" votes (watch.ts).
+    if (body?.stationId && body.sessionId) rememberSession(body.sessionId, body.stationId);
     // During the station's planned off air (G9) the beat isn't counted or kept, and says when it's back.
     await syncStreamSignOff();
     const t = now();

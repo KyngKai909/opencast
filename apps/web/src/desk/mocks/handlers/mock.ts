@@ -7,6 +7,7 @@ import { now } from "../../../lib/clock";
 import { advance, creatorById, getDb, newId, resetDb, saveDb, stationById, worksOf } from "../db";
 import { resetSettings } from "../settingsDb";
 import { resetSponsors } from "../sponsorsDb";
+import { resetStorage } from "../storageDb";
 import { resetClaims } from "../claimsDb";
 import { bodyOf, fail, needsAdmin } from "../respond";
 
@@ -91,6 +92,7 @@ export const mockHandlers: HttpHandler[] = [
     resetDb();
     resetSettings();
     resetSponsors();
+    resetStorage();
     resetClaims();
     return HttpResponse.json({ ok: true });
   })

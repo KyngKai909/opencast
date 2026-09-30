@@ -8,6 +8,7 @@ import { schema } from "@opencast/db";
 import type { AudienceReport } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest } from "../../errors.js";
+import { createWatchData, recordSessionMinute, type WatchData } from "./watch.js";
 
 type Platform = "phone" | "cast" | "web" | "tv_app" | "mirror";
 
@@ -28,6 +29,8 @@ export interface AudienceService {
   /** The usual tuned in for a station at this hour, from the last week: for estimates and holds. */
   typicalTunedIn(stationIds: string[], at: Date): Promise<Map<string, number>>;
   report(stationId: string, from: Date, to: Date): Promise<AudienceReport>;
+  /** Watch data (added 2026-09-29, follow-up Phase 1): per airing of each program; votes; the daily purge. */
+  watch: WatchData;
 }
 
 export function createAudienceService({ deps, services }: ModuleContext): AudienceService {
@@ -38,6 +41,8 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
   const minuteOf = (at: Date) => new Date(Math.floor(at.getTime() / MINUTE) * MINUTE);
 
   const service: AudienceService = {
+    watch: createWatchData({ deps, services }),
+
     async heartbeat(input) {
       const now = deps.clock.now();
       // Planned off air (off air hours, a sign-off on the log): nothing's on, so nobody's tuned in.
@@ -85,6 +90,8 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
             .insert(M)
             .values({ stationId: input.stationId, minute, tunedIn: 1, [key]: 1 })
             .onConflictDoUpdate({ target: [M.stationId, M.minute], set: { tunedIn: sql`${M.tunedIn} + 1`, [key]: sql`${M[key]} + 1` } });
+          // Watch data: the same minute, for this session, kept 30 days (watch.ts).
+          await recordSessionMinute(db, { sessionId: input.sessionId, stationId: input.stationId, minute });
         };
         await count(minuteOf(now));
         // A beat covers the half minute before it too.
@@ -217,6 +224,15 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           };
         })
         .sort((a, b) => (b.airedAt ?? "").localeCompare(a.airedAt ?? ""));
+      // Watch data: each airing's own numbers, behind the minimum audience.
+      const watch = await service.watch.forStation(
+        stationId,
+        airings.map((a) => ({ logEntryId: a.logEntryId, endsAt: a.endsAt, onNow: Date.parse(a.endsAt) > now.getTime() }))
+      );
+      const byProgramWithWatch = byProgram.map((row) => {
+        const w = row.key && watch.get(row.key);
+        return w ? { ...row, watch: w } : row;
+      });
 
       const translators = await services.stations.translators(stationId);
       const translatorCounts = translators.length
@@ -247,7 +263,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           name: t.name,
           viewers: translatorCounts.find((c) => c.translatorId === t.id)?.viewers ?? 0
         })),
-        byProgram,
+        byProgram: byProgramWithWatch,
         // U3: the same window a week earlier, the whole way (minutes with anyone tuned in), and every break.
         comparison: lastWeek
           .map((r) => ({ minute: new Date(r.minute.getTime() + weekMs).toISOString(), tunedIn: r.tunedIn }))

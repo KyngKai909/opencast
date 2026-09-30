@@ -104,6 +104,31 @@ The catalog's one credit an hour, sold by series and market (the Network desk's 
 | A sponsorship that starts mid-month | as station sponsorships | the whole month is held and paid; credited from the moment it's agreed |
 | Ending a sponsorship | the desk or the business | credited to the end of its paid month, not refunded, then Clear again |
 
+## Watch data (added 2026-09-29, follow-up Phase 1)
+
+Collected and stored only (`docs/schema.md`, "Watch data"). Nothing that decides what airs or how money is split reads it yet.
+
+**Open, not built:**
+
+| Decision | Where it would live | Now |
+|---|---|---|
+| Syndication market stats for stations deciding what to carry (how a program does elsewhere) | the market's offers, from `audience.airing_stats` added up across carriers | not built: no station sees another station's numbers, and offers show none |
+| A "share by watch time" carriage deal type: a station's break revenue split among the makers it carried, by watch time, perhaps adjusted for time slot | a new `CarriageTerm`, settled from `airing_stats.watch_seconds` | not built: the deal types are barter, cash, cash plus barter and free, as before |
+| Station-level skippable blocks (a jukebox hour; never spots, credits, station IDs, or carried programs unless the maker allows it) | the log and the player | not built: nothing is skippable |
+
+**Decided while building (say if any should change):**
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| How long per-session rows are kept | the rules registry, `watch_data.retention` (Settings, Rules, group `watch_data`) | 30 days (2 to 90). Votes go sooner: once their airing is final, an hour after it ends |
+| The minimum audience | `watch_data.minimum_audience` `{ viewers, carriedAirings }` | 20 viewers at once at some point **in that airing** (each airing is gated on its own, not the program once any airing reached it). Stored regardless |
+| What a maker sees of other stations | `watch_data.minimum_audience.carriedAirings`, `audience.watch.forMaker` | other stations' airings only added together, at least 2 of them reaching the minimum between them; the maker's own airings always count. Otherwise they're left out and counted in `notCounted` (so one carrier's single airing can never be read off by subtracting the maker's own) |
+| One "Not for me" per viewer per airing | `audience.not_for_me_votes` (session, log entry) | one per **session**, signed in or not: the person is never stored, so a signed-in viewer on two devices can vote twice. A vote is for the log entry on the station's log when it's sent, and counts from a session counted in 2 of the program's minutes |
+| Bot filtering for watch data | `watch.ts` | a session ever flagged is left out entirely, including the minutes it was counted as tuned in before it was caught (the station's tuned-in line keeps those, as before) |
+| The existing tuned-in figures on the Audience page's program rows (average, peak, stayed from the line) | `AudienceReport.byProgram` | unchanged, not behind the minimum: they're the station's own tuned-in counts from before. Only the new `watch` numbers are gated. Say if the minimum should hide them too |
+| "Not for me" in the player | `features.not_for_me` (group `features`), read by the apps from `GET /v1/config` | off. The API takes votes either way. The desk's Rules page doesn't draw the `watch_data` and `features` groups yet (its `GROUPS` list); the API sets them |
+| External stations' tuned-in time (Phase 6) | `airing_stats.external` (a `listed` station's airings) | recorded and labelled, left out of the maker's totals; nothing that pays reads `airing_stats` |
+
 ## Product
 
 | Decision | Where it lives | Default |

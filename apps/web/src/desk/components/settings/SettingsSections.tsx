@@ -511,7 +511,7 @@ export function SignersSection() {
 
 // ---------- Change log ----------
 
-type Kind = "all" | "rule" | "role" | "signer";
+type Kind = "all" | "rule" | "role" | "signer" | "storage";
 
 export function ChangeLogSection() {
   const [kind, setKind] = useState<Kind>("all");
@@ -542,7 +542,8 @@ export function ChangeLogSection() {
           { value: "all", label: "Everything" },
           { value: "rule", label: "Rules" },
           { value: "role", label: "Team" },
-          { value: "signer", label: "Signers" }
+          { value: "signer", label: "Signers" },
+          { value: "storage", label: "Storage" }
         ]}
       />
       {log.isLoading ? <Quiet /> : log.error || !log.data ? <ErrorLine error={log.error} /> : <Table label="Change log" columns={columns} rows={log.data} rowKey={(e) => e.id} rowPadding={9} className="nd-log" />}

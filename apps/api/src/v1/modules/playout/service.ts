@@ -71,6 +71,17 @@ export interface AsRunView {
   airingId: string | null;
 }
 
+/** A program row of the as-run log, for watch data. */
+export interface ProgramRow {
+  id: string;
+  stationId: string;
+  startedAt: Date;
+  endedAt: Date;
+  logEntryId: string | null;
+  programId: string | null;
+  carried: boolean;
+}
+
 export interface PlayoutService {
   /** Whether each station is on air, and where to play it. */
   /** `standingBy`: a live block is on the stand-by slate, waiting for its signal (S13). */
@@ -83,6 +94,12 @@ export interface PlayoutService {
   asRun(stationId: string, from: Date, to: Date): Promise<AsRunView[]>;
   /** Catalog sponsors (added 2026-09-29): the catalog credits that aired in a window, every station (credits naming a series carry its program). */
   catalogCreditsAired(programIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; programId: string; startedAt: Date }>>;
+  /**
+   * Watch data (added 2026-09-29, follow-up Phase 1): the as-run log's program rows (PGM, outside
+   * breaks, not slates or station ID fills) that ended in a window, every station, or the stations
+   * given. With `logEntryIds`, every program row of those log entries, whenever they aired.
+   */
+  programRows(input: { endedFrom: Date; endedTo: Date; stationIds?: string[] } | { logEntryIds: string[] }): Promise<ProgramRow[]>;
   /** As-run rows for spot airings, for billing and results. */
   asRunForAirings(airingIds: string[]): Promise<Map<string, typeof schema.asRun.$inferSelect>>;
   /**
@@ -554,6 +571,23 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .from(A)
         .where(and(eq(A.code, "UND"), inArray(A.programId, programIds), gte(A.startedAt, from), lt(A.startedAt, to)));
       return rows.flatMap((r) => (r.programId ? [{ stationId: r.stationId, programId: r.programId, startedAt: r.startedAt }] : []));
+    },
+
+    async programRows(input) {
+      const A = schema.asRun;
+      const where =
+        "logEntryIds" in input
+          ? input.logEntryIds.length
+            ? inArray(A.logEntryId, input.logEntryIds)
+            : undefined
+          : and(gte(A.endedAt, input.endedFrom), lt(A.endedAt, input.endedTo), input.stationIds ? (input.stationIds.length ? inArray(A.stationId, input.stationIds) : sql`false`) : undefined);
+      if (!where) return [];
+      const rows = await db
+        .select({ id: A.id, stationId: A.stationId, startedAt: A.startedAt, endedAt: A.endedAt, logEntryId: A.logEntryId, programId: A.programId, agreementId: A.carriageAgreementId })
+        .from(A)
+        .where(and(where, eq(A.code, "PGM"), isNull(A.breakId), inArray(A.reason, ["planned", "rotation", "backup_rotation", "dead_air_fill", "live"])))
+        .orderBy(asc(A.startedAt));
+      return rows.map(({ agreementId, ...r }) => ({ ...r, carried: agreementId !== null }));
     },
 
     async asRunForAirings(airingIds) {

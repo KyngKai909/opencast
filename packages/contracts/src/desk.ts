@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { DateOnly, Id, Market, Timestamp } from "./common.js";
+import { storageMaintenanceApi } from "./storageMaintenance.js";
 
 /** A Network desk role. Admin is the account's admin flag (and OPENCAST_ADMIN_EMAILS), as before. */
 export const DeskRole = z.enum(["admin", "rights_reviewer", "market_lead"]);
@@ -43,8 +44,11 @@ export const RoleInput = z
   .object({ role: DeskRole, marketId: Id.optional() })
   .refine((r) => (r.role === "market_lead") === !!r.marketId, { message: "A market lead needs a market, and only a market lead has one", path: ["marketId"] });
 
-/** Where a rule sits on the Rules page. */
-export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow", "call_signs", "sponsors"]);
+/**
+ * Where a rule sits on the Rules page. `watch_data` and `features` added 2026-09-29 (follow-up
+ * Phase 1: how long watch data is kept, the minimum audience, and the "Not for me" flag).
+ */
+export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow", "call_signs", "sponsors", "watch_data", "features"]);
 export type RuleGroup = z.infer<typeof RuleGroup>;
 
 /** One version of a rule: its value from a date. */
@@ -87,7 +91,8 @@ export type RuleList = z.infer<typeof RuleList>;
 export const RuleValueAt = z.object({ key: z.string(), scope: z.string(), at: Timestamp, value: z.unknown(), effectiveFrom: Timestamp, versionId: Id });
 export type RuleValueAt = z.infer<typeof RuleValueAt>;
 
-export const ChangeKind = z.enum(["rule", "role", "signer"]);
+/** `storage` added 2026-09-29: each apply of a storage job (Settings, Storage maintenance). */
+export const ChangeKind = z.enum(["rule", "role", "signer", "storage"]);
 export const ChangeLogEntry = z.object({
   id: Id,
   at: Timestamp,
@@ -255,5 +260,8 @@ export const deskApi = {
     params: z.object({ proposalId: Id }),
     response: SignerProposal,
     status: 200
-  })
+  }),
+
+  // Storage maintenance (added 2026-09-29), admins only: storageMaintenance.ts.
+  ...storageMaintenanceApi
 } as const;
