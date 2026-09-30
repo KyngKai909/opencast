@@ -136,7 +136,7 @@ Staging's Railway bucket bills as Railway's bucket pricing says. It has no stora
 
 ## What to set in Cloudflare
 
-1. **The bucket.** Create the bucket (`opencast-media`, docs/deploy.md "Cutting production over"). No public access is needed.
+1. **The bucket.** `opencast-staging` for staging and `opencast-production` for production (both created 2026-09-30). Staging's is public through its r2.dev address, for playback; production's gets a custom domain.
 2. **CORS.** Add the policy above with production's two app origins, and any other origin the apps are served from (`UPLOAD_CORS_ORIGINS`).
 3. **Lifecycle.** Change the default multipart abort rule to 1 day, and add the `uploads/` prefix rule (7 days).
 4. **API tokens.** The API and the worker need one with **Object Read & Write** on this bucket (`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`). It covers multipart uploads, presigning, the server-side copy and deletes. To apply CORS and lifecycle with the script instead of the dashboard, make a short-lived **Admin Read & Write** token, run `-- --apply` once, then delete the token.
