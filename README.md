@@ -4,11 +4,12 @@ Monorepo for **Opencast** — a dial of 24/7 local stations. Anyone can run a ch
 or a radio-band one, with a schedule, breaks, sponsors and a number on the dial. Viewers tune in on
 the web, a phone, a TV app or by casting, the way they'd flip channels.
 
-Four web apps, two native wrappers, an API, a playout worker, and the escrow contracts that hold a
-claimable station's earnings until its creator claims them.
+Four web apps, two native wrappers, an API, a playout worker, a relay, and the escrow contracts that
+hold a claimable station's earnings until its creator claims them.
 
 [System](#what-the-system-is) · [Layout](#repository-layout) · [Branches](#branches-and-deploys) ·
-[Quickstart](#quickstart) · [Playout](#playout) · [Money](#money) · [Apps](#the-apps) ·
+[Quickstart](#quickstart) · [Playout](#playout) · [Video in and out](#how-video-gets-in-and-out) ·
+[Money](#money) · [Apps](#the-apps) ·
 [API](#the-api-appsapi) · [Contracts](#the-escrow-contracts-contracts) · [Tests](#tests-and-ci) ·
 [Docs](#documentation)
 
@@ -33,7 +34,7 @@ flowchart LR
   MC["Master control<br/><i>the log, library, breaks</i>"] --> API["API<br/><code>apps/api</code>"]
   API --> DB[("Postgres<br/>Redis")]
   W["Worker<br/><code>apps/worker</code>"] --> DB
-  W -->|"prepare once"| R2[("Object storage<br/><i>segments by content ID</i>")]
+  W -->|"prepare once"| R2[("Cloudflare R2<br/><i>segments by content ID</i>")]
   W -->|"assemble"| PL["Channel playlists<br/><i>HLS, per rendition</i>"]
   PL --> V["Viewer · TV · Cast"]
   R2 --> V
@@ -72,7 +73,8 @@ apps/
   site/       marketing site         @opencast/site      Vite + React
   gallery/    component gallery      @opencast/gallery   every ui component, beside its frame
   api/        the API                @opencast/api       Express, Postgres, Redis
-  worker/     playout                @opencast/worker    prepares, assembles, relays
+  worker/     playout                @opencast/worker    prepares, assembles; radio live ingest
+  relay/      translators            @opencast/relay     one stream per station to YouTube, Twitch, RTMP
 packages/
   contracts/  Zod request/response schemas and the HLS tag spec — the API's public surface
   db/         Drizzle schema, SQL migrations, the seed
@@ -125,7 +127,8 @@ pull request. Never force-push `staging` or `main`.
 | Opencast for business | `apps/business` | Vercel — [opencast-business.vercel.app](https://opencast-business.vercel.app) |
 | TV mode | `apps/tv` | Vercel — [opencast-tv.vercel.app](https://opencast-tv.vercel.app) |
 | Site | `apps/site` | Vercel — [opencast-site.vercel.app](https://opencast-site.vercel.app) |
-| API, worker, Postgres, Redis | `apps/api`, `apps/worker` | Railway project `opencast` |
+| API, worker, relay, Postgres, Redis | `apps/api`, `apps/worker`, `apps/relay` | Railway project `opencast` |
+| Uploads and prepared segments | | Cloudflare R2: `opencast-staging`, `opencast-production` |
 | iPhone, Android, Android TV / Fire TV | `apps/web/ios`, `apps/web/android`, `apps/tv/android` | Capacitor 8; nothing submitted yet |
 
 Everything Railway runs is defined in [`.railway/railway.ts`](./.railway/railway.ts) and applied
@@ -200,8 +203,9 @@ flowchart LR
 - **Breaks** come from the station's break rule and always contain a station ID. Each spot placed
   makes a hold on the advertiser's balance; one without a hold is skipped for the next in rotation.
 - **Live blocks** point the playlist at Livepeer's segments for their hours, and back.
-- **Translators** relay a channel to YouTube, Twitch or any RTMP address. They're the one continuous
-  encode, only while on, and their egress is recorded.
+- **Translators** simulcast a station to YouTube, Twitch or any RTMP address. By default only its
+  live shows go out; "Everything I air" runs one sender per station in `apps/relay`, which
+  re-encodes only to draw the station's bug. More in [`docs/relay.md`](./docs/relay.md).
 - **Readiness.** Every hour the worker checks the next 48 hours: an item not prepared an hour before
   it airs warns the station and the desk, and airs the usual fill if it's still missing.
 - **Day templates and off air hours.** A station builds a day once and repeats it (every day,
@@ -217,6 +221,42 @@ npm run as-run -w @opencast/worker -- <stationId>
 
 `curl localhost:8788/health` shows the worker's leader, stations on air, what's prepared or
 waiting, readiness and translators.
+
+---
+
+## How video gets in and out
+
+Every byte of video takes one of these paths. None of them passes through the API server, so the
+API only hands out addresses and keeps the records.
+
+```mermaid
+flowchart LR
+  subgraph In
+    UP["Upload in the browser<br/><i>parts, resumable</i>"]
+    ENC["Live encoder<br/><i>RTMP</i>"]
+  end
+  UP -->|"presigned parts,<br/>straight to storage"| R2[("Cloudflare R2<br/><i>originals, prepared segments</i>")]
+  R2 -->|"prepare once"| WK["Worker"]
+  WK --> R2
+  ENC -->|"TV band"| LP["Livepeer<br/><i>live transcode</i>"]
+  ENC -->|"radio band"| WK
+  WK -->|"assemble"| PL["Channel playlists"]
+  LP --> PL
+  PL --> V["Viewer · TV · Cast"]
+  R2 -->|"segments, no egress fees"| V
+  PL --> RL["Relay<br/><code>apps/relay</code>"]
+  RL --> LPR["Livepeer relay stream<br/><i>no transcode</i>"]
+  LPR --> OUT["YouTube · Twitch · RTMP"]
+```
+
+- **Uploads** go from the browser to R2 in 16–64 MiB parts, five at a time, and resume after a
+  dropped connection or a reload. The API reads the file back once for its content ID, so a file
+  already on the platform is stored once. More in [`docs/uploads.md`](./docs/uploads.md).
+- **Viewers** fetch segments from R2's public address. R2 doesn't charge for egress, so a viewer-hour
+  costs a small fraction of a cent.
+- **Relays** push one stream per station to Livepeer, which sends it on to each platform untouched.
+  Platform keys are sealed with AES-256-GCM (`PLATFORM_SECRETS_KEY`); see
+  [`docs/platforms.md`](./docs/platforms.md).
 
 ---
 
@@ -242,8 +282,13 @@ flowchart LR
   uploads.
 - **Claimable stations** are ones Opencast sets up for a creator who hasn't joined. What they earn
   goes to the escrow weekly and is paid out when the creator claims the station.
+- **Pay-as-you-go.** Being on air is free. A station pays for storage, relays of everything it airs
+  and live hours, measured daily and billed monthly: from earnings first, then its card or Clear
+  wallet, with caps and a 14-day grace period that never takes the channel off air. The price sheet,
+  every number for review, is in [`docs/pricing.md`](./docs/pricing.md).
 - **Payments** run through a provider switch (`PAYMENTS_PROVIDER`): a fake on staging, Clear or
-  Stripe in production. A live Stripe key outside production is refused.
+  Stripe in production. A live Stripe key outside production is refused. Setup is in
+  [`docs/stripe.md`](./docs/stripe.md).
 
 A worked week of every entry is in [`docs/phase-6-sample-week.md`](./docs/phase-6-sample-week.md),
 generated by a test.
@@ -265,12 +310,18 @@ open questions in [`docs/apps/open-questions.md`](./docs/apps/open-questions.md)
 
 Sign-in is **Privy**, with Opencast's own Privy app (the API refuses to start with Clear's).
 
+**Watch data.** Every airing records watch time, the audience at its start, peak and end, tune-aways
+by the minute and "Not for me" votes. Per-session events are deleted after 30 days, leaving only
+per-airing totals, so no viewer can be identified. A program's numbers show only once an airing
+reached 20 viewers. Stations see theirs on the Audience page; makers see totals across the stations
+that carried them.
+
 ---
 
 ## The API (`apps/api`)
 
 Express, Postgres (Drizzle; rules enforced by triggers) and Redis. `/v1` is built from
-`packages/contracts`: 264 endpoints in 14 modules, listed in [`docs/api.md`](./docs/api.md). How
+`packages/contracts`: 343 endpoints in 22 modules, listed in [`docs/api.md`](./docs/api.md). How
 it's put together — modules, roles, events, how money moves — is in
 [`docs/architecture.md`](./docs/architecture.md), and the schema in
 [`docs/schema.md`](./docs/schema.md).
@@ -324,9 +375,11 @@ real-API Playwright specs on pull requests. Production builds are checked for mo
 | API reference | [`docs/api.md`](./docs/api.md) (generated) |
 | Contracts changelog · requests | [`docs/contracts-changelog.md`](./docs/contracts-changelog.md) · [`docs/contract-requests.md`](./docs/contract-requests.md) |
 | Deploying | [`docs/deploy.md`](./docs/deploy.md) |
+| Prices · Stripe | [`docs/pricing.md`](./docs/pricing.md) · [`docs/stripe.md`](./docs/stripe.md) |
+| Relays · platforms · uploads | [`docs/relay.md`](./docs/relay.md) · [`docs/platforms.md`](./docs/platforms.md) · [`docs/uploads.md`](./docs/uploads.md) |
 | Clear integration | [`docs/clear-integration.md`](./docs/clear-integration.md) |
 | The apps: inventory, rules, testing, native | [`docs/apps/`](./docs/apps/) |
-| Build prompts | [`docs/prompts/`](./docs/prompts/) — the platform prompt and the apps prompt |
+| Build prompts | [`docs/prompts/`](./docs/prompts/): the platform, apps and follow-up prompts; where the code stood against them is in [`docs/catch-up-report.md`](./docs/catch-up-report.md) |
 | Reference designs | [`docs/reference/`](./docs/reference/) |
 | Open decisions | [`docs/open-decisions.md`](./docs/open-decisions.md) |
 
@@ -337,6 +390,7 @@ real-API Playwright specs on pull requests. Production builds are checked for mo
 - Secrets live in Railway, Vercel and the ignored `.env`; never in the repo. Rotate anything that
   has been pasted anywhere else
 - Signed-in endpoints check the Privy token and the caller's role on every request
+- Platform stream keys and tokens are stored sealed (AES-256-GCM) and never sent back to an app
 - Money only moves through the ledger, and billing reads only the as-run log
 - The escrow contracts are **unaudited**; don't deploy them to a real network before a review
 
