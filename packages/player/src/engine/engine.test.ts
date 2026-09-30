@@ -534,3 +534,21 @@ describe("sound before the viewer has clicked", () => {
     }
   });
 });
+
+describe("the banner while paused", () => {
+  it("shows on pause and stays until play, then goes after the usual time", async () => {
+    const done = engine.tune(CIVC.station.id);
+    await flush(50);
+    await done;
+    await flush(6000);
+    expect(engine.getState().banner).toBeNull();
+    engine.pause();
+    expect(engine.getState().banner?.stationId).toBe(CIVC.station.id);
+    await flush(60_000);
+    expect(engine.getState().banner?.stationId).toBe(CIVC.station.id);
+    engine.play();
+    expect(engine.getState().banner?.stationId).toBe(CIVC.station.id);
+    await flush(5001);
+    expect(engine.getState().banner).toBeNull();
+  });
+});

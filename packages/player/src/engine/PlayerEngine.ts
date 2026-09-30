@@ -519,6 +519,15 @@ export class PlayerEngine {
     this.timers.banner = setTimeout(() => this.patch({ banner: null }), this.o.bannerMs);
   }
 
+  /** Paused: the banner shows, as it does on tuning in, and stays until playing again. */
+  private holdBanner() {
+    const stationId = this.state.currentId;
+    if (!stationId) return;
+    if (this.timers.banner) clearTimeout(this.timers.banner);
+    this.timers.banner = 0;
+    this.patch({ banner: { stationId, until: this.o.now() + this.o.bannerMs } });
+  }
+
   hideBanner() {
     if (this.timers.banner) clearTimeout(this.timers.banner);
     this.patch({ banner: null });
@@ -563,6 +572,7 @@ export class PlayerEngine {
     if (!d || this.state.status !== "playing") return;
     d.video.pause();
     this.patch({ status: "paused", paused: { since: this.o.now(), expired: false } });
+    this.holdBanner();
     if (this.timers.pause) clearTimeout(this.timers.pause);
     // After the hold the player offers Back to live rather than piling up a delay.
     this.timers.pause = setTimeout(() => this.state.paused && this.patch({ paused: { ...this.state.paused, expired: true } }), this.o.pauseHoldMs);
@@ -583,6 +593,8 @@ export class PlayerEngine {
     }
     void v.play().catch(() => {});
     this.patch({ status: "playing" });
+    // The banner held while paused goes after the usual time.
+    if (this.state.banner) this.showBanner();
     this.mediaSession();
   }
 
