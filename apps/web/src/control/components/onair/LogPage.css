@@ -36,6 +36,35 @@
 .cc-offair__rule { margin: 0; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--hair); display: grid; gap: 10px; justify-items: start; }
 .cc-offair__times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
 
+/* Edit mode (2026-09-29; no frame draws it): the log's own blocks, a changed one marked with a
+   signal edge, a locked one quieter, one with a problem outlined in standby amber. */
+.cc-log__end { display: flex; align-items: center; gap: 10px; }
+.cc-log__main > .cc-edit__bar { margin-bottom: 14px; }
+.cc-edit__blk { touch-action: none; user-select: none; }
+/* On a touch screen the page scrolls under a finger; a start is typed there instead. */
+@media (pointer: coarse) { .cc-edit__blk { touch-action: auto; } }
+button.cc-edit__blk { cursor: grab; }
+.cc-edit__blk--dragging { cursor: grabbing; opacity: .9; z-index: 2; }
+.cc-edit__blk--changed { box-shadow: inset 3px 0 0 var(--signal), inset 0 0 0 1px var(--hair); }
+.cc-edit__blk--locked { cursor: default; opacity: .7; }
+button.cc-edit__blk--locked { cursor: not-allowed; }
+.cc-edit__blk--problem { box-shadow: inset 0 0 0 2px var(--standby); }
+.cc-edit__blk.oc-blk--sel { box-shadow: inset 0 0 0 2px var(--signal); }
+.cc-edit__summary { margin: 0 0 8px; font-weight: 600; font-size: 14px; }
+.cc-edit__lines, .cc-edit__problems, .cc-edit__warnings, .cc-edit__past { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+.cc-edit__lines li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cc-edit__problems li { color: var(--standby); }
+.cc-edit__problems li::before { content: "Problem: "; font-weight: 600; }
+.cc-edit__warnings li { color: var(--ink-70); padding-left: 10px; box-shadow: inset 2px 0 0 var(--standby); }
+.cc-edit__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cc-edit__fields { display: grid; gap: 12px; margin-top: 10px; }
+.cc-edit__lock { margin: 8px 0 10px; font-size: 13.5px; color: var(--standby); font-weight: 600; }
+.cc-edit__from { margin-bottom: 12px; }
+.cc-edit__choices { max-height: 320px; overflow: auto; }
+.cc-edit__last { margin: 0 0 8px; }
+.cc-edit__past li { display: grid; gap: 1px; }
+.cc-edit__past small { color: var(--ink-50); font-size: 12px; }
+
 /* The week: seven days side by side, the hours once at the left. */
 .cc-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .cc-week__h { margin: 0 0 4px; font: 600 13px var(--font-text); color: var(--ink-70); }

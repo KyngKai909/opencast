@@ -9,6 +9,7 @@ import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 import { cadenceContext, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+import { createChangeOps, logVersion, type ChangeOps } from "./changes.js";
 
 export type { OffAirSpanView } from "./offair.js";
 
@@ -86,6 +87,8 @@ type ListingPatch = { episodeTitle?: string | null; episodeDescription?: string 
 export interface LogService {
   /** Day templates (added 2026-09-29). */
   templates: TemplateOps;
+  /** Edit mode (added 2026-09-29): batches of changes, checked together and published at once, and their history. */
+  changes: ChangeOps;
   /** Planned off air time (off air hours and sign-off entries) overlapping a window. */
   offAirSpans(stationId: string, from: Date, to: Date): Promise<OffAirSpanView[]>;
   /** The planned off air time on at a moment, if any. */
@@ -130,7 +133,7 @@ export interface LogService {
   entries(stationId: string, from: Date, to: Date): Promise<Row[]>;
   /** One entry's slot. */
   entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
-  /** Every station's items on the log in a window, earliest first (the worker cache reads ahead). */
+  /** Every station's items on the log in a window, earliest first (the readiness check reads ahead). */
   upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
@@ -153,7 +156,7 @@ export interface LogService {
   /** Puts carried slots on the carrier's log. */
   placeCarried(input: { agreementId: string; carrierStationId: string; programId: string; starts: Date[]; replaceExisting: boolean }): Promise<{ placed: number; replaced: number; blockedByLimit: number }>;
 
-  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[]; offAir: OffAirSpanView[]; days: LogDay[] }>;
+  log(stationId: string, from: Date, to: Date): Promise<{ from: string; to: string; entries: LogEntry[]; breaks: BreakSlotView[]; gaps: Gap[]; offAir: OffAirSpanView[]; days: LogDay[]; version: string }>;
   add(stationId: string, userId: string, input: EntryInput): Promise<LogEntry>;
   update(stationId: string, entryId: string, input: Partial<EntryInput>): Promise<LogEntry>;
   remove(stationId: string, entryId: string): Promise<void>;
@@ -606,6 +609,7 @@ export function createLogService(ctx: ModuleContext): LogService {
 
   const service: LogService = {
     templates,
+    changes: undefined as unknown as ChangeOps,
 
     async offAirSpans(stationId, from, to) {
       return (await offAirMap([stationId], from, to)).get(stationId) ?? [];
@@ -1188,7 +1192,9 @@ export function createLogService(ctx: ModuleContext): LogService {
         repeats,
         offAir,
         // G11: each broadcast day in the window and the day template that made it.
-        days
+        days,
+        // Edit mode: what a draft began from (a batch is refused if the window changed since).
+        version: logVersion(rows)
       };
     },
 
@@ -1362,6 +1368,21 @@ export function createLogService(ctx: ModuleContext): LogService {
       }
     }
   };
+  // Edit mode (added 2026-09-29): a batch checks with the single edits' own rules.
+  service.changes = createChangeOps(ctx, {
+    validate,
+    releaseBreaks,
+    load: (stationId, from, to) => load([stationId], from, to),
+    async titles(rows) {
+      const ctx = await context(rows);
+      return new Map(rows.map((r) => [r.id, titleOf(r, ctx)]));
+    },
+    offAirSpans: (stationId, from, to) => service.offAirSpans(stationId, from, to),
+    gapsIn,
+    ensureBreaks: (stationId, from, to) => service.ensureBreaks(stationId, from, to),
+    breakContexts: (ids) => service.breakContexts(ids),
+    markEdited: (stationId, dates) => templates.markEdited(stationId, dates)
+  });
   return service;
 }
 

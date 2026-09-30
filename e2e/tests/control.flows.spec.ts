@@ -1,6 +1,7 @@
 // Master control's flows (apps prompt, Phase 9), on the mock at its Saturday evening, 8:42 pm:
 // sign on for the first time, carry a program, fill a break from the spot market, approve a
-// sponsorship. What each screen says is the reference frames' copy (docs/reference/control).
+// sponsorship, edit the log and publish the changes. What each screen says is the reference
+// frames' copy (docs/reference/control); edit mode has no frame (docs/apps/new-copy.md).
 
 import { expect, test } from "@playwright/test";
 import { signInAs } from "./control.support";
@@ -182,4 +183,42 @@ test("BEAT approves a sponsorship", async ({ page }) => {
   await expect(page.getByText("$275.00 a month")).toBeVisible();
   await expect(page.getByText("Beat Tape Live, since October")).toBeVisible();
   await expect(page.getByText("New request")).toHaveCount(0);
+});
+
+test("BEAT edits its log and publishes the changes", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/log?view=evening&day=sat");
+  await expect(page.getByRole("heading", { name: "Program log" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit log" }).click();
+  await expect(page.getByText("Editing the log.")).toBeVisible();
+  const log = page.getByRole("list", { name: "The log, being edited" });
+
+  // What's airing is locked.
+  await log.getByRole("button", { name: /Saturday Reel/ }).click();
+  await expect(page.getByText("On air now, too late to change.")).toBeVisible();
+
+  // Slow Hours dragged half an hour later (1.12 px a minute), to the nearest minute.
+  const slow = log.getByRole("button", { name: /Slow Hours/ });
+  await slow.scrollIntoViewIfNeeded();
+  const box = (await slow.boundingBox())!;
+  await page.mouse.move(box.x + 40, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 40, box.y + 20, { steps: 4 });
+  await page.mouse.move(box.x + 40, box.y + 10 + 33.6, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByText("1 change: Slow Hours moves to 11:00 pm")).toBeVisible();
+  await expect(page.getByText("Dead air from 10:30 pm to 11:00 pm (30 min).")).toBeVisible();
+
+  // Then typed: 11:10 pm.
+  const start = page.getByLabel("Starts at");
+  await start.fill("23:10");
+  await start.press("Enter");
+  await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
+
+  // Published, all at once; the history says who and when.
+  await page.getByRole("button", { name: "Publish changes" }).click();
+  await expect(page.getByText("1 change published.")).toBeVisible();
+  await expect(page.getByText("Editing the log.")).toHaveCount(0);
+  await expect(page.getByText(/^Last changed by Kai M\. at 8:4\d pm$/)).toBeVisible();
+  await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
 });

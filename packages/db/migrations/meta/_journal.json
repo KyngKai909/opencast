@@ -176,6 +176,13 @@
       "when": 1790726580049,
       "tag": "0024_break_cadence",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790736823158,
+      "tag": "0026_log_changes",
+      "breakpoints": true
     }
   ]
 }

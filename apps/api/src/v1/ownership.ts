@@ -37,7 +37,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
     // Added 2026-09-29: day templates and off air hours.
     "broadcast.day_template_entries",
     "broadcast.day_template_dates",
-    "broadcast.off_air_hours"
+    "broadcast.off_air_hours",
+    // Added 2026-09-29: edit mode's history.
+    "broadcast.log_changes"
   ],
   playout: [
     "broadcast.playout_state",

@@ -600,6 +600,28 @@ export const offAirHours = broadcast.table(
   (t) => [index("off_air_hours_station").on(t.stationId)]
 );
 
+/**
+ * The log's edit history (added 2026-09-29, migration 0026): each batch of changes published from
+ * master control's edit mode, who published it and when, and what it said ("3 changes: Late Crate
+ * moves to 9:10 pm, …"). Single edits (a fill, a template) aren't recorded here.
+ */
+export const logChanges = broadcast.table(
+  "log_changes",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    userId: uuid("user_id").references(() => users.id),
+    summary: text("summary").notNull(),
+    lines: jsonb("lines").$type<string[]>().notNull(),
+    /** The batch as it was sent, for the record. */
+    changes: jsonb("changes").$type<unknown[]>().notNull(),
+    createdAt: createdAt()
+  },
+  (t) => [index("log_changes_station_time").on(t.stationId, t.createdAt)]
+);
+
 /** A break slot, generated from the break rule or cued live. Filled from rotations at playout. */
 export const breaks = broadcast.table(
   "breaks",

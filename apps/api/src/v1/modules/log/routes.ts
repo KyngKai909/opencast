@@ -28,6 +28,15 @@ export function logRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) 
     await log.remove(params.stationId, params.entryId);
     return { ok: true as const };
   });
+  // Edit mode (added 2026-09-29): a batch of changes, checked (a dry run) or published at once.
+  r.handle(api.applyLogChanges, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.changes.apply(params.stationId, user.id, body);
+  });
+  r.handle(api.listLogChanges, async ({ user, params, query }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return { changes: await log.changes.history(params.stationId, query.limit) };
+  });
   r.handle(api.repeatDay, async ({ user, params, body }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return log.repeatDay(params.stationId, body);

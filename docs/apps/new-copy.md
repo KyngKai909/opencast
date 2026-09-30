@@ -662,3 +662,31 @@ No frame draws an email or an invite's page. The emails are plain text with a si
 | Business, a viewer on the Balance page | "Viewers see results, airings and statements." (the rail's reason), buttons "Where it aired" and "Statements"; on a statement page with nothing to show, a viewer's button is "Where it aired" instead of "Balance". No balance in the header ("Available …" isn't shown to viewers) |
 | Network desk, approving a claim with no wallet (the API's `no_wallet`) | "The creator has no wallet yet. It's made when they claim, signed in: ask them to claim again from their link." (was "The creator needs to sign in first: their wallet is where the escrow pays.") |
 | The claim (permission page's Claim now, master control's claim page) | none: the wallet is made without a screen of its own; if it fails, the pages' own errors ("That didn't go through. Try again.", "Something went wrong. Try again.") |
+
+### Edit mode on the program log (the user's request, 2026-09-29)
+
+No frame draws it: the log page's own title bar, timeline and pane (A.4), with "Edit log" beside the view choices. Owners and operators only (setup step 3 too). The API's words (the summary's lines, problems and warnings) are shown as they come.
+
+| Where | Words |
+|---|---|
+| The title bar | "Edit log" (a button beside Day, Evening, Week; Week isn't offered while editing) |
+| Over the timeline, editing | "Editing the log." and, on air, "Nothing changes on air until you publish. What's on now, and anything starting in the next 20 seconds, stays as it is."; off air, "Nothing changes until you publish." |
+| The timeline (screen readers) | the list "The log, being edited"; after a block's times, its state: "moved", "resized", "replaced", "new", "locked", "has a problem" |
+| The pane, Your changes | heading "Your changes"; none yet: "No changes yet. Drag a program to move it, or pick one to change it."; checking: "Checking your changes…"; the API's summary ("3 changes: Late Crate moves to 9:10 pm, …", four lines at most, then ", and {2} more") and one line per change with "Undo" (screen readers: "Undo: {line}"); problems, each "Problem: {line}: {message}"; warnings as they come; buttons "Publish changes" and "Discard" ("Done" with no changes); under them "Everything goes out at once. On air, the channel switches at the next item." |
+| A stale draft (409 `log_changed`) | "The log changed since you started editing." / "Reloading drops your changes. Make them again on the log as it is now." and "Reload" |
+| Published | toast "{1} change published." / "{3} changes published." |
+| The pane, a picked entry | its title and "{9:00 pm} to {9:30 pm}", "Close"; "Starts at" (help "Snapped to the nearest 4 seconds, where the channel can change.", error "Type a time like 9:10 pm or 21:10."); a live block's "Ends at", a sign-off's "Back on at"; a program's "Airs" (the library's programs, "{title} ({28:00})"); "Put on before", "Put on after"; "Take off the log" |
+| A locked entry | the API's words: "On air now, too late to change.", "Airs in {20} s, too late to change.", "It has already aired.", "It has already started." (off air); a live block on now: "End early in the studio" (to its studio, where End early is) |
+| Putting something on | eyebrow "{After} {Late Crate}, {10:28 pm}" ("Before" too); title "Put something on"; subtitle "What comes after it moves down to make room."; "Your library" / "Programs you carry", "Program" ("{Saturday Reel}, from {REEL}"), the list "What goes on" with each length; "Nothing in your library can air yet.", "You don't carry anything yet."; "Find more in the syndication market. Your changes are kept while you look."; "Cancel", "Put it on" |
+| The pane, not editing: Changes | heading "Changes"; "Last changed by {Kai M.} at {8:42 pm}" ("{Sat 8:42 pm}" after 20 hours; "Last changed at …" without a name); the last five batches, each its summary and "{Kai M.}, {8:42 pm}" ("Someone" without a name) |
+
+**The API's words** (`applyLogChanges`)
+
+| When | Words |
+|---|---|
+| Each change | "{Late Crate} moves to {9:10 pm}" ("{Sun 9:10 pm}" on another day), "{Beat Tape Live} now ends at {10:15 pm}", "{Crate Talk} replaces {Slow Hours} at {8:50 pm}", "{Night Desk} at {9:20 pm} comes off the log", "{Crate Talk} goes on at {9:20 pm}", "An entry that isn't on the log any more" |
+| The summary | "{1} change: …" / "{3} changes: …" (lines joined with commas; after four, ", and {2} more") |
+| Problems | locked (above); "That's too soon: the channel is already set for the next 20 seconds." (off air: "That's in the past."); "{Slow Hours} would overlap {Late Crate} at {8:30 pm}."; "That entry isn't on the log any more."; "It's already coming off the log."; "Only a program's item can be replaced."; and a single edit's own words (rights, carriage limits, "The slot is shorter than the item.", "It has to end after it starts.") |
+| Publishing with a problem (422 `log_changes_refused`) | the first problem's words |
+| A stale draft (409 `log_changed`) | "The log changed since you started editing. Reload it to see what changed, then make your changes again." |
+| Warnings | "Dead air from {9:40 pm} to {10:00 pm} ({20 min})."; "{1} held spot in the break {after Late Crate} moves to the next break." ("{2} held spots … move …"); "{2} barter spots in the break {during Saturday Reel} move with it."; "{2} barter spots in the break … are returned if they don't air." (its program comes off); after publishing, if one found no room: "{1} held spot couldn't move to another break and is returned if it doesn't air." |

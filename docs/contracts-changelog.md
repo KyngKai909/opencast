@@ -2,6 +2,19 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: edit mode on the program log
+
+"Edit log" in master control: changes to the log drafted, checked together and published at once. Additive: two endpoints, four schemas, one optional field and one constant. Migration **0026** (`broadcast.log_changes`, the log's history).
+
+- New: `applyLogChanges` (`POST /stations/:stationId/log/changes`, owner or operator), body `{ dryRun = false, base?: { from, to, version }, changes: LogChange[] (1 to 200) }` → `LogChangesResult`. `LogChange` is one of `{ op: "move", entryId, startsAt }` (keeps its length), `{ op: "replace", entryId, itemId, carriageAgreementId? }` (programs only; the slot becomes the item's length in whole minutes, as `updateEntry` does), `{ op: "resize", entryId, endsAt }`, `{ op: "remove", entryId }` and `{ op: "insert", key?, entry }` (`entry` as `addEntry` takes it). Every change is checked with the single edits' rules (rights, carriage limits, a slot shorter than its item, 4-second snapping) and against the rest of the log after the batch (overlaps). A dry run answers `problems` (each `{ index, code, message }`: `locked`, `too_soon`, `overlap`, `not_found`, `removed`, `not_a_program`, or the rule's own code) and `warnings` (`dead_air`, `held_spots`, `held_spots_kept`) without changing anything; publishing with a problem is 422 `log_changes_refused` (the first problem's message; `fields` has one per change, `changes.<index>`) and applies nothing. Published, it's one transaction; `record` is the history entry.
+  - `base`: the window the draft began from and its `version` (below). 409 `log_changed` if the log's entries in that window changed since. The result's `version` is the window's after publishing (the base's on a dry run).
+  - On air, the entry airing now and anything starting within `LOG_EDIT_LEAD_MS` (20 seconds, the assembler's `LEAD_MS`) is locked, and nothing can be moved or put on inside it: "On air now, too late to change.", "Airs in 20 s, too late to change.", "That's too soon: …". Off air, only what's already started or aired is locked. End early is unchanged (`endEarly`).
+  - Publishing marks template dates edited (as single edits do), tells an on-air station to read its log again (one `replan` command per batch, when anything it touches is within 30 minutes; `replanned` says whether it went), and moves spots held in a break that goes (its program moved, changed item or came off) to the next break from there with room: a station's spot to a break spots air in, a maker's barter spot to its own program's next break. The break they move into is marked filled. One with no room within 12 hours stays and is returned if it doesn't air, as before (`held_spots_kept`).
+- New: `listLogChanges` (`GET /stations/:stationId/log/changes?limit=10`, owner or operator) → `{ changes: LogChangeRecord[] }`, newest first. `LogChangeRecord` is `{ id, at, by: { userId, name }, summary, lines, count }`. Only batches from `applyLogChanges` are recorded (not fills, templates or single edits).
+- `ProgramLog.version` (optional string): a hash of the window's entries (times, what airs, a live block ended early), for `base`.
+- New constant `LOG_EDIT_LEAD_MS` (20 000).
+- The API's spots service gains `moveAiring(airingId, breakId, scheduledAt)` (internal; no endpoint).
+
 ## 2026-09-29: invites that reach people
 
 Invites and every other email now go out through Resend (`RESEND_API_KEY`; without it, the log, as before). Additive: one new endpoint and one new schema; no migration.

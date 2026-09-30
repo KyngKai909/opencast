@@ -7,8 +7,11 @@
 // ("2026-10-03", from a template's dates); `?entry=` picks out an entry (from the Monitor).
 // Times are on 4-second segment boundaries (prepare once, then assemble): what's drawn, and the
 // gaps a fill is sent for, are snapped as the API snaps them, so the times shown are its answer.
+// "Edit log" (owners and operators, 2026-09-29) makes the log editable: a draft of changes, checked
+// and summed up, published at once (LogEditor.tsx). `?edit=1` keeps edit mode across a visit to
+// the market; the draft itself is kept for the tab.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import { stationsApi, type ProgramLog, type StationIdent } from "@opencast/contracts";
 import {
@@ -41,6 +44,7 @@ import { OffAirHoursSection } from "./OffAirHours";
 import { DayOrigin, RepeatDaySection } from "./RepeatDay";
 import { entrySource } from "./rundown";
 import { DAY_KEYS, DAY_SHORT, broadcastDay, isoDate, spanText, viewWindow, weekOf, weekdayOf, type LogView, type Ymd } from "./time";
+import { ChangesSection, draftGaps, EditTimeline, EntrySection, InsertDialog, LogHistory, useLogEdit } from "./LogEditor";
 import "./LogPage.css";
 
 const MIN = 60_000;
@@ -52,6 +56,8 @@ export interface LogPageProps {
   base: string | null;
   /** Setup step 3: the foot with Back and Continue. */
   setup?: { back: string; next: string };
+  /** Owners and operators: "Edit log", and the log's history. */
+  canEdit?: boolean;
 }
 
 /** The marker on an off air block's title: the log's CSS draws the block as the calm off air band. */
@@ -110,14 +116,16 @@ export function openGaps(windowGaps: Gap[], deadAir: Gap[], windowTo: string, t:
     });
 }
 
-export function LogPage({ stationId, station, base, setup }: LogPageProps) {
+export function LogPage({ stationId, station, base, setup, canEdit = false }: LogPageProps) {
   const phone = useIsPhone();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
-  const t = useNow(30_000).getTime();
+  const view = (["day", "evening", "week"].includes(params.get("view") ?? "") ? params.get("view") : "evening") as LogView;
+  const editing = canEdit && params.get("edit") === "1" && view !== "week";
+  // Edit mode counts down to what's locked, to the second.
+  const t = useNow(editing ? 1_000 : 30_000).getTime();
   const today = broadcastDay(now());
   const thisWeek = weekOf(today);
-  const view = (["day", "evening", "week"].includes(params.get("view") ?? "") ? params.get("view") : "evening") as LogView;
   const dayParam = params.get("day") ?? DAY_KEYS[weekdayOf(today)];
   const dated = /^\d{4}-\d{2}-\d{2}$/.exec(dayParam) ? ymdOf(dayParam) : null;
   const week = dated ? weekOf(dated) : thisWeek;
@@ -148,6 +156,9 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   const selected: (Gap & { key: string }) | null =
     gaps.find((g) => g.key === fillParam || g.startsAt === fillParam) ?? (fromDeadAir ? { ...snapSpan(fromDeadAir), key: fromDeadAir.startsAt } : null) ?? (phone ? null : (gaps[0] ?? null));
   const fill = useFill({ stationId, base, gap: selected, phone });
+  const edit = useLogEdit({ stationId, log: log.data, win, active: editing, onAir: !!playout.data?.onAir, now: t, onDone: () => set("edit", null) });
+  const [picked, setPicked] = useState<string | null>(null);
+  const [inserting, setInserting] = useState<"before" | "after" | null>(null);
 
   if (log.isLoading) return <Quiet />;
   if (log.isError) return <ControlTitle title="Program log" description={log.error.message} />;
@@ -162,8 +173,28 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
   };
 
   const blocks = log.data ? timelineBlocks(log.data, win.from, win.to, t) : [];
+  const drafted = new Map(edit.entries.map((e) => [e.id, e]));
+  const pickedEntry = editing && picked ? drafted.get(picked) : undefined;
+  const pxPerMinute = view === "day" ? 0.5 : 1.12;
   const timeline =
-    view === "week" ? (
+    editing && log.data ? (
+      <EditTimeline
+        blocks={timelineBlocks({ entries: edit.entries, breaks: edit.breaks, gaps: draftGaps(edit.entries, log.data.offAir ?? [], win.from, win.to), offAir: log.data.offAir }, win.from, win.to, t)}
+        from={win.from}
+        to={win.to}
+        pxPerMinute={pxPerMinute}
+        maxHeight={phone ? undefined : setup ? 430 : 540}
+        entries={drafted}
+        locked={edit.locked}
+        troubled={edit.troubled}
+        selectedId={picked}
+        onSelect={setPicked}
+        onMove={(id, startsAt) => {
+          edit.add({ op: "move", entryId: id, startsAt });
+          setPicked(id);
+        }}
+      />
+    ) : view === "week" ? (
       // On the phone the week scrolls sideways: focusable, so the keyboard can scroll it too.
       <div className="cc-week" role="region" aria-label="The week" tabIndex={0}>
         {week.map((d) => {
@@ -183,7 +214,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
         blocks={blocks}
         from={win.from}
         to={win.to}
-        pxPerMinute={view === "day" ? 0.5 : 1.12}
+        pxPerMinute={pxPerMinute}
         timeZone={STATION_TZ}
         maxHeight={phone ? undefined : setup ? 430 : 540}
         selectedId={entryParam && !fillParam ? entryParam : selected ? `gap:${selected.key}` : undefined}
@@ -267,7 +298,17 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
       { replace: true }
     );
 
-  const sheetGap = phone && selected;
+  const sheetGap = phone && selected && !editing;
+  const startEditing = () =>
+    setParams(
+      (p) => {
+        p.set("edit", "1");
+        p.delete("fill");
+        if (view === "week") p.set("view", "evening");
+        return p;
+      },
+      { replace: true }
+    );
   const onAirNow = !!playout.data?.onAir;
 
   return (
@@ -276,16 +317,23 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
         title="Program log"
         description="What airs, in order. Build one day and repeat it, then adjust."
         end={
-          <Segmented
-            label="View"
-            value={view}
-            onChange={(v) => set("view", v)}
-            options={[
-              { value: "day", label: "Day" },
-              { value: "evening", label: "Evening" },
-              { value: "week", label: "Week" }
-            ]}
-          />
+          <div className="cc-log__end">
+            {canEdit && !editing && (
+              <Button size="sm" onClick={startEditing}>
+                Edit log
+              </Button>
+            )}
+            <Segmented
+              label="View"
+              value={view}
+              onChange={(v) => set("view", v)}
+              options={[
+                { value: "day", label: "Day" },
+                { value: "evening", label: "Evening" },
+                ...(editing ? [] : [{ value: "week" as const, label: "Week" }])
+              ]}
+            />
+          </div>
         }
       />
       {view !== "week" && (
@@ -300,7 +348,12 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
       )}
       <div className={view === "week" ? "cc-log__split cc-log__split--week" : "cc-log__split"}>
         <div className="cc-log__main">
-          {first && (
+          {editing && (
+            <Notice tone="plain" icon={null} title="Editing the log." className="cc-edit__bar">
+              {onAirNow ? "Nothing changes on air until you publish. What's on now, and anything starting in the next 20 seconds, stays as it is." : "Nothing changes until you publish."}
+            </Notice>
+          )}
+          {first && !editing && (
             <Notice tone="standby" title={`Dead air from ${spanText(first.startsAt, first.endsAt)}.`} action={
                 <Button size="sm" onClick={() => fillFrom(first)}>
                   Fill it
@@ -313,11 +366,21 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
           {timeline}
         </div>
         {view !== "week" && (
-          <aside className="cc-log__pane" aria-label="Filling, breaks, repeats and off air hours">
-            {fillSection}
-            {breaksSection}
-            {repeatSection}
-            {offAirSection}
+          <aside className="cc-log__pane" aria-label={editing ? "Your changes" : "Filling, breaks, repeats and off air hours"}>
+            {editing ? (
+              <>
+                <ChangesSection edit={edit} />
+                {pickedEntry && <EntrySection edit={edit} entry={pickedEntry} base={base} onInsert={setInserting} onClose={() => setPicked(null)} />}
+              </>
+            ) : (
+              <>
+                {fillSection}
+                {canEdit && <LogHistory stationId={stationId} />}
+                {breaksSection}
+                {repeatSection}
+                {offAirSection}
+              </>
+            )}
           </aside>
         )}
       </div>
@@ -329,6 +392,7 @@ export function LogPage({ stationId, station, base, setup }: LogPageProps) {
           </Button>
         </ControlFoot>
       )}
+      {editing && pickedEntry && inserting && <InsertDialog edit={edit} stationId={stationId} anchor={pickedEntry} where={inserting} base={base} onClose={() => setInserting(null)} />}
       {sheetGap && (
         <Sheet
           open

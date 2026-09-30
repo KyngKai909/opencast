@@ -89,6 +89,11 @@ export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart, B
   upcomingSpotContent(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; spotId: string; contentId: string; airsAt: Date | null; durationMs?: number }>>;
   /** What's placed in each break, in order, with what playout needs to air it. */
   breakAirings(breakIds: string[]): Promise<Map<string, BreakAiring[]>>;
+  /**
+   * Added 2026-09-29 (the log's edit mode): a held airing whose break went airs in another break
+   * instead, at `scheduledAt`. Its hold, rate and spot are unchanged.
+   */
+  moveAiring(airingId: string, breakId: string, scheduledAt: Date): Promise<void>;
   /** Spots placed on a station in a window (for the hourly cap and same-spot limit). */
   placedOnStation(stationId: string, from: Date, to: Date): Promise<Array<{ spotId: string; lengthSec: number; scheduledAt: Date }>>;
   /**
@@ -1311,6 +1316,10 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         result.set(r.airing.breakId, list);
       }
       return result;
+    },
+
+    async moveAiring(airingId, breakId, scheduledAt) {
+      await db.update(AI).set({ breakId, scheduledAt }).where(eq(AI.id, airingId));
     },
 
     async placedOnStation(stationId, from, to) {

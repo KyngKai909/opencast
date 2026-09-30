@@ -2,7 +2,8 @@
 // sign-on and its checks, sign off, cue a break. The On air area owns this file. Everything
 // here reads and writes the shared db (fixtures/evening.ts): a break the spot market fills shows
 // in the log, on the Monitor's rundown and on the rail's badge at once. Off air hours and day
-// templates (G8, G9) are kept in ../schedule.ts; their own endpoints are in templates.ts.
+// templates (G8, G9) are kept in ../schedule.ts; their own endpoints are in templates.ts. Edit
+// mode's batch and the log's history are in logChanges.ts.
 // Planned off air isn't dead air: gaps leave it out, so nothing warns about it or fills it.
 // The log's times are on 4-second segment boundaries, as the API keeps them: what's sent is
 // rounded to the nearest (never refused), and a cued break starts at the next one.
@@ -20,6 +21,7 @@ import { itemsPreparedCheck, readinessOf } from "../prepared";
 import { fail, needsUser, path, reply } from "../respond";
 import { breakRuleOf, breaksAiring } from "../fixtures/station";
 import { GENERATED_SID_MS, GENERATED_SID_TITLE } from "./library";
+import { logChangeHandlers, mockLogVersion } from "./logChanges";
 import { createTemplate, generateWindow, logDays, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
 const HOUR = 3_600_000;
@@ -255,6 +257,8 @@ export function signOnChecks(st: DbStation) {
 // ---- Handlers ----
 
 export const logHandlers = [
+  // Edit mode (2026-09-29): a batch of changes, and the log's history.
+  ...logChangeHandlers,
   http.get(path(playoutApi.getStatus), ({ request, params }) => {
     const p = needsUser(request);
     if (p instanceof Response) return p;
@@ -298,7 +302,9 @@ export const logHandlers = [
       repeats: [...copies, ...templates],
       offAir: offAirFor(id, from, to),
       // G11: which template made each broadcast day in the window, today and past days too.
-      days: logDays(id, from, to)
+      days: logDays(id, from, to),
+      // Edit mode: what a draft begins from.
+      version: mockLogVersion(id, from, to)
     });
   }),
 

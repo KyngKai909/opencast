@@ -242,7 +242,13 @@ export const ProgramLog = z.object({
    * order, with the day template that made it (null for a day no template made) and whether it
    * was edited by hand since. Today and past days too.
    */
-  days: z.array(LogDay).optional()
+  days: z.array(LogDay).optional(),
+  /**
+   * Edit mode (added 2026-09-29): the window's version, a hash of its entries (their times, what
+   * airs and a live block ended early). An edit sends it back (`applyLogChanges`'s `base`); if the
+   * log changed in the window since, the edit is refused with 409 `log_changed`.
+   */
+  version: z.string().optional()
 });
 
 export const DeadAirStatus = z.object({
@@ -301,6 +307,100 @@ const EntryInput = z.object({
   episodeDescription: z.string().max(160).optional(),
   localNote: z.string().max(160).optional()
 });
+
+/**
+ * Edit mode (added 2026-09-29): how long before an entry starts it can still change on air. The
+ * channel is assembled this far ahead of the clock (the playout assembler's `LEAD_MS`): an entry
+ * on air now, or starting sooner than this, is locked ("Airs in 20 s, too late to change").
+ */
+export const LOG_EDIT_LEAD_MS = 20_000;
+
+/**
+ * Edit mode (added 2026-09-29): one change to the log, drafted and published with others in one
+ * batch (`applyLogChanges`). Times are snapped to 4-second segments, as `updateEntry` snaps them.
+ * Breaks aren't changed directly: they're generated from the break rule and follow the programs.
+ *
+ * - `move`: a new start; the entry keeps its length.
+ * - `replace`: another item airs in the entry's place, from its start; the slot becomes the item's
+ *   length rounded up to whole minutes, as `updateEntry` does with a new item. Programs only.
+ * - `resize`: a new end (a live block's length, a sign-off's back-on time, a program's slot).
+ * - `remove`: off the log.
+ * - `insert`: a new entry, as `addEntry` takes it. `key` is the app's own name for it, echoed back.
+ */
+export const LogChange = z.discriminatedUnion("op", [
+  z.object({ op: z.literal("move"), entryId: Id, startsAt: Timestamp }),
+  z.object({ op: z.literal("replace"), entryId: Id, itemId: Id, carriageAgreementId: Id.optional() }),
+  z.object({ op: z.literal("resize"), entryId: Id, endsAt: Timestamp }),
+  z.object({ op: z.literal("remove"), entryId: Id }),
+  z.object({ op: z.literal("insert"), key: z.string().max(64).optional(), entry: EntryInput })
+]);
+export type LogChange = z.infer<typeof LogChange>;
+
+/** Edit mode (added 2026-09-29): a published batch of changes, who published it and when. */
+export const LogChangeRecord = z.object({
+  id: Id,
+  at: Timestamp,
+  by: z.object({ userId: Id.nullable(), name: z.string().nullable() }),
+  /** "3 changes: Late Crate moves to 9:10 pm, …". */
+  summary: z.string(),
+  /** One line per change: "Late Crate moves to 9:10 pm". */
+  lines: z.array(z.string()),
+  count: z.number().int()
+});
+export type LogChangeRecord = z.infer<typeof LogChangeRecord>;
+
+/**
+ * Edit mode (added 2026-09-29): what a batch of changes does, checked together (a dry run) or
+ * published. `problems` refuse the batch (nothing is published while there's one): an overlap, a
+ * locked entry, rights, a carriage limit, a slot shorter than its item. `warnings` don't: dead air
+ * the batch leaves, and held spots moving to the next break.
+ */
+export const LogChangesResult = z.object({
+  /** True once published. A dry run, or a batch with problems, is never applied. */
+  applied: z.boolean(),
+  /** The window's version after (for `base.from`/`base.to`; absent without a `base`). */
+  version: z.string().optional(),
+  /** "3 changes: Late Crate moves to 9:10 pm, Slow Hours comes off the log, …". */
+  summary: z.string(),
+  changes: z.array(
+    z.object({
+      index: z.number().int(),
+      op: z.enum(["move", "replace", "resize", "remove", "insert"]),
+      /** The entry (an insert's once published; null before). */
+      entryId: Id.nullable(),
+      key: z.string().nullable(),
+      /** "Late Crate moves to 9:10 pm". */
+      line: z.string(),
+      /** Where it airs after the change (null for a removal). */
+      startsAt: Timestamp.nullable(),
+      endsAt: Timestamp.nullable()
+    })
+  ),
+  problems: z.array(
+    z.object({
+      /** The change it's about (null: the batch as a whole). */
+      index: z.number().int().nullable(),
+      /** `locked`, `overlap`, `not_found`, `too_soon`, or the rule's own code (`rights_unconfirmed`, a carriage limit…). */
+      code: z.string(),
+      message: z.string()
+    })
+  ),
+  warnings: z.array(
+    z.object({
+      index: z.number().int().nullable(),
+      /** `dead_air`: time left with nothing on the log. `held_spots`: a break with spots held in it goes, and they move to the next break. `held_spots_kept`: they couldn't move and are returned if they don't air. */
+      code: z.enum(["dead_air", "held_spots", "held_spots_kept"]),
+      message: z.string()
+    })
+  ),
+  /** Dead air in the changed stretch after the batch. */
+  gaps: z.array(Gap),
+  /** Whether an on-air station was told to read its log again (once per batch). */
+  replanned: z.boolean(),
+  /** The history record, once published. */
+  record: LogChangeRecord.nullable()
+});
+export type LogChangesResult = z.infer<typeof LogChangesResult>;
 
 export const logApi = {
   getLog: endpoint({
@@ -524,6 +624,32 @@ export const logApi = {
       .object({ episodeTitle: z.string().max(200).nullable(), episodeDescription: z.string().max(160).nullable(), localNote: z.string().max(160).nullable() })
       .partial(),
     response: Listing
+  }),
+
+  // ---- Added 2026-09-29: edit mode ----
+
+  applyLogChanges: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/changes",
+    auth: "user",
+    summary:
+      "Edit mode (owner, operator): check a batch of changes together (`dryRun`) or publish them all at once, in one transaction: moves, replacing an item, a new end, removals and inserts, with the same rules as `addEntry`, `updateEntry` and `removeEntry`. A problem refuses the whole batch (422 `log_changes_refused`, nothing applied); a dry run answers them instead. `base` is the window and version the draft began from: 409 `log_changed` if the log changed there since. On air, the entry airing now and anything starting within `LOG_EDIT_LEAD_MS` is locked. Publishing tells an on-air station to read its log again (once), marks template dates edited, moves spots held in a break that goes to the next break, and records the batch in the log's history.",
+    params: StationParams,
+    body: z.object({
+      dryRun: z.boolean().default(false),
+      base: z.object({ from: Timestamp, to: Timestamp, version: z.string() }).optional(),
+      changes: z.array(LogChange).min(1).max(200)
+    }),
+    response: LogChangesResult
+  }),
+  listLogChanges: endpoint({
+    method: "GET",
+    path: "/stations/:stationId/log/changes",
+    auth: "user",
+    summary: "Edit mode: the log's published batches of changes, newest first, with who and when (owner, operator)",
+    params: StationParams,
+    query: z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) }),
+    response: z.object({ changes: z.array(LogChangeRecord) })
   })
 };
 
