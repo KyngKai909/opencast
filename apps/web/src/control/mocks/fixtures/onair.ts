@@ -22,6 +22,63 @@ export function radioFrequencies(): string[] {
 /** Channels held for reserved call signs: drawn as taken (the frame's `taken` array ends with 44). */
 export const HELD = { tv: ["44.1"], radio: [] as string[] };
 
+// ---- Waitlist invites (added 2026-09-29) ----
+
+/** A call sign held on the waitlist, as its invite's link (`/control/new?reservation=<id>`) reads it. */
+export interface MockReservation {
+  id: string;
+  callSign: string;
+  /** The waitlist signup's address: only that person can use the link. */
+  email: string;
+  band: "tv" | "radio" | null;
+  channel: string | null;
+  heldUntil: string;
+  /** The station set up with it. */
+  stationId: string | null;
+  /** The hold ended (its end passed and it was released, or the desk released it). */
+  releasedAt: string | null;
+  signedOn: boolean;
+}
+
+export const SKAT_RESERVATION = "00000000-0000-4000-8000-000003900001";
+export const GOLD_RESERVATION = "00000000-0000-4000-8000-000003900002";
+
+/** SKAT, with TV 38.1, invited and open (Dani R., a skate crew); GOLD's hold ended on September 25. */
+function seedReservations(): MockReservation[] {
+  return [
+    { id: SKAT_RESERVATION, callSign: "SKAT", email: "skat@example.com", band: "tv", channel: "38.1", heldUntil: "2026-12-29T17:00:00.000Z", stationId: null, releasedAt: null, signedOn: false },
+    { id: GOLD_RESERVATION, callSign: "GOLD", email: "gold@example.com", band: "tv", channel: null, heldUntil: "2026-09-25T17:00:00.000Z", stationId: null, releasedAt: "2026-09-25T18:00:00.000Z", signedOn: false }
+  ];
+}
+
+const RESERVATIONS_KEY = "oc-mock-control-reservations";
+let reservations: MockReservation[] | null = null;
+
+export function mockReservations(): MockReservation[] {
+  if (reservations) return reservations;
+  try {
+    // A fresh shared db means a fresh start here too.
+    const raw = localStorage.getItem("oc-mock-control-db") === null ? null : localStorage.getItem(RESERVATIONS_KEY);
+    reservations = raw ? (JSON.parse(raw) as MockReservation[]) : seedReservations();
+  } catch {
+    reservations = seedReservations();
+  }
+  return reservations;
+}
+
+export function saveReservations() {
+  try {
+    localStorage.setItem(RESERVATIONS_KEY, JSON.stringify(mockReservations()));
+  } catch {
+    // Private windows: this visit only.
+  }
+}
+
+/** For tests. */
+export function resetReservations() {
+  reservations = seedReservations();
+}
+
 /** The mock streams (`npm run mock:streams -w @opencast/player`): a station's output plays only if it has one. */
 export const MOCK_STREAMS = ["civc", "beat", "reel", "sazn", "prep", "nite", "hall", "crat", "voze"];
 

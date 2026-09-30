@@ -2,6 +2,16 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-29: Waitlist invites open station setup with what's held
+
+A follow-up to Reserved call signs (desk-pages 02). Additive: one endpoint, one optional body field, two response fields, a new schema. No migration.
+
+- New `getReservationInvite` `GET /waitlist/reservations/:reservationId` (`waitlistApi`, auth `optional`) → `ReservationInvite` `{ id, callSign, market, band, channel, heldUntil, state, emailHint, signedInAs, emailMatches, stationId }`: a waitlist invite's link as master control reads it. `market` is the one its channel is held in (else the reservation's); `band` and `channel` are null when no channel is held. `state`: `open` (held, not used), `setting_up` (a station is being set up with it), `signed_on`, `ended` (its end passed, even before the hourly job releases it; the desk released it; or another name is held in its place). `emailHint` is the signup's address masked; signed in, `signedInAs` and `emailMatches` as `getInvite` has them (null when INVITE_EMAIL_MATCH=off); `stationId` only for someone on that station's team. 404 for an unknown id, or a hold that isn't the waitlist's.
+- `createStation` body: `reservationId?`. The station starts with the reservation's call sign and the channel held with it, and the reservation is the station's (`Reservation.state` `signing_on`; the hourly job ends it at sign-on, `release_reason` `signed_on`, as before). Refused before anything is made: 403 `reservation_email_mismatch` unless the account has the signup's email (the team invites' check, INVITE_EMAIL_MATCH, on by default); 422 `reservation_ended`; 409 `reservation_used` (a station already has it); 422 `studio`; 422 `call_sign_refused` and 409 `call_sign_undecided` as setup has them; 404 for an unknown one.
+- `chooseChannel`: choosing another number than the one held with the station's waitlist call sign releases that hold (the number is open again). Choosing the held one again changes nothing.
+- `listSignups` items gain `stationId` (the station set up from one of their reservations, else null) and `done` (true once there is one). Worked out from the reservations; nothing new is stored.
+- `inviteReservation`'s email links to `/control/new?reservation=<id>` (was `/control/new`), and its body says setup starts with the call sign and channel.
+
 ## 2026-09-29: Network desk, Catalog sponsors
 
 Follow-up Phase 0, item 11 (desk-pages 03). Additive: a new endpoint group, new schemas, a constant, two rules and one rule group. Migration **0030** (`spots.sponsorships.market_id` and `offered_by`, one live sponsorship or offer per slot; `spots.catalog_house_credits`).

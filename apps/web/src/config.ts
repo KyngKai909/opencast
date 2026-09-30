@@ -20,6 +20,8 @@ export const config = {
    * puts in the app, dist/tv) or "url" (VITE_TV_URL, for live reload against TV mode's dev server).
    */
   mirrorTv: (env.VITE_MIRROR_TV as string | undefined) === "url" ? ("url" as const) : ("bundled" as const),
+  /** The public site (apps/site): its `#join` is the waitlist (an ended waitlist invite links there). */
+  siteUrl: ((env.VITE_SITE_URL as string | undefined) || "http://localhost:5176").replace(/\/+$/, ""),
   /** Where mock mode's clock starts (the reference frames' moment), or null for the real time. */
   mockClock: (env.VITE_MOCK_CLOCK as string | undefined) || null
 };

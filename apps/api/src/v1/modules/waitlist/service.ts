@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, ne } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { formatChannelNumber, isValidCallSign, parseChannelNumber, type Band } from "@opencast/domain";
-import { callSignIdeas, callSignRefusal, type CallSignRefusal, type FlaggedStation, type Market, type Reservation, type ReservationsOverview, type ReservationState } from "@opencast/contracts";
+import { callSignIdeas, callSignRefusal, type CallSignRefusal, type FlaggedStation, type Market, type Reservation, type ReservationInvite, type ReservationsOverview, type ReservationState } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
+import { maskEmail } from "../../email.js";
 
 type Role = "viewer" | "station" | "producer" | "business";
 
@@ -29,7 +30,8 @@ export interface WaitlistService {
   join(input: { role: Role; email: string; zip: string; callSign?: string; name?: string; about?: string }): Promise<{ role: Role; market: Market | null; message: string; heldCallSign: string | null }>;
   reservations(marketId?: string): Promise<Reservation[]>;
   holdChannel(reservationId: string, input: { marketId: string; band: Band; channel: string }): Promise<void>;
-  signups(filter: { marketId?: string; role?: Role }): Promise<Array<{ id: string; role: Role; email: string; zip: string; market: Market | null; callSign: string | null; createdAt: string }>>;
+  /** `stationId` and `done` (added 2026-09-29): the station set up from their invite, and so done on the waitlist. */
+  signups(filter: { marketId?: string; role?: Role }): Promise<Array<{ id: string; role: Role; email: string; zip: string; market: Market | null; callSign: string | null; createdAt: string; stationId: string | null; done: boolean }>>;
 
   // Added 2026-09-29: reserved call signs on the desk (desk-pages 02).
   /** 422 `call_sign_refused` for a name `call_signs.refused` doesn't allow (the waitlist and station setup). */
@@ -44,6 +46,20 @@ export interface WaitlistService {
   release(user: CurrentUser, reservationId: string, note?: string): Promise<{ ok: true; callSign: string; channel: string | null }>;
   decide(user: CurrentUser, reservationId: string, input: { suggestions?: Array<{ reservationId: string; callSign: string }>; note?: string }): Promise<{ kept: Reservation; told: Array<{ reservationId: string; email: string | null; suggestion: string | null }> }>;
   suggest(user: CurrentUser, reservationId: string, input: { callSign: string; alternatives?: string[]; note?: string }): Promise<Reservation>;
+  // Added 2026-09-29: the invite's link opens station setup with the call sign and channel held.
+  /** The invite's link (`/control/new?reservation=<id>`) as master control reads it. */
+  invitePreview(reservationId: string, user: CurrentUser | null): Promise<ReservationInvite>;
+  /**
+   * Before a station is started from an invite: 404 unless it's a waitlist hold, 422
+   * `reservation_ended` once it has ended, 409 `reservation_used` when a station has it, 403
+   * `reservation_email_mismatch` unless the person has the signup's email (INVITE_EMAIL_MATCH),
+   * 422 `call_sign_refused`, 409 `call_sign_undecided`. Says the call sign and any channel held.
+   */
+  inviteFor(user: CurrentUser, reservationId: string): Promise<{ callSign: string; channel: { marketId: string; band: Band; tenths: number } | null }>;
+  /** Inside the new station's transaction: the reservation is its (signing on). 409 `reservation_used` if another got there first. */
+  tieToStation(tx: Executor, reservationId: string, stationId: string): Promise<void>;
+  /** A station chose another channel: the channels held with its call sign for any other number are let go. */
+  releaseOtherChannels(tx: Executor, stationId: string, keep: { marketId: string; band: Band; tenths: number }): Promise<void>;
   /** The jobs' hourly pass: reminders before the end, holds that ended (and their channels), holds whose station signed on. */
   sweep(): Promise<{ reminded: number; expired: number; signedOn: number }>;
 }
@@ -199,7 +215,9 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       title: `Sign on as ${view.callSign}`,
       body:
         `${view.market ? `The ${view.market.name} is opening on Opencast` : "Opencast is ready for you"}, and ${view.callSign} is held for you${until}.${view.channel ? ` So is channel ${view.channel}.` : ""}\n\n` +
-        `Sign in with ${row.email} to set up your station. Choose ${view.callSign} as its call sign${view.channel ? ` and ${view.channel} as its channel` : ""}: nobody else can.`,
+        `Sign in with ${row.email} to set up your station. It starts with ${view.callSign} as its call sign${view.channel ? ` and ${view.channel} as its channel` : ""}: nobody else can have ${view.channel ? "them" : "it"}.`,
+      // The link opens setup with the call sign and channel held (added 2026-09-29).
+      link: `${deps.config.appOrigin}/control/new?reservation=${row.reservation.id}`,
       key: `invite-${row.reservation.id}-${deps.clock.now().getTime()}`
     });
   }
@@ -355,6 +373,14 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
         .where(and(...(filter.marketId ? [eq(W.marketId, filter.marketId)] : []), ...(filter.role ? [eq(W.role, filter.role)] : [])))
         .orderBy(desc(W.createdAt));
       const markets = await services.network.marketsByIds(rows.map((r) => r.marketId).filter((v): v is string => Boolean(v)));
+      // Done: a station was set up from one of their reservations (their invite's link).
+      const started = rows.length
+        ? await db
+            .select({ signupId: R.signupId, stationId: R.stationId })
+            .from(R)
+            .where(and(inArray(R.signupId, rows.map((r) => r.id)), isNotNull(R.stationId), eq(R.reason, "waitlist")))
+        : [];
+      const stationOf = new Map(started.map((s) => [s.signupId!, s.stationId!]));
       return rows.map((r) => ({
         id: r.id,
         role: r.role,
@@ -362,7 +388,9 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
         zip: r.zip,
         market: r.marketId ? (markets.get(r.marketId) ?? null) : null,
         callSign: r.requestedCallSign,
-        createdAt: r.createdAt.toISOString()
+        createdAt: r.createdAt.toISOString(),
+        stationId: stationOf.get(r.id) ?? null,
+        done: stationOf.has(r.id)
       }));
     },
 
@@ -509,6 +537,77 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       return viewOf(replacement.id);
     },
 
+    async invitePreview(reservationId, user) {
+      const row = await inviteRow(reservationId);
+      const r = row.reservation;
+      const [h] = await db.select().from(H).where(and(eq(H.reservationId, r.id), isNull(H.releasedAt)));
+      // The channel's market is the one to set up in; else the reservation's.
+      const marketId = h?.marketId ?? r.marketId;
+      const market = marketId ? ((await services.network.marketsByIds([marketId])).get(marketId) ?? null) : null;
+      const emails = user ? await services.accounts.verifiedEmails(user) : [];
+      const yours = !!user && !!r.stationId && (await services.accounts.stationRole(user, r.stationId)) !== null;
+      return {
+        id: r.id,
+        callSign: r.callSign,
+        market,
+        band: h?.band ?? null,
+        channel: h ? formatChannelNumber({ band: h.band, tenths: h.tenths }) : null,
+        heldUntil: r.heldUntil?.toISOString() ?? null,
+        state: inviteState(r),
+        emailHint: row.email ? maskEmail(row.email) : null,
+        signedInAs: user ? (emails[0] ?? null) : null,
+        emailMatches: user && row.email && deps.config.inviteEmailMatch !== false ? emails.includes(row.email.toLowerCase()) : null,
+        stationId: yours ? r.stationId : null
+      };
+    },
+
+    async inviteFor(user, reservationId) {
+      const row = await inviteRow(reservationId);
+      const r = row.reservation;
+      const state = inviteState(r);
+      if (state === "ended") throw refused("reservation_ended", `This invite has ended: ${r.callSign} isn't held for you any more. If it's still free, you can reserve it again on the waitlist.`);
+      if (state !== "open") throw conflict("reservation_used", `A station is already being set up as ${r.callSign}.`);
+      // Only the person it's for: the team invites' check (INVITE_EMAIL_MATCH, on by default).
+      if (row.email && deps.config.inviteEmailMatch !== false) {
+        const emails = await services.accounts.verifiedEmails(user);
+        if (!emails.includes(row.email.toLowerCase())) {
+          const hint = maskEmail(row.email);
+          throw new HttpError(403, "reservation_email_mismatch", `This invite is for ${hint}; you're signed in as ${emails[0] ?? "an account with no email"}. Sign in with ${hint} to use it.`);
+        }
+      }
+      await service.requireAllowed(r.callSign);
+      const others = await db
+        .select({ id: R.id })
+        .from(R)
+        .where(and(eq(R.callSign, r.callSign), isNull(R.releasedAt), ne(R.id, r.id)));
+      if (others.length && r.decision !== "kept") throw conflict("call_sign_undecided", `Someone else asked for ${r.callSign} too. Opencast's team is deciding who keeps it, and will write to you.`);
+      const [h] = await db.select().from(H).where(and(eq(H.reservationId, r.id), isNull(H.releasedAt)));
+      return { callSign: r.callSign, channel: h ? { marketId: h.marketId, band: h.band, tenths: h.tenths } : null };
+    },
+
+    async tieToStation(tx, reservationId, stationId) {
+      const [tied] = await tx
+        .update(R)
+        .set({ stationId })
+        .where(and(eq(R.id, reservationId), isNull(R.stationId), isNull(R.releasedAt)))
+        .returning({ callSign: R.callSign });
+      if (!tied) throw conflict("reservation_used", "A station is already being set up with this invite.");
+    },
+
+    async releaseOtherChannels(tx, stationId, keep) {
+      const held = await tx
+        .select({ id: H.id, marketId: H.marketId, band: H.band, tenths: H.tenths })
+        .from(H)
+        .innerJoin(R, eq(R.id, H.reservationId))
+        .where(and(eq(R.stationId, stationId), isNull(H.releasedAt)));
+      const other = held.filter((h) => !(h.marketId === keep.marketId && h.band === keep.band && h.tenths === keep.tenths));
+      if (!other.length) return;
+      await tx
+        .update(H)
+        .set({ releasedAt: deps.clock.now() })
+        .where(inArray(H.id, other.map((h) => h.id)));
+    },
+
     async sweep() {
       const now = deps.clock.now();
       const { reminderDays } = await hold();
@@ -555,6 +654,21 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       return { reminded, expired: ended.length, signedOn };
     }
   };
+
+  /** A waitlist reservation and its signup's email, by id, for the invite's link; 404 for anything else. */
+  async function inviteRow(reservationId: string) {
+    const [row] = await db.select({ reservation: R, email: W.email }).from(R).leftJoin(W, eq(W.id, R.signupId)).where(eq(R.id, reservationId));
+    if (!row || row.reservation.reason !== "waitlist") throw notFound("That invite");
+    return row;
+  }
+
+  /** Where the invite's link stands: its station signed on, a station is being set up with it, it ended, or it's open. */
+  function inviteState(r: typeof R.$inferSelect): ReservationInvite["state"] {
+    if (r.releaseReason === "signed_on") return "signed_on";
+    const ended = !!r.releasedAt || (!!r.heldUntil && r.heldUntil.getTime() <= deps.clock.now().getTime());
+    if (r.stationId && !r.releasedAt) return "setting_up";
+    return ended ? "ended" : "open";
+  }
 
   /** Waiting for an invite and able to have one. */
   function invitable(r: Reservation) {

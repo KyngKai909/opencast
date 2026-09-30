@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { CallSign, Id, Market, Timestamp } from "./common.js";
+import { Band, CallSign, Id, Market, Timestamp } from "./common.js";
 import { CallSignRefusal } from "./callSigns.js";
 
 export const WaitlistRole = z.enum(["viewer", "station", "producer", "business"]);
@@ -64,6 +64,34 @@ export const ReservationsOverview = z.object({
 });
 export type ReservationsOverview = z.infer<typeof ReservationsOverview>;
 
+/**
+ * A waitlist invite's link (`/control/new?reservation=<id>`) as master control reads it (added
+ * 2026-09-29): the call sign, the market and channel held with it, when the hold ends, and whether
+ * it can still be used. Anyone with the link can read it; the invited address is only ever masked.
+ * `open`: held and not used yet. `setting_up`: a station is being set up with it. `signed_on`: that
+ * station has signed on. `ended`: the hold ended (its end passed, the desk released it, or another
+ * name is held in its place).
+ */
+export const ReservationInvite = z.object({
+  id: Id,
+  callSign: CallSign,
+  market: Market.nullable(),
+  /** The channel held with it, and its band; null when none is held. */
+  band: Band.nullable(),
+  channel: z.string().nullable(),
+  heldUntil: Timestamp.nullable(),
+  state: z.enum(["open", "setting_up", "signed_on", "ended"]),
+  /** The waitlist signup's address, masked (`s…@example.com`). */
+  emailHint: z.string().nullable(),
+  /** Signed in: the account's own email. Null signed out, or with no email. */
+  signedInAs: z.string().nullable(),
+  /** Signed in: whether the account has the signup's email (verified email, Google or Apple). Null signed out, or when the check is off (INVITE_EMAIL_MATCH=off). */
+  emailMatches: z.boolean().nullable(),
+  /** The station made with it, when the signed-in person is on its team; else null. */
+  stationId: Id.nullable()
+});
+export type ReservationInvite = z.infer<typeof ReservationInvite>;
+
 export const waitlistApi = {
   join: endpoint({
     method: "POST",
@@ -110,6 +138,15 @@ export const waitlistApi = {
       /** Up to three free names to offer instead, when it's refused or taken. */
       suggestions: z.array(CallSign)
     })
+  }),
+  getReservationInvite: endpoint({
+    method: "GET",
+    path: "/waitlist/reservations/:reservationId",
+    auth: "optional",
+    summary:
+      "Added 2026-09-29: a waitlist invite's link as master control reads it: the call sign, market, channel held and end, whether it's open, being set up, signed on or ended, and the address masked. Signed in, whether the account has the signup's email. 404 for an unknown one, or a hold that isn't the waitlist's.",
+    params: z.object({ reservationId: Id }),
+    response: ReservationInvite
   }),
   listReservations: endpoint({
     method: "GET",
@@ -205,7 +242,20 @@ export const waitlistApi = {
     auth: "admin",
     summary: "Everyone on the waitlist, per market",
     query: z.object({ marketId: Id.optional(), role: WaitlistRole.optional() }),
-    response: z.array(z.object({ id: Id, role: WaitlistRole, email: z.string(), zip: z.string(), market: Market.nullable(), callSign: z.string().nullable(), createdAt: Timestamp }))
+    response: z.array(
+      z.object({
+        id: Id,
+        role: WaitlistRole,
+        email: z.string(),
+        zip: z.string(),
+        market: Market.nullable(),
+        callSign: z.string().nullable(),
+        createdAt: Timestamp,
+        /** Added 2026-09-29: the station set up from their invite (null until then), and so done on the waitlist. */
+        stationId: Id.nullable(),
+        done: z.boolean()
+      })
+    )
   })
 };
 

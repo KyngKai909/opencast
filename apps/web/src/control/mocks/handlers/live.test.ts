@@ -2,7 +2,7 @@
 // Live and programming on the mocks: live sources and their keys, hosts, speakers, the lower
 // third, ending early, listings, and the library's rights, uploads and guarded deletes.
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN_PREFIX } from "../../../auth/mockToken";
@@ -10,6 +10,7 @@ import { LIVE_SOURCE_IDS } from "../fixtures/evening";
 import { PROGRAM_IDS } from "../fixtures/library";
 import { LIVE_ENTRY_IDS, listingStatus, resetLive } from "../fixtures/live";
 import { BEAT } from "../fixtures/stations";
+import { at } from "../fixtures/time";
 import { handlers } from "./index";
 
 const server = setupServer(...handlers);
@@ -49,12 +50,19 @@ describe("live sources", () => {
   });
 
   it("has one browser source, and won't remove a source a block still uses", async () => {
+    // At the reference's 8:42 pm, while tonight's blocks are still to come (late at night on the
+    // real clock they've all ended, and nothing would be using the source).
+    vi.useFakeTimers({ now: new Date(at("20:42:12")), toFake: ["Date"] });
+    try {
     expect((await api(`${S}/live-sources`, { method: "POST", body: { kind: "browser", name: "Another" } })).status).toBe(409);
     const refused = await api(`${S}/live-sources/${LIVE_SOURCE_IDS.studioA}`, { method: "DELETE" });
     expect(refused.status).toBe(409);
     expect(refused.body.error.message).toMatch(/^It feeds \d live blocks?\./);
     const made = await api(`${S}/live-sources`, { method: "POST", body: { kind: "encoder", name: "Van" } });
     expect((await api(`${S}/live-sources/${made.body.source.id}`, { method: "DELETE" })).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hides the server and key from a host, and keeps hosts out of setup", async () => {

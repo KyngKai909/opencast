@@ -238,7 +238,8 @@ describe("Invite the next 10", () => {
     expect(res.body.invited.map((r: { callSign: string }) => r.callSign)).toEqual(order.filter((cs) => res.body.invited.some((r: { callSign: string }) => r.callSign === cs)));
     expect(res.body.invited.every((r: { state: string; invitedAt: string | null }) => r.invitedAt && (r.state === "invited" || r.state === "ending"))).toBe(true);
     const invite = h.sent.filter((s) => s.title.startsWith("Sign on as ")).at(-1)!;
-    expect(invite.link).toMatch(/\/control\/new$/);
+    // The link opens setup with the reservation (added 2026-09-29).
+    expect(invite.link).toMatch(/\/control\/new\?reservation=[0-9a-f-]{36}$/);
     expect(invite.body).toContain("The Inland Empire is opening on Opencast");
     // Nobody who needs a decision was invited.
     const invitedIds = new Set(res.body.invited.map((r: { id: string }) => r.id));

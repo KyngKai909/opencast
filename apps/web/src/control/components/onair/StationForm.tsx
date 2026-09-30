@@ -1,12 +1,14 @@
 // A.1 Your station, setup step 1: name, call sign, band, market, channel and colour, with the
 // station as viewers will see it. Each field saves as you go; the first save starts the station
 // (`/new` creates it, then carries on at /setup/:stationId/station). A colour that fails 4.5:1
-// against white can't be saved, and says why.
+// against white can't be saved, and says why. From a waitlist invite (added 2026-09-29), the call
+// sign held is filled in and locked, and the channel held is chosen in its market; choosing another
+// lets the held one go when it saves.
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { accountsApi, stationsApi, waitlistApi, type StationSetup } from "@opencast/contracts";
+import { accountsApi, stationsApi, waitlistApi, type ReservationInvite, type StationSetup } from "@opencast/contracts";
 import {
   Button,
   ChannelPicker,
@@ -58,20 +60,22 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
-export function StationForm({ setup }: { setup: StationSetup | null }) {
+export function StationForm({ setup, reservation = null }: { setup: StationSetup | null; reservation?: ReservationInvite | null }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
   const st = setup?.station ?? null;
+  // A waitlist invite only starts a station (on /new).
+  const held = st ? null : reservation;
   const [id, setId] = useState<string | null>(st?.id ?? null);
   const [name, setName] = useState(st?.name ?? "");
-  const [callSign, setCallSign] = useState(st?.callSign ?? "");
-  const [band, setBand] = useState<"tv" | "radio">(st?.band ?? "tv");
-  const [channel, setChannel] = useState<string | null>(st?.channel ?? null);
+  const [callSign, setCallSign] = useState(st?.callSign ?? held?.callSign ?? "");
+  const [band, setBand] = useState<"tv" | "radio">(st?.band ?? held?.band ?? "tv");
+  const [channel, setChannel] = useState<string | null>(st?.channel ?? held?.channel ?? null);
   const [colourText, setColourText] = useState(st?.colour ?? SWATCHES[1]);
   const [changingMarket, setChangingMarket] = useState(false);
-  // The market picked here, before the station has one saved.
-  const [pickedMarketId, setPickedMarketId] = useState<string | null>(null);
+  // The market picked here, before the station has one saved (an invite's: the one its channel is held in).
+  const [pickedMarketId, setPickedMarketId] = useState<string | null>(held?.market?.id ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,8 +88,11 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
     null;
   const channels = useApi(stationsApi.availableChannels, { params: { marketSlug: market?.slug ?? "" }, query: { band } }, { enabled: !!market });
   const typedSign = useDebounced(callSign, 250);
-  const check = useApi(waitlistApi.checkCallSign, { params: { callSign: typedSign } }, { enabled: /^[A-Z]{3,5}$/.test(typedSign) && typedSign !== st?.callSign });
-  const signState = callSignState(callSign, st?.callSign ?? null, typedSign === callSign ? check.data : undefined);
+  const check = useApi(waitlistApi.checkCallSign, { params: { callSign: typedSign } }, { enabled: !held && /^[A-Z]{3,5}$/.test(typedSign) && typedSign !== st?.callSign });
+  // The call sign held for them is theirs: no need to ask.
+  const signState = held ? "free" : callSignState(callSign, st?.callSign ?? null, typedSign === callSign ? check.data : undefined);
+  // The channel held with it, in this market and band.
+  const heldChannel = held?.channel && held.band === band && held.market?.id === market?.id ? held.channel : null;
 
   const colour = readColour(colourText);
   const ratio = colour ? contrastRatio(colour, "#FFFFFF") : null;
@@ -102,7 +109,7 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
   const ensure = async (): Promise<string | null> => {
     if (id) return id;
     if (!name.trim()) return null;
-    const made = await call(stationsApi.createStation, { body: { kind: "station", name: name.trim(), ...(passes && colour ? { colour } : {}) } });
+    const made = await call(stationsApi.createStation, { body: { kind: "station", name: name.trim(), ...(passes && colour ? { colour } : {}), ...(held ? { reservationId: held.id } : {}) } });
     setId(made.station.id);
     return made.station.id;
   };
@@ -119,7 +126,7 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
 
   const saveAll = async (sid: string) => {
     if (name.trim() && name.trim() !== st?.name) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { name: name.trim() } });
-    if (signState === "free" && callSign !== st?.callSign && !fixed) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } });
+    if (!held && signState === "free" && callSign !== st?.callSign && !fixed) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } });
     if (passes && colour && colour !== st?.colour) await call(stationsApi.updateSetup, { params: { stationId: sid }, body: { colour } });
     if (channel && market && !fixed && (channel !== st?.channel || band !== st?.band)) await call(stationsApi.chooseChannel, { params: { stationId: sid }, body: { marketId: market.id, band, channel } });
   };
@@ -132,6 +139,8 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
       if (!sid) return;
       if (!had) {
         await saveAll(sid);
+        // Then what was just changed: saveAll reads what's rendered, from before this change.
+        await fn(sid);
         navigate(controlPath(`/setup/${sid}/station`), { replace: true });
         return;
       }
@@ -170,7 +179,7 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
 
   // The dial's options: taken ones struck through, this station's own choice open.
   const options = (channels.data?.channels ?? []).map((c) => {
-    const mine = c.channel === channel || c.channel === st?.channel;
+    const mine = c.channel === channel || c.channel === st?.channel || c.channel === heldChannel;
     return { value: band === "tv" ? c.channel.split(".")[0] : c.channel, taken: c.state !== "open" && !mine };
   });
   const pickerValue = channel ? (band === "tv" ? channel.split(".")[0] : channel) : undefined;
@@ -189,11 +198,11 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
       className="cc-sf__sign"
       value={callSign}
       onChange={(e) => setCallSign(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 5))}
-      onBlur={() => signState === "free" && callSign !== st?.callSign && void saveField((sid) => call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } }))}
-      disabled={fixed}
+      onBlur={() => !held && signState === "free" && callSign !== st?.callSign && void saveField((sid) => call(stationsApi.updateSetup, { params: { stationId: sid }, body: { callSign } }))}
+      disabled={fixed || !!held}
       autoComplete="off"
       spellCheck={false}
-      ok={signState === "free" ? `${callSign} is free` : undefined}
+      ok={signState === "free" && !held ? `${callSign} is free` : undefined}
       error={
         signState === "invalid"
           ? "Three to five capital letters"
@@ -204,7 +213,7 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
               : `${callSign} is taken`
             : undefined
       }
-      help={fixed ? "Fixed since the first sign-on" : undefined}
+      help={fixed ? "Fixed since the first sign-on" : held ? "Held for you on the waitlist" : undefined}
     />
   );
 
@@ -283,6 +292,7 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
                 ? `Open channels in the ${marketName}. Taken ones are struck through.${channel ? ` You'll be ${channel}; subchannels ${channel.split(".")[0]}.2 and up are for stations you carry around the clock.` : ""}`
                 : `Open frequencies in the ${marketName}. Taken ones are struck through.`}
             </div>
+            {heldChannel && !fixed && <div className="cc-sf__help">{`${heldChannel} is held for you. If you choose another, ${heldChannel} is let go.`}</div>}
           </div>
           <div className="cc-sf__fld">
             <span className="cc-sf__lb">Station colour</span>

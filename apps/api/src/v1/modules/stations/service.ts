@@ -140,7 +140,8 @@ export interface StationsService {
   /** Used by Network desk to set up claimable, listed and catalog stations. */
   createManaged(db: Executor, input: { kind: StationKind; name: string; callSign: string; colour?: string; marketId: string; band: Band; tenths: number; description?: string }): Promise<string>;
 
-  create(user: CurrentUser, input: { kind: "station" | "studio"; name: string; description?: string; colour?: string; handle?: string }): Promise<StationSetupView>;
+  /** `reservationId` (added 2026-09-29): started from a waitlist invite, with the call sign and any channel held. */
+  create(user: CurrentUser, input: { kind: "station" | "studio"; name: string; description?: string; colour?: string; handle?: string; reservationId?: string }): Promise<StationSetupView>;
   setup(stationId: string): Promise<StationSetupView>;
   updateSetup(user: CurrentUser, stationId: string, input: SetupPatch): Promise<StationSetupView>;
   availableChannels(marketId: string, band: Band): Promise<Array<{ channel: string; state: "open" | "taken" | "held" }>>;
@@ -653,6 +654,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         throw badRequest("That colour doesn't hold 4.5:1 against white. Choose a darker one.", { colour: "Needs 4.5:1" });
       }
       if (input.kind === "studio" && !input.handle) throw badRequest("A studio needs a short handle.", { handle: "Required" });
+      if (input.kind === "studio" && input.reservationId) throw refused("studio", "A studio has a handle, not a call sign.");
+      // From a waitlist invite (added 2026-09-29): checked first, so nothing is made when it can't be used.
+      const held = input.reservationId ? await services.waitlist.inviteFor(user, input.reservationId) : null;
       const stationId = await db.transaction(async (tx) => {
         const [station] = await tx
           .insert(S)
@@ -666,6 +670,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
           .returning();
         await services.accounts.addStationMember(tx, station.id, user.id, "owner");
         await tx.insert(schema.breakRules).values({ stationId: station.id });
+        if (held && input.reservationId) {
+          // The reservation is the station's first, so the guards let it have the name and the channel.
+          await services.waitlist.tieToStation(tx, input.reservationId, station.id);
+          await tx.update(S).set({ callSign: held.callSign }).where(eq(S.id, station.id));
+          if (held.channel) await tx.insert(C).values({ stationId: station.id, ...held.channel });
+        }
         return station.id;
       });
       return service.setup(stationId);
@@ -775,6 +785,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         } else {
           await tx.insert(C).values({ stationId, marketId: input.marketId, band: input.band, tenths: number.tenths });
         }
+        // Another than the channel held with its waitlist call sign: the held one goes (added 2026-09-29).
+        await services.waitlist.releaseOtherChannels(tx, stationId, { marketId: input.marketId, band: input.band, tenths: number.tenths });
       });
       return service.setup(stationId);
     },

@@ -370,7 +370,7 @@ export const stationsApi = {
     method: "POST",
     path: "/stations",
     auth: "user",
-    summary: "Start a station (or a studio). Nothing is public until it signs on. The creator becomes the owner.",
+    summary: "Start a station (or a studio). Nothing is public until it signs on. The creator becomes the owner. Changed 2026-09-29: `reservationId` starts it from a waitlist invite, with the call sign and channel held.",
     body: z.object({
       kind: z.enum(["station", "studio"]).default("station"),
       name: z.string().min(1).max(80),
@@ -379,7 +379,15 @@ export const stationsApi = {
       handle: z
         .string()
         .regex(/^[a-z0-9-]{2,30}$/)
-        .optional()
+        .optional(),
+      /**
+       * Added 2026-09-29: start it from a waitlist invite (`/control/new?reservation=<id>`). The
+       * call sign held takes its call sign, and a channel held its channel. Only for the person the
+       * invite is for (403 `reservation_email_mismatch`, unless INVITE_EMAIL_MATCH=off); 422
+       * `reservation_ended` once the hold has ended; 409 `reservation_used` when a station is
+       * already being set up with it; 409 `call_sign_undecided`, 422 `call_sign_refused` as setup.
+       */
+      reservationId: Id.optional()
     }),
     response: StationSetup,
     status: 201
@@ -438,7 +446,7 @@ export const stationsApi = {
     method: "PUT",
     path: "/stations/:stationId/channel",
     auth: "user",
-    summary: "Choose market, band and channel before first sign-on. A station gets X.1.",
+    summary: "Choose market, band and channel before first sign-on. A station gets X.1. Changed 2026-09-29: choosing another than the channel held with its waitlist call sign lets the held one go.",
     params: StationParams,
     body: z.object({ marketId: Id, band: Band, channel: ChannelNumber }),
     response: StationSetup

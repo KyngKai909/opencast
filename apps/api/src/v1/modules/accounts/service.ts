@@ -45,6 +45,11 @@ export interface AccountsService {
   displayNames(userIds: string[]): Promise<Map<string, string | null>>;
   /** Every email the user has, lower-cased (their account email and linked ones). */
   emailsOf(userId: string): Promise<string[]>;
+  /**
+   * Added 2026-09-29: the signed-in person's verified emails as accepting an invite checks them
+   * (INVITE_EMAIL_MATCH): the ones recorded, and Privy's linked accounts read again.
+   */
+  verifiedEmails(user: CurrentUser): Promise<string[]>;
   notificationPrefs(userId: string, scope: "viewer" | "station" | "business", scopeId: string | null): Promise<Record<string, unknown>>;
   saveNotificationPrefs(userId: string, scope: "viewer" | "station" | "business", scopeId: string | null, prefs: Record<string, unknown>): Promise<void>;
 
@@ -561,6 +566,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       const rows = await db.select({ id: u.id, displayName: u.displayName }).from(u).where(inArray(u.id, userIds));
       return new Map(rows.map((r) => [r.id, r.displayName]));
     },
+
+    verifiedEmails: (user) => verifiedEmails(user),
 
     async emailsOf(userId) {
       const [user] = await db.select({ email: u.email }).from(u).where(eq(u.id, userId));

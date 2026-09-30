@@ -18,6 +18,8 @@ export function waitlistRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return { ok: true as const };
   });
   r.handle(api.listSignups, ({ query }) => waitlist.signups(query));
+  // The invite's link (added 2026-09-29): anyone with it reads it; signed in, it says whether it's theirs.
+  r.handle(api.getReservationInvite, ({ params, user }) => waitlist.invitePreview(params.reservationId, user ?? null));
 
   // Reserved call signs on the desk (added 2026-09-29, desk-pages 02): each checks the desk role
   // for the reservation's market.

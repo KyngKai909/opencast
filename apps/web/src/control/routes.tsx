@@ -18,8 +18,10 @@ export function AppRoutes() {
   const auth = useAuth();
   const loc = useLocation();
   if (!auth.ready) return null;
-  // Claiming a station (rights 05.1) and an invite's link start signed out: they ask for sign-in themselves.
-  if (!auth.signedIn && !loc.pathname.startsWith(controlPath("/claim/")) && !loc.pathname.startsWith(controlPath("/invites/"))) return <SignIn />;
+  // Claiming a station (rights 05.1), an invite's link and a waitlist invite's link
+  // (`/control/new?reservation=<id>`) start signed out: they ask for sign-in themselves.
+  const waitlistInvite = loc.pathname === controlPath("/new") && new URLSearchParams(loc.search).has("reservation");
+  if (!auth.signedIn && !loc.pathname.startsWith(controlPath("/claim/")) && !loc.pathname.startsWith(controlPath("/invites/")) && !waitlistInvite) return <SignIn />;
   return (
     <Routes>
       <Route index element={<Home />} />
