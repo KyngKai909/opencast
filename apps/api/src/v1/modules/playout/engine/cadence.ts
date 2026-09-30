@@ -268,16 +268,20 @@ export async function cadenceContext(
   // How long a break without spots runs (only asked when spots don't air in every break).
   let needs: BreakNeeds | null = null;
   if (cadence.spots.every !== "break") {
-    const [fillers, credits, members, sidMs] = await Promise.all([
+    const [fillers, credits, members, sidMs, catalog] = await Promise.all([
       services.library.fillers(stationId),
       services.spots.creditsFor(stationId),
       services.ledger.memberCredits(stationId),
-      services.playout.stationIdMs(stationId)
+      services.playout.stationIdMs(stationId),
+      services.shelf.catalogSeries()
     ]);
     const [into, out] = [fillers.bumpers[0], fillers.bumpers[1] ?? fillers.bumpers[0]];
+    // A catalog program always has a credit to air (its series' sponsor, or Clear): once an hour, but
+    // a break's length is decided alone, so each of its breaks keeps the room.
+    const catalogPrograms = new Set(catalog.map((c) => c.programId));
     needs = {
       stationIdMs: fillers.stationIds[0]?.durationMs ?? sidMs,
-      credit: (programId) => members.named.length > 0 || credits.some((c) => c.programId === null || c.programId === programId),
+      credit: (programId) => members.named.length > 0 || (programId !== null && catalogPrograms.has(programId)) || credits.some((c) => c.programId === null || c.programId === programId),
       bumpersMs: into ? (into.durationMs ?? 0) + (out!.durationMs ?? 0) : 0
     };
   }

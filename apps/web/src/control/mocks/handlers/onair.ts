@@ -3,7 +3,7 @@
 // this file.
 
 import { http } from "msw";
-import { stationsApi, waitlistApi, type StationIdent } from "@opencast/contracts";
+import { CALL_SIGN_RULES_DEFAULT, callSignIdeas, callSignRefusal, stationsApi, waitlistApi, type StationIdent } from "@opencast/contracts";
 import { contrastRatio, ratioLabel, stationColourPasses } from "@opencast/ui";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog, type DbStation } from "../db";
@@ -68,8 +68,12 @@ export const onairHandlers = [
   http.get(path(waitlistApi.checkCallSign), ({ params }) => {
     const callSign = String(params.callSign).toUpperCase();
     const valid = /^[A-Z]{3,5}$/.test(callSign);
-    const available = valid && !allIdents().some((s) => s.callSign === callSign);
-    return reply(waitlistApi.checkCallSign.response, { callSign, valid, available });
+    // Names Opencast won't allow (2026-09-29), with the registry's first rules.
+    const refusal = valid ? callSignRefusal(callSign, CALL_SIGN_RULES_DEFAULT) : null;
+    const taken = (cs: string) => allIdents().some((s) => s.callSign === cs);
+    const available = valid && !refusal && !taken(callSign);
+    const suggestions = valid && !available ? callSignIdeas(callSign).filter((i) => !taken(i) && !callSignRefusal(i, CALL_SIGN_RULES_DEFAULT)).slice(0, 3) : [];
+    return reply(waitlistApi.checkCallSign.response, { callSign, valid, available, reservable: available, heldForYou: false, refusal, suggestions });
   }),
 
   http.post(path(stationsApi.createStation), async ({ request }) => {

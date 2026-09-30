@@ -36,6 +36,8 @@ export interface ShelfService {
   rebuild(user: CurrentUser | null, seriesId: string, reason?: string, itemId?: string | null): Promise<RebuildView>;
   /** Waits for episodes being composed (tests, shutdown). */
   settle(): Promise<void>;
+  /** Catalog sponsors (added 2026-09-29): every series that isn't "coming", by the program it's offered as. */
+  catalogSeries(): Promise<Array<{ id: string; title: string; colour: string | null; programId: string; stationId: string }>>;
 }
 
 const EVIDENCE_TYPES = /^(application\/pdf|image\/(png|jpeg|gif|webp|heic)|text\/plain)$/;
@@ -363,6 +365,11 @@ export function createShelfService({ deps, services }: ModuleContext): ShelfServ
   }
 
   const service: ShelfService = {
+    async catalogSeries() {
+      const rows = await db.select().from(S).orderBy(asc(S.createdAt));
+      return rows.filter((r) => r.state !== "coming").map((r) => ({ id: r.id, title: r.title, colour: r.colour, programId: r.programId, stationId: r.stationId }));
+    },
+
     async shelf(user) {
       const rows = await db.select().from(S).orderBy(asc(S.createdAt));
       const carriers = await carriersOf(rows);

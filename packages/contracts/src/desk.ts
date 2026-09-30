@@ -44,7 +44,7 @@ export const RoleInput = z
   .refine((r) => (r.role === "market_lead") === !!r.marketId, { message: "A market lead needs a market, and only a market lead has one", path: ["marketId"] });
 
 /** Where a rule sits on the Rules page. */
-export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow"]);
+export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow", "call_signs", "sponsors"]);
 export type RuleGroup = z.infer<typeof RuleGroup>;
 
 /** One version of a rule: its value from a date. */

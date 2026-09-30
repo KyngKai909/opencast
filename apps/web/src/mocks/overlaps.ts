@@ -91,7 +91,7 @@ export const overlapHandlers: HttpHandler[] = [
     if (!c?.ok || !d?.ok) return c ?? d ?? undefined;
     const a = await json(c);
     const b = await json(d);
-    return HttpResponse.json({ ...a, available: !!a.available && !!b.available });
+    return HttpResponse.json({ ...a, available: !!a.available && !!b.available, reservable: !!a.reservable && !!b.reservable, refusal: a.refusal ?? b.refusal ?? null });
   }),
 
   http.get(path(notificationsApi.getPrefs), async ({ request }) => {

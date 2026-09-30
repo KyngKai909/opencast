@@ -81,6 +81,8 @@ export interface PlayoutService {
   cueBreak(user: CurrentUser, stationId: string): Promise<void>;
   status(stationId: string): Promise<PlayoutStatusView>;
   asRun(stationId: string, from: Date, to: Date): Promise<AsRunView[]>;
+  /** Catalog sponsors (added 2026-09-29): the catalog credits that aired in a window, every station (credits naming a series carry its program). */
+  catalogCreditsAired(programIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; programId: string; startedAt: Date }>>;
   /** As-run rows for spot airings, for billing and results. */
   asRunForAirings(airingIds: string[]): Promise<Map<string, typeof schema.asRun.$inferSelect>>;
   /**
@@ -535,13 +537,23 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return rows.map((r) => ({
         id: r.id,
         code: r.code,
-        title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
+        title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && r.code !== "UND" && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
         startedAt: r.startedAt.toISOString(),
         endedAt: r.endedAt.toISOString(),
         reason: r.reason,
         itemId: r.assetId,
         airingId: r.airingId
       }));
+    },
+
+    async catalogCreditsAired(programIds, from, to) {
+      if (!programIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, programId: A.programId, startedAt: A.startedAt })
+        .from(A)
+        .where(and(eq(A.code, "UND"), inArray(A.programId, programIds), gte(A.startedAt, from), lt(A.startedAt, to)));
+      return rows.flatMap((r) => (r.programId ? [{ stationId: r.stationId, programId: r.programId, startedAt: r.startedAt }] : []));
     },
 
     async asRunForAirings(airingIds) {

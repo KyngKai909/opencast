@@ -3,8 +3,15 @@
 // API rounds them), the Monitor's readiness, the sign-on check `items_prepared`, and a library
 // item's preparation. On the reference's Saturday, 8:42:12 pm.
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
+
+// On the reference's Saturday, 8:42:12 pm, whatever the real time is: the mock clock, as dev:mock
+// runs it. (Late Crate, ep. 15 is still being prepared until 9:30 pm; on the real clock after that,
+// these would all read "ready".)
+vi.mock("../../../config", () => ({
+  config: { mock: true, apiBase: "", privyAppId: null, mockClock: "2026-09-27T03:42:12Z" }
+}));
 import { onSegment } from "@opencast/ui";
 import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN_PREFIX } from "../../../auth/mockToken";

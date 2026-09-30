@@ -6,7 +6,8 @@ import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
-import { cadenceContext, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
+import { cadenceContext, hourStartIn, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
+import { catalogCreditBreaks, catalogEntries } from "../playout/engine/catalogCredit.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
 import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
 import { createChangeOps, logVersion, PARK, type ChangeOps } from "./changes.js";
@@ -732,6 +733,9 @@ export function createLogService(ctx: ModuleContext): LogService {
         services.library.fillers(stationId)
       ]);
       const ctx = await context(entries);
+      // Catalog programs keep one credit an hour: their series' sponsor in this market, or Clear.
+      const catalog = await catalogEntries(services, stationId, entries, deps.clock.now());
+      const catalogBreaks = catalog.programOf.size ? catalogCreditBreaks(slots, (entryId) => catalog.programOf.has(entryId), hourStartIn(await stationTz(stationId))) : new Set<string>();
       // The bumper into the break and the one out of it (changed 2026-09-29): the library's first
       // two, or its one bumper twice.
       const bumperIn = fillers.bumpers[0];
@@ -766,7 +770,8 @@ export function createLogService(ctx: ModuleContext): LogService {
         let left = Math.max(0, slot.lengthMs - rows.reduce((sum, r) => sum + r.lengthMs, 0));
         const sidMs = parts.stationId ? Math.min(left, stationIdMs) : 0;
         left -= sidMs;
-        const credit = parts.underwriting && credits.length > 0 && left >= CREDIT_MS;
+        const catalogCredit = slot.logEntryId && catalogBreaks.has(slot.startsAt) ? catalog.credits.get(catalog.programOf.get(slot.logEntryId)!) : undefined;
+        const credit = parts.underwriting && (credits.length > 0 || !!catalogCredit) && left >= CREDIT_MS;
         if (credit) left -= CREDIT_MS;
         // Each bumper airs whole or not at all: into the break first.
         const into = parts.bumpers && bumperIn && bumperIn.durationMs! <= left ? bumperIn : null;
@@ -780,7 +785,18 @@ export function createLogService(ctx: ModuleContext): LogService {
           rows.push({ id: `${slot.startsAt}:open`, kind: "open", title: "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: "Filled from the rotation about 20 minutes before" });
           left = 0;
         }
-        if (credit) rows.push({ id: `${slot.startsAt}:credit`, kind: "underwriting", title: credits.map((c) => c.business).join(", "), lengthMs: CREDIT_MS, spotId: null, business: null, shortName: null, rotation: null, note: "Made possible by" });
+        if (credit)
+          rows.push({
+            id: `${slot.startsAt}:credit`,
+            kind: "underwriting",
+            title: catalogCredit ? catalogCredit.sponsor.business : credits.map((c) => c.business).join(", "),
+            lengthMs: CREDIT_MS,
+            spotId: null,
+            business: null,
+            shortName: null,
+            rotation: null,
+            note: catalogCredit ? `${catalogCredit.subject} is made possible by` : "Made possible by"
+          });
         if (outOf) rows.push(bumper(outOf, "out"));
         if (left > 0) rows.push({ id: `${slot.startsAt}:slate`, kind: "open", title: "Station ID slate", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: null });
         if (sidMs > 0) rows.push({ id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null });

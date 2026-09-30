@@ -1,0 +1,18 @@
+/* desk-pages 02, Reserved call signs: .rs rows (90px, 80px, 1fr, 120px, 150px, 130px), the call sign
+   in the wide display face, the channel in mono, "Reserved by" with its small line, the row's buttons. */
+.nd-reserved .oc-table__row { font-size: 14px; }
+.nd-reserved__cs { font: 800 17px var(--font-display); font-stretch: 112%; letter-spacing: -0.01em; }
+.nd-reserved__ch { font: 500 13.5px var(--font-mono); color: var(--ink-70); }
+.nd-reserved__who { min-width: 0; }
+.nd-reserved__who small { display: block; font-size: 12.5px; color: var(--ink-70); overflow-wrap: anywhere; }
+.nd-reserved__end { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.nd-reserved__market { display: inline-flex; align-items: center; gap: 4px; }
+.nd-reserved__market .oc-icon { width: 14px; height: 14px; }
+.nd-reserved__foot { margin: 14px 0 0; font-size: 13px; color: var(--ink-70); }
+.nd-reserved__quiet { margin: 0 0 10px; font-size: 13.5px; color: var(--ink-70); }
+.nd-reserved__flagged { margin-top: 32px; }
+.nd-reserved__h { margin: 0 0 6px; font: 700 17px var(--font-display); }
+
+@media (max-width: 720px) {
+  .nd-reserved .oc-control-title__end { flex-wrap: wrap; }
+}

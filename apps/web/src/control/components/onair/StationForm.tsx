@@ -194,7 +194,16 @@ export function StationForm({ setup }: { setup: StationSetup | null }) {
       autoComplete="off"
       spellCheck={false}
       ok={signState === "free" ? `${callSign} is free` : undefined}
-      error={signState === "invalid" ? "Three to five capital letters" : signState === "taken" ? `${callSign} is taken` : undefined}
+      error={
+        signState === "invalid"
+          ? "Three to five capital letters"
+          : signState === "taken"
+            ? // A name Opencast won't allow says why, with names to try (2026-09-29).
+              check.data?.refusal && check.data.callSign === callSign
+              ? `${check.data.refusal.reason}${check.data.suggestions.length ? ` Try ${check.data.suggestions.slice(0, 2).join(" or ")}.` : ""}`
+              : `${callSign} is taken`
+            : undefined
+      }
       help={fixed ? "Fixed since the first sign-on" : undefined}
     />
   );

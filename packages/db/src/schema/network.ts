@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, integer, jsonb, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, jsonb, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, millis } from "./columns.js";
 import { network, band } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -35,6 +35,9 @@ export const waitlistSignups = network.table("waitlist_signups", {
   marketId: uuid("market_id").references(() => markets.id),
   requestedCallSign: text("requested_call_sign"),
   notifiedAt: at("notified_at"),
+  /** Added 2026-09-29 (0029): who's asking and what for, as they wrote it (the desk's "Reserved by"). */
+  name: text("name"),
+  about: text("about"),
   createdAt: createdAt()
 });
 
@@ -42,6 +45,12 @@ export const waitlistSignups = network.table("waitlist_signups", {
  * A call sign held for someone on the waitlist ("BEAT is on hold for you"),
  * and for a year after a station signs off for good. While active, no other
  * station can take it (enforced by trigger on broadcast.stations).
+ *
+ * Since 0029 (2026-09-29): two people may ask for the same name (the index isn't unique); the
+ * desk decides, keeping one (`decision` kept) and releasing the others (`release_reason`
+ * not_kept), each with a name held for them instead (a new row that `replaces` theirs, with the
+ * same `created_at`, their place in line). A hold ends at `held_until` (`call_signs.hold`, 120
+ * days), with a reminder before; the desk can extend or release it.
  */
 export const callSignReservations = network.table(
   "call_sign_reservations",
@@ -55,11 +64,26 @@ export const callSignReservations = network.table(
     reason: text("reason", { enum: ["waitlist", "signed_off", "admin"] }).notNull(),
     heldUntil: at("held_until"),
     releasedAt: at("released_at"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    // Added 2026-09-29 (0029).
+    invitedAt: at("invited_at"),
+    remindedAt: at("reminded_at"),
+    extendedAt: at("extended_at"),
+    extendedBy: uuid("extended_by").references(() => users.id),
+    decision: text("decision", { enum: ["kept", "not_kept"] }),
+    decidedAt: at("decided_at"),
+    decidedBy: uuid("decided_by").references(() => users.id),
+    /** The names offered with it when it wasn't kept or wasn't allowed (the first is held). */
+    suggested: text("suggested").array(),
+    /** The reservation this one was held in place of (a suggestion). */
+    replaces: uuid("replaces"),
+    releaseReason: text("release_reason", { enum: ["expired", "released", "not_kept", "refused", "signed_on", "replaced"] }),
+    releasedBy: uuid("released_by").references(() => users.id),
+    note: text("note")
   },
   (t) => [
     check("call_sign_format", sql`${t.callSign} ~ '^[A-Z]{3,5}$'`),
-    uniqueIndex("call_sign_reservations_active").on(t.callSign).where(sql`${t.releasedAt} is null`)
+    index("call_sign_reservations_active").on(t.callSign).where(sql`${t.releasedAt} is null`)
   ]
 );
 

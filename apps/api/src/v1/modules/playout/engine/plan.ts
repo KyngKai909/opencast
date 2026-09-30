@@ -27,7 +27,8 @@ import type { BreakSlotView } from "../../log/service.js";
 import { clockTime } from "../../../lib/time.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
 import { Slates, type StationLook } from "./slates.js";
-import { partsOf } from "./cadence.js";
+import { hourStartIn, partsOf } from "./cadence.js";
+import { catalogCreditBreaks } from "./catalogCredit.js";
 import type { Band } from "./ladder.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
 
@@ -214,6 +215,13 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       ]);
       const tz = await services.stations.timezoneOf(stationId);
       const segments: Segment[] = [];
+      // Catalog programs keep one credit an hour, thanking their series' sponsor in this market (or Clear).
+      const programOfEntry = (entryId: string | null) => {
+        const entry = entryId ? entries.find((e) => e.id === entryId) : undefined;
+        return entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
+      };
+      const catalog = await services.spots.catalogCredits(stationId, [...new Set(entries.map((e) => programOfEntry(e.id)).filter((v): v is string => Boolean(v)))], from);
+      const catalogBreaks = catalogCreditBreaks(breaks, (entryId) => catalog.has(programOfEntry(entryId) ?? ""), hourStartIn(tz));
 
       const composeBreak = async (slot: BreakSlotView, entryId: string | null): Promise<Segment[]> => {
         const start = Date.parse(slot.startsAt);
@@ -236,11 +244,13 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         // The thank-you credit: sponsors of this program, of the station, and members who asked to be named.
         const entry = entries.find((e) => e.id === entryId);
         const programId = entry?.programId ?? (entry?.assetId ? items.get(entry.assetId)?.programId : null) ?? null;
-        const sponsors = credits.filter((c) => c.programId === null || c.programId === programId);
+        const catalogCredit = programId && catalogBreaks.has(slot.startsAt) ? catalog.get(programId) : undefined;
+        const sponsors = catalogCredit ? [{ ...catalogCredit.sponsor, programId }] : credits.filter((c) => c.programId === null || c.programId === programId);
+        const thanked = catalogCredit ? [] : members.named;
         // Room for the station ID after it (the generated one is ten seconds).
         const sidRoom = parts.stationId ? (fillers.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
         let left = slot.lengthMs - spotMs;
-        const creditMs = parts.underwriting && (sponsors.length || members.named.length) && left >= sidRoom + 10_000 ? Math.min(CREDIT_MS, left - sidRoom) : 0;
+        const creditMs = parts.underwriting && (sponsors.length || thanked.length) && left >= sidRoom + 10_000 ? Math.min(CREDIT_MS, left - sidRoom) : 0;
         left -= creditMs;
         // A bumper into the break and one out of it (the same one twice when there's one), each
         // whole or not at all, into the break first; none where the cadence leaves them out.
@@ -278,18 +288,21 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const afterSpots = out.length;
         if (creditMs > 0) {
           const programSponsors = sponsors.some((c) => c.programId && c.programId === programId);
-          const subject = programSponsors && programId ? (programs.get(programId)?.title ?? station.name) : station.name;
+          const subject = catalogCredit ? catalogCredit.subject : programSponsors && programId ? (programs.get(programId)?.title ?? station.name) : station.name;
+          // A catalog credit is drawn in its series' colour, and carries its program so it's counted.
+          const look = catalogCredit ? { ...station, colour: catalogCredit.colour ?? station.colour } : station;
           out.push({
             key: `${key}:und`,
             startsAt: new Date(cursor),
             endsAt: new Date(cursor + creditMs),
             code: "UND",
             label: `${subject} is made possible by`,
-            source: { kind: "image", path: await slates.credit(station, { subject, sponsors: sponsors.map((s) => ({ business: s.business, creditText: s.creditText })), members: members.named }) },
+            source: { kind: "image", path: await slates.credit(look, { subject, sponsors: sponsors.map((s) => ({ business: s.business, creditText: s.creditText })), members: thanked }) },
             slate: "credit",
             reason: "planned",
             inBreak: true,
-            breakId: slot.id ?? undefined
+            breakId: slot.id ?? undefined,
+            ...(catalogCredit && programId ? { programId } : {})
           });
           cursor += creditMs;
         }

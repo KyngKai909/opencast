@@ -29,6 +29,8 @@ export function nounOf(c: ClaimX): string {
 export function stateWords(c: ClaimX, callSign: string): { text: string; tone: "standby" | "plain" } {
   switch (c.state) {
     case "open":
+      // A privacy complaint has no answer window: Opencast reviews it (added 2026-09-29).
+      if (c.kind === "privacy") return { text: "Off air, privacy complaint", tone: "standby" };
       return { text: `Off air, ${c.daysToAnswer ?? 0} ${c.daysToAnswer === 1 ? "day" : "days"} to answer`, tone: "standby" };
     case "answered":
       return { text: "Answered, back on air", tone: "plain" };

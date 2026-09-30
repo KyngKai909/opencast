@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { Numbering, type RuleGroup } from "./desk.js";
 import { PUBLIC_DOMAIN_US_DEFAULT, PublicDomainUs, SOUND_RECORDINGS_US_DEFAULT, SoundRecordingsUs, cutoffYear, soundCutoffYear } from "./publicDomain.js";
+import { CALL_SIGN_RULES_DEFAULT, CallSignRules } from "./callSigns.js";
 
 const Bps = z.number().int().min(0).max(10_000);
 const PriceOrUnset = z.number().int().min(0).nullable();
@@ -186,6 +187,47 @@ export const RULES = {
     display: (v) => (v.signers ? `${v.threshold} of ${v.signers.length}` : "As deployed"),
     isSet: (v) => v.signers !== null,
     readOnly: true
+  }),
+  // Reserved call signs (added 2026-09-29, desk-pages 02; first versions in migration 0029).
+  "call_signs.hold": def({
+    group: "call_signs",
+    title: "Reserved call signs are held for",
+    detail: "From the day they're reserved, unless the person signs on or the desk extends it. A reminder goes before the end",
+    schema: z.object({ days: z.number().int().min(7).max(730), reminderDays: z.number().int().min(1).max(60) }).refine((v) => v.reminderDays < v.days, { message: "The reminder goes before the end" }),
+    fallback: { days: 120, reminderDays: 14 },
+    display: (v) => `${v.days} days, a reminder ${v.reminderDays} ${v.reminderDays === 1 ? "day" : "days"} before`
+  }),
+  "call_signs.refused": def({
+    group: "call_signs",
+    title: "Call signs Opencast won't allow",
+    detail: "Checked on the waitlist and at station setup. Stations already on the dial keep theirs",
+    schema: CallSignRules,
+    fallback: CALL_SIGN_RULES_DEFAULT,
+    display: (v) =>
+      [v.refuseKwFourLetters ? "K or W and three letters" : null, `${v.impersonation.length} ${v.impersonation.length === 1 ? "brand" : "brands"} and stations`, `${v.denylist.length} on the denylist`].filter(Boolean).join(", ")
+  }),
+  // Catalog sponsors (added 2026-09-29, desk-pages 03; no first version: the fallback is the value until one is set).
+  "catalog.sponsor_prices": def({
+    group: "sponsors",
+    title: "Catalog sponsorship",
+    detail: "A month: one catalog series in a market, or every catalog series in a market. A slot is for sale once its price is set",
+    schema: z.object({ seriesMonthlyMicros: PriceOrUnset, everySeriesMonthlyMicros: PriceOrUnset }),
+    fallback: { seriesMonthlyMicros: null, everySeriesMonthlyMicros: null } as { seriesMonthlyMicros: number | null; everySeriesMonthlyMicros: number | null },
+    display: (v) =>
+      v.seriesMonthlyMicros === null && v.everySeriesMonthlyMicros === null
+        ? "Not set yet"
+        : [v.seriesMonthlyMicros === null ? null : `${dollars(v.seriesMonthlyMicros)} a series`, v.everySeriesMonthlyMicros === null ? null : `${dollars(v.everySeriesMonthlyMicros)} every series`].filter(Boolean).join(", ") + " a month",
+    isSet: (v) => v.seriesMonthlyMicros !== null || v.everySeriesMonthlyMicros !== null,
+    scoped: true
+  }),
+  "shares.catalog_sponsorship": def({
+    group: "shares",
+    title: "Where catalog sponsorship goes",
+    detail: "Opencast, the co-op pool and the creator fund. Until it's set, it stays with the catalog station",
+    schema: z.object({ opencastBps: Bps, poolBps: Bps, fundBps: Bps }).refine((v) => v.opencastBps + v.poolBps + v.fundBps <= 10_000, { message: "The shares add up to 100% or less" }),
+    fallback: { opencastBps: 0, poolBps: 0, fundBps: 0 },
+    display: (v) => (!v.opencastBps && !v.poolBps && !v.fundBps ? "Not set yet" : `${pct(v.opencastBps)} Opencast, ${pct(v.poolBps)} the pool, ${pct(v.fundBps)} the creator fund`),
+    isSet: (v) => !!(v.opencastBps || v.poolBps || v.fundBps)
   })
 } as const;
 

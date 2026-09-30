@@ -58,8 +58,17 @@ export function Waitlist({ role, onRoleChange }: WaitlistProps) {
     retry: false
   });
   const checked = checkable && check.data?.callSign === callSign ? check.data : null;
-  const liveError = checked && !checked.valid ? COPY.callSignShort : checked && !checked.available ? COPY.callSignTaken(callSign) : undefined;
-  const liveOk = checked && checked.valid && checked.available ? COPY.callSignFree(callSign) : undefined;
+  // Refused names say why (2026-09-29); a name someone else asked for can still be asked for.
+  const liveError = !checked
+    ? undefined
+    : !checked.valid
+      ? COPY.callSignShort
+      : checked.refusal
+        ? COPY.callSignRefused(checked.refusal.reason, checked.suggestions)
+        : !checked.available && !checked.reservable
+          ? COPY.callSignTaken(callSign)
+          : undefined;
+  const liveOk = checked && checked.valid && !checked.refusal ? (checked.available ? COPY.callSignFree(callSign) : checked.reservable ? COPY.callSignAlsoAsked(callSign) : undefined) : undefined;
 
   const join = useMutation({
     mutationFn: (body: ReturnType<typeof toBody>) => call(waitlistApi.join, { body }),
@@ -67,7 +76,7 @@ export function Waitlist({ role, onRoleChange }: WaitlistProps) {
     onError: (e) => {
       if (e instanceof NetworkError) return setFormError(COPY.offline);
       if (e instanceof ApiError) {
-        if (e.code === "call_sign_taken") return showErrors({ callSign: e.message });
+        if (e.code === "call_sign_taken" || e.code === "call_sign_refused") return showErrors({ callSign: e.message });
         const { fields, rest } = fieldErrorsFrom(e.fields);
         if (Object.keys(fields).length) showErrors(fields);
         setFormError(Object.keys(fields).length ? (rest[0] ?? null) : e.message);

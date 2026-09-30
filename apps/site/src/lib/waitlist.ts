@@ -45,6 +45,8 @@ export const COPY = {
   callSignShort: "A call sign is three to five letters.",
   callSignFree: (cs: string) => `${cs} is free.`,
   callSignTaken: (cs: string) => `${cs} is taken. Try another.`,
+  callSignRefused: (reason: string, ideas: string[]) => `${reason}${ideas.length ? ` Try ${ideas.slice(0, 2).join(" or ")}.` : " Try another."}`,
+  callSignAlsoAsked: (cs: string) => `Someone else asked for ${cs} too. You can still ask: Opencast decides who keeps it.`,
   offline: "We couldn’t reach Opencast. Check your connection and try again."
 } as const;
 

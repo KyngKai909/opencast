@@ -9,6 +9,7 @@ const local = (s: string) => new Date(`${s}-07:00`).toISOString();
 
 const open: ClaimX = {
   id: uid(1),
+  kind: "copyright",
   item: { id: uid(2), title: "Crate Session 03" },
   station: BEAT,
   claimantName: "Westside Tapes LLC",

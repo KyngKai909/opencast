@@ -18,6 +18,13 @@ export const claimStatus = trust.enum("claim_status", [
   "restored"
 ]);
 
+/**
+ * Added 2026-09-29 (migration 0028): a privacy complaint (someone shown without consent) comes off
+ * air like a copyright claim but has no answer window, is reviewed by Opencast, and never counts
+ * toward the repeat limit. Every claim from before is copyright.
+ */
+export const claimKind = trust.enum("claim_kind", ["copyright", "privacy"]);
+
 export const claims = trust.table(
   "claims",
   {
@@ -37,6 +44,7 @@ export const claims = trust.table(
     rangeStartMs: millis("range_start_ms"),
     rangeEndMs: millis("range_end_ms"),
     swornStatement: boolean("sworn_statement").notNull(),
+    kind: claimKind("kind").notNull().default("copyright"),
     status: claimStatus("status").notNull().default("open"),
     receivedAt: at("received_at").notNull().defaultNow(),
     answerDueAt: at("answer_due_at").notNull(),

@@ -30,13 +30,14 @@ export function initialsOf(name: string): string {
 /** P4: where a spot's code and QR sit (inside title safe, bottom left) and for how long at its end. */
 export const CODE_PLACEMENT = { placement: "bottom_left" as const, box: { x: 0.1, y: 0.72, w: 0.2, h: 0.18 }, lastMs: 10_000 };
 import { createSponsorships, type SponsorshipsPart } from "./sponsorships.js";
+import { createCatalogSponsors, monthOf as catalogMonthOf, type CatalogSponsorsPart } from "./catalogSponsors.js";
 import { createOrders, type OrdersPart } from "./orders.js";
 import { createCodes, type CodesPart } from "./codes.js";
 import { createBusinessPart, type BusinessPart } from "./business.js";
 
 type Targeting = Spot["targeting"];
 
-export interface SpotsService extends SponsorshipsPart, OrdersPart, CodesPart, BusinessPart {
+export interface SpotsService extends SponsorshipsPart, CatalogSponsorsPart, OrdersPart, CodesPart, BusinessPart {
   businessNames(ids: string[]): Promise<Map<string, string>>;
   /** E4: signs a business's receipt links (made on first use). */
   receiptsKey(businessId: string): Promise<string>;
@@ -680,6 +681,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
   const parts = {
     sponsorships: createSponsorships(ctx),
+    catalogSponsors: createCatalogSponsors(ctx),
     orders: createOrders(ctx, {
       createSpotFromOrder: async (input) => {
         const [row] = await db
@@ -709,9 +711,22 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
 
   const service: SpotsService = {
     ...parts.sponsorships,
+    ...parts.catalogSponsors,
     ...parts.orders,
     ...parts.codes,
     ...parts.business,
+
+    // Catalog sponsors (added 2026-09-29): on the month's roll, last month's Clear-filled slots are
+    // recorded, and markets whose catalog credit changed (a month held, one lapsed) plan again.
+    async rollSponsorships() {
+      const SS = schema.sponsorships;
+      const before = await db.select({ id: SS.id, status: SS.status, marketId: SS.marketId }).from(SS).where(sql`${SS.marketId} is not null`);
+      const result = await parts.sponsorships.rollSponsorships();
+      const previous = new Date(Date.parse(catalogMonthOf(deps.clock.now())) - 86_400_000);
+      await parts.catalogSponsors.recordHouseCredits(catalogMonthOf(previous)).catch((error) => console.error("[spots] recording Clear-filled slots failed", error));
+      if (before.length) await parts.catalogSponsors.replanMarkets(before.flatMap((r) => (r.status === "approved" && r.marketId ? [r.marketId] : [])));
+      return result;
+    },
 
     async businessNames(ids) {
       const unique = [...new Set(ids)];

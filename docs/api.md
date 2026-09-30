@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-296 endpoints in 16 modules.
+312 endpoints in 17 modules.
 
 ## accounts (35)
 
@@ -262,7 +262,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `heartbeat` | POST | `/heartbeat` | anyone (personal if signed in), or a TV signed in | Players send this every 30 seconds while tuned in |
 | `getAudience` | GET | `/stations/:stationId/audience` | signed in | The station's own numbers (never shown to viewers) |
 
-## trust (6)
+## trust (7)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -270,8 +270,9 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `listClaims` | GET | `/stations/:stationId/claims` | signed in | Claims against this station's items, and its standing |
 | `answerClaim` | POST | `/claims/:claimId/answer` | signed in | Answer with a rights basis and an attestation. The item airs again; the claimant has 10 business days to respond. |
 | `removeClaimedItem` | POST | `/claims/:claimId/remove` | signed in | Take the item down instead of answering |
-| `resolveClaim` | POST | `/claims/:claimId/resolve` | Opencast admin | Opencast records the outcome: upheld, withdrawn or restored |
+| `resolveClaim` | POST | `/claims/:claimId/resolve` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Opencast records the outcome: upheld, withdrawn or restored. A rights reviewer or an admin (403 `desk_role` otherwise; `admin` before 2026-09-29). 409 `not_open` once the claim is closed. |
 | `attachToClaim` | POST | `/claims/:claimId/attachments` | signed in | B6: upload the permission or licence that backs an answer (owner, operator; a PDF, image or text file up to 20 MB). Returns the `attachmentUrl` `answerClaim` takes. 409 `not_open` once the claim is answered or closed; 422 `wrong_file_type`, `too_big`. |
+| `listDeskClaims` | GET | `/admin/claims` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Every claim on every station, newest first, with each one's timeline and carriers, the stations with claims and the page's figures. Admins and rights reviewers see every market; a market lead sees their own markets' (and only theirs with `marketId`: 403 `desk_role` for another). |
 
 ## notifications (4)
 
@@ -282,14 +283,22 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `getPrefs` | GET | `/me/notification-prefs` | signed in | Notification settings for a scope |
 | `setPrefs` | PUT | `/me/notification-prefs` | signed in | Change notification settings. Always-on kinds stay on. |
 
-## waitlist (5)
+## waitlist (13)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
-| `join` | POST | `/waitlist` | anyone | Join the waitlist. A station can ask for a call sign; it's held until the market opens. |
-| `checkCallSign` | GET | `/call-signs/:callSign` | anyone | Whether a call sign is free |
+| `join` | POST | `/waitlist` | anyone | Join the waitlist. A station can ask for a call sign; it's held for 120 days (`call_signs.hold`). 422 `call_sign_refused` for a name Opencast won't allow; someone else asking for the same name is allowed, and the desk decides. |
+| `checkCallSign` | GET | `/call-signs/:callSign` | anyone (personal if signed in) | Whether a call sign is free. Signed in, a name held for you is available to you |
 | `listReservations` | GET | `/admin/reservations` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Reserved call signs and the channels held for them |
 | `holdChannel` | POST | `/admin/reservations/:reservationId/channel` | Opencast admin | Hold a channel number for a reservation; no other station can take it |
+| `reservationsOverview` | GET | `/admin/reservations/overview` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The market's reservations in numbers, the hold's rule, and stations on the dial whose call signs break the rules now |
+| `callSignSuggestions` | GET | `/admin/call-signs/:callSign/suggestions` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Free names to offer in place of this one (Suggest, Decide) |
+| `inviteReservation` | POST | `/admin/reservations/:reservationId/invite` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Email them to sign on with their call sign (again, if they were invited before). 422 `not_allowed`, `same_name`, `no_email` |
+| `inviteNextReservations` | POST | `/admin/reservations/invite-next` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Invite the next ones waiting in the market, in reservation order (Invite the next 10) |
+| `extendReservation` | POST | `/admin/reservations/:reservationId/extend` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Hold it longer: the hold's days again, from its end (or from today, if that's later) |
+| `releaseReservation` | POST | `/admin/reservations/:reservationId/release` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | End the hold now: the name and any channel held with it are free. They get an email |
+| `decideReservation` | POST | `/admin/reservations/:reservationId/decide` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Same name twice: keep this one. Each other is told, with a free name held for them instead in the same place in line (chosen here, or the first suggestion) |
+| `suggestCallSign` | POST | `/admin/reservations/:reservationId/suggest` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Not allowed: hold `callSign` for them instead, in the same place in line, and tell them why (with up to three other free names) |
 | `listSignups` | GET | `/admin/waitlist` | Opencast admin | Everyone on the waitlist, per market |
 
 ## network (25)
@@ -379,3 +388,15 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `failItem` | POST | `/admin/catalog/items/:itemId/fail` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Marks an item failed (a renewal found, a rights claim): it comes out of every episode, and those episodes are rebuilt |
 | `setEpisode` | PUT | `/admin/catalog/series/:seriesId/episodes/:number` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | An episode's items in order: double-checked items only (422 `not_passed`). Composed by the next rebuild |
 | `rebuildEpisodes` | POST | `/admin/catalog/series/:seriesId/rebuild` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Composes every episode whose items changed; the rest are left as they are |
+
+## catalogSponsors (7)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getCatalogSponsors` | GET | `/admin/catalog/sponsors` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | The catalog's credit by series and market: who it thanks, the price, what aired, and the offers out |
+| `catalogSponsorBusinesses` | GET | `/admin/catalog/sponsors/businesses` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Businesses to offer a slot to, by name (the first 20) |
+| `offerCatalogSponsorship` | POST | `/admin/catalog/sponsors/offers` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Offers a slot to a business at the registry's price; it answers from its own side. 422 `credit_text`, `not_for_sale` (no price set), `bad_month`; 409 `slot_taken` |
+| `assignCatalogSponsorship` | POST | `/admin/catalog/sponsors/assignments` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Assigns a slot to a business that has agreed to it, holding its first month now (as `offerCatalogSponsorship`, and 422 `insufficient_balance`) |
+| `endCatalogSponsorship` | POST | `/admin/catalog/sponsors/:sponsorshipId/end` | the Opencast team (admin, rights reviewer or market lead; the role is checked per action) | Ends a sponsorship (credited to the end of its paid month, then Clear again), or withdraws an offer |
+| `listBusinessCatalogSponsorships` | GET | `/businesses/:businessId/catalog-sponsorships` | signed in | A business's catalog sponsorships and the offers waiting for its answer (owner or manager) |
+| `answerCatalogOffer` | POST | `/businesses/:businessId/catalog-sponsorships/:sponsorshipId/answer` | signed in | Accepts an offer (its first month is held now if it has started; 422 `insufficient_balance`) or declines it (owner or manager) |

@@ -1,11 +1,22 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { formatChannelNumber, isValidCallSign, parseChannelNumber, type Band } from "@opencast/domain";
-import type { Market } from "@opencast/contracts";
+import { callSignIdeas, callSignRefusal, type CallSignRefusal, type FlaggedStation, type Market, type Reservation, type ReservationsOverview, type ReservationState } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
-import { badRequest, conflict, notFound } from "../../errors.js";
+import type { CurrentUser } from "../../http.js";
+import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 
 type Role = "viewer" | "station" | "producer" | "business";
+
+export interface CallSignCheck {
+  callSign: string;
+  valid: boolean;
+  available: boolean;
+  reservable: boolean;
+  heldForYou: boolean;
+  refusal: CallSignRefusal | null;
+  suggestions: string[];
+}
 
 export interface WaitlistService {
   heldChannels(marketId: string, band: Band): Promise<Array<{ tenths: number; callSign: string }>>;
@@ -15,19 +26,187 @@ export interface WaitlistService {
   holdAfterSignOff(stationId: string): Promise<void>;
   isAvailable(callSign: string): Promise<boolean>;
   countInMarket(marketId: string): Promise<number>;
-  join(input: { role: Role; email: string; zip: string; callSign?: string }): Promise<{ role: Role; market: Market | null; message: string; heldCallSign: string | null }>;
-  reservations(marketId?: string): Promise<Array<{ id: string; callSign: string; email: string | null; market: Market | null; channel: string | null; heldUntil: string | null; createdAt: string }>>;
+  join(input: { role: Role; email: string; zip: string; callSign?: string; name?: string; about?: string }): Promise<{ role: Role; market: Market | null; message: string; heldCallSign: string | null }>;
+  reservations(marketId?: string): Promise<Reservation[]>;
   holdChannel(reservationId: string, input: { marketId: string; band: Band; channel: string }): Promise<void>;
   signups(filter: { marketId?: string; role?: Role }): Promise<Array<{ id: string; role: Role; email: string; zip: string; market: Market | null; callSign: string | null; createdAt: string }>>;
+
+  // Added 2026-09-29: reserved call signs on the desk (desk-pages 02).
+  /** 422 `call_sign_refused` for a name `call_signs.refused` doesn't allow (the waitlist and station setup). */
+  requireAllowed(callSign: string): Promise<void>;
+  check(callSign: string, userId: string | null): Promise<CallSignCheck>;
+  /** Free, allowed names to offer in place of this one. */
+  suggestionsFor(callSign: string, limit?: number): Promise<string[]>;
+  overview(user: CurrentUser, marketId: string): Promise<ReservationsOverview>;
+  invite(user: CurrentUser, reservationId: string): Promise<Reservation>;
+  inviteNext(user: CurrentUser, marketId: string, count: number): Promise<{ invited: Reservation[]; left: number }>;
+  extend(user: CurrentUser, reservationId: string, note?: string): Promise<Reservation>;
+  release(user: CurrentUser, reservationId: string, note?: string): Promise<{ ok: true; callSign: string; channel: string | null }>;
+  decide(user: CurrentUser, reservationId: string, input: { suggestions?: Array<{ reservationId: string; callSign: string }>; note?: string }): Promise<{ kept: Reservation; told: Array<{ reservationId: string; email: string | null; suggestion: string | null }> }>;
+  suggest(user: CurrentUser, reservationId: string, input: { callSign: string; alternatives?: string[]; note?: string }): Promise<Reservation>;
+  /** The jobs' hourly pass: reminders before the end, holds that ended (and their channels), holds whose station signed on. */
+  sweep(): Promise<{ reminded: number; expired: number; signedOn: number }>;
 }
 
 const R = schema.callSignReservations;
 const H = schema.channelHolds;
 const W = schema.waitlistSignups;
 const YEAR = 365 * 86_400_000;
+const DAY = 86_400_000;
+
+type Row = { reservation: typeof R.$inferSelect; email: string | null; name: string | null; about: string | null };
+type ReleaseReason = NonNullable<(typeof R.$inferSelect)["releaseReason"]>;
+
+/** Held firmly: nobody else can ask for it (a station's, the desk's, one being set up, or kept by a decision). */
+const firm = (r: typeof R.$inferSelect) => r.reason !== "waitlist" || !!r.stationId || r.decision === "kept";
+
+const FOOTER = "You're getting this because you reserved a call sign on Opencast's waitlist.";
 
 export function createWaitlistService({ deps, services }: ModuleContext): WaitlistService {
   const { db } = deps;
+
+  const rowsWhere = (where: ReturnType<typeof and>) =>
+    db
+      .select({ reservation: R, email: W.email, name: W.name, about: W.about })
+      .from(R)
+      .leftJoin(W, eq(W.id, R.signupId))
+      .where(where)
+      .orderBy(asc(R.createdAt), asc(R.id));
+
+  async function activeRow(reservationId: string): Promise<Row> {
+    const [row] = await rowsWhere(and(eq(R.id, reservationId), isNull(R.releasedAt)));
+    if (!row) throw notFound("That reservation");
+    return row;
+  }
+
+  const rules = () => services.settings.valueAt("call_signs.refused");
+  const hold = () => services.settings.valueAt("call_signs.hold");
+
+  /** Only an admin, or the market's lead; a reservation with no market is admins'. */
+  const need = (user: CurrentUser, marketId: string | null) => services.settings.requireDesk(user, marketId ? { market: marketId } : "admin");
+
+  const dateWords = (d: Date, timeZone: string) => new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone }).format(d);
+
+  async function heldNames(callSigns: string[], ex: Executor = db): Promise<Set<string>> {
+    if (!callSigns.length) return new Set();
+    const rows = await ex.select({ callSign: R.callSign }).from(R).where(and(inArray(R.callSign, callSigns), isNull(R.releasedAt)));
+    return new Set(rows.map((r) => r.callSign));
+  }
+
+  /** The desk's view of each row: its state, the others asking for the same name, whether it's allowed now. */
+  async function views(rows: Row[]): Promise<Reservation[]> {
+    if (!rows.length) return [];
+    const ids = rows.map((r) => r.reservation.id);
+    const [holds, refusedRules, holdRule] = await Promise.all([db.select().from(H).where(and(inArray(H.reservationId, ids), isNull(H.releasedAt))), rules(), hold()]);
+    const names = [...new Set(rows.map((r) => r.reservation.callSign))];
+    const sameNames = await db
+      .select({ id: R.id, callSign: R.callSign })
+      .from(R)
+      .where(and(inArray(R.callSign, names), isNull(R.releasedAt)));
+    const markets = await services.network.marketsByIds([...rows.map((r) => r.reservation.marketId), ...holds.map((h) => h.marketId)].filter((v): v is string => Boolean(v)));
+    const now = deps.clock.now().getTime();
+    return rows.map(({ reservation: r, email, name, about }) => {
+      const h = holds.find((x) => x.reservationId === r.id);
+      const refusal = r.reason === "signed_off" ? null : callSignRefusal(r.callSign, refusedRules);
+      const sameName = firm(r) ? [] : sameNames.filter((x) => x.callSign === r.callSign && x.id !== r.id).map((x) => x.id);
+      const ending = !!r.heldUntil && r.heldUntil.getTime() - now <= holdRule.reminderDays * DAY;
+      const state: ReservationState =
+        r.reason === "signed_off" ? "held_after_sign_off" : refusal ? "not_allowed" : sameName.length ? "same_name" : ending ? "ending" : r.stationId ? "signing_on" : r.invitedAt ? "invited" : "waiting";
+      return {
+        id: r.id,
+        callSign: r.callSign,
+        email,
+        market: r.marketId ? (markets.get(r.marketId) ?? null) : null,
+        channel: h ? formatChannelNumber({ band: h.band, tenths: h.tenths }) : null,
+        heldUntil: r.heldUntil?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+        state,
+        reason: r.reason,
+        name,
+        about,
+        invitedAt: r.invitedAt?.toISOString() ?? null,
+        remindedAt: r.remindedAt?.toISOString() ?? null,
+        extendedAt: r.extendedAt?.toISOString() ?? null,
+        stationId: r.stationId,
+        sameName,
+        decidedAt: r.decidedAt?.toISOString() ?? null,
+        refusal
+      };
+    });
+  }
+
+  const viewOf = async (reservationId: string) => (await views([await activeRow(reservationId)]))[0]!;
+
+  async function timezoneOf(marketId: string | null): Promise<string> {
+    if (!marketId) return "America/Los_Angeles";
+    return (await services.network.marketsByIds([marketId])).get(marketId)?.timezone ?? "America/Los_Angeles";
+  }
+
+  /** Ends a hold: the reservation and any channel held with it. */
+  async function releaseRow(ex: Executor, reservationId: string, reason: ReleaseReason, by: string | null, extra: Partial<typeof R.$inferInsert> = {}) {
+    const now = deps.clock.now();
+    await ex
+      .update(R)
+      .set({ releasedAt: now, releaseReason: reason, releasedBy: by, ...extra })
+      .where(eq(R.id, reservationId));
+    await ex
+      .update(H)
+      .set({ releasedAt: now })
+      .where(and(eq(H.reservationId, reservationId), isNull(H.releasedAt)));
+  }
+
+  /** Holds `callSign` for the same person in place of `old`: the same place in line, end and channel. */
+  async function holdInstead(ex: Executor, old: typeof R.$inferSelect, callSign: string, note: string | null) {
+    const [row] = await ex
+      .insert(R)
+      .values({
+        callSign,
+        signupId: old.signupId,
+        marketId: old.marketId,
+        reason: old.reason,
+        heldUntil: old.heldUntil,
+        createdAt: old.createdAt,
+        invitedAt: old.invitedAt,
+        replaces: old.id,
+        note
+      })
+      .returning();
+    await ex
+      .update(H)
+      .set({ reservationId: row.id })
+      .where(and(eq(H.reservationId, old.id), isNull(H.releasedAt)));
+    return row;
+  }
+
+  /** 409 or 422 unless `callSign` could be held for someone now. */
+  async function requireFree(callSign: string, ex: Executor = db) {
+    if (!isValidCallSign(callSign)) throw badRequest("Three to five capital letters.", { callSign: "Three to five capital letters" });
+    const refusal = callSignRefusal(callSign, await rules());
+    if (refusal) throw refused("call_sign_refused", `${callSign} isn't allowed either. ${refusal.reason}`);
+    const [station, held] = await Promise.all([services.stations.takenCallSigns([callSign]), heldNames([callSign], ex)]);
+    if (station.has(callSign) || held.has(callSign)) throw conflict("call_sign_taken", `${callSign} is taken. Choose another.`);
+  }
+
+  async function tell(to: string | null, notice: { title: string; body: string; action?: string; link?: string | null; key?: string }) {
+    if (!to) return;
+    await deps.notifier.email(to, { title: notice.title, body: notice.body, link: notice.link ?? `${deps.config.appOrigin}/control/new`, action: notice.action ?? "Set up your station", footer: FOOTER, kind: "desk", key: notice.key });
+  }
+
+  async function sendInvite(row: Row, view: Reservation) {
+    const tz = view.market?.timezone ?? "America/Los_Angeles";
+    const until = row.reservation.heldUntil ? ` until ${dateWords(row.reservation.heldUntil, tz)}` : "";
+    await tell(row.email, {
+      title: `Sign on as ${view.callSign}`,
+      body:
+        `${view.market ? `The ${view.market.name} is opening on Opencast` : "Opencast is ready for you"}, and ${view.callSign} is held for you${until}.${view.channel ? ` So is channel ${view.channel}.` : ""}\n\n` +
+        `Sign in with ${row.email} to set up your station. Choose ${view.callSign} as its call sign${view.channel ? ` and ${view.channel} as its channel` : ""}: nobody else can.`,
+      key: `invite-${row.reservation.id}-${deps.clock.now().getTime()}`
+    });
+  }
+
+  async function checkNeedsAll(user: CurrentUser, rows: Row[]) {
+    for (const marketId of new Set(rows.map((r) => r.reservation.marketId))) await need(user, marketId);
+  }
 
   const service: WaitlistService = {
     async heldChannels(marketId, band) {
@@ -40,18 +219,18 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
     },
 
     async claimCallSign(tx, { callSign, stationId, userId }) {
-      const [reservation] = await tx
+      const rows = await tx
         .select({ reservation: R, email: W.email })
         .from(R)
         .leftJoin(W, eq(W.id, R.signupId))
         .where(and(eq(R.callSign, callSign), isNull(R.releasedAt)));
-      if (!reservation || reservation.reservation.stationId === stationId) return;
-      if (reservation.reservation.stationId) throw conflict("call_sign_held", `${callSign} is held for someone else.`);
+      if (!rows.length || rows.some((r) => r.reservation.stationId === stationId)) return;
       const emails = await services.accounts.emailsOf(userId);
-      if (!reservation.email || !emails.includes(reservation.email.toLowerCase())) {
-        throw conflict("call_sign_held", `${callSign} is held for someone else.`);
-      }
-      await tx.update(R).set({ stationId }).where(eq(R.id, reservation.reservation.id));
+      const mine = rows.filter((r) => !r.reservation.stationId && r.email && emails.includes(r.email.toLowerCase()));
+      // Two people asked for it (2026-09-29): nobody takes it until the desk decides.
+      if (mine.length && rows.length > 1) throw conflict("call_sign_undecided", `Someone else asked for ${callSign} too. Opencast's team is deciding who keeps it, and will write to you.`);
+      if (!mine.length) throw conflict("call_sign_held", `${callSign} is held for someone else.`);
+      await tx.update(R).set({ stationId }).where(eq(R.id, mine[0]!.reservation.id));
     },
 
     async holdAfterSignOff(stationId) {
@@ -59,7 +238,7 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       if (!ident?.callSign) return;
       await db
         .update(R)
-        .set({ releasedAt: deps.clock.now() })
+        .set({ releasedAt: deps.clock.now(), releaseReason: "replaced" })
         .where(and(eq(R.callSign, ident.callSign), isNull(R.releasedAt)));
       await db.insert(R).values({
         callSign: ident.callSign,
@@ -81,53 +260,84 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
       return rows.length;
     },
 
+    async requireAllowed(callSign) {
+      const refusal = callSignRefusal(callSign, await rules());
+      if (!refusal) return;
+      const ideas = await service.suggestionsFor(callSign, 2);
+      throw new HttpError(422, "call_sign_refused", `${refusal.reason}${ideas.length ? ` Try ${ideas.join(" or ")}.` : " Choose another."}`, { callSign: refusal.reason });
+    },
+
+    async check(raw, userId) {
+      const callSign = raw.toUpperCase();
+      if (!isValidCallSign(callSign)) return { callSign, valid: false, available: false, reservable: false, heldForYou: false, refusal: null, suggestions: [] };
+      const [refusedRules, active, stations] = await Promise.all([rules(), rowsWhere(and(eq(R.callSign, callSign), isNull(R.releasedAt))), services.stations.takenCallSigns([callSign])]);
+      const refusal = callSignRefusal(callSign, refusedRules);
+      const emails = userId ? await services.accounts.emailsOf(userId) : [];
+      const mine = active.filter((r) => r.reservation.reason === "waitlist" && r.email && emails.includes(r.email.toLowerCase()));
+      const heldForYou = mine.length > 0 && (active.length === 1 || mine.some((r) => r.reservation.decision === "kept"));
+      const onStation = stations.has(callSign);
+      const available = !refusal && !onStation && (!active.length || heldForYou);
+      const reservable = !refusal && !onStation && !active.some((r) => firm(r.reservation));
+      const suggestions = !available || refusal ? await service.suggestionsFor(callSign) : [];
+      return { callSign, valid: true, available, reservable, heldForYou, refusal, suggestions };
+    },
+
+    async suggestionsFor(callSign, limit = 3) {
+      const refusedRules = await rules();
+      const ideas = callSignIdeas(callSign).filter((i) => !callSignRefusal(i, refusedRules));
+      const [stations, held] = await Promise.all([services.stations.takenCallSigns(ideas), heldNames(ideas)]);
+      return ideas.filter((i) => !stations.has(i) && !held.has(i)).slice(0, limit);
+    },
+
     async join(input) {
       const market = await services.network.marketForZip(input.zip);
       const email = input.email.toLowerCase();
-      if (input.callSign && !(await service.isAvailable(input.callSign))) {
-        throw conflict("call_sign_taken", `${input.callSign} is taken. Try another.`);
+      const callSign = input.role === "station" ? input.callSign : undefined;
+      let alsoAsked = false;
+      let already = false;
+      if (callSign) {
+        const refusal = callSignRefusal(callSign, await rules());
+        if (refusal) {
+          const ideas = await service.suggestionsFor(callSign, 2);
+          throw new HttpError(422, "call_sign_refused", `${refusal.reason}${ideas.length ? ` Try ${ideas.join(" or ")}.` : " Try another."}`, { callSign: refusal.reason });
+        }
+        const [active, stations] = await Promise.all([rowsWhere(and(eq(R.callSign, callSign), isNull(R.releasedAt))), services.stations.takenCallSigns([callSign])]);
+        already = active.some((r) => r.email === email && r.reservation.reason === "waitlist");
+        if (!already && (stations.has(callSign) || active.some((r) => firm(r.reservation)))) {
+          const ideas = await service.suggestionsFor(callSign, 2);
+          throw conflict("call_sign_taken", `${callSign} is taken. ${ideas.length ? `Try ${ideas.join(" or ")}.` : "Try another."}`);
+        }
+        alsoAsked = !already && active.length > 0;
       }
+      const days = (await hold()).days;
+      const now = deps.clock.now();
       await db.transaction(async (tx) => {
         const [signup] = await tx
           .insert(W)
-          .values({ role: input.role, email, zip: input.zip, marketId: market?.id ?? null, requestedCallSign: input.callSign ?? null })
+          .values({ role: input.role, email, zip: input.zip, marketId: market?.id ?? null, requestedCallSign: input.callSign ?? null, name: input.name?.trim() || null, about: input.about?.trim() || null, createdAt: now })
           .returning();
-        if (input.role === "station" && input.callSign) {
-          await tx.insert(R).values({ callSign: input.callSign, signupId: signup.id, marketId: market?.id ?? null, reason: "waitlist" });
+        if (callSign && !already) {
+          // Its place in line is when it was asked for; it ends the hold's days later.
+          await tx.insert(R).values({ callSign, signupId: signup.id, marketId: market?.id ?? null, reason: "waitlist", heldUntil: new Date(now.getTime() + days * DAY), createdAt: now });
         }
       });
       const message = {
         viewer: "You're on the list.",
-        station: input.callSign ? `${input.callSign} is on hold for you.` : "Your station is on the list.",
+        station: callSign
+          ? already
+            ? `${callSign} is already on hold for you.`
+            : alsoAsked
+              ? `${callSign} is on hold for you. Someone else asked for it too: Opencast's team decides who keeps it, and writes to you either way.`
+              : `${callSign} is on hold for you.`
+          : "Your station is on the list.",
         producer: "Your programs are on the list.",
         business: "Your business is on the list."
       }[input.role];
-      return { role: input.role, market, message, heldCallSign: input.role === "station" ? (input.callSign ?? null) : null };
+      return { role: input.role, market, message, heldCallSign: callSign ?? null };
     },
 
     async reservations(marketId) {
-      const rows = await db
-        .select({ reservation: R, email: W.email })
-        .from(R)
-        .leftJoin(W, eq(W.id, R.signupId))
-        .where(and(isNull(R.releasedAt), ...(marketId ? [eq(R.marketId, marketId)] : [])))
-        .orderBy(desc(R.createdAt));
-      const holds = rows.length
-        ? await db.select().from(H).where(and(inArray(H.reservationId, rows.map((r) => r.reservation.id)), isNull(H.releasedAt)))
-        : [];
-      const markets = await services.network.marketsByIds([...rows.map((r) => r.reservation.marketId), ...holds.map((h) => h.marketId)].filter((v): v is string => Boolean(v)));
-      return rows.map(({ reservation, email }) => {
-        const hold = holds.find((h) => h.reservationId === reservation.id);
-        return {
-          id: reservation.id,
-          callSign: reservation.callSign,
-          email,
-          market: reservation.marketId ? (markets.get(reservation.marketId) ?? null) : null,
-          channel: hold ? formatChannelNumber({ band: hold.band, tenths: hold.tenths }) : null,
-          heldUntil: reservation.heldUntil?.toISOString() ?? null,
-          createdAt: reservation.createdAt.toISOString()
-        };
-      });
+      return views(await rowsWhere(and(isNull(R.releasedAt), ...(marketId ? [eq(R.marketId, marketId)] : []))));
     },
 
     async holdChannel(reservationId, input) {
@@ -154,7 +364,202 @@ export function createWaitlistService({ deps, services }: ModuleContext): Waitli
         callSign: r.requestedCallSign,
         createdAt: r.createdAt.toISOString()
       }));
+    },
+
+    async overview(user, marketId) {
+      await need(user, marketId);
+      const market = (await services.network.marketsByIds([marketId])).get(marketId);
+      if (!market) throw notFound("That market");
+      const [list, holdRule, refusedRules, onDial] = await Promise.all([service.reservations(marketId), hold(), rules(), services.stations.inMarkets([marketId])]);
+      const flaggedStations: FlaggedStation[] = [];
+      for (const s of onDial) {
+        const refusal = s.ident.callSign ? callSignRefusal(s.ident.callSign, refusedRules) : null;
+        if (refusal && s.ident.callSign) flaggedStations.push({ stationId: s.id, callSign: s.ident.callSign, name: s.ident.name, channel: s.ident.channel, refusal });
+      }
+      return {
+        market,
+        held: list.length,
+        withChannel: list.filter((r) => r.channel).length,
+        toInvite: list.filter(invitable).length,
+        needsDecision: list.filter((r) => r.state === "same_name" || r.state === "not_allowed").length,
+        holdDays: holdRule.days,
+        reminderDays: holdRule.reminderDays,
+        flaggedStations: flaggedStations.sort((a, b) => a.callSign.localeCompare(b.callSign))
+      };
+    },
+
+    async invite(user, reservationId) {
+      const row = await activeRow(reservationId);
+      await need(user, row.reservation.marketId);
+      const [view] = await views([row]);
+      if (view!.state === "not_allowed") throw refused("not_allowed", `${view!.callSign} isn't allowed. Suggest another name first.`);
+      if (view!.state === "same_name") throw refused("same_name", `Two people asked for ${view!.callSign}. Decide who keeps it first.`);
+      if (row.reservation.reason !== "waitlist") throw refused("not_waitlist", `${view!.callSign} isn't held for anyone on the waitlist.`);
+      if (!row.email) throw refused("no_email", "There's no email to send the invite to.");
+      await sendInvite(row, view!);
+      const now = deps.clock.now();
+      await db.update(R).set({ invitedAt: now }).where(eq(R.id, reservationId));
+      if (row.reservation.signupId) await db.update(W).set({ notifiedAt: now }).where(eq(W.id, row.reservation.signupId));
+      return viewOf(reservationId);
+    },
+
+    async inviteNext(user, marketId, count) {
+      await need(user, marketId);
+      const rows = await rowsWhere(and(isNull(R.releasedAt), eq(R.marketId, marketId)));
+      const list = await views(rows);
+      const next = list.filter(invitable);
+      const invited: Reservation[] = [];
+      for (const view of next.slice(0, count)) invited.push(await service.invite(user, view.id));
+      return { invited, left: next.length - invited.length };
+    },
+
+    async extend(user, reservationId, note) {
+      const row = await activeRow(reservationId);
+      await need(user, row.reservation.marketId);
+      const now = deps.clock.now();
+      const days = (await hold()).days;
+      const from = Math.max(now.getTime(), row.reservation.heldUntil?.getTime() ?? now.getTime());
+      await db
+        .update(R)
+        .set({ heldUntil: new Date(from + days * DAY), extendedAt: now, extendedBy: user.id, remindedAt: null, ...(note?.trim() ? { note: note.trim() } : {}) })
+        .where(eq(R.id, reservationId));
+      return viewOf(reservationId);
+    },
+
+    async release(user, reservationId, note) {
+      const row = await activeRow(reservationId);
+      await need(user, row.reservation.marketId);
+      const [view] = await views([row]);
+      await db.transaction((tx) => releaseRow(tx, reservationId, "released", user.id, note?.trim() ? { note: note.trim() } : {}));
+      if (row.reservation.reason === "waitlist") {
+        await tell(row.email, {
+          title: `Your hold on ${view!.callSign} has ended`,
+          body: `Opencast's team ended your hold on ${view!.callSign}${view!.channel ? ` and channel ${view!.channel}` : ""}. If it's still free, you can reserve it again on the waitlist.`,
+          link: deps.config.appOrigin,
+          action: "Open Opencast"
+        });
+      }
+      return { ok: true as const, callSign: view!.callSign, channel: view!.channel };
+    },
+
+    async decide(user, reservationId, input) {
+      const row = await activeRow(reservationId);
+      const [view] = await views([row]);
+      if (!view!.sameName.length) throw refused("not_same_name", `Nobody else is waiting for ${view!.callSign}.`);
+      const others = await rowsWhere(and(inArray(R.id, view!.sameName), isNull(R.releasedAt)));
+      await checkNeedsAll(user, [row, ...others]);
+      // A name for each of the others: the one chosen here, else the next free suggestion.
+      const chosen = new Map((input.suggestions ?? []).map((s) => [s.reservationId, s.callSign]));
+      for (const id of chosen.keys()) if (!others.some((o) => o.reservation.id === id)) throw badRequest("A suggestion is for someone who isn't asking for this name.", { suggestions: "Unknown reservation" });
+      const picked: Array<{ row: Row; suggestion: string | null }> = [];
+      const pool = await service.suggestionsFor(view!.callSign, others.length + 3);
+      for (const o of others) {
+        const given = chosen.get(o.reservation.id);
+        if (given) {
+          if (picked.some((p) => p.suggestion === given)) throw badRequest(`${given} can go to one person only.`, { suggestions: "Twice" });
+          await requireFree(given);
+          picked.push({ row: o, suggestion: given });
+        } else {
+          picked.push({ row: o, suggestion: pool.find((s) => ![...chosen.values()].includes(s) && !picked.some((p) => p.suggestion === s)) ?? null });
+        }
+      }
+      const now = deps.clock.now();
+      const note = input.note?.trim() || null;
+      await db.transaction(async (tx) => {
+        await tx.update(R).set({ decision: "kept", decidedAt: now, decidedBy: user.id, ...(note ? { note } : {}) }).where(eq(R.id, reservationId));
+        for (const p of picked) {
+          // The name held instead takes their channel first; then theirs ends.
+          if (p.suggestion) await holdInstead(tx, p.row.reservation, p.suggestion, `Held in place of ${view!.callSign}, which went to someone else`);
+          await releaseRow(tx, p.row.reservation.id, "not_kept", user.id, { decision: "not_kept", decidedAt: now, decidedBy: user.id, suggested: p.suggestion ? [p.suggestion] : null, ...(note ? { note } : {}) });
+        }
+      });
+      for (const p of picked) {
+        await tell(p.row.email, {
+          title: `${view!.callSign} went to someone else`,
+          body:
+            `Two people asked for ${view!.callSign}, and Opencast's team gave it to the other.` +
+            (p.suggestion ? ` We've held ${p.suggestion} for you instead, in the same place in line.\n\nYou can choose another call sign when you set up your station.` : " You can reserve another on the waitlist."),
+          ...(p.suggestion ? {} : { link: deps.config.appOrigin, action: "Open Opencast" })
+        });
+      }
+      return { kept: await viewOf(reservationId), told: picked.map((p) => ({ reservationId: p.row.reservation.id, email: p.row.email, suggestion: p.suggestion })) };
+    },
+
+    async suggest(user, reservationId, input) {
+      const row = await activeRow(reservationId);
+      await need(user, row.reservation.marketId);
+      const [view] = await views([row]);
+      if (!view!.refusal) throw refused("allowed", `${view!.callSign} is allowed: there's nothing to suggest.`);
+      await requireFree(input.callSign);
+      const refusedRules = await rules();
+      const taken = await heldNames(input.alternatives ?? []);
+      const onStations = await services.stations.takenCallSigns(input.alternatives ?? []);
+      const alternatives = [...new Set(input.alternatives ?? [])].filter((a) => a !== input.callSign && !callSignRefusal(a, refusedRules) && !taken.has(a) && !onStations.has(a)).slice(0, 3);
+      const note = input.note?.trim() || null;
+      const replacement = await db.transaction(async (tx) => {
+        const held = await holdInstead(tx, row.reservation, input.callSign, `Held in place of ${view!.callSign}, which isn't allowed`);
+        await releaseRow(tx, reservationId, "refused", user.id, { suggested: [input.callSign, ...alternatives], ...(note ? { note } : {}) });
+        return held;
+      });
+      const others = alternatives.length === 1 ? `${alternatives[0]} is free too, if you'd rather.` : alternatives.length ? `${alternatives.slice(0, -1).join(", ")} and ${alternatives.at(-1)} are free too, if you'd rather.` : "";
+      await tell(row.email, {
+        title: `${view!.callSign} isn't allowed`,
+        body: `${view!.refusal!.reason} We've held ${input.callSign} for you instead, in the same place in line.${others ? ` ${others}` : ""}\n\nYou can choose another call sign when you set up your station.`
+      });
+      return viewOf(replacement.id);
+    },
+
+    async sweep() {
+      const now = deps.clock.now();
+      const { reminderDays } = await hold();
+      // Signed on: the station has the call sign for good, so the hold is done.
+      const withStation = await db
+        .select({ id: R.id, stationId: R.stationId })
+        .from(R)
+        .where(and(isNull(R.releasedAt), eq(R.reason, "waitlist"), isNotNull(R.stationId)));
+      const profiles = await services.stations.profiles(withStation.map((r) => r.stationId!));
+      let signedOn = 0;
+      for (const r of withStation) {
+        if (!profiles.get(r.stationId!)?.firstSignedOnAt) continue;
+        await db.update(R).set({ releasedAt: now, releaseReason: "signed_on" }).where(eq(R.id, r.id));
+        signedOn++;
+      }
+      // Ended: released, with their channel; the person is told.
+      const ended = await rowsWhere(and(isNull(R.releasedAt), lte(R.heldUntil, now)));
+      for (const row of ended) {
+        await db.transaction((tx) => releaseRow(tx, row.reservation.id, "expired", null));
+        if (row.reservation.reason === "waitlist") {
+          await tell(row.email, {
+            title: `Your hold on ${row.reservation.callSign} has ended`,
+            body: `${row.reservation.callSign} was held for you until ${dateWords(row.reservation.heldUntil!, await timezoneOf(row.reservation.marketId))}. If it's still free, you can reserve it again on the waitlist.`,
+            link: deps.config.appOrigin,
+            action: "Open Opencast",
+            key: `hold-ended-${row.reservation.id}`
+          });
+        }
+      }
+      // Ending soon: one reminder each.
+      const soon = await rowsWhere(and(isNull(R.releasedAt), eq(R.reason, "waitlist"), isNull(R.remindedAt), lte(R.heldUntil, new Date(now.getTime() + reminderDays * DAY))));
+      let reminded = 0;
+      for (const row of soon) {
+        if (!row.email) continue;
+        const until = dateWords(row.reservation.heldUntil!, await timezoneOf(row.reservation.marketId));
+        await tell(row.email, {
+          title: `${row.reservation.callSign} is held until ${until}`,
+          body: `Your hold on ${row.reservation.callSign} ends on ${until}. Set up your station before then to keep it. After that, anyone can reserve it.`,
+          key: `hold-reminder-${row.reservation.id}-${row.reservation.heldUntil!.getTime()}`
+        });
+        await db.update(R).set({ remindedAt: now }).where(eq(R.id, row.reservation.id));
+        reminded++;
+      }
+      return { reminded, expired: ended.length, signedOn };
     }
   };
+
+  /** Waiting for an invite and able to have one. */
+  function invitable(r: Reservation) {
+    return r.reason === "waitlist" && !r.invitedAt && !r.stationId && !r.refusal && !r.sameName.length && !!r.email;
+  }
+
   return service;
 }

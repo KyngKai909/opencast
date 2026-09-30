@@ -27,6 +27,8 @@ export interface JobResults {
   closedSwept: number;
   /** Day templates' dates generated this hour (three weeks ahead), or null in other minutes. */
   templates: { stations: number; dates: number } | null;
+  /** Reserved call signs, once an hour (added 2026-09-29): reminders sent, holds ended, holds whose station signed on. */
+  reservations?: { reminded: number; expired: number; signedOn: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -54,10 +56,15 @@ export function createJobs(deps: Deps, services: Services) {
     // Day templates: every hour, the dates three weeks ahead are generated (before the dead-air check reads them).
     const hour = now.toISOString().slice(0, 13);
     let templates: JobResults["templates"] = null;
+    let reservations: JobResults["reservations"] = null;
     if (hour !== lastHour) {
       lastHour = hour;
       templates = await services.log.templates.generateAll().catch((error) => {
         console.error("[jobs] day templates failed", error);
+        return null;
+      });
+      reservations = await services.waitlist.sweep().catch((error) => {
+        console.error("[jobs] reserved call signs failed", error);
         return null;
       });
     }
@@ -132,7 +139,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations };
   }
 
   let timer: NodeJS.Timeout | undefined;

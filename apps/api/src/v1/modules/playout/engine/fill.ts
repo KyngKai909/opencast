@@ -16,7 +16,8 @@
 import type { ModuleContext } from "../../../context.js";
 import { tzOffsetMinutes } from "../../../lib/time.js";
 import type { BreakSlotView } from "../../log/service.js";
-import { partsOf } from "./cadence.js";
+import { hourStartIn, partsOf } from "./cadence.js";
+import { catalogCreditBreaks, catalogEntries } from "./catalogCredit.js";
 
 const HOUR = 3_600_000;
 /**
@@ -131,6 +132,18 @@ export function createFiller({ services }: ModuleContext) {
     return result;
   }
 
+  /** The breaks ahead that carry a catalog program's hourly credit (counted from the top of the first one's hour). */
+  async function catalogCreditsAhead(stationId: string, slots: BreakSlotView[], tz: string, now: Date, aheadMs: number): Promise<Set<string>> {
+    if (!slots.length) return new Set();
+    const hourStart = hourStartIn(tz);
+    const from = new Date(hourStart(Math.min(...slots.map((s) => Date.parse(s.startsAt)))));
+    const to = new Date(now.getTime() + aheadMs);
+    const entries = await services.log.entries(stationId, from, to);
+    const { programOf } = await catalogEntries(services, stationId, entries, now);
+    if (!programOf.size) return new Set();
+    return catalogCreditBreaks(await services.log.breaks(stationId, from, to), (entryId) => programOf.has(entryId), hourStart);
+  }
+
   return {
     /** Stores and fills every break starting in the next `aheadMs`. Money for each spot is held here. */
     async fillAhead(stationId: string, now: Date, aheadMs: number): Promise<FillResult[]> {
@@ -138,12 +151,15 @@ export function createFiller({ services }: ModuleContext) {
       const slots = await services.log.ensureBreaks(stationId, now, new Date(now.getTime() + aheadMs));
       const credits = await services.spots.creditsFor(stationId);
       const members = await services.ledger.memberCredits(stationId);
+      const waiting = slots.some((slot) => slot.id && !slot.filledAt);
+      const catalogBreaks = waiting ? await catalogCreditsAhead(stationId, slots, tz, now, aheadMs) : new Set<string>();
       const results: FillResult[] = [];
       for (const slot of slots) {
         if (!slot.id || slot.filledAt) continue;
         // A break without spots is never marked filled: only its barter share is placed, once.
         if (!partsOf(slot).spots && (slot.producerShareMs === 0 || slot.filledMs > 0)) continue;
-        results.push(await fillOne(stationId, slot, tz, credits.length > 0 || members.named.length > 0));
+        // Room for the credit: the station's own, or a catalog program's hourly one (its series' sponsor, or Clear).
+        results.push(await fillOne(stationId, slot, tz, credits.length > 0 || members.named.length > 0 || catalogBreaks.has(slot.startsAt)));
       }
       return results;
     },

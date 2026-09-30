@@ -90,6 +90,20 @@ Every Open rule is set in Network desk, Settings, Rules, from a date, with the o
 | Escrow signer changes | Settings, Escrow signers | every other admin (as of the proposal) approves; any one refuses; one open at a time. Approved changes go to the timelock (contracts/README.md) |
 | Taking admin away from someone in OPENCAST_ADMIN_EMAILS | accounts | it doesn't stick: the list makes them an admin again at their next sign-in (Settings says so) |
 
+## Network desk: Catalog sponsors (added 2026-09-29, follow-up Phase 0 item 11, desk-pages 03)
+
+The catalog's one credit an hour, sold by series and market (the Network desk's Catalog sponsors page). A catalog sponsorship is a sponsorship like any other underneath (`spots.sponsorships` with its `market_id`), so it's prepaid: held from the business's balance on the 1st, paid at the month's end, and lapsed when a month can't be held.
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| Whether Clear pays for the catalog slots it fills (the frame shows Clear at $400.00 a month) | each month's Clear-filled slots (series, market, credits aired) are recorded on the 1st in `spots.catalog_house_credits`, with `billed_micros`; nothing posts to the ledger | not billed: `billed_micros` 0, and the page says "Not billed". A bill can be made from those rows once it's decided |
+| Where catalog sponsorship money goes (Opencast, the co-op pool, the creator fund) and in what split | the rules registry, `shares.catalog_sponsorship` (`opencastBps`, `poolBps`, `fundBps`; Settings, Rules, Shares). Read by nothing until it's decided | 0% each, "Not set yet". Until then it settles into the catalog station's earnings, as any sponsorship of the catalog station's programs would, with Opencast's share of spots and sponsorships (`shares.opencast.spotBps`, 0) and the pool (`shares.pool`, 0) taken as for any sponsorship |
+| The price of a catalog slot: one series in a market, or every series in a market | `catalog.sponsor_prices`, per market (a market's own version wins; Settings, Rules, Catalog sponsors) | not set: no slot is for sale, and the credit thanks Clear everywhere |
+| The house sponsor's name and line on air | `CATALOG_HOUSE_SPONSOR` in the contracts (not a rule) | "Clear", "The member-owned co-op" |
+| Assigning a slot on a business's word (the desk's "Assign it"), besides offering it for the business to accept | `assignCatalogSponsorship`; who assigned is kept (`offered_by`, `decided_by`) | allowed to the market's lead or an admin with "They've agreed" ticked; its first month is held at once or nothing is assigned. The business app has no screen to accept an offer yet (the API has `answerCatalogOffer`) |
+| A sponsorship that starts mid-month | as station sponsorships | the whole month is held and paid; credited from the moment it's agreed |
+| Ending a sponsorship | the desk or the business | credited to the end of its paid month, not refunded, then Clear again |
+
 ## Product
 
 | Decision | Where it lives | Default |

@@ -284,3 +284,137 @@ test("Settings: a rule changed from a date, in the change log", async ({ page })
   await expect(log.getByRole("row", { name: /Repeat limit: 3 to 2/ })).toContainText("After the September review");
   await expect(log.getByRole("row", { name: /Repeat limit: 3 to 2/ })).toContainText("Dee A.");
 });
+
+// desk-pages 01 (item 11): every claim on every station. The figures, an answered claim's timeline
+// and carriers, a privacy complaint that says so, an outcome recorded by Rae (a rights reviewer), and
+// a market lead who sees only the High Desert.
+test("Rights claims: timelines, carriers, a privacy complaint and an outcome", async ({ page }) => {
+  const signIn = async (email: string) => {
+    await page.evaluate((e) => localStorage.setItem("oc-mock-signed-in", e), email);
+  };
+  await page.goto("/desk");
+  await signIn("rae@opencast.example");
+  await useGround(page, "dark");
+  await page.goto("/desk/rights-claims");
+  await expect(page.getByRole("heading", { level: 1, name: "Rights claims" })).toBeVisible();
+  await expect(page.getByText("Open claims, 3 off air")).toBeVisible();
+  await expect(page.getByText("Station answer due in 2 days")).toBeVisible();
+  const open = page.getByRole("grid", { name: "Open claims" });
+  await expect(open.getByRole("row", { name: /Late Crate, ep\. 9, on BEAT 12\.1/ })).toContainText("Counter-notice sent");
+  await expect(open.getByRole("row", { name: /Tamales for forty/ })).toContainText("SAZN answers by Sept 28");
+  await expect(open.getByRole("row", { name: /Council Watch/ })).toContainText("Privacy, not copyright");
+
+  // The answered claim: its timeline and the three carriers it was pulled from.
+  await open.getByRole("row", { name: /Late Crate/ }).click();
+  const late = page.getByRole("complementary", { name: "Late Crate, ep. 9" });
+  await expect(late.getByText("Off air on BEAT and 3 carriers")).toBeVisible();
+  await expect(late.getByText("Counter-notice sent to the claimant")).toBeVisible();
+  await expect(late.getByRole("list", { name: "Carriers" }).getByRole("listitem")).toHaveCount(3);
+  await late.getByRole("button", { name: "See evidence" }).click();
+  const evidence = page.getByRole("dialog", { name: "Evidence" });
+  await expect(evidence.getByText("rights@northside.example")).toBeVisible();
+  await evidence.getByRole("button", { name: "Close" }).last().click();
+  await expect(evidence).toBeHidden();
+
+  // The privacy complaint follows its own path.
+  await open.getByRole("row", { name: /Council Watch/ }).click();
+  const council = page.getByRole("complementary", { name: "Council Watch, Sept 22" });
+  await expect(council.getByText("Opencast reviews it", { exact: true })).toBeVisible();
+  await expect(council.getByText("Off air on CIVC and 6 carriers")).toBeVisible();
+
+  // Rae records the outcome on Harbor Nights: withdrawn, back on air, and closed.
+  await open.getByRole("row", { name: /Harbor Nights, ep\. 2/ }).click();
+  await page.getByRole("complementary", { name: "Harbor Nights, ep. 2" }).getByRole("button", { name: "Record the outcome" }).click();
+  const outcome = page.getByRole("dialog", { name: "Record the outcome" });
+  await outcome.getByRole("radio", { name: /Withdrawn/ }).click();
+  await outcome.getByRole("button", { name: "Record it" }).click();
+  await expect(page.getByText("Withdrawn. Harbor Nights, ep. 2 is back on air.")).toBeVisible();
+  await expect(open.getByRole("row", { name: /Harbor Nights, ep\. 2/ })).toHaveCount(0);
+  await page.getByRole("radio", { name: "Closed" }).click();
+  await expect(page.getByRole("grid", { name: "Closed claims" }).getByRole("row", { name: /Harbor Nights, ep\. 2/ })).toContainText("Withdrawn");
+  await page.getByRole("radio", { name: "By station" }).click();
+  await expect(page.getByRole("table", { name: "Claims by station" }).getByRole("row", { name: /REEL 24\.1/ })).toContainText("1 of 3");
+
+  // Lee leads the High Desert: MOJV's claim only, and no outcomes to record.
+  await signIn("lee@opencast.example");
+  await page.goto("/desk/rights-claims?tab=closed");
+  const closed = page.getByRole("grid", { name: "Closed claims" });
+  await expect(closed.getByRole("row", { name: /MOJV/ })).toHaveCount(1);
+  await expect(closed.getByRole("row", { name: /BEAT/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Record the outcome" })).toHaveCount(0);
+});
+
+// desk-pages 02: reserved call signs. The same name twice decided, a name that isn't allowed
+// replaced, the next ones invited in reservation order, and the hold's length in the rules.
+test("Reserved call signs: decide, suggest and invite the next 10", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await useGround(page, "light");
+  await page.goto("/desk/reserved-call-signs");
+  await expect(page.getByRole("heading", { level: 1, name: "Reserved call signs" })).toBeVisible();
+  await expect(page.getByText("26 held from the waitlist in the Inland Empire, 4 with a channel held.")).toBeVisible();
+  const table = page.getByRole("table", { name: "Reserved call signs" });
+  await expect(table.getByRole("row", { name: /^TACO/ })).toContainText("Ends tomorrow");
+  await expect(table.getByRole("row", { name: /^HOOP/ })).toContainText("Invited, signing on");
+
+  await table.getByRole("button", { name: "Decide VALE" }).click();
+  const decide = page.getByRole("dialog", { name: "VALE: 2 people asked" });
+  await expect(decide.getByLabel("Hold instead for Pastor Ellis")).toHaveValue("VALEY");
+  await decide.getByRole("button", { name: "Keep it for Dani R." }).click();
+  await expect(page.getByText("VALE stays with Dani R. VALEY is held instead for the other.")).toBeVisible();
+  await expect(table.getByRole("row", { name: /^VALEY/ })).toContainText("Pastor Ellis");
+
+  await table.getByRole("button", { name: "Suggest KFRO" }).click();
+  await page.getByRole("dialog", { name: "KFRO isn't allowed" }).getByRole("button", { name: "Hold FRO instead" }).click();
+  await expect(table.getByRole("row", { name: /^FRO\b/ })).toContainText("J. Park");
+  await expect(table.getByRole("row", { name: /^KFRO/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Invite the next 10" }).click();
+  await page.getByRole("dialog", { name: "Invite the next 10" }).getByRole("button", { name: "Send 10 invites" }).click();
+  await expect(table.getByRole("row", { name: /^SKAT/ })).toContainText("Invited");
+  await settled(page);
+  await checkA11y(page, "reserved call signs, after decisions");
+
+  await page.goto("/desk/settings/rules");
+  await expect(page.getByRole("region", { name: "Call signs" }).getByText("120 days, a reminder 14 days before")).toBeVisible();
+});
+
+// desk-pages 03 (item 11): Catalog sponsors. The page as drawn (Clear thanked wherever nobody else
+// is, Inland Empire Libraries in Nights at the observatory), an open slot offered from the grid, the
+// business saying yes (the mock's business side), and the slot then naming it.
+test("Catalog sponsors: an open slot offered, and the business says yes", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await useGround(page, "light");
+  await page.goto("/desk/catalog-sponsors");
+  await expect(page.getByRole("heading", { level: 1, name: "Catalog sponsors" })).toBeVisible();
+  await expect(page.getByText("Catalog credits aired in September")).toBeVisible();
+  await expect(page.getByText("Share to the creator fund. Not set yet")).toBeVisible();
+  const list = page.getByRole("grid", { name: "Catalog sponsors" });
+  await expect(list.getByRole("row", { name: /Clear/ })).toContainText("The house sponsor, thanked wherever nobody else is");
+  await expect(list.getByRole("row", { name: /Inland Empire Libraries/ })).toContainText("Since August");
+  const pane = page.getByRole("region", { name: "Inland Empire Libraries' credit" });
+  await expect(pane.getByRole("figure", { name: /Nights at the observatory is made possible by Inland Empire Libraries/ })).toBeVisible();
+  await expect(pane).toContainText("6 Inland Empire stations");
+  await checkA11y(page, "catalog sponsors");
+
+  // An open slot, from the grid: Cartoons in the Inland Empire, offered to Orange Street Coffee.
+  const grid = page.getByRole("table", { name: "Slots by series and market" });
+  await grid.getByRole("button", { name: "Cartoons, 1928 to 1936 in Inland Empire: Clear. Open slot, $150.00 a month" }).click();
+  const slotPane = page.getByRole("region", { name: "Cartoons, 1928 to 1936 in Inland Empire" });
+  await expect(slotPane).toContainText("Airs 12 times a day here, on 5 stations");
+  await slotPane.getByRole("button", { name: "Offer it" }).click();
+  const dialog = page.getByRole("dialog", { name: "Offer a slot" });
+  await expect(dialog.getByText(/\$150\.00 a month, from Settings/)).toBeVisible();
+  await dialog.getByLabel("Find the business").fill("orange");
+  await expect(dialog.getByLabel("Business", { exact: true })).toHaveText("Orange Street Coffee, Redlands");
+  await dialog.getByLabel("Their credit", { exact: true }).fill("Orange Street Coffee, roasting in Redlands.");
+  await dialog.getByLabel("Starts", { exact: true }).selectOption({ label: "October 1" });
+  await dialog.getByRole("button", { name: "Send the offer" }).click();
+  await expect(page.getByText("Offered to Orange Street Coffee. It's theirs to answer.")).toBeVisible();
+  await expect(list.getByRole("row", { name: /Orange Street Coffee/ })).toContainText("Offered, waiting for their answer");
+
+  // The business says yes: credited from October 1, Clear until then.
+  const business = page.getByRole("region", { name: "Mock mode: the business's side" });
+  await business.getByRole("button", { name: "They say yes" }).click();
+  await expect(list.getByRole("row", { name: /Orange Street Coffee/ })).toContainText("Starts October 1");
+  await expect(grid.getByRole("button", { name: /^Cartoons, 1928 to 1936 in Inland Empire: Orange Street Coffee\. Starts October 1/ })).toBeVisible();
+});

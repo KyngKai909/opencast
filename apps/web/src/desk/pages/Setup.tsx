@@ -243,7 +243,7 @@ function SetupView({ creator, works, recipes, boards, operators, meId, market }:
   const heldProposal = !setup ? proposed.map((ch) => ({ ch, h: holderOf(board, ch) })).find((x) => x.h?.kind === "held") : undefined;
   const channelHolder = !setup && channel ? holderOf(board, channel) : null;
   const csCheck = useApi(waitlistApi.checkCallSign, { params: { callSign } }, { enabled: !setup && !!callSign && !callSignProblem(callSign) });
-  const csProblem = setup ? null : !callSign ? "Choose a call sign." : (callSignProblem(callSign) ?? (csCheck.data && !csCheck.data.available ? `${callSign} is taken. Try another.` : null));
+  const csProblem = setup ? null : !callSign ? "Choose a call sign." : (callSignProblem(callSign) ?? (csCheck.data?.refusal ? csCheck.data.refusal.reason : csCheck.data && !csCheck.data.available ? `${callSign} is taken. Try another.` : null));
   const colour = setup?.colour ?? colourFor(creator.id);
   const operator = setup?.operator ?? operators.find((o) => o.id === draft.operatorId) ?? null;
   const signOnAt = setup?.signOnAt ?? draft.signOnAt;

@@ -190,6 +190,27 @@
       "when": 1790737367780,
       "tag": "0027_desk_settings_and_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1790737400000,
+      "tag": "0028_claim_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790737450000,
+      "tag": "0029_reserved_call_signs",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790737500000,
+      "tag": "0030_catalog_sponsors",
+      "breakpoints": true
     }
   ]
 }

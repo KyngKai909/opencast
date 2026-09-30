@@ -1,0 +1,6 @@
+/* desk-pages 03: the credit's slate in the pane (.slate), white type on the series' colour. */
+.nd-slate { margin: 10px 0 0; aspect-ratio: 16 / 9; border-radius: var(--r-screen, 6px); color: #fff; display: flex; flex-direction: column; justify-content: center; padding: 0 8%; overflow: hidden; }
+.nd-slate__lead { font-size: 12px; opacity: 0.85; }
+.nd-slate__name { font: 800 21px/1.05 var(--font-display); font-stretch: 112%; margin: 6px 0 4px; overflow-wrap: anywhere; }
+.nd-slate__line { font-size: 11.5px; opacity: 0.9; }
+.nd-slate--small { max-width: 320px; }

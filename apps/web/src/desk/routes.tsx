@@ -11,6 +11,9 @@
 //   /desk/markets/:marketSlug/catalog/series/:id desk-catalog 02 a series and its items (?ep=14 picks the episode)
 //   /desk/markets/:marketSlug/catalog/items/:id  desk-catalog 03 an item's rights check
 //   /desk/held-earnings                          07.1 held earnings
+//   /desk/rights-claims                          desk-pages 01 rights claims (?tab=closed|stations, ?claim=<id>)
+//   /desk/reserved-call-signs[/:marketSlug]      desk-pages 02 reserved call signs (the remembered market without one)
+//   /desk/catalog-sponsors                       desk-pages 03 Catalog sponsors (?market=los-angeles filters, ?sel= picks, ?add=offer|assign)
 //   /desk/settings/:section                      desk-pages 04 Settings: team, rules, markets, signers, log, you
 // The creator's permission page (06.1, 06.2) is the viewer area's /permission/:token.
 
@@ -22,18 +25,20 @@ import { useAuth } from "../auth/AuthProvider";
 import { gateFor } from "./auth/gate";
 import { DeskLayout } from "./layout/DeskLayout";
 import { rememberedMarket } from "./layout/market";
-import { NotFound, Quiet, Unbuilt } from "./pages/common";
+import { NotFound, Quiet } from "./pages/common";
 import Ask from "./pages/Ask";
 import Board from "./pages/Board";
 import Catalog from "./pages/Catalog";
 import CatalogItem from "./pages/CatalogItem";
 import CatalogSeries from "./pages/CatalogSeries";
+import Claims from "./pages/Claims";
 import Held from "./pages/Held";
 import Listed from "./pages/Listed";
 import NotForYou from "./pages/NotForYou";
 import Pipeline from "./pages/Pipeline";
 import Reserved from "./pages/Reserved";
 import Settings from "./pages/Settings";
+import Sponsors from "./pages/Sponsors";
 import Setup from "./pages/Setup";
 import SignIn from "./pages/SignIn";
 import { deskPath } from "../areas";
@@ -63,8 +68,9 @@ export function AppRoutes() {
         </Route>
         <Route path="held-earnings" element={<Held />} />
         <Route path="reserved-call-signs" element={<Reserved />} />
-        <Route path="rights-claims" element={<Unbuilt title="Rights claims" about="Claims against programs on any station, and the answers." />} />
-        <Route path="catalog-sponsors" element={<Unbuilt title="Catalog sponsors" about="Businesses that sponsor the catalog station's programs." />} />
+        <Route path="reserved-call-signs/:marketSlug" element={<Reserved />} />
+        <Route path="rights-claims" element={<Claims />} />
+        <Route path="catalog-sponsors" element={<Sponsors />} />
         <Route path="settings" element={<Navigate to="rules" replace />} />
         <Route path="settings/:section" element={<Settings />} />
         <Route path="*" element={<NotFound />} />

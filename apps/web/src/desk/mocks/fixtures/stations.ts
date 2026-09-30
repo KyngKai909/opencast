@@ -74,24 +74,67 @@ export interface DbReservation {
   channel: string | null;
   heldUntil: string | null;
   createdAt: string;
+  // Added 2026-09-29 (desk-pages 02). A released reservation leaves the list.
+  name: string | null;
+  about: string | null;
+  reason: "waitlist" | "signed_off" | "admin";
+  invitedAt: string | null;
+  remindedAt: string | null;
+  extendedAt: string | null;
+  /** The station they're setting up with it. */
+  stationId: string | null;
+  decision: "kept" | null;
+  decidedAt: string | null;
 }
 
 // The waitlist's reserved call signs: 26 in the Inland Empire ("26 people on the waitlist here"),
-// four holding a channel, and a few in High Desert.
-const IE_SIGNS = ["TACO", "SKAT", "HOOP", "GOSP", "BRUN", "CHLO", "DUNE", "EAST", "FARM", "GRIT", "HOME", "INKY", "JOLT", "LOCO", "MESA", "NOPL", "OPAL", "PALM", "QUIL", "ROSA", "SOLA", "TRUK", "UNDR", "VALE", "YARD", "ZINE"];
+// four holding a channel, and a few in High Desert. The reference's rows (desk-pages 02) are here
+// on the mock's own names and channels: HOOP 52.1 invited and signing on (the frame's HALO), DUSK
+// waiting, VALE asked for twice, KFRO not allowed, TACO 41.1 ending tomorrow (the frame's GOLD;
+// the mock's clock is Saturday, September 26).
+const IE_SIGNS = ["TACO", "SKAT", "HOOP", "GOSP", "BRUN", "CHLO", "DUSK", "EAST", "FARM", "GRIT", "HOME", "INKY", "JOLT", "LOCO", "MESA", "NOPL", "OPAL", "PALM", "VALE", "ROSA", "SOLA", "TRUK", "KFRO", "VALE", "YARD", "ZINE"];
 const HELD: Record<string, { band: "tv" | "radio"; channel: string }> = { TACO: { band: "tv", channel: "41.1" }, SKAT: { band: "tv", channel: "44.1" }, HOOP: { band: "tv", channel: "52.1" }, GOSP: { band: "radio", channel: "95.6" } };
+const DAY = 86_400_000;
+const at = (month: number, day: number) => new Date(Date.UTC(2026, month - 1, day, 17)).toISOString();
+/** Who asked, keyed by call sign (the second VALE by index). */
+const ASKED: Record<string, Partial<DbReservation>> = {
+  HOOP: { name: "Ruth O.", about: "Community choir, Riverside", createdAt: at(8, 30), invitedAt: at(9, 20), stationId: U(3900) },
+  DUSK: { name: "Marco T.", about: "Late-night film club, Redlands", createdAt: at(9, 3) },
+  VALE: { name: "Dani R.", about: "A skate crew, Fontana", createdAt: at(9, 8) },
+  "VALE#23": { name: "Pastor Ellis", about: "A church, Fontana", createdAt: at(9, 11) },
+  KFRO: { name: "J. Park", about: "Wanted a real-looking call sign", createdAt: at(9, 14) },
+  TACO: { name: "Hank V.", about: "Oldies, Upland", createdAt: at(5, 30) }
+};
+
+const reservation = (id: string, callSign: string, marketId: string, fields: Partial<DbReservation>): DbReservation => {
+  const createdAt = fields.createdAt ?? at(8, 1);
+  return {
+    id,
+    callSign,
+    email: `${callSign.toLowerCase()}@example.com`,
+    marketId,
+    band: null,
+    channel: null,
+    heldUntil: new Date(Date.parse(createdAt) + 120 * DAY).toISOString(),
+    name: null,
+    about: null,
+    reason: "waitlist",
+    invitedAt: null,
+    remindedAt: null,
+    extendedAt: null,
+    stationId: null,
+    decision: null,
+    decidedAt: null,
+    ...fields,
+    createdAt
+  };
+};
 
 export function seedReservations(): DbReservation[] {
-  const ie = IE_SIGNS.map((cs, i) => ({
-    id: U(3000 + i),
-    callSign: cs,
-    email: `${cs.toLowerCase()}@example.com`,
-    marketId: IE.id,
-    band: HELD[cs]?.band ?? null,
-    channel: HELD[cs]?.channel ?? null,
-    heldUntil: HELD[cs] ? "2027-03-31T07:00:00.000Z" : null,
-    createdAt: new Date(Date.UTC(2026, 7, 1 + i, 17)).toISOString()
-  }));
-  const hd = ["DUST", "JOSH", "RIMS"].map((cs, i) => ({ id: U(3100 + i), callSign: cs, email: null, marketId: HD.id, band: i === 0 ? ("radio" as const) : null, channel: i === 0 ? "92.4" : null, heldUntil: i === 0 ? "2027-03-31T07:00:00.000Z" : null, createdAt: new Date(Date.UTC(2026, 8, 3 + i, 17)).toISOString() }));
+  const ie = IE_SIGNS.map((cs, i) => {
+    const who = ASKED[i === 23 ? "VALE#23" : cs] ?? {};
+    return reservation(U(3000 + i), cs, IE.id, { band: HELD[cs]?.band ?? null, channel: HELD[cs]?.channel ?? null, createdAt: at(8, 1 + i), ...who, ...(i === 23 ? { email: "grace@example.com" } : {}) });
+  });
+  const hd = ["DUST", "JOSH", "RIMS"].map((cs, i) => reservation(U(3100 + i), cs, HD.id, { band: i === 0 ? "radio" : null, channel: i === 0 ? "92.4" : null, createdAt: at(9, 3 + i) }));
   return [...ie, ...hd];
 }

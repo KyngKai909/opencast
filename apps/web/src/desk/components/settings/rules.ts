@@ -7,10 +7,13 @@ export const GROUPS: Array<{ id: RuleView["group"]; label: string }> = [
   { id: "pay_as_you_go", label: "Pay-as-you-go" },
   { id: "shares", label: "Shares" },
   { id: "rights", label: "Rights" },
-  { id: "relays", label: "Relays" }
+  { id: "relays", label: "Relays" },
+  { id: "call_signs", label: "Call signs" },
+  { id: "sponsors", label: "Catalog sponsors" }
 ];
 
-export type FieldKind = "dollars" | "percent" | "number" | "choice" | "json";
+/** `letters`: a list of capital-letter words, typed with commas between (call signs' lists). */
+export type FieldKind = "dollars" | "percent" | "number" | "choice" | "json" | "letters";
 
 export interface ValueField {
   /** The key in the rule's value; "" for a value that's a single word (payout schedule). */
@@ -47,8 +50,23 @@ const LABELS: Record<string, [string, FieldKind]> = {
   platforms: ["Platforms (JSON)", "json"],
   tiers: ["Terms by year (JSON)", "json"],
   signers: ["Keys (JSON)", "json"],
-  threshold: ["Approvals a claim needs", "number"]
+  threshold: ["Approvals a claim needs", "number"],
+  reminderDays: ["Reminder, days before the end", "number"],
+  impersonation: ["Brands and stations", "letters"],
+  denylist: ["Denylist", "letters"],
+  seriesMonthlyMicros: ["One series in a market, a month", "dollars"],
+  everySeriesMonthlyMicros: ["Every series in a market, a month", "dollars"],
+  opencastBps: ["Opencast", "percent"],
+  poolBps: ["The co-op pool", "percent"]
 };
+
+const YES_NO = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" }
+];
+
+/** Rules whose value has a yes-or-no part, in words. */
+const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters" };
 
 const trimZeros = (s: string) => (s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s);
 
@@ -57,6 +75,7 @@ function textOf(kind: FieldKind, v: unknown): string {
   if (kind === "dollars") return trimZeros(((v as number) / 1_000_000).toFixed(6));
   if (kind === "percent") return trimZeros(((v as number) / 100).toFixed(2));
   if (kind === "json") return JSON.stringify(v, null, 2);
+  if (kind === "letters") return (v as string[]).join(", ");
   return String(v);
 }
 
@@ -67,6 +86,7 @@ export function fieldsFor(value: unknown): ValueField[] {
   return Object.entries(value as Record<string, unknown>)
     .filter(([k]) => k !== "jurisdiction")
     .map(([k, v]) => {
+      if (typeof v === "boolean") return { name: k, label: YES_NO_LABELS[k] ?? k, kind: "choice" as const, nullable: false, options: YES_NO, text: String(v) };
       const [label, kind] = LABELS[k] ?? [k, Array.isArray(v) || (v && typeof v === "object") ? "json" : "number"];
       return { name: k, label, kind, nullable: v === null || k.endsWith("Micros"), text: textOf(kind, v) };
     });
@@ -76,7 +96,12 @@ export function fieldsFor(value: unknown): ValueField[] {
 export function valueFrom(original: unknown, fields: ValueField[]): { value: unknown } | { error: string; field: string } {
   const read = (f: ValueField): { ok: true; v: unknown } | { ok: false; error: string } => {
     const t = f.text.trim();
-    if (f.kind === "choice") return { ok: true, v: t };
+    if (f.kind === "choice") return { ok: true, v: f.options === YES_NO ? t === "true" : t };
+    if (f.kind === "letters") {
+      const words = t.split(/[\s,]+/).map((w) => w.toUpperCase()).filter(Boolean);
+      const bad = words.find((w) => !/^[A-Z]{2,12}$/.test(w));
+      return bad ? { ok: false, error: `${bad} isn't 2 to 12 letters.` } : { ok: true, v: [...new Set(words)] };
+    }
     if (f.kind === "json") {
       try {
         return { ok: true, v: JSON.parse(t) };

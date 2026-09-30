@@ -1,4 +1,4 @@
-import { SPOT_CATEGORIES, spotsApi as api } from "@opencast/contracts";
+import { SPOT_CATEGORIES, catalogSponsorsApi as sponsorsApi, spotsApi as api } from "@opencast/contracts";
 import { checkCreditText } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
@@ -291,5 +291,21 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
   r.handle(api.stationCustomers, async ({ user, params, query }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return spots.stationCustomers(params.stationId, query.month);
+  });
+
+  // Catalog sponsors (added 2026-09-29): Network desk sells the catalog's credit by series and market;
+  // the business answers an offer from its own side.
+  r.handle(sponsorsApi.getCatalogSponsors, ({ user, query }) => spots.catalogSponsors(user, query.marketId));
+  r.handle(sponsorsApi.catalogSponsorBusinesses, ({ query }) => spots.catalogSponsorBusinesses(query.q));
+  r.handle(sponsorsApi.offerCatalogSponsorship, ({ user, body }) => spots.offerCatalogSponsorship(user, body));
+  r.handle(sponsorsApi.assignCatalogSponsorship, ({ user, body }) => spots.assignCatalogSponsorship(user, body));
+  r.handle(sponsorsApi.endCatalogSponsorship, ({ user, params }) => spots.endCatalogSponsorship(user, params.sponsorshipId));
+  r.handle(sponsorsApi.listBusinessCatalogSponsorships, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.businessCatalogSponsorships(params.businessId);
+  });
+  r.handle(sponsorsApi.answerCatalogOffer, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.answerCatalogOffer(params.businessId, user.id, params.sponsorshipId, body.decision);
   });
 }

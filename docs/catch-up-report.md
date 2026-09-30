@@ -17,6 +17,23 @@ The repo on branch `follow-up` (from `dev` at e8ba662), checked against the late
 | 11 | Network desk, remaining pages | Partly done (mostly not started) | Large |
 | 12 | Changed reference files | Mixed, see below | Small to large |
 
+## Closing the gaps (after the report)
+
+Everything in the proposed order below is closed on `follow-up`, except the parts left to their phases (the Translators redraw goes to Phase 3, changing channel to Phase 5, External sources to Phase 6) and Clear Pay code events, which wait on Clear.
+
+| Gap | Closed in |
+|---|---|
+| 2, 4: prepare from originals, previews from prepared segments, delete on GC and takedown, Infrequent Access kept, Pinata and location relinks, CIDv1 checked | f46a091 |
+| 5: a creator's wallet at claim | f46a091 |
+| 7: invites through Resend with accept pages, resend and the email check; Online markets; strict viewers | f46a091 |
+| 8: the break order in the reference | f46a091 |
+| 12: "External" copy; Tuning sound stored | f46a091 |
+| 1, 2: the old `/api` routes, the worker's old loop, lockfile, stale docs | 31af9fe |
+| 10: the desk Catalog; 11: desk Settings (roles, the rules registry, numbering, escrow signers) | 56f67e5 |
+| 11: Rights claims, Reserved call signs, Catalog sponsors | the commit after 56f67e5 |
+
+Also built on the way, at the user's request: program log edit mode (ad64f1b), and log edits moving or cancelling viewers' reminders (18b22fc).
+
 ## 1. Four apps, one session: done
 
 `apps/web` serves the viewer at `/`, master control at `/control` and Network desk at `/desk`, with one Privy root and one query client. Control and desk load lazily. The desk is gated on `isAdmin` in the app and on every desk endpoint. `apps/business`, `apps/tv` (with the Cast receiver and Android) and `apps/site` exist. No separate control or desk app is left.
@@ -168,12 +185,11 @@ Also missing:
   - each claim's timeline and carrier count;
   - a kind for privacy complaints.
 
-**Reserved call signs:** partly done (medium).
-- The table exists. Missing:
-  - **End dates:** the 120-day expiry, Extend and Release aren't built.
-  - **Duplicate names:** blocked by a unique index; needs a schema change and a "Decide" flow.
-  - **Refused names:** four-letter K/W names and impersonation, with "Suggest".
-  - The state column, "Invite the next 10", and the market switcher.
+**Reserved call signs:** done 2026-09-29 (migration 0029; docs/contracts-changelog.md).
+- End dates from the registry's `call_signs.hold` (120 days), a reminder 14 days before and release after (with the channel); Extend and Release.
+- The same name twice: allowed (the index isn't unique), and "Decide" keeps one and holds a suggestion for the other in their place in line.
+- Refused names in the registry (`call_signs.refused`: K or W and three letters, brands and stations, a denylist), refused on the waitlist and at station setup, with "Suggest"; stations already on the dial are flagged, not changed.
+- The State column, the row actions, "Invite the next 10", the market switcher, market leads kept to their markets.
 
 **Catalog sponsors:** not started (medium to large).
 - There's no model for selling the catalog credit by series and market, and nothing that has Clear fill the gaps.

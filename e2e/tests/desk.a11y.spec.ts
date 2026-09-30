@@ -49,8 +49,8 @@ const ROUTES: Route[] = [
   { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
   { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
   { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
-  { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
-  { path: "/desk/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
+  { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByRole("grid", { name: "Open claims" })).toBeVisible(); } },
+  { path: "/desk/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByRole("grid", { name: "Catalog sponsors" })).toBeVisible(); } },
   { path: "/desk/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
   { path: "/desk/no-such-page", ready: h1("There's nothing here.") }
 ];

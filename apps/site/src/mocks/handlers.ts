@@ -2,7 +2,7 @@
 // module answers (apps/api/src/v1/modules/waitlist). Markets aren't open yet, as before launch.
 
 import { http } from "msw";
-import { waitlistApi } from "@opencast/contracts";
+import { CALL_SIGN_RULES_DEFAULT, callSignIdeas, callSignRefusal, waitlistApi } from "@opencast/contracts";
 import { fail, path, reply } from "./respond";
 
 const IE = { id: "00000000-0000-4000-8000-000000090001", slug: "inland-empire", name: "Inland Empire", timezone: "America/Los_Angeles", open: false };
@@ -19,11 +19,17 @@ export const TAKEN = new Set(["BEAT", "CIVC", "REEL", "SAZN", "NITE"]);
 
 const VALID = /^[A-Z]{3,5}$/;
 
+/** Free, allowed names in place of one that's taken or refused (the API's suggestions, as it orders them). */
+const ideasFor = (callSign: string) => callSignIdeas(callSign).filter((i) => !TAKEN.has(i) && !callSignRefusal(i, CALL_SIGN_RULES_DEFAULT)).slice(0, 3);
+
 export const handlers = [
   http.get(path(waitlistApi.checkCallSign), ({ params }) => {
     const callSign = String(params.callSign).toUpperCase();
     const valid = VALID.test(callSign);
-    return reply(waitlistApi.checkCallSign.response, { callSign, valid, available: valid && !TAKEN.has(callSign) });
+    // Names Opencast won't allow (2026-09-29), with the registry's first rules.
+    const refusal = valid ? callSignRefusal(callSign, CALL_SIGN_RULES_DEFAULT) : null;
+    const available = valid && !refusal && !TAKEN.has(callSign);
+    return reply(waitlistApi.checkCallSign.response, { callSign, valid, available, reservable: available, heldForYou: false, refusal, suggestions: valid && !available ? ideasFor(callSign) : [] });
   }),
 
   http.post(path(waitlistApi.join), async ({ request }) => {
@@ -34,6 +40,11 @@ export const handlers = [
       return fail(400, "bad_request", `Check the form: ${parsed.error.issues[0]?.message ?? "invalid"}.`, fields);
     }
     const body = parsed.data;
+    const refusal = body.callSign ? callSignRefusal(body.callSign, CALL_SIGN_RULES_DEFAULT) : null;
+    if (body.callSign && refusal) {
+      const ideas = ideasFor(body.callSign).slice(0, 2);
+      return fail(422, "call_sign_refused", `${refusal.reason}${ideas.length ? ` Try ${ideas.join(" or ")}.` : " Try another."}`, { callSign: refusal.reason });
+    }
     if (body.callSign && TAKEN.has(body.callSign)) return fail(409, "call_sign_taken", `${body.callSign} is taken. Try another.`);
     const message = {
       viewer: "You're on the list.",

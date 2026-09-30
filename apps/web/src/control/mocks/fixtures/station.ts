@@ -134,6 +134,7 @@ function seedClaims(): ClaimX[] {
   return [
     {
       id: uid(7_000_001),
+      kind: "copyright",
       item: { id: crate03?.id ?? uid(7_000_901), title: "Crate Session 03" },
       station: BEAT,
       claimantName: "Westside Tapes LLC",
@@ -164,6 +165,7 @@ function seedClaims(): ClaimX[] {
     },
     {
       id: uid(7_000_002),
+      kind: "copyright",
       item: { id: late12?.id ?? uid(7_000_902), title: "Late Crate, ep. 12" },
       station: BEAT,
       claimantName: "R. Delgado",
@@ -188,6 +190,7 @@ function seedClaims(): ClaimX[] {
     },
     {
       id: uid(7_000_003),
+      kind: "copyright",
       item: { id: uid(7_000_903), title: "BEAT station ID, v1" },
       station: BEAT,
       claimantName: "Loopdeck",

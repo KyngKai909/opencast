@@ -78,15 +78,27 @@ describe("Waitlist", () => {
 
   it("cleans the call sign, checks it live, and holds it", async () => {
     render(<Harness start="station" />);
-    type("Call sign you'd like", "kx-yz9");
-    expect((screen.getByLabelText("Call sign you'd like") as HTMLInputElement).value).toBe("KXYZ");
-    expect(await screen.findByText("KXYZ is free.")).toBeTruthy();
+    type("Call sign you'd like", "zx-yq9");
+    expect((screen.getByLabelText("Call sign you'd like") as HTMLInputElement).value).toBe("ZXYQ");
+    expect(await screen.findByText("ZXYQ is free.")).toBeTruthy();
     type("Email", "kai@example.com");
     type("ZIP code", "92373");
     submit();
-    expect(await screen.findByRole("heading", { name: "KXYZ is on hold for you." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "ZXYQ is on hold for you." })).toBeTruthy();
     expect(screen.getByText("We’ll write when your market opens, and your call sign is held until then.")).toBeTruthy();
-    expect(sent).toEqual([{ role: "station", email: "kai@example.com", zip: "92373", callSign: "KXYZ" }]);
+    expect(sent).toEqual([{ role: "station", email: "kai@example.com", zip: "92373", callSign: "ZXYQ" }]);
+  });
+
+  // 2026-09-29: names Opencast won't allow (call_signs.refused) say why, with names to try.
+  it("says why a call sign isn't allowed, with names to try, and won't send it", async () => {
+    render(<Harness start="station" />);
+    type("Call sign you'd like", "kxyz");
+    expect(await screen.findByText("Four letters starting with K or W look like a real broadcast call sign. Try XYZ or XYZS.")).toBeTruthy();
+    type("Email", "kai@example.com");
+    type("ZIP code", "92373");
+    submit();
+    expect(screen.getByText("Four letters starting with K or W look like a real broadcast call sign. Try XYZ or XYZS.")).toBeTruthy();
+    expect(sent).toEqual([]);
   });
 
   it("says a taken call sign under the field, and won't send it", async () => {
@@ -101,7 +113,7 @@ describe("Waitlist", () => {
 
   it("puts the API's 409 on the call sign", async () => {
     // The check said free, but someone held it before the form was sent.
-    server.use(http.get("*/v1/call-signs/:callSign", ({ params }) => HttpResponse.json({ callSign: String(params.callSign), valid: true, available: true })));
+    server.use(http.get("*/v1/call-signs/:callSign", ({ params }) => HttpResponse.json({ callSign: String(params.callSign), valid: true, available: true, reservable: true, heldForYou: false, refusal: null, suggestions: [] })));
     render(<Harness start="station" />);
     type("Call sign you'd like", "REEL");
     await screen.findByText("REEL is free.");

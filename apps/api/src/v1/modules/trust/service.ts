@@ -4,9 +4,9 @@
 
 import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Claim } from "@opencast/contracts";
+import { CLAIM_ANSWER_SOON_DAYS, claimNext, claimPhase, claimTimeline, repeatStanding, type Claim, type ClaimFacts, type ClaimKind, type DeskClaim, type DeskClaimCarrier, type DeskClaims, type Market, type StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
-import type { UploadedFile } from "../../http.js";
+import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 
 export interface StandingView {
@@ -25,6 +25,8 @@ export interface ClaimInput {
   claimText: string;
   rangeStartMs?: number;
   rangeEndMs?: number;
+  /** Added 2026-09-29: a privacy complaint (default copyright). */
+  kind?: ClaimKind;
 }
 
 export interface TrustService {
@@ -37,6 +39,8 @@ export interface TrustService {
   answer(claimId: string, userId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string; attachmentUrl?: string }): Promise<Claim>;
   remove(claimId: string): Promise<Claim>;
   resolve(claimId: string, outcome: "upheld" | "withdrawn" | "restored"): Promise<Claim>;
+  /** Network desk (added 2026-09-29): every claim in the caller's markets, with timelines, carriers and figures. */
+  deskClaims(user: CurrentUser, marketId?: string): Promise<DeskClaims>;
   /** Open claims past their deadline: removed from the library. Run by the scheduler. */
   expireOverdue(): Promise<number>;
   /** B6: a file that backs an answer, stored by content ID. */
@@ -61,6 +65,8 @@ export function addBusinessDays(from: Date, days: number): Date {
   }
   return at;
 }
+
+const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
 export function createTrustService({ deps, services }: ModuleContext): TrustService {
   const { db } = deps;
@@ -105,6 +111,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
       return [
         {
           id: r.id,
+          kind: r.kind,
           item: { id: r.assetId, title: titles.items.get(r.assetId) ?? "" },
           station,
           claimantName: r.claimantName,
@@ -117,7 +124,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
           state: r.status,
           receivedAt: r.receivedAt.toISOString(),
           answerDueAt: r.answerDueAt.toISOString(),
-          daysToAnswer: r.status === "open" ? Math.max(0, Math.ceil((r.answerDueAt.getTime() - now) / DAY)) : null,
+          daysToAnswer: r.status === "open" && r.kind === "copyright" ? Math.max(0, Math.ceil((r.answerDueAt.getTime() - now) / DAY)) : null,
           answer: answer
             ? {
                 basis: answer.basis,
@@ -161,7 +168,8 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
       const [counts] = await db
         .select({
           open: sql<number>`count(*) filter (where ${C.status} = 'open')::int`,
-          upheld: sql<number>`count(*) filter (where ${C.status} = 'upheld' and ${C.closedAt} >= ${yearAgo})::int`
+          // The repeat limit is about copyright: privacy complaints never count toward it.
+          upheld: sql<number>`count(*) filter (where ${C.status} = 'upheld' and ${C.kind} = 'copyright' and ${C.closedAt} >= ${yearAgo})::int`
         })
         .from(C)
         .where(eq(C.stationId, stationId));
@@ -201,6 +209,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
           rangeStartMs: input.rangeStartMs ?? null,
           rangeEndMs: input.rangeEndMs ?? null,
           swornStatement: true,
+          kind: input.kind ?? "copyright",
           receivedAt: now,
           answerDueAt
         })
@@ -241,6 +250,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
     async answer(claimId, userId, input) {
       const claim = await one(claimId);
       if (claim.status !== "open") throw refused("not_open", "That claim has been dealt with.");
+      if (claim.kind === "privacy") throw refused("privacy_claim", "A privacy complaint isn't answered with a rights basis. Opencast reviews it and will be in touch.");
       const setup = await services.stations.setup(claim.stationId);
       if (!setup.legalName || !setup.legalContact) {
         throw refused("legal_details", "Add the station's legal name and contact in Settings first. They're sent with your answer.");
@@ -277,6 +287,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
 
     async resolve(claimId, outcome) {
       const claim = await one(claimId);
+      if (claim.status !== "open" && claim.status !== "answered") throw new HttpError(409, "not_open", "That claim has been dealt with.");
       const now = deps.clock.now();
       if (outcome === "upheld") await services.library.archiveForClaim(claim.assetId);
       await db.update(C).set({ status: outcome, closedAt: now }).where(eq(C.id, claimId));
@@ -308,11 +319,122 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
       return { attachmentUrl: await content.url(stored.cid), fileName: file.originalName };
     },
 
+    async deskClaims(user, marketId) {
+      // Admins and rights reviewers: every market. A market lead: their own markets.
+      const everywhere = user.isAdmin || (await services.settings.mayDesk(user, "rights"));
+      let markets: Set<string> | null = null;
+      if (marketId) {
+        if (!everywhere) await services.settings.requireDesk(user, { market: marketId });
+        markets = new Set([marketId]);
+      } else if (!everywhere) {
+        const grants = await services.settings.rolesOf(user);
+        markets = new Set(grants.flatMap((g) => (g.role === "market_lead" && g.market ? [g.market.id] : [])));
+      }
+
+      const all = await db.select().from(C).orderBy(desc(C.receivedAt));
+      const profiles = await services.stations.profiles(all.map((r) => r.stationId));
+      const rows = markets ? all.filter((r) => markets.has(profiles.get(r.stationId)?.marketId ?? "")) : all;
+      const claims = await views(rows);
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const now = deps.clock.now();
+      const { threshold, answerDays, replyDays } = await policy();
+
+      // Carriers under an agreement with nothing on their log still can't air it: they count too.
+      const openRows = rows.filter((r) => claimPhase(r.status) === "open");
+      const items = await services.library.itemsByIds(openRows.map((r) => r.assetId));
+      const programOf = new Map([...items].flatMap(([id, i]) => (i.programId ? [[id, i.programId] as const] : [])));
+      const carriersOf = await services.catalog.carriersOf([...new Set(programOf.values())]);
+      const extraIds = new Set<string>();
+      for (const r of openRows) for (const s of carriersOf.get(programOf.get(r.assetId) ?? "") ?? []) extraIds.add(s);
+      const extraIdents = await services.stations.idents([...extraIds]);
+
+      // Where to write to each maker: its legal contact when that's an email, else an owner's.
+      const makers = [...new Set(rows.map((r) => r.stationId))];
+      const emails = new Map<string, string | null>();
+      await Promise.all(
+        makers.map(async (stationId) => {
+          const legal = (await services.stations.setup(stationId).catch(() => null))?.legalContact?.trim() ?? "";
+          if (EMAIL.test(legal)) return void emails.set(stationId, legal);
+          const owners = await services.accounts.stationMemberIds(stationId, ["owner"]);
+          const people = await services.accounts.peopleByIds(owners);
+          emails.set(stationId, owners.map((o) => people.get(o)?.email ?? null).find((e): e is string => !!e) ?? null);
+        })
+      );
+
+      const marketRows = await services.network.marketsByIds([...new Set([...profiles.values()].map((p) => p.marketId).filter((m): m is string => !!m))]);
+      const attachments = rows.length ? await db.select().from(schema.claimAttachments).where(inArray(schema.claimAttachments.claimId, rows.map((r) => r.id))) : [];
+      const links = new Map(await Promise.all([...new Set(attachments.map((a) => a.contentId))].map(async (cid) => [cid, await services.library.content.url(cid)] as const)));
+
+      const deskClaims: DeskClaim[] = claims.map((c) => {
+        const row = byId.get(c.id)!;
+        const phase = claimPhase(row.status);
+        const facts: ClaimFacts = { kind: row.kind, state: row.status, receivedAt: c.receivedAt, answerDueAt: c.answerDueAt, closedAt: row.closedAt?.toISOString() ?? null, answer: c.answer, takedowns: c.takedowns };
+        const lastRestore = c.takedowns.map((t) => t.restoredAt).filter((v): v is string => !!v).sort().at(-1) ?? null;
+        const carriers: DeskClaimCarrier[] = c.takedowns
+          .filter((t) => t.station.id !== row.stationId)
+          .map((t) => ({ station: t.station, airingsPulled: t.airingsReplaced, pulledAt: t.pulledAt, restoredAt: t.restoredAt }));
+        if (phase === "open") {
+          for (const s of carriersOf.get(programOf.get(row.assetId) ?? "") ?? []) {
+            const ident = extraIdents.get(s);
+            if (s === row.stationId || !ident || carriers.some((k) => k.station.id === s)) continue;
+            carriers.push({ station: ident, airingsPulled: 0, pulledAt: null, restoredAt: row.status === "answered" ? lastRestore : null });
+          }
+        }
+        const marketOf = profiles.get(row.stationId)?.marketId;
+        const market: Market | null = marketOf ? (marketRows.get(marketOf) ?? null) : null;
+        return {
+          ...c,
+          phase,
+          claimantContact: row.claimantContact,
+          market,
+          next: claimNext(facts),
+          carriers,
+          timeline: claimTimeline(facts),
+          stationEmail: emails.get(row.stationId) ?? null,
+          attachments: attachments.filter((a) => a.claimId === c.id).map((a) => ({ fileName: a.fileName, url: links.get(a.contentId) ?? "" }))
+        };
+      });
+
+      // Each maker against the repeat limit (copyright claims upheld in the last 12 months).
+      const yearAgo = now.getTime() - 365 * DAY;
+      const stationRows = new Map<string, { station: StationIdent; open: number; closed: number; upheld: number }>();
+      for (const c of deskClaims) {
+        const row = byId.get(c.id)!;
+        const s = stationRows.get(row.stationId) ?? { station: c.station, open: 0, closed: 0, upheld: 0 };
+        if (c.phase === "open") s.open++;
+        else s.closed++;
+        if (row.status === "upheld" && row.kind === "copyright" && row.closedAt && row.closedAt.getTime() >= yearAgo) s.upheld++;
+        stationRows.set(row.stationId, s);
+      }
+      const stations = [...stationRows.values()]
+        .map((s) => ({ station: s.station, open: s.open, closed: s.closed, upheldLast12Months: s.upheld, standing: repeatStanding(s.upheld, threshold) }))
+        .sort((a, b) => b.upheldLast12Months - a.upheldLast12Months || b.open - a.open || (a.station.callSign ?? a.station.name).localeCompare(b.station.callSign ?? b.station.name));
+
+      const open = deskClaims.filter((c) => c.phase === "open");
+      const due = open.filter((c) => c.state === "open" && c.kind === "copyright" && c.daysToAnswer !== null && c.daysToAnswer <= CLAIM_ANSWER_SOON_DAYS);
+      const carrying = new Set(open.flatMap((c) => c.carriers.map((k) => k.station.id)));
+      return {
+        claims: deskClaims,
+        stations,
+        stats: {
+          open: open.length,
+          offAir: open.filter((c) => c.state === "open").length,
+          answersDue: due.length,
+          soonestAnswerDays: due.length ? Math.min(...due.map((c) => c.daysToAnswer!)) : null,
+          carryingStations: carrying.size,
+          nearRepeatLimit: stations.filter((s) => s.standing !== "good").length
+        },
+        rules: { repeatLimit: threshold, answerDays, counterNoticeBusinessDays: replyDays },
+        canResolve: everywhere
+      };
+    },
+
     async expireOverdue() {
       const overdue = await db
         .select()
         .from(C)
-        .where(and(eq(C.status, "open"), lt(C.answerDueAt, deps.clock.now())));
+        // A privacy complaint has no answer window: Opencast reviews it.
+        .where(and(eq(C.status, "open"), eq(C.kind, "copyright"), lt(C.answerDueAt, deps.clock.now())));
       for (const claim of overdue) {
         await services.library.archiveForClaim(claim.assetId);
         await db.update(C).set({ status: "expired", closedAt: deps.clock.now() }).where(eq(C.id, claim.id));

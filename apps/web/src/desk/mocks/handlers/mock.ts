@@ -6,6 +6,8 @@ import { permissionLink } from "./permission";
 import { now } from "../../../lib/clock";
 import { advance, creatorById, getDb, newId, resetDb, saveDb, stationById, worksOf } from "../db";
 import { resetSettings } from "../settingsDb";
+import { resetSponsors } from "../sponsorsDb";
+import { resetClaims } from "../claimsDb";
 import { bodyOf, fail, needsAdmin } from "../respond";
 
 export const MOCK_BASE = "*/v1/__mock/desk";
@@ -88,6 +90,8 @@ export const mockHandlers: HttpHandler[] = [
     if (p instanceof Response) return p;
     resetDb();
     resetSettings();
+    resetSponsors();
+    resetClaims();
     return HttpResponse.json({ ok: true });
   })
 ];

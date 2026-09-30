@@ -243,6 +243,8 @@ function seed(): SettingsDb {
   const rules: MockRuleVersion[] = RULE_KEYS.map((key, i) => ({ id: U(7000 + i), key, scope: "", value: RULES[key].fallback, effectiveFrom: epoch, setBy: null, note: "The value in effect before the registry", createdAt: "2026-09-29T19:00:00.000Z" }));
   // High Desert grows into its numbers: TV 2 to 36 for now.
   rules.push({ id: U(7050), key: "numbering.channels", scope: HD.id, value: { tv: { firstMajor: 2, lastMajor: 36 }, radio: { firstTenths: 882, lastTenths: 1078 } }, effectiveFrom: "2026-09-01T00:00:00.000Z", setBy: DEE_ID, note: "Room to grow later", createdAt: "2026-08-30T17:00:00.000Z" });
+  // Catalog sponsors (desk-pages 03): the catalog's credit priced from August.
+  rules.push({ id: U(7091), key: "catalog.sponsor_prices", scope: "", value: { seriesMonthlyMicros: 150_000_000, everySeriesMonthlyMicros: 400_000_000 }, effectiveFrom: "2026-08-01T00:00:00.000Z", setBy: DEE_ID, note: "Launch prices", createdAt: "2026-07-30T17:00:00.000Z" });
   const log: SettingsDb["log"] = [
     { id: U(7060), at: "2026-08-30T17:00:00.000Z", by: DEE_ID, kind: "rule", subject: "numbering.channels", scope: HD.id, summary: "Channel numbering (High Desert): TV 2 to 69, radio 88.2 to 107.8 to TV 2 to 36, radio 88.2 to 107.8", before: null, after: null, effectiveFrom: "2026-09-01T00:00:00.000Z", note: "Room to grow later" },
     { id: U(7061), at: "2026-08-12T17:00:00.000Z", by: DEE_ID, kind: "role", subject: RAE_ID, scope: "", summary: "Made Rae T. a rights reviewer", before: null, after: null, effectiveFrom: null, note: null }

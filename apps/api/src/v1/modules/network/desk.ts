@@ -815,6 +815,8 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       const creator = await creatorRow(creatorId);
       if (!["said_yes", "already_licensed"].includes(creator.stage)) throw refused("no_permission", "Set up a station only after they say yes, or when their work is already licensed.");
       if (creator.stationId) throw refused("already_set_up", "This creator already has a station.");
+      // Names Opencast won't allow (call_signs.refused, added 2026-09-29): 422 call_sign_refused.
+      await services.waitlist.requireAllowed(input.callSign);
       const number = parseChannelNumber(input.band, input.channel);
       if (!number) throw badRequest("That channel isn't in the band.");
       const [recipe] = await db.select().from(RE).where(eq(RE.id, input.recipeId));

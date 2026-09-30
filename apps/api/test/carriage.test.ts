@@ -121,7 +121,7 @@ describe("the waitlist", () => {
     const res = await anon(h).post("/v1/waitlist").send({ role: "station", email: "dana@example.com", zip: "92392", callSign: "HOOP" }).expect(201);
     expect(res.body).toMatchObject({ message: "HOOP is on hold for you.", heldCallSign: "HOOP", market: { slug: "high-desert" } });
     const check = await anon(h).get("/v1/call-signs/HOOP").expect(200);
-    expect(check.body).toEqual({ callSign: "HOOP", valid: true, available: false });
+    expect(check.body).toMatchObject({ callSign: "HOOP", valid: true, available: false });
 
     const stranger = await h.signIn();
     const station = await stranger.post("/v1/stations", { name: "Not Dana" }).expect(201);

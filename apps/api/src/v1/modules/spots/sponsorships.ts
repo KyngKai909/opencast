@@ -2,7 +2,7 @@
 // monthly amount, credited on air. The station approves each one. Each month's
 // amount is held at the start of the month and paid to the station at its end.
 
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { checkCreditText } from "@opencast/domain";
 import type { SponsorTarget, Sponsorship, SponsorshipSetting } from "@opencast/contracts";
@@ -22,7 +22,7 @@ export interface SponsorshipsPart {
   activeSponsorCount(stationId: string): Promise<number>;
   /** E2: the approved sponsors by name, with their monthly amounts. */
   activeSponsors(stationId: string): Promise<Array<{ name: string; monthlyMicros: number }>>;
-  /** Credits for the current month, for the underwriting slate. */
+  /** Credits for the current month, for the underwriting slate. A station's own sponsors (catalog credits: catalogCredits). */
   creditsFor(stationId: string): Promise<Array<{ business: string; creditText: string; programId: string | null }>>;
   /** Holds each approved sponsorship's month at its start, pays last month to the station, lapses the unfunded. */
   rollSponsorships(): Promise<{ held: number; paid: number; lapsed: number }>;
@@ -94,7 +94,7 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
     const [row] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(SS)
-      .where(and(eq(SS.stationId, stationId), inArray(SS.status, ["requested", "approved"]), programId ? eq(SS.programId, programId) : sql`${SS.programId} is null`));
+      .where(and(eq(SS.stationId, stationId), isNull(SS.marketId), inArray(SS.status, ["requested", "approved"]), programId ? eq(SS.programId, programId) : sql`${SS.programId} is null`));
     return row.n;
   }
 
@@ -238,6 +238,8 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
     async decideSponsorship(sponsorshipId, userId, decision) {
       const [row] = await db.select().from(SS).where(eq(SS.id, sponsorshipId));
       if (!row) throw notFound("That sponsorship");
+      // A catalog sponsorship (Network desk's offer) is the business's to answer, not the catalog station's.
+      if (row.marketId) throw refused("catalog_offer", "The business answers this offer itself.");
       if (row.status !== "requested") throw refused("already_decided", "That request has been answered.");
       const [updated] = await db
         .update(SS)
@@ -291,7 +293,7 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
         .select({ sponsorship: SS })
         .from(SS)
         .innerJoin(SM, and(eq(SM.sponsorshipId, SS.id), eq(SM.month, month)))
-        .where(and(eq(SS.stationId, stationId), eq(SS.status, "approved")))
+        .where(and(eq(SS.stationId, stationId), eq(SS.status, "approved"), isNull(SS.marketId)))
         .orderBy(asc(SS.createdAt));
       const names = await services.spots.businessNames(rows.map((r) => r.sponsorship.advertiserId));
       return rows.map((r) => ({ business: names.get(r.sponsorship.advertiserId) ?? "", creditText: r.sponsorship.creditText, programId: r.sponsorship.programId }));
@@ -313,7 +315,7 @@ export function createSponsorships({ deps, services }: ModuleContext): Sponsorsh
         const [settings, programs, active, credits] = await Promise.all([
           db.select().from(SET).where(eq(SET.stationId, station.id)),
           services.library.programsForStation(station.id),
-          db.select({ programId: SS.programId }).from(SS).where(and(eq(SS.stationId, station.id), inArray(SS.status, ["requested", "approved"]))),
+          db.select({ programId: SS.programId }).from(SS).where(and(eq(SS.stationId, station.id), isNull(SS.marketId), inArray(SS.status, ["requested", "approved"]))),
           services.ledger.memberCredits(station.id)
         ]);
         const whole = settings.find((x) => x.programId === null);

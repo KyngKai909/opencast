@@ -89,6 +89,8 @@ export interface StationsService {
   /** Public stations in these markets (both bands), for targeting and the market board. */
   inMarkets(marketIds: string[]): Promise<StationProfile[]>;
   byRef(ref: string): Promise<StationProfile | null>;
+  /** Added 2026-09-29 (reserved call signs): of these call signs, the ones a station has. */
+  takenCallSigns(callSigns: string[]): Promise<Set<string>>;
   search(q: string, marketId?: string): Promise<{ tuneTo: StationProfile | null; stations: StationProfile[] }>;
   timezoneOf(stationId: string): Promise<string>;
   breakRule(stationId: string): Promise<BreakRuleView>;
@@ -426,6 +428,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       return row ? ((await service.profiles([row.id])).get(row.id) ?? null) : null;
     },
 
+    async takenCallSigns(callSigns) {
+      if (!callSigns.length) return new Set();
+      const rows = await db.select({ callSign: S.callSign }).from(S).where(inArray(S.callSign, callSigns));
+      return new Set(rows.map((r) => r.callSign).filter((c): c is string => !!c));
+    },
+
     async search(q, marketId) {
       const text = q.trim();
       let tuneTo: StationProfile | null = null;
@@ -682,6 +690,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       }
       await db.transaction(async (tx) => {
         if (input.callSign && input.callSign !== current.callSign) {
+          // Names Opencast won't allow (call_signs.refused, added 2026-09-29): 422 call_sign_refused.
+          await services.waitlist.requireAllowed(input.callSign);
           // A call sign held on the waitlist goes to the person who reserved it.
           await services.waitlist.claimCallSign(tx, { callSign: input.callSign, stationId, userId: user.id });
         }

@@ -55,6 +55,15 @@ describe("call signs", () => {
     await tx.run(`INSERT INTO network.call_sign_reservations (call_sign, reason) VALUES ('TACO', 'waitlist')`);
     await tx.rejects(/held for someone else/, () => station(tx, { callSign: "TACO" }));
   });
+
+  // 0029 (2026-09-29): two people may ask for the same name; the desk decides. Until then, and
+  // after, no station takes a name held for someone else.
+  test("two people can hold the same name, and neither frees it for anyone else", async (tx) => {
+    await tx.run(`INSERT INTO network.call_sign_reservations (call_sign, reason) VALUES ('VALE', 'waitlist'), ('VALE', 'waitlist')`);
+    await tx.rejects(/held for someone else/, () => station(tx, { callSign: "VALE" }));
+    await tx.run(`UPDATE network.call_sign_reservations SET released_at = now(), release_reason = 'not_kept', decision = 'not_kept', suggested = ARRAY['VALES'] WHERE ctid = (SELECT ctid FROM network.call_sign_reservations WHERE call_sign = 'VALE' LIMIT 1)`);
+    await tx.rejects(/held for someone else/, () => station(tx, { callSign: "VALE" }));
+  });
 });
 
 describe("channels", () => {

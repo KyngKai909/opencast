@@ -194,8 +194,8 @@ function RuleForm({ rule, onClose }: { rule: RuleView; onClose: () => void }) {
                 </option>
               ))}
             </SelectField>
-          ) : f.kind === "json" ? (
-            <TextAreaField key={f.name} label={f.label} rows={6} value={f.text} onChange={(e) => setField(i, e.target.value)} error={errors[f.name]} />
+          ) : f.kind === "json" || f.kind === "letters" ? (
+            <TextAreaField key={f.name} label={f.label} rows={f.kind === "letters" ? 3 : 6} value={f.text} onChange={(e) => setField(i, e.target.value)} error={errors[f.name]} help={f.kind === "letters" ? "Capital letters, a comma between." : undefined} />
           ) : (
             <Field
               key={f.name}

@@ -317,9 +317,23 @@ export const sponsorships = spots.table(
     startsOn: date("starts_on").notNull(),
     decidedAt: at("decided_at"),
     decidedBy: uuid("decided_by").references(() => users.id),
+    /**
+     * A catalog sponsorship (added 2026-09-29, migration 0030): the market its credit is sold in.
+     * The station is the catalog station, the program the series' (null: every catalog series in
+     * the market). Null for a station's own sponsorships.
+     */
+    marketId: uuid("market_id").references(() => markets.id),
+    /** A catalog sponsorship: who on the desk offered or assigned it. */
+    offeredBy: uuid("offered_by").references(() => users.id),
     createdAt: createdAt()
   },
-  (t) => [check("sponsorship_amount_positive", sql`${t.monthlyMicros} > 0`)]
+  (t) => [
+    check("sponsorship_amount_positive", sql`${t.monthlyMicros} > 0`),
+    // One live sponsorship or offer per catalog slot (series × market).
+    uniqueIndex("sponsorships_catalog_slot")
+      .on(t.marketId, sql`coalesce(${t.programId}, '00000000-0000-0000-0000-000000000000'::uuid)`)
+      .where(sql`${t.marketId} is not null and ${t.status} in ('requested', 'approved')`)
+  ]
 );
 
 /** Each month's amount, held from the sponsor's balance at the start of the month. */
@@ -336,6 +350,29 @@ export const sponsorshipMonths = spots.table(
       .references(() => holds.id)
   },
   (t) => [primaryKey({ columns: [t.sponsorshipId, t.month] })]
+);
+
+/**
+ * Clear-filled catalog slots (added 2026-09-29, migration 0030): each month, each catalog series in
+ * each market where the credit thanked the house sponsor because nobody had bought the slot, with
+ * the credits that aired. Recorded on the 1st for the month before. Nothing is billed (Open:
+ * whether Clear pays for these); `billed_micros` stays 0 until that's decided.
+ */
+export const catalogHouseCredits = spots.table(
+  "catalog_house_credits",
+  {
+    programId: uuid("program_id")
+      .notNull()
+      .references(() => programs.id),
+    marketId: uuid("market_id")
+      .notNull()
+      .references(() => markets.id),
+    month: date("month").notNull(),
+    credits: integer("credits").notNull(),
+    billedMicros: micros("billed_micros").notNull().default(0),
+    recordedAt: at("recorded_at").notNull().defaultNow()
+  },
+  (t) => [primaryKey({ columns: [t.programId, t.marketId, t.month] }), check("catalog_house_credits_counted", sql`${t.credits} > 0`)]
 );
 
 export const orderStatus = spots.enum("order_status", [

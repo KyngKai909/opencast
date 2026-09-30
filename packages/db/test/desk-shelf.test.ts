@@ -38,7 +38,10 @@ describe("the rules registry", () => {
   test("starts with every rule's value in effect before it", async (tx) => {
     const rows = await tx.client.query(`SELECT key, value FROM network.rules ORDER BY key`);
     const byKey = Object.fromEntries(rows.rows.map((r: { key: string; value: unknown }) => [r.key, r.value]));
-    expect(Object.keys(byKey)).toHaveLength(15);
+    // 15 from 0027; the hold and the refused names from 0029 (reserved call signs).
+    expect(Object.keys(byKey)).toHaveLength(17);
+    expect(byKey["call_signs.hold"]).toEqual({ days: 120, reminderDays: 14 });
+    expect(byKey["call_signs.refused"]).toMatchObject({ refuseKwFourLetters: true, denylist: ["ALERT", "EAS", "SOS"] });
     expect(byKey["shares.opencast"]).toEqual({ spotBps: 0, pledgeBps: 0, productionBps: 0 });
     expect(byKey["rights.claim_dates"]).toEqual({ answerDays: 14, counterNoticeBusinessDays: 10 });
     expect(byKey["numbering.channels"]).toEqual({ tv: { firstMajor: 2, lastMajor: 69 }, radio: { firstTenths: 882, lastTenths: 1078 } });

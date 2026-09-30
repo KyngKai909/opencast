@@ -5,6 +5,23 @@ import { RULES } from "@opencast/contracts";
 import { fieldsFor, fromWords, shortKey, valueFrom } from "./rules";
 
 describe("rule values in the form", () => {
+  it("types the call sign rules as yes or no and lists of capital letters (added 2026-09-29)", () => {
+    const fields = fieldsFor(RULES["call_signs.refused"].fallback);
+    expect(fields.map((f) => [f.name, f.label, f.kind])).toEqual([
+      ["refuseKwFourLetters", "Refuse K or W and three letters", "choice"],
+      ["impersonation", "Brands and stations", "letters"],
+      ["denylist", "Denylist", "letters"]
+    ]);
+    expect(fields[2]!.text).toBe("ALERT, EAS, SOS");
+    const changed = [{ ...fields[0]!, text: "false" }, fields[1]!, { ...fields[2]!, text: "alert, eas sos,, gritz" }];
+    expect(valueFrom(RULES["call_signs.refused"].fallback, changed)).toEqual({ value: { ...RULES["call_signs.refused"].fallback, refuseKwFourLetters: false, denylist: ["ALERT", "EAS", "SOS", "GRITZ"] } });
+    expect(valueFrom(RULES["call_signs.refused"].fallback, [fields[0]!, fields[1]!, { ...fields[2]!, text: "OK, NO-WAY" }])).toEqual({ error: "NO-WAY isn't 2 to 12 letters.", field: "denylist" });
+    expect(fieldsFor(RULES["call_signs.hold"].fallback).map((f) => [f.label, f.text])).toEqual([
+      ["Days", "120"],
+      ["Reminder, days before the end", "14"]
+    ]);
+  });
+
   it("types prices in dollars, empty for not set yet", () => {
     const fields = fieldsFor(RULES["prices.storage"].fallback);
     expect(fields).toEqual([{ name: "perGbMonthMicros", label: "Price a GB a month", kind: "dollars", nullable: true, text: "" }]);
