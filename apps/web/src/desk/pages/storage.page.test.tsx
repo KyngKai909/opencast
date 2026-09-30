@@ -89,7 +89,7 @@ describe("Storage maintenance", () => {
     expect(within(files).getByRole("progressbar", { name: "Files stored by location: checking" })).toBeTruthy();
     expect((within(files).getByRole("button", { name: "Apply: Files stored by location" }) as HTMLButtonElement).disabled).toBe(true);
     runsOut();
-    expect(await within(files).findByText("3 files stored by location, 1 can't be read", {}, { timeout: 3_000 })).toBeTruthy();
+    expect(await within(files).findByText("3 files stored by location, 1 can't be read")).toBeTruthy();
     expect(within(files).queryByRole("progressbar")).toBeNull();
     expect(within(files).getByText(/^Last check: Dee A\., /)).toBeTruthy();
 
@@ -97,7 +97,7 @@ describe("Storage maintenance", () => {
     fireEvent.click(within(pins).getByRole("button", { name: "Check: Pinata pins" }));
     expect(await within(pins).findByText("Checking…")).toBeTruthy();
     runsOut();
-    expect(await within(pins).findByText("0 Pinata pins to copy, 2 catalog pins stay on IPFS", {}, { timeout: 3_000 })).toBeTruthy();
+    expect(await within(pins).findByText("0 Pinata pins to copy, 2 catalog pins stay on IPFS")).toBeTruthy();
 
     const saved: Blob[] = [];
     URL.createObjectURL = vi.fn((b: Blob) => (saved.push(b), "blob:report"));
@@ -127,7 +127,7 @@ describe("Storage maintenance", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await within(items).findByText("Applying, 0 of 3 items")).toBeTruthy();
     runsOut();
-    expect(await within(items).findByText("Queued for the worker: 2. Left to prepare: 2. Apply again once the worker has prepared them.", {}, { timeout: 3_000 })).toBeTruthy();
+    expect(await within(items).findByText("Queued for the worker: 2. Left to prepare: 2. Apply again once the worker has prepared them.")).toBeTruthy();
     expect(within(items).getByText(/^Last apply: Dee A\., .*0 items moved onto their originals, 2 queued for the worker\.$/)).toBeTruthy();
 
     // Again, once the worker has prepared them: moved, and nothing left.
@@ -137,7 +137,7 @@ describe("Storage maintenance", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await within(items).findByText("Applying, 0 of 3 items")).toBeTruthy();
     runsOut();
-    expect(await within(items).findByText("Nothing queued or left to prepare.", {}, { timeout: 3_000 })).toBeTruthy();
+    expect(await within(items).findByText("Nothing queued or left to prepare.")).toBeTruthy();
     view.unmount();
 
     renderAt("/desk/settings/log");

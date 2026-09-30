@@ -64,7 +64,7 @@ describe("an invite's page", () => {
     const code = await screen.findAllByLabelText(/Code/);
     fireEvent.change(code[0]!, { target: { value: "123456" } });
     // A viewer lands on the business's results.
-    expect(await screen.findByText(`Landed on /${OSC}/results`, {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText(`Landed on /${OSC}/results`)).toBeTruthy();
     expect(settingsState().invites.find((i) => i.id === SAM_INVITE)?.acceptedAt).not.toBeNull();
   });
 

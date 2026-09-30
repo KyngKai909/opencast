@@ -106,7 +106,7 @@ describe("setup from a waitlist invite", () => {
     fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
     const code = await screen.findAllByLabelText(/Code/);
     fireEvent.change(code[0]!, { target: { value: "123456" } });
-    await waitFor(() => expect(callSignField().value).toBe("SKAT"), { timeout: 4000 });
+    await waitFor(() => expect(callSignField().value).toBe("SKAT"));
     expect(callSignField().disabled).toBe(true);
   });
 

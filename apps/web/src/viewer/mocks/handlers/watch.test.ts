@@ -1,6 +1,13 @@
 // The viewer's mock for watch data (follow-up Phase 1): the public config's "Not for me" switch,
 // read from the desk's rules, and the vote, in the contract's shapes and the API's words.
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// On the reference's Saturday, 8:42:12 pm, whatever the real time is: the mock clock, as dev:mock
+// runs it. (The vote needs a program airing on BEAT: on the real clock, most of the day nothing is.)
+vi.mock("../../../config", async (importOriginal) => {
+  const { config } = await importOriginal<typeof import("../../../config")>();
+  return { config: { ...config, mock: true, mockClock: "2026-09-27T03:42:12Z" } };
+});
 import { setupServer } from "msw/node";
 import { audienceApi, configApi } from "@opencast/contracts";
 import { now } from "../../../lib/clock";

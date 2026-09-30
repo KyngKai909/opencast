@@ -3,7 +3,7 @@
 // Release, the market switcher, a market lead sent to their own market, and stations on the dial
 // flagged against today's rules.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -21,11 +21,6 @@ import { MOCK_TOKEN_PREFIX } from "../../auth/mockToken";
 import Reserved from "./Reserved";
 
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-// The page loads in two rounds (markets and me, then the reservations and the overview), and the
-// reservation endpoints sit near the end of every area's ~265 mock handlers, which MSW walks one
-// by one: about 100 ms here, about a second on a GitHub runner running files in parallel. The
-// default 1 s findBy/waitFor timeout then fails a test before the page has loaded.
-configure({ asyncUtilTimeout: 5000 });
 const server = setupServer(...handlers);
 beforeAll(() => {
   window.matchMedia ??= ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as never;

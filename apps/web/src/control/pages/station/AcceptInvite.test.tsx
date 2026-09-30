@@ -75,7 +75,7 @@ describe("a station invite's page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Email me a code" }));
     const code = await screen.findAllByLabelText(/Code/);
     fireEvent.change(code[0]!, { target: { value: "123456" } });
-    expect(await screen.findByText("Landed on /control/beat", {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByText("Landed on /control/beat")).toBeTruthy();
     expect(dee().acceptedAt).not.toBeNull();
     expect(getDb().members.some((m) => m.stationId === BEAT.id && m.role === "operator" && m.personId === dee().acceptedBy)).toBe(true);
   });

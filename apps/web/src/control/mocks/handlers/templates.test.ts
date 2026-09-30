@@ -2,7 +2,15 @@
 // Day templates and off air hours on the mocks (G8, G9): BEAT's templates, making, changing and
 // stopping one, the off air hours and their 400, and planned off air kept out of dead air.
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// On the reference's Saturday, 8:42:12 pm, whatever the real time is: the mock clock, as dev:mock
+// runs it. (On the real clock, the sign-off that runs into the off air hours wasn't the one found
+// just after midnight, and never meets them once Pacific time is UTC-8: the fixtures are UTC-7.)
+vi.mock("../../../config", async (importOriginal) => {
+  const { config } = await importOriginal<typeof import("../../../config")>();
+  return { config: { ...config, mock: true, mockClock: "2026-09-27T03:42:12Z" } };
+});
 import { setupServer } from "msw/node";
 import { getDb, resetDb } from "../db";
 import { MOCK_TOKEN_PREFIX } from "../../../auth/mockToken";

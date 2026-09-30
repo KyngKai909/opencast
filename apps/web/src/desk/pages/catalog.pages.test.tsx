@@ -2,7 +2,7 @@
 // with its episode, the item that came out and what was rebuilt (02); adding an item and checking
 // it twice, the second time by someone else (03); and Settings' rules, team and change log (desk-pages 04).
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { configure, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -19,10 +19,6 @@ import { setTokenSource } from "../../api/client";
 import { MOCK_TOKEN_PREFIX } from "../../auth/mockToken";
 import Catalog from "./Catalog";
 
-// These pages load through every area's mock handlers, which is slow on CI's runners (see
-// reserved.page.test.tsx): give finds and the longest test more time than the defaults.
-configure({ asyncUtilTimeout: 5000 });
-vi.setConfig({ testTimeout: 20_000 });
 import CatalogItem from "./CatalogItem";
 import CatalogSeries from "./CatalogSeries";
 import Settings from "./Settings";
@@ -125,7 +121,7 @@ describe("adding an item, checked twice", () => {
     }
     await waitFor(() => expect((screen.getByRole("button", { name: "Send for second check" }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Send for second check" }));
-    await waitFor(() => expect(document.body.textContent).toContain("Waiting for a rights reviewer or admin other than Dee A."), { timeout: 3000 });
+    await waitFor(() => expect(document.body.textContent).toContain("Waiting for a rights reviewer or admin other than Dee A."));
     view.unmount();
 
     signInAs("rae@opencast.example");

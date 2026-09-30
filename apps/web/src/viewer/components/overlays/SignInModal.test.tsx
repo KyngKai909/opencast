@@ -91,7 +91,7 @@ describe("sign-in hand-off", () => {
     expect(await screen.findByText("To save CIVC 7.1 as a preset")).toBeTruthy();
     await signInWithCode();
 
-    expect(await screen.findByText("You're signed in.", {}, { timeout: 3000 })).toBeTruthy();
+    expect(await screen.findByText("You're signed in.")).toBeTruthy();
     expect(screen.getByText("2 presets you made before signing in")).toBeTruthy();
     expect(screen.getByText("Two things before you go back to CIVC.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save CIVC 7.1 and go back" }));
@@ -111,7 +111,7 @@ describe("sign-in hand-off", () => {
     renderApp("PREP");
     fireEvent.click(screen.getByRole("button", { name: "Save PREP" }));
     await signInWithCode();
-    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe(`?modal=replace-key&station=${id("PREP")}`), { timeout: 3000 });
+    await waitFor(() => expect(screen.getByTestId("where").textContent).toBe(`?modal=replace-key&station=${id("PREP")}`));
     expect(screen.queryByText("You're signed in.")).toBeNull();
     expect(getDb().presets.some((p) => p.stationId === id("PREP"))).toBe(false);
   });
@@ -123,7 +123,7 @@ describe("sign-in hand-off", () => {
     renderApp("PREP");
     fireEvent.click(screen.getByRole("button", { name: "Save PREP" }));
     await signInWithCode();
-    await waitFor(() => expect(getDb().presets.find((p) => p.stationId === id("PREP"))?.key).toBe(3), { timeout: 3000 });
+    await waitFor(() => expect(getDb().presets.find((p) => p.stationId === id("PREP"))?.key).toBe(3));
   });
 
   it("closing before signing in keeps it on this device, with Undo", async () => {

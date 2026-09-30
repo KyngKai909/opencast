@@ -13,6 +13,13 @@ In each app: `npx tsc -p tsconfig.json --noEmit` and `npx vitest run` (in `apps/
 areas' suites together, and `src/mocks/handlers.test.ts`, which checks the one mock world answers
 each endpoint once). The API: `npm test -w @opencast/api`.
 
+The four web apps' Vitest configs give each test 20 s and their setup files give `findBy` and
+`waitFor` 5 s, for GitHub's slower runners; a file doesn't need its own. A test on the mocks runs
+on the reference's Saturday, 8:42:12 pm, never the real clock: the config's `mockClock` for a whole
+file (`vi.mock` of `config`), or `vi.useFakeTimers({ toFake: ["Date"] })` and `vi.setSystemTime`
+where only some tests need it. On the real clock a test passes at some hours and dates and fails
+at others (PREP's nightly off air, a month's results after the month ends).
+
 ## The mock flows
 
 `npm run e2e` from the root (or `cd e2e && npx playwright test --project <project>`) runs the specs

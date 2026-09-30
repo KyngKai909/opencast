@@ -10,6 +10,7 @@ const { statementsOf } = await import("../../mocks/fixtures/results");
 const { OSC_ID } = await import("../../mocks/fixtures/businesses");
 const { getDb, move } = await import("../../mocks/db");
 const { can } = await import("../../business/abilities");
+const { now } = await import("../../lib/clock");
 
 const $ = (d: number) => Math.round(d * 1_000_000);
 const NOW = new Date("2026-09-27T03:42:12Z");
@@ -86,7 +87,10 @@ describe("results by period", () => {
     const colton = getDb().spots.find((s) => s.title === "Now open in Colton")!;
     colton.state = "in_rotation";
     move(OSC_ID, { kind: "aired", label: "Aired on BEAT 12.1", amountMicros: -$(4), detail: ":30 spot, 150 tuned in, $4.00 an airing" });
-    const r = buildResults(OSC_ID, rangeFor(q(""), OSC_ID, new Date(Date.now() + 1)), new Date(Date.now() + 1));
+    // Just after the airing, on the mock clock that stamped it. (On the real date, from October 1
+    // "this month" was October, without the September airing.)
+    const after = new Date(now().getTime() + 1);
+    const r = buildResults(OSC_ID, rangeFor(q(""), OSC_ID, after), after);
     expect(r.bySpot.find((s) => s.title === "Now open in Colton")?.airings).toBe(1);
   });
 });
