@@ -96,7 +96,9 @@
 .oc-banner {
   left: calc(96 * var(--u)); right: calc(96 * var(--u)); bottom: calc(54 * var(--u));
   padding: calc(34 * var(--u)) calc(40 * var(--u)) calc(26 * var(--u));
-  display: grid; grid-template-columns: calc(380 * var(--u)) minmax(0, 1fr) calc(260 * var(--u)); gap: calc(44 * var(--u));
+  /* The reference's 380 and 260 are minimums: a longer call sign (RETRO) or channel (99.2) widens its
+     column instead of running into the program's name. */
+  display: grid; grid-template-columns: minmax(calc(380 * var(--u)), max-content) minmax(0, 1fr) minmax(calc(260 * var(--u)), max-content); gap: calc(44 * var(--u));
 }
 .oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; }
 .oc-banner__ch {

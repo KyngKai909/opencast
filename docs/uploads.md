@@ -71,14 +71,20 @@ The STOP demo (`npm run demo:uploads -w @opencast/api -- --s3`, below) sends a 4
 
 ## CORS
 
-The browser `PUT`s parts to the bucket from the apps' origins, and must read each answer's `ETag`.
+Two rules. **Playback:** every player (the web app, TV mode and the Cast receiver on their own origin, the phone apps' `capacitor://localhost` and `https://localhost`, local development) reads segments with `fetch`/XHR, so `GET` and `HEAD` are open to any origin; the segments are public anyway. **Uploads:** the browser `PUT`s parts from the apps' origins only, and must read each answer's `ETag`. (Until 2026-09-30 this page had only the upload rule, which left TV mode on Stand by: its origin couldn't read the segments.)
 
-**Cloudflare R2** (dashboard: R2 → the bucket → Settings → CORS Policy → Add CORS policy; the dashboard takes this shape):
+**Cloudflare R2** (dashboard: R2 → the bucket → Settings → CORS Policy → Edit; the dashboard takes this shape). For `opencast-staging`:
 
 ```json
 [
   {
-    "AllowedOrigins": ["https://<the web app's origin>", "https://<the business app's origin>"],
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 86400
+  },
+  {
+    "AllowedOrigins": ["https://opencast-web.vercel.app", "https://opencast-business.vercel.app", "http://localhost:5173", "http://localhost:5174", "http://localhost:5177", "http://localhost:5181"],
     "AllowedMethods": ["PUT", "GET", "HEAD"],
     "AllowedHeaders": ["content-type"],
     "ExposeHeaders": ["ETag"],
@@ -87,21 +93,9 @@ The browser `PUT`s parts to the bucket from the apps' origins, and must read eac
 ]
 ```
 
-**The Railway bucket** (staging), through the S3 API: `npm run storage:uploads-bucket -w @opencast/api -- --apply` with staging's variables (`railway run -s api -- …`), or `aws s3api put-bucket-cors --endpoint-url "$R2_ENDPOINT" --bucket "$R2_BUCKET" --cors-configuration file://cors.json` with:
+For `opencast-production`, the same with production's web and business origins in the second rule, and no localhost.
 
-```json
-{
-  "CORSRules": [
-    {
-      "AllowedOrigins": ["https://<staging's web app origin>", "https://<staging's business app origin>", "http://localhost:5174", "http://localhost:5177"],
-      "AllowedMethods": ["PUT", "GET", "HEAD"],
-      "AllowedHeaders": ["content-type"],
-      "ExposeHeaders": ["ETag"],
-      "MaxAgeSeconds": 3600
-    }
-  ]
-}
-```
+Through the S3 API instead: `npm run storage:uploads-bucket -w @opencast/api` prints the same rules from `APP_ORIGIN`, `BUSINESS_ORIGIN` and `UPLOAD_CORS_ORIGINS`, and `-- --apply` sends them (needs an Admin Read & Write token; see above).
 
 If the Railway bucket refuses `PutBucketCors` (the script says so, and changes nothing), set the rule in the bucket's settings in Railway, or ask Railway. Uploads fail in the browser without it (Uppy logs "Could not read the ETag header").
 

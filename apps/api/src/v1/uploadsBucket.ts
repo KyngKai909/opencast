@@ -1,8 +1,10 @@
 // What the bucket needs for direct uploads (added 2026-09-30, follow-up Phase 4; docs/uploads.md):
 //
-// - CORS: browsers PUT parts straight to the bucket from the apps' origins, and read each part's
-//   `ETag` from the answer (Uppy completes the upload with them), so `PUT` is allowed and `ETag`
-//   exposed. `GET` and `HEAD` are there for the presigned reads the apps already make.
+// - CORS, two rules. Playback: every player reads segments with fetch/XHR (hls.js), from wherever
+//   it runs (the web app, TV mode and the Cast receiver on its own origin, the phone apps'
+//   capacitor://localhost and https://localhost, local development), so `GET` and `HEAD` are open
+//   to any origin; the segments are public anyway. Uploads: browsers PUT parts straight to the
+//   bucket from the apps' origins only, and read each part's `ETag` (Uppy completes with them).
 // - Lifecycle: multipart uploads nobody finished are aborted after a day (their parts cost storage
 //   until then), and anything left at a staging key (`uploads/…`) goes after a week. The jobs tick
 //   aborts abandoned uploads too; this is the store's own backstop.
@@ -22,6 +24,8 @@ export function uploadOrigins(env: NodeJS.ProcessEnv): string[] {
 /** The CORS rules, in the S3 API's shape (R2 and Railway buckets take the same). */
 export function uploadCorsRules(origins: string[]): CORSRule[] {
   return [
+    // Playback, from any origin (a rule for uploads alone once left TV mode on Stand by).
+    { AllowedOrigins: ["*"], AllowedMethods: ["GET", "HEAD"], AllowedHeaders: ["*"], MaxAgeSeconds: 86400 },
     {
       AllowedOrigins: origins,
       AllowedMethods: ["PUT", "GET", "HEAD"],
