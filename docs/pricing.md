@@ -9,7 +9,7 @@ These prices are the rules registry's first set versions, from **October 1, 2026
 | Usage | Unit | Cost to Opencast | Margin | Price | Rule |
 |---|---|---|---|---|---|
 | **Storage**, originals and prepared segments together | GB a month (each day's GB, averaged over the month) | **$0.018** (for review) | **$0.022**, 55% of the price (for review) | **$0.04** (for review) | `prices.storage` |
-| **Relays, everything a station airs** | hour relayed, per station, however many platforms | **$0.085** to one platform, **$0.15** to two, **$0.22** to three (for review) | **$0.115** (58%) at one platform, **$0.05** at two, **−$0.02** at three (for review) | **$0.20** (for review) | `prices.relay_everything` |
+| **Relays, everything a station airs** | hour relayed, per station, however many platforms | **$0.085** on Railway with Livepeer splitting it, whatever the number of platforms, *if* Livepeer doesn't charge the split (unconfirmed; **$0.415** if it does). **$0.013 to $0.016** on a Hetzner server (recommendation 1) (for review) | **$0.115** (58%) today; **−$0.215** if Livepeer charges; **$0.034 to $0.037** (about 70%) at recommendation 2's $0.05 on Hetzner (for review) | **$0.20** today; **$0.05** proposed (recommendation 2) (for review) | `prices.relay_everything` |
 | **Live hours** through Livepeer (ingest and transcoding) | hour live | **$0.48**, flat, whatever the audience (since 2026-09-30: viewers play the worker's copies from R2; for review) | **$0.27**, 36% (for review) | **$0.75** (for review) | `prices.live_hours` |
 | Radio live through the worker's own ingest (not Livepeer) | hour live | **about $0.002** (for review) | none | **Free** (Open, for review) | `prices.radio_live` |
 | Relays, live shows only (Phase 3) | | a relay's cost, only while live | none | **Free** | none |
@@ -25,13 +25,32 @@ These prices are the rules registry's first set versions, from **October 1, 2026
 - Preparing is once per file and isn't billed on its own, so its cost is spread over the storage it makes: the TV ladder takes 2.0 vCPU-hours per media hour at $0.0278 = $0.056, and makes 4.8 GB, so **$0.0116 a GB**; writing its segments (4,500 per media hour at $4.50 a million) is **$0.0042 a GB**. Spread over six months kept, **$0.0026 a GB-month**.
 - Together about **$0.0176**, rounded to $0.018. On the radio band preparing costs a little more per GB (0.06 vCPU-hours for 0.1 GB) but the files are 48 times smaller.
 
-**Relays, $0.085 an hour to one platform** (for review):
+**Relays, $0.085 an hour today** (for review; updated 2026-09-30 after follow-up Phases 3 to 6):
 
-- CPU: 0.55 vCPU composited (the station bug drawn in) × $0.0278 = **$0.015**.
+Since Phase 3, a station's relay is **one push**, from the relay service (`apps/relay`, on Railway) to the station's Livepeer relay stream, which sends it on to every platform. So the cost no longer grows with the number of platforms. Per station per relayed hour, composited (the station bug drawn in):
+
+- CPU: 0.55 vCPU × $0.0278 = **$0.015** (stream-copied, with no bug, about $0.001).
 - Memory: 0.25 GB × $10 a GB-month ÷ 730 = **$0.0034**.
-- Egress: 2.93 Mbps nominal is 1.32 GB an hour × $0.05 = **$0.066**, for each platform (the picture is composited once and sent to each).
-- So $0.085 to one platform, $0.15 to two, $0.22 to three. The price is per station however many platforms (the prompt's rule), so three or more platforms lose money at $0.20 (for review). A radio station's relay is a still picture at 400 kbps: about $0.017 an hour to one platform.
-- **Phase 3 (2026-09-30)**: the relay service sends **one** push per station, and Livepeer's multistream splits it to every platform, so on Railway a relay costs about **$0.085 an hour whatever the number of platforms**, *if* Livepeer doesn't charge a stream with no transcoding profiles (not confirmed: docs/relay.md). If it does ($0.33 an hour, like transcoding), about **$0.415**, a loss at $0.20; the fallback (`RELAY_FAN_OUT=direct`, the relay pushing to each platform) is the table above. On a Hetzner US server, about **$0.013 to $0.016** an hour either way with `direct` (for review).
+- Egress, the one push: 2.93 Mbps is 1.32 GB an hour × Railway's $0.05 = **$0.066**. This is almost all of it.
+- Reading the channel's segments: from R2 (Phase 4 onward), no egress and 900 reads an hour, **under $0.001**.
+- **About $0.085 an hour, however many platforms**, on one condition: that Livepeer doesn't charge for a stream with no transcoding (`profiles: []`). That isn't confirmed (docs/relay.md, "Livepeer's billing"). If Livepeer charges it like transcoding ($0.33 an hour), it's **about $0.415**, and every relayed hour loses **$0.215** at $0.20. The fallback, `RELAY_FAN_OUT=direct` (the relay pushes to each platform itself), costs $0.085 to one platform, $0.151 to two and $0.217 to three on Railway.
+- A radio station's relay is a still picture at 400 kbps: about $0.017 an hour.
+- "Live shows only" relays stay free: Livepeer sends the live source's own stream to the platforms, and nothing runs on our side.
+
+**Recommendation 1: run the relay on a Hetzner US server, with `direct`** (not done; for review):
+
+- Egress is almost free there: 1 TB included, about $1.20 a TB beyond, against Railway's $50 a TB. A push around the clock is about **$1.20 a station-month instead of $48**.
+- With `direct`, Livepeer isn't in the relay path at all, so its billing question no longer matters.
+- **About $0.013 an hour to one platform, $0.014 to two and $0.016 to three** (docs/relay.md, "The cost difference").
+- The catch is a fixed server: about $0.02 a vCPU-hour, and a 4-vCPU server runs about 6 composited stations around the clock (more stream-copied), paid whether it's busy or not. The per-hour figure assumes it's kept reasonably full; with few relays, a smaller server. Check Hetzner's current prices before choosing.
+- Moving is a handover, not a rebuild: the same image and variables, then Railway's relay goes to 0 replicas (docs/relay.md, "Moving it to a cheap-bandwidth host").
+
+**Recommendation 2: charge less for relays** (not done; for review; only once recommendation 1 is done):
+
+- **$0.05 an hour** per station, however many platforms: about **$0.034 to $0.037 of margin (about 70%)** on Hetzner. Around the clock that's $36.50 a month instead of $146.
+- **Or a flat monthly price** for "Everything I air" around the clock, for example **$25 a station-month**, against about $12 of cost on Hetzner (a margin of about 53%). Easier to understand, and cheaper than hourly for stations that relay most of the day.
+- **On Railway, $0.05 would lose money** ($0.035 an hour with a free Livepeer split, $0.365 if charged), so recommendation 2 waits for recommendation 1.
+- Both are rules in the registry (`prices.relay_everything`, with an effective date), so either is a desk change, not a deploy. A flat monthly price needs a new rule shape (for review).
 
 **Live hours, $0.48 an hour, flat** (for review; since 2026-09-30):
 
@@ -63,7 +82,17 @@ The Phase 2 STOP demo (`npm run demo:billing -w @opencast/api`, checked by `apps
 | BEAT 12.1 | 40 GB kept (30 over), relays to YouTube and Twitch 6 hours a day (186 hours, counted once), 10 live hours (5 over) | **$42.15**: $1.20 + $37.20 + $3.75, all from its earnings |
 | REEL 24.1 | 25 GB kept (15 over), relays around the clock (744 hours) | **$149.40**: $0.60 + $148.80; its card was declined, so the grace period |
 
-And a busy TV station as Phase 5 assumed it (300 hours kept prepared, 1,440 GB; a translator around the clock; 20 live hours): $57.20 + $146.00 + $11.25 = **$214.45** a month, against about $96.50 of cost.
+And a busy TV station as Phase 5 assumed it (300 hours kept prepared, 1,440 GB; a relay to one platform around the clock, 730 hours; 20 live hours), costs worked out on 2026-09-30:
+
+| | What it pays | What it costs Opencast | Margin |
+|---|---|---|---|
+| **Today** (relay on Railway, Livepeer split free) | $57.20 + $146.00 + $11.25 = **$214.45** | $25.92 + $62.05 + $9.60 = **$97.57** | $116.88 |
+| Today, if Livepeer charges the split | **$214.45** | $25.92 + $302.95 + $9.60 = **$338.47** | **−$124.02** |
+| **Recommendation 1** (relay on Hetzner, `direct`) | **$214.45** | $25.92 + $9.49 + $9.60 = **$45.01** | $169.44 |
+| **Recommendations 1 and 2** ($0.05 an hour) | $57.20 + $36.50 + $11.25 = **$104.95** | **$45.01** | $59.94 |
+| Recommendations 1 and 2 (flat $25 a month) | $57.20 + $25.00 + $11.25 = **$93.45** | **$45.01** | $48.44 |
+
+So recommendation 1 alone cuts the relay's cost by about 85% and removes the Livepeer risk; recommendation 2 passes most of that saving on to stations. The other examples at recommendation 2's $0.05: BEAT's 186 relay hours would be $9.30 instead of $37.20, and REEL's 744 hours $37.20 instead of $148.80 (or $25 flat).
 
 ## How billing works
 

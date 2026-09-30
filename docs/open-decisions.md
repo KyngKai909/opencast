@@ -232,7 +232,7 @@ Being on air is free; a station pays for storage, relays of everything it airs a
 | Decision | Where it lives | Default |
 |---|---|---|
 | Storage price (originals and prepared segments together, GB a month, each day's GB averaged) | `prices.storage.perGbMonthMicros` | $0.04 from 2026-10-01 (cost about $0.018); not set before |
-| Relays of everything a station airs (per hour, per station, however many platforms) | `prices.relay_everything.perHourMicros` | $0.20 from 2026-10-01 (cost $0.085 to one platform, $0.15 to two, $0.22 to three: three or more lose money) |
+| Relays of everything a station airs (per hour, per station, however many platforms) | `prices.relay_everything.perHourMicros` | $0.20 from 2026-10-01 (cost about $0.085 an hour on Railway however many platforms, since Phase 3's one push, if Livepeer doesn't charge its split; $0.415 if it does). Proposed: relay on a Hetzner server ($0.013 to $0.016) and $0.05 an hour or a flat monthly price (docs/pricing.md, recommendations 1 and 2) |
 | Live hours through Livepeer | `prices.live_hours.perHourMicros` | $0.75 from 2026-10-01 (cost $0.33 plus $0.03 a viewer-hour; $0.48 at 5 viewers) |
 | Radio live through the worker's own ingest (not Livepeer): billed, or free? | `prices.radio_live.perHourMicros`, its own usage type (`radio_live`), metered either way | free ($0; cost about $0.002 an hour) |
 | The free allowance each month | `prices.free_allowance` (`storageGb`, `liveHours`) | 10 GB and 5 live hours (costs Opencast about $2.58 a station a month) |
