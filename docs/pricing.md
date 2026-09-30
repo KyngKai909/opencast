@@ -44,6 +44,13 @@ These prices are the rules registry's first set versions, from **October 1, 2026
 
 **Radio live**: the worker's own ingest encodes AAC at 128 and 64 kbps (about 0.06 vCPU per live hour, $0.002), and its segments are stored with everything else. Free, and kept as its own usage type so it can be priced later (Open).
 
+**Being on air, free to the station** (what it costs Opencast; for review):
+
+- **Viewers**: segments come straight from R2, which charges no egress, only reads: at 4-second segments a viewer-hour is 900 reads at $0.36 a million, **about $0.0003** (and R2's first 10 million reads a month are free). The playlists come from the worker on Railway: a refresh every segment, a few KB each, about 2 MB a viewer-hour at $0.05 a GB, **under $0.0001**. So 1,000 viewer-hours cost about **$0.40**, on any station, prerecorded or live.
+- **Uploads** go from the browser straight to R2 (follow-up Phase 4): nothing passes through Railway, so there's no Railway egress for them, and a file already on the platform is stored once.
+- **External stations** (follow-up Phase 6): one small request per listing a minute, and a schedule feed read hourly; nothing stored or served.
+- **Before production**: `R2_PUBLIC_BASE` on staging is the bucket's `r2.dev` address, which Cloudflare rate-limits and meant for development. Production should have a custom domain on the bucket (docs/deploy.md, step 3), which Cloudflare's cache sits in front of, saving reads too; without one, files go out by signed URLs.
+
 **Card fees**: Stripe's 2.9% + 30¢ on a usage charge comes out of the price, not on top ($0.59 on a $10 charge). Stripe won't charge less than **$0.50**, so a smaller amount waits for the next month's bill.
 
 ## What a month costs
@@ -60,7 +67,7 @@ And a busy TV station as Phase 5 assumed it (300 hours kept prepared, 1,440 GB; 
 
 ## How billing works
 
-- **Measured daily** (UTC), by the jobs: storage once an hour (what's kept at the time: every file a station's items, caption tracks and relay background point at, once each, plus the segments prepared from them); relay hours from `translator_sessions` (per station: sessions at the same time count once); live hours from the as-run log's `live` rows (a TV station's are Livepeer's, transcoded there and copied once into R2; a radio station's are its own type). Independent stations and studios pay; claimable stations (Opencast runs them), listed city streams and the catalog station don't (Open).
+- **Measured daily** (UTC), by the jobs: storage once an hour (what's kept at the time: every file a station's items, caption tracks and relay background point at, once each, plus the segments prepared from them); relay hours from `translator_sessions` (per station: sessions at the same time count once); live hours from the as-run log's `live` rows (a TV station's are Livepeer's, transcoded there and copied once into R2; a radio station's are its own type). Independent stations and studios pay; claimable stations (Opencast runs them) and the catalog station don't (Open). External stations (follow-up Phase 6) never use any of it: nothing is stored, relayed or transcoded for them, since viewers play the source's own stream.
 - **Accrued** each day as a `usage` entry, after the free allowance (used first, from the 1st), at that day's price, and never past the station's cap.
 - **Paid from earnings first**: before every payout (weekly by default) and when the month closes. What earnings don't cover is charged at month end to the **funding source**: the owner's linked Clear wallet if Clear gave Opencast full access (the owner approves the transfer on Clear's page), otherwise the card saved for the station (an off-session charge through Stripe). The owners can choose one instead.
 - **Grace**: nothing to charge (no card, a declined card, a Clear payment not approved) starts a **14-day** grace period (`billing.grace`, Open). The owners are told on the day, 3 days before the end, and when relays and live shows pause. The channel never pauses. Paying (a new card, "Pay now", or from Clear) brings them back at once.
