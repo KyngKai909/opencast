@@ -77,15 +77,19 @@ export function useWatch(stationRef: string | undefined) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playingId, engineChannels, navigate]);
 
-  // Arrow keys change channel on this page, and only here.
+  // Arrow keys change channel on this page, and only here; the space bar (or k) pauses and resumes.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const toggle = e.key === " " || e.key === "k";
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && !toggle) return;
       if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest('[role="dialog"], [role="radiogroup"], [role="menu"], [role="listbox"], [role="tablist"]'))) return;
+      // Space on a focused button or link presses it; leave that alone.
+      if (toggle && t && t.closest("button, a, [role='button'], [role='slider']")) return;
       e.preventDefault();
-      engine.handle({ type: "channel", dir: e.key === "ArrowUp" ? "up" : "down" }, { input: "keyboard" });
+      if (toggle) engine.handle({ type: "togglePlay" }, { input: "keyboard" });
+      else engine.handle({ type: "channel", dir: e.key === "ArrowUp" ? "up" : "down" }, { input: "keyboard" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

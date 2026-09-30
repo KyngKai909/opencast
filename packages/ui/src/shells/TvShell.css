@@ -21,5 +21,8 @@
   pointer-events: none;
 }
 .oc-tv-shell__safe > * { pointer-events: auto; }
-.oc-tv-shell__overlays { position: relative; flex: 1; min-height: 0; }
+/* The overlays fill the safe area but only take clicks where they draw something, so the picture's
+   own buttons ("Tap for sound", "Back to live") stay reachable with a mouse. */
+.oc-tv-shell__safe > .oc-tv-shell__overlays { position: relative; flex: 1; min-height: 0; pointer-events: none; }
+.oc-tv-shell__overlays > * { pointer-events: auto; }
 .oc-tv-shell__hints { flex: none; display: flex; gap: 40px; align-items: center; font-size: 22px; color: var(--ink-70); }

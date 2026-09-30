@@ -138,3 +138,11 @@ describe("the iPhone bridge", () => {
     expect(dispatch.mock.calls[0]).toEqual([{ type: "info" }, { input: "bridge", who: "Kai's iPhone" }]);
   });
 });
+
+describe("a computer's keyboard in TV mode", () => {
+  it("pauses and resumes with the space bar or k on the picture, not in the guide or menus", () => {
+    expect(commandForKey(key(" "), "tv")).toEqual({ type: "togglePlay" });
+    expect(commandForKey(key("k"), "tv")).toEqual({ type: "togglePlay" });
+    expect(commandForKey(key(" "), "tv", "overlay")).toBeNull();
+  });
+});

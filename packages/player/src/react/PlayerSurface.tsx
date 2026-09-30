@@ -47,6 +47,21 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
   const [codeLift, setCodeLift] = useState<number | null>(null);
 
   const dock = usePlayerDock();
+
+  // Sound refused until the viewer does something: the first click, tap or key anywhere turns it
+  // on (browsers count any of them), not only the "Tap for sound" button, which a TV's overlays or
+  // a remote can't reach.
+  useEffect(() => {
+    if (!s.mutedByBrowser) return;
+    const on = () => engine.setMuted(false);
+    const opts = { capture: true } as const;
+    window.addEventListener("pointerdown", on, opts);
+    window.addEventListener("keydown", on, opts);
+    return () => {
+      window.removeEventListener("pointerdown", on, opts);
+      window.removeEventListener("keydown", on, opts);
+    };
+  }, [s.mutedByBrowser, engine]);
   useEffect(() => {
     if (stage.current) engine.attach(stage.current);
     // Leaving the page hands the videos back to the dock: the sound carries on.

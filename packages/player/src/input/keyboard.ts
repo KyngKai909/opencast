@@ -69,6 +69,8 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
     if (key === "ArrowLeft") return { type: "presets" };
     return { type: "guide" };
   }
+  // A computer's keyboard in TV mode: the space bar (or k) pauses and resumes, on the picture only.
+  if ((key === " " || key === "k") && where === "picture") return { type: "togglePlay" };
   const mapped = TV_KEYS[key];
   if (mapped === "ok") return { type: "select" };
   if (mapped && where === "overlay" && mapped.type === "back") return mapped;
