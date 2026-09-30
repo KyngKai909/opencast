@@ -79,7 +79,10 @@ async function tour(page: Page, path: string, heading: string | RegExp, level = 
   await page.goto(path);
   await expect(page.getByRole("heading", { level }).filter({ hasText: heading }).first()).toBeVisible();
   await page.waitForLoadState("networkidle");
-  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0);
+  // Every read is in. The player is left out: it stays busy while it tunes, and here the station's
+  // output never arrives (nothing assembles a playlist with the API's jobs off), so the Monitor's
+  // program picture keeps tuning behind its title card.
+  await expect(page.locator('[aria-busy="true"]:not(.oc-player)')).toHaveCount(0);
   for (const m of [...new Set(misses)]) test.info().annotations.push({ type: "api-miss", description: m });
   expect(errors, "page errors").toEqual([]);
   await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
