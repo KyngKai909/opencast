@@ -23,9 +23,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+# No RELAY_PORT here: the health endpoint listens on the host's PORT (Railway sets it), else 8789.
 ENV NODE_ENV=production \
-    RELAY_SCRATCH_DIR=/tmp/opencast-relay \
-    RELAY_PORT=8789
+    RELAY_SCRATCH_DIR=/tmp/opencast-relay
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
