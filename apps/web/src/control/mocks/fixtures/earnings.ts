@@ -587,7 +587,7 @@ export function statementCsv(s: Statement, callSign: string): { filename: string
       rows.push([l.group ?? "", l.label, "", "airing", when.toISOString(), l.averageTunedIn ?? "", (share / 100).toFixed(2)]);
     }
   });
-  rows.push(["total", s.paidOn ? "Paid out" : "Total", s.destination ?? "", "", s.paidOn ?? "", "", dollars(s.lines.reduce((a, l) => a + l.amountMicros, 0))]);
+  rows.push(["total", s.paidOn ? "Paid out" : "Total", s.destination ?? "", "", s.paidOn ?? "", "", dollars(s.lines.reduce((a, l) => a + (l.includedAbove ? 0 : l.amountMicros), 0))]);
   return { filename: `${callSign}-statement-week-of-${s.periodStart}.csv`, csv: rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n" };
 }
 

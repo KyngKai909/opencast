@@ -1,0 +1,51 @@
+/* Settings, Station account, pay-as-you-go: ruled sections (.sec-top), a usage table set like the
+   earnings rows (.row2: title and detail on the left, mono amounts on the right), cap rows with
+   their actions at the end, the options list, and the card form's stand-in. Rules, not boxes. */
+.cc-usage { max-width: 680px; }
+.cc-usage > section { margin-top: 28px; }
+.cc-usage > section:first-of-type { margin-top: 0; }
+.cc-usage__standing { margin-bottom: 20px; }
+.cc-usage .cc-readonly { margin-bottom: 20px; }
+.cc-usage__standing + .cc-error { margin: -8px 0 20px; }
+
+.cc-usage__table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cc-usage__table th, .cc-usage__table td { padding: 12px 0; border-bottom: 1px solid var(--hair); vertical-align: top; }
+.cc-usage__table thead th { padding: 8px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); text-align: right; }
+.cc-usage__table thead th:first-child { text-align: left; }
+.cc-usage__table tbody th { text-align: left; font-weight: 400; padding-right: 16px; }
+.cc-usage__table tbody th b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.cc-usage__table tbody th small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-70); line-height: 1.45; }
+.cc-usage__table td { width: 112px; text-align: right; font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cc-usage__table td + td { padding-left: 12px; }
+.cc-usage__total th, .cc-usage__total td { border-top: 2px solid var(--ink); border-bottom: 0; font-size: 15px; }
+.cc-usage__total th { font-weight: 600 !important; }
+
+.cc-usage__tag { margin-left: 6px; vertical-align: 1px; }
+.cc-usage__rows { list-style: none; margin: 0; padding: 0; }
+.cc-usage__capend { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.cc-usage__capend .cc-row__val { margin-right: 4px; }
+.cc-usage__capform { display: inline-flex; align-items: center; gap: 8px; }
+.cc-usage__capform .oc-field { width: 120px; }
+
+.cc-usage__choice { margin-top: 4px; }
+.cc-usage__choice + .oc-kvrows { margin-top: 6px; }
+.cc-usage__label { margin: 14px 0 4px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); }
+.cc-usage__note { margin: 10px 0 0; font-size: 13px; color: var(--ink-70); line-height: 1.45; max-width: 60ch; }
+
+/* The card form (a modal on the web, a sheet on the phone). */
+.cc-card { display: grid; gap: 12px; }
+.cc-card__quiet { min-height: 120px; }
+.cc-card__stripe { min-height: 120px; }
+.cc-card__standin { padding: 16px; border: 1px dashed var(--line); border-radius: var(--r-control); }
+.cc-card__standin b { display: block; font-size: 15px; font-weight: 600; }
+.cc-card__standin p { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-70); line-height: 1.45; }
+.cc-card__error { margin: 0; font-size: 13px; font-weight: 600; color: var(--standby); }
+.cc-card__note { margin: 0; font-size: 12.5px; color: var(--ink-50); line-height: 1.45; }
+
+@media (max-width: 767px) {
+  .cc-usage { max-width: none; padding-top: 16px; }
+  .cc-usage .cc-sec-top { flex-wrap: wrap; row-gap: 2px; }
+  .cc-usage__table td { width: 84px; font-size: 13px; }
+  .cc-usage .cc-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .cc-usage__capend { justify-content: flex-start; }
+}

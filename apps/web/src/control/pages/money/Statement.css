@@ -1,5 +1,7 @@
 /* A weekly statement (earnings 03.1: .split 1fr 1fr, .sec-top, .row2). */
 .cc-stmt__split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.cc-stmt__split--one { grid-template-columns: minmax(0, 1fr); max-width: 680px; }
+.cc-stmt__note { margin: 10px 0 0; font-size: 13px; color: var(--ink-70); line-height: 1.45; }
 .cc-stmt__error { margin: 0 0 16px; padding: 12px 0; color: var(--ink-70); border-top: 1px solid var(--line); }
 @media (max-width: 900px) {
   .cc-stmt__split { grid-template-columns: minmax(0, 1fr); gap: 22px; }

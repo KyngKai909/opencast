@@ -1,5 +1,8 @@
 /* Monitor (master-control A.7 .mon, .rd, .cd, .health; rights 05.2 .run-by) and the phone (P.1 .pm-*). */
 .cc-mon { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; }
+/* The station account's banner (pay-as-you-go: in grace or paused), above the picture. */
+.cc-mon__banner { margin-bottom: 16px; }
+.cc-pm__banner { margin: 12px 16px; }
 .cc-mon__lbl { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); }
 .cc-mon__rundown { margin-top: 16px; }
 .cc-mon__pv { opacity: .85; }

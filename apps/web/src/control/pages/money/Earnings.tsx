@@ -10,6 +10,7 @@ import { ledgerApi } from "@opencast/contracts";
 import { Button, ControlTitle, KeyValueList, Segmented, money } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
 import { ClearAccount } from "../../components/earnings/ClearAccount";
+import { AccountBanner } from "../../components/account/AccountBanner";
 import { earningsSections, heldTonightDetail, payoutDetail, phoneRows, plural } from "../../components/earnings/lines";
 import { MoveToBank } from "../../components/earnings/MoveToBank";
 import { earningsPeriodLabel, earningsRange, earningsShortLabel, earningsTotalLabel, isEarningsPeriod, weekdayOf, type EarningsPeriod } from "../../components/earnings/periods";
@@ -49,6 +50,7 @@ export default function Earnings() {
           <h1 className="cc-earn-phone__h">Earnings</h1>
           <span className="cc-earn-phone__period">{label}</span>
         </div>
+        <AccountBanner className="cc-earn__banner" />
         <div className="cc-earn-phone__main">
           {earnings.isLoading ? (
             <Quiet />
@@ -98,6 +100,7 @@ export default function Earnings() {
           />
         }
       />
+      <AccountBanner className="cc-earn__banner" />
       {earnings.isLoading ? (
         <Quiet />
       ) : !e ? (

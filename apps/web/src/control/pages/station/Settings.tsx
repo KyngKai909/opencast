@@ -54,6 +54,10 @@ function lede(id: string, s: StationState, phone: boolean) {
       return <TeamLede s={s} />;
     case "notifications":
       return phone ? undefined : s.studio ? `What you hear about ${cs}. Each person on the team sets their own.` : `What you hear about ${cs}. Each person on the team sets their own. Dead-air warnings are always on.`;
+    case "account":
+      return s.studio
+        ? `${cs} pays only for what it uses past the free allowance, mostly storage, from its earnings first.`
+        : `Being on air is free. ${cs} pays only for storage, relays of everything it airs and live hours, from its earnings first.`;
     case "ownership":
       return `Hand ${cs} to someone on the team, or sign it off for good.`;
     default:

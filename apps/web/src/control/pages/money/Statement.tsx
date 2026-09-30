@@ -10,7 +10,7 @@ import { Button, ControlTitle, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import { saveText } from "../../components/earnings/download";
-import { statementSections, statementSubtitle, statementTitle } from "../../components/earnings/lines";
+import { statementSections, statementSubtitle, statementTitle, statementTotal } from "../../components/earnings/lines";
 import { MoneyRows, Section } from "../../components/earnings/Section";
 import { useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
@@ -56,16 +56,20 @@ export default function Statement() {
   const sections = statementSections(st);
   const left = sections.filter((x) => x.column === "left");
   const right = sections.filter((x) => x.column === "right");
-  const total = { title: st.paidOn ? "Paid out" : "Total", amount: st.lines.reduce((a, l) => a + l.amountMicros, 0) };
-  const column = (secs: typeof sections, withTotal: boolean) => (
-    <div className="cc-stmt__col">
+  // Lines shown for reference (a usage section's types) aren't counted in the total.
+  const total = { title: st.paidOn ? "Paid out" : "Total", amount: statementTotal(st) };
+  const column = (secs: typeof sections, withTotal: boolean, key: number) => (
+    <div className="cc-stmt__col" key={key}>
       {secs.map((sec, i) => (
         <Section key={sec.key} title={sec.title || undefined} sub={sec.sub}>
           <MoneyRows rows={sec.rows} total={withTotal && i === secs.length - 1 ? total : undefined} />
+          {sec.note && <p className="cc-stmt__note">{sec.note}</p>}
         </Section>
       ))}
     </div>
   );
+  // A monthly statement can have nothing for the left column (no spots, sponsors or pledges of its own).
+  const columns = [left, right].filter((c) => c.length > 0);
 
   return (
     <div className="cc-stmt">
@@ -80,10 +84,7 @@ export default function Statement() {
           ) : undefined
         }
       />
-      <div className="cc-stmt__split">
-        {column(left, right.length === 0)}
-        {right.length > 0 && column(right, true)}
-      </div>
+      <div className={`cc-stmt__split${columns.length === 1 ? " cc-stmt__split--one" : ""}`}>{columns.map((c, i) => column(c, i === columns.length - 1, i))}</div>
     </div>
   );
 }

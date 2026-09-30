@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Statement, StationEarnings } from "@opencast/contracts";
-import { andList, earningsSections, heldTonightDetail, parseAmount, perThousandMicros, phoneRows, pledgesDetail, plural, sponsorsDetail, spotsDetail, statementLineDetail, statementSections, statementSubtitle, statementTitle } from "./lines";
+import { andList, earningsSections, heldTonightDetail, parseAmount, perThousandMicros, phoneRows, pledgesDetail, plural, sponsorsDetail, spotsDetail, statementLineDetail, statementSections, statementSubtitle, statementTitle, statementTotal, usageLineDetail } from "./lines";
 import { airedTimes, sourceLine } from "./audience";
 
 const $ = (d: number) => Math.round(d * 1_000_000);
@@ -121,6 +121,79 @@ describe("statements", () => {
     expect(statementTitle(week)).toBe("Week of September 14");
     expect(statementSubtitle(week)).toBe("Paid Monday, September 21, to Chase ending 2231.");
     expect(statementSubtitle({ ...week, paidOn: null })).toBe("September 14 to September 20.");
+  });
+});
+
+describe("the statement's usage section (pay-as-you-go)", () => {
+  // As the API writes them: each type shown with its units and price (includedAbove), what earnings
+  // paid (counted), and what's still owed (shown).
+  const usage = (label: string, micros: number, u: NonNullable<Statement["lines"][number]["usage"]>): Statement["lines"][number] => ({ label, detail: null, amountMicros: micros ? -micros : 0, notSetYet: false, group: "usage", includedAbove: true, usage: u });
+  const lines: Statement["lines"] = [
+    { label: "Spots", detail: "62 entries", amountMicros: $(135.09), notSetYet: false, group: "spots", airings: 62 },
+    { label: "Pledges", detail: "61 entries", amountMicros: $(374), notSetYet: false, group: "sponsors_pledges" },
+    usage("Storage", $(0.3), { type: "storage", unit: "gb_month", quantity: 9.8, freeQuantity: 2.3, billableQuantity: 7.5, priceMicros: $(0.04) }),
+    { label: "Usage, taken from earnings", detail: "1 entry", amountMicros: -$(9.9), notSetYet: false, group: "usage" },
+    usage("Relays, everything you air", $(8.4), { type: "relay_everything", unit: "hour", quantity: 42, freeQuantity: 0, billableQuantity: 42, priceMicros: $(0.2) }),
+    usage("Live hours", $(1.2), { type: "live_hours", unit: "hour", quantity: 6.6, freeQuantity: 5, billableQuantity: 1.6, priceMicros: $(0.75) }),
+    usage("Radio live", 0, { type: "radio_live", unit: "hour", quantity: 3, freeQuantity: 0, billableQuantity: 3, priceMicros: 0 }),
+    { label: "Usage still owed", detail: "Taken from earnings before the next payout; what earnings don't cover is charged at month end", amountMicros: -$(0.25), notSetYet: false, group: "usage", includedAbove: true },
+    { label: "Paid out", detail: "1 entry", amountMicros: -$(499.19), notSetYet: false, group: "other" }
+  ];
+  const weekly: Statement = {
+    id: "00000000-0000-4000-8000-000000000010",
+    period: "week",
+    periodStart: "2026-10-05",
+    periodEnd: "2026-10-11",
+    openingMicros: 0,
+    closingMicros: 0,
+    lines,
+    issuedAt: "2026-10-12T15:00:00.000Z",
+    csvUrl: "/v1/statements/x/csv",
+    pdfUrl: null,
+    paidOn: "2026-10-12",
+    destination: "Chase ending 2231"
+  };
+
+  it("says each type's units and price", () => {
+    expect(usageLineDetail(lines[2].usage!)).toBe("9.80 GB-months, 2.30 free, at $0.04 a GB-month");
+    expect(usageLineDetail(lines[4].usage!)).toBe("42 hours, at $0.20 an hour");
+    expect(usageLineDetail(lines[5].usage!)).toBe("6.6 hours, 5 free, at $0.75 an hour");
+    expect(usageLineDetail(lines[6].usage!)).toBe("3 hours, free");
+    expect(usageLineDetail({ ...lines[4].usage!, priceMicros: null })).toBe("42 hours, price not set yet");
+  });
+
+  it("a weekly statement: its own section on the right, before Other: the types, what earnings paid, what's still owed", () => {
+    const s = statementSections(weekly);
+    expect(s.map((x) => [x.title, x.column])).toEqual([
+      ["Spots", "left"],
+      ["Sponsors and pledges", "left"],
+      ["Usage", "right"],
+      ["Other", "right"]
+    ]);
+    const u = s.find((x) => x.key === "usage")!;
+    expect(u.sub).toBe("Taken from earnings before the payout");
+    expect(u.note).toBe("Each type is shown with its units and price. Only what was taken from earnings counts in the total.");
+    expect(u.rows.map((r) => [r.title, r.detail, r.amount, !!r.quiet])).toEqual([
+      ["Storage", "9.80 GB-months, 2.30 free, at $0.04 a GB-month", -$(0.3), true],
+      ["Relays, everything you air", "42 hours, at $0.20 an hour", -$(8.4), true],
+      ["Live hours", "6.6 hours, 5 free, at $0.75 an hour", -$(1.2), true],
+      ["Radio live", "3 hours, free", 0, true],
+      ["Usage, taken from earnings", "1 entry", -$(9.9), false],
+      ["Usage still owed", "Taken from earnings before the next payout; what earnings don't cover is charged at month end", -$(0.25), true]
+    ]);
+  });
+
+  it("counts only what earnings paid: usage is deducted before the payout, once", () => {
+    expect(statementTotal(weekly)).toBe($(135.09) + $(374) - $(9.9) - $(499.19));
+  });
+
+  it("a monthly statement: the month's title, and the usage section on its own column", () => {
+    const month: Statement = { ...weekly, period: "month", periodStart: "2026-10-01", periodEnd: "2026-10-31", paidOn: null, lines: lines.filter((l) => l.group === "usage") };
+    expect(statementTitle(month)).toBe("October");
+    expect(statementSubtitle(month)).toBe("October 1 to 31.");
+    const s = statementSections(month);
+    expect(s.map((x) => [x.title, x.column])).toEqual([["Usage", "right"]]);
+    expect(statementTotal(month)).toBe(-$(9.9));
   });
 });
 

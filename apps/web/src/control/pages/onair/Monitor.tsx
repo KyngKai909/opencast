@@ -14,6 +14,7 @@ import { useApi, useApiMutation } from "../../../api/hooks";
 import { LOG_READS, useDeadAir, useLog, usePlayout } from "../../components/onair/data";
 import { monitorOffAirText } from "../../components/onair/offAir";
 import { ProgramPicture } from "../../components/onair/ProgramPicture";
+import { AccountBanner } from "../../components/account/AccountBanner";
 import { logEntryHref, readinessLine } from "../../components/onair/readiness";
 import { breakLine, buildRundown, currentIndex, nextBreak, rundownFrom, type RundownRow } from "../../components/onair/rundown";
 import { broadcastDay, dayClock, monthDay } from "../../components/onair/time";
@@ -230,6 +231,7 @@ export default function Monitor() {
     return (
       <div className="cc-pm">
         {runBy && <div className="cc-pm__sec">{runBy}</div>}
+        <AccountBanner className="cc-pm__banner" />
         {picture}
         {onAir && upNext && (
           <div className="cc-pm__sec cc-pm__next">
@@ -266,6 +268,7 @@ export default function Monitor() {
   return (
     <div className="cc-mon-page">
       <ControlTitle title="Monitor" description={description} end={end} />
+      <AccountBanner className="cc-mon__banner" />
       {signOn.isError && <Notice tone="standby">{signOn.error.message}</Notice>}
       <div className="cc-mon">
         <div>

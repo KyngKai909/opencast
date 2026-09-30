@@ -25,7 +25,7 @@ export function Section({ title, sub, children, className }: { title?: ReactNode
 
 /** Money rows (.row2): the title and detail on the left, the amount in mono on the right; undecided lines at $0.00, "Not set yet". */
 export function MoneyRows({ rows, total }: { rows: MoneyRow[]; total?: { title: string; amount: number } }) {
-  const items: KeyValueRow[] = rows.map((r) => ({ title: r.title, detail: r.detail, amount: r.amount, notSetYet: r.notSetYet }));
+  const items: KeyValueRow[] = rows.map((r) => ({ title: r.title, detail: r.detail, amount: r.amount, notSetYet: r.notSetYet, quiet: r.quiet }));
   if (total) items.push({ title: total.title, amount: total.amount, total: true });
   return <KeyValueList variant="rows" items={items} />;
 }

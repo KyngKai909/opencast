@@ -6,6 +6,7 @@ import { money } from "@opencast/ui";
 import type { Statement, StationEarnings } from "@opencast/contracts";
 import type { StatementGroup, StatementLine } from "../../api/types";
 import { dayOf, weekdayOf, type EarningsPeriod } from "./periods";
+import { priceText, quantityText } from "../account/usage";
 
 export interface MoneyRow {
   key: string;
@@ -13,6 +14,8 @@ export interface MoneyRow {
   detail?: string;
   amount: number;
   notSetYet?: boolean;
+  /** Shown, not counted in the total (a statement's `includedAbove` lines: usage per type, what was charged elsewhere). */
+  quiet?: boolean;
 }
 
 export interface MoneySection {
@@ -137,11 +140,26 @@ const GROUPS: Array<{ group: StatementGroup; title: string }> = [
   { group: "production", title: "Production" },
   { group: "shared", title: "Shared" },
   { group: "card_fees", title: "Card fees" },
+  // Pay-as-you-go (follow-up Phase 2): taken from earnings before the payout.
+  { group: "usage", title: "Usage" },
   { group: "other", title: "Other" }
 ];
 
+/** A usage line's units and price: "38.50 GB-months, 10.00 free, at $0.04 a GB-month"; "168 hours, at $0.20 an hour". */
+export function usageLineDetail(u: NonNullable<StatementLine["usage"]>): string {
+  const free = u.freeQuantity > 0 ? `${u.unit === "gb_month" ? u.freeQuantity.toFixed(2) : Number(u.freeQuantity.toFixed(2)).toLocaleString("en-US")} free` : null;
+  const price = priceText(u.unit, u.priceMicros);
+  return [quantityText(u.unit, u.quantity), free, price === "Free" || price === "Price not set yet" ? price.toLowerCase() : `at ${price}`].filter(Boolean).join(", ");
+}
+
+/** What a statement adds up to: lines shown for reference (`includedAbove`) aren't counted. */
+export function statementTotal(s: Pick<Statement, "lines">): number {
+  return s.lines.reduce((a, l) => a + (l.includedAbove ? 0 : l.amountMicros), 0);
+}
+
 /** A statement line's detail: per-thousand lines show their math ("18 airings, $8.00 per 1,000 tuned in, average 262"). */
 export function statementLineDetail(l: StatementLine): string | undefined {
+  if (l.usage) return usageLineDetail(l.usage);
   if (l.rate && l.airings !== undefined) {
     const airings = plural(l.airings, "airing");
     if (l.rate.kind === "per_airing") return `${airings}, ${money(l.rate.micros)} an airing`;
@@ -158,23 +176,33 @@ export function perThousandMicros(rateMicros: number, airings: number, averageTu
 export interface StatementSection extends MoneySection {
   /** The frame's two columns: spots, sponsors and pledges on the left; the rest on the right. */
   column: "left" | "right";
+  /** A line under the rows (the usage section says what's counted). */
+  note?: string;
 }
 
 /** The statement's lines under their headings. Without groups from the API, one list with no heading. */
 export function statementSections(s: Statement): StatementSection[] {
-  const rowOf = (l: StatementLine, i: number): MoneyRow => ({ key: `${i}`, title: l.label, detail: statementLineDetail(l), amount: l.amountMicros, notSetYet: l.notSetYet });
+  const rowOf = (l: StatementLine, i: number): MoneyRow => ({ key: `${i}`, title: l.label, detail: statementLineDetail(l), amount: l.amountMicros, notSetYet: l.notSetYet, ...(l.includedAbove ? { quiet: true } : {}) });
   if (!s.lines.some((l) => l.group)) return [{ key: "lines", title: "", column: "left", rows: s.lines.map(rowOf) }];
   const out: StatementSection[] = [];
   for (const g of GROUPS) {
-    const lines = s.lines.map((l, i) => ({ l, i })).filter(({ l }) => (l.group ?? "other") === g.group);
+    let lines = s.lines.map((l, i) => ({ l, i })).filter(({ l }) => (l.group ?? "other") === g.group);
     if (!lines.length) continue;
+    // Usage: each type with its units and price, then what earnings paid (counted), then anything charged elsewhere or still owed.
+    if (g.group === "usage") {
+      const rank = (l: StatementLine) => (l.usage ? 0 : !l.includedAbove ? 1 : 2);
+      lines = [...lines].sort((a, b) => rank(a.l) - rank(b.l) || a.i - b.i);
+    }
     const airings = g.group === "spots" ? lines.reduce((a, { l }) => a + (l.airings ?? 0), 0) : 0;
     out.push({
       key: g.group,
       title: g.title,
       sub: airings ? plural(airings, "airing") : undefined,
       column: g.group === "spots" || g.group === "sponsors_pledges" ? "left" : "right",
-      rows: lines.map(({ l, i }) => rowOf(l, i))
+      rows: lines.map(({ l, i }) => rowOf(l, i)),
+      ...(g.group === "usage"
+        ? { sub: "Taken from earnings before the payout", note: "Each type is shown with its units and price. Only what was taken from earnings counts in the total." }
+        : {})
     });
   }
   return out;
@@ -185,9 +213,11 @@ export function statementTitle(s: Pick<Statement, "period" | "periodStart">): st
   return s.period === "week" ? `Week of ${dayOf(s.periodStart)}` : dayOf(s.periodStart).split(" ")[0];
 }
 
-/** "Paid Monday, September 21, to Chase ending 2231." or, before it's paid, "September 21 to 27." */
-export function statementSubtitle(s: Pick<Statement, "paidOn" | "destination" | "periodStart" | "periodEnd">): string {
+/** "Paid Monday, September 21, to Chase ending 2231." or, before it's paid, "September 21 to September 27." (a month: "August 1 to 31.") */
+export function statementSubtitle(s: Pick<Statement, "paidOn" | "destination" | "periodStart" | "periodEnd"> & { period?: Statement["period"] }): string {
   if (s.paidOn) return `Paid ${weekdayOf(s.paidOn)}${s.destination ? `, to ${s.destination}` : ""}.`;
+  // A month's statement (pay-as-you-go's usage): "August 1 to 31."
+  if (s.period === "month" && s.periodStart.slice(0, 7) === s.periodEnd.slice(0, 7)) return `${dayOf(s.periodStart)} to ${Number(s.periodEnd.slice(8, 10))}.`;
   return `${dayOf(s.periodStart)} to ${dayOf(s.periodEnd)}.`;
 }
 

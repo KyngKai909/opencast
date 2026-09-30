@@ -11,3 +11,9 @@
 .cc-earn-phone__h { margin: 0; font: 800 19px var(--font-display); font-stretch: 112%; letter-spacing: -.02em; }
 .cc-earn-phone__period { margin-left: auto; font-size: 13px; color: var(--ink-50); }
 .cc-earn-phone__main { padding: 0 16px 16px; }
+
+/* The station account's banner (pay-as-you-go: in grace or paused), above the lines. */
+.cc-earn__banner { margin-bottom: 16px; }
+@media (max-width: 767px) {
+  .cc-earn__banner { margin: 0 16px 12px; }
+}

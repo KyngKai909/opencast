@@ -244,3 +244,54 @@ test("BEAT's Audience shows watch time and where people left; Offering your prog
   await expect(tape).toContainText("Not enough viewers yet");
   for (const callSign of ["HALL", "SAZN", "CRAT"]) await expect(list).not.toContainText(callSign);
 });
+
+test("Station account: BEAT caps its live hours; HALL's grace period shows on its Monitor; paying what's due (follow-up Phase 2)", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/settings/account");
+
+  // Usage so far this month and the estimate, per type (the mock's September, paid from earnings).
+  const usage = page.getByRole("table", { name: "This month" });
+  await expect(usage.getByRole("row").filter({ hasText: "Relays, everything you air" })).toContainText("$31.39$36.00");
+  await expect(usage.getByRole("row").filter({ hasText: /^Total/ })).toContainText("$34.75$40.41");
+
+  // A cap on live hours: set, and it sticks.
+  const caps = page.getByRole("list", { name: "Caps" });
+  const live = caps.getByRole("listitem").filter({ hasText: /^Live hours/ });
+  await expect(live).toContainText("No cap. At a cap: live shows pause for the rest of the month (station ID and bumpers air instead); your channel stays on air.");
+  await page.getByRole("button", { name: "Set a cap: Live hours" }).click();
+  await page.getByRole("textbox", { name: "Monthly cap for Live hours" }).fill("10");
+  await live.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Live hours is capped at $10.00 a month.")).toBeVisible();
+  await expect(live).toContainText("$2.25 of $10.00 so far.");
+  await page.reload();
+  await expect(page.getByRole("list", { name: "Caps" }).getByRole("listitem").filter({ hasText: /^Live hours/ })).toContainText("$10.00 a month");
+
+  // HALL, which Kai operates, is in its grace period: the Monitor says when relays and live shows
+  // pause, and Station account shows what's due, read-only.
+  await page.goto("/control/hall/monitor");
+  await expect(page.getByText("Relays and live shows pause on October 4")).toBeVisible();
+  await expect(page.getByText("$96.40 is due for August's usage. Your channel stays on air.")).toBeVisible();
+  await page.getByRole("link", { name: "Station account" }).click();
+  await expect(page.getByText("$96.40 is due for August's usage")).toBeVisible();
+  await expect(page.getByText(/Relays and live shows keep going until October 4 \(7 days\), then pause until it's paid\. Your channel stays on air\./)).toBeVisible();
+  await expect(page.getByText("Only owners change caps and what pays, or pay what's due.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pay now" })).toHaveCount(0);
+
+  // The owner's side of it: BEAT put in the same grace period (the mock's switch), then Pay now.
+  await page.evaluate(() => (window as unknown as { ocMock: { setAccountState(s: string, st: string): void } }).ocMock.setAccountState("BEAT", "grace"));
+  await page.goto("/control/beat/settings/account");
+  await expect(page.getByText("$96.40 is due for August's usage")).toBeVisible();
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await expect(page.getByText("Your card was declined. Replace the card to pay it.")).toBeVisible();
+
+  // A new card: no Stripe key on the mocks, so the stand-in saves the test card, and pays at once.
+  await page.getByRole("button", { name: "Replace", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Replace the card" });
+  await expect(dialog.getByText("Stripe's card form goes here")).toBeVisible();
+  await dialog.getByRole("button", { name: "Save test card" }).click();
+  await expect(page.getByText("Visa ending 4242 is saved, and $96.40 is paid. Nothing is due.")).toBeVisible();
+  await expect(page.getByText("$96.40 is due for August's usage")).toHaveCount(0);
+  await page.goto("/control/beat/monitor");
+  await expect(page.getByRole("heading", { name: "Monitor" })).toBeVisible();
+  await expect(page.getByText(/Relays and live shows (pause|are paused)/)).toHaveCount(0);
+});
