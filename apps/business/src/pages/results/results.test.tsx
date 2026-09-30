@@ -28,16 +28,22 @@ describe("the statement page", () => {
 
   it("starts and ends with the balance, returns shown but not added in", () => {
     const rows = balanceRows(asStatement(statementsOf(OSC_ID, NOW)[0]!));
+    // Relay viewers (follow-up Phase 3) are their own line, out of what airings spent; what's still
+    // waiting for YouTube's location data is shown, not added in.
     expect(rows.map((r) => [r.title, r.amount])).toEqual([
       ["Started the month", $(175.6)],
       ["Added", $(500)],
-      ["Spent on airings", -$(248.9)],
+      ["Spent on airings", -$(240.26)],
+      ["Relay viewers, as reported by YouTube", -$(8.64)],
+      ["Relay viewers, waiting for YouTube's location data", $(3.29)],
       ["Returned from short airings", $(1.86)],
       ["Fees", 0],
       ["Balance now", $(426.7)]
     ]);
-    expect(rows[3]!.quiet).toBe(true);
-    expect(rows[5]).toMatchObject({ total: true, detail: "$412.50 available, $14.20 held" });
+    expect(rows[3]!.quiet).toBeFalsy();
+    expect(rows[4]!.quiet).toBe(true);
+    expect(rows[5]!.quiet).toBe(true);
+    expect(rows[7]).toMatchObject({ total: true, detail: "$412.50 available, $14.20 held" });
   });
 });
 

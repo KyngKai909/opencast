@@ -1,5 +1,6 @@
 // Relays (added 2026-09-30, follow-up Phase 3): the Translators page's setting. Owners and
-// operators see and change it (like translators); the cost comes from the Station account.
+// operators see it; only owners change it, since "Everything I air" is billed (A192). The cost comes
+// from the Station account.
 import { relayApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
@@ -12,8 +13,8 @@ export function relaysRoutes(r: RouteRegistrar, { services }: ModuleContext) {
     return relays.view(params.stationId, user, role === "owner");
   });
   r.handle(api.updateRelay, async ({ user, params, body }) => {
-    const role = await accounts.requireStation(user, params.stationId, ["owner", "operator"]);
-    return relays.update(params.stationId, user, body, role === "owner");
+    await accounts.requireStation(user, params.stationId, ["owner"]);
+    return relays.update(params.stationId, user, body, true);
   });
   r.handle(api.listRelayRestarts, async ({ user, params, query }) => {
     await accounts.requireStation(user, params.stationId, ["owner", "operator"]);

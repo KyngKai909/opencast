@@ -14,7 +14,8 @@ import { NotificationsSection } from "../../components/station/settings/Notifica
 import { OwnershipSection } from "../../components/station/settings/OwnershipSection";
 import { TeamLede, TeamSection } from "../../components/station/settings/TeamSection";
 import { RelayBackground } from "../../components/station/RelayBackground";
-import { TranslatorList, TRANSLATOR_NOTE } from "../../components/station/TranslatorList";
+import { TranslatorsPanel } from "../../components/station/TranslatorsPanel";
+import { relayStopsNote, translatorsLede } from "../../components/station/relayWords";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation, type StationState } from "../../station/StationContext";
 import { NotFound } from "../common";
@@ -49,7 +50,7 @@ function lede(id: string, s: StationState, phone: boolean) {
     case "sponsorship":
       return sponsorshipDescription(cs);
     case "translators":
-      return `Relay ${cs} to other services. Opencast is always on; everything here is optional and can be added any time.`;
+      return translatorsLede(cs);
     case "team":
       return <TeamLede s={s} />;
     case "notifications":
@@ -76,8 +77,8 @@ function Body({ id, s, phone }: { id: string; s: StationState; phone: boolean })
     case "translators":
       return (
         <div className="cc-settings__translators">
-          <TranslatorList stationId={s.id} callSign={s.station.callSign ?? s.station.name} canEdit={s.can("programming")} removable phone={phone} />
-          <p className="cc-settings__note">{TRANSLATOR_NOTE}</p>
+          <TranslatorsPanel stationId={s.id} callSign={s.station.callSign ?? s.station.name} owner={s.role === "owner"} accountHref={`${s.base}/settings/account`} phone={phone} />
+          <p className="cc-settings__note">{relayStopsNote(s.station.callSign ?? s.station.name)}</p>
           {s.station.band === "radio" && <RelayBackground stationId={s.id} callSign={s.station.callSign ?? s.station.name} channel={s.station.channel} colour={s.station.colour} canEdit={s.can("programming")} />}
         </div>
       );

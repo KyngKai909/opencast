@@ -1,11 +1,12 @@
 // The proof beside an airing (biz-results 02.1): the frame captured as it aired, with the station's
 // bug on it, and the as-run log entry behind it: exact start and end, tuned in averaged over the
-// spot, the cost worked out as stations see it, and code scans in the hour after.
+// spot, the cost worked out as stations see it, and code scans in the hour after. On a station that
+// relays to YouTube or Twitch (follow-up Phase 3), each platform's relay viewers as their own line.
 
 import { KeyValueList, PictureFrame, clock } from "@opencast/ui";
 import type { ResultsAiring } from "@opencast/contracts";
 import { MARKET_TZ } from "../../lib/clock";
-import { airedWords, proofHeading, tenths } from "./format";
+import { airedWords, proofHeading, relayPartWords, tenths } from "./format";
 import { Section } from "./Section";
 import "./ProofPanel.css";
 
@@ -33,8 +34,9 @@ export function ProofPanel({ airing, now }: { airing: ResultsAiring; now: Date }
         items={[
           { label: "Started", value: tenths(airing.startedAt) },
           { label: "Ended", value: ended },
-          { label: "Tuned in", value: `${airing.tunedIn.toLocaleString("en-US")}, averaged over the spot` },
+          { label: airing.relayViewers?.length ? "Tuned in on Opencast" : "Tuned in", value: `${airing.tunedIn.toLocaleString("en-US")}, averaged over the spot` },
           { label: "Cost", value: airing.working },
+          ...(airing.relayViewers ?? []).map((p) => ({ label: p.label, value: relayPartWords(p) })),
           { label: "Code scans in the next hour", value: airing.scansNextHour.toLocaleString("en-US") }
         ]}
       />

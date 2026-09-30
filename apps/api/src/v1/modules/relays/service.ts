@@ -161,7 +161,7 @@ export function createRelaysService(ctx: ModuleContext): RelaysService {
         platforms,
         nextRestarts: [...nextByPlatform.values()].sort((a, b) => a.at.localeCompare(b.at)),
         recentRestarts: recent.map((x) => restartView(x, names, tz, now)),
-        canManage: true
+        canManage: owner
       };
     },
 

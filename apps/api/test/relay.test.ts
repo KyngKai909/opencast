@@ -569,6 +569,16 @@ describe("health and failure", () => {
 });
 
 describe("the Translators page's API", () => {
+  it("an operator sees the relay setting but can't change it (it's billed); an owner can", async () => {
+    const id = await station("OPER");
+    const op = await h.signIn("Otto");
+    await h.db.insert(schema.stationMemberships).values({ stationId: id, userId: op.id, role: "operator" });
+    const seen = RelayView.parse((await op.get(`/v1/stations/${id}/relay`).expect(200)).body);
+    expect(seen.canManage).toBe(false);
+    await op.patch(`/v1/stations/${id}/relay`, { mode: "everything" }).expect(403);
+    expect(RelayView.parse((await kai.get(`/v1/stations/${id}/relay`).expect(200)).body).canManage).toBe(true);
+  });
+
   it("relay mode, the break setting, the bug, hours and cost this month from billing; owners and operators only", async () => {
     const id = await station("PAGE");
     const view = RelayView.parse((await kai.get(`/v1/stations/${id}/relay`).expect(200)).body);

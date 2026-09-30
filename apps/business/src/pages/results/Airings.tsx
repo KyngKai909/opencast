@@ -13,7 +13,7 @@ import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useNow } from "../../lib/clock";
-import { airedWords, airingsCsv, andList, rowTime, saveText, slug } from "../../components/results/format";
+import { airedWords, airingTotal, airingsCsv, andList, rowTime, saveText, slug } from "../../components/results/format";
 import { ProofPanel } from "../../components/results/ProofPanel";
 import { selectionFrom, useResults } from "../../components/results/useResults";
 import { Quiet } from "../common";
@@ -85,7 +85,8 @@ export default function Airings() {
       cell: (a) => <span className={a.inFull ? undefined : "oc-table__cell--short"}>{airedWords(a.airedMs, a.spot.lengthSec)}</span>
     },
     ...(phone ? [] : [{ key: "tuned", header: "Tuned in", width: "64px", kind: "amount", cell: (a: ResultsAiring) => a.tunedIn.toLocaleString("en-US") } satisfies Column<ResultsAiring>]),
-    { key: "cost", header: "Cost", width: "60px", kind: "amount", cell: (a) => money(a.costMicros) }
+    // With relay viewers, the airing's cost in all (the proof panel splits it).
+    { key: "cost", header: "Cost", width: "60px", kind: "amount", cell: (a) => money(airingTotal(a)) }
   ];
 
   const empty = spotId ? "This spot hasn't aired yet." : "Nothing has aired yet.";

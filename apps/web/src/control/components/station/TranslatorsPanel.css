@@ -1,0 +1,54 @@
+/* Translators (master-control step A4: .tr-row, .lg, .opts, .pane, .kv, .m-note). */
+.cc-relays { display: grid; gap: 12px; container-type: inline-size; }
+.cc-relays--loading { min-height: 320px; }
+.cc-relays__split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; align-items: start; }
+.cc-relays__main { min-width: 0; }
+.cc-relays__lb { font-size: 12.5px; color: var(--ink-50); font-weight: 600; margin-bottom: 6px; }
+.cc-relays__lb--gap { margin-top: 16px; }
+.cc-relays__list { list-style: none; margin: 0; padding: 0; }
+.cc-relays__row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.cc-relays__row:first-child { border-top: 1px solid var(--line); }
+.cc-relays__lg {
+  width: 44px; height: 44px; border-radius: var(--r-control); display: grid; place-items: center;
+  /* The platform's own colour, carrying white letters like a station colour. */
+  background: var(--cc-relays-colour); color: var(--on-station);
+  font: 800 13px var(--font-display);
+}
+.cc-relays__what { min-width: 0; }
+.cc-relays__end { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+.cc-relays__keys { margin-bottom: 10px; }
+.cc-relays .oc-choices { border-top: 0; }
+.cc-relays__note { margin: 10px 0 0; font-size: 13px; color: var(--ink-70); }
+.cc-relays__link { color: var(--signal); font-weight: 600; text-decoration: none; }
+.cc-relays__quiet { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-70); }
+.cc-relays__who { margin: 0; font-size: 13.5px; color: var(--ink-70); }
+.cc-relays__error { margin: 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.cc-relays__restarts-sec { margin-top: 22px; }
+.cc-relays__restarts { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.cc-relays__restart { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+
+/* The pane: "On every relay". */
+.cc-relays__pane { border-left: 1px solid var(--hair); padding-left: 28px; }
+.cc-relays__pane h4 { margin: 0 0 10px; font: 700 15px var(--font-display); }
+.cc-relays__kv { border-top: 1px solid var(--line); margin: 12px 0 0; }
+.cc-relays__kvrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.cc-relays__kvrow > span:first-child { color: var(--ink-70); }
+.cc-relays__month { font-weight: 600; text-align: right; }
+.cc-relays__confirm { margin: 0; }
+
+/* Add a platform. */
+.cc-addp__signin { display: grid; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--hair); }
+.cc-addp__h { margin: 0 0 12px; font: 700 15px var(--font-display); }
+.cc-addp__why { margin: 0; font-size: 13px; color: var(--ink-70); }
+.cc-addp .oc-field { margin-bottom: 16px; }
+
+/* Narrower than the frame (Settings' pane, a tablet): the pane goes under. */
+@container (max-width: 820px) {
+  .cc-relays__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-relays__pane { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 16px; }
+}
+@media (max-width: 767px) {
+  .cc-relays--phone { padding: 0 16px 16px; }
+  .cc-relays__row { grid-template-columns: 44px minmax(0, 1fr); }
+  .cc-relays__end { grid-column: 2; justify-content: flex-start; }
+}

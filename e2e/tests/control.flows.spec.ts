@@ -295,3 +295,37 @@ test("Station account: BEAT caps its live hours; HALL's grace period shows on it
   await expect(page.getByRole("heading", { name: "Monitor" })).toBeVisible();
   await expect(page.getByText(/Relays and live shows (pause|are paused)/)).toHaveCount(0);
 });
+
+test("BEAT's translators: connect YouTube, relay everything BEAT airs, and show the slate in breaks (follow-up Phase 3)", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/translators");
+  await expect(page.getByRole("heading", { name: "Translators" })).toBeVisible();
+  const platforms = page.getByRole("list", { name: "Connected platforms" });
+  await expect(platforms.getByRole("listitem").filter({ has: page.getByText("Twitch", { exact: true }) })).toContainText("inlandbeat, signed in");
+
+  // YouTube, removed (confirmed) and connected again by signing in: the mock comes straight back.
+  await page.getByRole("button", { name: "Remove YouTube" }).click();
+  await page.getByRole("dialog", { name: "Remove YouTube?" }).getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByText("YouTube removed. BEAT no longer relays there.")).toBeVisible();
+  await page.getByRole("button", { name: "Connect with Google" }).click();
+  await expect(page.getByText("YouTube is connected.")).toBeVisible();
+  await expect(page).toHaveURL(/\/control\/beat\/translators$/);
+  await expect(platforms.getByRole("listitem").filter({ has: page.getByText("YouTube", { exact: true }) })).toContainText("Inland Beat channel, signed in. Opencast starts each broadcast for you");
+
+  // What gets relayed: live shows only (free), then everything BEAT airs, by the hour.
+  const modes = page.getByRole("radiogroup", { name: "What gets relayed" });
+  await modes.getByRole("radio", { name: /Live shows only/ }).click();
+  await expect(modes.getByRole("radio", { name: /Live shows only/ })).toHaveAttribute("aria-checked", "true");
+  await modes.getByRole("radio", { name: /Everything BEAT airs/ }).click();
+  await expect(page.getByText("BEAT relays everything it airs, at $0.20 an hour.")).toBeVisible();
+  await expect(modes.getByRole("radio", { name: /Everything BEAT airs/ })).toHaveAttribute("aria-checked", "true");
+
+  // During breaks, relays show the station ID slate.
+  const breaks = page.getByRole("radiogroup", { name: "During breaks, relays show" });
+  await breaks.getByRole("radio", { name: "Station ID slate" }).click();
+  await expect(breaks.getByRole("radio", { name: "Station ID slate" })).toHaveAttribute("aria-checked", "true");
+
+  // Relayed this month, and Twitch's next restart, timed to a break.
+  await expect(page.getByText("156.9 hours, $31.39 so far")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Next restarts" })).toContainText("Twitch restarts Saturday at 11:59 pm, during a break");
+});

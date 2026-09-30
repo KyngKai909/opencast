@@ -12,7 +12,7 @@ import { useApi } from "../../api/hooks";
 import { useBusiness } from "../../business/BusinessContext";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useNow } from "../../lib/clock";
-import { DAYPART_LABEL, daypartSentence, monthName, monthOf, perCustomer, plural, rangeWords, type Period } from "../../components/results/format";
+import { DAYPART_LABEL, daypartSentence, monthName, monthOf, perCustomer, plural, rangeWords, relayRows, type Period } from "../../components/results/format";
 import { selectionFrom, useResults, type Selection } from "../../components/results/useResults";
 import { Section } from "../../components/results/Section";
 import { Quiet } from "../common";
@@ -74,6 +74,11 @@ export default function Results() {
   const each = perCustomer(t.spentMicros, t.customers);
   const quiet = t.airings === 0;
   const periodWord = sel.period === "week" ? "this week" : sel.period === "all" ? "yet" : "this month";
+  // Relay viewers (follow-up Phase 3): each platform's line, with why a platform's viewers weren't billed.
+  const reasons: Partial<Record<"youtube" | "twitch", string>> = {};
+  for (const p of r.airings.flatMap((a) => a.relayViewers ?? [])) if (p.status === "not_billed" && p.reason && !reasons[p.platform]) reasons[p.platform] = p.reason;
+  const relay = r.relayViewers?.length ? relayRows(r.relayViewers, reasons) : [];
+  const relaySpent = t.relaySpentMicros ?? 0;
 
   if (phone) {
     const days = balance.data?.runwayDays;
@@ -92,7 +97,8 @@ export default function Results() {
           variant="rows"
           items={[
             ...r.byStation.map((s) => ({ title: `${s.station.callSign} ${s.station.channel}`, detail: plural(s.airings, "airing"), value: plural(s.customers, "customer") })),
-            { title: "Spent", amount: t.spentMicros },
+            { title: "Spent", detail: relaySpent > 0 ? `${money(relaySpent)} of it on relay viewers` : undefined, amount: t.spentMicros },
+            ...relay,
             ...(balance.data ? [{ title: "Available", detail: days != null ? `About ${plural(days, "day")} of airings` : undefined, amount: balance.data.availableMicros }] : [])
           ]}
         />
@@ -161,7 +167,7 @@ export default function Results() {
             stats={[
               { value: t.airings.toLocaleString("en-US"), caption: `Airings on ${plural(r.byStation.filter((s) => s.airings > 0).length, "station")}` },
               { value: t.tunedInAddedUp.toLocaleString("en-US"), caption: "People tuned in, added up across airings" },
-              { amount: t.spentMicros, caption: "Spent" },
+              { amount: t.spentMicros, caption: relaySpent > 0 ? `Spent, ${money(relaySpent)} of it on relay viewers` : "Spent" },
               { value: t.customers.toLocaleString("en-US"), caption: each !== null ? `Customers used the code. ${money(each)} each` : "Customers used the code" }
             ]}
           />
@@ -195,6 +201,14 @@ export default function Results() {
                   })}
                 />
               </Section>
+              {relay.length > 0 && (
+                <Section title="Relay viewers">
+                  <KeyValueList variant="rows" items={relay} />
+                  <p className="bz-res__note">
+                    Viewers on YouTube and Twitch, as those platforms report them, counted apart from Opencast's. With a location or a service area, you pay only for relay viewers the platform places inside it.
+                  </p>
+                </Section>
+              )}
             </div>
           </div>
         </>

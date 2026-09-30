@@ -66,6 +66,19 @@ export function partnerAdsDetail(p: NonNullable<StationEarnings["lines"]["partne
   return p.pendingMicros > 0 ? `${money(p.pendingMicros)} to come. Paid when partners pay, 30 to 90 days after airing` : "Paid when partners pay, 30 to 90 days after airing";
 }
 
+/**
+ * Relay viewers (follow-up Phase 3): per-thousand spots paid for the viewers YouTube and Twitch
+ * reported, one line per platform ("Relay viewers, as reported by YouTube"), apart from Spots.
+ */
+export function relayViewersRows(l: StationEarnings["lines"]): MoneyRow[] {
+  return (l.relayViewers ?? []).map((r) => ({
+    key: `relay-${r.platform}`,
+    title: r.label,
+    detail: r.airings ? `${plural(r.airings, "airing")}, for viewers ${r.platform === "youtube" ? "YouTube" : "Twitch"} reported during your spots` : "No airings yet",
+    amount: r.micros
+  }));
+}
+
 /** The earnings page's groups. A studio has no breaks or members of its own, and carries nothing. */
 export function earningsSections(e: StationEarnings, period: EarningsPeriod, studio: boolean): MoneySection[] {
   const l = e.lines;
@@ -76,6 +89,7 @@ export function earningsSections(e: StationEarnings, period: EarningsPeriod, stu
       title: "From your breaks",
       rows: [
         { key: "spots", title: "Spots", detail: spotsDetail(l.spots), amount: l.spots.micros },
+        ...relayViewersRows(l),
         { key: "sponsors", title: "Sponsors", detail: sponsorsDetail(l.sponsors), amount: l.sponsors.micros },
         ...(l.partnerAds ? [{ key: "partnerAds", title: "Ads from partners", detail: partnerAdsDetail(l.partnerAds), amount: l.partnerAds.micros }] : [])
       ]
@@ -109,6 +123,8 @@ export function phoneRows(e: StationEarnings, studio: boolean): MoneyRow[] {
   const rows: MoneyRow[] = [];
   if (!studio) {
     rows.push({ key: "spots", title: "Spots", amount: l.spots.micros });
+    // Relay viewers: one line on the phone, both platforms together.
+    if (l.relayViewers?.length) rows.push({ key: "relayViewers", title: "Relay viewers", amount: l.relayViewers.reduce((a, r) => a + r.micros, 0) });
     rows.push({ key: "sponsors", title: "Sponsors", amount: l.sponsors.micros });
     rows.push({ key: "pledges", title: "Pledges", amount: l.pledges.micros });
   }

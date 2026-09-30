@@ -291,3 +291,18 @@ test("a viewer sees results, airings and statements, not the balance or the spot
   await page.goto(`${OSC}/spots`);
   await expect(page.getByText("Viewers see results, airings and statements", { exact: false }).first()).toBeVisible();
 });
+
+test("results show relay viewers apart: YouTube's billed share, Twitch's, and what's waiting for YouTube's location data (follow-up Phase 3)", async ({ page }) => {
+  await page.setViewportSize(WIDTHS.web);
+  await reducedMotion(page);
+  await signInAs(page, PEOPLE.owner);
+
+  // BEAT relays to YouTube and Twitch; Orange Street Coffee is local.
+  await page.goto(`${OSC}/results?period=month&month=2026-09`);
+  const relay = page.getByRole("region", { name: "Relay viewers" });
+  await expect(relay.getByText("Relay viewers, as reported by YouTube")).toBeVisible();
+  await expect(relay.getByText("Relay viewers, as reported by Twitch")).toBeVisible();
+  await expect(relay.getByText(/Twitch doesn't report where viewers are, so they aren't billed to local businesses$/)).toBeVisible();
+  await expect(relay.getByText("Relay viewers, waiting for YouTube's location data")).toBeVisible();
+  await expect(page.getByText("Spent, $8.64 of it on relay viewers")).toBeVisible();
+});

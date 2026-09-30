@@ -73,6 +73,47 @@ describe("earnings lines", () => {
   });
 });
 
+describe("relay viewers (follow-up Phase 3)", () => {
+  // BEAT relays to YouTube and Twitch: their viewers' share of per-thousand spots, carved out of Spots.
+  const relayed: StationEarnings = {
+    ...september,
+    lines: {
+      ...september.lines,
+      spots: { ...september.lines.spots, micros: $(486.2 - 12.4 - 3.1) },
+      relayViewers: [
+        { platform: "youtube", label: "Relay viewers, as reported by YouTube", micros: $(12.4), airings: 31 },
+        { platform: "twitch", label: "Relay viewers, as reported by Twitch", micros: $(3.1), airings: 9 }
+      ]
+    }
+  };
+
+  it("a line per platform after Spots, and the total still adds up", () => {
+    const breaks = earningsSections(relayed, "month", false)[0]!;
+    expect(breaks.rows.map((r) => [r.title, r.detail, r.amount])).toEqual([
+      ["Spots", "212 airings from 5 businesses, settled after each airing", $(470.7)],
+      ["Relay viewers, as reported by YouTube", "31 airings, for viewers YouTube reported during your spots", $(12.4)],
+      ["Relay viewers, as reported by Twitch", "9 airings, for viewers Twitch reported during your spots", $(3.1)],
+      ["Sponsors", "Redlands Hardware and Clear, $100.00 a month each", $(200)]
+    ]);
+    const all = earningsSections(relayed, "month", false)
+      .flatMap((x) => x.rows)
+      .reduce((a, r) => a + r.amount, 0);
+    expect(all).toBe(relayed.totalMicros);
+  });
+
+  it("one line on the phone, both platforms together", () => {
+    expect(phoneRows(relayed, false).slice(0, 3).map((r) => [r.title, r.amount])).toEqual([
+      ["Spots", $(470.7)],
+      ["Relay viewers", $(15.5)],
+      ["Sponsors", $(200)]
+    ]);
+  });
+
+  it("none relayed: no lines", () => {
+    expect(earningsSections(september, "month", false)[0]!.rows.map((r) => r.title)).toEqual(["Spots", "Sponsors"]);
+  });
+});
+
 describe("statements", () => {
   const week: Statement = {
     id: "00000000-0000-4000-8000-000000630003",

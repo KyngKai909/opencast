@@ -3,6 +3,7 @@
 // micros; the pages write them with money().
 
 import { clock, duration, money } from "@opencast/ui";
+import { relayWaitingLabel, type RelayViewersLine, type RelayViewersPart } from "@opencast/contracts";
 import { MARKET_TZ } from "../../lib/clock";
 
 export type Period = "week" | "month" | "all";
@@ -114,6 +115,8 @@ export interface CsvAiring {
   tunedIn: number;
   costMicros: number;
   working: string;
+  /** Relay viewers (follow-up Phase 3): added to the cost, their working after Opencast's. */
+  relayViewers?: RelayViewersPart[];
 }
 
 /** The airings as a CSV, one per line, with the as-run entry for each. */
@@ -129,8 +132,8 @@ export function airingsCsv(list: CsvAiring[]): string {
       a.programContext ?? "",
       airedWords(a.airedMs, a.spot.lengthSec),
       a.tunedIn,
-      money(a.costMicros).replace("−", "-"),
-      a.working,
+      money(airingTotal(a)).replace("−", "-"),
+      [a.working, ...(a.relayViewers ?? []).map((p) => `${p.label}: ${relayPartWords(p)}`)].join("; "),
       a.asRunId
     ]);
   }
@@ -152,4 +155,47 @@ export function saveText(filename: string, text: string, type = "text/csv") {
 /** "orange-street-coffee". */
 export function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// ---- Relay viewers (follow-up Phase 3) ----
+
+/** What an airing cost in all: Opencast's viewers and the relay viewers billed. */
+export function airingTotal(a: { costMicros: number; relayViewers?: RelayViewersPart[] }): number {
+  return a.costMicros + (a.relayViewers ?? []).reduce((s, p) => s + p.costMicros, 0);
+}
+
+/** One platform's relay viewers on one airing, as the proof panel says them. */
+export function relayPartWords(p: RelayViewersPart): string {
+  switch (p.status) {
+    case "counting":
+      return "Counting. The platform's numbers come in a few minutes after the spot";
+    case "waiting_location":
+      return `${p.viewers !== null ? `${p.viewers.toLocaleString("en-US")} tuned in. ` : ""}${money(p.heldMicros)} held until it arrives`;
+    case "settled":
+      return p.working ?? money(p.costMicros);
+    case "returned":
+      return `${p.reason ?? "The platform's location data didn't arrive in time, so this wasn't charged"}. ${money(p.returnedMicros ?? 0)} went back to your balance`;
+    case "not_billed":
+      if (!p.viewers) return "No viewers were reported during the spot";
+      return `${p.viewers.toLocaleString("en-US")} tuned in. ${p.reason ?? "Not billed"}`;
+  }
+}
+
+/** A period's relay viewers on one platform: airings, viewers added up, what was billed, and why not. */
+export function relayLineDetail(line: RelayViewersLine, reason?: string | null): string {
+  const parts = [`${plural(line.airings, "airing")}, ${plural(line.viewersAddedUp, "viewer")} added up`];
+  if (line.billedViewersAddedUp > 0) parts[0] += `, ${line.billedViewersAddedUp.toLocaleString("en-US")} billed`;
+  else if (line.spentMicros === 0 && line.waitingMicros === 0 && reason) parts.push(reason);
+  if (line.returnedMicros > 0) parts.push(`${money(line.returnedMicros)} returned: no location data in time`);
+  return parts.join(". ");
+}
+
+/** The rows under "Relay viewers": each platform's line, then what's still waiting for location data. */
+export function relayRows(lines: RelayViewersLine[], reasons: Partial<Record<RelayViewersLine["platform"], string>> = {}) {
+  const rows: Array<{ title: string; detail: string; amount: number; quiet?: boolean }> = [];
+  for (const l of lines) rows.push({ title: l.label, detail: relayLineDetail(l, reasons[l.platform]), amount: l.spentMicros });
+  for (const l of lines)
+    if (l.waitingMicros > 0)
+      rows.push({ title: relayWaitingLabel(l.platform), detail: `${plural(l.waitingAirings, "airing")}. Held until it arrives; returned if it doesn't within 7 days`, amount: l.waitingMicros, quiet: true });
+  return rows;
 }
