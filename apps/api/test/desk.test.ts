@@ -113,9 +113,12 @@ describe("Network desk", () => {
     const server = await import("node:http").then((http) => http.createServer((_, res) => res.end(ics)));
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const port = (server.address() as { port: number }).port;
+    // The feed is on this machine; outside tests, desk-entered addresses must be public.
+    process.env.EXTERNAL_FETCH_ALLOW_PRIVATE = "1";
     const listed = await dee
       .post("/v1/admin/listed-sources", { marketId, band: "tv", channel: "9.1", callSign: "RDLS", name: "City of Redlands", streamUrl: "https://redlands.example/live", embedTerms: "allowed", calendarUrl: `http://127.0.0.1:${port}/agenda.ics`, evidence: { termsUrl: "https://redlands.example/terms", termsCheckedOn: "2026-09-21" } })
       .expect(201);
+    delete process.env.EXTERNAL_FETCH_ALLOW_PRIVATE;
     server.close();
     expect(listed.body).toMatchObject({ calendarSync: "synced", listingState: "listed", upcoming: 1, plays: "embed", onDial: true, schedule: { source: "feed", format: "ical" }, evidence: { basis: "embed_terms" } });
     const dial = await anon(h).get("/v1/markets/inland-empire/dial").expect(200);
