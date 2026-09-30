@@ -11,7 +11,7 @@ npx @railway/cli@latest config apply    # change it
 npx @railway/cli@latest variables --set "NAME=value" -s <service>   # a secret
 ```
 
-Railway retired per-service `railway.json` (Config as Code) in favour of this file. The root `railway.json` is only for the legacy services in the old `glistening-truth` project; delete it with that project.
+Railway retired per-service `railway.json` (Config as Code) in favour of this file. The old root `railway.json` (for the retired `glistening-truth` project) was deleted on 2026-09-30.
 
 ## Services
 
@@ -127,7 +127,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 7. **Check it.** Every service's `/health`; the API's pre-deploy log says "Migrations applied"; seed the markets; the worker's `/health` shows the leader, preparation and readiness. Sign in on the viewer, and put one test station on air end to end.
 8. **Move off Pinata.** With production's storage variables and `PINATA_JWT` on the api service, open Network desk, Settings → Storage maintenance, and Check **Pinata pins**, which reports. Then Apply, which copies each pin in, verifies it by hash, and points every item that used the pin at its new content ID (see "One-off storage steps"). Check Pinata's dashboard total matches (the old key sees only v3 files), mark any catalog pins, and only then unpin, which the desk never does: `railway ssh -s api -- npm run storage:move-off-pinata -w @opencast/api -- --copy --unpin --yes-unpin`. Unpinning can't be undone. Then run the other one-off storage steps above, from the same page.
 9. **Domains.** Add the custom domains (api and worker in Railway, the apps in Vercel) and update DNS. Update `WEB_ORIGIN`, `APP_ORIGIN`, `BUSINESS_ORIGIN`, Privy's allowed origins and Stripe's webhook URL if they were the Railway ones. Verify the sending domain in Resend and set `EMAIL_FROM` on it (see "Email").
-10. **Retire the old project.** Stop pointing anything at `glistening-truth`, then delete it from the Railway dashboard, along with the root `railway.json`. Its Postgres holds the only copy of the old `opencast_state`, which production doesn't import (a fresh start); take a `pg_dump` first if it might ever be wanted.
+10. **Retire the old project.** Done: the user deleted `glistening-truth` on 2026-09-30, and the root `railway.json` went with it.
 11. **Rotate and tidy.** Rotate the old Livepeer and Pinata keys, and anything else reused on staging. Delete the Livepeer test streams the early tests made. In the Railway dashboard, delete the stray project bucket `media-probe` (empty, no instance).
 
 ## Plan limits (Hobby)
