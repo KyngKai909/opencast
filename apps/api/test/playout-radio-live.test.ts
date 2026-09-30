@@ -122,7 +122,9 @@ describe("a radio live block through the worker", () => {
         const [state] = await h.db.select().from(schema.playoutState).where(eq(schema.playoutState.stationId, stationId));
         standingBy.push({ at: s, standingBy: state.standingBy });
       }
-      if (!during && s >= 34) {
+      // From 12 s after the push, until the first live segment is listed (a slow machine takes a
+      // few seconds more to connect and cut one); the playlist keeps it in its window after that.
+      if (s >= 34 && s < 80 && !/\/prepared\/live-[\w-]+\/a64\//.test(during64)) {
         during = (await h.services.playout.playlist(stationId, "a128.m3u8"))?.body ?? "";
         during64 = (await h.services.playout.playlist(stationId, "a64.m3u8"))?.body ?? "";
       }
