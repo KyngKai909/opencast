@@ -30,6 +30,21 @@ async function api(path: string, init: { method?: string; body?: unknown; as?: s
 
 const S = `/stations/${BEAT.id}`;
 
+/**
+ * Runs at the reference's 8:42 pm on the fixtures' day, whatever the real clock says: tonight's
+ * blocks and airings are still to come (late at night on the real clock they've ended, and this
+ * week's listings and what uses an item come out different).
+ */
+async function atTheFrame(run: () => Promise<void>) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(at("20:42:12")));
+  try {
+    await run();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 describe("live sources", () => {
   it("lists Studio A and the browser as 01.1 draws them", async () => {
     const r = await api(`${S}/live-sources`);
@@ -49,21 +64,15 @@ describe("live sources", () => {
     expect(reset.body.streamKey).not.toBe(made.body.streamKey);
   });
 
-  it("has one browser source, and won't remove a source a block still uses", async () => {
-    // At the reference's 8:42 pm, while tonight's blocks are still to come (late at night on the
-    // real clock they've all ended, and nothing would be using the source).
-    vi.useFakeTimers({ now: new Date(at("20:42:12")), toFake: ["Date"] });
-    try {
-    expect((await api(`${S}/live-sources`, { method: "POST", body: { kind: "browser", name: "Another" } })).status).toBe(409);
-    const refused = await api(`${S}/live-sources/${LIVE_SOURCE_IDS.studioA}`, { method: "DELETE" });
-    expect(refused.status).toBe(409);
-    expect(refused.body.error.message).toMatch(/^It feeds \d live blocks?\./);
-    const made = await api(`${S}/live-sources`, { method: "POST", body: { kind: "encoder", name: "Van" } });
-    expect((await api(`${S}/live-sources/${made.body.source.id}`, { method: "DELETE" })).status).toBe(200);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+  it("has one browser source, and won't remove a source a block still uses", () =>
+    atTheFrame(async () => {
+      expect((await api(`${S}/live-sources`, { method: "POST", body: { kind: "browser", name: "Another" } })).status).toBe(409);
+      const refused = await api(`${S}/live-sources/${LIVE_SOURCE_IDS.studioA}`, { method: "DELETE" });
+      expect(refused.status).toBe(409);
+      expect(refused.body.error.message).toMatch(/^It feeds \d live blocks?\./);
+      const made = await api(`${S}/live-sources`, { method: "POST", body: { kind: "encoder", name: "Van" } });
+      expect((await api(`${S}/live-sources/${made.body.source.id}`, { method: "DELETE" })).status).toBe(200);
+    }));
 
   it("hides the server and key from a host, and keeps hosts out of setup", async () => {
     const r = await api(`${S}/live-sources`, { as: "jen" });
@@ -142,15 +151,16 @@ describe("going live", () => {
 });
 
 describe("listings", () => {
-  it("flags the two airings the frame flags this week", async () => {
-    const from = new Date().toISOString();
-    const to = new Date(Date.now() + 7 * 86400e3).toISOString();
-    const r = await api(`${S}/listings?from=${from}&to=${to}`);
-    expect(r.status).toBe(200);
-    const need = r.body.listings.filter((l: { status: string }) => l.status === "needs_description").map((l: { title: string }) => l.title);
-    expect(need).toEqual(expect.arrayContaining(["Crate Session 03", "Late Crate, ep. 16"]));
-    expect(r.body.listings.find((l: { title: string }) => l.title === "Slow Hours")?.status).toBe("from_the_maker");
-  });
+  it("flags the two airings the frame flags this week", () =>
+    atTheFrame(async () => {
+      const from = new Date().toISOString();
+      const to = new Date(Date.now() + 7 * 86400e3).toISOString();
+      const r = await api(`${S}/listings?from=${from}&to=${to}`);
+      expect(r.status).toBe(200);
+      const need = r.body.listings.filter((l: { status: string }) => l.status === "needs_description").map((l: { title: string }) => l.title);
+      expect(need).toEqual(expect.arrayContaining(["Crate Session 03", "Late Crate, ep. 16"]));
+      expect(r.body.listings.find((l: { title: string }) => l.title === "Slow Hours")?.status).toBe("from_the_maker");
+    }));
 
   it("gives an airing its own description, and keeps the maker's words for carried programs", async () => {
     await api(`${S}/live-sources`);
@@ -192,14 +202,15 @@ describe("the library", () => {
     expect(r.body.offerable).toBe(false);
   });
 
-  it("won't delete an item that's in use, and says what uses it", async () => {
-    const ep15 = getDb().library.items.find((i) => i.title === "Late Crate, ep. 15")!;
-    const r = await api(`/library/${ep15.id}`, { method: "DELETE" });
-    expect(r.status).toBe(409);
-    expect(r.body.error.message).toBe("It's in 2 log entries and carried by 2 stations. Take it out of those first.");
-    const unused = getDb().library.items.find((i) => i.title === "Redlands Hardware, underwriting")!;
-    expect((await api(`/library/${unused.id}`, { method: "DELETE" })).status).toBe(200);
-  });
+  it("won't delete an item that's in use, and says what uses it", () =>
+    atTheFrame(async () => {
+      const ep15 = getDb().library.items.find((i) => i.title === "Late Crate, ep. 15")!;
+      const r = await api(`/library/${ep15.id}`, { method: "DELETE" });
+      expect(r.status).toBe(409);
+      expect(r.body.error.message).toBe("It's in 2 log entries and carried by 2 stations. Take it out of those first.");
+      const unused = getDb().library.items.find((i) => i.title === "Redlands Hardware, underwriting")!;
+      expect((await api(`/library/${unused.id}`, { method: "DELETE" })).status).toBe(200);
+    }));
 
   it("exports to IPFS for owners only", async () => {
     const ep15 = getDb().library.items.find((i) => i.title === "Late Crate, ep. 15")!;
