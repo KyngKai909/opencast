@@ -2,6 +2,10 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-30: TV live blocks from our own storage
+
+No change to `packages/contracts`, and no migration. Behaviour: during a TV station's live block the channel's playlists (`/hls/<station>/<rendition>.m3u8`, the playlist endpoints) point at the worker's copies of Livepeer's segments in object storage (`…/prepared/live-<source>-<session>/<rendition>/seg_NNNNN.ts`, the same form as radio live's), never at Livepeer's addresses; the copies stay two days (with their channel rows), so a live block plays back within the 30-minute window. A segment the worker couldn't copy is left out with a discontinuity where it was. Worker: `GET /health` gains `liveCopy` (next to `live`): `{ segments, liveSeconds, bytesPulled, bytesPulledPerLiveHour, objectsWritten, bytesWritten, cpuSeconds, cpuSecondsPerLiveHour, skipped, caughtUp, addedLatencyMs: { average, p95, max } | null }` since the worker started. Relays read the copies from storage like prepared segments; live-only relays (Livepeer multistream from the source's own stream) are unchanged.
+
 ## 2026-09-30: External stations (follow-up Phase 6)
 
 An external station has a channel number, a call sign, a banner and a place on the dial, but its video comes straight from the source's own stream: no playout, prepared segments, spots, sponsor credits, partner ads or earnings, never carried or offered in the market. Additive: new optional fields on the dial, the station page, listed sources and creators; four endpoints; one notice kind; one rule group with two rules. Migration **0039** (0038 is reserved for the live blocks to R2 work): `network.stream_permissions`, `network.external_outages`, new columns on `network.listed_sources` and `network.creators` (docs/schema.md). Internal names stay `listed`; what people read says "External".

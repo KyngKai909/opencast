@@ -8,9 +8,10 @@
 //     station), so nothing is re-encoded;
 //   - re-encoded when the bug is drawn on (players draw it themselves; here the picture leaves
 //     Opencast's players, so the relay composites it);
-//   - live blocks from Livepeer's playback (the segments the channel's playlist points at while
-//     they air) go through the same sender, so platforms see one stream with no interruption when
-//     a live block starts or ends;
+//   - live blocks (the segments the channel's playlist points at while they air: since 2026-09-30
+//     always the worker's own copies in storage, TV ones copied once from Livepeer, livecopy.ts,
+//     read here from storage like prepared ones, never from Livepeer) go through the same sender,
+//     so platforms see one stream with no interruption when a live block starts or ends;
 //   - on the radio band, the station's sound over its relay background (background.ts: prepared
 //     once at upload into a loop, drawn once more with the bug when the relay starts), or without
 //     one a picture in the station's colour with its call sign and channel. Nothing is encoded
@@ -80,6 +81,15 @@ export interface CodeWindow {
   code: string;
   offer: string;
   qrUrl: string;
+}
+
+/**
+ * The storage key of a live segment the worker stored (`prepared/live-…/<rendition>/seg_NNNNN.ts`,
+ * a TV live block's copy or a radio station's own), from its URL in a channel row; null for any
+ * other address. The sender reads these from storage, as it does prepared segments.
+ */
+export function storedSegmentKey(uri: string): string | null {
+  return /(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.ts)(?:$|\?)/.exec(uri)?.[1] ?? null;
 }
 
 /** The code a channel row carries, if any. */
@@ -485,9 +495,9 @@ export class StationSender {
 
   /** Reads a live segment: the worker's own from storage, Livepeer's over HTTP. */
   private async liveBytes(uri: string): Promise<Buffer | null> {
-    const own = /(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.ts)(?:$|\?)/.exec(uri);
+    const own = storedSegmentKey(uri);
     if (own) {
-      const bytes = await this.object(own[1]);
+      const bytes = await this.object(own);
       if (bytes) return bytes;
     }
     if (!/^https?:\/\//.test(uri)) return null;

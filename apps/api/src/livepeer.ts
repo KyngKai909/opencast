@@ -16,9 +16,9 @@ export interface LivepeerProfile {
 /**
  * A live block is transcoded by Livepeer to the same video renditions every prepared item has
  * (ladder.ts): the same sizes, bitrates and frame rate, with a keyframe every segment, so the
- * channel's playlists switch into Livepeer's segments and back without a player changing
- * rendition. (Livepeer makes no audio-only rendition; the channel's audio-only playlist reads the
- * smallest video one during a live block.)
+ * channel's playlists switch into Livepeer's segments (the worker's copies of them in storage,
+ * engine/livecopy.ts) and back without a player changing rendition. (Livepeer makes no audio-only
+ * rendition; the channel's audio-only one is the sound of its smallest, cut by the worker.)
  */
 export function livepeerProfiles(ladder: Ladder = LADDER): LivepeerProfile[] {
   return BAND_RENDITIONS.tv

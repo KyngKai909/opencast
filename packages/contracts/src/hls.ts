@@ -21,7 +21,7 @@ export const HLS_CLASS = {
   item: "org.useopencast.item",
   /** A break: the span the break rule made. Carries SCTE35-OUT / SCTE35-IN. */
   break: "org.useopencast.break",
-  /** A live block (Livepeer's segments for its hours). */
+  /** A live block (the live source's segments for its hours: the worker's copies in storage). */
   live: "org.useopencast.live",
   /** The station's bug for a span (usually the whole item; absent where the station hides it). */
   bug: "org.useopencast.bug",

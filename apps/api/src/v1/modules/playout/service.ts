@@ -10,6 +10,7 @@ import { isContentId, objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, REFERENCE, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
 import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
 import { captionSources } from "./engine/captions.js";
+import { liveObjectPrefixes } from "./engine/assemble.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
 import { queuePreparation, refKey, wantRow } from "./engine/prepare.js";
@@ -167,6 +168,14 @@ export interface PlayoutService {
    * hours is left for the storage sweep (players may still be fetching its segments).
    */
   dropPrepared(keys: string[], options: { evenIfAiring: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
+  /**
+   * Added 2026-09-30: deletes the live segments stored for a live source's blocks (TV ones copied
+   * from Livepeer, radio ones packaged by the worker; `prepared/live-<source>-<session>/`), for a
+   * takedown of what the source aired. Every session a channel row still points at goes at once,
+   * airing or not (the pruning of channel rows after two days deletes them otherwise). Returns the
+   * sessions deleted.
+   */
+  dropLiveCopies(liveSourceId: string): Promise<{ sessions: string[] }>;
   /** The storage sweep: what was prepared from files that are gone, left while it aired (or from before). */
   sweepPrepared(): Promise<{ dropped: number; deferred: number }>;
 
@@ -916,6 +925,16 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         dropped.push(key);
       }
       return { dropped, deferred };
+    },
+
+    async dropLiveCopies(liveSourceId) {
+      const rows = await db
+        .select({ liveUris: schema.channelItems.liveUris })
+        .from(schema.channelItems)
+        .where(and(eq(schema.channelItems.kind, "live"), eq(schema.channelItems.liveSourceId, liveSourceId)));
+      const sessions = liveObjectPrefixes(rows.map((r) => r.liveUris));
+      for (const prefix of sessions) await deps.storage.objects.deletePrefix(prefix);
+      return { sessions };
     },
 
     async sweepPrepared() {

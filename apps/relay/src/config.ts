@@ -6,7 +6,8 @@
 //   LIVEPEER_API_KEY        Livepeer Studio (the per-station relay streams and their targets)
 //   LIVEPEER_API_BASE       default https://livepeer.studio/api
 //   LIVEPEER_RTMP_INGEST_BASE  default rtmp://rtmp.livepeer.com/live
-//   LIVEPEER_PLAYBACK_BASE  where live blocks are read (default https://livepeercdn.studio/hls)
+//   LIVEPEER_PLAYBACK_BASE  Livepeer's playback (default https://livepeercdn.studio/hls); not read by
+//                           the relay: live blocks come from the worker's copies in storage
 //   HLS_PUBLIC_URL          the channel playlist base (the worker's HLS origin): prepared segments
 //                           are read there when object storage isn't configured here
 //   R2_* / S3_*             optional: object storage, read directly (cheaper than through the worker)

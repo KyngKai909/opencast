@@ -11,6 +11,8 @@
 //   - assembles every station on air (assemble.ts): its playlists point at prepared segments;
 //   - takes radio stations' live pushes on its own RTMP ingest (rtmp.ts, radiolive.ts) while it's
 //     the leader: the radio band never goes through Livepeer;
+//   - copies TV live blocks' segments from Livepeer into storage as they arrive (livecopy.ts), once
+//     per source whichever stations air it, while it's the leader: the channel points at the copies;
 //   - (relays moved out: the relay service, apps/relay, sends each station's relay stream, from
 //     sender.ts; the worker no longer pushes to any platform);
 //   - every hour, the storage sweep: what was prepared from files that are gone (left while a
@@ -31,7 +33,8 @@ import { publicUrl } from "../../../lib/url.js";
 import { ChannelAssembler, pruneChannelItems, type ChannelLook } from "./assemble.js";
 import { createFiller } from "./fill.js";
 import { BAND_RENDITIONS, LADDER, scaledLadder, type Band, type Ladder } from "./ladder.js";
-import { audioOnlySegment, LiveHlsSource, type AudioOnlyMaker, type LiveSource } from "./live.js";
+import { LiveHlsSource, type LiveSource } from "./live.js";
+import { createLiveCopier, liveCopyCounter, type LiveCopyStats } from "./livecopy.js";
 import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
@@ -77,6 +80,10 @@ export interface EngineOptions {
    * a free one). None by default: radio live sources then air the stand-by slate.
    */
   ingest?: { port: number; host?: string } | null;
+  /** How long a live source's poll waits for a segment's copy under way (live.ts `COPY_WAIT_MS` by default). */
+  liveCopyWaitMs?: number;
+  /** How long a TV live segment's copy is retried before it's skipped (livecopy.ts `COPY_DEADLINE_MS` by default). */
+  liveCopyDeadlineMs?: number;
 }
 
 export interface ReadinessSummary {
@@ -126,6 +133,10 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let readiness: ReadinessSummary = { checkedAt: null, items: 0, ready: 0, waiting: 0, firstNotReady: null };
   /** Radio live: what packaging the stations' sound has cost since the worker started. */
   const liveCpu = { sessions: 0, ms: 0, cpuSeconds: 0 };
+  /** TV live: what copying Livepeer's segments into storage has cost since the worker started. */
+  const liveCopy = liveCopyCounter();
+  /** TV live sources, one per source however many stations air it (so it's copied once), with how many use it. */
+  const tvSources = new Map<string, { source: LiveHlsSource; users: number }>();
   const ingest = options.ingest
     ? new RtmpIngest({
         port: options.ingest.port,
@@ -295,27 +306,37 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     return source?.livepeerPlaybackId ? `${LIVEPEER_PLAYBACK}/${source.livepeerPlaybackId}/index.m3u8` : null;
   }
 
-  /** Stores a live segment the worker made; its URL for the playlists. */
-  async function storeLiveSegment(key: string, file: string): Promise<string> {
+  /** Stores a live segment the worker made (or copied); its URL for the playlists. */
+  async function storeLiveSegment(key: string, file: string, contentType = "video/mp2t"): Promise<string> {
     const sha256 = createHash("sha256").update(await fs.readFile(file)).digest();
-    await deps.storage.objects.put(key, file, { contentType: "video/mp2t", storageClass: "standard", sha256 });
+    await deps.storage.objects.put(key, file, { contentType, storageClass: "standard", sha256 });
     return publicUrl(deps, deps.storage.objects.publicUrl?.(key) ?? `/hls/${key}`);
   }
 
-  /** TV live blocks: the audio-only rendition's segment, the sound of Livepeer's smallest. */
-  function audioOnlyMaker(liveSourceId: string): AudioOnlyMaker {
-    return async ({ uri, seq, session, rendition }) => {
-      const response = await fetch(uri, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-      if (!response?.ok) return null;
-      const sound = await audioOnlySegment(Buffer.from(await response.arrayBuffer()));
-      if (!sound) return null;
-      await fs.mkdir(scratchDir, { recursive: true });
-      const file = path.join(scratchDir, `ao-${liveSourceId.slice(0, 8)}-${session}-${seq}.ts`);
-      await fs.writeFile(file, sound);
-      try {
-        return await storeLiveSegment(liveSegmentKey(liveSourceId, session, rendition, seq), file);
-      } finally {
-        await fs.rm(file, { force: true });
+  /**
+   * A TV live source, shared by every station airing it: Livepeer's segments copied into storage
+   * once. Closing it (a station done with it) stops copying once no station uses it.
+   */
+  function tvLiveSource(liveSourceId: string, url: string, now: () => number): LiveSource {
+    let shared = tvSources.get(liveSourceId);
+    if (!shared || shared.source.url !== url) {
+      const copy = createLiveCopier({ liveSourceId, scratchDir, store: storeLiveSegment, counter: liveCopy, deadlineMs: options.liveCopyDeadlineMs });
+      shared = { source: new LiveHlsSource(url, BAND_RENDITIONS.tv, ladder, now, { copy, onEvent: (e) => liveCopy.event(e), waitMs: options.liveCopyWaitMs }), users: 0 };
+      tvSources.set(liveSourceId, shared);
+    }
+    const entry = shared;
+    entry.users++;
+    let closed = false;
+    return {
+      poll: () => entry.source.poll(),
+      connected: () => entry.source.connected(),
+      after: (seq) => entry.source.after(seq),
+      close: async () => {
+        if (closed) return;
+        closed = true;
+        if (--entry.users > 0) return;
+        if (tvSources.get(liveSourceId) === entry) tvSources.delete(liveSourceId);
+        await entry.source.close();
       }
     };
   }
@@ -341,7 +362,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       });
     }
     const url = await liveUrl(liveSourceId);
-    return url ? new LiveHlsSource(url, BAND_RENDITIONS.tv, ladder, now, audioOnlyMaker(liveSourceId)) : null;
+    return url ? tvLiveSource(liveSourceId, url, now) : null;
   }
 
   async function startAssembler(stationId: string) {
@@ -420,12 +441,13 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     /** The radio ingest, when the worker runs one. */
     ingest,
     /** For the worker's health endpoint. */
-    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; live: LiveCpu }> {
+    async stats(): Promise<{ stationsOnAir: number; preparation: PreparationStats; readiness: ReadinessSummary; live: LiveCpu; liveCopy: LiveCopyStats }> {
       return {
         stationsOnAir: assemblers.size,
         preparation: await preparer.stats(),
         readiness,
-        live: { sessions: liveCpu.sessions, liveSeconds: Math.round(liveCpu.ms / 1000), cpuSeconds: Math.round(liveCpu.cpuSeconds * 10) / 10, cpuSecondsPerLiveHour: liveCpu.ms ? Math.round((liveCpu.cpuSeconds * 3_600_000) / liveCpu.ms) : null }
+        live: { sessions: liveCpu.sessions, liveSeconds: Math.round(liveCpu.ms / 1000), cpuSeconds: Math.round(liveCpu.cpuSeconds * 10) / 10, cpuSecondsPerLiveHour: liveCpu.ms ? Math.round((liveCpu.cpuSeconds * 3_600_000) / liveCpu.ms) : null },
+        liveCopy: liveCopy.stats()
       };
     },
 

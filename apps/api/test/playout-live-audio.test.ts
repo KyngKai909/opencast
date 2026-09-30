@@ -1,9 +1,11 @@
 // A TV station's live block and its audio-only rendition: Livepeer makes no audio-only rendition,
 // so the channel's `a128` takes the sound of Livepeer's smallest rendition, stream-copied (no
 // re-encode, its timestamps kept) into segments of its own, stored with the platform's objects.
-// Before, audio-only listeners were sent Livepeer's 360p pictures during live blocks. Against a
-// local fake of Livepeer's output serving real TS (no Livepeer stream is created, nothing paid is
-// called), on a frozen clock; FFmpeg takes the sound.
+// Before, audio-only listeners were sent Livepeer's 360p pictures during live blocks. Since
+// 2026-09-30 the pictures are copied into storage too (livecopy.ts), and the sound is taken from
+// the smallest rendition's bytes already pulled: each of Livepeer's segments is fetched once.
+// Against a local fake of Livepeer's output serving real TS (no Livepeer stream is created,
+// nothing paid is called), on a frozen clock; FFmpeg takes the sound.
 import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import http from "node:http";
@@ -25,6 +27,7 @@ let dir: string;
 /** Livepeer's segments: pictures and sound, two seconds each, as a real TS file per rendition. */
 const segments: Record<string, Buffer> = {};
 const on = { from: Date.parse("2026-10-01T20:00:44.000Z"), to: Date.parse("2026-10-01T20:01:30.000Z") };
+const fetched = new Map<string, number>();
 
 function probe(file: string) {
   const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_name,codec_type,start_time", "-of", "json", file], { encoding: "utf8" });
@@ -52,6 +55,7 @@ function fakeLivepeer() {
     }
     const seg = /^\/hls\/fake\/(720p0|360p0)\/\d+\.ts$/.exec(url);
     if (seg) {
+      fetched.set(url, (fetched.get(url) ?? 0) + 1);
       res.setHeader("content-type", "video/mp2t");
       res.end(segments[seg[1]]);
       return;
@@ -108,14 +112,21 @@ describe("a TV live block's audio-only rendition", () => {
     audio = (await h.services.playout.playlist(stationId, "a128.m3u8"))!.body;
     v720 = (await h.services.playout.playlist(stationId, "v720.m3u8"))!.body;
 
-    // The pictures still come from Livepeer; the audio-only rendition from the platform's own objects.
-    expect(v720).toContain(`${origin}/hls/fake/720p0/`);
-    expect(audio).not.toContain(`${origin}/hls/fake/`);
+    // Pictures and sound from the platform's own objects, never Livepeer's.
+    expect(v720).not.toContain(origin);
+    expect(audio).not.toContain(origin);
     const own = audio.split("\n").filter((l) => /\/prepared\/live-[\w-]+\/a128\/seg_\d{5}\.ts$/.test(l));
     expect(own.length).toBeGreaterThanOrEqual(5);
     // Segment for segment with the pictures (the same count in the live stretch).
-    const live720 = v720.split("\n").filter((l) => l.startsWith(`${origin}/hls/fake/720p0/`));
+    const live720 = v720.split("\n").filter((l) => /\/prepared\/live-[\w-]+\/v\d+\/seg_\d{5}\.ts$/.test(l));
     expect(own.length).toBe(live720.length);
+    // Each of Livepeer's segments fetched once: the 360p's pictures and the sound from one fetch.
+    expect([...fetched.values()].every((n) => n === 1)).toBe(true);
+    // (a few more than the playlist shows: the copies run a segment or two ahead of what's
+    // published, and the one copied when the block first asked may be passed for a newer edge)
+    const small = [...fetched.keys()].filter((u) => u.includes("/360p0/")).length;
+    expect(small).toBeGreaterThanOrEqual(own.length);
+    expect(small).toBeLessThanOrEqual(own.length + 4);
 
     // Sound only, AAC as Livepeer sent it, with Livepeer's timestamps (nothing re-encoded).
     const key = /(prepared\/live-[\w-]+\/a128\/seg_\d{5}\.ts)$/.exec(own[0])![1];

@@ -34,11 +34,11 @@ flowchart LR
   MC["Master control<br/><i>the log, library, breaks</i>"] --> API["API<br/><code>apps/api</code>"]
   API --> DB[("Postgres<br/>Redis")]
   W["Worker<br/><code>apps/worker</code>"] --> DB
-  W -->|"prepare once"| R2[("Cloudflare R2<br/><i>segments by content ID</i>")]
+  W -->|"prepare once,<br/>copy live once"| R2[("Cloudflare R2<br/><i>segments by content ID</i>")]
   W -->|"assemble"| PL["Channel playlists<br/><i>HLS, per rendition</i>"]
   PL --> V["Viewer · TV · Cast"]
   R2 --> V
-  LP["Livepeer<br/><i>live blocks only</i>"] --> PL
+  LP["Livepeer<br/><i>live blocks only</i>"] -->|"each segment once"| W
 ```
 
 Three ideas to know before reading the code.
@@ -47,7 +47,8 @@ Three ideas to know before reading the code.
 transcoded once, into 4-second segments at a fixed ladder, and stored by content ID. A channel is a
 rolling HLS playlist that points at those segments in the order the log says. Writing playlists
 takes almost no CPU, so a channel costs a few dollars a month, not hundreds. Live blocks are the
-only live encode (through Livepeer, for their hours only).
+only live encode (through Livepeer, for their hours only); the worker copies Livepeer's segments
+into R2 once, so viewers play live blocks from R2 too.
 
 **The player draws the graphics.** The station's bug, lower thirds and a spot's code and QR aren't
 burned into the picture. The worker writes `#EXT-X-DATERANGE` tags into the playlist
@@ -227,7 +228,11 @@ flowchart LR
   64 kbps. Spots, bumpers, station IDs and generated underwriting credits are prepared the same way.
 - **Breaks** come from the station's break rule and always contain a station ID. Each spot placed
   makes a hold on the advertiser's balance; one without a hold is skipped for the next in rotation.
-- **Live blocks** point the playlist at Livepeer's segments for their hours, and back.
+- **Live blocks** point the playlist at live segments in R2 for their hours, and back. On the TV
+  band the worker's leader pulls each new segment of each of Livepeer's renditions once and stores
+  it (`prepared/live-<source>-<session>/`, kept two days with the channel's rows), so viewers and
+  relays never fetch from Livepeer, a live hour costs the same whatever the audience, and pause and
+  rewind work through a live block. On the radio band the worker packages the encoder's push itself.
 - **Translators** simulcast a station to YouTube, Twitch or any RTMP address. By default only its
   live shows go out; "Everything I air" runs one sender per station in `apps/relay`, which
   re-encodes only to draw the station's bug. More in [`docs/relay.md`](./docs/relay.md).
@@ -245,7 +250,8 @@ npm run as-run -w @opencast/worker -- <stationId>
 ```
 
 `curl localhost:8788/health` shows the worker's leader, stations on air, what's prepared or
-waiting, readiness and translators.
+waiting, readiness, radio live's CPU (`live`) and TV live copying (`liveCopy`: bytes pulled per live
+hour, CPU, segments skipped, the delay a copy adds).
 
 ---
 
@@ -260,13 +266,14 @@ flowchart LR
     UP["Upload in the browser<br/><i>parts, resumable</i>"]
     ENC["Live encoder<br/><i>RTMP</i>"]
   end
-  UP -->|"presigned parts,<br/>straight to storage"| R2[("Cloudflare R2<br/><i>originals, prepared segments</i>")]
+  UP -->|"presigned parts,<br/>straight to storage"| R2[("Cloudflare R2<br/><i>originals, prepared segments,<br/>live copies</i>")]
   R2 -->|"prepare once"| WK["Worker"]
   WK --> R2
   ENC -->|"TV band"| LP["Livepeer<br/><i>live transcode</i>"]
   ENC -->|"radio band"| WK
+  LP -->|"each segment once"| LC["Worker: live copy"]
+  LC --> R2
   WK -->|"assemble"| PL["Channel playlists"]
-  LP --> PL
   PL --> V["Viewer · TV · Cast"]
   R2 -->|"segments, no egress fees"| V
   PL --> RL["Relay<br/><code>apps/relay</code>"]
@@ -278,7 +285,8 @@ flowchart LR
   dropped connection or a reload. The API reads the file back once for its content ID, so a file
   already on the platform is stored once. More in [`docs/uploads.md`](./docs/uploads.md).
 - **Viewers** fetch segments from R2's public address. R2 doesn't charge for egress, so a viewer-hour
-  costs a small fraction of a cent.
+  costs a small fraction of a cent. Live blocks too: the worker copies each of Livepeer's segments
+  into R2 once as it's published, so no viewer is Livepeer delivery.
 - **Relays** push one stream per station to Livepeer, which sends it on to each platform untouched.
   Platform keys are sealed with AES-256-GCM (`PLATFORM_SECRETS_KEY`); see
   [`docs/platforms.md`](./docs/platforms.md).

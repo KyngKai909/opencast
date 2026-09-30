@@ -1049,14 +1049,14 @@ export const channelItems = broadcast.table(
     discontinuity: boolean("discontinuity").notNull().default(true),
     startsAt: at("starts_at").notNull(),
     endsAt: at("ends_at").notNull(),
-    /** `prepared` segments, `live` segments (Livepeer's), or `end`: the playlist ends here (#EXT-X-ENDLIST). */
+    /** `prepared` segments, `live` segments (the worker's own in storage: a TV block's copied from Livepeer, a radio one's packaged), or `end`: the playlist ends here (#EXT-X-ENDLIST). */
     kind: text("kind", { enum: ["prepared", "live", "end"] }).notNull(),
     preparedKey: text("prepared_key"),
     firstSegment: integer("first_segment").notNull().default(0),
     segments: integer("segments").notNull().default(0),
     /** Segment lengths on the channel's timeline (ms). */
     segmentMs: jsonb("segment_ms").$type<number[]>().notNull().default([]),
-    /** Live: each rendition's segment URLs. */
+    /** Live: each rendition's segment URLs (in storage, `prepared/live-<source>-<session>/`; before 2026-09-30 a TV block's were Livepeer's). */
     liveUris: jsonb("live_uris").$type<Record<string, string[]>>(),
     /** The #EXT-X-DATERANGE lines that go with it. */
     tags: jsonb("tags").$type<string[]>().notNull().default([]),

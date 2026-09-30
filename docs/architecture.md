@@ -92,9 +92,16 @@ assemble.ts         per station on air: the run sheet becomes the channel's time
                     (proof.ts), and settlement
 playlist.ts         renders a channel's master and media playlists from its timeline (API and worker,
                     short cache); the player draws the bug, lower thirds and codes from the DATERANGE tags
-live.ts, radiolive.ts, rtmp.ts
-                    live blocks: TV through Livepeer (same ladder; the audio-only rendition made here),
-                    radio through the worker's own RTMP ingest, packaged to 128k and 64k
+live.ts, livecopy.ts, radiolive.ts, rtmp.ts
+                    live blocks, always from the worker's own segments in storage
+                    (prepared/live-<source>-<session>/<rendition>/, kept with their channel rows,
+                    two days): TV transcoded by Livepeer (same ladder), each new segment of each
+                    rendition pulled once by the leader and stored in R2 as it's published, the
+                    audio-only rendition cut from the smallest's bytes (livecopy.ts; one pull per
+                    source however many stations air it or viewers watch; a failed copy is retried
+                    briefly, then skipped with a discontinuity; a copy behind drops to the newest;
+                    health `liveCopy`); radio through the worker's own RTMP ingest, packaged to
+                    128k and 64k. Viewers and relays never fetch Livepeer's segments
 sender.ts, fanout.ts, relayBreaks.ts
                     relays (follow-up Phase 3; run by the relay service, apps/relay, never the worker):
                     one continuous stream per station from the channel's own segments, live blocks

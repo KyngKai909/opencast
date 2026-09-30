@@ -9,10 +9,12 @@
 //     live, lower third, sign-off).
 //   - Open time and holds air the station ID slate, prepared at the length needed (whole seconds,
 //     at most a minute a row). Items not prepared air the same fill, and the station is told.
-//   - A live block points at the live source's segments (TV: Livepeer's, the same ladder, with the
-//     audio-only rendition's sound taken from Livepeer's smallest; radio: the worker's own, from
-//     the station's RTMP push), appended as they appear; a source that isn't connected airs the
-//     prepared stand-by slate. A source that reconnects starts a new row (a discontinuity).
+//   - A live block points at the live source's segments, always the worker's own copies in storage
+//     (TV: Livepeer's, the same ladder, pulled once and stored as they appear, with the audio-only
+//     rendition's sound taken from Livepeer's smallest; radio: packaged from the station's RTMP
+//     push), appended as they appear; a source that isn't connected airs the prepared stand-by
+//     slate. A source that reconnects starts a new row (a discontinuity), and so does a segment the
+//     copy had to skip (a new `part`): the next row carries on from the segment after it.
 //   - A planned sign-off: the sign-off slate, then the playlist ends (an `end` row: #EXT-X-ENDLIST).
 //     At the back time a new run starts (a new playlist), from the station ID.
 //   - When an item's last segment is published, its as-run entry is written with the program
@@ -112,7 +114,9 @@ export class ChannelAssembler {
   /** Plan segments with nothing left to air. */
   private passed = new Set<string>();
   private sources = new Map<string, LiveSource | null>();
-  private liveRow: { row: Row; segKey: string; sourceId: string; lastSeq: number; session?: string } | null = null;
+  private liveRow: { row: Row; segKey: string; sourceId: string; lastSeq: number; session?: string; part?: number } | null = null;
+  /** A live row closed at a skipped segment: the next row carries on after `lastSeq` (same session). */
+  private resume: { segKey: string; sourceId: string; lastSeq: number; session?: string } | null = null;
   private standBy: { id: string; segKey: string; sourceId: string } | null = null;
   private signalLost = new Set<string>();
   private pending: "now" | "future" | null = null;
@@ -259,8 +263,10 @@ export class ChannelAssembler {
   private async extend(now: number) {
     const lead = this.options.leadMs ?? LEAD_MS;
     await this.syncSources(now);
-    // The stand-by slate is written ahead; a source that connects cuts it at the next segment boundary.
-    if (this.standBy && this.sources.get(this.standBy.sourceId)?.connected()) {
+    // The stand-by slate is written ahead; a source that connects cuts it at the next segment
+    // boundary, once it has a segment to air (a TV source's first copy: asking starts the copying).
+    const standing = this.standBy ? this.sources.get(this.standBy.sourceId) : null;
+    if (this.standBy && standing?.connected() && standing.after(null).length) {
       this.standBy = null;
       await this.truncate(now);
     }
@@ -269,6 +275,7 @@ export class ChannelAssembler {
       // Fell behind (the worker stalled): carry on from now; the next item's date-time says so.
       this.log(`behind by ${Math.round((now - c.at) / 1000)} s: carrying on from now`);
       if (this.liveRow) await this.closeLive();
+      this.resume = null;
       c.at = now;
     }
     for (let guard = 0; guard < 200 && this.cursor!.at < now + lead && !this.stopped; guard++) {
@@ -430,6 +437,7 @@ export class ChannelAssembler {
     const src = seg.source;
     if (src.kind !== "live" && this.liveRow) await this.closeLive();
     if (src.kind !== "live" && this.standBy) this.standBy = null;
+    if (src.kind !== "live") this.resume = null;
 
     if (src.kind === "off") {
       // Planned off air: the playlist ends; the next run starts at the back time.
@@ -535,7 +543,10 @@ export class ChannelAssembler {
 
     if (source?.connected()) {
       if (this.standBy?.segKey === seg.key) {
-        // Back from stand-by at the next segment boundary.
+        // Back from stand-by at the next segment boundary, once there's a segment to air: a
+        // source that copies its segments (TV) starts copying when asked, and the slate carries on
+        // until the first copy lands.
+        if (!source.after(null).length) return false;
         this.standBy = null;
         await this.truncate(now);
       }
@@ -546,13 +557,15 @@ export class ChannelAssembler {
         let row = live.row;
         const uris = { ...(row.liveUris ?? {}) };
         const lengths = [...row.segmentMs];
-        // The source reconnected (a new session, its timestamps from the start): a new row.
-        if (fresh[0].session !== live.session) {
+        // The source reconnected (a new session, its timestamps from the start): a new row. A
+        // segment skipped (its copy failed, or the copy caught up): a new row too, from the next.
+        if (fresh[0].session !== live.session || (fresh[0].part ?? 0) !== (live.part ?? 0)) {
+          if (fresh[0].session === live.session) this.resume = { segKey: seg.key, sourceId: liveSourceId, lastSeq: live.lastSeq, session: live.session };
           await this.closeLive();
           return true;
         }
         for (const s of fresh) {
-          if (row.startsAt.getTime() + sum(lengths) >= blockEnd || s.session !== live.session) break;
+          if (row.startsAt.getTime() + sum(lengths) >= blockEnd || s.session !== live.session || (s.part ?? 0) !== (live.part ?? 0)) break;
           lengths.push(s.durationMs);
           for (const r of BAND_RENDITIONS[band]) uris[r] = [...(uris[r] ?? []), s.uris[r]!];
           // The source's captions, when it has them ("" where a segment has none).
@@ -572,10 +585,25 @@ export class ChannelAssembler {
         if (end >= blockEnd) await this.closeLive();
         return true;
       }
-      // Into the live block, at the source's live edge (once the channel's timeline reaches now).
-      if (c.at > now + 2_000) return false;
-      const edge = source.after(null);
+      // Into the live block, at the source's live edge (once the channel's timeline reaches now);
+      // asking for it first, so a source that copies its segments starts copying now.
+      let edge = source.after(null);
+      const resume = this.resume?.segKey === seg.key && this.resume.sourceId === liveSourceId ? this.resume : null;
+      const next = resume ? source.after(resume.lastSeq).filter((s) => s.session === resume.session) : [];
+      if (next.length) {
+        // On from the segment after the one skipped, in its part, to the block's end.
+        const part = next[0].part ?? 0;
+        edge = [];
+        let t = c.at;
+        for (const s of next) {
+          if ((s.part ?? 0) !== part || t >= blockEnd) break;
+          edge.push(s);
+          t += s.durationMs;
+        }
+      } else if (resume && edge[0]?.session === resume.session) return false;
+      else if (c.at > now + 2_000) return false;
       if (!edge.length) return false;
+      this.resume = null;
       if (this.liveRow) await this.closeLive();
       const id = crypto.randomUUID();
       const lengths = edge.map((s) => s.durationMs);
@@ -583,7 +611,7 @@ export class ChannelAssembler {
       if (edge.some((s) => s.uris.subs)) uris.subs = edge.map((s) => s.uris.subs ?? "");
       const tags = await this.tagsFor(id, seg, c.at, c.at + sum(lengths), null, "live");
       const row = await this.insertRow({ id, ...this.asRunFields(seg), reason: "live", kind: "live", liveUris: uris, segments: lengths.length, segmentMs: lengths, startsAt: new Date(c.at), endsAt: new Date(c.at + sum(lengths)), tags, open: true });
-      this.liveRow = { row, segKey: seg.key, sourceId: liveSourceId, lastSeq: edge[edge.length - 1].seq, session: edge[edge.length - 1].session };
+      this.liveRow = { row, segKey: seg.key, sourceId: liveSourceId, lastSeq: edge[edge.length - 1].seq, session: edge[edge.length - 1].session, part: edge[edge.length - 1].part };
       this.signalLost.delete(seg.key);
       this.log("live source connected: on air from it");
       return true;
@@ -594,6 +622,7 @@ export class ChannelAssembler {
       await this.closeLive();
       this.log("live signal lost: standing by");
     }
+    this.resume = null;
     if (!this.signalLost.has(seg.key)) {
       this.signalLost.add(seg.key);
       if (seg.startsAt.getTime() <= now + 2_000) this.options.onSignalLost?.(liveSourceId);
@@ -649,6 +678,7 @@ export class ChannelAssembler {
     // source connecting cuts it. Before, a replan while standing by (dead air filled after the
     // block, a log edit) left the slate to run out before the source could air.
     if (standByGone) this.standBy = null;
+    this.resume = null;
   }
 
   // --- Published: the as-run log ------------------------------------------------------------
