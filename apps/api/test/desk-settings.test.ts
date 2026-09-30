@@ -142,7 +142,10 @@ describe("the rules registry", () => {
     const list = await dee.get("/v1/admin/rules");
     expect(list.status).toBe(200);
     const byKey = Object.fromEntries(list.body.rules.map((r: { key: string; current: { display: string; set: boolean } }) => [r.key, r.current]));
-    expect(byKey["prices.storage"]).toMatchObject({ display: "Not set yet", set: false });
+    // The starting price sheet (docs/pricing.md) from October 1, 2026 (migration 0033, pay-as-you-go).
+    expect(byKey["prices.storage"]).toMatchObject({ display: "$0.04 a GB a month", set: true });
+    expect(byKey["prices.radio_live"]).toMatchObject({ display: "Free", set: true });
+    expect(byKey["billing.grace"]).toMatchObject({ display: "14 days, a warning 3 days before" });
     expect(byKey["prices.free_allowance"]).toMatchObject({ display: "10 GB, 5 live hours", set: true });
     expect(byKey["shares.opencast"]).toMatchObject({ display: "0%, not set yet", set: false });
     expect(byKey["rights.public_domain_us"]).toMatchObject({ display: "1930" });

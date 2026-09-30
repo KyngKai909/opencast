@@ -39,6 +39,18 @@ export interface Events {
     sentAt: string;
   };
   "code.used": { businessId: string; spotId: string; code: string };
+  /**
+   * Pay-as-you-go (added 2026-09-29): a step in a station's account the owners are told about:
+   * the month's usage, a charge that failed, grace started or ending soon, paused, resumed, a cap
+   * reached, a payment to approve in Clear. Worded where it happens; one notice per `dedupeKey`.
+   */
+  "station.account": {
+    stationId: string;
+    step: "usage_summary" | "charge_failed" | "grace_started" | "clear_approval" | "grace_ending" | "paused" | "resumed" | "paid" | "cap_reached";
+    title: string;
+    body: string;
+    dedupeKey: string;
+  };
 }
 
 type Handler<K extends keyof Events> = (payload: Events[K]) => Promise<void> | void;

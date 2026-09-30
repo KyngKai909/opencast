@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, bigint, boolean, check, date, index, integer, jsonb, smallint, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, bigint, boolean, check, date, doublePrecision, index, integer, jsonb, primaryKey, smallint, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { at, createdAt, id, micros } from "./columns.js";
 import { ledger } from "./namespaces.js";
 import { stations } from "./broadcast.js";
@@ -27,7 +27,14 @@ export const accountKind = ledger.enum("account_kind", [
   "opencast_absorbed",
   "card_fees",
   /** Money outside the system: banks, cards, payouts. Its balance is the negative of what's inside. */
-  "external"
+  "external",
+  // Pay-as-you-go (added 2026-09-29, migration 0033, follow-up Phase 2).
+  /** A station's usage, owed to Opencast: negative while it owes. Not money anywhere; a claim. */
+  "usage_owed",
+  /** Opencast's side of usage accrued and not yet paid (the other side of `usage_owed`). */
+  "usage_billed",
+  /** Usage paid to Opencast: from a station's earnings, its linked Clear wallet or its card. In the treasury. */
+  "opencast_usage"
 ]);
 
 export const accountsTable = ledger.table(
@@ -43,14 +50,16 @@ export const accountsTable = ledger.table(
     createdAt: createdAt()
   },
   (t) => [
+    // Compared as text (migration 0033): the kinds added in the same migration can't be cast to the enum before it commits.
     check(
       "account_owner_fits_kind",
-      sql`case ${t.kind}
+      sql`case ${t.kind}::text
         when 'advertiser_available' then ${t.advertiserId} is not null and ${t.stationId} is null
         when 'station_earnings' then ${t.stationId} is not null and ${t.advertiserId} is null
         when 'escrow_owed' then ${t.stationId} is not null and ${t.advertiserId} is null
         when 'escrow' then ${t.stationId} is not null and ${t.advertiserId} is null
         when 'creator' then ${t.stationId} is not null and ${t.userId} is not null
+        when 'usage_owed' then ${t.stationId} is not null and ${t.advertiserId} is null
         else ${t.advertiserId} is null and ${t.stationId} is null
       end`
     ),
@@ -111,7 +120,11 @@ export const entryKind = ledger.enum("entry_kind", [
   "escrow_claim",
   "escrow_stop",
   "escrow_unclaimed",
-  "reversal"
+  "reversal",
+  /** Pay-as-you-go (migration 0033): a station's usage for a day, accrued (and the month's rounding to the cent). */
+  "usage",
+  /** Pay-as-you-go: usage paid, from the station's earnings, its linked Clear wallet or its card. */
+  "usage_payment"
 ]);
 
 /** One balanced movement of money. Never updated or deleted; a reversal is a new entry. */
@@ -367,3 +380,118 @@ export const chainCursor = ledger.table("chain_cursor", {
   block: bigint("block", { mode: "bigint" }).notNull(),
   updatedAt: at("updated_at").notNull().defaultNow()
 });
+
+
+// ---- Pay-as-you-go for stations (added 2026-09-29, migration 0033, follow-up Phase 2) ----------
+// Owned by the ledger module (modules/ledger/billing.ts). Being on air is free; a station pays for
+// storage, relays of everything it airs, and live hours through Livepeer. Usage is measured each
+// day, accrued as `usage` entries, and paid at month end: from earnings first, then the station's
+// linked Clear wallet (full access) or its card. See docs/pricing.md.
+
+/**
+ * What a station used on a day (UTC), by usage type: storage in GB (measured that day, originals
+ * and prepared segments together), everything else in hours. Today's row is measured again every
+ * hour; a day is closed the next day, when its charge (after the free allowance, at that day's
+ * price, never past the station's cap) is worked out and accrued in one `usage` entry per station.
+ */
+export const usageDays = ledger.table(
+  "usage_days",
+  {
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** `storage`, `relay_everything`, `live_hours`, `radio_live`, `relay_live_only` (packages/contracts billing.ts). */
+    usageType: text("usage_type").notNull(),
+    day: date("day").notNull(),
+    /** GB for storage; hours otherwise. */
+    quantity: doublePrecision("quantity").notNull().default(0),
+    /** Storage only: the bytes behind it (originals, prepared). */
+    detail: jsonb("detail"),
+    /** Set when the day is closed: what it adds to the month's charge for this type. */
+    chargeMicros: micros("charge_micros"),
+    closedAt: at("closed_at"),
+    /** The `usage` entry the day's charges were accrued in (none when they came to nothing). */
+    entryId: uuid("entry_id").references(() => entries.id),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [
+    primaryKey({ columns: [t.stationId, t.usageType, t.day] }),
+    index("usage_days_day").on(t.day),
+    check("usage_type_known", sql`${t.usageType} in ('storage', 'relay_everything', 'live_hours', 'radio_live', 'relay_live_only')`),
+    check("usage_quantity_nonnegative", sql`${t.quantity} >= 0`),
+    check("usage_charge_nonnegative", sql`${t.chargeMicros} is null or ${t.chargeMicros} >= 0`)
+  ]
+);
+
+/**
+ * A station's pay-as-you-go settings and standing: how it pays what earnings don't cover (its
+ * owner's linked Clear wallet, or a card saved through Stripe), its monthly caps per usage type,
+ * and whether it's in its grace period or paused for an unpaid bill. `capsReached` is what the
+ * metering found this month (a cap reached pauses that usage until the month ends).
+ */
+export const stationBilling = ledger.table(
+  "station_billing",
+  {
+    stationId: uuid("station_id")
+      .primaryKey()
+      .references(() => stations.id),
+    funding: text("funding", { enum: ["clear", "card"] }),
+    /** The owner's Clear link, when the station pays from Clear (full access needed at the time). */
+    clearLinkId: uuid("clear_link_id").references(() => clearLinks.id),
+    /** The card, as Stripe (or the fake) knows it: its PaymentMethod, "Visa ending 4242", the last day it works. */
+    cardRef: text("card_ref"),
+    cardLabel: text("card_label"),
+    cardExpiresOn: date("card_expires_on"),
+    /** Monthly caps in micros, by usage type ({ "relay_everything": 20000000 }); missing or null is no cap. */
+    caps: jsonb("caps").$type<Record<string, number | null>>().notNull().default({}),
+    /** The month (YYYY-MM) each type reached its cap in: paused until that month ends. */
+    capsReached: jsonb("caps_reached").$type<Record<string, string>>().notNull().default({}),
+    standing: text("standing", { enum: ["ok", "grace", "paused"] }).notNull().default("ok"),
+    graceStartedAt: at("grace_started_at"),
+    pausedAt: at("paused_at"),
+    updatedBy: uuid("updated_by").references(() => users.id),
+    updatedAt: at("updated_at").notNull().defaultNow()
+  },
+  (t) => [
+    check("station_billing_clear_has_link", sql`${t.funding} is distinct from 'clear' or ${t.clearLinkId} is not null`),
+    check("station_billing_grace_started", sql`${t.standing} = 'ok' or ${t.graceStartedAt} is not null`)
+  ]
+);
+
+/**
+ * A station's bill for a month (UTC): opened with its first day of usage, closed after the month
+ * ends. What was accrued, paid and still due are the ledger's (`usage` and `usage_payment` entries
+ * with this bill as their source); the row keeps the month's lines for statements and the last
+ * attempt to charge what earnings didn't cover.
+ */
+export const usageBills = ledger.table(
+  "usage_bills",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** The month's first day. */
+    month: date("month").notNull(),
+    status: text("status", { enum: ["open", "due", "paid"] }).notNull().default("open"),
+    /** Per usage type once closed: quantity, free, billable, price (the month's last), charge. */
+    lines: jsonb("lines"),
+    closedAt: at("closed_at"),
+    paidAt: at("paid_at"),
+    attempts: smallint("attempts").notNull().default(0),
+    lastAttemptAt: at("last_attempt_at"),
+    lastMethod: text("last_method", { enum: ["card", "clear"] }),
+    /** Why the last attempt didn't pay it ("Your card was declined."), or null. */
+    lastFailure: text("last_failure"),
+    lastProviderRef: text("last_provider_ref"),
+    /** A transfer from the owner's Clear wallet waiting to be mined (lower-case), and what it sends. */
+    clearTxHash: text("clear_tx_hash"),
+    clearAmountMicros: micros("clear_amount_micros"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    uniqueIndex("usage_bills_station_month").on(t.stationId, t.month),
+    uniqueIndex("usage_bills_clear_tx").on(t.clearTxHash).where(sql`${t.clearTxHash} is not null`),
+    check("usage_bill_month_start", sql`extract(day from ${t.month}) = 1`)
+  ]
+);

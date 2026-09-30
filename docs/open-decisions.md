@@ -84,7 +84,7 @@ Every Open rule is set in Network desk, Settings, Rules, from a date, with the o
 | Who can do the second check | desk roles | a rights reviewer or an admin who didn't do the first; the database refuses the same person |
 | Composing episodes: joined into one file (H.264/AAC, the tallest item's height up to 1080, 30 fps) and prepared once like any program | `shelf/compose.ts` | re-encoded, not stream-copied, so items from different sources join cleanly |
 | Bumpers inside catalog episodes | not built | none: an episode is its items; the carrier's breaks bring bumpers |
-| Prices, relay hours, live hours, the free allowance, platform limits | `prices.*`, `relays.platform_limits` | not set yet; 10 GB and 5 live hours free; Twitch 48 hours, Facebook 8, YouTube saves under 12 (read by Phases 2 and 3) |
+| Prices, relay hours, live hours, the free allowance, platform limits | `prices.*`, `relays.platform_limits` | the starting price sheet from October 1, 2026 (docs/pricing.md; see "Pay-as-you-go" below); 10 GB and 5 live hours free; Twitch 48 hours, Facebook 8, YouTube saves under 12 (read by Phases 2 and 3) |
 | Each market's numbering | `numbering.channels`, per market | TV 2 to 69 with subchannels; radio 88.2 to 107.8, even tenths (the user's decision; the frame's "88.1 to 107.9" is from before it). Stations choose only inside their market's range |
 | Market leads: which pages | desk roles | the board, the creator pipeline (creators, works, asking, reminders), external sources and reservations of their own market; everything else is admins' |
 | Escrow signer changes | Settings, Escrow signers | every other admin (as of the proposal) approves; any one refuses; one open at a time. Approved changes go to the timelock (contracts/README.md) |
@@ -224,3 +224,28 @@ The email provider is decided: Resend (the user's choice, 2026-09-29), through i
 | A radio-band station is listed as a station "kind" in spot targeting | Band is its own field; categories stay categories |
 | The waitlist has four roles, Phase 4 lists three | All four: viewer, station, producer, business |
 | Stop pays an unclaimed creator "within a week", but they have no wallet until they sign in | The escrow pays Stop only to an approved creator wallet, after 72 hours in public. Privy makes no wallet at sign-in (`createOnLogin` is off in the web and business apps, for everyone). Instead, when a signed-in creator claims (or stops) from the permission page's Claim now or master control's claim page, the page makes their Privy embedded wallet first with `createWallet` (unless they already have a wallet: one they signed in with, or one made before), and the claim then reads their wallets from Privy and records it on the account, where approving finds it (`walletOf`). Approving reads Privy again if nothing was recorded, and refuses with `no_wallet` only when there's still none. Updated 2026-09-29 (catch-up report, section 5) |
+
+## Pay-as-you-go for stations (added 2026-09-29, follow-up Phase 2)
+
+Being on air is free; a station pays for storage, relays of everything it airs and live hours through Livepeer (docs/pricing.md, docs/stripe.md). Every price is in the rules registry with an effective date (Network desk, Settings, Rules, Pay-as-you-go), set by migration 0033 as the starting price sheet: cost plus a margin from the Phase 5 measurements, **every number for review**.
+
+| Decision | Where it lives | Default |
+|---|---|---|
+| Storage price (originals and prepared segments together, GB a month, each day's GB averaged) | `prices.storage.perGbMonthMicros` | $0.04 from 2026-10-01 (cost about $0.018); not set before |
+| Relays of everything a station airs (per hour, per station, however many platforms) | `prices.relay_everything.perHourMicros` | $0.20 from 2026-10-01 (cost $0.085 to one platform, $0.15 to two, $0.22 to three: three or more lose money) |
+| Live hours through Livepeer | `prices.live_hours.perHourMicros` | $0.75 from 2026-10-01 (cost $0.33 plus $0.03 a viewer-hour; $0.48 at 5 viewers) |
+| Radio live through the worker's own ingest (not Livepeer): billed, or free? | `prices.radio_live.perHourMicros`, its own usage type (`radio_live`), metered either way | free ($0; cost about $0.002 an hour) |
+| The free allowance each month | `prices.free_allowance` (`storageGb`, `liveHours`) | 10 GB and 5 live hours (costs Opencast about $2.58 a station a month) |
+| The grace period before relays and live hours pause, and the warning before its end | `billing.grace` (`days`, `warnDaysBefore`) | 14 days, warned 3 days before |
+| Number and call sign licenses (yearly renewals) | reserved in the pricing table (`RESERVED_USAGE_TYPES`, packages/contracts billing.ts); not built | none |
+| Who pays: independent stations and studios. Claimable stations (Opencast runs them for their creator), listed city streams and the catalog station | `BILLED_KINDS`, apps/api/src/v1/modules/ledger/billing.ts | not billed (their usage isn't metered) |
+| Stripe's card fee on a usage charge: out of the price, or on top? | `recordCardPayment` | out of the price (a `card_fee` entry from `opencast_usage`); on top would be a surprise |
+| Amounts under Stripe's card minimum ($0.50) | `CARD_MINIMUM_MICROS` | carried to the next month's bill; no grace for them |
+| Which funding source pays when the owners haven't chosen | `resolveFunding` | an owner's linked Clear wallet with full access, else the card on file (the prompt's order); the owners can choose one |
+| When earnings pay usage | `collectFromEarnings` | before every payout (weekly by default) and when the month closes: usage owed comes out of earnings before anything is paid out |
+| Days and months for billing | the jobs | UTC (a month closes at 00:00 UTC on the 1st, 5 pm the day before in Los Angeles) |
+| A GB | metering | 10^9 bytes |
+| What a storage cap pauses | `USAGE_TYPES.storage.pauses` | new uploads and link imports (409 `storage_paused`); files already kept stay, at no more than the cap |
+| A cap of $0 | `checkCapsFor` | reached by anything billable; usage inside the free allowance doesn't reach it |
+| Metering before the first run | the jobs | none: metering starts the day it first runs, with no backfill |
+| Stripe's Connect fallback (`PAYMENTS_PROVIDER=stripe_only`) on ClearLabs Inc's account | docs/stripe.md | stations would see ClearLabs Inc's branding in Express onboarding until Opencast has its own Stripe account |

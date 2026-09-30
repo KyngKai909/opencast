@@ -147,6 +147,9 @@ export function clearPayments(clear: ClearClient, stripe: StripeCards | null, fa
       return stripe.cardSession(input);
     },
 
+    // Pay-as-you-go: stations' cards through Stripe (faked without a key, like pledges).
+    stationCards: stripe ? stripe.stationCards() : fallbackCard.stationCards,
+
     custody: ownAccountsCustody,
 
     async applyMove(move: ProviderMove, accounts) {

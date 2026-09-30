@@ -12,6 +12,7 @@
     "test": "npm run test:suite && npm run test:realtime",
     "test:suite": "vitest run --exclude test/playout-translator.test.ts --exclude test/playout-radio-live.test.ts --exclude test/playout-relay-background.test.ts --exclude test/playout-live-audio.test.ts",
     "demo:watch-data": "tsx --conditions=source scripts/demo-watch-data.ts",
+    "demo:billing": "tsx --conditions=source scripts/demo-billing.ts",
     "storage:move-off-pinata": "tsx --conditions=source scripts/move-off-pinata.ts",
     "storage:prepare-from-originals": "tsx --conditions=source scripts/prepare-from-originals.ts",
     "storage:relink-locations": "tsx --conditions=source scripts/relink-locations.ts",

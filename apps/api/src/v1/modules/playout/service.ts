@@ -169,6 +169,14 @@ export interface PlayoutService {
   dropPrepared(keys: string[], options: { evenIfAiring: boolean }): Promise<{ dropped: string[]; deferred: string[] }>;
   /** The storage sweep: what was prepared from files that are gone, left while it aired (or from before). */
   sweepPrepared(): Promise<{ dropped: number; deferred: number }>;
+
+  // ---- Pay-as-you-go metering (added 2026-09-29, follow-up Phase 2) ----
+  /** Translator sessions overlapping [from, to), each clipped to it; a running one counts to its last update. */
+  relaySessions(from: Date, to: Date): Promise<Array<{ stationId: string; translatorId: string; startedAt: Date; endedAt: Date }>>;
+  /** What aired live (the as-run log's `live` rows) overlapping [from, to), clipped to it. */
+  liveAired(from: Date, to: Date): Promise<Array<{ stationId: string; startedAt: Date; endedAt: Date }>>;
+  /** The bytes stored for each content ID's prepared segments (every band's renditions, ready or not yet swept). */
+  preparedBytes(contentIds: string[]): Promise<Map<string, number>>;
 }
 
 export interface PreviewRef {
@@ -618,6 +626,49 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     async onAirStations() {
       const rows = await db.select({ stationId: P.stationId }).from(P).where(eq(P.onAir, true));
       return rows.map((r) => r.stationId);
+    },
+
+    async relaySessions(from, to) {
+      const TS = schema.translatorSessions;
+      const rows = await db
+        .select()
+        .from(TS)
+        .where(and(lt(TS.startedAt, to), sql`coalesce(${TS.endedAt}, ${TS.updatedAt}) > ${from}`));
+      return rows.flatMap((r) => {
+        const startedAt = new Date(Math.max(r.startedAt.getTime(), from.getTime()));
+        const endedAt = new Date(Math.min((r.endedAt ?? r.updatedAt).getTime(), to.getTime()));
+        return endedAt > startedAt ? [{ stationId: r.stationId, translatorId: r.translatorId, startedAt, endedAt }] : [];
+      });
+    },
+
+    async liveAired(from, to) {
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, startedAt: A.startedAt, endedAt: A.endedAt })
+        .from(A)
+        .where(and(eq(A.reason, "live"), lt(A.startedAt, to), gt(A.endedAt, from)));
+      return rows.flatMap((r) => {
+        const startedAt = new Date(Math.max(r.startedAt.getTime(), from.getTime()));
+        const endedAt = new Date(Math.min(r.endedAt.getTime(), to.getTime()));
+        return endedAt > startedAt ? [{ stationId: r.stationId, startedAt, endedAt }] : [];
+      });
+    },
+
+    async preparedBytes(contentIds) {
+      const out = new Map<string, number>();
+      if (!contentIds.length) return out;
+      const PI = schema.preparedItems;
+      const PR = schema.preparedRenditions;
+      // Each rendition's bytes (written as it's prepared); the item's own figure when there are none.
+      const rows = await db
+        .select({ contentId: PI.contentId, item: PI.bytes, renditions: sql<string>`coalesce((select sum(${PR.bytes}) from ${PR} where ${PR.key} = ${PI.key}), 0)` })
+        .from(PI)
+        .where(inArray(PI.contentId, contentIds));
+      for (const r of rows) {
+        const bytes = Math.max(Number(r.renditions), r.item ?? 0);
+        if (r.contentId && bytes > 0) out.set(r.contentId, (out.get(r.contentId) ?? 0) + bytes);
+      }
+      return out;
     },
 
     async scheduleSignOn(stationId, at) {

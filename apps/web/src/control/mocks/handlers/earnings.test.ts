@@ -48,7 +48,10 @@ describe("who sees BEAT's money", () => {
 
   it("only owners download a statement's CSV", async () => {
     const list = await (await api(`/stations/${BEAT.id}/statements`, "marcus")).json();
-    expect(list).toHaveLength(4);
+    // Four weeks, and August's month with its usage section (pay-as-you-go).
+    expect(list).toHaveLength(5);
+    expect(list[4]).toMatchObject({ period: "month", periodStart: "2026-08-01" });
+    expect(list[4].lines.filter((l: { group?: string }) => l.group === "usage").map((l: { label: string }) => l.label)).toEqual(["Usage, taken from earnings", "Storage", "Relays, everything you air", "Live hours"]);
     const id = list[0].id;
     expect((await api(`/statements/${id}/csv`, "marcus")).status).toBe(403);
     const csv = await (await api(`/statements/${id}/csv`, "kai")).json();

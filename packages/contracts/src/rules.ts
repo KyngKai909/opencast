@@ -66,6 +66,16 @@ export const RULES = {
     display: (v) => (v.perHourMicros === null ? "Not set yet" : `${dollars(v.perHourMicros)} an hour`),
     isSet: (v) => v.perHourMicros !== null
   }),
+  // Added 2026-09-29 (follow-up Phase 2): radio live through the worker's own ingest (not Livepeer), its own type so it can be priced apart. Free by default (Open).
+  "prices.radio_live": def({
+    group: "pay_as_you_go",
+    title: "Radio live",
+    detail: "Per hour live on the radio band, through Opencast's own ingest rather than Livepeer",
+    schema: z.object({ perHourMicros: PriceOrUnset }),
+    fallback: { perHourMicros: 0 } as { perHourMicros: number | null },
+    display: (v) => (v.perHourMicros === null ? "Not set yet" : v.perHourMicros === 0 ? "Free" : `${dollars(v.perHourMicros)} an hour`),
+    isSet: (v) => v.perHourMicros !== null
+  }),
   "prices.free_allowance": def({
     group: "pay_as_you_go",
     title: "Free each month",
@@ -73,6 +83,15 @@ export const RULES = {
     schema: z.object({ storageGb: z.number().min(0).max(100_000), liveHours: z.number().min(0).max(10_000) }),
     fallback: { storageGb: 10, liveHours: 5 },
     display: (v) => `${v.storageGb} GB, ${v.liveHours} live ${v.liveHours === 1 ? "hour" : "hours"}`
+  }),
+  // Added 2026-09-29 (follow-up Phase 2): how long a station keeps its relays and live hours after a bill goes unpaid.
+  "billing.grace": def({
+    group: "pay_as_you_go",
+    title: "Grace period",
+    detail: "After a month's usage can't be charged, relays and live hours keep going this long, then pause until it's paid. The channel never pauses",
+    schema: z.object({ days: z.number().int().min(1).max(60), warnDaysBefore: z.number().int().min(1).max(30) }).refine((v) => v.warnDaysBefore < v.days, { message: "The warning goes before the end" }),
+    fallback: { days: 14, warnDaysBefore: 3 },
+    display: (v) => `${v.days} ${v.days === 1 ? "day" : "days"}, a warning ${v.warnDaysBefore} ${v.warnDaysBefore === 1 ? "day" : "days"} before`
   }),
   "shares.opencast": def({
     group: "shares",

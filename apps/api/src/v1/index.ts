@@ -22,6 +22,8 @@ import { createSpotsService } from "./modules/spots/service.js";
 import { spotsRoutes } from "./modules/spots/routes.js";
 import { createLedgerService } from "./modules/ledger/service.js";
 import { ledgerRoutes } from "./modules/ledger/routes.js";
+import { createBillingService } from "./modules/ledger/billing.js";
+import { billingRoutes } from "./modules/ledger/billingRoutes.js";
 import { createAudienceService } from "./modules/audience/service.js";
 import { audienceRoutes } from "./modules/audience/routes.js";
 import { createTrustService } from "./modules/trust/service.js";
@@ -52,6 +54,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   services.catalog = createCatalogService(ctx);
   services.spots = createSpotsService(ctx);
   services.ledger = createLedgerService(ctx);
+  services.billing = createBillingService(ctx);
   services.audience = createAudienceService(ctx);
   services.trust = createTrustService(ctx);
   services.notifications = createNotificationsService(ctx);
@@ -76,6 +79,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   catalogRoutes(registrar, ctx);
   spotsRoutes(registrar, ctx);
   ledgerRoutes(registrar, ctx);
+  billingRoutes(registrar, ctx);
   audienceRoutes(registrar, ctx);
   trustRoutes(registrar, ctx);
   notificationsRoutes(registrar, ctx);

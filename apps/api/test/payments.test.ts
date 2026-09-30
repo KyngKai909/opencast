@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { deriveMoves, type PostingForMoves } from "../src/v1/modules/ledger/moves.js";
-import { clearPayments, fakeClear, fakePayments, ownAccountsCustody, StripeCards } from "../src/v1/payments/index.js";
+import { clearPayments, fakeClear, fakePayments, ownAccountsCustody, paymentsFromEnv, StripeCards, stripeKeyProblem } from "../src/v1/payments/index.js";
 import { anon, createHarness, market, stationFixture, type Harness } from "./harness.js";
 
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
@@ -179,13 +179,13 @@ describe("Stripe webhooks", () => {
   const event = (type: string, object: object) => JSON.stringify({ id: "evt_1", object: "event", type, data: { object }, api_version: "2025-01-01", created: 1, livemode: false });
 
   it("reads a card top-up's success, signed by Stripe", async () => {
-    const payload = event("payment_intent.succeeded", { id: "pi_1", object: "payment_intent", metadata: { depositId: "dep-1" } });
+    const payload = event("payment_intent.succeeded", { id: "pi_1", object: "payment_intent", metadata: { app: "opencast", depositId: "dep-1" } });
     const header = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" });
     expect(await cards.parse(Buffer.from(payload), header)).toEqual({ kind: "deposit_arrived", depositId: "dep-1" });
   });
 
   it("refuses anything not signed with our secret, or changed after signing", async () => {
-    const payload = event("payment_intent.succeeded", { id: "pi_1", object: "payment_intent", metadata: { depositId: "dep-1" } });
+    const payload = event("payment_intent.succeeded", { id: "pi_1", object: "payment_intent", metadata: { app: "opencast", depositId: "dep-1" } });
     const forged = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_someone_else" });
     await expect(cards.parse(Buffer.from(payload), forged)).rejects.toThrow();
     const header = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" });
@@ -194,9 +194,146 @@ describe("Stripe webhooks", () => {
   });
 
   it("reads a monthly pledge's payment", async () => {
-    const payload = event("invoice.paid", { id: "in_1", object: "invoice", amount_paid: 1000, parent: { subscription_details: { metadata: { pledgeId: "pl-1" } } } });
+    const payload = event("invoice.paid", { id: "in_1", object: "invoice", amount_paid: 1000, parent: { subscription_details: { metadata: { app: "opencast", pledgeId: "pl-1" } } } });
     const header = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" });
     expect(await cards.parse(Buffer.from(payload), header)).toMatchObject({ kind: "pledge_paid", pledgeId: "pl-1", amountMicros: $(10) });
+  });
+
+  // Follow-up Phase 2 (2026-09-29): the account is ClearLabs Inc's, shared with Clear.
+  it("ignores every event whose object isn't Opencast's (no `app: opencast` in its metadata)", async () => {
+    const sign = (payload: string) => stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" });
+    const theirs = [
+      event("payment_intent.succeeded", { id: "pi_2", object: "payment_intent", metadata: { depositId: "dep-1" } }),
+      event("payment_intent.succeeded", { id: "pi_3", object: "payment_intent", metadata: { app: "clear", depositId: "dep-1" } }),
+      event("payment_intent.payment_failed", { id: "pi_4", object: "payment_intent", metadata: { usageBillId: "bill-1" } }),
+      event("invoice.paid", { id: "in_2", object: "invoice", amount_paid: 1000, parent: { subscription_details: { metadata: { pledgeId: "pl-1" } } } }),
+      event("setup_intent.succeeded", { id: "seti_1", object: "setup_intent", metadata: { stationId: "st-1" } }),
+      event("account.updated", { id: "acct_1", object: "account", payouts_enabled: true, metadata: { stationId: "st-1" } }),
+      event("checkout.session.completed", { id: "cs_1", object: "checkout.session", mode: "payment", payment_status: "paid", amount_total: 1000, metadata: { pledgeId: "pl-1" } })
+    ];
+    for (const payload of theirs) expect(await cards.parse(Buffer.from(payload), sign(payload))).toBeNull();
+  });
+
+  it("reads a station's usage charge and a card it saved", async () => {
+    const sign = (payload: string) => stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" });
+    const paid = event("payment_intent.succeeded", { id: "pi_9", object: "payment_intent", amount: 14940, amount_received: 14940, metadata: { app: "opencast", usageBillId: "bill-1", stationId: "st-1" } });
+    expect(await cards.parse(Buffer.from(paid), sign(paid))).toEqual({ kind: "usage_paid", billId: "bill-1", providerRef: "pi_9", amountMicros: $(149.4), feeMicros: Math.round($(149.4) * 0.029) + 300_000 });
+    const failed = event("payment_intent.payment_failed", { id: "pi_10", object: "payment_intent", last_payment_error: { message: "Your card was declined." }, metadata: { app: "opencast", usageBillId: "bill-1" } });
+    expect(await cards.parse(Buffer.from(failed), sign(failed))).toEqual({ kind: "usage_failed", billId: "bill-1", providerRef: "pi_10", reason: "Your card was declined." });
+    const saved = event("setup_intent.succeeded", { id: "seti_2", object: "setup_intent", metadata: { app: "opencast", stationId: "st-1" } });
+    expect(await cards.parse(Buffer.from(saved), sign(saved))).toEqual({ kind: "station_card_saved", stationId: "st-1", setupIntentId: "seti_2" });
+  });
+});
+
+describe("Opencast's own Stripe key", () => {
+  it("is a restricted key (rk_), never the account's secret key (sk_), and live only in production", () => {
+    expect(stripeKeyProblem("rk_test_123", false)).toBeNull();
+    expect(stripeKeyProblem("rk_live_123", true)).toBeNull();
+    expect(stripeKeyProblem("sk_test_123", false)).toMatch(/restricted key/);
+    expect(stripeKeyProblem("sk_live_123", true)).toMatch(/restricted key/);
+    expect(stripeKeyProblem("rk_live_123", false)).toMatch(/live Stripe key outside production/);
+    expect(stripeKeyProblem("pk_test_123", false)).toMatch(/isn't a Stripe restricted key/);
+    const clock = { now: () => new Date() };
+    expect(() => paymentsFromEnv({ PAYMENTS_PROVIDER: "stripe_only", STRIPE_SECRET_KEY: "sk_test_123" } as NodeJS.ProcessEnv, clock, "https://app.opencast.test")).toThrow(/restricted key/);
+    expect(() => paymentsFromEnv({ PAYMENTS_PROVIDER: "stripe_only", STRIPE_SECRET_KEY: "rk_live_123", NODE_ENV: "development" } as NodeJS.ProcessEnv, clock, "https://app.opencast.test")).toThrow(/outside production/);
+    const ok = paymentsFromEnv({ PAYMENTS_PROVIDER: "stripe_only", STRIPE_SECRET_KEY: "rk_test_123", STRIPE_WEBHOOK_SECRET: "whsec_x" } as NodeJS.ProcessEnv, clock, "https://app.opencast.test");
+    expect(ok.name).toBe("stripe_only");
+    expect(ok.stationCards).toBeTruthy();
+  });
+});
+
+/**
+ * Stripe's requests as they'd go out (form-encoded), answered from canned objects: nothing leaves
+ * the machine. Every object Opencast creates must say it's Opencast's, and every card charge must
+ * carry the statement suffix.
+ */
+function recordingStripe(options: { appTag?: string; suffix?: string } = {}) {
+  const sent: Array<{ method: string; path: string; body: URLSearchParams }> = [];
+  const pm = { id: "pm_card_visa", object: "payment_method", card: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2030 }, metadata: {} };
+  const answer = (method: string, path: string): object => {
+    if (path === "/v1/customers") return { id: "cus_1", object: "customer" };
+    if (path.startsWith("/v1/payment_methods")) return pm;
+    if (method === "GET" && path.startsWith("/v1/payment_intents"))
+      return { object: "list", has_more: false, data: [{ id: "pi_old", object: "payment_intent", status: "succeeded", metadata: { app: "opencast", depositId: "dep-1", feeMicros: "0" }, latest_charge: { id: "ch_1", object: "charge", amount: 25_000, amount_refunded: 0 } }] };
+    if (path === "/v1/payment_intents") return { id: "pi_1", object: "payment_intent", status: "succeeded", client_secret: "pi_1_secret", amount: 14940 };
+    if (path === "/v1/checkout/sessions") return { id: "cs_1", object: "checkout.session", url: "https://checkout.stripe.com/c/pay/cs_1" };
+    if (path.startsWith("/v1/subscriptions")) return { id: "sub_123", object: "subscription", customer: "cus_1" };
+    if (path === "/v1/accounts") return { id: "acct_1", object: "account" };
+    if (path === "/v1/account_links") return { object: "account_link", url: "https://connect.stripe.com/setup/e/acct_1" };
+    if (path === "/v1/transfers") return { id: "tr_1", object: "transfer" };
+    if (path === "/v1/refunds") return { id: "re_1", object: "refund" };
+    if (path === "/v1/setup_intents") return { id: "seti_1", object: "setup_intent", client_secret: "seti_1_secret_x", status: "requires_payment_method" };
+    if (path.startsWith("/v1/setup_intents/")) return { id: "seti_1", object: "setup_intent", status: "succeeded", payment_method: "pm_card_visa", metadata: { app: "opencast", stationId: "st-1" } };
+    if (path.startsWith("/v1/invoices/")) return { id: "in_1", object: "invoice" };
+    throw new Error(`Unexpected Stripe request ${method} ${path}`);
+  };
+  const fetchFn = (async (url: string | URL, init?: RequestInit) => {
+    const u = new URL(String(url));
+    const method = init?.method ?? "GET";
+    const body = new URLSearchParams(method === "GET" ? u.search : String(init?.body ?? ""));
+    sent.push({ method, path: u.pathname, body });
+    return new Response(JSON.stringify(answer(method, u.pathname)), { status: 200, headers: { "content-type": "application/json", "request-id": "req_test" } });
+  }) as typeof fetch;
+  const cards = new StripeCards({ secretKey: "rk_test_offline", webhookSecret: "whsec_test_secret", appTag: options.appTag, statementDescriptorSuffix: options.suffix, httpClient: Stripe.createFetchHttpClient(fetchFn) });
+  return { cards, sent };
+}
+
+describe("everything Opencast creates in Stripe says so", () => {
+  const saved = new Map<string, { ref: string; status: "active" | "needs_onboarding" | "closed"; onboardingUrl: string | null }>();
+  const accounts = {
+    async get(owner: { type: string; id?: string }, provider: string) {
+      return saved.get(`${owner.type}:${owner.id}:${provider}`) ?? null;
+    },
+    async save(owner: { type: string; id?: string }, provider: string, account: { ref: string; status: "active" | "needs_onboarding"; onboardingUrl?: string | null }) {
+      saved.set(`${owner.type}:${owner.id}:${provider}`, { ref: account.ref, status: account.status, onboardingUrl: account.onboardingUrl ?? null });
+    }
+  };
+
+  it("metadata `app: opencast` on every object, and the statement suffix on every card charge", async () => {
+    const { cards, sent } = recordingStripe();
+    const business = { type: "advertiser" as const, id: "11111111-1111-4111-8111-111111111111", name: "Orange Street Coffee" };
+    const station = { type: "station" as const, id: "22222222-2222-4222-8222-222222222222", name: "Inland Beat" };
+    // Top-ups (card and bank), pledges (monthly and once), a pledge's new card, Connect, a payout, a refund.
+    await cards.link(business, "pm_card_visa", accounts);
+    await cards.charge({ depositId: "dep-1", owner: business, paymentMethodId: "pm_card_visa", amountMicros: $(250), feeMicros: $(7.55), bank: false }, accounts);
+    await cards.charge({ depositId: "dep-2", owner: business, paymentMethodId: "pm_bank", amountMicros: $(250), feeMicros: $(2), bank: true }, accounts);
+    await cards.pledge({ pledgeId: "pl-1", stationId: station.id, stationName: "Inland Beat", amountMicros: $(10), cadence: "monthly", returnUrl: "https://app.opencast.test/stations/st" });
+    await cards.pledge({ pledgeId: "pl-2", stationId: station.id, stationName: "Inland Beat", amountMicros: $(25), cadence: "once", returnUrl: "https://app.opencast.test/stations/st" });
+    await cards.cardSession({ pledgeId: "pl-1", providerRef: "sub_123", returnUrl: "https://app.opencast.test/you" });
+    await cards.connectAccount(station, accounts, "https://app.opencast.test/stations/st/earnings");
+    await cards.transfer({ destination: "acct_1", amountMicros: $(42), idempotencyKey: "payout:1", description: "Opencast earnings" });
+    await cards.refund({ customer: "cus_1", amountMicros: $(100), idempotencyKey: "payout:2" });
+    // Pay-as-you-go: a station's card, saved and charged.
+    const rail = cards.stationCards();
+    await rail.setupCard({ stationId: "st-1", stationName: "Inland Beat" }, accounts);
+    expect(await rail.savedCard({ stationId: "st-1", setupIntentId: "seti_1" })).toMatchObject({ paymentMethodId: "pm_card_visa", label: "Visa ending 4242" });
+    expect(await rail.chargeUsage({ billId: "bill-1", attempt: 1, stationId: "st-1", stationName: "Inland Beat", paymentMethodId: "pm_card_visa", amountMicros: $(149.4), description: "Opencast usage" }, accounts)).toMatchObject({ status: "succeeded", providerRef: "pi_1" });
+    // A monthly pledge's renewal, still a draft, gets the suffix too.
+    const stripe = new Stripe("sk_test_offline");
+    const payload = JSON.stringify({ id: "evt_1", object: "event", type: "invoice.created", data: { object: { id: "in_1", object: "invoice", status: "draft", parent: { subscription_details: { metadata: { app: "opencast", pledgeId: "pl-1" } } } } }, api_version: "2025-01-01", created: 1, livemode: false });
+    expect(await cards.parse(Buffer.from(payload), stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_test_secret" }))).toBeNull();
+
+    const creates = sent.filter((r) => r.method === "POST" && ["/v1/customers", "/v1/payment_intents", "/v1/checkout/sessions", "/v1/accounts", "/v1/transfers", "/v1/refunds", "/v1/setup_intents"].includes(r.path));
+    expect(creates.length).toBe(12);
+    for (const r of creates) expect(r.body.get("metadata[app]"), `${r.path} ${r.body}`).toBe("opencast");
+    // Payment methods Opencast attaches are tagged too.
+    expect(sent.filter((r) => r.method === "POST" && /^\/v1\/payment_methods\/pm_[a-z_]+$/.test(r.path)).every((r) => r.body.get("metadata[app]") === "opencast")).toBe(true);
+    // Checkout: the charge, the subscription and the setup it makes are Opencast's as well.
+    const sessions = sent.filter((r) => r.path === "/v1/checkout/sessions");
+    expect(sessions.map((r) => r.body.get("subscription_data[metadata][app]") ?? r.body.get("payment_intent_data[metadata][app]") ?? r.body.get("setup_intent_data[metadata][app]"))).toEqual(["opencast", "opencast", "opencast"]);
+    // Every card charge carries OPENCAST; the bank debit doesn't (it isn't a card charge).
+    const intents = sent.filter((r) => r.method === "POST" && r.path === "/v1/payment_intents");
+    expect(intents.map((r) => r.body.get("statement_descriptor_suffix"))).toEqual(["OPENCAST", null, "OPENCAST"]);
+    expect(sessions[1].body.get("payment_intent_data[statement_descriptor_suffix]")).toBe("OPENCAST");
+    expect(intents[2].body.get("off_session")).toBe("true");
+    expect(sent.find((r) => r.path === "/v1/invoices/in_1")?.body.get("statement_descriptor")).toBe("OPENCAST");
+  });
+
+  it("reads the tag and the suffix from configuration", async () => {
+    const { cards, sent } = recordingStripe({ appTag: "opencast-staging", suffix: "OPENCAST TV" });
+    await cards.pledge({ pledgeId: "pl-3", stationId: "st", stationName: "Inland Beat", amountMicros: $(25), cadence: "once", returnUrl: "https://app.opencast.test/stations/st" });
+    expect(sent[0].body.get("metadata[app]")).toBe("opencast-staging");
+    expect(sent[0].body.get("payment_intent_data[statement_descriptor_suffix]")).toBe("OPENCAST TV");
   });
 });
 
@@ -264,7 +401,7 @@ describe("the Stripe adapter against stripe-mock", async () => {
     const stripe = new Stripe("sk_test_123");
     const event = (object: object) => JSON.stringify({ id: "evt_1", object: "event", type: "checkout.session.completed", data: { object }, api_version: "2025-01-01", created: 1, livemode: false });
     const sign = (payload: string) => stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_x" });
-    const setup = event({ id: "cs_setup", object: "checkout.session", mode: "setup", setup_intent: "seti_123", metadata: { pledgeId: "pl-1", subscription: "sub_123" } });
+    const setup = event({ id: "cs_setup", object: "checkout.session", mode: "setup", setup_intent: "seti_123", metadata: { app: "opencast", pledgeId: "pl-1", subscription: "sub_123" } });
     // stripe-mock's setup intents have no payment method: say this one took pm_123 (its fixture card).
     const retrieve = cards.stripe.setupIntents.retrieve;
     cards.stripe.setupIntents.retrieve = (async () => ({ id: "seti_123", payment_method: "pm_123" })) as never;
@@ -273,8 +410,18 @@ describe("the Stripe adapter against stripe-mock", async () => {
     } finally {
       cards.stripe.setupIntents.retrieve = retrieve;
     }
-    const started = event({ id: "cs_sub", object: "checkout.session", mode: "subscription", subscription: "sub_123", metadata: { pledgeId: "pl-2" } });
+    const started = event({ id: "cs_sub", object: "checkout.session", mode: "subscription", subscription: "sub_123", metadata: { app: "opencast", pledgeId: "pl-2" } });
     expect(await cards.parse(Buffer.from(started), sign(started))).toMatchObject({ kind: "pledge_started", pledgeId: "pl-2", providerRef: "sub_123" });
+  });
+
+  it.runIf(available)("pay-as-you-go: saves a station's card with a SetupIntent and charges it off-session (Stripe's spec accepts both)", async () => {
+    const rail = cards.stationCards();
+    const setup = await rail.setupCard({ stationId: "33333333-3333-4333-8333-333333333333", stationName: "Saturday Reel" }, accounts);
+    expect(setup.setupIntentId).toMatch(/^seti_/);
+    expect(setup.clientSecret).toBeTruthy();
+    const charged = await rail.chargeUsage({ billId: "44444444-4444-4444-8444-444444444444", attempt: 1, stationId: "33333333-3333-4333-8333-333333333333", stationName: "Saturday Reel", paymentMethodId: "pm_card_visa", amountMicros: $(149.4), description: "Opencast usage for REEL 24.1, October 2026" }, accounts);
+    expect(charged.providerRef).toMatch(/^pi_/);
+    await rail.detachCard("pm_card_visa");
   });
 
   it.runIf(available)("opens a Connect Express account for a station, and transfers to it", async () => {

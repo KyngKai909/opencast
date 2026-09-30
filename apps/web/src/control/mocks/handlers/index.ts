@@ -1,6 +1,7 @@
 // Every mock handler, one file per area (see each file's header for who owns it). The first
 // handler to match a request answers it.
 
+import { accountHandlers } from "./account";
 import { accountsHandlers } from "./accounts";
 import { earningsHandlers } from "./earnings";
 import { libraryHandlers } from "./library";
@@ -25,6 +26,7 @@ export const handlers = [
   ...marketHandlers,
   ...spotsHandlers,
   ...earningsHandlers,
+  ...accountHandlers,
   ...stationHandlers,
   ...relayBackgroundHandlers
 ];

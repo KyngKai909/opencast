@@ -187,6 +187,8 @@ export interface StatementView {
     airings?: number;
     kind?: "added" | "aired" | "returned" | "fees" | "sponsorship" | "order" | "withdrawn" | "refund" | "spot_station";
     includedAbove?: boolean;
+    /** Pay-as-you-go (2026-09-29): a usage type's units and price, on station statements. */
+    usage?: import("@opencast/contracts").Statement["lines"][number]["usage"];
   }>;
   issuedAt: string;
   csvUrl: string;
@@ -200,7 +202,7 @@ export interface StatementView {
   closingHeldMicros?: number;
 }
 
-type StatementGroup = "spots" | "sponsors_pledges" | "carriage" | "shared" | "card_fees" | "production" | "other";
+type StatementGroup = "spots" | "sponsors_pledges" | "carriage" | "shared" | "card_fees" | "production" | "other" | "usage";
 
 /** E3: the group a statement line belongs to, from its label (statements issued before this carry no group). */
 function statementGroup(label: string, accountKind: string): StatementGroup {
@@ -210,6 +212,8 @@ function statementGroup(label: string, accountKind: string): StatementGroup {
   if (label === "Your programs on other stations" || label === "Programs you carry") return "carriage";
   if (label === "The pool" || label === "Opencast's share") return "shared";
   if (label === "Made for you") return "production";
+  // Pay-as-you-go (2026-09-29): usage taken from earnings, before the payout.
+  if (label === USAGE_FROM_EARNINGS) return "usage";
   return "other";
 }
 
@@ -229,7 +233,7 @@ export interface StationEarningsView {
   };
   totalMicros: number;
   held: { tonightMicros: number; tonightAirings: number; restOfWeekMicros: number; restOfWeekAirings: number; tonightBreaks?: number };
-  account: { availableMicros: number; paidOutThisMonthMicros: number };
+  account: { availableMicros: number; paidOutThisMonthMicros: number; usageOwedMicros?: number };
   nextPayout: { on: string; schedule: "weekly" | "monthly"; destination: string | null; amountMicros?: number } | null;
 }
 
@@ -256,6 +260,9 @@ const BPS = 10_000;
 const dollars = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
 const shortAddress = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
+/** Pay-as-you-go's line on a station's statement: usage paid from its earnings. */
+const USAGE_FROM_EARNINGS = "Usage, taken from earnings";
+
 /** How a ledger entry reads on a statement. */
 function statementLabel(kind: string, sourceType: string | null, amount: number, accountKind: string): string {
   if (accountKind === "advertiser_available") {
@@ -264,7 +271,7 @@ function statementLabel(kind: string, sourceType: string | null, amount: number,
   }
   if (kind === "settle") return sourceType === "sponsorship_month" ? "Sponsors" : sourceType === "production_order" ? "Made for you" : "Spots";
   if (kind === "carriage_fee" || kind === "barter_split") return amount > 0 ? "Your programs on other stations" : "Programs you carry";
-  const labels: Record<string, string> = { pledge: "Pledges", pool: "The pool", payout: "Paid out", escrow_deposit: "Into escrow", reversal: "Reversed" };
+  const labels: Record<string, string> = { pledge: "Pledges", pool: "The pool", payout: "Paid out", escrow_deposit: "Into escrow", reversal: "Reversed", usage_payment: USAGE_FROM_EARNINGS };
   return labels[kind] ?? kind;
 }
 
@@ -359,6 +366,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
   /** Takes a station's earnings out of the ledger and asks the provider to pay them to its bank. */
   async function payoutStation(stationId: string, micros: number, memo: string, idempotencyKey?: string) {
     if ((await stationAccountKind(stationId)) === "escrow_owed") throw refused("escrow", "A claimable station's earnings go to escrow.");
+    // Pay-as-you-go: usage owed comes out of earnings before anything is paid out.
+    await services.billing.collectFromEarnings(stationId);
     const account = await service.account(db, "station_earnings", { stationId });
     if ((await balanceOf([account])) < micros) throw refused("insufficient_balance", "That's more than the station has.");
     // The owner's linked Clear wallet, if that's where the station is paid; else its own account.
@@ -1138,7 +1147,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.pledges.stationId, stationId), gte(schema.pledges.startedAt, from)));
       const payoutAccount = kind === "escrow_owed" ? null : await service.payoutAccount(stationId).catch(() => null);
       const rule = await services.stations.breakRule(stationId);
-      const [sponsorList, available] = await Promise.all([services.spots.activeSponsors(stationId), balanceOf([account])]);
+      const [sponsorList, available, usageOwed] = await Promise.all([services.spots.activeSponsors(stationId), balanceOf([account]), kind === "escrow_owed" ? Promise.resolve(0) : services.billing.owedMicros(stationId)]);
 
       return {
         period,
@@ -1162,7 +1171,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           restOfWeekAirings: rest.length,
           tonightBreaks: new Set(tonight.map((t) => t.breakId)).size
         },
-        account: { availableMicros: available, paidOutThisMonthMicros: Number(payouts[0].sum) },
+        account: { availableMicros: available, paidOutThisMonthMicros: Number(payouts[0].sum), usageOwedMicros: usageOwed },
         nextPayout:
           kind === "escrow_owed"
             ? null
@@ -1170,8 +1179,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
                 on: nextPayoutOn.toISOString().slice(0, 10),
                 schedule: config.payoutSchedule,
                 destination: payoutAccount?.status === "active" ? payoutAccount.destination.label : null,
-                // E2: what it would pay if it went now.
-                amountMicros: Math.max(0, available)
+                // E2: what it would pay if it went now (usage owed comes out first).
+                amountMicros: Math.max(0, available - usageOwed)
               }
       };
     },
@@ -1359,6 +1368,10 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           });
           return;
         }
+        case "usage_paid":
+        case "usage_failed":
+        case "station_card_saved":
+          return services.billing.handlePaymentEvent(event);
         case "account_ready": {
           if (event.owner.type === "opencast") return;
           await db
@@ -1503,6 +1516,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
     },
 
     async runPayouts() {
+      // Pay-as-you-go: usage owed is taken from earnings first, then the rest is paid.
+      await services.billing.collectFromEarnings().catch((error) => console.error("[ledger] taking usage from earnings failed", error));
       const rows = await db
         .select({ stationId: L.stationId, sum: sql<string>`coalesce(sum(${P.amountMicros}), 0)` })
         .from(L)
@@ -1566,7 +1581,8 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
 
     async issueStatements(period, start) {
       const end = period === "week" ? new Date(start.getTime() + 7 * DAY) : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
-      const kinds = period === "week" ? (["station_earnings", "escrow_owed"] as const) : (["advertiser_available"] as const);
+      // Stations get weekly statements, and (pay-as-you-go, 2026-09-29) monthly ones with the month's usage; businesses monthly.
+      const kinds = period === "week" ? (["station_earnings", "escrow_owed"] as const) : (["advertiser_available", "station_earnings"] as const);
       const accounts = await db.select().from(L).where(inArray(L.kind, [...kinds]));
       const config = await service.config(start);
       let issued = 0;
@@ -1578,7 +1594,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           .where(and(eq(P.accountId, account.id), lt(E.occurredAt, end)));
         const opening = rows.filter((r) => r.entry.occurredAt < start).reduce((s, r) => s + r.amount, 0);
         const inPeriod = rows.filter((r) => r.entry.occurredAt >= start);
-        if (!inPeriod.length && opening === 0) continue;
+        // Pay-as-you-go: the usage section, each type with its units and price (shown), before the payout.
+        const usageLines = account.kind === "station_earnings" && account.stationId ? await services.billing.statementLines(account.stationId, start, end) : [];
+        if (!inPeriod.length && opening === 0 && !usageLines.length) continue;
         const lines = new Map<string, { label: string; detail: string | null; amountMicros: number; count: number }>();
         for (const r of inPeriod) {
           const label = statementLabel(r.entry.kind, r.entry.sourceType, r.amount, account.kind);
@@ -1600,6 +1618,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           };
         });
         if (account.kind !== "advertiser_available") out.push({ label: "Opencast's share", detail: null, amountMicros: 0, notSetYet: config.opencastSpotShareBps === 0, group: "shared" });
+        out.push(...usageLines);
         const [row] = await db
           .insert(schema.statements)
           .values({

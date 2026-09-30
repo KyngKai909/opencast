@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-320 endpoints in 18 modules.
+329 endpoints in 19 modules.
 
 ## accounts (35)
 
@@ -413,3 +413,17 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `getConfig` | GET | `/config` | anyone | The viewer apps' switches (features on or off), from the rules registry |
+
+## billing (9)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `getStationAccount` | GET | `/stations/:stationId/account` | signed in | The Station account (owners and operators; operators see only): usage so far this month and the month's estimate per type, the free allowance left, caps, the funding source, standing (ok, grace, paused) and recent bills |
+| `setUsageCaps` | PUT | `/stations/:stationId/account/caps` | signed in | Monthly caps in dollars per usage type (owner only). Null removes a cap. Reaching one pauses that usage until the month ends (relays, live shows, new uploads), never the channel, and tells the owner. 422 `not_cappable` for a free type. |
+| `startCardSetup` | POST | `/stations/:stationId/account/card-setup` | signed in | Start saving a card (owner only): a Stripe SetupIntent for the station, to confirm with Stripe's own card form (`clientSecret`, with `publishableKey`), then `saveCard`. 409 `cards_unavailable` when this server has no card provider. |
+| `saveCard` | POST | `/stations/:stationId/account/card` | signed in | The card's SetupIntent succeeded: save it as the station's card (owner only), replacing any other. When the card is what pays (chosen, or no Clear wallet with full access), anything due is charged to it at once; paid, relays and live hours resume. 422 `card_not_saved` when the SetupIntent isn't the station's or didn't succeed. |
+| `removeCard` | DELETE | `/stations/:stationId/account/card` | signed in | Remove the station's card (owner only). If it was the funding source, none is chosen until another is. |
+| `setFundingSource` | PUT | `/stations/:stationId/account/funding` | signed in | Choose what pays what earnings don't cover (owner only), instead of the default order (an owner's Clear wallet with full access, then the card): `clear` (the caller's linked Clear wallet; 409 `clear_not_linked`, `clear_read_only` or `clear_unavailable`) or `card` (409 `no_card` until one is saved) |
+| `payUsageNow` | POST | `/stations/:stationId/account/pay` | signed in | Pay what's due now (owner only): from earnings first, then the card. Paid, relays and live hours resume. 409 `nothing_due`; 409 `pay_from_clear` when the source is Clear (use the Clear payment); 422 `card_declined` with the card's reason. |
+| `quoteClearUsagePayment` | POST | `/stations/:stationId/account/clear-payment/quote` | signed in | Paying what's due from the owner's linked Clear wallet (owner only, full access): where to send it. The app asks Clear to send it (the person confirms on Clear's page), then confirms with the transaction hash. 409 `nothing_due`, `clear_read_only`, `clear_not_linked`, `clear_unavailable`. |
+| `confirmClearUsagePayment` | POST | `/stations/:stationId/account/clear-payment` | signed in | The transfer from Clear was sent (owner only): checked on chain (from the owner's linked wallet, to Opencast's account, at least what's due), then what's due is paid and relays and live hours resume. Waits while it isn't mined yet. 422 `transfer_not_valid`; 409 `transfer_already_used`. |

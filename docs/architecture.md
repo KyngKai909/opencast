@@ -153,7 +153,12 @@ cash carriage  carrier earnings → producer earnings (per aired episode)
 pledge         external → station earnings (less Stripe's fee, less Opencast's share, 0)
 withdrawal     available → external
 payout         station earnings → external
+usage          station usage owed → Opencast usage billed (each day, accrued; nothing moves)
+usage paid     station earnings (before each payout, and at month end) or external (Clear, card)
+                 → Opencast usage (the treasury); usage owed and billed settle
 ```
+
+**Pay-as-you-go** (follow-up Phase 2; `modules/ledger/billing.ts`, docs/pricing.md). Being on air is free. The jobs measure each station's storage, relay hours (per station, platforms at the same time counted once) and live hours every hour, close each UTC day into a `usage` entry (after the free allowance, at that day's price from the rules registry, never past the station's cap), and close each month's bill: earnings first, then the owner's Clear wallet with full access (the owner approves the transfer) or the station's card (an off-session Stripe charge). What can't be charged starts the grace period (`billing.grace`); after it, relays and live hours pause (the translators' relays drop out of `stations.relays`, live blocks plan as open time), never the channel. A cap reached pauses its usage the same way (a storage cap stops new uploads). The Stripe side, kept apart from Clear's use of ClearLabs Inc's account, is docs/stripe.md.
 
 Spots, catalog and playout never call a provider: they ask the ledger, which uses `payments/` (adapters: `clear`, `stripe_only`, `fake`, chosen by `PAYMENTS_PROVIDER`).
 

@@ -61,7 +61,9 @@ HLS: items are prepared once into segments in object storage, and each station's
 | `WORKER_INGEST_PORT` | | ✓ | added 2026-09-29: the port the leading worker takes radio stations' RTMP pushes on (1935 by default; `off` turns it off). Radio live blocks never go through Livepeer. Encoders need a TCP route to it (on Railway, a TCP proxy on the worker) |
 | `WORKER_INGEST_SERVER` | ✓ | | added 2026-09-29: the address radio stations' encoders are given, e.g. `rtmp://<the worker's TCP proxy>/live` (default `rtmp://localhost:<WORKER_INGEST_PORT>/live`) |
 | `PAYMENTS_PROVIDER` | ✓ | ✓ | `fake` on staging; `clear` or `stripe_only` in production (docs/clear-integration.md) |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓ | ✓ | test keys on staging, live only in production. Webhook: `https://<api>/v1/webhooks/stripe` |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓ | ✓ | Opencast's own **restricted** key (`rk_test_…` on staging, `rk_live_…` only in production; a secret key `sk_…` is refused) on ClearLabs Inc's account, and its own webhook endpoint's signing secret. Webhook: `https://<api>/v1/webhooks/stripe`. Permissions and events: docs/stripe.md |
+| `STRIPE_PUBLISHABLE_KEY` | ✓ | | `pk_test_…` / `pk_live_…`, sent to master control with each card setup (pay-as-you-go) |
+| `STRIPE_STATEMENT_DESCRIPTOR_SUFFIX`, `STRIPE_METADATA_APP` | | | on every card charge (default `OPENCAST`), and `metadata.app` on every Stripe object Opencast makes, which webhook events must carry (default `opencast`) |
 | `CHAIN_RPC_URL`, `CHAIN_ID`, `ESCROW_CONTRACT_ADDRESS`, `CREATOR_FUND_ADDRESS`, `USDC_ADDRESS` | ✓ | ✓ | from `contracts/`'s deploy (Base Sepolia on staging). The API only reads and encodes |
 | `SETTLEMENT_PRIVATE_KEY` | | ✓ | the wallet that sends the weekly escrow batch and the pool's fund share. Worker only |
 | `VITE_API_BASE` | | | the web apps, at build: the API's public URL |
@@ -119,7 +121,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
    - Privy: Opencast's own production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed, and embedded wallets created only for people who sign in;
    - Clear: its provider app ID (`CLEAR_PRIVY_PROVIDER_APP_ID` on api, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` on the web and business apps in Vercel) and `CLEAR_WALLET_ACCESS`, once Clear has requested global-wallet provider access in its own Privy dashboard and allowed Opencast's app;
    - Livepeer: a new API key;
-   - Stripe: live `STRIPE_SECRET_KEY`, plus a webhook to `https://<api>/v1/webhooks/stripe` for its `STRIPE_WEBHOOK_SECRET`;
+   - Stripe: a live restricted `STRIPE_SECRET_KEY` (`rk_live_…`, with the permissions in docs/stripe.md), plus Opencast's own webhook to `https://<api>/v1/webhooks/stripe` (the events in docs/stripe.md) for its `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PUBLISHABLE_KEY`;
    - `PAYMENTS_PROVIDER`: `stripe_only` until Clear has what docs/clear-integration.md lists, then `clear`.
    - Resend: a production API key (`RESEND_API_KEY`), and `EMAIL_FROM` on a verified domain (see "Email"); `BUSINESS_ORIGIN` for the business app.
 5. **Contracts, on Base.** Decide the verifier and steward keys (2 of 3 each, different people) and the admin Safe (docs/open-decisions.md). Then run `contracts/script/DeployEscrow.s.sol` against Base with `ADMIN_SAFE`, `ESCROW_VERIFIERS`, `FUND_STEWARDS`, `USDC_ADDRESS` (Base USDC) and `FUND_EXCLUDED` (the settlement wallet and the Safe). Fund a settlement wallet with a little ETH for gas. Set `CHAIN_RPC_URL`, `CHAIN_ID=8453`, `ESCROW_CONTRACT_ADDRESS`, `CREATOR_FUND_ADDRESS` and `USDC_ADDRESS` on api and worker, and `SETTLEMENT_PRIVATE_KEY` on the worker only. Try it on Base Sepolia first, on staging.

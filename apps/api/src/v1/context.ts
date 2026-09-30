@@ -14,6 +14,7 @@ import type { PlayoutService } from "./modules/playout/service.js";
 import type { CatalogService } from "./modules/catalog/service.js";
 import type { SpotsService } from "./modules/spots/service.js";
 import type { LedgerService } from "./modules/ledger/service.js";
+import type { BillingService } from "./modules/ledger/billing.js";
 import type { AudienceService } from "./modules/audience/service.js";
 import type { TrustService } from "./modules/trust/service.js";
 import type { NotificationsService } from "./modules/notifications/service.js";
@@ -126,6 +127,8 @@ export interface Services {
   shelf: ShelfService;
   /** Storage maintenance (added 2026-09-29): the one-off storage jobs, run from the desk. */
   maintenance: MaintenanceService;
+  /** Pay-as-you-go for stations (added 2026-09-29, follow-up Phase 2): metering, bills, the Station account. Part of the ledger module. */
+  billing: BillingService;
 }
 
 export interface ModuleContext {

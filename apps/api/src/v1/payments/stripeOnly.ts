@@ -47,9 +47,10 @@ export function stripeOnlyPayments(stripe: StripeCards, appOrigin: string): Paym
     endPledge: (ref) => stripe.endSubscription(ref),
     resumePledge: (ref) => stripe.resumeSubscription(ref),
     pledgeCardSession: (input) => stripe.cardSession(input),
+    stationCards: stripe.stationCards(),
 
     // Everything on Opencast's side sits in one Stripe balance: nothing moves between wallets.
-    custody: (account: LedgerAccount) => (account.kind === "external" ? null : (chainCustody(account) ?? "platform")),
+    custody: (account: LedgerAccount) => (account.kind === "external" || account.kind === "usage_owed" || account.kind === "usage_billed" ? null : (chainCustody(account) ?? "platform")),
 
     async applyMove(move) {
       // Only encumbrances reach here (one wallet, no transfers); the ledger is the hold.

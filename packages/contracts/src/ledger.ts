@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import { DateOnly, Id, Micros, StationIdent, Timestamp } from "./common.js";
+import { UsageType, UsageUnit } from "./billing.js";
 
 /** A value that isn't decided yet: shown as "Not set yet" at $0.00. */
 export const Undecided = z.object({ micros: Micros, notSetYet: z.boolean() });
@@ -55,7 +56,7 @@ export const Statement = z.object({
       notSetYet: z.boolean().default(false),
       // ---- E3 (added 2026-09-29) ----
       /** Station statements use the first seven; business statements (2026-09-29) use `balance` and `spent`. */
-      group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other", "balance", "spent"]).optional(),
+      group: z.enum(["spots", "sponsors_pledges", "carriage", "shared", "card_fees", "production", "other", "balance", "spent", "usage"]).optional(),
       /** Business statements (added 2026-09-29): what the line is. `spot_station` lines are one spot on one station. */
       kind: z.enum(["added", "aired", "returned", "fees", "sponsorship", "order", "withdrawn", "refund", "spot_station"]).optional(),
       /** Shown, not added in (money returned from holds, fees paid on top). */
@@ -65,7 +66,24 @@ export const Statement = z.object({
       /** The rate, when every airing on the line had the same one. Not sent yet. */
       rate: z.object({ kind: z.enum(["per_thousand", "per_airing"]), micros: Micros }).optional(),
       /** Per-thousand lines: the average tuned in across the airings. Not sent yet. */
-      averageTunedIn: z.number().int().optional()
+      averageTunedIn: z.number().int().optional(),
+      /**
+       * Pay-as-you-go (added 2026-09-29, follow-up Phase 2): station statements' `usage` group. A line
+       * per usage type with its units and price (shown, `includedAbove`), then what was taken from
+       * earnings (added in, before the payout) and what's still owed or was charged elsewhere (shown).
+       */
+      usage: z
+        .object({
+          type: UsageType,
+          unit: UsageUnit,
+          quantity: z.number(),
+          /** Inside the free allowance. */
+          freeQuantity: z.number(),
+          billableQuantity: z.number(),
+          /** The price per unit (the period's last; null: not set yet). */
+          priceMicros: Micros.nullable()
+        })
+        .optional()
     })
   ),
   issuedAt: Timestamp,
@@ -131,7 +149,12 @@ export const StationEarnings = z.object({
     /** E2 (added 2026-09-29): how many breaks tonight's held airings are in ("9 airings in 4 breaks"). */
     tonightBreaks: z.number().int().optional()
   }),
-  account: z.object({ availableMicros: Micros, paidOutThisMonthMicros: Micros }),
+  account: z.object({
+    availableMicros: Micros,
+    paidOutThisMonthMicros: Micros,
+    /** Pay-as-you-go (added 2026-09-29): usage owed, taken from earnings before the next payout. */
+    usageOwedMicros: Micros.optional()
+  }),
   nextPayout: z
     .object({
       on: DateOnly,

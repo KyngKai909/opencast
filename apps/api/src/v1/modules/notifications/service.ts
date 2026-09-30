@@ -31,7 +31,8 @@ type Kind =
   | "preset_live"
   | "station_news"
   | "signed_on_off"
-  | "spot_added";
+  | "spot_added"
+  | "station_account";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -58,7 +59,7 @@ export interface NoticeView {
 
 type Prefs = Record<string, { push: boolean; email: boolean }>;
 
-export const ALWAYS_ON: Kind[] = ["dead_air_warning", "low_balance", "rights_claim"];
+export const ALWAYS_ON: Kind[] = ["dead_air_warning", "low_balance", "rights_claim", "station_account"];
 
 /** What's on unless someone turns it off. Business viewers start with only the weekly summary. */
 const DEFAULTS: Record<Scope["kind"], Prefs> = {
@@ -80,7 +81,9 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     order_update: { push: true, email: true },
     rights_claim: { push: true, email: true },
     weekly_summary: { push: false, email: true },
-    signed_on_off: { push: true, email: false }
+    signed_on_off: { push: true, email: false },
+    // Pay-as-you-go (2026-09-29): always on, to the owners.
+    station_account: { push: true, email: true }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -483,6 +486,18 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
         scope: { kind: "station", id: stationId }
       });
     }
+  });
+
+  // Pay-as-you-go (added 2026-09-29): the station's owners hear each step of its account.
+  deps.bus.on("station.account", async (e) => {
+    await service.notify(await services.accounts.stationMemberIds(e.stationId, ["owner"]), {
+      kind: "station_account",
+      title: e.title,
+      body: e.body,
+      link: `/stations/${e.stationId}/settings?section=account`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: e.dedupeKey
+    });
   });
 
   deps.bus.on("business.low_balance", async (e) => {

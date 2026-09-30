@@ -24,6 +24,7 @@ import { deskApi } from "./desk.js";
 import { catalogShelfApi } from "./catalogShelf.js";
 import { catalogSponsorsApi } from "./catalogSponsors.js";
 import { configApi } from "./config.js";
+import { billingApi } from "./billing.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -51,6 +52,7 @@ export * from "./catalogSponsors.js";
 export * from "./callSigns.js";
 export * from "./config.js";
 export * from "./storageMaintenance.js";
+export * from "./billing.js";
 
 export const API_PREFIX = "/v1";
 
@@ -74,7 +76,9 @@ export const api = {
   catalogShelf: catalogShelfApi,
   catalogSponsors: catalogSponsorsApi,
   /** Added 2026-09-29 (follow-up Phase 1): the apps' public switches. */
-  config: configApi
+  config: configApi,
+  /** Added 2026-09-29 (follow-up Phase 2): pay-as-you-go, the Station account. */
+  billing: billingApi
 } as const;
 
 export const HealthResponse = z.object({

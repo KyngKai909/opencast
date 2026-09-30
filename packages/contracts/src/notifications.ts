@@ -30,7 +30,13 @@ export const NoticeKind = z.enum([
   /** O1, station team: the station signed on or off. */
   "signed_on_off",
   /** O1, business: a station added your spot to its rotation. */
-  "spot_added"
+  "spot_added",
+  /**
+   * Pay-as-you-go (added 2026-09-29), station owners, always on: the month's usage, a charge that
+   * failed, the grace period starting and ending soon, relays and live hours paused and resumed,
+   * a cap reached, a payment to approve in Clear.
+   */
+  "station_account"
 ]);
 
 export const Notice = z.object({

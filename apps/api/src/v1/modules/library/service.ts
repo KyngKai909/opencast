@@ -58,6 +58,13 @@ export interface ProgramRef {
 export interface LibraryService {
   /** Files by content ID: storing, references, locks, IPFS. */
   content: Content;
+  /**
+   * Pay-as-you-go (added 2026-09-29): what each station keeps in storage, by content ID: its
+   * items' files (originals included), their caption tracks and its relay background, each file
+   * once per station however many items point at it, with the bytes of the stored files. The
+   * prepared segments' bytes are playout's (`preparedBytes`).
+   */
+  storageUse(): Promise<Map<string, { originalBytes: number; contentIds: string[] }>>;
   /** Every content ID an item's files point at (all versions, originals too). */
   contentOfItems(itemIds: string[]): Promise<string[]>;
   /** Other stations' items made from the same files (a takedown pulls them too). */
@@ -515,6 +522,28 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
   const service: LibraryService = {
     content,
 
+    async storageUse() {
+      const CR = schema.contentRefs;
+      const C = schema.contents;
+      const rows = await db.execute<{ station_id: string; cid: string; bytes: string }>(sql`
+        select distinct x.station_id, c.cid, c.bytes from (
+          select a.station_id, r.cid from ${CR} r join ${F} f on f.id = r.owner_id join ${A} a on a.id = f.asset_id
+            where r.owner in ('asset_file', 'asset_original')
+          union
+          select a.station_id, r.cid from ${CR} r join ${A} a on a.id = r.owner_id where r.owner = 'caption_track'
+          union
+          select r.owner_id as station_id, r.cid from ${CR} r where r.owner = 'relay_background'
+        ) x join ${C} c on c.cid = x.cid and c.deleted_at is null`);
+      const out = new Map<string, { originalBytes: number; contentIds: string[] }>();
+      for (const r of rows.rows) {
+        const entry = out.get(r.station_id) ?? { originalBytes: 0, contentIds: [] };
+        entry.originalBytes += Number(r.bytes);
+        entry.contentIds.push(r.cid);
+        out.set(r.station_id, entry);
+      }
+      return out;
+    },
+
     contentOfItems: cidsOf,
 
     async itemsSharingContent(itemIds) {
@@ -742,6 +771,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     async upload(stationId, file, fields) {
       if (!file) throw badRequest("Choose a file to upload.", { file: "Required" });
       await checkOwnership(stationId, fields);
+      // Pay-as-you-go: storage at its monthly cap takes nothing new until the month ends or the cap goes up.
+      await services.billing.requireStorage(stationId);
       // A caption file sent with it is checked before anything is stored.
       if (fields.captions !== undefined && !toWebVtt(fields.captions)) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
       const probe = await deps.media.probe(file.path).catch(() => null);
@@ -834,6 +865,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
 
     async importLinks(stationId, input) {
       if (input.programId) await checkOwnership(stationId, { programId: input.programId });
+      await services.billing.requireStorage(stationId);
       const [row] = await db
         .insert(schema.importJobs)
         .values({ stationId, requestedUrls: input.urls, expandPlaylists: input.expandPlaylists, status: "queued", items: [] })

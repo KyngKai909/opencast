@@ -4,7 +4,7 @@
 // matches the ledger.
 
 import { fakeAddress } from "./clear.js";
-import { ownAccountsCustody, stripeCardFeeMicros, type Payments, type ProviderMove } from "./types.js";
+import { ownAccountsCustody, ownerWallet, stripeCardFeeMicros, type Payments, type ProviderMove } from "./types.js";
 
 export interface FakeMirror {
   /** Money in each wallet, encumbered or not. */
@@ -19,10 +19,20 @@ export function fakeCard(label: string, now: Date) {
   return { label, expiresOn: new Date(Date.UTC(now.getUTCFullYear() + 3, now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10) };
 }
 
-export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeMirror } {
+/**
+ * Pay-as-you-go cards on the fake (2026-09-29), named like Stripe's test cards: a SetupIntent id with
+ * "declined" in it saves a card that's always declined ("Visa ending 0002"); any other saves one
+ * that always works ("Visa ending 4242"). `charges` records each charge tried.
+ */
+export interface FakeStationCards {
+  charges: Array<{ billId: string; stationId: string; amountMicros: number; paymentMethodId: string; ok: boolean; providerRef: string }>;
+}
+
+export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeMirror; cards: FakeStationCards } {
   let n = 0;
   const ref = (prefix: string) => `${prefix}_fake_${++n}`;
   const mirror: FakeMirror = { wallets: new Map(), encumbered: new Map(), applied: new Set() };
+  const cards: FakeStationCards = { charges: [] };
   const pending = new Map<string, { wallet: string; amountMicros: number }>();
   const add = (wallet: string, micros: number) => mirror.wallets.set(wallet, (mirror.wallets.get(wallet) ?? 0) + micros);
   const addBusinessDays = (from: Date, days: number) => {
@@ -37,6 +47,7 @@ export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeM
   return {
     name: "fake",
     mirror,
+    cards,
     depositFeeMicros: (kind, amount) => (kind === "card" ? stripeCardFeeMicros(amount) : 0),
     arrives: (kind) => (kind === "clear_bank" ? "1 to 2 business days" : kind === "card" ? "Arrives right away" : "Instant"),
     async linkFundingSource({ kind, token }) {
@@ -89,15 +100,40 @@ export function fakePayments(clock: { now(): Date }): Payments & { mirror: FakeM
     // A transfer from a linked Clear wallet is taken as sent (nothing is on chain here), once per transaction.
     clearWallet: {
       async depositAddress(owner) {
-        return fakeAddress(`advertiser:${owner.id}`);
+        return fakeAddress(ownerWallet(owner));
       },
-      async verifyTransfer({ businessId, txHash, amountMicros }) {
+      async verifyTransfer({ businessId, txHash, amountMicros, wallet }) {
         if (!mirror.applied.has(`clear-transfer:${txHash}`)) {
           mirror.applied.add(`clear-transfer:${txHash}`);
-          add(`advertiser:${businessId}`, amountMicros);
+          add(wallet ?? `advertiser:${businessId}`, amountMicros);
         }
         return { status: "confirmed" };
       }
+    },
+
+    // Card money lands in Opencast's Stripe balance (the treasury), where the ledger credits it.
+    stationCards: {
+      publishableKey: null,
+      async setupCard() {
+        const id = ref("seti");
+        return { setupIntentId: id, clientSecret: `${id}_secret_fake` };
+      },
+      async savedCard({ setupIntentId }) {
+        if (!setupIntentId.startsWith("seti_")) throw new Error("That card setup isn't this station's.");
+        const declined = setupIntentId.includes("declined");
+        return declined
+          ? { paymentMethodId: `pm_fake_declined_${++n}`, label: "Visa ending 0002", expiresOn: fakeCard("", clock.now()).expiresOn }
+          : { paymentMethodId: `pm_fake_${++n}`, label: "Visa ending 4242", expiresOn: fakeCard("", clock.now()).expiresOn };
+      },
+      async chargeUsage({ billId, stationId, amountMicros, paymentMethodId }) {
+        const ok = !paymentMethodId.includes("declined");
+        const providerRef = ref("pi");
+        cards.charges.push({ billId, stationId, amountMicros, paymentMethodId, ok, providerRef });
+        return ok
+          ? { status: "succeeded", providerRef, feeMicros: stripeCardFeeMicros(amountMicros), reason: null }
+          : { status: "failed", providerRef, feeMicros: 0, reason: "Your card was declined." };
+      },
+      async detachCard() {}
     },
 
     async webhook(_provider, rawBody) {

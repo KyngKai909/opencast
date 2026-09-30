@@ -24,6 +24,7 @@ import { dbStation, stationBreaks, stationLog } from "../db";
 import { getSpots, spotById } from "./spots";
 import { BEAT, CRAT, HALL, LAB, stationByRef, uid } from "./stations";
 import { MIN, at } from "./time";
+import { usageStatement } from "./account";
 import { airingWatchOf } from "./watch";
 
 const $ = (dollars: number) => Math.round(dollars * 1_000_000);
@@ -528,6 +529,12 @@ export function moveToBank(stationId: string, amountMicros: number, money: (m: n
 export function stationStatements(stationId: string): Statement[] {
   const l = ledgerOf(stationId);
   if (!l) return [];
+  // Pay-as-you-go: a month's statement with its usage section (fixtures/account.ts), after the weeks.
+  const usage = usageStatement(stationId);
+  return [...weeklyStatements(l), ...(usage ? [usage] : [])];
+}
+
+function weeklyStatements(l: Ledger): Statement[] {
   return l.statements.map((s) => {
     const total = s.lines.reduce((a, x) => a + x.amountMicros, 0);
     return {

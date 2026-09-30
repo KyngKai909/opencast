@@ -389,6 +389,65 @@ describe("spots", () => {
   });
 });
 
+// Pay-as-you-go (migration 0033, follow-up Phase 2): a station's usage is owed on its own account,
+// accrued and paid in balanced entries like anything else; its days and bills keep their shape.
+describe("pay-as-you-go", () => {
+  test("usage is owed by a station, and Opencast's side of it belongs to nobody else", async (tx) => {
+    const s = await station(tx, { callSign: "BEAT" });
+    await tx.rejects(/account_owner_fits_kind/, () => account(tx, "usage_owed"));
+    await tx.rejects(/account_owner_fits_kind/, () => account(tx, "usage_billed", { stationId: s.id }));
+    await tx.rejects(/account_owner_fits_kind/, () => account(tx, "opencast_usage", { stationId: s.id }));
+    const owed = await account(tx, "usage_owed", { stationId: s.id });
+    const billed = await account(tx, "usage_billed");
+    const paid = await account(tx, "opencast_usage");
+    const earnings = await account(tx, "station_earnings", { stationId: s.id });
+    const outside = await account(tx, "external", { label: "bank" });
+    await tx.accepts(async () => {
+      await entry(tx, "deposit", [
+        [earnings.id, 5_000_000],
+        [outside.id, -5_000_000]
+      ]);
+      // Accrued: the station owes $1.20.
+      await entry(tx, "usage", [
+        [owed.id, -1_200_000],
+        [billed.id, 1_200_000]
+      ]);
+      // Paid from its earnings.
+      await entry(tx, "usage_payment", [
+        [earnings.id, -1_200_000],
+        [owed.id, 1_200_000],
+        [billed.id, -1_200_000],
+        [paid.id, 1_200_000]
+      ]);
+      await tx.check();
+    });
+    await tx.rejects(/doesn't balance/, async () => {
+      await entry(tx, "usage", [
+        [owed.id, -1_000_000],
+        [billed.id, 999_999]
+      ]);
+      await tx.check();
+    });
+  });
+
+  test("a day's usage is one of the known types, never negative; a bill is for a whole month", async (tx) => {
+    const s = await station(tx, { callSign: "BEAT" });
+    await tx.accepts(() => tx.run(`INSERT INTO ledger.usage_days (station_id, usage_type, day, quantity) VALUES ($1, 'storage', '2026-10-03', 12.5)`, [s.id]));
+    await tx.rejects(/usage_type_known/, () => tx.run(`INSERT INTO ledger.usage_days (station_id, usage_type, day, quantity) VALUES ($1, 'bandwidth', '2026-10-03', 1)`, [s.id]));
+    await tx.rejects(/usage_quantity_nonnegative/, () => tx.run(`INSERT INTO ledger.usage_days (station_id, usage_type, day, quantity) VALUES ($1, 'live_hours', '2026-10-03', -1)`, [s.id]));
+    await tx.run(`INSERT INTO ledger.usage_bills (station_id, month) VALUES ($1, '2026-10-01')`, [s.id]);
+    await tx.rejects(/usage_bills_station_month/, () => tx.run(`INSERT INTO ledger.usage_bills (station_id, month) VALUES ($1, '2026-10-01')`, [s.id]));
+    await tx.rejects(/usage_bill_month_start/, () => tx.run(`INSERT INTO ledger.usage_bills (station_id, month) VALUES ($1, '2026-11-15')`, [s.id]));
+  });
+
+  test("a station paying from Clear names the link; grace has a start", async (tx) => {
+    const s = await station(tx, { callSign: "BEAT" });
+    await tx.rejects(/station_billing_clear_has_link/, () => tx.run(`INSERT INTO ledger.station_billing (station_id, funding) VALUES ($1, 'clear')`, [s.id]));
+    await tx.rejects(/station_billing_grace_started/, () => tx.run(`INSERT INTO ledger.station_billing (station_id, standing) VALUES ($1, 'grace')`, [s.id]));
+    await tx.accepts(() => tx.run(`INSERT INTO ledger.station_billing (station_id, funding, standing, grace_started_at) VALUES ($1, 'card', 'grace', now())`, [s.id]));
+  });
+});
+
 describe("escrow", () => {
   async function setup(tx: Tx) {
     const claimable = await station(tx, { kind: "claimable", callSign: "CRAT" });

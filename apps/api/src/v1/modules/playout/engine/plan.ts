@@ -187,15 +187,19 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
     /** Everything that airs on a station between `from` and `to`, in order, with no gaps. */
     async plan(stationId: string, from: Date, to: Date): Promise<Segment[]> {
       const lookback = new Date(from.getTime() - 6 * 3_600_000);
-      const [allEntries, breaks, allFillers, station, credits, members, offAirSpans] = await Promise.all([
+      const [allEntries, breaks, allFillers, station, credits, members, offAirSpans, paused] = await Promise.all([
         services.log.entries(stationId, lookback, to),
         services.log.breaks(stationId, lookback, to),
         services.library.fillers(stationId),
         look(stationId),
         services.spots.creditsFor(stationId),
         services.ledger.memberCredits(stationId),
-        services.log.offAirSpans(stationId, lookback, to)
+        services.log.offAirSpans(stationId, lookback, to),
+        services.billing.paused(stationId)
       ]);
+      // Pay-as-you-go: live hours paused (their cap reached, or a bill unpaid past the grace
+      // period) air the live block's time as open time, station ID and bumpers. Never dead air.
+      const livePaused = station.band === "radio" ? paused.radioLive : paused.liveHours;
       // Planned off air time is its own block (sign-off entries included), from sign-off to back.
       const offAirBlocks = offAirStretches(offAirSpans).map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.backAt), logEntryId: o.logEntryId }));
       const entries = allEntries.filter((e) => e.kind !== "off_air");
@@ -356,7 +360,9 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const inside = breaks.filter((b) => b.logEntryId === entry.id).sort((x, y) => x.startsAt.localeCompare(y.startsAt));
         const reason: AsRunReason = entry.localNote === DEAD_AIR_NOTE ? "dead_air_fill" : "planned";
 
-        if (entry.kind === "live") {
+        if (entry.kind === "live" && livePaused) {
+          await openTime(s, e);
+        } else if (entry.kind === "live") {
           let t = s;
           for (const b of inside) {
             const bs = Date.parse(b.startsAt);

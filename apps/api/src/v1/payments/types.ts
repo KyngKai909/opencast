@@ -61,10 +61,37 @@ export type TransferCheck = { status: "confirmed" } | { status: "pending" } | { 
  * the provider, Opencast's the requester). Clear and the fake have it; Stripe-only doesn't.
  */
 export interface ClearWalletRail {
-  /** The business's balance account on chain: where a transfer from a Clear wallet is sent. */
-  depositAddress(owner: Owner & { type: "advertiser" }, accounts: AccountDirectory): Promise<string>;
-  /** Checks a transfer: from the linked wallet, to the business's account, at least the amount (USDC, 6 decimals). */
-  verifyTransfer(input: { businessId: string; txHash: string; from: string; to: string; amountMicros: number }): Promise<TransferCheck>;
+  /**
+   * An account's address on chain: where a transfer from a Clear wallet is sent. A business's
+   * balance account, or (pay-as-you-go, 2026-09-29) Opencast's treasury for a station's usage.
+   */
+  depositAddress(owner: Owner, accounts: AccountDirectory): Promise<string>;
+  /**
+   * Checks a transfer: from the linked wallet, to the account, at least the amount (USDC, 6
+   * decimals). `wallet` is where it lands (the fake's mirror credits it): the business's by default.
+   */
+  verifyTransfer(input: { businessId: string; txHash: string; from: string; to: string; amountMicros: number; wallet?: Wallet }): Promise<TransferCheck>;
+}
+
+/**
+ * Pay-as-you-go (added 2026-09-29): a station's card, saved with a Stripe SetupIntent and charged
+ * off-session at month end for the usage its earnings didn't cover. Every object carries
+ * `metadata.app` and every charge the statement suffix (docs/stripe.md).
+ */
+export interface StationCardRail {
+  /** A SetupIntent for the station's Stripe customer (made the first time), to confirm with Stripe's card form. */
+  setupCard(input: { stationId: string; stationName: string }, accounts: AccountDirectory): Promise<{ setupIntentId: string; clientSecret: string }>;
+  /** The card a succeeded SetupIntent saved. Throws when it isn't this station's, or didn't succeed. */
+  savedCard(input: { stationId: string; setupIntentId: string }): Promise<{ paymentMethodId: string; label: string; expiresOn: string | null }>;
+  /** Charges the card off-session for a usage bill. Declines come back as `failed` with the reason, never thrown. */
+  chargeUsage(
+    input: { billId: string; attempt: number; stationId: string; stationName: string; paymentMethodId: string; amountMicros: number; description: string },
+    accounts: AccountDirectory
+  ): Promise<{ status: "succeeded" | "pending" | "failed"; providerRef: string | null; feeMicros: number; reason: string | null }>;
+  /** Removes the card from the station's customer. */
+  detachCard(paymentMethodId: string): Promise<void>;
+  /** Stripe's publishable key, for the app's card form; null with the fake. */
+  readonly publishableKey: string | null;
 }
 
 /** A payout's destination when it's a linked Clear wallet rather than a bank: `wallet:<address>`. */
@@ -95,7 +122,11 @@ export type PaymentEvent =
   | { kind: "pledge_card"; pledgeId: string; card: PledgeCard }
   | { kind: "pledge_ended"; pledgeId: string }
   | { kind: "payout_confirmed" | "payout_failed"; payoutRef: string }
-  | { kind: "account_ready"; owner: Owner };
+  | { kind: "account_ready"; owner: Owner }
+  // Pay-as-you-go (added 2026-09-29): a station's usage charge, and a card saved for it.
+  | { kind: "usage_paid"; billId: string; providerRef: string; amountMicros: number; feeMicros: number }
+  | { kind: "usage_failed"; billId: string; providerRef: string; reason: string }
+  | { kind: "station_card_saved"; stationId: string; setupIntentId: string };
 
 export interface Payments {
   readonly name: "fake" | "clear" | "stripe_only";
@@ -136,6 +167,8 @@ export interface Payments {
   payoutAccount(owner: Owner & { type: "station" | "advertiser" }, accounts: AccountDirectory): Promise<{ status: "active" | "needs_onboarding"; url: string | null }>;
   /** Funding from and payouts to linked Clear wallets; absent when the provider can't (Stripe-only). */
   readonly clearWallet?: ClearWalletRail;
+  /** Stations' cards for pay-as-you-go (Stripe, or the fake); absent when no card provider is set up. */
+  readonly stationCards?: StationCardRail;
   /** Reads a provider's webhook. Null when it's not something the ledger acts on. Throws when the signature is wrong. */
   webhook(provider: "stripe" | "clear", rawBody: Buffer, headers: Record<string, string | undefined>): Promise<PaymentEvent | null>;
 }
@@ -177,7 +210,13 @@ export function ownAccountsCustody(account: LedgerAccount, holdAdvertiserId: str
     case "pool":
     case "opencast_absorbed":
     case "card_fees":
+    // Pay-as-you-go: usage paid lands in the treasury (from a station's own account, a Clear
+    // wallet or a card). What's owed and billed isn't money anywhere: no custody.
+    case "opencast_usage":
       return "opencast:treasury";
+    case "usage_owed":
+    case "usage_billed":
+      return null;
     case "external":
       // Card money lands in Opencast's Stripe balance and is credited on from the treasury.
       return account.label === "stripe" ? "opencast:treasury" : null;

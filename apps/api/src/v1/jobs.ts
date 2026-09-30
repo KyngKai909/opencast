@@ -35,6 +35,11 @@ export interface JobResults {
    */
   watchData?: { computed: number; finalized: number; votesDeleted: number } | null;
   watchDataPurged?: { sessions: number; minutes: number; votes: number } | null;
+  /**
+   * Pay-as-you-go (added 2026-09-29, follow-up Phase 2): usage measured (hourly), days and months
+   * closed (UTC midnight), grace steps, Clear payments checked again.
+   */
+  billing?: import("./modules/ledger/billing.js").BillingTickResult | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -100,6 +105,12 @@ export function createJobs(deps: Deps, services: Services) {
         return null;
       });
     }
+    // Pay-as-you-go: usage measured every hour; at each UTC day's end the day is closed (accrued),
+    // and at a month's end its bills (earnings first, then Clear or the card, else grace).
+    const billing = await services.billing.tick().catch((error) => {
+      console.error("[jobs] pay-as-you-go failed", error);
+      return null;
+    });
     // Last: whatever the ledger wrote this minute goes to the provider.
     const moves = await services.ledger.sendMoves();
 
@@ -161,7 +172,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing };
   }
 
   let timer: NodeJS.Timeout | undefined;

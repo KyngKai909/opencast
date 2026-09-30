@@ -225,6 +225,13 @@
       "when": 1790745715104,
       "tag": "0032_storage_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790749866709,
+      "tag": "0033_pay_as_you_go",
+      "breakpoints": true
     }
   ]
 }

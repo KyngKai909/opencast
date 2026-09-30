@@ -130,6 +130,12 @@ export interface StationsService {
   makers(): Promise<Array<{ profile: StationProfile; turnaround: string | null; fromMicros: number | null }>>;
   /** For playout: every enabled relay, with its key (and a radio station's background, once prepared). */
   relays(stationId: string): Promise<Array<{ id: string; rtmpUrl: string; streamKey: string; breakHandling: "air_spots" | "station_id_slate"; burnCaptions: boolean; background: { loopKey: string; frames: number } | null }>>;
+  /**
+   * Pay-as-you-go (added 2026-09-29): what each translator relays. Every translator relays the
+   * whole channel today, so each is `everything` (billed per hour, per station); Phase 3 adds
+   * "Live shows only" (`live_only`, free), a translator's own setting, read here.
+   */
+  relayModes(translatorIds: string[]): Promise<Map<string, "everything" | "live_only">>;
   /** A radio station's relay background (added 2026-09-29). */
   getRelayBackground(stationId: string): Promise<RelayBackgroundView | null>;
   setRelayBackground(stationId: string, file: import("../../http.js").UploadedFile | null): Promise<RelayBackgroundView>;
@@ -629,11 +635,21 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       });
     },
 
+    async relayModes(translatorIds) {
+      // The seam for Phase 3's modes: until translators have one, they relay everything.
+      return new Map(translatorIds.map((id) => [id, "everything" as const]));
+    },
+
     async relays(stationId) {
-      const rows = await db
+      const all = await db
         .select()
         .from(schema.translators)
         .where(and(eq(schema.translators.stationId, stationId), eq(schema.translators.enabled, true)));
+      // Pay-as-you-go: relays of everything the station airs pause at their cap, or past the grace
+      // period of an unpaid bill (relays of live shows only are free and keep going). The channel doesn't.
+      const paused = all.length ? (await services.billing.paused(stationId)).relays : false;
+      const modes = paused ? await service.relayModes(all.map((r) => r.id)) : null;
+      const rows = modes ? all.filter((r) => modes.get(r.id) === "live_only") : all;
       const background = rows.length && (await bandOfStation(stationId)) === "radio" ? await service.relayBackground(stationId) : null;
       return rows.filter((r) => r.streamKey).map((r) => ({ id: r.id, rtmpUrl: r.rtmpUrl, streamKey: r.streamKey, breakHandling: r.breakHandling, burnCaptions: r.burnCaptions, background }));
     },
