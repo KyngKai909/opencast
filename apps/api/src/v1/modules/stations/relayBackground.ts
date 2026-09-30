@@ -142,7 +142,7 @@ export function createRelayBackgrounds({ deps, services }: ModuleContext) {
         throw refused("unreadable_file", "That file couldn't be read as a picture or a video.");
       }
       const content = services.library.content;
-      const stored = await content.store(file.path, { storageClass: "standard", contentType: file.mimeType || undefined });
+      const stored = await content.keep(file, { storageClass: "standard", contentType: file.mimeType || undefined });
       const [previous] = await db.select().from(RB).where(eq(RB.stationId, stationId));
       const now = deps.clock.now();
       const [row] = await db.transaction(async (tx) => {

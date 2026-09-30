@@ -11,6 +11,7 @@ import path from "node:path";
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Executor, ModuleContext } from "../../context.js";
+import type { UploadedFile } from "../../http.js";
 import { refused } from "../../errors.js";
 import { contentIdOf, contentTypeOf, objectKey, sha256FromCid, type StorageClass } from "../../storage.js";
 
@@ -78,6 +79,48 @@ export function createContent({ deps, services }: ModuleContext) {
           set: { deletedAt: null, deletedReason: null, storageClass, store: objects.name }
         });
       return { cid, bytes, storageClass };
+    },
+
+    /**
+     * Keeps a direct upload (added 2026-09-30, follow-up Phase 4) that's in the store already, at
+     * `stagedKey`, read once for its content ID: the same rules as `store`, without sending the bytes
+     * again. Bytes the platform already has are stored once: the staged copy is deleted and the
+     * existing object kept, in its own class. Otherwise the staged object moves to its content ID in
+     * the class asked for (server side in R2). Taken-down bytes are refused (and the staged copy goes).
+     */
+    async adopt(stagedKey: string, input: { cid: string; bytes: number; storageClass: StorageClass; contentType: string }): Promise<{ cid: string; bytes: number; storageClass: StorageClass; duplicate: boolean }> {
+      const { cid, bytes } = input;
+      const finalKey = objectKey.file(cid);
+      const [existing] = await db.select().from(C).where(eq(C.cid, cid));
+      if (existing?.deletedReason === "takedown") {
+        if (stagedKey !== finalKey) await objects.delete(stagedKey).catch(() => undefined);
+        throw refused("taken_down", "That file was taken down after a rights claim and can't be stored again.");
+      }
+      const present = await objects.has(finalKey);
+      const needsMove = !existing || existing.deletedAt !== null || !present;
+      const storageClass: StorageClass = needsMove ? input.storageClass : existing!.storageClass;
+      // Picked up again after a restart, with the move already made: nothing to move.
+      if (stagedKey !== finalKey) {
+        if (needsMove && !present) {
+          if (!objects.move) throw new Error(`the ${objects.name} store can't move objects`);
+          await objects.move(stagedKey, finalKey, { storageClass, contentType: input.contentType });
+        } else {
+          await objects.delete(stagedKey);
+        }
+      }
+      await db
+        .insert(C)
+        .values({ cid, bytes, contentType: input.contentType, storageClass, store: objects.name })
+        .onConflictDoUpdate({ target: C.cid, set: { deletedAt: null, deletedReason: null, storageClass, store: objects.name } });
+      return { cid, bytes, storageClass, duplicate: !needsMove };
+    },
+
+    /** Keeps a file: a direct upload's by `adopt`, a form upload's (a local file) by `store`. */
+    async keep(file: UploadedFile, input: { storageClass: StorageClass; contentType?: string }): Promise<{ cid: string; bytes: number; storageClass: StorageClass }> {
+      if (!file.stored) return content.store(file.path, input);
+      const kept = await content.adopt(file.stored.key, { cid: file.stored.cid, bytes: file.stored.bytes, storageClass: input.storageClass, contentType: input.contentType || file.mimeType || contentTypeOf(file.originalName) });
+      file.stored.onKept?.({ cid: kept.cid, duplicate: kept.duplicate });
+      return kept;
     },
 
     async addRef(tx: Executor, cid: string, owner: ContentOwner, ownerId: string) {

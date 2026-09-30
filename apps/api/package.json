@@ -14,9 +14,11 @@
     "demo:watch-data": "tsx --conditions=source scripts/demo-watch-data.ts",
     "demo:billing": "tsx --conditions=source scripts/demo-billing.ts",
     "demo:relay-viewers": "tsx --conditions=source scripts/demo-relay-viewers.ts",
+    "demo:uploads": "tsx --conditions=source scripts/demo-uploads.ts",
     "storage:move-off-pinata": "tsx --conditions=source scripts/move-off-pinata.ts",
     "storage:prepare-from-originals": "tsx --conditions=source scripts/prepare-from-originals.ts",
     "storage:relink-locations": "tsx --conditions=source scripts/relink-locations.ts",
+    "storage:uploads-bucket": "tsx --conditions=source scripts/uploads-bucket.ts",
     "test:realtime": "vitest run test/playout-relay.test.ts test/playout-radio-live.test.ts test/playout-relay-background.test.ts test/playout-live-audio.test.ts --no-file-parallelism"
   },
   "dependencies": {

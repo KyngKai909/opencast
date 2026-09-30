@@ -253,6 +253,13 @@
       "when": 1790758606468,
       "tag": "0036_translator_keys_sealed",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790787741523,
+      "tag": "0037_direct_uploads",
+      "breakpoints": true
     }
   ]
 }

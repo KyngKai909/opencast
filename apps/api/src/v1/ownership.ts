@@ -93,5 +93,7 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.platform_geography",
     "broadcast.platform_geography_checks"
   ],
+  // Added 2026-09-30 (follow-up Phase 4): direct uploads, from their parts to what they made.
+  uploads: ["broadcast.uploads"],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };

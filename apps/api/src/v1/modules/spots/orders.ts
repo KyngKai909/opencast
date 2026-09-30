@@ -150,7 +150,7 @@ export function createOrders(
     const content = services.library.content;
     // Originals, in Infrequent Access: a brief is read once or twice, and a delivery that becomes
     // the spot is prepared for air from this original, once (its prepared segments are what's read).
-    const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
+    const stored = await content.keep(file, { storageClass: "infrequent", contentType: file.mimeType || undefined });
     return db.transaction(async (tx) => {
       const [saved] = await tx
         .insert(F)

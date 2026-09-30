@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-337 endpoints in 21 modules.
+343 endpoints in 22 modules.
 
 ## accounts (35)
 
@@ -445,3 +445,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `updateRelay` | PATCH | `/stations/:stationId/relay` | signed in | Change the relay mode, what breaks show, the station bug on relays, or saving YouTube videos (owners, operators) |
 | `listRelayRestarts` | GET | `/stations/:stationId/relay/restarts` | signed in | Every restart for platform limits, latest first: planned, done, failed, or due for the station to do |
 | `dismissPaidPromotionReminder` | POST | `/stations/:stationId/relay/platforms/:platformId/paid-promotion-reminder/dismiss` | signed in | The station marked paid promotion on a destination Opencast can't mark: stop reminding it for this broadcast |
+
+## uploads (6)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `createUpload` | POST | `/uploads` | signed in | Start a direct upload: checks the role for its purpose (404 or 403 as the old upload endpoint would), then answers with the part size, parts to send at once and the first part URLs. 422 `too_big`, `wrong_file_type` (a relay background or caption file of the wrong type); 409 `storage_paused` (a library item while storage is at its cap), `not_radio` (a relay background on a TV station), `brief_closed`, `not_in_the_making`, `not_an_upload`, `preparing`, `claim_open`. |
+| `signUploadParts` | POST | `/uploads/:uploadId/parts` | signed in | More part URLs (up to 100 at once), each used once; ask again to retry a part. The person who started it only (404 otherwise). 409 `not_uploading` once it's completed or aborted; 422 for a part number past `partCount`. |
+| `listUploadParts` | GET | `/uploads/:uploadId/parts` | signed in | The parts the store already has, to resume after a dropped connection or a reload. 409 `not_uploading` once it's completed or aborted. |
+| `completeUpload` | POST | `/uploads/:uploadId/complete` | signed in | Every part is in: the upload becomes `checking` and the API takes it from there (content ID, stored once, the checks, preparation). Answers at once; follow it with `getUpload`. Calling it again answers the same. 409 `parts_missing` (a part the store doesn't have, or an ETag that doesn't match), `not_uploading` (aborted). |
+| `abortUpload` | DELETE | `/uploads/:uploadId` | signed in | Cancel an upload: its parts are deleted. An upload that's already finished is left as it is. Uploads left unfinished for 24 hours are aborted by themselves. |
+| `getUpload` | GET | `/uploads/:uploadId` | signed in | An upload's state, content ID and what it made. The person who started it only (404 otherwise). |

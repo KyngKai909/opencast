@@ -100,6 +100,10 @@ The separate Railway web services from before the Opencast app (control, viewer,
 
 Staging's database is fresh. For markets on the dial, seed it once from inside the api service (`railway ssh -s api -- npm run seed -w @opencast/db`); the seed is safe to rerun.
 
+## Direct uploads (follow-up Phase 4, 2026-09-30)
+
+Uploads go from the browser straight to the bucket in parts (presigned multipart uploads), never through the API; the API checks roles, signs the parts and, once they're in, reads the file back for its content ID and does the checks. The bucket needs CORS and lifecycle rules: docs/uploads.md has them, with the part size, costs and what to set in Cloudflare. On staging, apply them to the Railway bucket once: `railway run -s api -- npm run storage:uploads-bucket -w @opencast/api -- --apply` (it says if the bucket refuses, and the manual step). Migration 0037 adds `broadcast.uploads`; the worker's jobs tick picks up completions after an API restart and aborts uploads left for a day. The old multipart form endpoints still answer.
+
 ## One-off storage steps (Follow-up, 2026-09-29)
 
 Since this change, uploads are kept as their original (Infrequent Access) and playout prepares from it; previews play the prepared segments; what was prepared from a file is deleted with it. Three one-off steps bring older data in line. Each reports by default, changes nothing until asked, is safe to run again, and never unpins or deletes anything but the 1280 px copies the originals replace.
@@ -120,7 +124,7 @@ Production is empty until this runs. Nothing here touches `glistening-truth` unt
 
 1. **Plan.** Upgrade the Railway plan so the worker's 20 GB scratch volume fits (Hobby stops at 5 GB).
 2. **Code.** Merge `staging` into `main` (a PR; never force-push `main`). Production builds `main`.
-3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs.
+3. **Object storage.** In Cloudflare, create the R2 bucket `opencast-media` and an API token scoped to it (read and write). Optionally add a public custom domain for `R2_PUBLIC_BASE`; without one, files are served by signed URLs. Uploads go straight from the browser to the bucket, so it needs a CORS policy (the apps' origins may `PUT`, and `ETag` is exposed) and lifecycle rules (unfinished multipart uploads aborted after a day, `uploads/` cleared after a week): the exact JSON and where to paste it are in docs/uploads.md "What to set in Cloudflare".
 4. **Keys.** Make fresh ones for production. Don't reuse the old project's Livepeer or Pinata keys, which are to be rotated:
    - Privy: Opencast's own production app (`PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY`, `PRIVY_APP_SECRET`), with the production app origins allowed, and embedded wallets created only for people who sign in;
    - Clear: its provider app ID (`CLEAR_PRIVY_PROVIDER_APP_ID` on api, `VITE_CLEAR_PRIVY_PROVIDER_APP_ID` on the web and business apps in Vercel) and `CLEAR_WALLET_ACCESS`, once Clear has requested global-wallet provider access in its own Privy dashboard and allowed Opencast's app;

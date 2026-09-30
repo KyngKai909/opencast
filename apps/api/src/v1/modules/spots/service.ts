@@ -983,7 +983,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       // The original, kept as it came, by content ID in Infrequent Access (the same spot uploaded
       // twice is stored once). Playout prepares it for air from this original, once; the checks
       // below read it too.
-      const stored = await services.library.content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
+      const stored = await services.library.content.keep(file, { storageClass: "infrequent", contentType: file.mimeType || undefined });
       // P4: every spot gets its own code as it's checked: Opencast's letters, and its title as the
       // offer until the business names one (nothing is promised for it).
       if (!(await db.select({ id: schema.codes.id }).from(schema.codes).where(eq(schema.codes.spotId, spotId))).length) {
@@ -1054,6 +1054,9 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
         await services.library.content.addRef(tx, stored.cid, "spot_file", saved.id);
         await tx.insert(schema.uploadChecks).values(checks.map((c) => ({ spotFileId: saved.id, check: c.check, result: c.result === "pending" ? "for_you" : c.result, detail: { ...c.detail, pending: c.result === "pending" } })));
       });
+      // A direct upload (follow-up Phase 4) starts its preparation now, so review and the first
+      // airing don't wait for it. (A form upload's is asked for when it's sent for review, as before.)
+      if (file.stored) await services.playout.previews([{ contentId: stored.cid, mediaKind: probe.mediaKind, band: probe.mediaKind === "audio" ? "radio" : "tv", durationMs }], { prepare: true });
       return service.spot(spotId);
     },
 

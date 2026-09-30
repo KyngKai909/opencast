@@ -32,6 +32,19 @@ function sponsorshipFor(id: string) {
 const order = (o: deals.FxOrder, status = 200) => reply(spotsApi.getOrder.response, deals.publicOrder(o), status);
 const sponsorship = (x: deals.FxSponsorship, status = 200) => reply(spotsApi.offerSponsorship.response, deals.publicSponsorship(x), status);
 
+/** A file for a brief (the form endpoint's work, and a direct upload's once its parts are in). */
+export function mockAttachBriefFile(request: Request, orderId: string, file: File | null): Response {
+  const p = needsUser(request);
+  if (p instanceof Response) return p;
+  const o = orderFor(orderId);
+  if (!o) return fail(404, "not_found", "That order wasn't found.");
+  const r = roleOn(o.business.id, p, "advertise");
+  if (r instanceof Response) return r;
+  if (!file) return fail(400, "no_file", "Choose a file to add.");
+  const out = deals.attachBriefFile(o, file.name || null);
+  return isFail(out) ? failed(out) : order(out);
+}
+
 export const dealsHandlers: HttpHandler[] = [
   // ---- Sponsorships ----
 
@@ -141,17 +154,9 @@ export const dealsHandlers: HttpHandler[] = [
   }),
 
   http.post(path(spotsApi.attachBriefFile), async ({ request, params }) => {
-    const p = needsUser(request);
-    if (p instanceof Response) return p;
-    const o = orderFor(String(params.orderId));
-    if (!o) return fail(404, "not_found", "That order wasn't found.");
-    const r = roleOn(o.business.id, p, "advertise");
-    if (r instanceof Response) return r;
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
-    if (!file || typeof file === "string") return fail(400, "no_file", "Choose a file to add.");
-    const out = deals.attachBriefFile(o, (file as File).name || null);
-    return isFail(out) ? failed(out) : order(out);
+    return mockAttachBriefFile(request, String(params.orderId), file && typeof file !== "string" ? (file as File) : null);
   }),
 
   http.post(path(spotsApi.acceptQuote), ({ request, params }) => {

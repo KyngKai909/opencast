@@ -10,7 +10,6 @@ import { Button, Checkbox, KeyValueList, Modal, PictureFrame, PicturePlaceholder
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { useAuth } from "../../../auth/AuthProvider";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
@@ -19,7 +18,8 @@ import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../component
 import { languageName } from "../../components/live/listings";
 import { preparationWords } from "../../components/onair/readiness";
 import { SecTop } from "../../components/live/Studio";
-import { sendFile } from "../../components/live/upload";
+import { UploadList } from "@opencast/ui/upload";
+import { useUpload } from "../../components/live/upload";
 import { NotFound, Quiet } from "../common";
 import "./Library.css";
 import "./LibraryItem.css";
@@ -36,12 +36,22 @@ export default function LibraryItem() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
-  const auth = useAuth();
   useShellOptions({ flush: true });
   const lib = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} });
   const itemQ = useApi(libraryApi.getItem, { params: { itemId } }, { refetchInterval: (q) => (q.state.data?.status === "preparing" ? 2000 : false) });
   const history = useApi(libraryApi.getItemHistory, { params: { itemId } }, { retry: false });
   const file = useRef<HTMLInputElement>(null);
+  // L6: the new file goes straight to storage in parts (follow-up Phase 4), then through the same checks.
+  const up = useUpload({
+    id: `replace-${itemId}`,
+    purpose: () => ({ kind: "library_replace", itemId }),
+    clearFinishedAfterMs: 4000,
+    onFinished: (f) => {
+      void refreshLibrary(qc);
+      toast.show({ message: `${f.name} is being prepared for air. ${itemQ.data?.title ?? "The item"} keeps its history and schedule.` });
+    },
+    onFailed: (f) => toast.show({ message: f.error ?? "Something went wrong. Try again." })
+  });
   const [exporting, setExporting] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
@@ -57,15 +67,7 @@ export default function LibraryItem() {
   const now = clockNow();
   const inUse = h ? h.logEntries + h.carriers > 0 : true;
 
-  const replace = async (f: File) => {
-    try {
-      await sendFile(libraryApi.replaceFile, { itemId: item.id }, f, {}, auth.getToken);
-      await refreshLibrary(qc);
-      toast.show({ message: `${f.name} is being prepared for air. ${item.title} keeps its history and schedule.` });
-    } catch (e) {
-      toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
-    }
-  };
+  const replace = (f: File) => up.add([f]);
   const remove = async () => {
     try {
       await call(libraryApi.deleteItem, { params: { itemId: item.id } });
@@ -108,7 +110,9 @@ export default function LibraryItem() {
             </p>
           </div>
           <div className="cc-item__end">
-            <Button size="sm" onClick={() => file.current?.click()}>Replace file</Button>
+            <Button size="sm" onClick={() => file.current?.click()} disabled={up.busy}>
+              Replace file
+            </Button>
             {item.rights && item.status === "ready" ? (
               <Button size="sm" href={`${s.base}/log?place=${item.id}`}>Schedule</Button>
             ) : (
@@ -134,6 +138,8 @@ export default function LibraryItem() {
             />
           </div>
         </div>
+
+        <UploadList items={up.items} label="Replacing the file" finishedWords="Uploaded. It airs once it's prepared" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
 
         <div className="cc-item__grid">
           <div>

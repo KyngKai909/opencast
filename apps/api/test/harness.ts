@@ -80,6 +80,8 @@ export async function createHarness(
     publicBase?: string;
     /** Platform connections (follow-up Phase 3): fake YouTube and Twitch, and the secrets key. */
     platforms?: Deps["platforms"];
+    /** Another object store (the direct-upload demo's MinIO); local disk by default. */
+    objects?: (storageRoot: string) => Deps["storage"]["objects"];
   } = {}
 ): Promise<Harness> {
   const database = await freshDatabase();
@@ -117,7 +119,7 @@ export async function createHarness(
   const deps: Deps = {
     db: database.db,
     media: ffmpegPipeline(storageRoot),
-    storage: { objects: localObjectStore(path.join(storageRoot, "objects"), `${options.publicBase ?? ""}/objects`), ipfs: fakeIpfs() },
+    storage: { objects: options.objects?.(storageRoot) ?? localObjectStore(path.join(storageRoot, "objects"), `${options.publicBase ?? ""}/objects`), ipfs: fakeIpfs() },
     chain: options.chain ?? null,
     payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
@@ -194,6 +196,7 @@ export async function createHarness(
     async close() {
       // Background work (storing uploads, imports) finishes before the database goes.
       await services.shelf.settle();
+      await services.uploads.settle();
       await services.library.settle();
       await deps.bus.settle();
       await deps.relay.close();

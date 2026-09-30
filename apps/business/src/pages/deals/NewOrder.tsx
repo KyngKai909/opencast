@@ -1,15 +1,17 @@
 // production-orders 02.1 order a spot: the brief (/orders/new). What it's called, its length, what
 // it's about, what it must say, files to use, when it's needed, and who makes it (listMakers, with
 // turnaround, history or specialty, samples and "From $"). "Ask BEAT for a quote" sends the brief
-// (orderSpot), then attaches the files (attachBriefFile, multipart; P18 asks for files with the
-// brief). `?from=<orderId>` starts from an earlier brief, after a maker passed, offering the others.
+// (orderSpot), then sends the files straight to storage in parts (follow-up Phase 4, direct uploads
+// for the brief; P18 asks for files with the brief), with their progress. `?from=<orderId>` starts from an earlier brief, after a maker passed, offering the others.
 // Owners and managers.
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { spotsApi, type ProductionOrder } from "@opencast/contracts";
 import { Button, Field, Icon, Segmented, TextAreaField, money, useToast } from "@opencast/ui";
+import { UploadList } from "@opencast/ui/upload";
 import { call } from "../../api/client";
+import { useUpload } from "../../api/upload";
 import { useBusiness } from "../../business/BusinessContext";
 import { errorText, useMakers, useOrder, useProfile, useRefresh } from "../../components/deals/data";
 import { callSign, marketDate, stationLabel } from "../../components/deals/format";
@@ -76,6 +78,20 @@ function NewOrderPage() {
   };
   const ok = !problems.title && !problems.about && !problems.neededBy && !!maker;
 
+  const orderId = useRef<string | null>(null);
+  const sentTo = useRef<string>("");
+  const up = useUpload({
+    id: `brief-${b.id}`,
+    purpose: () => ({ kind: "order_file", orderId: orderId.current!, role: "brief" }),
+    onBatchDone: ({ failed }) => void sent(failed.map((f) => f.name))
+  });
+  /** The brief is sent (and its files, or what couldn't be attached): on to the order. */
+  const sent = async (notAttached: string[] = []) => {
+    await refresh();
+    toast.show({ message: `Sent to ${sentTo.current} for a quote.${notAttached.length ? ` ${notAttached.join(", ")} couldn't be attached. Add ${notAttached.length === 1 ? "it" : "them"} from the order.` : ""}` });
+    navigate(`${b.base}/orders/${orderId.current}`);
+  };
+
   const send = async () => {
     setTried(true);
     if (!ok || !maker) return;
@@ -86,13 +102,12 @@ function NewOrderPage() {
         params: { businessId: b.id },
         body: { makerStationId: maker.station.id, title: title.trim(), lengthSec: Number(length) as 15 | 30 | 60, about: about.trim(), mustSay: mustSay.trim() || undefined, neededBy }
       });
-      for (const file of chosen) await call(spotsApi.attachBriefFile, { params: { orderId: order.id }, body: { file } });
-      await refresh();
-      toast.show({ message: `Sent to ${callSign(maker.station)} for a quote.` });
-      navigate(`${b.base}/orders/${order.id}`);
+      orderId.current = order.id;
+      sentTo.current = callSign(maker.station);
+      if (chosen.length) up.add(chosen);
+      else await sent();
     } catch (e) {
       setError(errorText(e));
-    } finally {
       setSending(false);
     }
   };
@@ -149,6 +164,7 @@ function NewOrderPage() {
               />
             </div>
           </div>
+          <UploadList items={up.items} label="Attaching the brief's files" finishedWords="Attached" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
           <Field className="bz-no__fld bz-no__date" label="Needed by" type="date" min={today} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} error={tried ? problems.neededBy : null} />
         </div>
 

@@ -49,6 +49,11 @@ export interface JobResults {
   relayViewers?: { settled: number; notBilled: number; returned: number } | null;
   /** The old translators' plain stream keys moved to sealed storage (added 2026-09-30; hourly, and at the first tick). Null in other minutes. */
   translatorKeys?: { moved: number; waiting: number; failed: number } | null;
+  /**
+   * Direct uploads (added 2026-09-30, follow-up Phase 4): completions picked up again after a restart,
+   * uploads abandoned for 24 hours aborted, and (hourly) multipart uploads left open in the store aborted.
+   */
+  uploads?: { resumed: number; abandoned: number; orphans: number } | null;
 }
 
 export function createJobs(deps: Deps, services: Services) {
@@ -57,6 +62,7 @@ export function createJobs(deps: Deps, services: Services) {
   let lastHour = "";
   let lastWatch = 0;
   let lastTranslatorKeys = 0;
+  let lastUploadOrphans = 0;
 
   async function tick(): Promise<JobResults> {
     const now = deps.clock.now();
@@ -140,6 +146,13 @@ export function createJobs(deps: Deps, services: Services) {
         return null;
       });
     }
+    // Direct uploads: completions nobody holds any more, and uploads nobody finished.
+    const orphans = now.getTime() - lastUploadOrphans >= 3_600_000;
+    if (orphans) lastUploadOrphans = now.getTime();
+    const uploads = await services.uploads.sweep({ orphans }).catch((error) => {
+      console.error("[jobs] uploads failed", error);
+      return null;
+    });
     // Last: whatever the ledger wrote this minute goes to the provider.
     const moves = await services.ledger.sendMoves();
 
@@ -201,7 +214,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing, platforms, relayViewers, translatorKeys };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing, platforms, relayViewers, translatorKeys, uploads };
   }
 
   let timer: NodeJS.Timeout | undefined;

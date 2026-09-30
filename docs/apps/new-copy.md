@@ -915,3 +915,28 @@ Step A4 (`control/opencast-master-control.html`) draws the Translators page; its
 | Business, Where it aired | the "Spent" figure: "Spent, {$8.64} of it on relay viewers"; section "Relay viewers": "Relay viewers, as reported by YouTube" with "{31} airings, {1,840} viewers added up, {610} billed" (and ". {$0.42} returned: no location data in time"); "Relay viewers, as reported by Twitch" with "{31} airings, {212} viewers added up. Twitch doesn't report where viewers are, so they aren't billed to local businesses"; "Relay viewers, waiting for YouTube's location data" with "{3} airings. Held until it arrives; returned if it doesn't within 7 days" (held, shown quiet); the note "Viewers on YouTube and Twitch, as those platforms report them, counted apart from Opencast's. With a location or a service area, you pay only for relay viewers the platform places inside it."; the phone's "Spent" row: "{$8.64} of it on relay viewers" |
 | Business, an airing's proof | "Tuned in on Opencast" (when relayed); each platform's line: the API's working when settled; "{200} tuned in. {$1.60} held until it arrives"; "{40} tuned in. {reason}"; "{reason}. {$0.56} went back to your balance"; "Counting. The platform's numbers come in a few minutes after the spot"; the CSV's working adds "{label}: {the same words}" after Opencast's |
 | Station earnings | "Relay viewers, as reported by YouTube" (and Twitch) with "{31} airings, for viewers {YouTube} reported during your spots" ("No airings yet"); the phone's one line "Relay viewers" |
+
+### Direct uploads: the upload list and its errors (follow-up Phase 4, 2026-09-30)
+
+Files go straight to storage in parts (docs/uploads.md). Each drop zone and file button in master control and the business app shows the files under it while they're on their way. No frame draws this list. The drop zones keep their frame words ("Drop video or audio files here", "Choose files", "Upload and check", "Replace file", "Shrink to fit", "Add files", "Deliver") and their toasts ("{2} files are being prepared for air.", "{name} is being prepared for air. {title} keeps its history and schedule.", "{name} is being prepared. Relays show it once it's ready.", "Delivered to {Orange Street Coffee}."). Names, sizes and percentages are filled in.
+
+| Where | Words |
+|---|---|
+| A row, while it's sent | the file's name, its size ("4.2 GB", "21 MB", "86 KB"), a progress bar (spoken "{name}, uploaded"), "Uploading, {45}%" |
+| Paused | "Paused at {45}%" |
+| Every part in, the API reading it | "Checking" |
+| Finished, by screen | Library: "Uploaded. It's in the library below" (the row goes after 4 seconds); Replace file (L6): "Uploaded. It airs once it's prepared"; Relay background: "Uploaded. Preparing the loop"; a production order's delivery (master control): "Delivered. Being prepared for their review"; a new spot and Shrink to fit (business): "Checked"; a brief's files: "Attached"; anywhere else: "Preparing for air", or "Done" |
+| Back after a reload, a big file the browser didn't keep | "Stopped at {45}%. Choose the file again to carry on." |
+| Failed on the way (after its own retries) | "The connection dropped. Retry to carry on from where it stopped." |
+| Failed at the API | the API's words (the old endpoints': "That file can't be read as video or audio.", and so on); none given: "That upload couldn't be finished. Try again." |
+| Buttons | "Pause", "Resume", "Retry" (failed on the way only), "Cancel" (while it's on its way), an × to clear a finished or failed row; spoken "Pause {name}", "Resume {name}", "Retry {name}", "Cancel {name}", "Clear {name}" |
+| The lists' names (spoken) | "Uploading to the library", "Replacing the file", "Uploading the background", "Delivering", "Uploading the spot", "Sending it again, shrunk to fit", "Attaching the brief's files" |
+| New order, a brief's file that failed | toast "Sent to {BEAT} for a quote. {logo.png} couldn't be attached. Add it from the order." ("Add them" for more than one) |
+| API: `too_big` | "Use a file of {100 GB} or less." (a caption file: "1 MB", a relay background: "100 MB") |
+| API: `wrong_file_type`, a caption file | "Use a WebVTT (.vtt) or SRT (.srt) caption file." |
+| API: `parts_missing` | "Part {12} of {128} isn't in yet. Resume the upload." |
+| API: `not_uploading` | "That upload isn't taking parts any more."; completing a cancelled one: "That upload was cancelled or couldn't be finished. Upload the file again." |
+| API: `abandoned` (not finished in a day) | "Not finished within a day, so it was cancelled. Upload the file again." |
+| API: `wrong_size`, `not_found`, `couldnt_read` | "The file that arrived isn't the size it said it was. Upload it again.", "The file didn't arrive. Upload it again.", "That file couldn't be read from storage. Upload it again." |
+| API: `signature` (a part URL changed or run out) | "That part URL has expired or isn't signed. Ask for a new one." (the uploader asks by itself) |
+| API: `uploads_need_bucket`, `uploads_unavailable` (a server set up wrong) | "Uploads need object storage (R2) on this server.", "Direct uploads aren't available on this server." |

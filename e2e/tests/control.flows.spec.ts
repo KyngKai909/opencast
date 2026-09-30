@@ -55,8 +55,10 @@ test("someone new signs on for the first time", async ({ page }) => {
   await expect(page.getByText("2 files are being prepared for air.")).toBeVisible();
   await expect(page.getByText("2 need rights confirmed")).toBeVisible();
   await page.getByLabel("Type of TAPE station ID").selectOption("SID");
+  // The files upload side by side (straight to storage, follow-up Phase 4), so the smaller one can
+  // land first: each item's own row is used, not the list's order.
   for (const title of ["Tape Talks, ep. 1", "TAPE station ID"]) {
-    await page.getByRole("button", { name: "Confirm rights to air it" }).first().click();
+    await page.getByRole("row").filter({ has: page.getByRole("button", { name: `More for ${title}` }) }).getByRole("button", { name: "Confirm rights to air it" }).click();
     const pane = page.getByRole("dialog", { name: `Can TAPE air ${title}?` });
     await pane.getByText("I made it").click();
     await pane.getByRole("button", { name: "Confirm rights", exact: true }).click();

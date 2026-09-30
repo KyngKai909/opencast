@@ -7,7 +7,10 @@ import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { accountsApi, ORDER_STATE_LABELS, type OrderState, type ProductionOrder, spotsApi } from "@opencast/contracts";
 import { Button, ControlTitle, Field, KeyValueList, Lines, Segmented, Sheet, Table, Tag, TextAreaField, money, useToast, type Column } from "@opencast/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { UploadList } from "@opencast/ui/upload";
 import { useApi } from "../../../api/hooks";
+import { useUpload } from "../../components/live/upload";
 import { errorText, useMakerOrders, useMarket, useOrder, useSetRotation, useRotations, useWrite } from "../../components/spots/data";
 import { dateText, localDate, parseMoney, rateText, spotLength } from "../../components/spots/format";
 import { ErrorLine, SpotTabs } from "../../components/spots/parts";
@@ -229,8 +232,21 @@ function QuoteForm({ o }: { o: ProductionOrder }) {
 function AfterQuote({ o, who }: { o: ProductionOrder; who: string }) {
   const s = useStation();
   const toast = useToast();
-  const deliver = useWrite(spotsApi.deliverOrder, ORDER_READERS);
-  const [file, setFile] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // The delivery goes straight to storage in parts (follow-up Phase 4), then through the spot checks.
+  const up = useUpload({
+    id: `delivery-${o.id}`,
+    purpose: () => ({ kind: "order_file", orderId: o.id, role: "delivery" }),
+    clearFinishedAfterMs: 3000,
+    onFinished: () => {
+      setFile(null);
+      void Promise.all(ORDER_READERS.map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })));
+      toast.show({ message: `Delivered to ${o.business.name}.` });
+    },
+    onFailed: (f) => setError(f.error ?? "Something went wrong. Try again.")
+  });
   const q = o.quote;
   const facts = q
     ? [
@@ -270,12 +286,15 @@ function AfterQuote({ o, who }: { o: ProductionOrder; who: string }) {
           className="cc-ord__deliver"
           onSubmit={(e) => {
             e.preventDefault();
-            deliver.mutate({ params: { orderId: o.id }, body: {} }, { onSuccess: () => toast.show({ message: `Delivered to ${o.business.name}.` }) });
+            if (!file) return;
+            setError(null);
+            up.add([file]);
           }}
         >
-          <Field label="The spot" type="file" accept="video/*,audio/*" onChange={(e) => setFile(e.target.files?.[0]?.name ?? null)} help="Checked on arrival: length, picture, title safe, captions, loudness." />
-          {deliver.error && <ErrorLine>{errorText(deliver.error)}</ErrorLine>}
-          <Button variant="primary" block type="submit" disabled={!file || deliver.isPending}>
+          <Field label="The spot" type="file" accept="video/*,audio/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} help="Checked on arrival: length, picture, title safe, captions, loudness." />
+          <UploadList items={up.items} label="Delivering" finishedWords="Delivered. Being prepared for their review" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
+          {error && <ErrorLine>{error}</ErrorLine>}
+          <Button variant="primary" block type="submit" disabled={!file || up.busy}>
             {o.deliveries.length ? "Deliver a new version" : "Deliver"}
           </Button>
         </form>

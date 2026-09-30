@@ -58,6 +58,29 @@ function dayOfBudget(s: Spot): number {
   return s.budget.dailyCapMicros ?? mockOf(s).pace ?? Math.min(s.budget.totalMicros, 10_000_000);
 }
 
+/** A spot's file and its checks (the form endpoint's work, and a direct upload's once its parts are in). */
+export function mockUploadSpotFile(request: Request, spotId: string, file: File | null, scaled: boolean): Response {
+  const p = needsUser(request);
+  if (p instanceof Response) return p;
+  const s = spotFor(spotId, p, "advertise");
+  if (s instanceof Response) return s;
+  if (s.state !== "draft") return fail(409, "not_draft", "A listed spot's file can't change. Make a new spot instead.");
+  if (!file) return fail(400, "no_file", "Choose the spot's file to upload.");
+  const m = mockOf(s);
+  m.scaled = scaled;
+  let url = "/mock-media/spot.mp4";
+  try {
+    url = URL.createObjectURL(file);
+  } catch {
+    // No object URLs (tests): the still stands in.
+  }
+  // P4: a spot without a code gets one as it's checked: Opencast's letters, the title as the offer.
+  if (!s.code) s.code = { code: codeFor(dbBusiness(s.businessId)!, getDb().spots.map((x) => x.code?.code ?? "")), offer: s.title, windowDays: 7, pickedBy: "opencast" };
+  s.file = { url, previewUrl: null, durationMs: s.lengthSec * 1000, originalFilename: file.name || null, checks: uploadChecks(s.lengthSec, s.code?.code ?? null, scaled) };
+  saveSpots();
+  return reply(SpotX, spotOut(s));
+}
+
 export const spotsHandlers: HttpHandler[] = [
   http.get(path(spotsApi.listSpots), ({ request, params }) => {
     const p = needsUser(request);
@@ -154,28 +177,9 @@ export const spotsHandlers: HttpHandler[] = [
   }),
 
   http.post(path(spotsApi.uploadSpotFile), async ({ request, params }) => {
-    const p = needsUser(request);
-    if (p instanceof Response) return p;
-    const s = spotFor(String(params.spotId), p, "advertise");
-    if (s instanceof Response) return s;
-    if (s.state !== "draft") return fail(409, "not_draft", "A listed spot's file can't change. Make a new spot instead.");
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
-    if (!(file instanceof File)) return fail(400, "no_file", "Choose the spot's file to upload.");
-    const scaled = form?.get("scaleToFit") === "true";
-    const m = mockOf(s);
-    m.scaled = scaled;
-    let url = "/mock-media/spot.mp4";
-    try {
-      url = URL.createObjectURL(file);
-    } catch {
-      // No object URLs (tests): the still stands in.
-    }
-    // P4: a spot without a code gets one as it's checked: Opencast's letters, the title as the offer.
-    if (!s.code) s.code = { code: codeFor(dbBusiness(s.businessId)!, getDb().spots.map((x) => x.code?.code ?? "")), offer: s.title, windowDays: 7, pickedBy: "opencast" };
-    s.file = { url, previewUrl: null, durationMs: s.lengthSec * 1000, originalFilename: file.name || null, checks: uploadChecks(s.lengthSec, s.code?.code ?? null, scaled) };
-    saveSpots();
-    return reply(SpotX, spotOut(s));
+    return mockUploadSpotFile(request, String(params.spotId), file instanceof File ? file : null, form?.get("scaleToFit") === "true");
   }),
 
   http.post(path(spotsApi.matchStations), async ({ request, params }) => {

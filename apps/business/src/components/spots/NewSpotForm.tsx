@@ -1,15 +1,18 @@
 // Before the check frame (biz-spots 02.1): the spot's name and its file. Choosing "Upload and check"
-// starts the spot as a draft (createSpot) and sends the file (uploadSpotFile, multipart); the checks
-// come back with it. Used by New spot and by getting started's "Your first spot".
+// starts the spot as a draft (createSpot) and sends the file straight to storage in parts (follow-up
+// Phase 4, a direct upload for the spot), with its progress, pause and resume; once it's in and
+// checked, the spot comes back with its checks. Used by New spot and by getting started's "Your first spot".
 //
 // createSpot needs a rate and a budget before there's a file (contract request B1). Until a draft
 // can be made without them, it starts with the rate page's suggested values, which the business
 // sets on the next page; a draft is never in any station's market.
 
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Button, Field } from "@opencast/ui";
 import { spotsApi, type Business } from "@opencast/contracts";
+import { UploadList } from "@opencast/ui/upload";
 import { call } from "../../api/client";
+import { useUpload } from "../../api/upload";
 import { SpotX } from "../../api/ext/spots";
 import { chosenFiles, errorText } from "./data";
 import "./NewSpotForm.css";
@@ -72,6 +75,19 @@ export function NewSpotForm({ business, draft, onDone }: NewSpotFormProps) {
   // A draft made on an earlier try: a failed upload doesn't leave a second draft behind.
   const [made, setMade] = useState<SpotX | undefined>(draft);
   const ready = title.trim().length > 0 && !!file && !busy;
+  const target = useRef<string | null>(null);
+  const up = useUpload({
+    id: `spot-${business.id}`,
+    purpose: () => ({ kind: "spot_file", spotId: target.current!, scaleToFit: false }),
+    onFinished: (_item, upload) => {
+      void call(spotsApi.getSpot, { params: { spotId: upload.result?.spotId ?? target.current! } }, SpotX).then(onDone, (err) => {
+        setError(errorText(err));
+        setBusy(false);
+      });
+    },
+    // The list says why; "Upload and check" sends it again.
+    onFailed: () => setBusy(false)
+  });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -91,8 +107,10 @@ export function NewSpotForm({ business, draft, onDone }: NewSpotFormProps) {
         ));
       setMade(spot);
       chosenFiles.set(spot.id, file);
-      const uploaded = await call(spotsApi.uploadSpotFile, { params: { spotId: spot.id }, body: { file, scaleToFit: false } }, SpotX);
-      onDone(uploaded);
+      target.current = spot.id;
+      // A try that failed is cleared first, so the same file can go again.
+      for (const item of up.items) up.remove(item.id);
+      up.add([file]);
     } catch (err) {
       setError(errorText(err));
       setBusy(false);
@@ -115,6 +133,7 @@ export function NewSpotForm({ business, draft, onDone }: NewSpotFormProps) {
         </div>
         <p className="bz-newspot__help">It's checked the moment it arrives: length, picture, safe areas, captions and loudness. Opencast adds its code and QR.</p>
       </div>
+      <UploadList items={up.items} label="Uploading the spot" finishedWords="Checked" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
       {error && (
         <p className="bz-newspot__error" role="alert">
           {error}

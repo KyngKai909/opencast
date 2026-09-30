@@ -26,6 +26,7 @@ import type { ShelfService } from "./modules/shelf/service.js";
 import type { MaintenanceService } from "./modules/maintenance/service.js";
 import type { RelaysService } from "./modules/relays/service.js";
 import type { PlatformDeps, PlatformsService } from "./modules/platforms/service.js";
+import type { UploadsService } from "./modules/uploads/service.js";
 import type { PinataAccount } from "./storageMaintenance.js";
 import type { GeoLookup } from "./geo.js";
 import type { PlaceLookup } from "./places.js";
@@ -141,6 +142,8 @@ export interface Services {
   relays: RelaysService;
   /** Platform connections for relays (added 2026-09-30, follow-up Phase 3), the relay service's seam, and relay viewers. */
   platforms: PlatformsService;
+  /** Direct uploads (added 2026-09-30, follow-up Phase 4): presigned multipart uploads, and completing them. */
+  uploads: UploadsService;
 }
 
 export interface ModuleContext {

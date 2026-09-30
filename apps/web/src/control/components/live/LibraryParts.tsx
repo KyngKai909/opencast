@@ -8,10 +8,10 @@ import { libraryApi, type Folder, type GeneratedStationId, type LibraryItem, typ
 import { Button, ChoiceList, CodeSelect, Field, Icon, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
-import { useAuth } from "../../../auth/AuthProvider";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { librarySummary, readyLine } from "./logic";
-import { sendFile } from "./upload";
+import { UploadList } from "@opencast/ui/upload";
+import { useUpload } from "./upload";
 import "./LibraryParts.css";
 
 export const refreshLibrary = (qc: ReturnType<typeof useQueryClient>) =>
@@ -54,73 +54,73 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
 
 // ---- Drop zone ----
 
-/** "Drop video or audio files here", Choose files, Import from a link (A.2). */
+/**
+ * "Drop video or audio files here", Choose files, Import from a link (A.2). Files go straight to
+ * storage in parts (follow-up Phase 4): each one's progress shows under the drop zone, with Pause,
+ * Resume, Retry and Cancel, then "Checking" while the API reads it; once it's in the library below,
+ * it leaves the list.
+ */
 export function UploadDrop({ stationId, folderId }: { stationId: string; folderId?: string | null }) {
-  const auth = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [linking, setLinking] = useState(false);
-
-  const upload = async (files: FileList | File[]) => {
-    const list = Array.from(files);
-    let sent = 0;
-    for (const f of list) {
-      try {
-        await sendFile(libraryApi.upload, { stationId }, f, { folderId: folderId ?? undefined }, auth.getToken);
-        sent++;
-      } catch (e) {
-        toast.show({ message: `${f.name}: ${e instanceof Error ? e.message : "Something went wrong. Try again."}` });
-      }
+  const up = useUpload({
+    id: `library-${stationId}`,
+    purpose: () => ({ kind: "library_item", stationId, fields: folderId ? { folderId } : {} }),
+    clearFinishedAfterMs: 4000,
+    onFinished: () => void refreshLibrary(qc),
+    onBatchDone: ({ finished, failed }) => {
+      for (const f of failed) toast.show({ message: `${f.name}: ${f.error ?? "Something went wrong. Try again."}` });
+      if (finished.length) toast.show({ message: finished.length === 1 ? `${finished[0]!.name} is being prepared for air.` : `${finished.length} files are being prepared for air.` });
     }
-    if (sent) {
-      await refreshLibrary(qc);
-      toast.show({ message: sent === 1 ? `${list[0]!.name} is being prepared for air.` : `${sent} files are being prepared for air.` });
-    }
-  };
+  });
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
-    if (e.dataTransfer.files.length) void upload(e.dataTransfer.files);
+    if (e.dataTransfer.files.length) up.add(e.dataTransfer.files);
   };
 
   return (
-    <div
-      className={cx("cc-drop", over && "cc-drop--over")}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={onDrop}
-    >
-      <span className="cc-drop__ic" aria-hidden="true">
-        <Icon name="upload" />
-      </span>
-      <div>
-        <b>Drop video or audio files here</b>
-        <small>MP4, MOV, MP3, WAV and most others. They're converted for air automatically.</small>
-      </div>
-      <div className="cc-drop__end">
-        <Button size="sm" onClick={() => input.current?.click()}>Choose files</Button>
-        <Button size="sm" icon="link" onClick={() => setLinking(true)}>
-          Import from a link
-        </Button>
-      </div>
-      <input
-        ref={input}
-        type="file"
-        multiple
-        accept="video/*,audio/*"
-        hidden
-        onChange={(e) => {
-          if (e.target.files?.length) void upload(e.target.files);
-          e.target.value = "";
+    <>
+      <div
+        className={cx("cc-drop", over && "cc-drop--over")}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
         }}
-      />
-      <ImportLink open={linking} stationId={stationId} onClose={() => setLinking(false)} />
-    </div>
+        onDragLeave={() => setOver(false)}
+        onDrop={onDrop}
+      >
+        <span className="cc-drop__ic" aria-hidden="true">
+          <Icon name="upload" />
+        </span>
+        <div>
+          <b>Drop video or audio files here</b>
+          <small>MP4, MOV, MP3, WAV and most others. They're converted for air automatically.</small>
+        </div>
+        <div className="cc-drop__end">
+          <Button size="sm" onClick={() => input.current?.click()}>Choose files</Button>
+          <Button size="sm" icon="link" onClick={() => setLinking(true)}>
+            Import from a link
+          </Button>
+        </div>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          accept="video/*,audio/*"
+          hidden
+          onChange={(e) => {
+            if (e.target.files?.length) up.add(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <ImportLink open={linking} stationId={stationId} onClose={() => setLinking(false)} />
+      </div>
+      <UploadList items={up.items} label="Uploading to the library" finishedWords="Uploaded. It's in the library below" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
+    </>
   );
 }
 

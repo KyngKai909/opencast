@@ -7,5 +7,6 @@ import { moneyHandlers } from "./money";
 import { resultsHandlers } from "./results";
 import { settingsHandlers } from "./settings";
 import { spotsHandlers } from "./spots";
+import { uploadHandlers } from "./uploads";
 
-export const handlers = [...accountsHandlers, ...moneyHandlers, ...spotsHandlers, ...resultsHandlers, ...dealsHandlers, ...settingsHandlers];
+export const handlers = [...accountsHandlers, ...moneyHandlers, ...spotsHandlers, ...resultsHandlers, ...dealsHandlers, ...settingsHandlers, ...uploadHandlers];

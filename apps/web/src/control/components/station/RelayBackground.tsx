@@ -11,8 +11,8 @@ import { Button, PictureFrame, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError, call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
-import { useAuth } from "../../../auth/AuthProvider";
-import { sendFile } from "../live/upload";
+import { UploadList } from "@opencast/ui/upload";
+import { useUpload } from "../live/upload";
 import { SecTop } from "../live/Studio";
 import "./RelayBackground.css";
 
@@ -43,30 +43,31 @@ export function RelayBackground({ stationId, callSign, channel, colour, canEdit 
   const params = { stationId };
   const q = useApi(stationsApi.getRelayBackground, { params }, { refetchInterval: (query) => (query.state.data?.background?.status === "preparing" ? 2_000 : false) });
   const qc = useQueryClient();
-  const auth = useAuth();
   const toast = useToast();
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["GET", stationsApi.getRelayBackground.path] });
+  // Straight to storage (follow-up Phase 4), then prepared into a loop.
+  const up = useUpload({
+    id: `relay-background-${stationId}`,
+    purpose: () => ({ kind: "relay_background", stationId }),
+    clearFinishedAfterMs: 3000,
+    onFinished: (f) => {
+      void refresh();
+      toast.show({ message: `${f.name} is being prepared. Relays show it once it's ready.` });
+    },
+    onFailed: (f) => setError(f.error ?? "Something went wrong. Try again.")
+  });
 
   if (q.isLoading) return <div className="cc-rbg cc-rbg--loading" aria-busy="true" />;
   // Not there yet (an API without backgrounds): the section stays out of the way.
   if (q.isError && q.error instanceof ApiError && q.error.code === "not_available") return null;
   const bg = q.data?.background ?? null;
 
-  const upload = async (f: File) => {
-    setBusy(true);
+  const upload = (f: File) => {
     setError(null);
-    try {
-      await sendFile(stationsApi.setRelayBackground, { stationId }, f, {}, auth.getToken);
-      await refresh();
-      toast.show({ message: `${f.name} is being prepared. Relays show it once it's ready.` });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
-    } finally {
-      setBusy(false);
-    }
+    up.add([f]);
   };
   const remove = async () => {
     setBusy(true);
@@ -110,7 +111,7 @@ export function RelayBackground({ stationId, callSign, channel, colour, canEdit 
           <p className="cc-rbg__help">An image, a GIF, or a video up to 30 seconds. Its sound is left out. Spots' codes show over it for their last 10 seconds, as they do on TV.</p>
           {canEdit && (
             <div className="cc-rbg__actions">
-              <Button size="sm" icon="upload" disabled={busy || bg?.status === "preparing"} onClick={() => file.current?.click()}>
+              <Button size="sm" icon="upload" disabled={busy || up.busy || bg?.status === "preparing"} onClick={() => file.current?.click()}>
                 {bg ? "Replace" : "Upload"}
               </Button>
               {bg && (
@@ -120,6 +121,7 @@ export function RelayBackground({ stationId, callSign, channel, colour, canEdit 
               )}
             </div>
           )}
+          <UploadList items={up.items} label="Uploading the background" finishedWords="Uploaded. Preparing the loop" onPause={up.pause} onResume={up.resume} onRetry={up.retry} onRemove={up.remove} />
           {error && (
             <p className="cc-rbg__error" role="alert">
               {error}
@@ -132,7 +134,7 @@ export function RelayBackground({ stationId, callSign, channel, colour, canEdit 
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) void upload(f);
+              if (f) upload(f);
               e.target.value = "";
             }}
           />

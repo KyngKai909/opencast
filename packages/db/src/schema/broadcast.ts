@@ -288,6 +288,57 @@ export const contentRefs = broadcast.table(
 );
 
 /**
+ * A direct upload (added 2026-09-30, follow-up Phase 4, migration 0037): a file going straight from
+ * the browser to object storage in parts, at a staging key (`uploads/<id>`), then read by the API
+ * (content ID, stored once, the checks, preparation). The row is how completion survives a restart:
+ * `checking` with an expired lease is picked up again by the jobs tick. Uploads left `uploading` for
+ * 24 hours are aborted (their parts deleted). docs/uploads.md.
+ */
+export const uploads = broadcast.table(
+  "uploads",
+  {
+    id: id(),
+    /** Who started it: only they can sign parts, complete, abort or read it. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    purpose: text("purpose", { enum: ["library_item", "library_replace", "spot_file", "order_file", "caption", "relay_background"] }).notNull(),
+    /** What it's for, as `createUpload` took it (the contracts' `UploadPurpose`). */
+    target: jsonb("target").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    bytes: bigint("bytes", { mode: "number" }).notNull(),
+    partSize: integer("part_size").notNull(),
+    partCount: integer("part_count").notNull(),
+    /** Where the parts go: the bucket (`r2`, any S3-compatible store) or local disk (development). */
+    store: text("store", { enum: ["local", "r2"] }).notNull(),
+    /** The staging key, `uploads/<id>`. */
+    key: text("key").notNull(),
+    /** The store's multipart upload ID (S3's `UploadId`); the local store uses the row's ID. */
+    multipartId: text("multipart_id"),
+    state: text("state", { enum: ["uploading", "checking", "preparing", "done", "failed", "aborted"] }).notNull(),
+    /** Its content ID, once read. */
+    contentId: text("content_id"),
+    /** The platform had these bytes already: nothing new was stored. */
+    duplicate: boolean("duplicate").notNull().default(false),
+    /** What it made or changed: `{ itemId }`, `{ spotId }`, `{ orderId }`, `{ stationId }`. */
+    result: jsonb("result"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    /** Times completion was started (a restart picks it up again, up to a few times). */
+    attempts: integer("attempts").notNull().default(0),
+    /** While `checking`: who's working on it holds it until then, and renews it as it reads. */
+    leaseUntil: at("lease_until"),
+    completedAt: at("completed_at"),
+    /** Still `uploading` after this: aborted by the jobs tick. */
+    expiresAt: at("expires_at").notNull(),
+    updatedAt: at("updated_at").notNull().defaultNow(),
+    createdAt: createdAt()
+  },
+  (t) => [index("uploads_state").on(t.state, t.leaseUntil), index("uploads_user").on(t.userId), check("content_id_format", sql`${t.contentId} is null or ${t.contentId} ~ '^b[a-z2-7]{58}$'`)]
+);
+
+/**
  * Retired 2026-09-29: low-bitrate HLS previews rendered separately (`previews/<cid>/`). Previews
  * play the prepared segments now; the storage sweep deletes what's left of these and their rows.
  * Kept (not dropped) so the schema only ever grows.

@@ -110,7 +110,11 @@ export interface LibraryService {
   stationOfProgram(programId: string): Promise<string>;
   stationOfFolder(folderId: string): Promise<string>;
   /** With `captions` (WebVTT or SRT text, added 2026-09-29), the item gets its caption track at once. */
-  upload(stationId: string, file: UploadedFile, fields: ItemFields & { captions?: string; captionLanguage?: string }): Promise<LibraryItem>;
+  /**
+   * `options.id` (a direct upload, added 2026-09-30): the new item's ID, so completing it again after
+   * a restart finds the item it made. A direct upload (`file.stored`) is kept before this returns.
+   */
+  upload(stationId: string, file: UploadedFile, fields: ItemFields & { captions?: string; captionLanguage?: string }, options?: { id?: string }): Promise<LibraryItem>;
   updateItem(itemId: string, fields: Partial<ItemFields>): Promise<LibraryItem>;
   archiveItem(itemId: string): Promise<void>;
   /** Removes an item after a claim, whatever it's used in (its airings were already pulled). */
@@ -410,10 +414,18 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
    * prepares it for air from this original (the fixed ladder, loudness levelled, captions), once;
    * nothing else is made from it here. Its loudness is measured from it for the library.
    */
-  async function storeInBackground(itemId: string, stationId: string, file: string, replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
+  async function storeInBackground(itemId: string, stationId: string, file: string | UploadedFile, replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
     try {
       await db.update(A).set({ prepProgress: 10 }).where(eq(A.id, itemId));
-      const [original, loudness] = await Promise.all([content.store(file, { storageClass: "infrequent" }), deps.media.loudness(file).catch(() => null)]);
+      // A direct upload (follow-up Phase 4) is in the store already: measured where it's staged
+      // (Standard), then moved to its content ID in Infrequent Access. One read each, in that order.
+      const [original, loudness] =
+        typeof file === "string"
+          ? await Promise.all([content.store(file, { storageClass: "infrequent" }), deps.media.loudness(file).catch(() => null)])
+          : await deps.media
+              .loudness(file.path)
+              .catch(() => null)
+              .then(async (lufs) => [await content.keep(file, { storageClass: "infrequent" }), lufs] as const);
       await db.transaction(async (tx) => {
         const [{ version }] = await tx.select({ version: max(F.version) }).from(F).where(eq(F.assetId, itemId));
         // `content_id` is the original. (`original_content_id` was for when it pointed at a copy; left empty now.)
@@ -433,8 +445,15 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         }
       });
       // The local copy was only for the work; the store has it now.
-      await fs.rm(file, { force: true });
+      if (typeof file === "string") await fs.rm(file, { force: true });
       await afterReady(itemId, stationId, original.cid);
+      // A direct upload starts its preparation for air now (the worker prepares it after what airs
+      // within the hour); a form upload's waits until something needs it, as before.
+      if (typeof file !== "string") {
+        const [row] = await db.select({ mediaKind: A.mediaKind, durationMs: A.durationMs }).from(A).where(eq(A.id, itemId));
+        const band = (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
+        if (row) await services.playout.previews([{ contentId: original.cid, mediaKind: row.mediaKind, band: row.mediaKind === "audio" ? "radio" : band, durationMs: row.durationMs }], { prepare: true });
+      }
     } catch (error) {
       // A replacement that fails leaves the item as it was: the old file still airs.
       await db.update(A).set(replacing ? { status: "ready", prepProgress: 100 } : { status: "failed", prepProgress: null }).where(eq(A.id, itemId));
@@ -768,25 +787,32 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return row.stationId;
     },
 
-    async upload(stationId, file, fields) {
+    async upload(stationId, file, fields, options = {}) {
       if (!file) throw badRequest("Choose a file to upload.", { file: "Required" });
       await checkOwnership(stationId, fields);
       // Pay-as-you-go: storage at its monthly cap takes nothing new until the month ends or the cap goes up.
       await services.billing.requireStorage(stationId);
       // A caption file sent with it is checked before anything is stored.
       if (fields.captions !== undefined && !toWebVtt(fields.captions)) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
+      // A direct upload picked up again after a restart: the item it made already.
+      if (options.id && (await db.select({ id: A.id }).from(A).where(eq(A.id, options.id))).length) return service.item(options.id);
       const probe = await deps.media.probe(file.path).catch(() => null);
       if (!probe || probe.durationMs === null) throw refused("unreadable_file", "That file can't be read as video or audio.");
-      // Keep the upload past the request: multer's temp file is removed when it ends.
-      const keep = path.join(deps.config.storageRoot, "uploads", stationId, "originals");
-      await fs.mkdir(keep, { recursive: true });
-      const kept = path.join(keep, `${path.basename(file.path)}${path.extname(file.originalName)}`);
-      await fs.copyFile(file.path, kept);
+      // Keep the upload past the request: multer's temp file is removed when it ends. (A direct
+      // upload is in the store already.)
+      let kept: string | null = null;
+      if (!file.stored) {
+        const keep = path.join(deps.config.storageRoot, "uploads", stationId, "originals");
+        await fs.mkdir(keep, { recursive: true });
+        kept = path.join(keep, `${path.basename(file.path)}${path.extname(file.originalName)}`);
+        await fs.copyFile(file.path, kept);
+      }
 
       const item = await db.transaction(async (tx) => {
         const [row] = await tx
           .insert(A)
           .values({
+            ...(options.id ? { id: options.id } : {}),
             stationId,
             programId: fields.programId ?? null,
             folderId: fields.folderId ?? null,
@@ -812,7 +838,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         const [program] = item.programId ? await db.select({ language: P.captionsLanguage }).from(P).where(eq(P.id, item.programId)) : [];
         await service.putCaptionTrack(item.id, null, { language: fields.captionLanguage ?? program?.language ?? "en", text: fields.captions, source: "uploaded" });
       }
-      background(storeInBackground(item.id, stationId, kept));
+      if (kept) background(storeInBackground(item.id, stationId, kept));
+      else await storeInBackground(item.id, stationId, file);
       return service.item(item.id);
     },
 
@@ -1042,11 +1069,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (shortestSlotMs !== null && probe.durationMs > shortestSlotMs + 1000) {
         throw refused("too_long_for_log", "The new file is longer than a slot it's on the log in. Make the slot longer first, or use a shorter cut.");
       }
+      // The current file airs until the new one is ready.
+      if (file.stored) {
+        await db.update(A).set({ status: "preparing", prepProgress: 0 }).where(eq(A.id, itemId));
+        await storeInBackground(itemId, row.stationId, file, { probe, originalName: file.originalName });
+        return service.item(itemId);
+      }
       const keep = path.join(deps.config.storageRoot, "uploads", row.stationId, "originals");
       await fs.mkdir(keep, { recursive: true });
       const kept = path.join(keep, `${path.basename(file.path)}${path.extname(file.originalName)}`);
       await fs.copyFile(file.path, kept);
-      // The current file airs until the new one is ready.
       await db.update(A).set({ status: "preparing", prepProgress: 0 }).where(eq(A.id, itemId));
       background(storeInBackground(itemId, row.stationId, kept, { probe, originalName: file.originalName }));
       return service.item(itemId);

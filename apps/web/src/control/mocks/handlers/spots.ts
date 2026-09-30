@@ -143,6 +143,24 @@ const orderById = (id: string) => getSpots().orders.find((o) => o.id === id);
 
 // ---- Handlers ----
 
+/** Delivering a version (the form endpoint's work, and a direct upload's once its parts are in). */
+export function mockDeliverOrder(request: Request, orderId: string): Response {
+  const p = needsUser(request);
+  if (p instanceof Response) return p;
+  const o = orderById(orderId);
+  if (!o || !isMember(o.maker.id, p)) return fail(404, "not_found", "That order wasn't found.");
+  if (!mayAct(o.maker.id, p)) return fail(403, "forbidden", "Only owners and operators deliver.");
+  if (o.state !== "accepted" && o.state !== "changes_requested") return fail(409, "not_now", "This order isn't waiting for a delivery.");
+  const t = now();
+  const version = o.deliveries.length + 1;
+  o.deliveries.push({ id: `${o.id.slice(0, -4)}${String(version).padStart(4, "0")}`, version, url: `/mock-files/${o.title.toLowerCase().replace(/\W+/g, "-")}-v${version}.mp4`, previewUrl: null, createdAt: t.toISOString() });
+  o.state = "delivered";
+  o.deliveredAt = t.toISOString();
+  o.autoApproveAt = new Date(t.getTime() + 7 * 86400e3).toISOString();
+  saveSpots();
+  return reply(spotsApi.getOrder.response, orderOut(o));
+}
+
 export const spotsHandlers = [
   http.get(path(spotsApi.getAvails), ({ request, params }) => {
     const p = needsUser(request);
@@ -335,22 +353,7 @@ export const spotsHandlers = [
     return reply(spotsApi.getOrder.response, orderOut(o));
   }),
 
-  http.post(path(spotsApi.deliverOrder), async ({ request, params }) => {
-    const p = needsUser(request);
-    if (p instanceof Response) return p;
-    const o = orderById(String(params.orderId));
-    if (!o || !isMember(o.maker.id, p)) return fail(404, "not_found", "That order wasn't found.");
-    if (!mayAct(o.maker.id, p)) return fail(403, "forbidden", "Only owners and operators deliver.");
-    if (o.state !== "accepted" && o.state !== "changes_requested") return fail(409, "not_now", "This order isn't waiting for a delivery.");
-    const t = now();
-    const version = o.deliveries.length + 1;
-    o.deliveries.push({ id: `${o.id.slice(0, -4)}${String(version).padStart(4, "0")}`, version, url: `/mock-files/${o.title.toLowerCase().replace(/\W+/g, "-")}-v${version}.mp4`, previewUrl: null, createdAt: t.toISOString() });
-    o.state = "delivered";
-    o.deliveredAt = t.toISOString();
-    o.autoApproveAt = new Date(t.getTime() + 7 * 86400e3).toISOString();
-    saveSpots();
-    return reply(spotsApi.getOrder.response, orderOut(o));
-  }),
+  http.post(path(spotsApi.deliverOrder), ({ request, params }) => mockDeliverOrder(request, String(params.orderId))),
 
   http.post(path(spotsApi.addOrderNote), async ({ request, params }) => {
     const p = needsUser(request);

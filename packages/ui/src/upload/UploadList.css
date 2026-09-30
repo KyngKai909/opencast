@@ -1,0 +1,16 @@
+/* Direct uploads (follow-up Phase 4): files on their way to storage, under a drop zone. */
+.oc-upl { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.oc-upl__row { border: 1px solid var(--hair); border-radius: var(--r-control); padding: 10px 12px; background: var(--raised); }
+.oc-upl__top, .oc-upl__foot { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.oc-upl__name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oc-upl__size { flex: none; font-size: 12.5px; color: var(--ink-70); }
+.oc-upl__bar { height: 4px; margin: 8px 0 6px; background: var(--hair); border-radius: 4px; overflow: hidden; }
+.oc-upl__bar i { display: block; height: 100%; background: var(--signal-fill); transition: width .2s linear; }
+.oc-upl__row--paused .oc-upl__bar i { background: var(--line); }
+.oc-upl__row--checking .oc-upl__bar i { background: var(--standby-fill); }
+.oc-upl__row--preparing .oc-upl__bar i, .oc-upl__row--done .oc-upl__bar i { background: var(--ink); }
+.oc-upl__row--failed .oc-upl__bar i { background: var(--tally); }
+.oc-upl__status { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-70); }
+.oc-upl__row--failed .oc-upl__status { color: var(--live); }
+.oc-upl__actions { flex: none; display: flex; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .oc-upl__bar i { transition: none; } }

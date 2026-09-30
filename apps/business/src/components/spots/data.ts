@@ -23,15 +23,21 @@ export function useBalance(businessId: string, enabled = true) {
   return useApi(ledgerApi.getBalance, { params: { businessId } }, { enabled });
 }
 
+/** Shows a spot as it is now, and refreshes everything a spot shows up in. */
+export function useSpotChanged() {
+  const qc = useQueryClient();
+  return (spot: SpotX) => {
+    qc.setQueriesData({ queryKey: [spotsApi.getSpot.method, spotsApi.getSpot.path, { spotId: spot.id }] }, (old) => (old ? spot : old));
+    for (const e of READERS) void qc.invalidateQueries({ queryKey: [e.method, e.path] });
+  };
+}
+
 /** A write that answers with the spot (SpotX), then refreshes everything a spot shows up in. */
 export function useSpotWrite<E extends EndpointDef>(endpoint: E) {
-  const qc = useQueryClient();
+  const changed = useSpotChanged();
   return useMutation({
     mutationFn: (args: CallArgs) => call(endpoint, args, SpotX),
-    onSuccess: (spot) => {
-      qc.setQueriesData({ queryKey: [spotsApi.getSpot.method, spotsApi.getSpot.path, { spotId: spot.id }] }, (old) => (old ? spot : old));
-      for (const e of READERS) void qc.invalidateQueries({ queryKey: [e.method, e.path] });
-    }
+    onSuccess: changed
   });
 }
 

@@ -16,6 +16,7 @@ import { spotsHandlers } from "./spots";
 import { stationHandlers } from "./station";
 import { stationsHandlers } from "./stations";
 import { templateHandlers } from "./templates";
+import { uploadHandlers } from "./uploads";
 
 export const handlers = [
   ...accountsHandlers,
@@ -32,5 +33,6 @@ export const handlers = [
   ...stationHandlers,
   ...relayBackgroundHandlers,
   ...relayHandlers,
-  ...platformHandlers
+  ...platformHandlers,
+  ...uploadHandlers
 ];

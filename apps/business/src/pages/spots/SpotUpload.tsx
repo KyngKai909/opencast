@@ -3,18 +3,21 @@
 //
 // /spots/new: the name and the file. Once it's uploaded: the frame with TV's safe areas drawn over
 // it and the checks beside it, from the spot's `file.checks`: fine, fixed for you, for you to fix,
-// or checked in review. "Shrink to fit" sends the same file again with scaleToFit (P2); "Change"
-// changes the code and its offer.
+// or checked in review. "Shrink to fit" sends the same file again with scaleToFit (P2; a direct
+// upload, and the same bytes are stored once); "Change" changes the code and its offer.
 
 import { useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { spotsApi } from "@opencast/contracts";
 import { Button } from "@opencast/ui";
+import { UploadList } from "@opencast/ui/upload";
+import { call } from "../../api/client";
 import { useApi } from "../../api/hooks";
-import { checkDetail, type SpotX } from "../../api/ext/spots";
+import { useUpload } from "../../api/upload";
+import { checkDetail, SpotX } from "../../api/ext/spots";
 import { useBusiness } from "../../business/BusinessContext";
 import { CodeModal } from "../../components/spots/CodeModal";
-import { chosenFiles, errorText, useSpot, useSpotWrite } from "../../components/spots/data";
+import { chosenFiles, errorText, useSpot, useSpotChanged } from "../../components/spots/data";
 import { dayWords } from "../../components/spots/format";
 import { NewSpotForm } from "../../components/spots/NewSpotForm";
 import { LoadError, Section, SpotHead, ViewerBlocked } from "../../components/spots/parts";
@@ -65,7 +68,15 @@ function Checked({ spot }: { spot: SpotX }) {
   const b = useBusiness();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const shrink = useSpotWrite(spotsApi.uploadSpotFile);
+  const changed = useSpotChanged();
+  const [shrinkError, setShrinkError] = useState<string | null>(null);
+  const shrink = useUpload({
+    id: `shrink-${spot.id}`,
+    purpose: () => ({ kind: "spot_file", spotId: spot.id, scaleToFit: true }),
+    clearFinishedAfterMs: 0,
+    onFinished: () => void call(spotsApi.getSpot, { params: { spotId: spot.id } }, SpotX).then(changed, (e) => setShrinkError(errorText(e))),
+    onFailed: (item) => setShrinkError(item.error ?? "Something went wrong. Try again.")
+  });
   const [needFile, setNeedFile] = useState(false);
   const checks = spot.file?.checks ?? [];
   const blocked = blocksListing(checks);
@@ -73,7 +84,10 @@ function Checked({ spot }: { spot: SpotX }) {
   const codeFrom = codeCheck ? checkDetail(codeCheck.detail) : {};
   const lastSeconds = codeFrom.fromMs !== undefined && codeFrom.toMs !== undefined ? Math.round((codeFrom.toMs - codeFrom.fromMs) / 1000) : null;
 
-  const doShrink = (file: File) => shrink.mutate({ params: { spotId: spot.id }, body: { file, scaleToFit: true } });
+  const doShrink = (file: File) => {
+    setShrinkError(null);
+    shrink.add([file]);
+  };
   const onShrink = () => {
     const file = chosenFiles.get(spot.id);
     if (file) doShrink(file);
@@ -99,7 +113,7 @@ function Checked({ spot }: { spot: SpotX }) {
               checks={checks}
               actions={{
                 safe_area: checks.some((c) => c.check === "safe_area" && c.result === "for_you") ? (
-                  <Button size="sm" onClick={onShrink} disabled={shrink.isPending}>
+                  <Button size="sm" onClick={onShrink} disabled={shrink.busy}>
                     Shrink to fit
                   </Button>
                 ) : undefined,
@@ -131,9 +145,10 @@ function Checked({ spot }: { spot: SpotX }) {
               />
             </div>
           )}
-          {shrink.error && (
+          <UploadList items={shrink.items} label="Sending it again, shrunk to fit" finishedWords="Checked" onPause={shrink.pause} onResume={shrink.resume} onRetry={shrink.retry} onRemove={shrink.remove} />
+          {shrinkError && (
             <p className="bz-sperror" role="alert">
-              {errorText(shrink.error)}
+              {shrinkError}
             </p>
           )}
           {blocked && <p className="bz-upload__blocked">The length or picture won't air as it is. Upload a new cut to go on.</p>}

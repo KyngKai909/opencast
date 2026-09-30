@@ -106,6 +106,47 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
   };
 }
 
+/** A file as the mocks see it. */
+export type MockFile = Pick<File, "name" | "type" | "size">;
+
+/** The library upload's work (the form endpoint's, and a direct upload's once its parts are in). */
+export function mockLibraryUpload(request: Request, stationId: string, file: MockFile | null, fields: { title?: string; code?: string; folderId?: string | null }): Response {
+  const p = needsUser(request);
+  if (p instanceof Response) return p;
+  const denied = programs(stationId, p);
+  if (denied) return denied;
+  if (!dbStation(stationId)) return fail(404, "not_found", "That station wasn't found.");
+  if (!file) return fail(400, "no_file", "Choose a video or audio file.");
+  if (!/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
+    return fail(415, "not_media", "That file isn't video or audio.");
+  }
+  const audio = file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name);
+  // Under a minute is guessed as a bumper. The mock can't read the length: small files are short.
+  const code = (fields.code as LibraryItem["code"] | undefined) ?? (file.size < 8_000_000 ? "BMP" : "PGM");
+  const item = newItem(stationId, { title: fields.title ?? titleFrom(file.name), code, mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: fields.folderId ?? null });
+  getDb().library.items.push(item);
+  liveState().preparing[item.id] = Date.now();
+  saveLive();
+  return reply(libraryApi.upload.response, item, 201);
+}
+
+/** L6's work: a new file for an item. */
+export function mockReplaceFile(request: Request, itemId: string, file: MockFile | null): Response {
+  const p = needsUser(request);
+  if (p instanceof Response) return p;
+  const item = itemById(itemId);
+  if (!item) return fail(404, "not_found", "That item wasn't found.");
+  const denied = programs(item.stationId, p);
+  if (denied) return denied;
+  if (!file) return fail(400, "no_file", "Choose a video or audio file.");
+  if (item.source === "link") return fail(409, "not_an_upload", "It came from a link, so there's no file of ours to replace.");
+  if (item.status === "preparing") return fail(409, "preparing", "It's still being prepared. Replace it once it's ready.");
+  Object.assign(item, { originalFilename: file.name, status: "preparing", prepProgress: 0, storage: null });
+  liveState().preparing[item.id] = Date.now();
+  saveLive();
+  return reply(libraryApi.getItem.response, withProbe(item));
+}
+
 export const libraryHandlers = [
   http.get(path(libraryApi.getLibrary), ({ request, params }) => {
     const p = needsUser(request);
@@ -133,27 +174,10 @@ export const libraryHandlers = [
   }),
 
   http.post(path(libraryApi.upload), async ({ request, params }) => {
-    const p = needsUser(request);
-    if (p instanceof Response) return p;
-    const id = String(params.stationId);
-    const denied = programs(id, p);
-    if (denied) return denied;
-    if (!dbStation(id)) return fail(404, "not_found", "That station wasn't found.");
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
-    if (!(file instanceof File)) return fail(400, "no_file", "Choose a video or audio file.");
-    if (!/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
-      return fail(415, "not_media", "That file isn't video or audio.");
-    }
     const field = (k: string) => (typeof form?.get(k) === "string" ? String(form?.get(k)) : undefined);
-    const audio = file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name);
-    // Under a minute is guessed as a bumper. The mock can't read the length: small files are short.
-    const code = (field("code") as LibraryItem["code"] | undefined) ?? (file.size < 8_000_000 ? "BMP" : "PGM");
-    const item = newItem(id, { title: field("title") ?? titleFrom(file.name), code, mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: field("folderId") ?? null });
-    getDb().library.items.push(item);
-    liveState().preparing[item.id] = Date.now();
-    saveLive();
-    return reply(libraryApi.upload.response, item, 201);
+    return mockLibraryUpload(request, String(params.stationId), file instanceof File ? file : null, { title: field("title"), code: field("code"), folderId: field("folderId") });
   }),
 
   http.post(path(libraryApi.importLinks), async ({ request, params }) => {
@@ -222,21 +246,9 @@ export const libraryHandlers = [
   }),
 
   http.post(path(libraryApi.replaceFile), async ({ request, params }) => {
-    const p = needsUser(request);
-    if (p instanceof Response) return p;
-    const item = itemById(String(params.itemId));
-    if (!item) return fail(404, "not_found", "That item wasn't found.");
-    const denied = programs(item.stationId, p);
-    if (denied) return denied;
     const form = await request.formData().catch(() => null);
     const file = form?.get("file");
-    if (!(file instanceof File)) return fail(400, "no_file", "Choose a video or audio file.");
-    if (item.source === "link") return fail(409, "not_an_upload", "It came from a link, so there's no file of ours to replace.");
-    if (item.status === "preparing") return fail(409, "preparing", "It's still being prepared. Replace it once it's ready.");
-    Object.assign(item, { originalFilename: file.name, status: "preparing", prepProgress: 0, storage: null });
-    liveState().preparing[item.id] = Date.now();
-    saveLive();
-    return reply(libraryApi.getItem.response, withProbe(item));
+    return mockReplaceFile(request, String(params.itemId), file instanceof File ? file : null);
   }),
 
   http.get(path(libraryApi.getItem), ({ request, params }) => {

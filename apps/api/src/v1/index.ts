@@ -46,6 +46,8 @@ import { createRelaysService } from "./modules/relays/service.js";
 import { relaysRoutes } from "./modules/relays/routes.js";
 import { createPlatformsService } from "./modules/platforms/service.js";
 import { platformsRoutes } from "./modules/platforms/routes.js";
+import { createUploadsService } from "./modules/uploads/service.js";
+import { localUploadPartRoute, uploadsRoutes } from "./modules/uploads/routes.js";
 
 export function createV1(deps: Deps): { router: Router; services: Services; deps: Deps } {
   const services = {} as Services;
@@ -70,11 +72,14 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   services.maintenance = createMaintenanceService(ctx);
   services.relays = createRelaysService(ctx);
   services.platforms = createPlatformsService(ctx);
+  services.uploads = createUploadsService(ctx);
 
   const router = express.Router();
   // Webhooks first: they need the raw body, before anything reads it as JSON.
   router.post("/webhooks/checkout/:hookToken", ...checkoutWebhookHandler(deps, services));
   router.post("/webhooks/:provider", ...webhookHandler(deps, services));
+  // Direct uploads' local part PUTs (development) are raw bytes, before anything reads JSON too.
+  localUploadPartRoute(router, ctx);
   router.use(express.json({ limit: "2mb" }));
   const registrar = new RouteRegistrar(router, deps, services);
   accountsRoutes(registrar, ctx);
@@ -97,6 +102,7 @@ export function createV1(deps: Deps): { router: Router; services: Services; deps
   maintenanceRoutes(registrar, ctx);
   relaysRoutes(registrar, ctx);
   platformsRoutes(registrar, ctx);
+  uploadsRoutes(registrar, ctx);
   router.use(errorHandler(deps.config.production));
   return { router, services, deps };
 }

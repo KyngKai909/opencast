@@ -64,6 +64,23 @@ export interface UploadedFile {
   originalName: string;
   size: number;
   mimeType: string;
+  /**
+   * A direct upload (added 2026-09-30, follow-up Phase 4): the bytes are in object storage already, at
+   * a staging key, and were read once for their content ID. `path` is where FFmpeg reads them from (a
+   * presigned URL, or a local path in development). Keeping it (`content.keep`) moves it to its
+   * content ID, or drops it when the platform has those bytes already, instead of storing it again.
+   */
+  stored?: StoredUpload;
+}
+
+export interface StoredUpload {
+  /** The staging key (`uploads/<id>`). */
+  key: string;
+  cid: string;
+  sha256: Buffer;
+  bytes: number;
+  /** Told whether keeping it stored anything new. */
+  onKept?(result: { cid: string; duplicate: boolean }): void;
 }
 
 export interface HandlerContext<E extends EndpointDef> {
