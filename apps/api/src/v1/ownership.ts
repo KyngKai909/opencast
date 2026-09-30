@@ -80,5 +80,7 @@ export const MODULE_TABLES: Record<string, string[]> = {
   // Added 2026-09-29: Network desk Settings (desk roles, the rules registry, signer proposals, the change log).
   settings: ["network.desk_roles", "network.rules", "network.change_log", "network.signer_proposals", "network.signer_approvals"],
   // Added 2026-09-29: the catalog's shelf. (The catalog module's `catalog.*` is the syndication market's.)
+  // Added 2026-09-30: storage maintenance runs from desk Settings.
+  maintenance: ["network.storage_runs"],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };
