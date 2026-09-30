@@ -1,0 +1,27 @@
+/* Watch data (follow-up Phase 1, 2026-09-29; no frame): the Audience page's watch time over its
+   tune-away line, and Offering your programs' totals across carriers. */
+.cc-watch__time { font: 500 14px var(--font-mono); }
+.cc-watch__line { margin-top: 8px; max-width: 320px; }
+.cc-watch__votes { display: block; }
+.cc-watch__quiet { color: var(--ink-50); font-size: 13px; }
+.cc-watch__state { display: block; text-align: right; line-height: 1.3; }
+
+/* Offering your programs: a program a row, its totals as small figures, then its tune-away line. */
+.cc-pwatch { margin-top: 4px; }
+.cc-pwatch__lead { margin: 10px 0 4px; font-size: 13.5px; color: var(--ink-70); max-width: 70ch; }
+.cc-pwatch__quiet { margin: 0; padding: 12px 0; font-size: 14px; color: var(--ink-70); }
+.cc-pwatch__list { list-style: none; margin: 0; padding: 0; }
+.cc-pwatch__row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 110px 110px 110px 200px; gap: 14px; align-items: start;
+  padding: 11px 0; border-bottom: 1px solid var(--hair);
+}
+.cc-pwatch__prog b { display: block; font: 700 15px/1.2 var(--font-display); }
+.cc-pwatch__prog small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-pwatch__prog .cc-pwatch__left { color: var(--ink-50); }
+.cc-pwatch__stat small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-pwatch__v { font: 500 14px var(--font-mono); }
+.cc-pwatch__none { grid-column: 2 / -1; font-size: 13px; color: var(--ink-50); }
+@media (max-width: 1080px) {
+  .cc-pwatch__row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cc-pwatch__prog, .cc-pwatch__line, .cc-pwatch__none { grid-column: 1 / -1; }
+}

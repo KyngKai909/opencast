@@ -6,6 +6,7 @@ import { Button, IconButton, Ident, Tally } from "@opencast/ui";
 import type { WatchData } from "./useWatch";
 import { AirPlayButton, AirPlayLine } from "./AirPlay";
 import { Picture } from "./Picture";
+import { NotForMe } from "./NotForMe";
 import { Actions, MembersLine, NowTitle, SharedAiring, Tonight } from "./parts";
 import { callSignOf, neighbourOf } from "./logic";
 
@@ -53,6 +54,7 @@ export function WatchWeb({ w }: { w: WatchData }) {
           </div>
           <span className="vw-watch__hint">Arrow keys change channel</span>
           <div className="vw-watch__right">
+            <NotForMe w={w} />
             <AirPlayButton w={w} />
             <IconButton icon="vol" label={s.muted ? "Unmute" : "Mute"} aria-pressed={s.muted} bare onClick={() => w.engine.setMuted(!s.muted)} />
             <IconButton icon="expand" label="Full screen" bare onClick={fullScreen} />

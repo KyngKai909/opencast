@@ -222,3 +222,25 @@ test("BEAT edits its log and publishes the changes", async ({ page }) => {
   await expect(page.getByText(/^Last changed by Kai M\. at 8:4\d pm$/)).toBeVisible();
   await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
 });
+
+test("BEAT's Audience shows watch time and where people left; Offering your programs adds up every station (follow-up Phase 1)", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/audience?period=tonight");
+  const table = page.getByRole("table", { name: /By program/ });
+  await expect(table.getByRole("columnheader", { name: "Watch time" })).toBeVisible();
+  // Each airing's watch time, and its tune-away line with the sentence that says it.
+  const late = table.getByRole("row").filter({ hasText: "Late Crate, ep. 14" });
+  await expect(late).toContainText(/\d+ hours/);
+  await expect(late.getByRole("figure")).toContainText(/^Most left around \d{1,2}:\d{2} pm/);
+  // The airing on now is still being counted.
+  await expect(table.getByRole("row").filter({ hasText: "Saturday Reel" })).toContainText("Counting…");
+
+  // Offering your programs: every station that aired them, added up; never a station's own.
+  await page.goto("/control/beat/market/offered");
+  const list = page.getByRole("list", { name: "Your programs across every station" });
+  await expect(list.getByRole("listitem").filter({ hasText: "Late Crate" }).filter({ hasText: "airings on 2 stations" })).toContainText("Watch time");
+  const tape = list.getByRole("listitem").filter({ hasText: "Beat Tape Live" }).filter({ hasText: "Radio band" });
+  await expect(tape).toContainText("1 airing not counted yet");
+  await expect(tape).toContainText("Not enough viewers yet");
+  for (const callSign of ["HALL", "SAZN", "CRAT"]) await expect(list).not.toContainText(callSign);
+});

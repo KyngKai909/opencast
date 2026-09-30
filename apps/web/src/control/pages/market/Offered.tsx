@@ -2,6 +2,8 @@
 // and carriers; a request waiting sits on top in standby amber; this month's carriage money, barter
 // and cash apart. Nested: a station asks (03.1, /requests/:requestId). On the phone, 05.2 and the
 // request as a sheet (05.1).
+// Watch data (follow-up Phase 1, 2026-09-29): each program's numbers across every station that
+// aired it, added up, under the list (components/watch/ProgramWatch). Owners and operators.
 
 import { type Agreement, type Offer } from "@opencast/contracts";
 import { useMemo } from "react";
@@ -17,6 +19,7 @@ import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { now } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
+import { ProgramWatch } from "../../components/watch/ProgramWatch";
 import "./Offered.css";
 
 interface Row {
@@ -125,6 +128,7 @@ export default function Offered() {
             );
           })}
         </dl>
+        {s.can("seeMoney") && <ProgramWatch stationId={s.id} />}
         {dialog}
       </div>
     );
@@ -209,6 +213,7 @@ export default function Offered() {
       {requestNotices}
       <Table label={`Programs ${name} makes`} columns={columns} rows={rows} rowKey={(r) => r.key} gap={14} rowPadding={11} className="cc-mk-offered__table" />
       {!rows.length && <Quietly>{name} has no programs yet. Programs you make in the library can be offered here.</Quietly>}
+      {s.can("seeMoney") && <ProgramWatch stationId={s.id} />}
       {s.can("seeMoney") && <CarriageMoney name={name} carriedBy={carriedBy} />}
       {dialog}
     </div>

@@ -129,3 +129,35 @@ test("an external station says External, and Tuning sound is off until turned on
   await page.reload();
   await expect(page.getByRole("switch", { name: "Tuning sound" })).toHaveAttribute("aria-checked", "true");
 });
+
+test("Not for me: off by default; with the switch on, one vote for what's airing, noted (follow-up Phase 1)", async ({ page }) => {
+  await page.setViewportSize(WIDTHS.web);
+  await useGround(page, "dark");
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem("oc-e2e-set")) return;
+    sessionStorage.setItem("oc-e2e-set", "1");
+    localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null }));
+  });
+
+  // Off, as the rules registry starts it: the player has no such control.
+  await page.goto("/watch/beat");
+  await expect(page.locator(".oc-player")).toHaveAttribute("data-status", "playing");
+  await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Not for me/ })).toHaveCount(0);
+
+  // The mock's switch turns it on (as the desk's Settings, Rules, Features would): a quiet button
+  // in the player's bar. The vote goes with the heartbeat's session, once.
+  const beat = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.endsWith("/heartbeat"));
+  await page.goto("/watch/beat?notForMe=on");
+  await beat;
+  const button = page.getByRole("button", { name: /^Not for me: / });
+  await expect(button).toBeVisible();
+  const vote = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.endsWith("/not-for-me"));
+  await button.click();
+  const res = await vote;
+  expect(await res.json()).toEqual({ ok: true, status: "recorded" });
+  expect(res.request().postDataJSON()).toEqual({ sessionId: expect.any(String) });
+  await expect(toast(page, "Noted. Only a count is kept, never who said it.")).toBeVisible();
+  await expect(page.getByText("Noted", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Not for me/ })).toHaveCount(0);
+});

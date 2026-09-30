@@ -1,7 +1,8 @@
 // tv 04.1 the menu rail over a dimmed picture ("/menu"). It slides in from the left and holds
 // everything that isn't watching; the picture keeps playing, dimmed, with its sound on. Each item
 // says where it stands ("5 saved", "4 stations", "Inland Empire", "Off"). Menu or Back closes it
-// (the dispatcher); OK opens or toggles the focused item.
+// (the dispatcher); OK opens or toggles the focused item. "Not for me" (follow-up Phase 1) sends
+// the viewer's vote on what's airing, then reads "Noted", with a quiet line under the items.
 
 import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router";
@@ -11,6 +12,7 @@ import { OPTIONS } from "../../components/settings/model";
 import { useTvSettings } from "../../components/settings/useTvSettings";
 import { otherBand, useRememberBand } from "../../components/watching/bands";
 import { menuItems, savedText, stationsText, toggledCaptions, type MenuItemId } from "../../components/watching/menu";
+import { offersNotForMe, useNotForMe, useNotForMeFlag } from "../../components/watching/notForMe";
 import { pledgeRoute } from "../../components/watching/pledge";
 import { MARKET_TZ } from "../../lib/clock";
 import { useDial, useMe, usePresets, useSignedIn } from "../../tv/data";
@@ -51,7 +53,11 @@ export default function Menu() {
   useEffect(() => focusKey("tvw-mi-guide"), []);
 
   const go = (to: string) => navigate(to, { replace: true });
-  const items = menuItems({ mode, station: current?.station ?? null });
+  const notForMeFlag = useNotForMeFlag();
+  const airing = current?.now ?? null;
+  const notForMe = offersNotForMe({ flag: notForMeFlag, stationKind: current?.station.kind, airing }) && !!current && !!airing;
+  const vote = useNotForMe(notForMe ? current!.station.id : null, notForMe ? airing : null);
+  const items = menuItems({ mode, station: current?.station ?? null, notForMe });
   const market = me.data?.market?.name ?? tvDial.data?.market.name ?? null;
   const captionsLabel = OPTIONS.captions.find((o) => o.value === settings.captions)?.label ?? null;
   const crossCount = crossDial.data ? crossDial.data.rows.length : null;
@@ -66,6 +72,7 @@ export default function Menu() {
     captions: () => <Item key="captions" id="captions" label="Captions" value={captionsLabel} onSelect={() => save({ captions: toggledCaptions(settings.captions) })} />,
     settings: () => <Item key="settings" id="settings" label="Settings" onSelect={() => go("/settings")} />,
     pledge: () => (current ? <Item key="pledge" id="pledge" label="Pledge" value={current.station.name} onSelect={() => go(pledgeRoute(current.station))} /> : null),
+    notForMe: () => (airing ? <Item key="notForMe" id="notForMe" label="Not for me" value={vote.said ? "Noted" : airing.title} onSelect={() => void vote.say()} /> : null),
     account: () => <Item key="account" id="account" label={account} onSelect={() => go(signedIn ? "/settings/account" : "/welcome")} />
   };
 
@@ -79,6 +86,9 @@ export default function Menu() {
             opencast
           </div>
           <div role="menu">{items.map((id) => render[id]())}</div>
+          <p className="tvw-rail__note" role="status">
+            {vote.line}
+          </p>
           <div className="tvw-rail__foot">Menu or Back to close</div>
         </nav>
       </FocusContext.Provider>

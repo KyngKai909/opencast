@@ -126,7 +126,7 @@ Collected and stored only (`docs/schema.md`, "Watch data"). Nothing that decides
 | One "Not for me" per viewer per airing | `audience.not_for_me_votes` (session, log entry) | one per **session**, signed in or not: the person is never stored, so a signed-in viewer on two devices can vote twice. A vote is for the log entry on the station's log when it's sent, and counts from a session counted in 2 of the program's minutes |
 | Bot filtering for watch data | `watch.ts` | a session ever flagged is left out entirely, including the minutes it was counted as tuned in before it was caught (the station's tuned-in line keeps those, as before) |
 | The existing tuned-in figures on the Audience page's program rows (average, peak, stayed from the line) | `AudienceReport.byProgram` | unchanged, not behind the minimum: they're the station's own tuned-in counts from before. Only the new `watch` numbers are gated. Say if the minimum should hide them too |
-| "Not for me" in the player | `features.not_for_me` (group `features`), read by the apps from `GET /v1/config` | off. The API takes votes either way. The desk's Rules page doesn't draw the `watch_data` and `features` groups yet (its `GROUPS` list); the API sets them |
+| "Not for me" in the player | `features.not_for_me` (group `features`), read by the apps from `GET /v1/config` | off. The API takes votes either way. The desk's Rules page draws the `watch_data` and `features` groups (Settings, Rules), so the desk can change them |
 | External stations' tuned-in time (Phase 6) | `airing_stats.external` (a `listed` station's airings) | recorded and labelled, left out of the maker's totals; nothing that pays reads `airing_stats` |
 
 ## Product

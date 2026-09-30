@@ -12,6 +12,7 @@ import { useChannels } from "../../data/viewer";
 import type { WatchData } from "./useWatch";
 import { AirPlayLine } from "./AirPlay";
 import { Picture } from "./Picture";
+import { NotForMe } from "./NotForMe";
 import { Actions, NowTitle, SharedAiring, Tonight } from "./parts";
 import { callSignOf, bandHint, neighbourOf } from "./logic";
 import { useOverlayParams } from "./overlay";
@@ -86,6 +87,7 @@ export function WatchPhone({ w }: { w: WatchData }) {
               <span className="oc-mono">until {clock(now.endsAt, { timeZone: MARKET_TZ })}</span>
             </div>
           )}
+          <NotForMe w={w} className="vw-nfm--phone" />
           <div className="vw-wph__controls">
             <IconButton icon="down" label={down ? `Down to ${down.station.channel}` : "Channel down"} className="vw-wph__step" onClick={() => step("down")} disabled={!down} />
             <IconButton icon={paused ? "play" : "pause"} label={paused ? "Play" : "Pause"} className="vw-wph__play" onClick={() => w.engine.togglePlay()} />
@@ -121,6 +123,7 @@ export function WatchPhone({ w }: { w: WatchData }) {
         </div>
         <SharedAiring w={w} />
         <NowTitle w={w} size="phone" />
+        <NotForMe w={w} className="vw-nfm--phone" />
         <Actions w={w} className="vw-wph__acts" />
         <Tonight w={w} before={0} />
       </div>

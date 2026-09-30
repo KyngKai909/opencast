@@ -7,6 +7,7 @@ import { PlayerProvider, startHeartbeat, tuningSoundFrom, usePlayer, type Engine
 import { call } from "../../api/client";
 import { setDevice } from "../device/store";
 import { useChannels, usePresets } from "../data/viewer";
+import { useNotForMeFlag } from "../data/notForMe";
 import { useSavedSettings } from "../layout/SettingsSync";
 import { lockScreenInput, nowPlayingInfo } from "../native/lockScreen";
 import { hasPlugin } from "../native/platform";
@@ -37,6 +38,8 @@ function PlayerSync() {
     engine.setOptions({ tuningSound: tuningSoundFrom(w) });
   }, [engine, settings?.watching]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), isPhone() ? "phone" : "web"), [engine]);
+  // The apps' switches ("Not for me"): read at start, then every few minutes (data/notForMe.ts).
+  useNotForMeFlag();
   return null;
 }
 

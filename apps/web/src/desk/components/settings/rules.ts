@@ -9,7 +9,10 @@ export const GROUPS: Array<{ id: RuleView["group"]; label: string }> = [
   { id: "rights", label: "Rights" },
   { id: "relays", label: "Relays" },
   { id: "call_signs", label: "Call signs" },
-  { id: "sponsors", label: "Catalog sponsors" }
+  { id: "sponsors", label: "Catalog sponsors" },
+  // Added 2026-09-29 (follow-up Phase 1): how long watch data is kept and when it shows; the apps' switches.
+  { id: "watch_data", label: "Watch data" },
+  { id: "features", label: "Features" }
 ];
 
 /** `letters`: a list of capital-letter words, typed with commas between (call signs' lists). */
@@ -57,7 +60,9 @@ const LABELS: Record<string, [string, FieldKind]> = {
   seriesMonthlyMicros: ["One series in a market, a month", "dollars"],
   everySeriesMonthlyMicros: ["Every series in a market, a month", "dollars"],
   opencastBps: ["Opencast", "percent"],
-  poolBps: ["The co-op pool", "percent"]
+  poolBps: ["The co-op pool", "percent"],
+  viewers: ["Viewers at once", "number"],
+  carriedAirings: ["Other stations' airings, together", "number"]
 };
 
 const YES_NO = [
@@ -65,8 +70,15 @@ const YES_NO = [
   { value: "false", label: "No" }
 ];
 
-/** Rules whose value has a yes-or-no part, in words. */
-const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters" };
+/** A feature's switch (`features.*`): on or off. */
+const ON_OFF = [
+  { value: "true", label: "On" },
+  { value: "false", label: "Off" }
+];
+
+/** Rules whose value has a yes-or-no part, in words. `enabled` is a feature's switch, on or off. */
+const YES_NO_LABELS: Record<string, string> = { refuseKwFourLetters: "Refuse K or W and three letters", enabled: "In the apps" };
+const ON_OFF_FIELDS = new Set(["enabled"]);
 
 const trimZeros = (s: string) => (s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s);
 
@@ -86,7 +98,7 @@ export function fieldsFor(value: unknown): ValueField[] {
   return Object.entries(value as Record<string, unknown>)
     .filter(([k]) => k !== "jurisdiction")
     .map(([k, v]) => {
-      if (typeof v === "boolean") return { name: k, label: YES_NO_LABELS[k] ?? k, kind: "choice" as const, nullable: false, options: YES_NO, text: String(v) };
+      if (typeof v === "boolean") return { name: k, label: YES_NO_LABELS[k] ?? k, kind: "choice" as const, nullable: false, options: ON_OFF_FIELDS.has(k) ? ON_OFF : YES_NO, text: String(v) };
       const [label, kind] = LABELS[k] ?? [k, Array.isArray(v) || (v && typeof v === "object") ? "json" : "number"];
       return { name: k, label, kind, nullable: v === null || k.endsWith("Micros"), text: textOf(kind, v) };
     });
@@ -96,7 +108,7 @@ export function fieldsFor(value: unknown): ValueField[] {
 export function valueFrom(original: unknown, fields: ValueField[]): { value: unknown } | { error: string; field: string } {
   const read = (f: ValueField): { ok: true; v: unknown } | { ok: false; error: string } => {
     const t = f.text.trim();
-    if (f.kind === "choice") return { ok: true, v: f.options === YES_NO ? t === "true" : t };
+    if (f.kind === "choice") return { ok: true, v: f.options === YES_NO || f.options === ON_OFF ? t === "true" : t };
     if (f.kind === "letters") {
       const words = t.split(/[\s,]+/).map((w) => w.toUpperCase()).filter(Boolean);
       const bad = words.find((w) => !/^[A-Z]{2,12}$/.test(w));

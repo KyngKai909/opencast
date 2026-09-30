@@ -247,3 +247,30 @@ test("TV settings: Tuning sound, off until turned on, and kept on this TV (tv-up
   await expect(row.locator(".tvs-row__val")).toContainText("On");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("oc-tv-device") ?? "{}").settings?.tuningSound)).toBe(true);
 });
+
+test("Not for me on the menu: off by default; with the switch on, OK says it once (follow-up Phase 1)", async ({ page }) => {
+  // Off, as the rules registry starts it: the menu has no such item.
+  await openTv(page, "/");
+  await playing(page);
+  await page.keyboard.press("ContextMenu");
+  await expect(page).toHaveURL(/\/menu$/);
+  await expect(page.getByRole("menuitem", { name: /Guide/ })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Not for me/ })).toHaveCount(0);
+
+  // The mock's switch turns it on: the item sits after the station line, reached with the arrows.
+  await openTv(page, "/?notForMe=on");
+  await playing(page);
+  await page.keyboard.press("ContextMenu");
+  const item = page.getByRole("menuitem", { name: /Not for me/ });
+  await expect(item).toBeVisible();
+  for (let i = 0; i < 12 && !(await focused(page).textContent())?.startsWith("Not for me"); i++) await page.keyboard.press("ArrowDown");
+  await expect(focused(page)).toContainText("Not for me");
+  const vote = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname.endsWith("/not-for-me"));
+  await page.keyboard.press("Enter");
+  expect(await (await vote).json()).toEqual({ ok: true, status: "recorded" });
+  await expect(item).toContainText("Noted");
+  await expect(page.getByRole("status").filter({ hasText: "Noted. Only a count is kept, never who said it." })).toBeVisible();
+  // OK again in the same airing: nothing more is sent.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status").filter({ hasText: /^You've already said .+ isn't for you\.$/ })).toBeVisible();
+});

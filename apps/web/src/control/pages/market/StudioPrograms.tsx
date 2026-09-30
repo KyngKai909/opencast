@@ -1,5 +1,7 @@
 // Market 04.1 a studio: Your programs (/:handle/programs). A studio makes programs and doesn't
 // broadcast: what it offers, who carries it, what it earned, and the way to a channel of its own.
+// Watch data (follow-up Phase 1, 2026-09-29): its programs across every station that aired them,
+// added up (components/watch/ProgramWatch).
 
 import { type Offer } from "@opencast/contracts";
 import { Navigate } from "react-router";
@@ -11,6 +13,7 @@ import { formatLine, termsTwoLines } from "../../components/market/words";
 import { now } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
+import { ProgramWatch } from "../../components/watch/ProgramWatch";
 import "./Studio.css";
 import { controlPath } from "../../../areas";
 
@@ -87,6 +90,7 @@ export default function StudioPrograms() {
       />
       <Table label="Your programs" columns={columns} rows={offered} rowKey={(o) => o.id} gap={14} rowPadding={11} className="cc-mk-studio__table" />
       {!offered.length && <Quietly>Nothing is offered yet. Offer a program and stations can carry it.</Quietly>}
+      {s.can("seeMoney") && <ProgramWatch stationId={s.id} />}
       <div className="cc-mk-studio__note">
         <div>
           <b>Want your own channel?</b>

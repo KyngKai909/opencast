@@ -41,7 +41,7 @@ function readSwitches(): Switches {
   return { offAir: list("offAir"), standby: list("standby") };
 }
 
-const switches = readSwitches();
+export const switches = readSwitches();
 
 /** One row as the watching screen gets it. */
 export function patchRow(r: DialRowX, t: Date, sw: Switches): DialRowX {

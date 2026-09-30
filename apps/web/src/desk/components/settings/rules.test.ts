@@ -1,8 +1,8 @@
 // A rule's value as form fields and back: dollars and percent in the form, micros and basis points
 // stored; "Not set yet" as an empty price.
 import { describe, expect, it } from "vitest";
-import { RULES } from "@opencast/contracts";
-import { fieldsFor, fromWords, shortKey, valueFrom } from "./rules";
+import { RULE_KEYS, RULES, RuleGroup } from "@opencast/contracts";
+import { fieldsFor, fromWords, GROUPS, shortKey, valueFrom } from "./rules";
 
 describe("rule values in the form", () => {
   it("types the call sign rules as yes or no and lists of capital letters (added 2026-09-29)", () => {
@@ -59,5 +59,37 @@ describe("rule values in the form", () => {
     expect(fromWords("1970-01-01T00:00:00.000Z", () => "")).toBe("Since the start");
     expect(fromWords("2026-11-01T00:00:00.000Z", () => "November 1")).toBe("From November 1");
     expect(shortKey("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")).toBe("0x7099…79C8");
+  });
+});
+
+describe("the Rules page's groups (watch data and features added 2026-09-29)", () => {
+  it("draws every group the registry has, so no rule is left off the page", () => {
+    expect(GROUPS.map((g) => g.id)).toEqual(expect.arrayContaining(["watch_data", "features"]));
+    expect(GROUPS.find((g) => g.id === "watch_data")?.label).toBe("Watch data");
+    expect(GROUPS.find((g) => g.id === "features")?.label).toBe("Features");
+    const drawn = new Set(GROUPS.map((g) => g.id));
+    const groupsWithRules = new Set(RULE_KEYS.map((k) => RULES[k].group));
+    // Numbering and escrow have their own sections (Markets, Escrow signers).
+    for (const g of RuleGroup.options.filter((x) => x !== "numbering" && x !== "escrow" && groupsWithRules.has(x))) expect(drawn.has(g)).toBe(true);
+  });
+
+  it("types how long sessions are kept, and the minimum audience, as numbers", () => {
+    const kept = fieldsFor(RULES["watch_data.retention"].fallback);
+    expect(kept.map((f) => [f.name, f.label, f.kind, f.text])).toEqual([["days", "Days", "number", "30"]]);
+    expect(valueFrom({ days: 30 }, [{ ...kept[0]!, text: "45" }])).toEqual({ value: { days: 45 } });
+    const min = fieldsFor(RULES["watch_data.minimum_audience"].fallback);
+    expect(min.map((f) => [f.name, f.label, f.kind, f.text])).toEqual([
+      ["viewers", "Viewers at once", "number", "20"],
+      ["carriedAirings", "Other stations' airings, together", "number", "2"]
+    ]);
+    expect(valueFrom(RULES["watch_data.minimum_audience"].fallback, [{ ...min[0]!, text: "25" }, min[1]!])).toEqual({ value: { viewers: 25, carriedAirings: 2 } });
+  });
+
+  it("switches \"Not for me\" on or off", () => {
+    const f = fieldsFor(RULES["features.not_for_me"].fallback);
+    expect(f.map((x) => [x.name, x.label, x.kind, x.text])).toEqual([["enabled", "In the apps", "choice", "false"]]);
+    expect(f[0]!.options?.map((o) => o.label)).toEqual(["On", "Off"]);
+    expect(valueFrom({ enabled: false }, [{ ...f[0]!, text: "true" }])).toEqual({ value: { enabled: true } });
+    expect(valueFrom({ enabled: true }, [{ ...f[0]!, text: "false" }])).toEqual({ value: { enabled: false } });
   });
 });

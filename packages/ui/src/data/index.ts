@@ -16,3 +16,4 @@ export { Funnel, FunnelRow, funnelPercents, type FunnelProps, type FunnelRowProp
 export { SplitBar, splitShares, type SplitBarProps, type SplitPart } from "./SplitBar";
 export { Runway, runwayDays, type RunwayProps } from "./Runway";
 export { Reach, type ReachProps } from "./Reach";
+export { Sparkbars, sparkPeak, type SparkbarsProps } from "./Sparkbars";

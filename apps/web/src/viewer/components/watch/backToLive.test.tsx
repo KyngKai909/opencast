@@ -15,6 +15,7 @@ vi.mock("../../data/viewer", () => ({ useChannels: () => [] }));
 vi.mock("../remote/WatchOnSheet", () => ({ WatchOnSheet: () => null }));
 vi.mock("../../cast/session", () => ({ useCastSession: () => ({ status: "idle" }) }));
 vi.mock("../../cast/useCast", () => ({ watchOnOffered: () => false }));
+vi.mock("./NotForMe", () => ({ NotForMe: () => null }));
 
 const { WatchWeb } = await import("./WatchWeb");
 const { WatchPhone } = await import("./WatchPhone");

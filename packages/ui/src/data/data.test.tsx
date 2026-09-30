@@ -13,6 +13,7 @@ import { Funnel, funnelPercents } from "./FunnelRow";
 import { SplitBar, splitShares } from "./SplitBar";
 import { Runway, runwayDays } from "./Runway";
 import { PromiseList } from "./PromiseList";
+import { Sparkbars, sparkPeak } from "./Sparkbars";
 
 const TZ = "America/Los_Angeles";
 const sat = (min: number) => new Date(Date.parse("2026-09-26T18:00:00-07:00") + min * 60_000);
@@ -217,5 +218,22 @@ describe("Checks and the promise", () => {
     const { container } = render(<PromiseList title="What happens to your money" lines={[{ lead: "It sits in your balance.", rest: "Nothing is spent by adding it." }]} />);
     expect(container.querySelector("h3")?.textContent).toBe("What happens to your money");
     expect(container.querySelector("li")?.textContent).toBe("It sits in your balance. Nothing is spent by adding it.");
+  });
+});
+
+describe("Sparkbars", () => {
+  it("draws a bar a step, the busiest in ink, and says what it shows in its caption", () => {
+    const { container, getByRole } = render(<Sparkbars values={[0, 2, 7, 3, 0]} caption="Most left around 9:24 pm" />);
+    expect(container.querySelectorAll("rect")).toHaveLength(5);
+    expect(container.querySelectorAll(".oc-sparkbars__peak")).toHaveLength(1);
+    expect(container.querySelector("rect:nth-child(3)")?.getAttribute("class")).toBe("oc-sparkbars__peak");
+    expect(container.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(getByRole("figure").textContent).toBe("Most left around 9:24 pm");
+  });
+
+  it("finds the busiest step, the first of a tie, and none when nobody left", () => {
+    expect(sparkPeak([0, 4, 4, 1])).toBe(1);
+    expect(sparkPeak([0, 0, 0])).toBeNull();
+    expect(sparkPeak([])).toBeNull();
   });
 });

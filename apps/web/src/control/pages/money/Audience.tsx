@@ -3,6 +3,8 @@
 // end, and what people watch on, with the translators' counts apart (never added in, never
 // billed). 04.1 on the phone: the live count, a small line and tonight's programs.
 // A station's own numbers only. Owners and operators see them; hosts never get here.
+// Watch data (follow-up Phase 1, 2026-09-29): each program row adds its watch time (listening time
+// on the radio band) and a small minute-by-minute tune-away line, behind the minimum audience.
 
 import { useSearchParams } from "react-router";
 import { audienceApi } from "@opencast/contracts";
@@ -18,6 +20,8 @@ import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { STATION_TZ, useNow } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
+import { TuneAwayLine, WatchTime } from "../../components/watch/WatchCell";
+import { timeLabelWord, watchPhoneText } from "../../components/watch/words";
 import "./Audience.css";
 
 const PERIODS: AudiencePeriod[] = ["tonight", "week", "month"];
@@ -113,7 +117,7 @@ export default function Audience() {
               variant="rows"
               items={programs.map((p) => ({
                 title: p.title,
-                detail: p.onNow ? "On now" : p.airedAt ? clock(p.airedAt, { timeZone: STATION_TZ }) : plural(p.airings, "airing"),
+                detail: [p.onNow ? "On now" : p.airedAt ? clock(p.airedAt, { timeZone: STATION_TZ }) : plural(p.airings, "airing"), !p.onNow && p.watch ? watchPhoneText(p.watch) : null].filter(Boolean).join(". "),
                 value: `${p.averageTunedIn.toLocaleString("en-US")} avg`
               })) satisfies KeyValueRow[]}
             />
@@ -125,14 +129,26 @@ export default function Audience() {
     );
   }
 
+  // Watch time, or listening time on the radio band (the rows say which).
+  const watchHeader = timeLabelWord(programs?.find((p) => p.watch)?.watch?.timeLabel ?? (radio ? "listening_time" : "watch_time"));
   const columns: Column<AudienceProgram & { time: string }>[] = [
     tonight
       ? { key: "aired", header: "Aired", width: "80px", kind: "time", cell: (r) => r.time }
       : { key: "airings", header: "Airings", width: "80px", kind: "time", cell: (r) => r.airings.toLocaleString("en-US") },
-    { key: "program", header: "Program", cell: (r) => <Lines title={r.title} detail={sourceLine(r)} /> },
-    { key: "average", header: "Average", width: "110px", kind: "amount", cell: (r) => r.averageTunedIn.toLocaleString("en-US") },
-    { key: "peak", header: "Peak", width: "110px", kind: "amount", cell: (r) => r.peakTunedIn.toLocaleString("en-US") },
-    { key: "stayed", header: "Stayed to the end", width: "130px", kind: "amount", cell: (r) => (r.onNow ? <span className="cc-aud__quiet">On now</span> : r.stayedToTheEnd === null ? <span className="cc-aud__quiet">–</span> : pct(r.stayedToTheEnd)) }
+    {
+      key: "program",
+      header: "Program",
+      cell: (r) => (
+        <>
+          <Lines title={r.title} detail={sourceLine(r)} />
+          <TuneAwayLine watch={r.watch} startsAt={r.airedAt ?? null} timeZone={STATION_TZ} />
+        </>
+      )
+    },
+    { key: "average", header: "Average", width: "90px", kind: "amount", cell: (r) => r.averageTunedIn.toLocaleString("en-US") },
+    { key: "peak", header: "Peak", width: "80px", kind: "amount", cell: (r) => r.peakTunedIn.toLocaleString("en-US") },
+    { key: "stayed", header: "Stayed to the end", width: "120px", kind: "amount", cell: (r) => (r.onNow ? <span className="cc-aud__quiet">On now</span> : r.stayedToTheEnd === null ? <span className="cc-aud__quiet">–</span> : pct(r.stayedToTheEnd)) },
+    { key: "watch", header: watchHeader, width: "112px", align: "end", cell: (r) => <WatchTime watch={r.watch} /> }
   ];
 
   const shares = splitShares(PLATFORMS.map((p) => ({ amount: a.byPlatform[p.key] })));

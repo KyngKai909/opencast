@@ -93,3 +93,9 @@
 .vw-airplay .oc-i { width: 20px; height: 16px; color: var(--signal); flex: none; }
 .vw-airplay .oc-btn { margin-left: auto; }
 .vw-airplay--phone { margin-top: 12px; border-bottom: 0; padding: 10px 12px; border-radius: var(--r-control); background: var(--raised); }
+
+/* "Not for me" (follow-up Phase 1, 2026-09-29; no frame): a quiet text button in the bar (web) and under what's on (phone). */
+.vw-nfm.oc-btn--text { font-weight: 500; font-size: 13px; }
+.vw-nfm--said { font-size: 13px; color: var(--ink-50); }
+.vw-nfm--phone { margin-top: 10px; }
+.vw-nfm--said.vw-nfm--phone { display: inline-block; }

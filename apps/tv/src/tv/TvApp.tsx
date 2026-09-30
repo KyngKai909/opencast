@@ -12,6 +12,7 @@ import { GroundProvider, TvShell } from "@opencast/ui";
 import { call, setAuthHandlers, setTokenSource } from "../api/client";
 import { useAccountSettingsSync } from "../components/settings/useTvSettings";
 import { hintsFor, keyHintsHidden, readFirstUse } from "../components/watching/hintRow";
+import { useNotForMeFlag } from "../components/watching/notForMe";
 import { now, MARKET_TZ } from "../lib/clock";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
 import { useChannels, usePresets } from "./data";
@@ -157,6 +158,8 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
   useEffect(() => engine.setPresets(Object.fromEntries(presets.map((p) => [p.key, p.stationId]))), [engine, presets]);
   useEffect(() => engine.setCaptions(device.settings.captions, device.settings.captionSize), [engine, device.settings.captions, device.settings.captionSize]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), mode === "cast" ? "cast" : mode === "mirror" ? "mirror" : "tv_app"), [engine, mode]);
+  // The apps' switches ("Not for me" on the menu): read at start, then every few minutes.
+  useNotForMeFlag();
 
   // First tune: the last channel on this TV, or the first station on the dial. Unless something
   // tuned first (a phone, or "/radio", which tunes its band's station: it's left to do that).
