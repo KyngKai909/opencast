@@ -75,6 +75,17 @@ export default defineRailway((ctx) => {
     PAYMENTS_PROVIDER: production ? secret() : "fake",
     STRIPE_SECRET_KEY: secret(),
     STRIPE_WEBHOOK_SECRET: secret(),
+    STRIPE_PUBLISHABLE_KEY: secret(),
+    // Platform connections (follow-up Phase 3, docs/platforms.md): stream keys and tokens are sealed
+    // with PLATFORM_SECRETS_KEY (old keys kept for rotation); Google and Twitch sign-in clients.
+    PLATFORM_SECRETS_KEY: secret(),
+    PLATFORM_SECRETS_OLD_KEYS: secret(),
+    GOOGLE_CLIENT_ID: secret(),
+    GOOGLE_CLIENT_SECRET: secret(),
+    TWITCH_CLIENT_ID: secret(),
+    TWITCH_CLIENT_SECRET: secret(),
+    // Storage maintenance's "Copy Pinata pins" (desk Settings); unset, that job says Pinata isn't connected.
+    PINATA_JWT: secret(),
     PRIVY_APP_ID: secret(),
     PRIVY_VERIFICATION_KEY: secret(),
     PRIVY_APP_SECRET: secret(),
@@ -148,6 +159,9 @@ export default defineRailway((ctx) => {
       DATABASE_URL: Postgres.env.DATABASE_URL,
       REDIS_URL: Redis.env.REDIS_URL,
       LIVEPEER_API_KEY: secret(),
+      // Opens the platforms' sealed stream keys (the same key as the API's).
+      PLATFORM_SECRETS_KEY: secret(),
+      PLATFORM_SECRETS_OLD_KEYS: secret(),
       // One push per station, split by Livepeer; `direct` pushes to each platform (docs/relay.md).
       RELAY_FAN_OUT: "livepeer",
       // The channel playlist base: prepared segments are read there when storage isn't reachable.
