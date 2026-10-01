@@ -305,14 +305,14 @@ describe("the radio band", () => {
       expect(gain.to[0]!.kind).toBe("destination");
     });
 
-    it("is off by default for video, and plays there when Tuning sound is on", async () => {
+    it("is on by default for video too, and stops there when Tuning sound is turned off", async () => {
       stubWebAudio();
       make();
       await onAir(CIVC);
       engine.handle({ type: "channel", dir: "up" });
       await flush(1200);
-      expect(engine.hissesPlayed()).toBe(0);
-      engine.setOptions({ tuningSound: { video: true } });
+      expect(engine.hissesPlayed()).toBe(1);
+      engine.setOptions({ tuningSound: { video: false } });
       engine.handle({ type: "channel", dir: "up" });
       await flush(0);
       expect(engine.hissesPlayed()).toBe(1);

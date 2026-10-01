@@ -395,11 +395,11 @@ void byId;
 describe("tuning sound", () => {
   const KOSP = station("KOSP", "88.3", { band: "radio" });
 
-  it("is on for the radio band and off for video by default", () => {
-    expect(TUNING_SOUND_DEFAULTS).toEqual({ video: false, radio: true });
+  it("is on for both bands by default", () => {
+    expect(TUNING_SOUND_DEFAULTS).toEqual({ video: true, radio: true });
     engine.setChannels([...dial, KOSP]);
-    expect(engine.getTuningSound()).toEqual({ video: false, radio: true });
-    expect(engine.tuningSoundOn(BEAT.station.id)).toBe(false);
+    expect(engine.getTuningSound()).toEqual({ video: true, radio: true });
+    expect(engine.tuningSoundOn(BEAT.station.id)).toBe(true);
     expect(engine.tuningSoundOn(KOSP.station.id)).toBe(true);
   });
 
@@ -415,9 +415,9 @@ describe("tuning sound", () => {
   });
 
   it("reads the account's watching settings, with the defaults where they're absent", () => {
-    expect(tuningSoundFrom(undefined)).toEqual({ video: false, radio: true });
-    expect(tuningSoundFrom({ tuningSound: true })).toEqual({ video: true, radio: true });
-    expect(tuningSoundFrom({ radioTuningSound: false })).toEqual({ video: false, radio: false });
+    expect(tuningSoundFrom(undefined)).toEqual({ video: true, radio: true });
+    expect(tuningSoundFrom({ tuningSound: false })).toEqual({ video: false, radio: true });
+    expect(tuningSoundFrom({ radioTuningSound: false })).toEqual({ video: true, radio: false });
   });
 });
 

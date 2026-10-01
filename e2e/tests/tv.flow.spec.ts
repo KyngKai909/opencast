@@ -240,7 +240,7 @@ test("a phone's commands over the relay change the channel and set the sleep tim
   await expect.poll(() => phone.evaluate(() => (window as unknown as { heard: Array<{ ended?: string }> }).heard.some((m) => m.ended === "tv_ended"))).toBe(true);
 });
 
-test("TV settings: Tuning sound, off until turned on, and kept on this TV (tv-update 04.1)", async ({ page }) => {
+test("TV settings: Tuning sound, on until turned off, and kept on this TV (tv-update 04.1; on by default since 2026-10-01)", async ({ page }) => {
   await openTv(page, "/settings/watching");
   const row = page.locator(".tvs-row--focus");
   await expect(row).toContainText("Captions");
@@ -248,10 +248,10 @@ test("TV settings: Tuning sound, off until turned on, and kept on this TV (tv-up
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
   await expect(row).toContainText("Tuning sound");
   await expect(row).toContainText("A soft hiss when changing channel");
-  await expect(row.locator(".tvs-row__val")).toContainText("Off");
-  await page.keyboard.press("ArrowRight");
   await expect(row.locator(".tvs-row__val")).toContainText("On");
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("oc-tv-device") ?? "{}").settings?.tuningSound)).toBe(true);
+  await page.keyboard.press("ArrowLeft");
+  await expect(row.locator(".tvs-row__val")).toContainText("Off");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("oc-tv-device") ?? "{}").settings?.tuningSound)).toBe(false);
 });
 
 test("Not for me on the menu: off by default; with the switch on, OK says it once (follow-up Phase 1)", async ({ page }) => {

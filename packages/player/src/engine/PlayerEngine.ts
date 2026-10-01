@@ -168,7 +168,8 @@ export interface TuningSound {
 }
 
 /** The hiss is on by default for the radio band, off for video (style guide, "Tuning the radio band"). */
-export const TUNING_SOUND_DEFAULTS: Readonly<TuningSound> = Object.freeze({ video: false, radio: true });
+// On for both bands by default (the user's decision, 2026-10-01; Phase 5 had video off).
+export const TUNING_SOUND_DEFAULTS: Readonly<TuningSound> = Object.freeze({ video: true, radio: true });
 
 /**
  * The account's watching settings as the player's option: `tuningSound` is the row in Watching
