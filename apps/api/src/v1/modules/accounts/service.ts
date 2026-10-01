@@ -1176,12 +1176,14 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
 
     async transferStationOwnership(stationId, fromUserId, toUserId) {
       const m = schema.stationMemberships;
+      const before = await service.stationMemberIds(stationId, ["owner"]);
       await db.transaction(async (tx) => {
         const [target] = await tx.select().from(m).where(and(eq(m.stationId, stationId), eq(m.userId, toUserId)));
         if (!target) throw refused("not_a_member", "Ownership can only go to someone already on the team.");
         await tx.update(m).set({ role: "operator" }).where(and(eq(m.stationId, stationId), eq(m.userId, fromUserId)));
         await tx.update(m).set({ role: "owner" }).where(and(eq(m.stationId, stationId), eq(m.userId, toUserId)));
       });
+      await ownersChanged(stationId, before);
     },
 
     async resendInvite(user, inviteId) {
@@ -1240,6 +1242,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           );
         }
       }
+      // A234: an owner who takes an invite to their own station's team takes its role.
+      const before = row.stationId ? await service.stationMemberIds(row.stationId, ["owner"]) : [];
       await db.transaction(async (tx) => {
         // Only one person can use an invite, even two at once.
         const [taken] = await tx
@@ -1253,6 +1257,7 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         if (row.stationId && row.role === "host" && row.programIds?.length) await services.stations.addHost(tx, row.stationId, user.id, row.programIds);
         if (row.advertiserId) await service.addBusinessMember(tx, row.advertiserId, user.id, row.role as BusinessRole);
       });
+      if (row.stationId) await ownersChanged(row.stationId, before);
     },
 
     async invitePreview(inviteId, user) {
@@ -1276,6 +1281,18 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       };
     }
   };
+
+  /**
+   * A234: a station's owners may have changed (`before`: its owners until now). When they did, its
+   * call-sign family is checked: the Network desk hears once if X.1 and a station sharing its call
+   * sign no longer have an owner in common. The change itself has happened: a failed check is
+   * logged, never the request's error.
+   */
+  async function ownersChanged(stationId: string, before: string[]) {
+    const after = await service.stationMemberIds(stationId, ["owner"]);
+    if (before.length === after.length && before.every((u) => after.includes(u))) return;
+    await services.stations.checkCallSignOwners(stationId, { before, after }).catch((error) => console.error(`[accounts] call sign owners check for ${stationId} failed`, error));
+  }
 
   /** The team an invite is for, as its page names it. */
   async function inviteTeam(row: typeof schema.invites.$inferSelect): Promise<InvitePreview["team"]> {

@@ -7,7 +7,7 @@
 // station puts it on the board, signing it on moves the creator to On air, a claim takes it off
 // held earnings.
 
-import type { Creator, CreatorWork, HeldEarnings, Market, MarketBoard, PermissionPage, Recipe, StationIdent } from "@opencast/contracts";
+import type { CallSignOwnersApart, Creator, CreatorWork, HeldEarnings, Market, MarketBoard, PermissionPage, Recipe, StationIdent } from "@opencast/contracts";
 import { now } from "../../lib/clock";
 import { seedCreators, seedRequests, seedWorks, type DbCreator, type DbRequest, type DbWork } from "./fixtures/creators";
 import { ESCROW, seedBalances, type DbBalance } from "./fixtures/held";
@@ -46,7 +46,7 @@ export interface Db {
   seq: number;
 }
 
-export const DB_VERSION = 8;
+export const DB_VERSION = 9;
 export const DB_KEY = "oc-mock-desk-db";
 
 export function seed(): Db {
@@ -335,8 +335,22 @@ export function boardView(market: Market, band: "tv" | "radio"): MarketBoard {
       deadAirComing: dead(band),
       waitlistHere: d.reservations.filter((r) => r.marketId === market.id).length,
       market: { localShareOfTonightPercent: anyOnAir ? (share?.market ?? null) : null, claimableOnAir: claimable("tv") + claimable("radio"), deadAirComing: [...dead("tv"), ...dead("radio")] }
-    }
+    },
+    ownersApart: band === "tv" ? ownersApartIn(market.id) : []
   };
+}
+
+/** A234: full stations sharing X.1's call sign whose owners no longer match X.1's, longest apart first (as the API answers). */
+export function ownersApartIn(marketId: string): CallSignOwnersApart[] {
+  const d = getDb();
+  return d.stations
+    .filter((s) => s.marketId === marketId && s.ident.kind === "station" && s.sharesCallSignWith && s.ownersSplitAt)
+    .sort((a, b) => Date.parse(a.ownersSplitAt!) - Date.parse(b.ownersSplitAt!))
+    .flatMap((m) => {
+      const head = stationById(m.sharesCallSignWith);
+      if (!head) return [];
+      return [{ head: head.ident, member: m.ident, since: m.ownersSplitAt!, headOwners: head.owners ?? [], memberOwners: m.owners ?? [], fixed: m.firstSignedOnAt !== null }];
+    });
 }
 
 export function heldView(): HeldEarnings {

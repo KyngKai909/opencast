@@ -404,10 +404,12 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
     async board(marketSlug, band) {
       const market = await services.network.marketBySlug(marketSlug);
       if (!market) throw notFound("That market");
-      const [stations, held, waitlistHere] = await Promise.all([
+      const [stations, held, waitlistHere, ownersApart] = await Promise.all([
         services.stations.inMarkets([market.id]),
         services.waitlist.heldChannels(market.id, band),
-        services.waitlist.countInMarket(market.id)
+        services.waitlist.countInMarket(market.id),
+        // A234: only TV has subchannels.
+        band === "tv" ? services.stations.callSignOwnersApart(market.id) : Promise.resolve([])
       ]);
       const onDial = stations.filter((s) => s.ident.band);
       const onBand = onDial.filter((s) => s.ident.band === band);
@@ -499,7 +501,8 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
             claimableOnAir: claimableOnAir(onDial),
             deadAirComing: deadAir
           }
-        }
+        },
+        ownersApart
       };
     },
 
@@ -980,6 +983,7 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
       if (event.type === "ready") await db.update(HO).set({ payableAfter: event.readyAt }).where(eq(HO.id, open.id));
       if (event.type === "cancelled") await db.update(HO).set({ cancelledAt: deps.clock.now(), cancelReason: "Cancelled by a verifier" }).where(eq(HO.id, open.id));
       if (event.type === "paid" && event.reason !== "unclaimed") {
+        const before = await services.accounts.stationMemberIds(stationId, ["owner"]);
         await db.transaction(async (tx) => {
           await tx.update(HO).set({ completedAt: deps.clock.now() }).where(eq(HO.id, open.id));
           await tx.update(CR).set({ stage: "claimed", nextAction: null }).where(eq(CR.id, open.creatorId));
@@ -989,6 +993,11 @@ export function createDesk({ deps, services }: ModuleContext): DeskPart {
             if (open.claimantUserId) await services.accounts.addStationMember(tx, stationId, open.claimantUserId, "owner");
           }
         });
+        // A234: a new owner; a call-sign family (none yet for a claimed station) hears if owners now differ.
+        if (event.reason === "claim") {
+          const after = await services.accounts.stationMemberIds(stationId, ["owner"]);
+          await services.stations.checkCallSignOwners(stationId, { before, after }).catch((error) => console.error(`[desk] call sign owners check for ${stationId} failed`, error));
+        }
         if (event.reason === "stop") await services.playout.signOff(stationId, true);
       }
     },

@@ -82,6 +82,16 @@ export interface StationProfile {
   sharesCallSignWith: string | null;
 }
 
+/** A234: a station sharing X.1's call sign whose owners no longer match X.1's (contracts `CallSignOwnersApart`). */
+export interface CallSignOwnersApartView {
+  head: StationIdent;
+  member: StationIdent;
+  since: string;
+  headOwners: string[];
+  memberOwners: string[];
+  fixed: boolean;
+}
+
 export interface StationsService {
   idents(ids: string[]): Promise<Map<string, StationIdent>>;
   kindOf(stationId: string): Promise<StationKind | null>;
@@ -107,6 +117,17 @@ export interface StationsService {
   familyIds(stationId: string): Promise<Set<string>>;
   /** A229: X.1 and the stations sharing its call sign now (not signed off for good), by any of them; null when it shares nothing. */
   callSignFamily(stationId: string): Promise<{ head: StationProfile; members: StationProfile[] } | null>;
+  /**
+   * A234 (added 2026-09-30): after a station's owners changed (`change`: its owners before and
+   * after, for the notice's words), whether X.1 and each full station sharing its call sign still
+   * have an owner in common. A member that no longer does is marked (`owners_split_at`) and the
+   * Network desk told once (`station.call_sign_owners`); one that does again is cleared, so a
+   * later split is told again. Nothing on air changes: no call sign changes, nothing is unlinked.
+   * External families, and stations that share nothing, are left alone.
+   */
+  checkCallSignOwners(stationId: string, change?: { before: string[]; after: string[] }): Promise<void>;
+  /** A234: a market's full stations sharing X.1's call sign whose owners no longer match X.1's, longest apart first. */
+  callSignOwnersApart(marketId: string): Promise<CallSignOwnersApartView[]>;
   /** Added 2026-09-29 (reserved call signs): of these call signs, the ones a station has. */
   takenCallSigns(callSigns: string[]): Promise<Set<string>>;
   search(q: string, marketId?: string): Promise<{ tuneTo: StationProfile | null; stations: StationProfile[] }>;
@@ -483,6 +504,49 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
 
   const newKey = (prefix: string) => `${prefix.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 20)}-${randomBytes(12).toString("hex")}`;
 
+  /**
+   * A234: the notice's words when a member no longer shares an owner with X.1: "12.2 BEAT Beat
+   * Tapes no longer shares an owner with 12.1 BEAT Inland Beat", what changed, who owns each now,
+   * and that nothing changes by itself.
+   */
+  async function ownersApartWords(p: {
+    head: typeof S.$inferSelect;
+    member: typeof S.$inferSelect;
+    headOwners: string[];
+    memberOwners: string[];
+    changed: string;
+    change?: { before: string[]; after: string[] };
+  }): Promise<{ title: string; body: string }> {
+    const idents = await service.idents([p.head.id, p.member.id]);
+    const h = idents.get(p.head.id);
+    const m = idents.get(p.member.id);
+    const short = (i: StationIdent | undefined, row: typeof S.$inferSelect) => [i?.channel, row.callSign].filter(Boolean).join(" ");
+    const full = (i: StationIdent | undefined, row: typeof S.$inferSelect) => [short(i, row), row.name].filter(Boolean).join(" ");
+    const people = await services.accounts.peopleByIds([...p.headOwners, ...p.memberOwners, ...(p.change?.before ?? []), ...(p.change?.after ?? [])]);
+    const name = (u: string) => people.get(u)?.name ?? "Someone on the team";
+    const list = (ids: string[]) => {
+      const n = ids.map(name);
+      return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}` : (n[0] ?? "");
+    };
+    const owns = (ids: string[], what: string) => (ids.length ? `${list(ids)} ${ids.length === 1 ? "owns" : "own"} ${what}` : `Nobody owns ${what}`);
+    const changedRow = p.changed === p.head.id ? p.head : p.member;
+    const changedName = short(changedRow === p.head ? h : m, changedRow);
+    let what = "";
+    if (p.change) {
+      const gone = p.change.before.filter((u) => !p.change!.after.includes(u));
+      const added = p.change.after.filter((u) => !p.change!.before.includes(u));
+      if (gone.length && added.length) what = `Ownership of ${changedName} moved from ${list(gone)} to ${list(added)}.`;
+      else if (gone.length) what = `${list(gone)} no longer ${gone.length === 1 ? "owns" : "own"} ${changedName}.`;
+      else if (added.length) what = `${list(added)} now ${added.length === 1 ? "owns" : "own"} ${changedName}.`;
+    }
+    const now = `${owns(p.memberOwners, short(m, p.member))}. ${owns(p.headOwners, short(h, p.head))}.`;
+    const channel = m?.channel ?? "It";
+    const after = p.member.firstSignedOnAt
+      ? `${p.member.callSign} is fixed on air, so nothing changes by itself. Whether ${channel} keeps it is for you and the owners to decide.`
+      : `Nothing changes by itself. Before ${channel} signs on, its owner can give it a call sign of its own.`;
+    return { title: `${full(m, p.member)} no longer shares an owner with ${full(h, p.head)}`, body: [what, now, after].filter(Boolean).join(" ") };
+  }
+
   const service: StationsService = {
     ...createRelayBackgrounds({ deps, services }),
 
@@ -583,6 +647,72 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       if (!head) return null;
       const tenths = (p: StationProfile) => (p.ident.channel ? Math.round(Number(p.ident.channel) * 10) : 0);
       return { head, members: members.flatMap((m) => all.get(m.id) ?? []).sort((a, b) => tenths(a) - tenths(b)) };
+    },
+
+    async checkCallSignOwners(stationId, change) {
+      const [row] = await db.select({ id: S.id, head: S.sharesCallSignWith }).from(S).where(eq(S.id, stationId));
+      if (!row) return;
+      const headId = row.head ?? row.id;
+      const [head] = await db.select().from(S).where(eq(S.id, headId));
+      // Only an owner's own stations share by owner; an external family is the desk's own (A229).
+      if (!head || head.kind !== "station") return;
+      // Signed off for good: archived, as the family check treats it.
+      const members = await db
+        .select()
+        .from(S)
+        .where(and(eq(S.sharesCallSignWith, headId), eq(S.kind, "station"), sql`${S.status} <> 'signed_off'`));
+      if (!members.length) return;
+      const ownersOf = new Map<string, string[]>();
+      for (const id of [headId, ...members.map((m) => m.id)]) ownersOf.set(id, await services.accounts.stationMemberIds(id, ["owner"]));
+      const headOwners = new Set(ownersOf.get(headId));
+      for (const m of members) {
+        const together = ownersOf.get(m.id)!.some((u) => headOwners.has(u));
+        if (together) {
+          // An owner in common again: the next split is told again.
+          if (m.ownersSplitAt) await db.update(S).set({ ownersSplitAt: null }).where(eq(S.id, m.id));
+          continue;
+        }
+        // Told already for this split.
+        if (m.ownersSplitAt) continue;
+        const at = deps.clock.now();
+        const [marked] = await db
+          .update(S)
+          .set({ ownersSplitAt: at })
+          .where(and(eq(S.id, m.id), isNull(S.ownersSplitAt)))
+          .returning({ id: S.id });
+        if (!marked) continue;
+        const words = await ownersApartWords({ head, member: m, headOwners: ownersOf.get(headId)!, memberOwners: ownersOf.get(m.id)!, changed: stationId, change });
+        deps.bus.emit("station.call_sign_owners", {
+          stationId: m.id,
+          headId,
+          step: "split",
+          title: words.title,
+          body: words.body,
+          dedupeKey: `call-sign-owners:${m.id}:${at.getTime()}`
+        });
+      }
+    },
+
+    async callSignOwnersApart(marketId) {
+      const apart = await db
+        .select({ id: S.id, head: S.sharesCallSignWith, since: S.ownersSplitAt, firstSignedOnAt: S.firstSignedOnAt })
+        .from(S)
+        .innerJoin(C, and(eq(C.stationId, S.id), eq(C.isPrimary, true), isNull(C.releasedAt)))
+        .where(and(eq(C.marketId, marketId), isNotNull(S.ownersSplitAt), isNotNull(S.sharesCallSignWith), eq(S.kind, "station"), sql`${S.status} <> 'signed_off'`))
+        .orderBy(asc(S.ownersSplitAt));
+      if (!apart.length) return [];
+      const heads = [...new Set(apart.map((a) => a.head!))];
+      const idents = await service.idents([...heads, ...apart.map((a) => a.id)]);
+      const owners = new Map<string, string[]>();
+      for (const id of [...heads, ...apart.map((a) => a.id)]) owners.set(id, await services.accounts.stationMemberIds(id, ["owner"]));
+      const people = await services.accounts.peopleByIds([...owners.values()].flat());
+      const names = (id: string) => (owners.get(id) ?? []).map((u) => people.get(u)?.name ?? "Someone on the team");
+      return apart.flatMap((a) => {
+        const head = idents.get(a.head!);
+        const member = idents.get(a.id);
+        if (!head || !member) return [];
+        return [{ head, member, since: a.since!.toISOString(), headOwners: names(a.head!), memberOwners: names(a.id), fixed: a.firstSignedOnAt !== null }];
+      });
     },
 
     async takenCallSigns(callSigns) {
@@ -965,7 +1095,11 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (input.colour !== undefined) patch.colour = input.colour.toUpperCase();
         if (input.callSign !== undefined) patch.callSign = input.callSign;
         // A229: a station sharing X.1's call sign that takes its own stops sharing (before sign-on only).
-        if (changingSign && current.sharesCallSignWith) patch.sharesCallSignWith = null;
+        if (changingSign && current.sharesCallSignWith) {
+          patch.sharesCallSignWith = null;
+          // A234: out of the family, owners that differed from X.1's no longer matter.
+          patch.ownersSplitAt = null;
+        }
         if (input.bug?.mode !== undefined) patch.bugMode = input.bug.mode;
         if (input.bug?.position !== undefined) patch.bugPosition = input.bug.position;
         if (input.bug?.opacity !== undefined) patch.bugOpacity = input.bug.opacity;
@@ -1097,10 +1231,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
           await tx.insert(C).values({ stationId, marketId: input.marketId, band: input.band, tenths: number.tenths });
         }
         if (share) {
-          await tx.update(S).set({ callSign: head!.ident.callSign, sharesCallSignWith: head!.id, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
+          // A234: a new link is made with an owner in common (the database checks it); one moving within its family keeps its mark.
+          const relinked = station.sharesCallSignWith !== head!.id;
+          await tx.update(S).set({ callSign: head!.ident.callSign, sharesCallSignWith: head!.id, ...(relinked ? { ownersSplitAt: null } : {}), updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
         } else if (station.sharesCallSignWith) {
           // It stops sharing: it chooses its own call sign next.
-          await tx.update(S).set({ callSign: null, sharesCallSignWith: null, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
+          await tx.update(S).set({ callSign: null, sharesCallSignWith: null, ownersSplitAt: null, updatedAt: deps.clock.now() }).where(eq(S.id, stationId));
         }
         // Another than the channel held with its waitlist call sign: the held one goes (added 2026-09-29).
         await services.waitlist.releaseOtherChannels(tx, stationId, { marketId: input.marketId, band: input.band, tenths: number.tenths });

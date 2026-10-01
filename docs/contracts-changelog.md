@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-09-30: A shared call sign whose stations no longer share an owner (A234)
+
+Additive: one notice kind, one optional field on the market board, one new schema. Migration **0043** (after 0042, named by hand): `broadcast.stations.owners_split_at`.
+
+- `notifications.ts`: `NoticeKind` gains `call_sign_owners` (the Network desk, station scope: "12.2 BEAT Beat Tapes no longer shares an owner with 12.1 BEAT Inland Beat", what changed, who owns each now; push and email on by default; the link opens the market board on the channel, `/desk/markets/{market}/board?ch=12`).
+- `network.ts`: new `CallSignOwnersApart` `{ head, member, since, headOwners, memberOwners, fixed }` (`StationIdent`s, when they split, owners' names, whether the member's call sign is fixed). `MarketBoard` gains optional `ownersApart` (`CallSignOwnersApart[]`, longest apart first; on the TV band, empty on radio).
+- Behaviour: when a full station's owners change (ownership moved with `transferStationOwnership`, an owner taking an invite to their own station's team, a claim paid to its creator) and X.1 and a station sharing its call sign no longer have an owner in common, the Network desk is told once; a later change while they're apart says nothing more, an owner in common again clears it, and a split after that is told again. Nothing changes on air: no call sign changes and nothing is unlinked. External families and stations that share nothing are left alone. A member taking a call sign of its own (before its first sign-on) or moving to another family is no longer flagged. Notices' email links to a Network desk page (`/desk/…`) now open that page (they opened master control before, also for `external_station`).
+
 ## 2026-09-30: Shared call signs (A229 to A235), and a full station's channel after signing off (A223)
 
 Additive: new optional fields and body fields, one new rule. Migration **0042** (after 0041, named by hand): `broadcast.stations.shares_call_sign_with` (the X.1 station whose call sign a station on X.n shares), the unique index `stations_call_sign` now partial (members left out), the foreign key and commit-time checks that keep sharing to X.n beside X.1 in one market and major (both external, or both the same owner's full stations); `network.listed_sources.removed_with`.

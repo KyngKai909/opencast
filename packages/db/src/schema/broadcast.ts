@@ -64,6 +64,13 @@ export const stations = broadcast.table(
      * follows X.1's (on update cascade).
      */
     sharesCallSignWith: uuid("shares_call_sign_with"),
+    /**
+     * A234 (added 2026-09-30, migration 0043): on a full station sharing X.1's call sign, since when
+     * no one owns both (an owner's change left them apart); null while they have an owner in common,
+     * or when it shares nothing. Set once per split, when the Network desk is told, and cleared when
+     * they have an owner in common again. Nothing else changes: the call sign stays shared.
+     */
+    ownersSplitAt: at("owners_split_at"),
     /** A studio's short handle in place of a call sign. */
     handle: text("handle"),
     name: text("name").notNull(),

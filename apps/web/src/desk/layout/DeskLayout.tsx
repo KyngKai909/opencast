@@ -1,7 +1,8 @@
 // Network desk's frame: DeskShell (the raised header with the amber Internal sign, "Opencast team"
 // and the avatar; the fixed rail with its mono counts) around every page. The rail's counts:
 // Creator pipeline, the yeses not set up yet (the board's figure); External sources, sources not on
-// the dial yet; Held earnings, the total held; Reserved call signs, the market's reservations.
+// the dial yet; Held earnings, the total held; Reserved call signs, the market's reservations;
+// Market board (A234), shared call signs whose stations no longer share an owner.
 
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router";
@@ -50,11 +51,15 @@ export function DeskLayout() {
   const listed = useApi(networkApi.listListedSources, { query: { marketId: market?.id } }, { enabled: !!market });
   const held = useApi(networkApi.heldEarnings, {});
   const reserved = useApi(waitlistApi.listReservations, { query: { marketId: market?.id } }, { enabled: !!market });
+  // The board's own TV answer (the same query the board asks), for its flags.
+  const board = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "tv" } }, { enabled: !!market });
 
   const yeses = creators.data?.filter((c) => c.stage === "said_yes" && !c.station).length;
   // External stations off the dial: waiting for their evidence, held by a rule, or hidden while down (Phase 6).
   const notListed = listed.data?.filter((l) => (l.onDial ?? l.listingState === "listed") === false).length;
+  const apart = board.data?.ownersApart?.length;
   const items: ShellItems<DeskPage> = {
+    "market-board": apart ? { count: String(apart), countLabel: `${apart} shared call ${apart === 1 ? "sign" : "signs"} to look at` } : {},
     "creator-pipeline": yeses ? { count: String(yeses), countLabel: `${yeses} ${yeses === 1 ? "yes" : "yeses"} to set up` } : {},
     "listed-sources": notListed ? { count: String(notListed), countLabel: `${notListed} not on the dial` } : {},
     "held-earnings": held.data ? { count: railAmount(held.data.totalHeldMicros), countLabel: `${money(held.data.totalHeldMicros)} held` } : {},

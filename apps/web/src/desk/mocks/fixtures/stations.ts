@@ -20,6 +20,10 @@ export interface DbStation {
   signOnAt: string | null;
   /** A229: the station on X.1 whose call sign this one shares (15.3 RIVC beside 15.1 RIVC). */
   sharesCallSignWith?: string | null;
+  /** A234: who owns a full station, by name (the board names them when a family's owners differ). */
+  owners?: string[];
+  /** A234: on a full station sharing X.1's call sign, since when no one owns both. */
+  ownersSplitAt?: string | null;
 }
 
 type Kind = StationIdent["kind"];
@@ -44,8 +48,13 @@ export const STATION_IDS = {
   // A201: a public-access channel's DASH stream link on 9.7 (a mock station).
   LOMA: U(197),
   // A229: Riverside County's streams sharing one call sign on 15 (15.2 is listed in the demo).
-  RIVC: U(151), RIVC_LIB: U(153)
+  RIVC: U(151), RIVC_LIB: U(153),
+  // A234: Beat Tapes shares 12.1 BEAT's call sign; its owner since Friday isn't BEAT's.
+  BEAT_TAPES: U(122)
 };
+
+/** A234: Friday, September 25, 4:10 pm in the Inland Empire: Kai M. handed Beat Tapes to Jen Park. */
+export const BEAT_TAPES_SPLIT = "2026-09-25T23:10:00.000Z";
 
 /** Monday, September 28, 6:00 am in the Inland Empire: LUPE's first sign-on. */
 export const LUPE_SIGN_ON = "2026-09-28T13:00:00.000Z";
@@ -58,7 +67,10 @@ export function seedStations(): DbStation[] {
     st(104, IE.id, "listed", "tv", "9.3", "SBCO", "San Bernardino County", null, {}, "San Bernardino"),
     // Being checked: not on the dial yet, so no channel (N8 asks for this to be allowed).
     st(105, IE.id, "listed", "tv", null, "RUSD", "Riverside Unified School District", null, { public: false, firstSignedOnAt: null }, "Riverside"),
-    st(106, IE.id, "station", "tv", "12.1", "BEAT", "Inland Beat", "#8C3B7A", {}, "Redlands"),
+    st(106, IE.id, "station", "tv", "12.1", "BEAT", "Inland Beat", "#8C3B7A", { owners: ["Kai M."] }, "Redlands"),
+    // A230, A234: Kai M.'s second station shares BEAT's call sign on 12.2; Jen Park owns it now, so
+    // nobody owns both (the board flags it; the call sign stays: it's fixed on air).
+    st(122, IE.id, "station", "tv", "12.2", "BEAT", "Beat Tapes", "#8C3B7A", { sharesCallSignWith: U(106), owners: ["Jen Park"], ownersSplitAt: BEAT_TAPES_SPLIT, firstSignedOnAt: "2026-09-01T13:00:00.000Z" }, "Redlands"),
     st(107, IE.id, "station", "tv", "18.1", "SAZN", "Sazón", "#A3402A", {}, "Fontana"),
     st(108, IE.id, "station", "tv", "24.1", "REEL", "Reel Inland", "#9A5412", {}, "Riverside"),
     st(109, IE.id, "station", "tv", "31.1", "PREP", "Prep Sports Weekly", "#1F5E8C", {}, "Riverside"),

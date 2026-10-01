@@ -79,6 +79,20 @@ export interface Events {
     body: string;
     dedupeKey: string;
   };
+  /**
+   * A234 (added 2026-09-30): a full station sharing X.1's call sign (`stationId`) no longer has an
+   * owner in common with X.1 (`headId`), after an owner changed. Once per split (`dedupeKey` carries
+   * when it split); nothing is emitted while they stay apart, or when they have an owner in common
+   * again. The Network desk hears. Worded where it happens.
+   */
+  "station.call_sign_owners": {
+    stationId: string;
+    headId: string;
+    step: "split";
+    title: string;
+    body: string;
+    dedupeKey: string;
+  };
 }
 
 type Handler<K extends keyof Events> = (payload: Events[K]) => Promise<void> | void;

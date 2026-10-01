@@ -1,14 +1,15 @@
 // The selected slot's line under the board (network-desk 01.1 .row2): what's on it, and where to go
-// from here. Opening a slot with subchannels lists them (9.1, 9.2, 9.3).
+// from here. Opening a slot with subchannels lists them (9.1, 9.2, 9.3). A234: a station sharing
+// X.1's call sign whose owners no longer include anyone who owns X.1 says so on its line.
 
 import { Button, clock, KeyValueList, type KeyValueRow } from "@opencast/ui";
 import { now } from "../../../lib/clock";
 import { dayMonth, dayWord } from "../../lib/dates";
-import { slotNumber } from "./board";
+import { ownersApartDetail, ownersApartOn, slotNumber } from "./board";
 import "./SlotDetail.css";
 import { controlPath } from "../../../areas";
 import { deskPath } from "../../../areas";
-import type { Creator } from "@opencast/contracts";
+import type { CallSignOwnersApart, Creator, StationIdent } from "@opencast/contracts";
 import type { BoardSlot } from "../../api/types";
 
 export interface SlotDetailProps {
@@ -18,22 +19,27 @@ export interface SlotDetailProps {
   timeZone: string;
   /** The claimable station's creator, from the pipeline (N7's creatorId, or by station). */
   creator: Creator | undefined;
+  /** A234: the board's stations sharing X.1's call sign whose owners no longer match X.1's. */
+  ownersApart?: CallSignOwnersApart[];
 }
 
 export function controlHref(callSign: string | null | undefined): string {
   return controlPath(callSign ? `/${callSign}/monitor` : "");
 }
 
-function openInControl(callSign: string | null | undefined) {
+function openInControl(callSign: string | null | undefined, label = "Open in master control") {
   return (
     <Button size="sm" href={controlHref(callSign)} target="_blank" rel="noopener">
-      Open in master control
+      {label}
     </Button>
   );
 }
 
+/** A station's part of master control's address: a family member's carries its channel ("beat-12-2", A229). */
+const controlRef = (s: StationIdent | undefined) => (s?.sharesCallSign && s.slug ? s.slug : s?.callSign);
+
 export function slotLines(p: SlotDetailProps): KeyValueRow[] {
-  const { slot, band, creator, timeZone, marketSlug } = p;
+  const { slot, band, creator, timeZone, marketSlug, ownersApart } = p;
   const first = slot.stations[0];
   const heading = first && slot.stations.length === 1 ? `${first.channel} ${first.callSign ?? first.name}, selected` : `${slotNumber(slot, band)}, selected`;
   switch (slot.state) {
@@ -53,8 +59,24 @@ export function slotLines(p: SlotDetailProps): KeyValueRow[] {
       const pipelineHref = deskPath(creator ? `/markets/${marketSlug}/pipeline/${creator.id}/setup` : `/markets/${marketSlug}/pipeline`);
       return [{ title: heading, detail, actions: (<>{openInControl(first?.callSign)}<Button size="sm" href={pipelineHref}>Pipeline</Button></>) }];
     }
-    case "station":
-      return [{ title: heading, detail: `Independent station. ${first?.name ?? ""}${first?.homeCity ? `, ${first.homeCity}` : ""}`, actions: openInControl(first?.callSign) }];
+    case "station": {
+      const line = { title: heading, detail: `Independent station. ${first?.name ?? ""}${first?.homeCity ? `, ${first.homeCity}` : ""}`, actions: openInControl(controlRef(first)) };
+      if (slot.stations.length < 2) return [line];
+      // Subchannels: each its own line, and a station whose owners no longer match X.1's says so (A234).
+      const apart = ownersApartOn(ownersApart, slot);
+      return [
+        // Each subchannel opens its own master control below.
+        { title: heading, detail: `Independent stations. ${first?.name ?? ""}${first?.homeCity ? `, ${first.homeCity}` : ""}` },
+        ...slot.stations.map((s) => {
+          const a = apart.get(s.id);
+          return {
+            title: `${s.channel} ${s.callSign ?? s.name}`,
+            detail: a ? `${s.name}. No longer shares an owner with ${a.head.channel} ${a.head.callSign}. ${ownersApartDetail(a, timeZone)}` : s.name,
+            actions: openInControl(controlRef(s), `Open ${s.channel}`)
+          };
+        })
+      ];
+    }
     case "catalog":
       return [{ title: heading, detail: `Opencast catalog. ${first?.name ?? ""}`, actions: openInControl(first?.callSign) }];
     case "listed":

@@ -71,6 +71,23 @@ describe("the board", () => {
     expect(radio.stats.deadAirComing.map((s) => s.callSign)).toEqual(["HALL"]);
   });
 
+  it("flags 12.2 BEAT, which no longer shares an owner with 12.1 BEAT (A234), on the TV band only", async () => {
+    const tv = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "tv" } })).json);
+    const radio = MarketBoard.parse((await api("GET", "/admin/markets/inland-empire/board", { query: { band: "radio" } })).json);
+    expect(tv.slots.find((s) => s.major === 12)!.stations.map((s) => `${s.channel} ${s.callSign} ${s.slug}`)).toEqual(["12.1 BEAT beat", "12.2 BEAT beat-12-2"]);
+    expect(tv.ownersApart).toEqual([
+      {
+        head: expect.objectContaining({ callSign: "BEAT", channel: "12.1", name: "Inland Beat" }),
+        member: expect.objectContaining({ callSign: "BEAT", channel: "12.2", name: "Beat Tapes", sharesCallSign: true }),
+        since: "2026-09-25T23:10:00.000Z",
+        headOwners: ["Kai M."],
+        memberOwners: ["Jen Park"],
+        fixed: true
+      }
+    ]);
+    expect(radio.ownersApart).toEqual([]);
+  });
+
   it("has nothing on Los Angeles yet", async () => {
     const tv = MarketBoard.parse((await api("GET", "/admin/markets/los-angeles/board")).json);
     expect(tv.slots.every((s) => s.state === "open")).toBe(true);

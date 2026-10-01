@@ -34,7 +34,8 @@ type Kind =
   | "spot_added"
   | "station_account"
   | "relay"
-  | "external_station";
+  | "external_station"
+  | "call_sign_owners";
 
 type Scope = { kind: "viewer" | "station" | "business"; id: string | null };
 
@@ -89,7 +90,9 @@ const DEFAULTS: Record<Scope["kind"], Prefs> = {
     // Relays (2026-09-30): a relay stopped or came back, a restart the station has to do, paid promotion to mark.
     relay: { push: true, email: false },
     // External stations (2026-09-30): the Network desk, when one leaves the dial for a stream that's down and when it's back.
-    external_station: { push: true, email: true }
+    external_station: { push: true, email: true },
+    // A234 (2026-09-30): the Network desk, when a station sharing X.1's call sign no longer shares an owner with it.
+    call_sign_owners: { push: true, email: true }
   },
   business: {
     low_balance: { push: true, email: true },
@@ -185,6 +188,8 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
    */
   async function emailLink(scope: Scope, link: string | null): Promise<string | null> {
     if (!link || /^https?:\/\//.test(link)) return link;
+    // A Network desk page (`/desk/…`): the desk is in the app, whatever the notice's scope.
+    if (link === "/desk" || link.startsWith("/desk/")) return `${appOrigin}${link}`;
     if (scope.kind === "business" && scope.id) {
       const [path, query = ""] = link.split("?");
       const parts = path!.split("/").filter(Boolean);
@@ -530,6 +535,21 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
       title: e.title,
       body: e.body,
       link: `/desk/markets/${ident?.marketSlug ?? ""}/listed`,
+      scope: { kind: "station", id: e.stationId },
+      dedupeKey: e.dedupeKey
+    });
+  });
+
+  // A234 (added 2026-09-30): the Network desk, when a full station sharing X.1's call sign no longer
+  // shares an owner with it. The link opens the market board on that channel.
+  deps.bus.on("station.call_sign_owners", async (e) => {
+    const ident = (await services.stations.idents([e.stationId])).get(e.stationId);
+    const major = ident?.channel?.split(".")[0];
+    await service.notify(await services.accounts.adminIds(), {
+      kind: "call_sign_owners",
+      title: e.title,
+      body: e.body,
+      link: ident?.marketSlug ? `/desk/markets/${ident.marketSlug}/board${major ? `?ch=${major}` : ""}` : "/desk",
       scope: { kind: "station", id: e.stationId },
       dedupeKey: e.dedupeKey
     });

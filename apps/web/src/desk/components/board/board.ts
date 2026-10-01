@@ -2,8 +2,9 @@
 // shows one set for the market. Counts add up across bands; the local share can't be added without
 // hours, so it's the market-wide figure when the API sends one (N7), otherwise the TV band's.
 
-import { type MarketBoard, SLOT_STATE_LABELS, type StationIdent } from "@opencast/contracts";
+import { type CallSignOwnersApart, type MarketBoard, SLOT_STATE_LABELS, type StationIdent } from "@opencast/contracts";
 import type { BoardSlot } from "../../api/types";
+import { dayMonth } from "../../lib/dates";
 
 export interface Coverage {
   localSharePercent: number | null;
@@ -98,4 +99,50 @@ export function slotLabel(slot: BoardSlot, band: "tv" | "radio"): string {
   const cs = slotCallSign(slot);
   const n = slotNumber(slot, band).replace("–", " to ");
   return [`${band === "radio" ? "" : "Channel "}${n}`, cs, SLOT_STATE_LABELS[slot.state]].filter(Boolean).join(", ");
+}
+
+// ---- A234 (added 2026-09-30): a shared call sign whose stations no longer share an owner ----
+
+/** "12.2 BEAT": a station by channel and call sign, as the board's lines name them. */
+export function channelAndCall(s: Pick<StationIdent, "callSign" | "channel" | "name">): string {
+  return [s.channel, s.callSign ?? s.name].filter(Boolean).join(" ");
+}
+
+/** "Kai M.", "Kai M. and Jen Park", "Ana, Kai M. and Jen Park". */
+function names(list: string[]): string {
+  return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : (list[0] ?? "");
+}
+
+/** "Jen Park owns 12.2", "Nobody owns 12.2". */
+function owns(owners: string[], channel: string): string {
+  return owners.length ? `${names(owners)} ${owners.length === 1 ? "owns" : "own"} ${channel}` : `Nobody owns ${channel}`;
+}
+
+/** "12.2 BEAT Beat Tapes no longer shares an owner with 12.1 BEAT Inland Beat" (the notice's title too). */
+export function ownersApartTitle(a: CallSignOwnersApart): string {
+  return `${channelAndCall(a.member)} ${a.member.name} no longer shares an owner with ${channelAndCall(a.head)} ${a.head.name}`;
+}
+
+/**
+ * Since when, who owns each now, and what happens next (nothing by itself): "Since September 30.
+ * Jen Park owns 12.2, Kai M. owns 12.1. BEAT is fixed on air, so nothing changes by itself".
+ */
+export function ownersApartDetail(a: CallSignOwnersApart, timeZone: string): string {
+  const m = a.member.channel ?? a.member.name;
+  const h = a.head.channel ?? a.head.name;
+  const next = a.fixed
+    ? `${a.member.callSign} is fixed on air, so nothing changes by itself`
+    : `Nothing changes by itself. Before ${m} signs on, its owner can give it a call sign of its own`;
+  return `Since ${dayMonth(a.since, timeZone)}. ${owns(a.memberOwners, m)}, ${owns(a.headOwners, h).replace(/^Nobody/, "nobody")}. ${next}`;
+}
+
+/** The board's slot for a split (its major): "12". */
+export function ownersApartSlot(a: CallSignOwnersApart): string {
+  return (a.head.channel ?? a.member.channel ?? "").split(".")[0] ?? "";
+}
+
+/** The splits on a slot, by the member's id. */
+export function ownersApartOn(list: CallSignOwnersApart[] | undefined, slot: Pick<BoardSlot, "stations">): Map<string, CallSignOwnersApart> {
+  const ids = new Set(slot.stations.map((s) => s.id));
+  return new Map((list ?? []).filter((a) => ids.has(a.member.id)).map((a) => [a.member.id, a]));
 }

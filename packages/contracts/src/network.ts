@@ -14,6 +14,25 @@ export const SLOT_STATE_LABELS = {
   open: "Open"
 } as const;
 
+/**
+ * A234 (added 2026-09-30): a full station sharing X.1's call sign whose owners no longer include
+ * anyone who owns X.1 (an ownership handover, an owner who left). Nothing changes on air by itself;
+ * the Network desk decides with the owners. Gone again once they have an owner in common.
+ */
+export const CallSignOwnersApart = z.object({
+  /** The station on X.1 ("12.1 BEAT"). */
+  head: StationIdent,
+  /** The station sharing its call sign ("12.2 BEAT"). */
+  member: StationIdent,
+  /** When they stopped having an owner in common (the desk was told then). */
+  since: Timestamp,
+  /** Who owns each now, by name (empty when nobody does). */
+  headOwners: z.array(z.string()),
+  memberOwners: z.array(z.string()),
+  /** The member's call sign is fixed (it has signed on), so only the desk and its owners can change it. */
+  fixed: z.boolean()
+});
+
 export const MarketBoard = z.object({
   market: Market,
   band: Band,
@@ -41,7 +60,12 @@ export const MarketBoard = z.object({
     market: z
       .object({ localShareOfTonightPercent: z.number().nullable(), claimableOnAir: z.number().int(), deadAirComing: z.array(StationIdent) })
       .optional()
-  })
+  }),
+  /**
+   * A234 (added 2026-09-30): stations sharing X.1's call sign whose owners no longer match X.1's, on
+   * this band (TV only: radio has no subchannels). Absent from an older API.
+   */
+  ownersApart: z.array(CallSignOwnersApart).optional()
 });
 
 /** N5 (added 2026-09-28): a claimable station's setup, read back. */
@@ -929,6 +953,7 @@ export const networkApi = {
 
 export type SlotState = z.infer<typeof SlotState>;
 export type MarketBoard = z.infer<typeof MarketBoard>;
+export type CallSignOwnersApart = z.infer<typeof CallSignOwnersApart>;
 export type Creator = z.infer<typeof Creator>;
 export type CreatorWork = z.infer<typeof CreatorWork>;
 export type PermissionPage = z.infer<typeof PermissionPage>;

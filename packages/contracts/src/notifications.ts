@@ -47,7 +47,13 @@ export const NoticeKind = z.enum([
    * External stations (added 2026-09-30, follow-up Phase 6), the Network desk: an external station
    * left the dial because its stream was down 5 minutes, or it's back on the dial.
    */
-  "external_station"
+  "external_station",
+  /**
+   * A234 (added 2026-09-30), the Network desk: a full station sharing X.1's call sign no longer
+   * shares an owner with X.1 ("12.2 BEAT Beat Tapes no longer shares an owner with 12.1 BEAT Inland
+   * Beat"). Once per split; nothing changes on air by itself. Push and email on by default.
+   */
+  "call_sign_owners"
 ]);
 
 export const Notice = z.object({
