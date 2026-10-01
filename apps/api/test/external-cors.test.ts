@@ -258,13 +258,16 @@ describe("another app's access (platform feeds)", () => {
   it("knows the patterns by the address alone", () => {
     expect(platformFeedOf("https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8")).toBe("jmp2.uk, which forwards to other apps' feeds");
     expect(platformFeedOf(`https://service-stitcher.clusters.pluto.tv/v2/stitch/hls/channel/5a4d3a00ad95e4718ae8d8db/master.m3u8?jwt=${SAMSUNG_JWT}`)).toBe("Pluto via Samsung TV Plus");
-    expect(platformFeedOf("https://stitcher.pluto.tv/stitch/hls/channel/abc/master.m3u8?deviceType=rokuChannel")).toBe("Pluto via The Roku Channel");
-    expect(platformFeedOf("https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/abc/master.m3u8?embedPartner=examplepartner")).toBe("Pluto via examplepartner");
+    expect(platformFeedOf("https://stitcher.pluto.tv/stitch/hls/channel/abc/master.m3u8?deviceType=rokuChannel&authToken=opaque")).toBe("Pluto via The Roku Channel");
     expect(platformFeedOf("https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/abc/master.m3u8?authToken=opaque")).toBe("Pluto via a partner app");
-    expect(platformFeedOf("https://cdn.example.net/samsungheadend_us/USBD1/playlist.m3u8")).toBe("Samsung TV Plus");
     expect(platformFeedOf(`https://cdn.example.net/live/master.m3u8?token=${testJwt({ partner: "rokuChannel" })}`)).toBe("The Roku Channel");
     // The source's own: a Pluto stitch address with nothing of another app's, a JWT naming no partner, anything else.
     expect(platformFeedOf("https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/abc/master.m3u8?deviceType=web")).toBeNull();
+    // Only a token is someone's access: partner parameters alone, or a partner's name in the path
+    // (AMC's own feed for Samsung's headend), aren't.
+    expect(platformFeedOf("https://stitcher.pluto.tv/stitch/hls/channel/abc/master.m3u8?deviceType=rokuChannel")).toBeNull();
+    expect(platformFeedOf("https://service-stitcher.clusters.pluto.tv/stitch/hls/channel/abc/master.m3u8?embedPartner=examplepartner")).toBeNull();
+    expect(platformFeedOf("https://d3f088nnrrvkwf.cloudfront.net/v1/amc_anime_x_hidive_1/samsungheadend_us/latest/main/hls/playlist.m3u8")).toBeNull();
     expect(platformFeedOf(`https://cdn.example.net/live/master.m3u8?token=${testJwt({ sub: "viewer", exp: 1 })}`)).toBeNull();
     expect(platformFeedOf("https://cdn.example.net/live/master.m3u8?token=not-a-jwt")).toBeNull();
     expect(platformFeedOf("https://news.example.com/media-manifest/streams/us.m3u8")).toBeNull();
@@ -276,8 +279,7 @@ describe("another app's access (platform feeds)", () => {
     h.deps.externalFetch = net.fn;
     const feeds = [
       ["25.1", "JUMP", "https://jmp2.uk/plu-5a4d3a00ad95e4718ae8d8db.m3u8", "jmp2.uk, which forwards to other apps' feeds"],
-      ["27.1", "PLUT", `https://service-stitcher.clusters.pluto.tv/v2/stitch/hls/channel/5a4d3a00ad95e4718ae8d8db/master.m3u8?deviceId=test&jwt=${SAMSUNG_JWT}`, "Pluto via Samsung TV Plus"],
-      ["29.1", "SAMS", "http://stream.example-cdn.com/samsungheadend_us/USBD1/playlist.m3u8", "Samsung TV Plus"]
+      ["27.1", "PLUT", `https://service-stitcher.clusters.pluto.tv/v2/stitch/hls/channel/5a4d3a00ad95e4718ae8d8db/master.m3u8?deviceId=test&jwt=${SAMSUNG_JWT}`, "Pluto via Samsung TV Plus"]
     ] as const;
     for (const [channel, callSign, url, label] of feeds) {
       const body = await add(channel, callSign, url);
@@ -320,8 +322,8 @@ describe("another app's access (platform feeds)", () => {
     const OWN = "https://change.example.org/live/master.m3u8";
     h.deps.externalFetch = fakeFetch(stream(OWN, { master: ALLOW, variant: ALLOW, segment: ALLOW }).routes).fn;
     const { id } = await add("33.1", "CHNG", OWN);
-    const away = await h.services.network.updateListedSource(null, id, { streamUrl: "https://cdn.example.net/samsungheadend_us/USBD2/playlist.m3u8" });
-    expect(away).toMatchObject({ waiting: "platform_feed", platformFeed: "Samsung TV Plus", onDial: false, cors: null });
+    const away = await h.services.network.updateListedSource(null, id, { streamUrl: "https://jmp2.uk/stvp-USBD2000001A.m3u8" });
+    expect(away).toMatchObject({ waiting: "platform_feed", platformFeed: "jmp2.uk, which forwards to other apps' feeds", onDial: false, cors: null });
     const back = await h.services.network.updateListedSource(null, id, { streamUrl: OWN });
     expect(back).toMatchObject({ waiting: null, platformFeed: null, onDial: true, cors: { state: "ok" } });
   });

@@ -3,11 +3,12 @@
 // (`waiting: "platform_feed"`), whatever their CORS, and stay listed (not removed): the desk asks the
 // channel's licensor for its own feed. One place, here, and docs/open-decisions.md (A238) lists them:
 //
-// - `jmp2.uk` (any address on it): a redirector to other apps' channel feeds.
-// - Pluto's stitcher (`*.pluto.tv`, a `stitch` host or path) carrying an app's session (`authToken`,
-//   `jwt`) or a partner's parameters (`embedPartner=…`, or `deviceType=` a partner's, like
-//   `samsung-tvplus` or `rokuChannel`).
-// - Samsung TV Plus headend paths (`samsungheadend` in the path).
+// Only addresses that carry another app's access token (narrowed 2026-10-01 at the user's request:
+// an address that merely names a partner, like AMC's own `…/samsungheadend_us/…` feed, isn't
+// using anyone's access and plays like any other):
+// - `jmp2.uk` (any address on it): a redirector that hands out Pluto feeds with Samsung TV Plus's token.
+// - Pluto's stitcher (`*.pluto.tv`, a `stitch` host or path) carrying an app's session token
+//   (`authToken`, `jwt`); the partner's parameters only name it in the desk's words.
 // - Any address with an `authToken=`, `token=` or `jwt=` that's a JWT whose payload names a partner
 //   (`partner`, `partnerId`, `partnerName`, `embedPartner`, `distributionPartner`, or a `deviceType`
 //   or `appName` that's a partner's).
@@ -80,7 +81,7 @@ function param(url: URL, name: string): string | null {
 }
 
 export interface PlatformFeedPattern {
-  id: "jmp2" | "pluto_partner" | "samsung_headend" | "partner_token";
+  id: "jmp2" | "pluto_partner" | "partner_token";
   /** The pattern, in words (docs and tests). */
   about: string;
   /** The desk's words for what it uses, when the address matches; null otherwise. */
@@ -96,22 +97,18 @@ export const PLATFORM_FEED_PATTERNS: readonly PlatformFeedPattern[] = [
   },
   {
     id: "pluto_partner",
-    about: "Pluto's stitcher (*.pluto.tv, a stitch host or path) with an app's authToken or jwt, or a partner's embedPartner or deviceType",
+    about: "Pluto's stitcher (*.pluto.tv, a stitch host or path) carrying an app's authToken or jwt",
     match: (u) => {
       if (!(u.hostname === "pluto.tv" || u.hostname.endsWith(".pluto.tv"))) return null;
       if (!/stitch/i.test(u.hostname) && !/stitch/i.test(u.pathname)) return null;
+      // Only with a token: partner parameters alone carry nobody's access.
+      const token = TOKEN_PARAMS.map((n) => param(u, n)).find((v) => !!v);
+      if (!token) return null;
       const embed = param(u, "embedPartner");
       const device = param(u, "deviceType");
-      const token = TOKEN_PARAMS.map((n) => param(u, n)).find((v) => !!v);
-      const partner = (embed && (partnerName(embed) ?? embed)) || (device && partnerName(device)) || (token && jwtPartner(token));
-      if (partner) return `Pluto via ${partner}`;
-      return token ? "Pluto via a partner app" : null;
+      const partner = jwtPartner(token) || (embed && (partnerName(embed) ?? embed)) || (device && partnerName(device));
+      return partner ? `Pluto via ${partner}` : "Pluto via a partner app";
     }
-  },
-  {
-    id: "samsung_headend",
-    about: "Samsung TV Plus headend paths (samsungheadend in the path)",
-    match: (u) => (/samsungheadend/i.test(u.pathname) ? "Samsung TV Plus" : null)
   },
   {
     id: "partner_token",

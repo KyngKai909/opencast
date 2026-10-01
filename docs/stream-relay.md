@@ -41,9 +41,10 @@ An http link that doesn't answer over https follows A237 unchanged: `/v1/`, its 
 
 Links that work only by using another app's access are **never relayed** (the user agreed), whatever their CORS. They wait, `waiting: "platform_feed"`, off the dial, and stay listed (not removed). The desk says "Uses another app's access (Pluto via Samsung TV Plus). Ask the channel's licensor for its own feed." The patterns live in one place, `PLATFORM_FEED_PATTERNS` in `apps/api/src/v1/lib/platformFeeds.ts`, matched by the address alone (nothing fetched):
 
-- `jmp2.uk` (a redirector to other apps' channel feeds);
-- Pluto's stitcher (`*.pluto.tv`, a `stitch` host or path) carrying an app's `authToken` or `jwt`, an `embedPartner=…`, or a partner's `deviceType` (`samsung-tvplus`, `rokuChannel`, …);
-- Samsung TV Plus headend paths (`samsungheadend` in the path);
+Only addresses that carry another app's access token (narrowed on 2026-10-01 at the user's request: an address that only names a partner, such as AMC's own `…/samsungheadend_us/…` feed or Pluto parameters with no token, isn't using anyone's access and plays like any other):
+
+- `jmp2.uk` (a redirector that hands out Pluto feeds carrying Samsung TV Plus's token);
+- Pluto's stitcher (`*.pluto.tv`, a `stitch` host or path) carrying an app's `authToken` or `jwt`;
 - any `authToken=`, `token=` or `jwt=` that's a JWT whose payload names a partner (`partner`, `partnerId`, `partnerName`, `embedPartner`, `distributionPartner`, or a partner's `deviceType` or `appName`).
 
 They're matched at listing, on a change, and for every listing at the checks' next pass (each minute, so well within the hour), which takes one that was on the dial before A238 off it. They're never tried over https, checked for CORS or checked every minute.
