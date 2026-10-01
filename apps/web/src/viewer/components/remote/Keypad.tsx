@@ -65,7 +65,8 @@ export function Keypad({ channels, onTune, onDone }: { channels: DialRowX[]; onT
                 {entry.shown.filled && <em>{entry.shown.filled}</em>}
               </>
             ) : (
-              "\u00a0"
+              // Nothing typed yet: the display's dim placeholder, so the space reads as the display.
+              <em>--.-</em>
             )}
           </span>
           <span className="oc-sr-only">{typed ? `Channel ${channel ?? typed}` : "Type a channel"}</span>

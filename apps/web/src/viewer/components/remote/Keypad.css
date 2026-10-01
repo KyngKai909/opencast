@@ -1,7 +1,7 @@
 /* The remote's keypad (tv 06.4: .kp-disp, .keypad, button.go). */
 .vw-kp { max-width: 430px; margin: 0 auto; }
-.vw-kp__disp { text-align: center; padding: 18px 0 6px; }
-.vw-kp__d { font: 500 64px/1 var(--font-mono); letter-spacing: -.05em; }
+.vw-kp__disp { text-align: center; padding: 8px 0 2px; }
+.vw-kp__d { font: 500 52px/1 var(--font-mono); letter-spacing: -.05em; }
 .vw-kp__d em { font-style: normal; color: var(--ink-50); }
 .vw-kp__disp small { display: block; font-size: 14px; color: var(--ink-70); margin-top: 6px; min-height: 1.45em; padding: 0 18px; }
 .vw-kp__disp small b { color: var(--ink); }

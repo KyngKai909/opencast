@@ -62,7 +62,9 @@ export default function Watching() {
   }, [s.channels, dial.data]);
   const row = rows.find((r) => r.station.id === s.currentId);
   const air = s.status === "stopped" ? null : airState(row, s.status);
-  const showAir = !!air && !!row && !s.entry;
+  // Not while a channel change is drawn: its static (the corner number, "Tuning in") shows over
+  // off air and Stand by too, and the next station's screen, if it has one, comes after it.
+  const showAir = !!air && !!row && !s.entry && !s.tuning;
   const suggest = useMemo(() => (air ? suggestion(rows, s.currentId) : null), [air, rows, s.currentId]);
 
   // Reminders reach a signed-in TV app (a Cast receiver has no account).
