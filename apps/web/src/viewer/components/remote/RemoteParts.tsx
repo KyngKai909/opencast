@@ -1,7 +1,8 @@
 // The phone remote's parts (tv 06.3, tv-update 02.2): the top bar with the TV and Stop, the now
-// strip from the receiver's state, the two rockers, Guide / Info / Keypad / Last, and the presets.
+// strip from the receiver's state, the two rockers, the arrows and OK with Menu, Guide, Back and
+// Info at their corners, the keypad, and the presets.
 
-import { useRef, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useNavigate } from "react-router";
 import { Button, Icon, ProgressBar, Tag, Tally } from "@opencast/ui";
 import type { DialRowX } from "../../api/ext";
@@ -11,7 +12,7 @@ import { useNowPlaying } from "../../player/PlayerRoot";
 import { MARKET_TZ } from "../../../lib/clock";
 import { useOverlayParams } from "../watch/overlay";
 import { stationSlug } from "../watch/logic";
-import { identText, type RemotePreset } from "./logic";
+import { identText, tvOverlayAfter, type RemotePreset, type TvOverlay } from "./logic";
 
 /** The remote's top bar: the TV (or "Mirroring to …") and Stop; over the keypad, Done. Reads the session itself (the shell renders it). */
 export function RemoteTop() {
@@ -118,32 +119,72 @@ export function Rockers({ row, up, down, paused, onCommand }: { row: DialRowX | 
 }
 
 /**
- * The TV's guide or menu from the phone: ▲ ▼ ◀ ▶ and OK move and choose on the TV (its remote's
- * keys), Back steps back there. Takes the rockers' place while the TV's guide or menu is open.
+ * What the phone opened on the TV with Guide or Menu (the TV doesn't say, so the phone keeps
+ * track): the same key closes it, the other opens that in its place, Back closes it, and a new
+ * station on the TV (OK on what's on) means it closed.
  */
-export function GuidePad({ onCommand, onBack, label = "Guide on the TV" }: { onCommand: (c: RemoteCommand) => void; onBack: () => void; label?: string }) {
+export function useTvOverlay(stationId: string | null): [TvOverlay, (open: TvOverlay) => void] {
+  const [open, setOpen] = useState<TvOverlay>(null);
+  const shown = useRef(stationId);
+  useEffect(() => {
+    if (stationId === shown.current) return;
+    shown.current = stationId;
+    setOpen((o) => tvOverlayAfter(o, "station"));
+  }, [stationId]);
+  return [open, setOpen];
+}
+
+const PAD_LABEL = { guide: "Guide on the TV", menu: "Menu on the TV" } as const;
+
+/**
+ * The arrows and OK, as on the TV's remote, with Menu, Guide, Back and Info at its corners. The
+ * arrows and OK always send focus and select: on the TV's picture up and down change channel, left
+ * opens presets, right the guide, and OK shows the banner; in the TV's guide and menu they move and
+ * choose. While the phone has the TV's guide or menu open, the pad says so.
+ */
+export function RemotePad({ open, onCommand, onOpenChange }: { open: TvOverlay; onCommand: (c: RemoteCommand) => void; onOpenChange: (open: TvOverlay) => void }) {
   const focus = (dir: "up" | "down" | "left" | "right") => () => onCommand({ type: "focus", dir });
+  const press = (key: "guide" | "menu" | "back") => () => {
+    onCommand({ type: key });
+    onOpenChange(tvOverlayAfter(open, key));
+  };
+  const label = open ? PAD_LABEL[open] : "Arrows";
   return (
-    <div className="vw-rm-pad" role="group" aria-label={label}>
-      <div className="vw-rm-pad__keys">
-        <button type="button" className="vw-rm-pad__up" aria-label="Up" onClick={focus("up")}>
+    <div className="vw-rm-pad">
+      {/* The group's name says it to a screen reader; this line says it on screen. */}
+      <p className="vw-rm-pad__on" aria-hidden="true">
+        {open && label}
+      </p>
+      {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
+      <Button className="vw-rm-pad__k vw-rm-pad__menu" icon="tv" onClick={press("menu")} aria-pressed={open === "menu"} set={open === "menu"}>
+        Menu
+      </Button>
+      {/* The TV's guide: pressed again, it closes there. */}
+      <Button className="vw-rm-pad__k vw-rm-pad__guide" icon="guide" onClick={press("guide")} aria-pressed={open === "guide"} set={open === "guide"}>
+        Guide
+      </Button>
+      <div className="vw-rm-ring" role="group" aria-label={label}>
+        <button type="button" className="vw-rm-ring__key vw-rm-ring__up" aria-label="Up" onClick={focus("up")}>
           <Icon name="up" />
         </button>
-        <button type="button" className="vw-rm-pad__left" aria-label="Left" onClick={focus("left")}>
+        <button type="button" className="vw-rm-ring__key vw-rm-ring__left" aria-label="Left" onClick={focus("left")}>
           <Icon name="back2" />
         </button>
-        <button type="button" className="vw-rm-pad__ok" onClick={() => onCommand({ type: "select" })}>
+        <button type="button" className="vw-rm-ring__ok" onClick={() => onCommand({ type: "select" })}>
           OK
         </button>
-        <button type="button" className="vw-rm-pad__right" aria-label="Right" onClick={focus("right")}>
+        <button type="button" className="vw-rm-ring__key vw-rm-ring__right" aria-label="Right" onClick={focus("right")}>
           <Icon name="chev" />
         </button>
-        <button type="button" className="vw-rm-pad__down" aria-label="Down" onClick={focus("down")}>
+        <button type="button" className="vw-rm-ring__key vw-rm-ring__down" aria-label="Down" onClick={focus("down")}>
           <Icon name="down" />
         </button>
       </div>
-      <Button size="sm" icon="back" onClick={onBack}>
+      <Button className="vw-rm-pad__k vw-rm-pad__back" icon="back" onClick={press("back")}>
         Back
+      </Button>
+      <Button className="vw-rm-pad__k vw-rm-pad__info" icon="info" onClick={() => onCommand({ type: "info" })}>
+        Info
       </Button>
     </div>
   );
@@ -158,41 +199,12 @@ export function BackToLive({ onCommand }: { onCommand: (c: RemoteCommand) => voi
   );
 }
 
-export function RemoteButtons({
-  onGuide,
-  onMenu,
-  onInfo,
-  onKeypad,
-  onLast,
-  guideOpen = false,
-  menuOpen = false
-}: {
-  onGuide: () => void;
-  onMenu: () => void;
-  onInfo: () => void;
-  onKeypad: () => void;
-  onLast: () => void;
-  guideOpen?: boolean;
-  menuOpen?: boolean;
-}) {
+/** Under the pad: the keypad (Last is the play rocker's lower key). */
+export function RemoteRow({ onKeypad }: { onKeypad: () => void }) {
   return (
     <div className="vw-rm-row">
-      {/* The TV's guide: pressed again, it closes there. */}
-      <Button icon="guide" onClick={onGuide} aria-pressed={guideOpen} set={guideOpen}>
-        Guide
-      </Button>
-      {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
-      <Button icon="tv" onClick={onMenu} aria-pressed={menuOpen} set={menuOpen}>
-        Menu
-      </Button>
-      <Button icon="info" onClick={onInfo}>
-        Info
-      </Button>
-      <Button icon="keys" onClick={onKeypad}>
+      <Button icon="keys" block onClick={onKeypad}>
         Keypad
-      </Button>
-      <Button icon="back" onClick={onLast}>
-        Last
       </Button>
     </div>
   );

@@ -1096,3 +1096,10 @@ Nothing changes on air; the Network desk is told and decides with the owners. Fo
 
 - Remote button row: **Menu** (beside Guide; opens the TV's menu, where Settings and Captions are; pressed again, it closes there).
 - While the TV's menu is open, the arrows-and-OK pad is labelled "Menu on the TV" (the guide's stays "Guide on the TV").
+
+## Phone remote: arrows and OK, like a TV's remote (2026-09-30)
+
+- Under the rockers, always there: the arrows (accessible names "Up", "Down", "Left", "Right") around **OK**, a group named "Arrows".
+- At the pad's corners: **Menu** (top left), **Guide** (top right), **Back** (bottom left, new: sends Back to the TV), **Info** (bottom right).
+- While the phone has the TV's guide or menu open, a small line over the pad says "Guide on the TV" or "Menu on the TV", and the group takes that name.
+- Under the pad: **Keypad** (one wide key), then "Guide on this phone". **Last** is now only the play rocker's lower key ("Last channel"); the button row's Last is gone.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { inMarket } from "../../mocks/fixtures/stations";
 import { dialRow } from "../../mocks/view";
 import type { PresetView } from "../../data/viewer";
-import { identText, keypadChannel, keypadEntry, keypadLine, presetStrip, pressKey, rockerNeighbours, tuningIn } from "./logic";
+import { identText, keypadChannel, keypadEntry, keypadLine, presetStrip, pressKey, rockerNeighbours, tuningIn, tvOverlayAfter } from "./logic";
 
 // The Inland Empire dial at the frames' moment.
 const NOW = new Date("2026-09-27T03:42:00Z");
@@ -72,5 +72,17 @@ describe("the presets strip", () => {
     const strip = presetStrip(presets);
     expect(strip.map((k) => k.key)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(strip.map((k) => (k.preset ? k.preset.station.callSign : null))).toEqual([null, station.callSign, null, null, null, null]);
+  });
+});
+
+describe("what's open on the TV", () => {
+  it("opens with Guide or Menu, closes with the same key, Back or a new station", () => {
+    expect(tvOverlayAfter(null, "guide")).toBe("guide");
+    expect(tvOverlayAfter("guide", "guide")).toBeNull();
+    expect(tvOverlayAfter("guide", "menu")).toBe("menu");
+    expect(tvOverlayAfter("menu", "guide")).toBe("guide");
+    expect(tvOverlayAfter("menu", "back")).toBeNull();
+    expect(tvOverlayAfter(null, "back")).toBeNull();
+    expect(tvOverlayAfter("guide", "station")).toBeNull();
   });
 });

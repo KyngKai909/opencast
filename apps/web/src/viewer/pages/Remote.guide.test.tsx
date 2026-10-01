@@ -1,6 +1,7 @@
 // The phone remote's Guide drives the TV's guide (the user's report, 2026-09-29: it opened the
-// phone's own guide while a TV was being driven). Guide sends `guide` to the TV; while it's open
-// there, a d-pad sends the arrows, OK and Back; the phone's guide stays one tap away.
+// phone's own guide while a TV was being driven). Guide sends `guide` to the TV; the arrows and OK,
+// always on the remote (2026-09-30), move and choose there, and Back closes it; the phone's guide
+// stays one tap away.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -81,14 +82,25 @@ describe.each([
     expect(screen.queryByTestId("where")).toBeNull();
   });
 
-  it("while the TV's guide is open, the d-pad moves and chooses there; Back and Guide close it", () => {
+  it("the arrows and OK are always there beside the rockers, on the TV's picture too", () => {
+    show();
+    expect(screen.getByRole("group", { name: "Channel" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Arrows" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Right" }));
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(sent).toEqual([{ type: "focus", dir: "right" }, { type: "select" }]);
+    // Last is the play rocker's, once.
+    expect(screen.getAllByRole("button", { name: /^Last/ }).map((b) => b.getAttribute("aria-label"))).toEqual(["Last channel"]);
+  });
+
+  it("while the TV's guide is open, the pad moves and chooses there; Back and Guide close it", () => {
     show();
     const guide = screen.getByRole("button", { name: "Guide" });
     fireEvent.click(guide);
     expect(guide.getAttribute("aria-pressed")).toBe("true");
-    const pad = screen.getByRole("group", { name: "Guide on the TV" });
-    // The rockers step aside for it.
-    expect(screen.queryByRole("group", { name: "Channel" })).toBeNull();
+    expect(screen.getByRole("group", { name: "Guide on the TV" })).toBeTruthy();
+    // The rockers stay.
+    expect(screen.getByRole("group", { name: "Channel" })).toBeTruthy();
     for (const name of ["Up", "Down", "Left", "Right", "OK"]) fireEvent.click(screen.getByRole("button", { name }));
     expect(sent.slice(1)).toEqual([
       { type: "focus", dir: "up" },
@@ -99,8 +111,8 @@ describe.each([
     ]);
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(sent.at(-1)).toEqual({ type: "back" });
-    expect(pad.isConnected).toBe(false);
-    expect(screen.getByRole("group", { name: "Channel" })).toBeTruthy();
+    expect(guide.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("group", { name: "Arrows" })).toBeTruthy();
     // Guide again: open, then pressed again, closed (as the TV's Guide key does).
     fireEvent.click(guide);
     fireEvent.click(guide);
@@ -108,7 +120,7 @@ describe.each([
     expect(screen.queryByRole("group", { name: "Guide on the TV" })).toBeNull();
   });
 
-  it("the d-pad goes when the TV's guide tunes another station (OK on what's on closes it there)", () => {
+  it("Guide lets go when the TV's guide tunes another station (OK on what's on closes it there)", () => {
     const r = show();
     fireEvent.click(screen.getByRole("button", { name: "Guide" }));
     expect(screen.getByRole("group", { name: "Guide on the TV" })).toBeTruthy();
@@ -122,6 +134,7 @@ describe.each([
       </MemoryRouter>
     );
     expect(screen.queryByRole("group", { name: "Guide on the TV" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Guide" }).getAttribute("aria-pressed")).toBe("false");
   });
 
   it("the phone's own guide is still there, as a second way", () => {

@@ -1,4 +1,4 @@
-/* The phone remote (tv 06.3: .pr-top, .pr-now, .rocker, .pr-row, .pr-pres; tv-update 02.2 .warnline). */
+/* The phone remote (tv 06.3: .pr-top, .pr-now, .rocker, .pr-row, .pr-pres; tv 01: .dpad; tv-update 02.2 .warnline). */
 .vw-rm { max-width: 430px; margin: 0 auto; }
 
 /* ---------- Top bar ---------- */
@@ -18,7 +18,7 @@
 .vw-rm-changed { margin: 0; padding: 10px 18px; border-bottom: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); }
 
 /* ---------- Rockers ---------- */
-.vw-rm-rocker { display: flex; justify-content: center; align-items: center; gap: 22px; padding: 22px 0 10px; }
+.vw-rm-rocker { display: flex; justify-content: center; align-items: center; gap: 22px; padding: 18px 0 10px; }
 .vw-rm-rk { width: 92px; height: 188px; border-radius: var(--r-screen); border: 1px solid var(--line); display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 14px 0; flex: none; }
 .vw-rm-rk button { width: 64px; height: 64px; border-radius: var(--r-control); border: 0; background: var(--raised); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
 .vw-rm-rk button:disabled { opacity: .45; cursor: default; }
@@ -30,24 +30,64 @@
 .vw-rm-mid__cs { font-size: 18px; }
 .vw-rm-mid__nb { font-size: 12px; margin-top: 6px; color: var(--ink-50); }
 
-/* ---------- Guide, Info, Keypad, Last ---------- */
-/* The TV's guide from the phone (no frame): a d-pad in the rockers' place, the rocker's keys and sizes. */
-.vw-rm-pad { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 0 6px; }
-.vw-rm-pad__keys { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 56px); gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-screen); }
-.vw-rm-pad__keys button { border: 0; border-radius: var(--r-control); background: var(--raised); color: var(--ink); display: grid; place-items: center; cursor: pointer; font: 600 15px var(--font-text); touch-action: manipulation; }
-.vw-rm-pad__keys button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.vw-rm-pad__keys .oc-i { width: 24px; height: 24px; }
-.vw-rm-pad__up { grid-area: 1 / 2; }
-.vw-rm-pad__left { grid-area: 2 / 1; }
-.vw-rm-pad__ok { grid-area: 2 / 2; background: var(--ink) !important; color: var(--ground) !important; }
-.vw-rm-pad__right { grid-area: 2 / 3; }
-.vw-rm-pad__down { grid-area: 3 / 2; }
-.vw-rm-phoneguide { display: block; margin: 0 auto 4px; }
+/* ---------- The arrows and OK, with Menu, Guide, Back and Info at the corners ---------- */
+/* No phone frame draws it: the round pad of tv 01's remote (.dpad, OK in ground on a ring), the
+   rockers' sizes and colours. Each arrow is a quarter of the ring, so the whole ring is keys. */
+.vw-rm-pad {
+  --ring: clamp(176px, 52vw, 204px);
+  display: grid; grid-template-columns: minmax(0, 1fr) var(--ring) minmax(0, 1fr);
+  grid-template-areas: "on on on" "menu ring guide" "back ring info";
+  column-gap: 12px; padding: 4px 18px 6px;
+}
+.vw-rm-pad__on { grid-area: on; margin: 0 0 6px; min-height: 16px; text-align: center; font: 600 12px/16px var(--font-text); color: var(--signal); }
+.vw-rm-pad__k.oc-btn { width: 100%; max-width: 72px; height: 56px; padding: 0; flex-direction: column; gap: 2px; font-size: 12px; border-radius: var(--r-screen); touch-action: manipulation; }
+.vw-rm-pad__k .oc-i { width: 18px; height: 18px; }
+.vw-rm-pad__k[aria-pressed="true"] { background: var(--raised); }
+.vw-rm-pad__k[aria-pressed="true"] .oc-i { color: var(--signal); }
+.vw-rm-pad__menu { grid-area: menu; justify-self: end; align-self: start; }
+.vw-rm-pad__guide { grid-area: guide; justify-self: start; align-self: start; }
+.vw-rm-pad__back { grid-area: back; justify-self: end; align-self: end; }
+.vw-rm-pad__info { grid-area: info; justify-self: start; align-self: end; }
+
+.vw-rm-ring {
+  grid-area: ring; position: relative; width: var(--ring); height: var(--ring); border-radius: 50%; overflow: hidden;
+  border: 1px solid var(--line); background: var(--raised);
+}
+/* The seams between the four arrows. */
+.vw-rm-ring::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(45deg, transparent calc(50% - .5px), var(--hair) calc(50% - .5px), var(--hair) calc(50% + .5px), transparent calc(50% + .5px)),
+    linear-gradient(-45deg, transparent calc(50% - .5px), var(--hair) calc(50% - .5px), var(--hair) calc(50% + .5px), transparent calc(50% + .5px));
+}
+.vw-rm-ring__key {
+  position: absolute; display: flex; padding: 0; border: 0; background: none; color: var(--ink);
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.vw-rm-ring__key .oc-i { width: 28px; height: 28px; }
+.vw-rm-ring__key:active { background: var(--hair); }
+/* An outline would be cut by the quarter's shape: the quarter lights up instead. */
+.vw-rm-ring__key:focus-visible { outline: none; background: var(--hair); color: var(--signal); }
+/* Each quarter's box is only as big as the part of it that shows (the ring cuts the corners, OK the
+   middle), so no key's box covers another's; the polygon is the quarter in that box's terms. */
+.vw-rm-ring__up { top: 0; left: 14%; width: 72%; height: 37%; clip-path: polygon(-19.44% 0, 119.44% 0, 68.06% 100%, 31.94% 100%); justify-content: center; align-items: flex-start; padding-top: 16px; }
+.vw-rm-ring__down { bottom: 0; left: 14%; width: 72%; height: 37%; clip-path: polygon(31.94% 0, 68.06% 0, 119.44% 100%, -19.44% 100%); justify-content: center; align-items: flex-end; padding-bottom: 16px; }
+.vw-rm-ring__left { left: 0; top: 14%; width: 37%; height: 72%; clip-path: polygon(0 -19.44%, 100% 31.94%, 100% 68.06%, 0 119.44%); justify-content: flex-start; align-items: center; padding-left: 16px; }
+.vw-rm-ring__right { right: 0; top: 14%; width: 37%; height: 72%; clip-path: polygon(0 31.94%, 100% -19.44%, 100% 119.44%, 0 68.06%); justify-content: flex-end; align-items: center; padding-right: 16px; }
+.vw-rm-ring__ok {
+  position: absolute; z-index: 1; top: 31%; left: 31%; width: 38%; height: 38%; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--ground); color: var(--ink); font: 700 16px var(--font-text);
+  display: grid; place-items: center; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.vw-rm-ring__ok:active { background: var(--ink); color: var(--ground); }
+.vw-rm-ring__ok:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* ---------- Back to live, the keypad, the phone's guide ---------- */
 /* Back to live: under the rockers while the TV is behind live. */
 .vw-rm-live { display: flex; justify-content: center; padding: 4px 18px 0; }
-.vw-rm-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 12px 18px; }
-.vw-rm-row .oc-btn { height: 52px; flex-direction: column; gap: 2px; font-size: 12px; padding: 0; }
+.vw-rm-row { padding: 12px 18px 6px; }
+.vw-rm-row .oc-btn { height: 48px; }
 .vw-rm-row .oc-btn .oc-i { width: 18px; height: 18px; }
+.vw-rm-phoneguide { display: block; margin: 4px auto 8px; }
 
 /* ---------- Presets ---------- */
 .vw-rm-pres__h { padding: 6px 18px; margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-50); }

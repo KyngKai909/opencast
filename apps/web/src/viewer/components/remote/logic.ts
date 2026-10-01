@@ -69,3 +69,17 @@ export interface RemotePreset {
 export function presetStrip(presets: PresetView[]): RemotePreset[] {
   return Array.from({ length: 6 }, (_, i) => ({ key: i + 1, preset: presets.find((p) => p.key === i + 1) ?? null }));
 }
+
+// ---------- The TV's guide and menu (the pad's Guide, Menu and Back) ----------
+
+/** What the phone opened on the TV with Guide or Menu. The TV doesn't say, so the phone keeps track. */
+export type TvOverlay = "guide" | "menu" | null;
+
+/**
+ * What's open on the TV after a key: Guide or Menu opens it, the same key again closes it, the
+ * other key opens that in its place; Back, or a new station on the TV (OK on what's on), closes it.
+ */
+export function tvOverlayAfter(open: TvOverlay, key: "guide" | "menu" | "back" | "station"): TvOverlay {
+  if (key === "guide" || key === "menu") return open === key ? null : key;
+  return null;
+}
