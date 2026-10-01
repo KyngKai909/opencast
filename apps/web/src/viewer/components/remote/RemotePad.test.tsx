@@ -27,12 +27,12 @@ const key = (name: string) => screen.getByRole("button", { name });
 const pressed = (name: string) => key(name).getAttribute("aria-pressed");
 
 describe("the remote's pad", () => {
-  it("is one box: the round pad with the quick keys in the corners, sending focus and select", () => {
+  it("is the cross pad round OK with the quick keys in a row under it, sending focus and select", () => {
     const onCommand = vi.fn();
     render(<Pad onCommand={onCommand} />);
     const pad = screen.getByRole("group", { name: "Arrows" });
-    // Menu and Guide above the ring, Back and Info below it, the arrows round OK in between.
-    expect([...pad.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["Menu", "Guide", "Up", "Left", "OK", "Right", "Down", "Back", "Info"]);
+    // The cross pad's arrows round OK, then the quick keys in their own row.
+    expect([...pad.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["Up", "Left", "OK", "Right", "Down", "Back", "Menu", "Guide", "Info"]);
     for (const name of ["Up", "Down", "Left", "Right", "OK"]) fireEvent.click(key(name));
     expect(onCommand.mock.calls.map(([c]) => c)).toEqual([
       { type: "focus", dir: "up" },

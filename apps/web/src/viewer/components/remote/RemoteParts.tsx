@@ -148,46 +148,48 @@ export function RemotePad({ open, onCommand, onOpenChange }: { open: TvOverlay; 
     onCommand({ type: key });
     onOpenChange(tvOverlayAfter(open, key));
   };
-  // A TV remote's middle in one box: the round pad (each arrow a quarter of the ring, OK in the
-  // middle) with Menu, Guide, Back and Info filling the corners, set apart from the ring so a
-  // thumb doesn't catch the wrong one. The group's name says what the arrows are driving.
+  // A TV remote's middle: a square cross pad (the arrows as wide bars round a big OK) in its own
+  // box, and the quick keys in a row of their own under it, well apart so a thumb meant for one
+  // doesn't land on the other. The group's name says what the arrows are driving.
   return (
     <div className="vw-rm-pad" role="group" aria-label={open ? PAD_LABEL[open] : "Arrows"}>
-      {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
-      <button type="button" className="vw-rm-pad__k vw-rm-pad__menu" onClick={press("menu")} aria-pressed={open === "menu"}>
-        <Icon name="tv" />
-        Menu
-      </button>
-      {/* The TV's guide: pressed again, it closes there. */}
-      <button type="button" className="vw-rm-pad__k vw-rm-pad__guide" onClick={press("guide")} aria-pressed={open === "guide"}>
-        <Icon name="guide" />
-        Guide
-      </button>
-      <div className="vw-rm-ring">
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__up" aria-label="Up" onClick={focus("up")}>
+      <div className="vw-rm-cross">
+        <button type="button" className="vw-rm-cross__k vw-rm-cross__up" aria-label="Up" onClick={focus("up")}>
           <Icon name="up" />
         </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__left" aria-label="Left" onClick={focus("left")}>
+        <button type="button" className="vw-rm-cross__k vw-rm-cross__left" aria-label="Left" onClick={focus("left")}>
           <Icon name="back2" />
         </button>
-        <button type="button" className="vw-rm-ring__ok" onClick={() => onCommand({ type: "select" })}>
+        <button type="button" className="vw-rm-cross__ok" onClick={() => onCommand({ type: "select" })}>
           OK
         </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__right" aria-label="Right" onClick={focus("right")}>
+        <button type="button" className="vw-rm-cross__k vw-rm-cross__right" aria-label="Right" onClick={focus("right")}>
           <Icon name="chev" />
         </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__down" aria-label="Down" onClick={focus("down")}>
+        <button type="button" className="vw-rm-cross__k vw-rm-cross__down" aria-label="Down" onClick={focus("down")}>
           <Icon name="down" />
         </button>
       </div>
-      <button type="button" className="vw-rm-pad__k vw-rm-pad__back" onClick={press("back")}>
-        <Icon name="back" />
-        Back
-      </button>
-      <button type="button" className="vw-rm-pad__k vw-rm-pad__info" onClick={() => onCommand({ type: "info" })}>
-        <Icon name="info" />
-        Info
-      </button>
+      <div className="vw-rm-quick">
+        <button type="button" className="vw-rm-quick__k" onClick={press("back")}>
+          <Icon name="back" />
+          Back
+        </button>
+        {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
+        <button type="button" className="vw-rm-quick__k" onClick={press("menu")} aria-pressed={open === "menu"}>
+          <Icon name="tv" />
+          Menu
+        </button>
+        {/* The TV's guide: pressed again, it closes there. */}
+        <button type="button" className="vw-rm-quick__k" onClick={press("guide")} aria-pressed={open === "guide"}>
+          <Icon name="guide" />
+          Guide
+        </button>
+        <button type="button" className="vw-rm-quick__k" onClick={() => onCommand({ type: "info" })}>
+          <Icon name="info" />
+          Info
+        </button>
+      </div>
     </div>
   );
 }

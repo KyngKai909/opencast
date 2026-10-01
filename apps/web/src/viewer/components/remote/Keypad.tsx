@@ -56,6 +56,10 @@ export function Keypad({ channels, onTune, onDone }: { channels: DialRowX[]; onT
   return (
     <div className="vw-kp">
       <div className="vw-kp__disp" role="status" aria-live="polite">
+        {/* Drawn as a field labelled Channel, the number large inside it, what it tunes under it. */}
+        <span className="vw-kp__label" aria-hidden="true">
+          Channel
+        </span>
         {/* The digits as drawn, and what they say in words (a plain div can't carry aria-label). */}
         <div className="vw-kp__d">
           <span aria-hidden="true">
@@ -65,7 +69,7 @@ export function Keypad({ channels, onTune, onDone }: { channels: DialRowX[]; onT
                 {entry.shown.filled && <em>{entry.shown.filled}</em>}
               </>
             ) : (
-              // Nothing typed yet: the display's dim placeholder, so the space reads as the display.
+              // Nothing typed yet: the field's dim placeholder.
               <em>--.-</em>
             )}
           </span>
