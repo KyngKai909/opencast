@@ -30,7 +30,6 @@ describe("the remote's Menu", () => {
     const onCommand = vi.fn();
     render(<RemotePad open="menu" onCommand={onCommand} onOpenChange={vi.fn()} />);
     expect(screen.getByRole("group", { name: "Menu on the TV" })).toBeTruthy();
-    expect(screen.getByText("Menu on the TV")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Down" }));
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
     expect(onCommand.mock.calls).toEqual([[{ type: "focus", dir: "down" }], [{ type: "select" }]]);

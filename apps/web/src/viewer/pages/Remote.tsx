@@ -95,6 +95,8 @@ function Remote() {
     return (
       <div className="vw-rm">
         {!phone && <RemoteTop />}
+        {/* The arrows and quick keys stay at the top while typing a number. */}
+        <RemotePad open={tvOpen} onCommand={send} onOpenChange={setTvOpen} />
         <Keypad
           channels={channels}
           onTune={(channel) => {
@@ -111,9 +113,10 @@ function Remote() {
       {!phone && <RemoteTop />}
       {row ? <NowStrip row={row} paused={paused} now={now} flicker={!litAtOpen.current} /> : <div className="vw-rm-quiet" aria-busy="true" aria-label="Waiting for the TV" />}
       {other && <p className="vw-rm-changed" role="status">{`${other} changed the channel.`}</p>}
+      {/* At the top, like a TV remote's middle: the arrows round OK with the quick keys. */}
+      <RemotePad open={tvOpen} onCommand={send} onOpenChange={setTvOpen} />
       <Rockers row={row} up={up} down={down} paused={paused} onCommand={send} />
       {row && (paused || receiver?.behindLive) && <BackToLive onCommand={send} />}
-      <RemotePad open={tvOpen} onCommand={send} onOpenChange={setTvOpen} />
       <RemoteRow onKeypad={() => open({ sheet: "keypad" })} />
       {/* The phone's own guide (tv 06 "Guide on the phone"): choosing a program there tunes the TV. */}
       {slug && (

@@ -140,7 +140,7 @@ const PAD_LABEL = { guide: "Guide on the TV", menu: "Menu on the TV" } as const;
  * The arrows and OK, as on the TV's remote, with Menu, Guide, Back and Info at its corners. The
  * arrows and OK always send focus and select: on the TV's picture up and down change channel, left
  * opens presets, right the guide, and OK shows the banner; in the TV's guide and menu they move and
- * choose. While the phone has the TV's guide or menu open, the pad says so.
+ * choose. While the phone has the TV's guide or menu open, the pad's name says so to a screen reader.
  */
 export function RemotePad({ open, onCommand, onOpenChange }: { open: TvOverlay; onCommand: (c: RemoteCommand) => void; onOpenChange: (open: TvOverlay) => void }) {
   const focus = (dir: "up" | "down" | "left" | "right") => () => onCommand({ type: "focus", dir });
@@ -148,44 +148,43 @@ export function RemotePad({ open, onCommand, onOpenChange }: { open: TvOverlay; 
     onCommand({ type: key });
     onOpenChange(tvOverlayAfter(open, key));
   };
-  const label = open ? PAD_LABEL[open] : "Arrows";
+  // A TV remote's middle: the arrows round OK, with Menu, Guide, Back and Info in the corners, every
+  // key filling its square of the box. The group's name says what the arrows are driving.
   return (
-    <div className="vw-rm-pad">
-      {/* The group's name says it to a screen reader; this line says it on screen. */}
-      <p className="vw-rm-pad__on" aria-hidden="true">
-        {open && label}
-      </p>
+    <div className="vw-rm-pad" role="group" aria-label={open ? PAD_LABEL[open] : "Arrows"}>
       {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
-      <Button className="vw-rm-pad__k vw-rm-pad__menu" icon="tv" onClick={press("menu")} aria-pressed={open === "menu"} set={open === "menu"}>
+      <button type="button" className="vw-rm-pad__k vw-rm-pad__k--side" onClick={press("menu")} aria-pressed={open === "menu"}>
+        <Icon name="tv" />
         Menu
-      </Button>
+      </button>
+      <button type="button" className="vw-rm-pad__k" aria-label="Up" onClick={focus("up")}>
+        <Icon name="up" />
+      </button>
       {/* The TV's guide: pressed again, it closes there. */}
-      <Button className="vw-rm-pad__k vw-rm-pad__guide" icon="guide" onClick={press("guide")} aria-pressed={open === "guide"} set={open === "guide"}>
+      <button type="button" className="vw-rm-pad__k vw-rm-pad__k--side" onClick={press("guide")} aria-pressed={open === "guide"}>
+        <Icon name="guide" />
         Guide
-      </Button>
-      <div className="vw-rm-ring" role="group" aria-label={label}>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__up" aria-label="Up" onClick={focus("up")}>
-          <Icon name="up" />
-        </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__left" aria-label="Left" onClick={focus("left")}>
-          <Icon name="back2" />
-        </button>
-        <button type="button" className="vw-rm-ring__ok" onClick={() => onCommand({ type: "select" })}>
-          OK
-        </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__right" aria-label="Right" onClick={focus("right")}>
-          <Icon name="chev" />
-        </button>
-        <button type="button" className="vw-rm-ring__key vw-rm-ring__down" aria-label="Down" onClick={focus("down")}>
-          <Icon name="down" />
-        </button>
-      </div>
-      <Button className="vw-rm-pad__k vw-rm-pad__back" icon="back" onClick={press("back")}>
+      </button>
+      <button type="button" className="vw-rm-pad__k" aria-label="Left" onClick={focus("left")}>
+        <Icon name="back2" />
+      </button>
+      <button type="button" className="vw-rm-pad__k vw-rm-pad__ok" onClick={() => onCommand({ type: "select" })}>
+        OK
+      </button>
+      <button type="button" className="vw-rm-pad__k" aria-label="Right" onClick={focus("right")}>
+        <Icon name="chev" />
+      </button>
+      <button type="button" className="vw-rm-pad__k vw-rm-pad__k--side" onClick={press("back")}>
+        <Icon name="back" />
         Back
-      </Button>
-      <Button className="vw-rm-pad__k vw-rm-pad__info" icon="info" onClick={() => onCommand({ type: "info" })}>
+      </button>
+      <button type="button" className="vw-rm-pad__k" aria-label="Down" onClick={focus("down")}>
+        <Icon name="down" />
+      </button>
+      <button type="button" className="vw-rm-pad__k vw-rm-pad__k--side" onClick={() => onCommand({ type: "info" })}>
+        <Icon name="info" />
         Info
-      </Button>
+      </button>
     </div>
   );
 }

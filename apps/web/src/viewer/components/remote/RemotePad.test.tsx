@@ -27,11 +27,12 @@ const key = (name: string) => screen.getByRole("button", { name });
 const pressed = (name: string) => key(name).getAttribute("aria-pressed");
 
 describe("the remote's pad", () => {
-  it("is a group of arrows around OK that sends focus and select", () => {
+  it("is one box of keys, the arrows round OK with the quick keys in the corners, sending focus and select", () => {
     const onCommand = vi.fn();
     render(<Pad onCommand={onCommand} />);
     const pad = screen.getByRole("group", { name: "Arrows" });
-    expect([...pad.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["Up", "Left", "OK", "Right", "Down"]);
+    // Three rows of three, as on a TV remote.
+    expect([...pad.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? b.textContent)).toEqual(["Menu", "Up", "Guide", "Left", "OK", "Right", "Back", "Down", "Info"]);
     for (const name of ["Up", "Down", "Left", "Right", "OK"]) fireEvent.click(key(name));
     expect(onCommand.mock.calls.map(([c]) => c)).toEqual([
       { type: "focus", dir: "up" },
@@ -49,16 +50,15 @@ describe("the remote's pad", () => {
     expect(onCommand.mock.calls.map(([c]) => c)).toEqual([{ type: "menu" }, { type: "guide" }, { type: "back" }, { type: "info" }]);
   });
 
-  it("keeps Guide and Menu pressed for what's open on the TV, and says so by the pad", () => {
+  it("keeps Guide and Menu pressed for what's open on the TV, and names the pad for it", () => {
     render(<Pad onCommand={vi.fn()} />);
     expect([pressed("Guide"), pressed("Menu")]).toEqual(["false", "false"]);
-    expect(screen.queryByText("Guide on the TV")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Guide on the TV" })).toBeNull();
 
     // Guide opens the TV's guide.
     fireEvent.click(key("Guide"));
     expect([pressed("Guide"), pressed("Menu")]).toEqual(["true", "false"]);
     expect(screen.getByRole("group", { name: "Guide on the TV" })).toBeTruthy();
-    expect(screen.getByText("Guide on the TV")).toBeTruthy();
 
     // Menu opens the menu in its place.
     fireEvent.click(key("Menu"));
@@ -78,7 +78,7 @@ describe("the remote's pad", () => {
     expect(pressed("Guide")).toBe("true");
     fireEvent.click(key("Back"));
     expect(pressed("Guide")).toBe("false");
-    expect(screen.queryByText("Guide on the TV")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Guide on the TV" })).toBeNull();
   });
 
   it("forgets what it opened when the TV changes station", () => {
