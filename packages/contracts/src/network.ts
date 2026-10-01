@@ -415,9 +415,21 @@ export const ListedSource = z.object({
   /**
    * Why it isn't on the dial, when it isn't: `terms_unclear`, `needs_permission`, `needs_terms`
    * (an embed with no terms page recorded), `dash_not_played` (a DASH-only stream link, A201),
-   * `other_market` (A200), `down` (hidden while its stream is down). Null when it's on the dial.
+   * `other_market` (A200), `down` (hidden while its stream is down), `needs_https` (A237: an
+   * `http://` stream link that doesn't answer over https, with Opencast's relay not configured).
+   * Null when it's on the dial.
    */
-  waiting: z.enum(["terms_unclear", "needs_terms", "needs_permission", "dash_not_played", "other_market", "down"]).nullable().optional(),
+  waiting: z.enum(["terms_unclear", "needs_terms", "needs_permission", "dash_not_played", "other_market", "down", "needs_https"]).nullable().optional(),
+  // ---- Added 2026-10-01 (A237: plain-http stream links) ----
+  /**
+   * How an `http://` stream link reaches HTTPS apps: `https` (the same address answered over https,
+   * played straight from the source), `relay` (through Opencast's HTTPS relay), or `needs_https`
+   * (neither: it waits). Null for everything else (an https stream link or an embed plays its address
+   * as listed).
+   */
+  playsOver: z.enum(["https", "relay", "needs_https"]).nullable().optional(),
+  /** A237: it plays through Opencast's HTTPS relay (`playsOver` is `relay`). */
+  relayed: z.boolean().optional(),
   /** The stream's checks: the state, since when, the last check and what it saw. */
   health: z
     .object({

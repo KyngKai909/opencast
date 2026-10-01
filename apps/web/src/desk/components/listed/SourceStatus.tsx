@@ -5,7 +5,7 @@
 import type { ReactNode } from "react";
 import { Icon, Lines } from "@opencast/ui";
 import type { ListedSource } from "@opencast/contracts";
-import { familyLine, nowWords, PLAYS_LABELS, playsDetail, playsOf, scheduleWords, sourceDetail, type NowTone, type Tone } from "./external";
+import { familyLine, nowWords, PLAYS_LABELS, playsDetail, playsOf, scheduleWords, sourceDetail, transportLine, type NowTone, type Tone } from "./external";
 import "./SourceStatus.css";
 
 export function Ok({ children, detail, warn }: { children: ReactNode; detail?: string; warn?: boolean }) {
@@ -56,7 +56,14 @@ export function channelCell(s: ListedSource) {
 
 /** How it plays (.tier): "Official embed" or "Stream link", and why it may, or what it waits for. */
 export function playsCell(s: ListedSource, timeZone: string) {
-  return <Lines className="nd-tier" title={PLAYS_LABELS[playsOf(s)]} detail={playsDetail(s, timeZone) || null} />;
+  // A237: an http:// stream link that plays over https, or through the relay, says so.
+  const transport = transportLine(s);
+  return (
+    <div>
+      <Lines className="nd-tier" title={PLAYS_LABELS[playsOf(s)]} detail={playsDetail(s, timeZone) || null} />
+      {transport && <small className="nd-ok__small">{transport}</small>}
+    </div>
+  );
 }
 
 function toned(w: { text: string; detail?: string; tone: Tone | NowTone }) {

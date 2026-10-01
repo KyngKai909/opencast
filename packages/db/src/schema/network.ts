@@ -335,7 +335,16 @@ export const listedSources = network.table("listed_sources", {
   channelReleasedAt: at("channel_released_at"),
   // ---- A229 (added 2026-09-30, migration 0042): shared call signs ----
   /** Taken off the dial with the listing on X.1 whose call sign it shares ("Put back" on X.1 brings it back too). */
-  removedWith: uuid("removed_with").references((): AnyPgColumn => listedSources.id)
+  removedWith: uuid("removed_with").references((): AnyPgColumn => listedSources.id),
+  // ---- A237 (added 2026-10-01, migration 0044): plain-http stream links ----
+  /**
+   * An `http://` stream link's https address (same host and path) when a real playlist answered
+   * there: the dial plays it straight from the source instead of through the relay. Null: not
+   * upgraded (not tried, or it didn't answer).
+   */
+  httpsUrl: text("https_url"),
+  /** When https was last tried for an `http://` stream link (at listing, a new address, then hourly). */
+  httpsCheckedAt: at("https_checked_at")
 });
 
 /**

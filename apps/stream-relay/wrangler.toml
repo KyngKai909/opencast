@@ -1,0 +1,23 @@
+# Opencast's HTTPS stream relay (A237, docs/stream-relay.md): external stations' plain-http stream
+# links, relayed over HTTPS so Opencast's HTTPS apps can play them. Pass-through only: nothing is
+# stored (no KV, R2 or Durable Objects), and Cloudflare's edge cache is off unless
+# RELAY_EDGE_CACHE_SECONDS says otherwise.
+#
+#   npx wrangler@4 secret put STREAM_RELAY_SECRET   (the same value as the API's STREAM_RELAY_SECRET)
+#   npx wrangler@4 deploy
+name = "opencast-stream-relay"
+main = "src/index.ts"
+# `cache: "no-store"` on subrequests needs a compatibility date from 2024-11-11 on.
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+# A custom domain instead of (or as well as) workers.dev, once Opencast's domain is bought:
+# routes = [{ pattern = "stream-relay.<domain>", custom_domain = true }]
+
+[vars]
+# Seconds a segment may be kept at Cloudflare's edge and in viewers' browsers. 0 (the default):
+# nothing kept, every segment fetched from the source (`no-store`). 30 to 60 saves requests to the
+# source when many people watch the same channel. Playlists are always `no-store`.
+RELAY_EDGE_CACHE_SECONDS = "0"
+
+# Secrets (never here): STREAM_RELAY_SECRET, set with `wrangler secret put`. Locally, `.dev.vars`.

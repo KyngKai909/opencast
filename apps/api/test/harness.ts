@@ -82,6 +82,10 @@ export async function createHarness(
     platforms?: Deps["platforms"];
     /** Another object store (the direct-upload demo's MinIO); local disk by default. */
     objects?: (storageRoot: string) => Deps["storage"]["objects"];
+    /** A237: Opencast's HTTPS relay for http:// stream links; none by default. */
+    streamRelay?: Deps["config"]["streamRelay"];
+    /** A237: the desk's fetch for external addresses (the https check). Default: no network, every fetch fails. */
+    externalFetch?: Deps["externalFetch"];
   } = {}
 ): Promise<Harness> {
   const database = await freshDatabase();
@@ -134,6 +138,8 @@ export async function createHarness(
     places: options.places,
     relay: options.relay ?? memoryRelayBus(),
     platforms: options.platforms,
+    // No network in tests: an https check fails unless a test passes a fake.
+    externalFetch: options.externalFetch ?? (async () => Promise.reject(new TypeError("fetch failed"))),
     config: {
       storageRoot,
       appOrigin: "https://app.opencast.test",
@@ -143,7 +149,8 @@ export async function createHarness(
       usdc: { chainId: 84532, address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
       production: false,
       sseHeartbeatMs: options.sseHeartbeatMs,
-      publicBase: options.publicBase ?? null
+      publicBase: options.publicBase ?? null,
+      streamRelay: options.streamRelay ?? null
     }
   };
   const { router, services } = createV1(deps);

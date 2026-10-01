@@ -95,6 +95,18 @@ const checks = [
     note: "Required only for the catalog's IPFS pins and a station's \"Export to IPFS\"."
   },
   {
+    key: "STREAM_RELAY_BASE",
+    scope: "root",
+    required: false,
+    note: "A237: the HTTPS stream relay's address (docs/stream-relay.md). Unset: http:// stream links play only if they answer over https."
+  },
+  {
+    key: "STREAM_RELAY_SECRET",
+    scope: "root",
+    required: false,
+    note: "A237: the secret relay addresses are signed with; the same value as the Worker's. Needed with STREAM_RELAY_BASE."
+  },
+  {
     key: "VITE_API_BASE",
     scope: "web",
     required: false,

@@ -16,6 +16,7 @@ import { relayFromEnv } from "./relay.js";
 import { emailFromEnv } from "./email.js";
 import { pinataFromEnv } from "./storageMaintenance.js";
 import { platformsFromEnv } from "./modules/platforms/service.js";
+import { streamRelayFromEnv } from "./lib/streamRelay.js";
 
 export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
   const databaseUrl = env.DATABASE_URL?.trim();
@@ -72,7 +73,9 @@ export function createDeps(env: NodeJS.ProcessEnv, storageRoot: string): Deps {
       usdc: env.CHAIN_ID && env.USDC_ADDRESS ? { chainId: Number(env.CHAIN_ID), address: env.USDC_ADDRESS } : null,
       production: env.NODE_ENV === "production",
       publicBase,
-      hlsBase: env.HLS_PUBLIC_URL?.trim().replace(/\/+$/, "") || null
+      hlsBase: env.HLS_PUBLIC_URL?.trim().replace(/\/+$/, "") || null,
+      // A237: the HTTPS relay for external stations' http:// stream links (docs/stream-relay.md).
+      streamRelay: streamRelayFromEnv(env)
     }
   };
 }

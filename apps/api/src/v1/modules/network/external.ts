@@ -8,6 +8,12 @@
 //   player (the source's written permission, kept like a claimable station's permission record, or
 //   a clearly public source with the basis). Never proxied, cached or re-served: viewers' players
 //   fetch from the source. Without the evidence a listing is saved but isn't on the dial.
+// - A237 (the user's decision, over the line above for `http://` stream links only): HTTPS apps
+//   can't load a plain-http stream, so one is tried over https first (the same host and path), and
+//   played from there straight from the source when a real playlist answers; otherwise it's carried
+//   through Opencast's HTTPS relay (apps/stream-relay: pass-through, nothing stored), or waits
+//   (`needs_https`) when the relay isn't configured. https stream links, embeds and DASH over https
+//   are unchanged. Checks still fetch the source directly.
 // - What's on comes from the source's own feed (iCal, RSS, JSON or XMLTV), or guide data checked
 //   against its published schedule; with neither, the banner says Live and the source.
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
@@ -36,6 +42,7 @@ import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
 import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../lib/schedules.js";
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
+import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
 
 /** A check that hasn't answered by then has failed. */
 export const CHECK_TIMEOUT_MS = 5_000;
@@ -43,6 +50,8 @@ export const CHECK_TIMEOUT_MS = 5_000;
 export const DOWN_AFTER_MS = 5 * 60_000;
 /** A playlist's first bytes are enough to know it's a playlist; nothing more is read. */
 const MANIFEST_BYTES = 64 * 1024;
+/** A237: how often an `http://` stream link that didn't answer over https is tried there again. */
+export const HTTPS_RECHECK_MS = 60 * 60_000;
 /** Checks at once, so a minute's round stays well inside the minute. */
 const CHECKS_AT_ONCE = 8;
 /** An IPTV list read by its address: its size and patience. */
@@ -198,17 +207,32 @@ export function basisFor(row: Pick<Row, "plays" | "embedTerms" | "termsUrl" | "t
  * Why a listing isn't on the dial, or null when it is. The evidence first, then the Open rules
  * (A200, A201), then its stream.
  */
-export function waitingFor(row: Pick<Row, "plays" | "embedTerms" | "basis" | "streamFormat" | "outsideMarket" | "health">, rules: { otherMarkets: boolean; dash: boolean }): Waiting | null {
+export function waitingFor(
+  row: Pick<Row, "plays" | "embedTerms" | "basis" | "streamFormat" | "outsideMarket" | "health"> & { streamUrl?: string; httpsUrl?: string | null },
+  rules: { otherMarkets: boolean; dash: boolean; relay?: boolean }
+): Waiting | null {
   if (row.plays === "embed") {
     if (row.embedTerms !== "allowed") return "terms_unclear";
     if (row.basis !== "embed_terms") return "needs_terms";
   } else {
     if (row.basis !== "written_permission" && row.basis !== "public_source") return "needs_permission";
     if (row.streamFormat === "dash" && !rules.dash) return "dash_not_played";
+    // A237: plain http plays over https from the source, or through the relay; with neither, it waits.
+    if (playsOverFor(row, !!rules.relay) === "needs_https") return "needs_https";
   }
   if (row.outsideMarket && !rules.otherMarkets) return "other_market";
   if (row.health === "hidden") return "down";
   return null;
+}
+
+/**
+ * A237: how an `http://` stream link reaches HTTPS apps: over https from the source (it answered
+ * there), through the relay, or neither (it waits). Null for anything else, which plays as listed.
+ */
+export function playsOverFor(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null }, relay: boolean): ListedSource["playsOver"] {
+  if (row.plays !== "stream_link" || !row.streamUrl || !isPlainHttp(row.streamUrl)) return null;
+  if (row.httpsUrl) return "https";
+  return relay ? "relay" : "needs_https";
 }
 
 /** Up to `limit` bytes of an answer's body as text, then the rest is let go unread. */
@@ -244,6 +268,8 @@ export interface StreamCheck {
   detail: string | null;
   /** A stream link's format, as its playlist says. */
   format?: "hls" | "dash";
+  /** Where the answer came from after redirects, when the fetch says (A237: https must stay https). */
+  finalUrl?: string;
 }
 
 /**
@@ -279,13 +305,29 @@ export async function checkStream(input: { plays: "embed" | "stream_link"; strea
       await res.body?.cancel().catch(() => undefined);
       return { ok: false, detail: `HTTP ${res.status}` };
     }
+    const finalUrl = res.url ? { finalUrl: res.url } : {};
     const head = (await readSome(res, MANIFEST_BYTES)).trimStart();
-    if (head.startsWith("#EXTM3U")) return { ok: true, detail: null, format: "hls" };
-    if (/<MPD[\s>]/.test(head)) return { ok: true, detail: null, format: "dash" };
+    if (head.startsWith("#EXTM3U")) return { ok: true, detail: null, format: "hls", ...finalUrl };
+    if (/<MPD[\s>]/.test(head)) return { ok: true, detail: null, format: "dash", ...finalUrl };
     return { ok: false, detail: "Not a stream playlist" };
   } catch (error) {
     return failed(error);
   }
+}
+
+/**
+ * A237: an `http://` stream link tried over https (the same host and path; 443, or its own port when
+ * it names one other than 80), with the minute's light check: a ranged GET of the playlist, a 5 s
+ * timeout, the public internet only. The https address when a real HLS or DASH playlist answers
+ * there (and a redirect didn't take it back to http), else null.
+ */
+export async function probeHttps(streamUrl: string, fetchFn: Fetch = publicFetch, timeoutMs = CHECK_TIMEOUT_MS): Promise<string | null> {
+  const url = httpsVariant(streamUrl);
+  if (!url) return null;
+  const check = await checkStream({ plays: "stream_link", streamUrl: url }, fetchFn, timeoutMs);
+  if (!check.ok) return null;
+  if (check.finalUrl && !/^https:/i.test(check.finalUrl)) return null;
+  return url;
 }
 
 /** Runs `work` over `items`, `limit` at a time. */
@@ -303,7 +345,29 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
 
   async function rules() {
     const [other, dash] = await Promise.all([services.settings.valueAt("external.other_markets"), services.settings.valueAt("external.dash_stream_links")]);
-    return { otherMarkets: other.allowed, dash: dash.played };
+    // A237: whether Opencast's HTTPS relay is configured here (STREAM_RELAY_BASE and STREAM_RELAY_SECRET).
+    return { otherMarkets: other.allowed, dash: dash.played, relay: !!deps.config.streamRelay };
+  }
+
+  /** A237: the desk's fetch for an https check (a fake in tests). */
+  const externalFetch = (): Fetch => deps.externalFetch ?? publicFetch;
+
+  /** A237: an `http://` stream link tried over https now, and what was found kept. */
+  async function recordHttps(sourceId: string, streamUrl: string, fetchFn: Fetch = externalFetch()) {
+    const httpsUrl = await probeHttps(streamUrl, fetchFn);
+    await db.update(LS).set({ httpsUrl, httpsCheckedAt: deps.clock.now() }).where(eq(LS.id, sourceId));
+    return httpsUrl;
+  }
+
+  /**
+   * What a viewer's player loads for a stream link on the dial: its address as listed, or (A237) for
+   * `http://`, the https address that answered, else the relay's address for it.
+   */
+  function streamAddress(r: Row): string | null {
+    if (r.plays !== "stream_link" || !isPlainHttp(r.streamUrl)) return r.streamUrl;
+    if (r.httpsUrl) return r.httpsUrl;
+    const relay = deps.config.streamRelay;
+    return relay ? relayUrl(relay, r.streamUrl, (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash" ? "dash" : "hls") : null;
   }
 
   async function views(rows: Row[]): Promise<ListedSource[]> {
@@ -365,6 +429,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         upcoming: counts.find((c) => c.sourceId === r.id)?.n ?? 0,
         plays: r.plays,
         streamFormat: r.plays === "stream_link" ? (r.streamFormat ?? streamFormatOf(r.streamUrl)) : null,
+        // A237: how an http:// stream link reaches HTTPS apps (null for everything else).
+        playsOver: playsOverFor(r, rule.relay),
+        relayed: playsOverFor(r, rule.relay) === "relay",
         evidence: { basis: r.basis, termsUrl: r.termsUrl, termsCheckedOn: r.termsCheckedOn, publicBasis: r.publicBasis, permission, note: r.waitingNote },
         schedule: { source: r.scheduleSource, format: r.scheduleFormat, url: r.calendarUrl, checkedAgainst: r.guideCheckedAgainst, checkedOn: r.guideCheckedOn },
         onDial: !removed && waiting === null,
@@ -500,6 +567,36 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           : `${row.name}'s stream is back after ${minutes} minute${minutes === 1 ? "" : "s"} down. It's on the dial again.`,
       dedupeKey: `external:${step}:${row.id}:${outage.downSince.toISOString()}`
     });
+  }
+
+  /** A dial row's playback: the source's embed or stream link (A237: an http:// one's https or relay address). */
+  function playbackOf(r: Row): ExternalDial["playback"] {
+    const url = streamAddress(r);
+    if (url === null) return null;
+    const dash = r.plays === "stream_link" && (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash";
+    return { kind: r.plays === "embed" ? "embed" : "hls", url, ...(dash ? { format: "dash" as const } : {}) };
+  }
+
+  /**
+   * One listing's minute check, fetching the source directly (never through the relay). A237: an
+   * http:// link upgraded to https is checked there, and the upgrade is dropped when https stops
+   * answering while http still does; one that isn't upgraded is tried over https again hourly.
+   */
+  async function checkOne(row: Row, fetchFn: Fetch): Promise<StreamCheck> {
+    if (row.plays !== "stream_link" || !isPlainHttp(row.streamUrl)) return checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
+    if (row.httpsUrl) {
+      const check = await checkStream({ plays: row.plays, streamUrl: row.httpsUrl }, fetchFn);
+      if (check.ok) return check;
+      const plain = await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
+      if (!plain.ok) return check;
+      await db.update(LS).set({ httpsUrl: null, httpsCheckedAt: deps.clock.now() }).where(eq(LS.id, row.id));
+      return plain;
+    }
+    const check = await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
+    if (row.httpsCheckedAt && deps.clock.now().getTime() - row.httpsCheckedAt.getTime() < HTTPS_RECHECK_MS) return check;
+    const httpsUrl = await recordHttps(row.id, row.streamUrl, fetchFn);
+    // It plays over https now, so https answering is what counts.
+    return httpsUrl && !check.ok ? { ok: true, detail: null } : check;
   }
 
   /** One check's result, applied: the outage opened, hidden at 5 minutes, closed when it's back. */
@@ -664,6 +761,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         if (creator) await tx.update(CR).set({ stationId, ...(basisFor(evidence) ? { stage: "on_air" as const } : {}), nextAction: null, nextActionDue: null }).where(eq(CR.id, creator.id));
         return row.id;
       });
+      // A237: an http:// stream link is tried over https straight away.
+      if (plays === "stream_link" && isPlainHttp(input.streamUrl)) await recordHttps(sourceId, input.streamUrl);
       if (input.calendarUrl) await part.syncListedSource(sourceId);
       return one(sourceId);
     },
@@ -838,6 +937,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             basis,
             streamFormat: plays === "stream_link" ? (restart ? streamFormatOf(streamUrl) : (row.streamFormat ?? streamFormatOf(streamUrl))) : null,
             ...(restart ? unchecked : {}),
+            // A237: a new address (or way to play) is tried over https afresh, below.
+            ...(restart ? { httpsUrl: null, httpsCheckedAt: null } : {}),
             ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const } : {})
           })
           .where(eq(LS.id, sourceId));
@@ -869,6 +970,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         if (effects.includes("waits_for_evidence")) await leadBack(tx, row, null);
         await recordChange(tx, user, sourceId, "changed", fields, effects);
       });
+      if (restart && plays === "stream_link" && isPlainHttp(streamUrl)) await recordHttps(sourceId, streamUrl);
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (effects.includes("schedule_reread") && after) await sync(after, fetchFn);
       return one(sourceId);
@@ -997,7 +1099,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             info: { source: r.name, plays: r.plays, schedule: r.scheduleSource },
             // Straight from the source: its embed, or its stream link in Opencast's player.
             // A201: a DASH stream link says so (`format: "dash"`); apps before it try it as HLS and stand by.
-            playback: waiting === null ? { kind: r.plays === "embed" ? "embed" : "hls", url: r.streamUrl, ...(r.plays === "stream_link" && (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash" ? { format: "dash" as const } : {}) } : null
+            // A237: an http:// stream link plays its https address, or the relay's (streamAddress).
+            playback: waiting === null ? playbackOf(r) : null
           };
           return [r.stationId, dial] as const;
         })
@@ -1008,13 +1111,17 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const result: ExternalCheckResult = { checked: 0, up: 0, down: 0, hidden: 0, back: 0 };
       const [rows, rule] = await Promise.all([db.select().from(LS).where(isNull(LS.removedAt)), rules()]);
       // Only listings that could be on the dial: evidence in place (a hidden one is still checked),
-      // and never one taken off the dial (A215).
+      // and never one taken off the dial (A215). A237: whether the relay is configured doesn't
+      // matter here (the worker runs these checks without the relay's variables, which only the API
+      // has): every http:// link with its evidence is checked at the source, and tried over https
+      // hourly (checkOne), so one waiting for https goes on the dial once it answers there.
       const due = rows.filter((r) => {
-        const waiting = waitingFor(r, rule);
+        const waiting = waitingFor(r, { ...rule, relay: true });
         return waiting === null || waiting === "down";
       });
+      const fetchFn = options.fetch ?? publicFetch;
       await inBatches(due, CHECKS_AT_ONCE, async (row) => {
-        const check = await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, options.fetch ?? publicFetch);
+        const check = await checkOne(row, fetchFn);
         result.checked++;
         await applyCheck(row, check, result);
       });

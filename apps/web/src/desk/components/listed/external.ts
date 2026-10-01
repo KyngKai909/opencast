@@ -102,6 +102,8 @@ export function playsDetail(s: ListedSource, timeZone: string): string {
       return ["Needs their permission", s.creatorId ? "In the creator pipeline" : null, note].filter(Boolean).join(". ");
     case "dash_not_played":
       return "DASH stream, not played yet";
+    case "needs_https":
+      return "Needs an https address";
     case "other_market":
       return "Outside this market";
   }
@@ -146,6 +148,17 @@ export function nowWords(s: ListedSource, now: Date): { text: string; detail?: s
   return h.state === "hidden" ? { text: down, detail: "Hidden from the dial", tone: "down" } : { text: down, detail: "Still on the dial", tone: "warn" };
 }
 
+/**
+ * A237: how a stream link listed as http:// reaches viewers, when it isn't as listed: over https from
+ * the source, or through Opencast's secure relay. Null otherwise (and "Needs an https address" is the
+ * How it plays line itself while it waits for one).
+ */
+export function transportLine(s: ListedSource): string | null {
+  if (s.playsOver === "https") return "Plays over https (its listed address is http)";
+  if (s.playsOver === "relay") return "Plays through Opencast's secure relay (its address is http)";
+  return null;
+}
+
 /** What it goes on the dial once: the end of "Saved. It goes on the dial once …". */
 export function onceWords(s: ListedSource): string {
   switch (s.waiting) {
@@ -157,6 +170,8 @@ export function onceWords(s: ListedSource): string {
       return "they say yes in writing, or it's confirmed public";
     case "dash_not_played":
       return "Settings allows DASH stream links";
+    case "needs_https":
+      return "its source answers over https, or Opencast's secure relay is set up";
     case "other_market":
       return "Settings allows other markets' streams";
     case "down":

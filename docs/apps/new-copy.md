@@ -1103,3 +1103,15 @@ Nothing changes on air; the Network desk is told and decides with the owners. Fo
 - At the pad's corners: **Menu** (top left), **Guide** (top right), **Back** (bottom left, new: sends Back to the TV), **Info** (bottom right).
 - While the phone has the TV's guide or menu open, a small line over the pad says "Guide on the TV" or "Menu on the TV", and the group takes that name.
 - Under the pad: **Keypad** (one wide key), then "Guide on this phone". **Last** is now only the play rocker's lower key ("Last channel"); the button row's Last is gone.
+
+## External stations' http:// stream links (A237, 2026-10-01)
+
+For review. Viewers see nothing new: a relayed station plays like any other.
+
+| Where | Words |
+|---|---|
+| Network desk, External sources table, How it plays (a third small line) | "Plays through Opencast's secure relay (its address is http)"; "Plays over https (its listed address is http)" when the same address answered over https |
+| Network desk, External sources table, How it plays, waiting | "Needs an https address" (an http link that doesn't answer over https, with the relay not set up) |
+| Network desk, a listing's details, How it plays | a row "Plays through Opencast's secure relay (its address is http)" or "Plays over https (its listed address is http)"; waiting, the line "Needs an https address" and the note "Apps on https can't play an http address. It waits until its source answers over https, or Opencast's secure relay is set up." |
+| Network desk, List a source (and Change, Put back), saved but waiting | "Saved. {City of Colton} goes on the dial once its source answers over https, or Opencast's secure relay is set up." (the toast's usual start, then these words) |
+| The relay's own answers (developers only, plain text) | "Not signed", "Bad signature", "Not a relay address", "Only http and https streams are relayed", "Addresses with a user name or password aren't relayed", "Not a public address", "The relay isn't configured", "The source answered {404}", "Couldn't reach the source", "The source didn't answer in 10 seconds", "Not a playlist", "The playlist is too large", "Too many redirects at the source", "Opencast stream relay" (/health) |

@@ -2,7 +2,7 @@
 // Right now, and the outage history, on the mock clock's Saturday, 8:42 pm in the Inland Empire.
 import { describe, expect, it } from "vitest";
 import type { ListedSource } from "@opencast/contracts";
-import { downFor, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail } from "./external";
+import { downFor, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail, transportLine } from "./external";
 
 const TZ = "America/Los_Angeles";
 const NOW = new Date("2026-09-27T03:42:12Z");
@@ -42,6 +42,20 @@ describe("how it plays", () => {
     expect(playsDetail(s({ waiting: "dash_not_played" }), TZ)).toBe("DASH stream, not played yet");
     expect(playsDetail(s({ waiting: "other_market" }), TZ)).toBe("Outside this market");
     expect(sourceDetail(s({ creatorId: "c", description: "A community channel's raw stream" }))).toBe("From an IPTV list. A community channel's raw stream");
+  });
+});
+
+describe("an http:// stream link (A237)", () => {
+  const http = { streamUrl: "http://colton.example.gov/live.m3u8" };
+  it("says how it reaches viewers: over https, through the secure relay, or waiting for an https address", () => {
+    expect(transportLine(s({ ...http, playsOver: "relay", relayed: true }))).toBe("Plays through Opencast's secure relay (its address is http)");
+    expect(transportLine(s({ ...http, playsOver: "https" }))).toBe("Plays over https (its listed address is http)");
+    expect(transportLine(s({ ...http, playsOver: "needs_https", waiting: "needs_https", onDial: false }))).toBeNull();
+    expect(playsDetail(s({ ...http, playsOver: "needs_https", waiting: "needs_https", onDial: false }), TZ)).toBe("Needs an https address");
+    expect(onceWords(s({ waiting: "needs_https" }))).toBe("its source answers over https, or Opencast's secure relay is set up");
+    // https links, and listings from before A237, say nothing more.
+    expect(transportLine(s({}))).toBeNull();
+    expect(transportLine(s({ playsOver: null }))).toBeNull();
   });
 });
 

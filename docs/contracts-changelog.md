@@ -2,6 +2,13 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-01: External stations' http:// stream links (A237)
+
+Additive: two optional fields and one more `waiting` value on `ListedSource`; `Playback` is unchanged. Migration **0044** (after 0043, named by hand): `network.listed_sources.https_url`, `https_checked_at`.
+
+- `network.ts`: `ListedSource` gains optional `playsOver` (`https` | `relay` | `needs_https`, or null: how an `http://` stream link reaches HTTPS apps; null for an https stream link or an embed, which play their address as listed) and `relayed` (true while it plays through Opencast's HTTPS relay). `waiting` gains `needs_https` (an `http://` stream link that doesn't answer over https, with the relay not configured). The desk is the only reader of `waiting`; a desk built before it would reject a listing waiting for this reason, so the desk ships with the API.
+- Behaviour: an `http://` stream link is tried over https when it's listed, when its address changes, and hourly with the minute's checks; when it answers there, `DialRow.playback.url` and `StationPage.playback.url` are that https address (straight from the source). Otherwise, with `STREAM_RELAY_BASE` and `STREAM_RELAY_SECRET` set, they're the signed relay address (`https://<relay>/v1/<sig>/<b64url(address)>`; DASH keeps `format: "dash"` with `…/v1/<sig>/<b64url(origin)>/<path>`); without them the station waits and isn't on the dial, guide or search. `https://` stream links and embeds are unchanged. The minute's checks fetch the source directly (the https address while it's upgraded, else the listed http address); a listing waiting for https is checked too (the checks don't depend on the relay's variables) and tried over https hourly.
+
 ## 2026-09-30: A shared call sign whose stations no longer share an owner (A234)
 
 Additive: one notice kind, one optional field on the market board, one new schema. Migration **0043** (after 0042, named by hand): `broadcast.stations.owners_split_at`.

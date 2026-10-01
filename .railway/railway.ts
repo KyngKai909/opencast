@@ -111,7 +111,13 @@ export default defineRailway((ctx) => {
       // Radio encoders push to the worker's RTMP ingest, through its TCP proxy.
       WORKER_INGEST_SERVER: "rtmp://${{worker.RAILWAY_TCP_PROXY_DOMAIN}}:${{worker.RAILWAY_TCP_PROXY_PORT}}/live",
       WEB_ORIGIN: production ? secret() : (["web", "business", "site", "tv"] as const).map(webOrigin).join(","),
-      SERVE_WEB_APP: "false"
+      SERVE_WEB_APP: "false",
+      // A237: Opencast's HTTPS relay for external stations' http:// stream links, a Cloudflare Worker
+      // (apps/stream-relay, docs/stream-relay.md): its address (`https://opencast-stream-relay.<account>.workers.dev`,
+      // kept in Railway since it isn't known here) and the secret the API signs with, the same value as
+      // the Worker's. Unset: an http link plays only when it answers over https, else it waits.
+      STREAM_RELAY_BASE: secret(),
+      STREAM_RELAY_SECRET: secret()
     }
   });
 

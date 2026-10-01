@@ -1,0 +1,3 @@
+# Wrangler's local secrets and state (`wrangler dev`): never committed.
+.dev.vars
+.wrangler/

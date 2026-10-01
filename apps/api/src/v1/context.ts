@@ -26,6 +26,7 @@ import type { ShelfService } from "./modules/shelf/service.js";
 import type { MaintenanceService } from "./modules/maintenance/service.js";
 import type { RelaysService } from "./modules/relays/service.js";
 import type { PlatformDeps, PlatformsService } from "./modules/platforms/service.js";
+import type { StreamRelay } from "./lib/streamRelay.js";
 import type { UploadsService } from "./modules/uploads/service.js";
 import type { PinataAccount } from "./storageMaintenance.js";
 import type { GeoLookup } from "./geo.js";
@@ -111,7 +112,18 @@ export interface Deps {
     publicBase?: string | null;
     /** Where the worker serves each station's own HLS (HLS_PUBLIC_URL), when it isn't the API's origin. */
     hlsBase?: string | null;
+    /**
+     * A237 (added 2026-10-01): Opencast's HTTPS relay for external stations' `http://` stream links
+     * (STREAM_RELAY_BASE and STREAM_RELAY_SECRET; apps/stream-relay, docs/stream-relay.md). Null or
+     * absent: such a link plays only when it answers over https, and otherwise waits (`needs_https`).
+     */
+    streamRelay?: StreamRelay | null;
   };
+  /**
+   * Fetches for addresses the Network desk types in (external stations' https check, A237). Absent:
+   * `publicFetch` (the public internet only). Tests pass a fake.
+   */
+  externalFetch?: typeof fetch;
 }
 
 /** Every module's service. Modules call each other only through these, never each other's tables. */
