@@ -365,10 +365,13 @@ describe("never used for", () => {
     expect(engine.getState().banner?.stationId).toBe(CIVC.station.id);
   });
 
-  it("off air: a press straight to an off-air station shows off air at once", async () => {
+  it("off air: a press to an off-air station still shows the static, like a TV, then off air", async () => {
     make();
     await onAir(LUPE);
     engine.handle({ type: "channel", dir: "up" });
+    // The change is drawn like any other: the static over the old picture, the new number in the corner.
+    expect(engine.getState().tuning).toMatchObject({ stationId: DARK.station.id, look: "static" });
+    await flush(MIN_STATIC_MS + ROLL_MS + 500);
     expect(engine.getState()).toMatchObject({ currentId: DARK.station.id, status: "off_air", tuning: null });
   });
 

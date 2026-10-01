@@ -559,14 +559,13 @@ export class PlayerEngine {
 
   /**
    * How this change looks: static over the old picture (a crossfade with reduced motion, the
-   * needle on the radio band), or nothing on first launch, for a station coming back, and for a
-   * press straight to an off-air station or a city's player (never static for those).
+   * needle on the radio band), on every channel change, like a TV: to an off-air station, one on
+   * Stand by or a city's player too, where the static runs its minimum and then clears to that
+   * screen. Nothing only on first launch and for a station coming back.
    */
   private lookFor(c: Channel, again: boolean): TuningLook {
     if (again) return "none";
     const covering = this.change.state;
-    const playable = c.onAir && c.playback?.kind === "hls" && (!isDash(c) || this.canPlayDash());
-    if (!covering && !playable) return "none";
     const s = this.state.status;
     if (!this.state.currentId || s === "stopped" || s === "idle") return "none";
     const fromRadio = frequencyOf(this.channel(this.state.currentId)?.station.channel) !== null && this.channel(this.state.currentId)?.station.band === "radio";

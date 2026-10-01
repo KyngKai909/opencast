@@ -365,7 +365,7 @@ describe("a device that can't play DASH", () => {
     await flush(CHANGE_MS + 500);
     expect(engine.getState().currentId).toBe(COLT.station.id);
     // By number (or the guide): it says it can't play here.
-    await engine.tune(LOMA.station.id);
+    await until(engine.tune(LOMA.station.id));
     await flush(CHANGE_MS);
     expect(engine.getState()).toMatchObject({ currentId: LOMA.station.id, status: "unplayable", pendingId: null });
     expect(driver.attach).not.toHaveBeenCalled();
