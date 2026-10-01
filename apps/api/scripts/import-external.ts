@@ -61,7 +61,14 @@ for (const listing of plan.listings ?? []) {
     continue;
   }
   try {
-    const added = await services.network.addListedSource(user, { ...listing, marketId: market.id });
+    // A lead with this stream in this market becomes the station (its stage moves on with it).
+    const [lead] = listing.creatorId
+      ? []
+      : await db
+          .select({ id: schema.creators.id })
+          .from(schema.creators)
+          .where(and(eq(schema.creators.marketId, market.id), eq(schema.creators.streamUrl, listing.streamUrl)));
+    const added = await services.network.addListedSource(user, { ...listing, marketId: market.id, ...(lead ? { creatorId: lead.id } : {}) });
     console.log(`  list  added ${label}: ${added.onDial ? "on the dial" : `waiting (${added.waiting ?? "checks"})`}`);
   } catch (error) {
     console.log(`  list  skip  ${label}: ${(error as Error).message}`);
