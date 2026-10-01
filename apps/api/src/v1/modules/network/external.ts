@@ -14,6 +14,12 @@
 //   through Opencast's HTTPS relay (apps/stream-relay: pass-through, nothing stored), or waits
 //   (`needs_https`) when the relay isn't configured. https stream links, embeds and DASH over https
 //   are unchanged. Checks still fetch the source directly.
+// - A238 (the user's decision, extending A237): a stream link browsers can't load because its server
+//   sends no CORS header for Opencast's apps (checked at listing, on a change and hourly: its playlist,
+//   first variant and first segment) plays through the relay too, with every address relayed (/v2/,
+//   "all" mode), or waits (`browsers_blocked`) without the relay; it plays direct again once a check
+//   finds CORS allowed. Links that work only with another app's access (lib/platformFeeds.ts) are
+//   never relayed: they wait (`platform_feed`) and stay listed.
 // - What's on comes from the source's own feed (iCal, RSS, JSON or XMLTV), or guide data checked
 //   against its published schedule; with neither, the banner says Live and the source.
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
@@ -43,6 +49,8 @@ import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
 import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
+import { probeCors, type CorsCheck } from "../../lib/streamCors.js";
+import { platformFeedOf } from "../../lib/platformFeeds.js";
 
 /** A check that hasn't answered by then has failed. */
 export const CHECK_TIMEOUT_MS = 5_000;
@@ -52,6 +60,8 @@ export const DOWN_AFTER_MS = 5 * 60_000;
 const MANIFEST_BYTES = 64 * 1024;
 /** A237: how often an `http://` stream link that didn't answer over https is tried there again. */
 export const HTTPS_RECHECK_MS = 60 * 60_000;
+/** A238: how often the address a viewer's player loads straight from the source is checked for CORS. */
+export const CORS_RECHECK_MS = 60 * 60_000;
 /** Checks at once, so a minute's round stays well inside the minute. */
 const CHECKS_AT_ONCE = 8;
 /** An IPTV list read by its address: its size and patience. */
@@ -208,9 +218,11 @@ export function basisFor(row: Pick<Row, "plays" | "embedTerms" | "termsUrl" | "t
  * (A200, A201), then its stream.
  */
 export function waitingFor(
-  row: Pick<Row, "plays" | "embedTerms" | "basis" | "streamFormat" | "outsideMarket" | "health"> & { streamUrl?: string; httpsUrl?: string | null },
+  row: Pick<Row, "plays" | "embedTerms" | "basis" | "streamFormat" | "outsideMarket" | "health"> & { streamUrl?: string; httpsUrl?: string | null; cors?: Row["cors"]; platformFeed?: string | null },
   rules: { otherMarkets: boolean; dash: boolean; relay?: boolean }
 ): Waiting | null {
+  // A238: another app's access is never played or relayed, whatever its evidence or CORS.
+  if (row.platformFeed) return "platform_feed";
   if (row.plays === "embed") {
     if (row.embedTerms !== "allowed") return "terms_unclear";
     if (row.basis !== "embed_terms") return "needs_terms";
@@ -219,6 +231,8 @@ export function waitingFor(
     if (row.streamFormat === "dash" && !rules.dash) return "dash_not_played";
     // A237: plain http plays over https from the source, or through the relay; with neither, it waits.
     if (playsOverFor(row, !!rules.relay) === "needs_https") return "needs_https";
+    // A238: a server browsers can't load from plays through the relay; with none, it waits.
+    if (corsBlocked(row) && !rules.relay) return "browsers_blocked";
   }
   if (row.outsideMarket && !rules.otherMarkets) return "other_market";
   if (row.health === "hidden") return "down";
@@ -229,10 +243,34 @@ export function waitingFor(
  * A237: how an `http://` stream link reaches HTTPS apps: over https from the source (it answered
  * there), through the relay, or neither (it waits). Null for anything else, which plays as listed.
  */
-export function playsOverFor(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null }, relay: boolean): ListedSource["playsOver"] {
-  if (row.plays !== "stream_link" || !row.streamUrl || !isPlainHttp(row.streamUrl)) return null;
-  if (row.httpsUrl) return "https";
-  return relay ? "relay" : "needs_https";
+export function playsOverFor(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null; cors?: Row["cors"]; platformFeed?: string | null }, relay: boolean): ListedSource["playsOver"] {
+  if (row.plays !== "stream_link" || !row.streamUrl || row.platformFeed) return null;
+  if (isPlainHttp(row.streamUrl) && !row.httpsUrl) return relay ? "relay" : "needs_https";
+  // A238: a server browsers can't load from, through the relay (or nothing: it waits, browsers_blocked).
+  if (corsBlocked(row)) return relay ? "relay" : null;
+  return row.httpsUrl ? "https" : null;
+}
+
+/** A238: why it's relayed, while it is: its address is http (A237), or its server blocks browsers (CORS). */
+export function relayReasonFor(row: Parameters<typeof playsOverFor>[0], relay: boolean): ListedSource["relayReason"] {
+  if (playsOverFor(row, relay) !== "relay") return null;
+  return row.streamUrl && isPlainHttp(row.streamUrl) && !row.httpsUrl ? "http" : "cors";
+}
+
+/**
+ * A238: the address a viewer's player would load straight from the source: an https stream link's
+ * own, or an http one's https address. Null for an http link that didn't answer over https (only the
+ * relay can carry it), an embed, and anything that isn't http(s).
+ */
+export function directAddressOf(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null }): string | null {
+  if (row.plays !== "stream_link" || !row.streamUrl) return null;
+  if (isPlainHttp(row.streamUrl)) return row.httpsUrl ?? null;
+  return /^https:\/\//i.test(row.streamUrl.trim()) ? row.streamUrl : null;
+}
+
+/** A238: its direct address's server sends no CORS header for Opencast's apps (at the last check). */
+function corsBlocked(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null; cors?: Row["cors"] }): boolean {
+  return row.cors === "blocked" && directAddressOf(row) !== null;
 }
 
 /** Up to `limit` bytes of an answer's body as text, then the rest is let go unread. */
@@ -360,14 +398,45 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
   }
 
   /**
+   * A238: the address a viewer's player loads straight from the source, checked for CORS now (with
+   * the web app's origin), and what was found kept. `keepKnown` (the hourly check): a check that
+   * couldn't tell (`unknown`) leaves an earlier `ok` or `blocked` as it was, so a slow answer doesn't
+   * flip how it plays.
+   */
+  async function recordCors(row: Pick<Row, "id" | "cors">, address: string, fetchFn: Fetch = externalFetch(), keepKnown = false): Promise<CorsCheck> {
+    const found = await probeCors(address, deps.config.appOrigin, fetchFn);
+    const keep = keepKnown && found.state === "unknown" && (row.cors === "ok" || row.cors === "blocked");
+    await db
+      .update(LS)
+      .set(keep ? { corsCheckedAt: deps.clock.now() } : { cors: found.state, corsDetail: found.detail, corsCheckedAt: deps.clock.now() })
+      .where(eq(LS.id, row.id));
+    return found;
+  }
+
+  /** A237 and A238 at listing and on a change: https tried for an http link, then CORS where the player would fetch straight from the source. */
+  async function probeNew(sourceId: string) {
+    const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+    if (!row || row.plays !== "stream_link" || row.platformFeed) return;
+    const httpsUrl = isPlainHttp(row.streamUrl) ? await recordHttps(sourceId, row.streamUrl) : null;
+    const direct = directAddressOf({ ...row, httpsUrl });
+    if (direct) await recordCors(row, direct);
+  }
+
+  /**
    * What a viewer's player loads for a stream link on the dial: its address as listed, or (A237) for
    * `http://`, the https address that answered, else the relay's address for it.
    */
   function streamAddress(r: Row): string | null {
-    if (r.plays !== "stream_link" || !isPlainHttp(r.streamUrl)) return r.streamUrl;
-    if (r.httpsUrl) return r.httpsUrl;
+    if (r.plays !== "stream_link") return r.streamUrl;
+    // A238: another app's access is never played, let alone relayed.
+    if (r.platformFeed) return null;
     const relay = deps.config.streamRelay;
-    return relay ? relayUrl(relay, r.streamUrl, (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash" ? "dash" : "hls") : null;
+    const format = (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash" ? "dash" : "hls";
+    if (isPlainHttp(r.streamUrl) && !r.httpsUrl) return relay ? relayUrl(relay, r.streamUrl, format) : null;
+    const direct = directAddressOf(r) ?? r.streamUrl;
+    // A238: a server browsers can't load from, through the relay with every address relayed (/v2/).
+    if (corsBlocked(r)) return relay ? relayUrl(relay, direct, format, "all") : null;
+    return direct;
   }
 
   async function views(rows: Row[]): Promise<ListedSource[]> {
@@ -432,6 +501,10 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         // A237: how an http:// stream link reaches HTTPS apps (null for everything else).
         playsOver: playsOverFor(r, rule.relay),
         relayed: playsOverFor(r, rule.relay) === "relay",
+        // A238: why it's relayed; whether browsers can load it straight from the source; another app's access.
+        relayReason: relayReasonFor(r, rule.relay),
+        cors: r.plays === "stream_link" && r.cors && directAddressOf(r) ? { state: r.cors, detail: r.corsDetail, checkedAt: r.corsCheckedAt?.toISOString() ?? null } : null,
+        platformFeed: r.platformFeed,
         evidence: { basis: r.basis, termsUrl: r.termsUrl, termsCheckedOn: r.termsCheckedOn, publicBasis: r.publicBasis, permission, note: r.waitingNote },
         schedule: { source: r.scheduleSource, format: r.scheduleFormat, url: r.calendarUrl, checkedAgainst: r.guideCheckedAgainst, checkedOn: r.guideCheckedOn },
         onDial: !removed && waiting === null,
@@ -581,22 +654,45 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
    * One listing's minute check, fetching the source directly (never through the relay). A237: an
    * http:// link upgraded to https is checked there, and the upgrade is dropped when https stops
    * answering while http still does; one that isn't upgraded is tried over https again hourly.
+   * Returns the check and the https address it has afterwards.
    */
-  async function checkOne(row: Row, fetchFn: Fetch): Promise<StreamCheck> {
-    if (row.plays !== "stream_link" || !isPlainHttp(row.streamUrl)) return checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
+  async function checkSource(row: Row, fetchFn: Fetch): Promise<{ check: StreamCheck; httpsUrl: string | null }> {
+    const httpsUrl = row.httpsUrl;
+    if (row.plays !== "stream_link" || !isPlainHttp(row.streamUrl)) return { check: await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn), httpsUrl };
     if (row.httpsUrl) {
       const check = await checkStream({ plays: row.plays, streamUrl: row.httpsUrl }, fetchFn);
-      if (check.ok) return check;
+      if (check.ok) return { check, httpsUrl };
       const plain = await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
-      if (!plain.ok) return check;
+      if (!plain.ok) return { check, httpsUrl };
       await db.update(LS).set({ httpsUrl: null, httpsCheckedAt: deps.clock.now() }).where(eq(LS.id, row.id));
-      return plain;
+      return { check: plain, httpsUrl: null };
     }
     const check = await checkStream({ plays: row.plays, streamUrl: row.streamUrl }, fetchFn);
-    if (row.httpsCheckedAt && deps.clock.now().getTime() - row.httpsCheckedAt.getTime() < HTTPS_RECHECK_MS) return check;
-    const httpsUrl = await recordHttps(row.id, row.streamUrl, fetchFn);
+    if (row.httpsCheckedAt && deps.clock.now().getTime() - row.httpsCheckedAt.getTime() < HTTPS_RECHECK_MS) return { check, httpsUrl };
+    const found = await recordHttps(row.id, row.streamUrl, fetchFn);
     // It plays over https now, so https answering is what counts.
-    return httpsUrl && !check.ok ? { ok: true, detail: null } : check;
+    return { check: found && !check.ok ? { ok: true, detail: null } : check, httpsUrl: found };
+  }
+
+  /**
+   * The minute's check (checkSource), then A238's CORS check of the address a viewer's player would
+   * load straight from the source: hourly, or at once when that address changed (an http link's https
+   * upgrade found or dropped), and only while the source answers. With no such address (an http link
+   * relayed), nothing is kept.
+   */
+  async function checkOne(row: Row, fetchFn: Fetch): Promise<StreamCheck> {
+    const { check, httpsUrl } = await checkSource(row, fetchFn);
+    if (row.plays !== "stream_link") return check;
+    const direct = directAddressOf({ ...row, httpsUrl });
+    const moved = direct !== directAddressOf(row);
+    if (!direct || (moved && !check.ok)) {
+      // What was found was about another address: checked afresh once there's one that answers.
+      if (row.cors !== null || row.corsCheckedAt !== null) await db.update(LS).set({ cors: null, corsDetail: null, corsCheckedAt: null }).where(eq(LS.id, row.id));
+      return check;
+    }
+    const due = moved || !row.corsCheckedAt || deps.clock.now().getTime() - row.corsCheckedAt.getTime() >= CORS_RECHECK_MS;
+    if (due && check.ok) await recordCors(moved ? { ...row, cors: null } : row, direct, fetchFn, !moved);
+    return check;
   }
 
   /** One check's result, applied: the outage opened, hidden at 5 minutes, closed when it's back. */
@@ -744,6 +840,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             ...evidence,
             basis: basisFor(evidence),
             streamFormat: plays === "stream_link" ? streamFormatOf(input.streamUrl) : null,
+            // A238: another app's access waits, never relayed.
+            platformFeed: platformFeedOf(input.streamUrl),
             waitingNote: input.evidence?.note ?? null,
             outsideMarket,
             scheduleSource: input.guideData ? "guide_data" : input.calendarUrl ? "feed" : "none",
@@ -761,8 +859,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         if (creator) await tx.update(CR).set({ stationId, ...(basisFor(evidence) ? { stage: "on_air" as const } : {}), nextAction: null, nextActionDue: null }).where(eq(CR.id, creator.id));
         return row.id;
       });
-      // A237: an http:// stream link is tried over https straight away.
-      if (plays === "stream_link" && isPlainHttp(input.streamUrl)) await recordHttps(sourceId, input.streamUrl);
+      // A237: an http:// stream link is tried over https straight away; A238: then CORS, where the
+      // player would fetch straight from the source (never for another app's access).
+      await probeNew(sourceId);
       if (input.calendarUrl) await part.syncListedSource(sourceId);
       return one(sourceId);
     },
@@ -937,8 +1036,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             basis,
             streamFormat: plays === "stream_link" ? (restart ? streamFormatOf(streamUrl) : (row.streamFormat ?? streamFormatOf(streamUrl))) : null,
             ...(restart ? unchecked : {}),
-            // A237: a new address (or way to play) is tried over https afresh, below.
-            ...(restart ? { httpsUrl: null, httpsCheckedAt: null } : {}),
+            // A237: a new address (or way to play) is tried over https afresh, below; A238: and for
+            // CORS, and matched against the platform feeds.
+            ...(restart ? { httpsUrl: null, httpsCheckedAt: null, cors: null, corsDetail: null, corsCheckedAt: null, platformFeed: platformFeedOf(streamUrl) } : {}),
             ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const } : {})
           })
           .where(eq(LS.id, sourceId));
@@ -970,7 +1070,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         if (effects.includes("waits_for_evidence")) await leadBack(tx, row, null);
         await recordChange(tx, user, sourceId, "changed", fields, effects);
       });
-      if (restart && plays === "stream_link" && isPlainHttp(streamUrl)) await recordHttps(sourceId, streamUrl);
+      if (restart) await probeNew(sourceId);
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (effects.includes("schedule_reread") && after) await sync(after, fetchFn);
       return one(sourceId);
@@ -1110,6 +1210,14 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     async checkExternalStations(options = {}) {
       const result: ExternalCheckResult = { checked: 0, up: 0, down: 0, hidden: 0, back: 0 };
       const [rows, rule] = await Promise.all([db.select().from(LS).where(isNull(LS.removedAt)), rules()]);
+      // A238: every listing matched against the platform feeds (one listed before A238 too, or after
+      // the patterns change): another app's access leaves the dial (`platform_feed`) and stays listed.
+      for (const r of rows) {
+        const feed = platformFeedOf(r.streamUrl);
+        if (feed === r.platformFeed) continue;
+        await db.update(LS).set({ platformFeed: feed }).where(eq(LS.id, r.id));
+        r.platformFeed = feed;
+      }
       // Only listings that could be on the dial: evidence in place (a hidden one is still checked),
       // and never one taken off the dial (A215). A237: whether the relay is configured doesn't
       // matter here (the worker runs these checks without the relay's variables, which only the API

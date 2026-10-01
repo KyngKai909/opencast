@@ -22,19 +22,25 @@ const LOMA_HTTP = "http://lomalinda.example.gov:8080/live/manifest.mpd";
 const RIALTO_HTTPS = "https://rialto.example.gov/live/index.m3u8";
 const PLAYLIST = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2000000\nhd/index.m3u8\n";
 
-/** A fake network: each address answers what `routes` says, and every call is kept. */
+/**
+ * A fake network: each address answers what `routes` says, and every call is kept. A238's CORS checks
+ * (the ones with an `Origin`) are kept apart, in `corsCalls`: these tests are about A237's https
+ * checks and the minute's checks (external-cors.test.ts has A238's).
+ */
 function fakeFetch(routes: Record<string, () => Response>) {
   const calls: string[] = [];
-  const fn = (async (input: RequestInfo | URL) => {
+  const corsCalls: string[] = [];
+  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    calls.push(url);
+    (new Headers(init?.headers).has("origin") ? corsCalls : calls).push(url);
     const route = routes[url];
     if (!route) throw new TypeError("fetch failed");
     return route();
   }) as Fetch;
-  return { fn, calls };
+  return { fn, calls, corsCalls };
 }
-const hls = () => new Response(PLAYLIST, { status: 200 });
+// A server that lets browsers load it (A238): it plays straight from the source when it answers over https.
+const hls = () => new Response(PLAYLIST, { status: 200, headers: { "access-control-allow-origin": "*" } });
 
 /** The signature an origin should carry, worked out here independently of the API's code. */
 const expectedSig = (origin: string) => createHmac("sha256", RELAY.secret).update(origin).digest("base64url");

@@ -1,10 +1,12 @@
-# The HTTPS stream relay (A237)
+# The HTTPS stream relay (A237, A238)
 
 Added 2026-10-01. Opencast's apps are served over HTTPS, and browsers block an `http://` stream on an HTTPS page as mixed content, so an external station whose stream link is plain `http://` couldn't play. **The user decided** (A237, docs/open-decisions.md) to change Phase 6's "never proxy, cache or re-serve the stream" **for `http://` stream links only**. Everything else still plays straight from the source, as before:
 
 - `https://` stream links;
 - official embeds (even an `http://` one: it's the source's own page in a frame);
 - DASH over https.
+
+**A238** (2026-10-01, the user's decision, extending A237) adds the streams browsers can't load because their server sends no CORS header, and keeps out the links that use another app's access: see [below](#a238-stream-links-browsers-cant-load).
 
 ## What happens to an `http://` stream link
 
@@ -16,6 +18,36 @@ Its evidence still has to hold first (a written permission or a public basis), a
 
 The minute's health checks always fetch the source directly from the server (never through the relay): the https address while it's upgraded, otherwise the listed http address.
 
+## A238: stream links browsers can't load
+
+Opencast's players fetch playlists and segments with XHR (hls.js, dash.js), so a server that sends no `Access-Control-Allow-Origin` header for the app plays nowhere in a browser, https or not (a news network's public `…/us.m3u8`, say). **The user decided** (A238) to relay these too.
+
+1. **The check.** The address a viewer's player would fetch straight from the source (an https stream link, or an http one's https address from step 1 above) is fetched with the web app's origin (`APP_ORIGIN`) as `Origin`, the minute check's light way (a ranged GET, a 5 s timeout, the public internet only; `apps/api/src/v1/lib/streamCors.ts`):
+   - the playlist: **blocked** when its answer has no `Access-Control-Allow-Origin` of `*` or the app's origin;
+   - allowed, then the **first variant playlist** (a master) and the **first segment** (or its `EXT-X-MAP` init), the same way: many CDNs allow playlists but not segments;
+   - DASH: the MPD, then its first init or segment when that's simple to work out (no `BaseURL`, a `SegmentTemplate` with only `$RepresentationID$` or `$Bandwidth$`, an `Initialization`, a `SegmentURL`); otherwise the MPD only, and the desk's detail says "Checked its MPD only";
+   - `cors` is `ok`, `blocked` or `unknown` (something didn't answer: it plays as listed, as before A238), with what was found and when.
+
+   When: at listing, on a change of address (A215), and hourly with the minute's checks (only while the source answers; an hourly check that can't tell leaves an earlier `ok` or `blocked` alone), and at once when an http link's https upgrade is found or dropped. Never every minute.
+2. **Blocked, with the relay configured**: the dial's and station page's `playback.url` is the relay's **`/v2/`** ("all" mode) address for it, and the Worker relays **every** address in its playlists, https included. The listing has `playsOver: "relay"`, `relayed: true` and `relayReason: "cors"` (A237's are `relayReason: "http"`), and the desk says "Browsers block this stream's server, so it plays through Opencast's secure relay", with what the check found.
+3. **Blocked, no relay**: it waits, `waiting: "browsers_blocked"`, off the dial ("Browsers can't play this stream yet"). It's still checked every minute and for CORS hourly.
+4. **Fixed**: once a check finds CORS allowed, it plays straight from the source again.
+
+An http link that doesn't answer over https follows A237 unchanged: `/v1/`, its playlists' https addresses left direct.
+
+**Opencast then carries these streams too**, so their evidence matters as much as an http link's, and more than a stream the viewer's player fetches itself: check the permission covers Opencast carrying it, or that the source is clearly public.
+
+### Never relayed: another app's access
+
+Links that work only by using another app's access are **never relayed** (the user agreed), whatever their CORS. They wait, `waiting: "platform_feed"`, off the dial, and stay listed (not removed). The desk says "Uses another app's access (Pluto via Samsung TV Plus). Ask the channel's licensor for its own feed." The patterns live in one place, `PLATFORM_FEED_PATTERNS` in `apps/api/src/v1/lib/platformFeeds.ts`, matched by the address alone (nothing fetched):
+
+- `jmp2.uk` (a redirector to other apps' channel feeds);
+- Pluto's stitcher (`*.pluto.tv`, a `stitch` host or path) carrying an app's `authToken` or `jwt`, an `embedPartner=…`, or a partner's `deviceType` (`samsung-tvplus`, `rokuChannel`, …);
+- Samsung TV Plus headend paths (`samsungheadend` in the path);
+- any `authToken=`, `token=` or `jwt=` that's a JWT whose payload names a partner (`partner`, `partnerId`, `partnerName`, `embedPartner`, `distributionPartner`, or a partner's `deviceType` or `appName`).
+
+They're matched at listing, on a change, and for every listing at the checks' next pass (each minute, so well within the hour), which takes one that was on the dial before A238 off it. They're never tried over https, checked for CORS or checked every minute.
+
 ## The relay
 
 A Cloudflare Worker in `apps/stream-relay` (TypeScript, `wrangler.toml`, no runtime dependencies). It is **strictly pass-through**:
@@ -24,23 +56,26 @@ A Cloudflare Worker in `apps/stream-relay` (TypeScript, `wrangler.toml`, no runt
 - **Playlists are always `no-store`**, at the edge and in the browser.
 - **Segments are `no-store` too, by default.** `RELAY_EDGE_CACHE_SECONDS` (a Worker variable in `wrangler.toml`, default `0`) lets Cloudflare's edge and viewers' browsers keep segments and keys for that many seconds (up to 3,600). 30 to 60 seconds saves requests to the source when many people watch the same channel at once; it doesn't save Worker requests (each viewer's request still runs the Worker). Leave it at 0 to keep "nothing kept".
 
-### Addresses
+### Addresses and modes
 
 ```
-GET|HEAD https://<relay>/v1/<sig>/<b64url(upstream URL)>            the address in full (HLS)
-GET|HEAD https://<relay>/v1/<sig>/<b64url(origin)>/<path>?<query>   the path kept (DASH)
+GET|HEAD https://<relay>/v1/<sig>/<b64url(upstream URL)>            the address in full (HLS), "http" mode (A237)
+GET|HEAD https://<relay>/v1/<sig>/<b64url(origin)>/<path>?<query>   the path kept (DASH), "http" mode
+GET|HEAD https://<relay>/v2/<sig>/<b64url(upstream URL)>            the address in full, "all" mode (A238)
+GET|HEAD https://<relay>/v2/<sig>/<b64url(origin)>/<path>?<query>   the path kept, "all" mode
 OPTIONS  (CORS preflight)        GET /health
 ```
 
-- `sig` is HMAC-SHA256 over the upstream's **origin** (`http://host[:port]`, as `URL.origin` writes it) with `STREAM_RELAY_SECRET`, base64url without padding. The API signs the stream link's origin (`apps/api/src/v1/lib/streamRelay.ts`); the Worker relays **any** address on a signed origin, so a playlist's segments and variant playlists on the same origin work without the API signing each one.
-- **A playlist that lists another `http://` origin** (a CDN, say): the Worker signs that origin itself while rewriting. It's following the listed source's own playlist, so that's acceptable, and it's the only way the Worker signs anything.
+- **Two modes.** `/v1/` ("http", A237): an http stream link; its playlists' http addresses are relayed and https ones stay direct. `/v2/` ("all", A238): a stream whose server browsers can't load from; every address its playlists name is relayed, https included.
+- `sig` is HMAC-SHA256 with `STREAM_RELAY_SECRET`, base64url without padding, over the upstream's **origin** (`http://host[:port]`, as `URL.origin` writes it) on `/v1/`, and over **`<origin>|all`** on `/v2/`. The mode is inside what's signed, so a `/v1/` signature is refused on `/v2/` (and the other way round): a viewer can't turn an http-only address into one that relays everything. A237's `/v1/` addresses are unchanged. The API signs the stream link's origin (`apps/api/src/v1/lib/streamRelay.ts`, `relayUrl(relay, address, format, mode)`); the Worker relays **any** address on a signed origin, so a playlist's segments and variant playlists on the same origin work without the API signing each one.
+- **A playlist that lists another origin** (a CDN, say): the Worker signs that origin itself while rewriting, in the playlist's own mode (on `/v1/` only http origins, since https stays direct; on `/v2/` any). It's following the listed source's own playlist, so that's acceptable, and it's the only way the Worker signs anything.
 - Unsigned or badly signed: **403**. Only `http:` and `https:` upstreams (anything else: **400**), never one with a user name or password, and never a local or private address (localhost, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, IPv6 loopback, unique-local and link-local; **403**). Redirects are followed (up to 5), each checked the same way.
 - The signature never expires: it says "this origin was listed", not "this viewer may watch". Changing the secret invalidates every relay address at once (players tuned in stand by and reload from the dial).
 
 ### What's rewritten
 
-- **HLS** (`.m3u8`/`.m3u`, or the type `application/vnd.apple.mpegurl`, `application/x-mpegurl`, `audio/mpegurl`): every URI, on its own line or in a `URI="…"` attribute (EXT-X-KEY, EXT-X-MAP, EXT-X-MEDIA, EXT-X-I-FRAME-STREAM-INF, EXT-X-SESSION-KEY, EXT-X-SESSION-DATA, EXT-X-PART, EXT-X-PRELOAD-HINT, EXT-X-RENDITION-REPORT, a DATERANGE's X-ASSET-URI), resolved against the playlist's own address (after any redirect). `http://` targets become signed relay addresses; `https://` targets are written out absolute and **stay direct**, to save Worker requests (that server's own CORS still applies: a direct https segment can still be blocked by it); `skd://` and `data:` are left alone. Query strings are kept.
-- **DASH** over http: the API gives the manifest's relay address on the path form, so its relative addresses (BaseURL, SegmentTemplate's `media` and `initialization`, `$Number$` templates and all) resolve against the relay as they would at the source. Absolute `http://` addresses (BaseURL, Location, PatchLocation, `media`, `initialization`, `index`, `sourceURL`, `bitstreamSwitching`, `xlink:href`) move onto the relay's path form for their origin, root-relative ones (`/audio/init.mp4`) onto the manifest's own origin, and `https://` ones stay direct. A manifest asked for in full, or one the source redirects, is sent (302) to its path form. Not handled: a root-relative address under a BaseURL on another origin (it's put on the manifest's origin).
+- **HLS** (`.m3u8`/`.m3u`, or the type `application/vnd.apple.mpegurl`, `application/x-mpegurl`, `audio/mpegurl`): every URI, on its own line or in a `URI="…"` attribute (EXT-X-KEY, EXT-X-MAP, EXT-X-MEDIA, EXT-X-I-FRAME-STREAM-INF, EXT-X-SESSION-KEY, EXT-X-SESSION-DATA, EXT-X-PART, EXT-X-PRELOAD-HINT, EXT-X-RENDITION-REPORT, a DATERANGE's X-ASSET-URI), resolved against the playlist's own address (after any redirect). `http://` targets become signed relay addresses; `https://` targets are written out absolute and **stay direct** on `/v1/`, to save Worker requests (that server's own CORS still applies: a direct https segment can still be blocked by it), and **are relayed too on `/v2/`**; `skd://` and `data:` are left alone. Query strings are kept.
+- **DASH** over http: the API gives the manifest's relay address on the path form, so its relative addresses (BaseURL, SegmentTemplate's `media` and `initialization`, `$Number$` templates and all) resolve against the relay as they would at the source. Absolute `http://` addresses (BaseURL, Location, PatchLocation, `media`, `initialization`, `index`, `sourceURL`, `bitstreamSwitching`, `xlink:href`) move onto the relay's path form for their origin, root-relative ones (`/audio/init.mp4`) onto the manifest's own origin, and `https://` ones stay direct on `/v1/` (on `/v2/` they move onto the relay too, as does `//host` on an https manifest). A manifest asked for in full, or one the source redirects, is sent (302) to its path form. Not handled: a root-relative address under a BaseURL on another origin (it's put on the manifest's origin).
 - **Refused:** a playlist bigger than 5 MB (by its length, or as it's read), and anything at a playlist's address whose type isn't a playlist's or a generic one (`text/plain`, `application/octet-stream`, XML) or whose body doesn't start `#EXTM3U` / contain `<MPD`: **502**.
 
 ### Requests and answers
@@ -51,7 +86,7 @@ OPTIONS  (CORS preflight)        GET /health
 
 ## Deploying it
 
-Nothing here has been deployed or set. The Worker lives on Cloudflare (the account R2 is on is fine), not Railway.
+The Worker was deployed and staging's api has `STREAM_RELAY_BASE` and `STREAM_RELAY_SECRET` (A237). **A238 needs the Worker redeployed** (`npx wrangler@4 deploy` in `apps/stream-relay`) before the API that hands out `/v2/` addresses goes out: an older Worker answers `/v2/` with 404, and those stations stand by. The secret and the API's variables are unchanged. The first-time steps: The Worker lives on Cloudflare (the account R2 is on is fine), not Railway.
 
 1. **Sign in to Cloudflare** from the repository: `npx wrangler@4 login` (a browser sign-in), or set `CLOUDFLARE_API_TOKEN` (a token from the "Edit Cloudflare Workers" template) and `CLOUDFLARE_ACCOUNT_ID` in the shell.
 2. **Make a secret**, e.g. `openssl rand -base64 32`, and keep it in your password manager. Never commit it.
@@ -76,4 +111,5 @@ Check current prices: Cloudflare's Workers pricing as of 2026-10-01.
 - **Paid plan**: $5 a month, which includes 10 million requests a month, then $0.30 a million. (CPU time is billed too past an included allowance; the relay does little work per request: a signature check, and for playlists a rewrite.)
 - **No bandwidth charges**: Workers don't bill egress, so a segment costs one request however big it is.
 - **Per viewer-hour**: at 6-second segments, a live HLS stream is about 600 segment requests and 600 playlist refreshes an hour, so **about 1,200 requests per viewer-hour** (more with a separate audio rendition or 2-second segments; fewer when the source's segments are https and stay direct). The free plan covers about 80 viewer-hours a day; the paid plan's included requests about 8,000 viewer-hours a month, and past that it's about **$0.0004 a viewer-hour**.
-- Only relayed listings count: an http link that answers over https, https links and embeds cost the relay nothing.
+- The cost per request is unchanged by A238's "all" mode. A CORS-blocked stream is relayed whole (its https segments too), so it's the full ~1,200 requests per viewer-hour; an http link (`/v1/`) whose segments are https costs less, since those stay direct.
+- Only relayed listings count: an http link that answers over https, https links browsers can load, and embeds cost the relay nothing.

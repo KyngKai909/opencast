@@ -13,7 +13,7 @@ import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
 import { dateAtTime } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
-import { changeWords, familyLine, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
+import { browserNote, changeWords, familyLine, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
 import { channelText } from "./SourceStatus";
 import "./SourceDetails.css";
 
@@ -158,8 +158,9 @@ export function SourceDetails({
           variant="rows"
           items={[
             { title: PLAYS_LABELS[playsOf(s)], detail: playsDetail(s, tz) || null },
-            // A237: an http:// stream link over https from the source, or through the relay.
-            ...(transportLine(s) ? [{ title: transportLine(s)!, detail: null }] : []),
+            // A237: an http:// stream link over https from the source, or through the relay; A238: one
+            // whose server blocks browsers, through the relay (with what the check found).
+            ...(transportLine(s) ? [{ title: transportLine(s)!, detail: s.relayReason === "cors" ? (s.cors?.detail ?? null) : null }] : []),
             ...evidenceRows(s, tz),
             { title: playsOf(s) === "embed" ? "Their player's address" : "Stream address", detail: <span className="nd-mono nd-src__addr">{s.streamUrl}</span> },
             ...earlierRows(s, tz)
@@ -171,6 +172,7 @@ export function SourceDetails({
           </p>
         )}
         {s.waiting === "needs_https" && <p className="nd-src__note">Apps on https can't play an http address. It waits until its source answers over https, or Opencast's secure relay is set up.</p>}
+        {browserNote(s) && <p className="nd-src__note">{browserNote(s)}</p>}
       </Section>
       <Section title="What's on">
         <KeyValueList variant="rows" items={scheduleRows(s, tz)} />

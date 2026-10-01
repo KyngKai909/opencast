@@ -432,5 +432,143 @@ describe("addresses", () => {
 
   it("signs as the API does (a shared vector: apps/api/test/external-relay.test.ts has the same one)", async () => {
     expect(await signOrigin("known-vector-key", "http://colton.example.gov")).toBe("uBIqo_knFS-LdJk2Pl2knW8AjqZTu4_7vpQmVLuZBS0");
+    // A238: "all" mode signs `<origin>|all`.
+    expect(await signOrigin("known-vector-key", "https://news.example.com", "all")).toBe("nje21UYkjFsILY7Q97gNpLcWi6Etb6Kxa3wx_dwGzzI");
+  });
+});
+
+// A238: "all" mode (/v2/), for an https stream whose server sends no CORS header. The signature covers
+// the mode (`<origin>|all`), and every address its playlists name is relayed, https too.
+describe("all mode (/v2/, A238)", () => {
+  const HTTPS_SOURCE = "https://news.example.com";
+  const HTTPS_CDN = "https://edge7.cdn.example.net";
+  const v2Full = async (upstream: string, secret = SECRET) => `${RELAY}/v2/${await signOrigin(secret, new URL(upstream).origin, "all")}/${b64urlEncode(upstream)}`;
+  const v2Path = async (upstream: string) => {
+    const u = new URL(upstream);
+    return `${RELAY}/v2/${await signOrigin(SECRET, u.origin, "all")}/${b64urlEncode(u.origin)}${u.pathname}${u.search}`;
+  };
+  const master = `${HTTPS_SOURCE}/media-manifest/streams/us.m3u8`;
+  const MASTER = [
+    "#EXTM3U",
+    '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud",NAME="English",URI="audio/en.m3u8"',
+    "#EXT-X-STREAM-INF:BANDWIDTH=2400000",
+    "720p/index.m3u8?token=abc",
+    "#EXT-X-STREAM-INF:BANDWIDTH=800000",
+    `${HTTPS_CDN}/us/480p/index.m3u8?sig=x%2By`,
+    "#EXT-X-STREAM-INF:BANDWIDTH=400000",
+    "http://plain.example.org/us/240p/index.m3u8",
+    ""
+  ].join("\n");
+
+  it("relays every address in the playlist, https included, in its own mode", async () => {
+    const n = network({ [master]: m3u8(MASTER) });
+    const res = await get(await v2Full(master), {}, ENV, n.fn);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    const lines = (await res.text()).split("\n");
+    const onV2 = (address: string) => {
+      expect(address.startsWith(`${RELAY}/v2/`), address).toBe(true);
+      return upstreamOf(address);
+    };
+    expect(onV2(/URI="([^"]*)"/.exec(lines[1]!)![1]!)).toBe(`${HTTPS_SOURCE}/media-manifest/streams/audio/en.m3u8`);
+    expect(onV2(lines[3]!)).toBe(`${HTTPS_SOURCE}/media-manifest/streams/720p/index.m3u8?token=abc`);
+    // Another https origin the playlist names: signed by the relay itself, in "all" mode.
+    expect(onV2(lines[5]!)).toBe(`${HTTPS_CDN}/us/480p/index.m3u8?sig=x%2By`);
+    expect(lines[5]!.split("/")[4]).toBe(await signOrigin(SECRET, HTTPS_CDN, "all"));
+    // http too, on /v2/ (never dropped back to /v1/).
+    expect(onV2(lines[7]!)).toBe("http://plain.example.org/us/240p/index.m3u8");
+
+    // The relay accepts the addresses it signed, and their media playlists' segments go through it too.
+    const media = `${HTTPS_CDN}/us/480p/index.m3u8?sig=x%2By`;
+    const cdn = network({ [media]: m3u8("#EXTM3U\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:6,\nhttps://edge7.cdn.example.net/us/480p/seg-1.m4s\n") });
+    const inner = await get(lines[5]!, {}, ENV, cdn.fn);
+    expect(inner.status).toBe(200);
+    const body = (await inner.text()).split("\n");
+    expect(upstreamOf(/URI="([^"]*)"/.exec(body[1]!)![1]!)).toBe(`${HTTPS_CDN}/us/480p/init.mp4`);
+    expect(upstreamOf(body[3]!)).toBe(`${HTTPS_CDN}/us/480p/seg-1.m4s`);
+    expect(body[3]!.startsWith(`${RELAY}/v2/`)).toBe(true);
+    const seg = network({ [`${HTTPS_CDN}/us/480p/seg-1.m4s`]: () => new Response("moof", { headers: { "content-type": "video/iso.segment" } }) });
+    const segment = await get(body[3]!, {}, ENV, seg.fn);
+    expect(segment.status).toBe(200);
+    expect(segment.headers.get("access-control-allow-origin")).toBe("*");
+    expect(await segment.text()).toBe("moof");
+  });
+
+  it("can't be reached with a /v1/ (http-only) signature, nor /v1/ with a /v2/ one", async () => {
+    const n = network({ [master]: m3u8(MASTER) });
+    const v1 = await relayFull(master);
+    const asAll = v1.replace(`${RELAY}/v1/`, `${RELAY}/v2/`);
+    const res = await get(asAll, {}, ENV, n.fn);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe("Bad signature");
+    const v2 = await v2Full(master);
+    expect((await get(v2.replace(`${RELAY}/v2/`, `${RELAY}/v1/`), {}, ENV, n.fn)).status).toBe(403);
+    // Signed with another secret: refused too.
+    expect((await get(await v2Full(master, `other-${crypto.randomUUID()}`), {}, ENV, n.fn)).status).toBe(403);
+    expect(n.calls).toEqual([]);
+    // /v3/ and anything else isn't a relay address.
+    expect((await get(v2.replace(`${RELAY}/v2/`, `${RELAY}/v3/`), {}, ENV, n.fn)).status).toBe(404);
+  });
+
+  it("leaves https direct on /v1/, as A237 does", async () => {
+    const http = `${SOURCE}/live/index.m3u8`;
+    const n = network({ [http]: m3u8(`#EXTM3U\n#EXTINF:6,\n${HTTPS_CDN}/seg-1.ts\n#EXTINF:6,\nseg-2.ts\n`) });
+    const lines = (await (await get(await relayFull(http), {}, ENV, n.fn)).text()).split("\n");
+    expect(lines[2]).toBe(`${HTTPS_CDN}/seg-1.ts`);
+    expect(lines[4]!.startsWith(`${RELAY}/v1/`)).toBe(true);
+  });
+
+  it("puts a DASH manifest's https addresses on the relay too, in /v2/'s path form", async () => {
+    const mpd = `${HTTPS_SOURCE}/dash/manifest.mpd`;
+    const MPD = `<?xml version="1.0"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="dynamic">
+  <BaseURL>https://edge7.cdn.example.net/dash/</BaseURL>
+  <Period id="1">
+    <AdaptationSet mimeType="video/mp4">
+      <SegmentTemplate initialization="/dash/init-$RepresentationID$.mp4" media="seg-$Number$.m4s"/>
+      <Representation id="720p" bandwidth="2400000"/>
+    </AdaptationSet>
+    <AdaptationSet mimeType="audio/mp4">
+      <SegmentTemplate media="//audio.example.net/a/$Number$.m4s"/>
+    </AdaptationSet>
+  </Period>
+</MPD>
+`;
+    const n = network({ [mpd]: () => new Response(MPD, { headers: { "content-type": "application/dash+xml" } }) });
+    // Asked for in full: sent to its path form, still on /v2/.
+    const full = await get(await v2Full(mpd), {}, ENV, n.fn);
+    expect(full.status).toBe(302);
+    expect(full.headers.get("location")).toBe(await v2Path(mpd));
+    expect(full.headers.get("access-control-allow-origin")).toBe("*");
+    const res = await get(await v2Path(mpd), {}, ENV, n.fn);
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    const prefix = async (origin: string) => `${RELAY}/v2/${await signOrigin(SECRET, origin, "all")}/${b64urlEncode(origin)}`;
+    expect(body).toContain(`<BaseURL>${await prefix(HTTPS_CDN)}/dash/</BaseURL>`);
+    expect(body).toContain(`initialization="${await prefix(HTTPS_SOURCE)}/dash/init-$RepresentationID$.mp4"`);
+    expect(body).toContain('media="seg-$Number$.m4s"');
+    expect(body).toContain(`media="${await prefix("https://audio.example.net")}/a/$Number$.m4s"`);
+  });
+
+  it("says CORS on everything it answers: playlists, segments, redirects, refusals and errors", async () => {
+    const seg = `${HTTPS_SOURCE}/media-manifest/streams/720p/seg-1.ts`;
+    const n = network({ [master]: m3u8(MASTER), [seg]: () => new Response("ts", { headers: { "content-type": "video/mp2t" } }) });
+    const v2 = await v2Full(master);
+    const answers = [
+      await get(v2, {}, ENV, n.fn),
+      await get(v2, { method: "HEAD" }, ENV, n.fn),
+      await get(await v2Full(seg), {}, ENV, n.fn),
+      await get(await v2Full(`${HTTPS_SOURCE}/gone.m3u8`), {}, ENV, n.fn),
+      await get(v2.replace(`${RELAY}/v2/`, `${RELAY}/v1/`), {}, ENV, n.fn),
+      await get(`${RELAY}/v2/${await signOrigin(SECRET, HTTPS_SOURCE, "all")}/!!`, {}, ENV, n.fn),
+      await get(await v2Full("https://127.0.0.1/a.m3u8"), {}, ENV, n.fn),
+      await get(v2, {}, {}, n.fn),
+      await get(v2, { method: "POST" }, ENV, n.fn),
+      await get(v2, { method: "OPTIONS" }, ENV, n.fn),
+      await get(`${RELAY}/nowhere`, {}, ENV, n.fn),
+      await get(`${RELAY}/health`, {}, ENV, n.fn)
+    ];
+    expect(answers.map((r) => r.status)).toEqual([200, 200, 200, 404, 403, 400, 403, 503, 405, 204, 404, 200]);
+    for (const r of answers) expect(r.headers.get("access-control-allow-origin"), String(r.status)).toBe("*");
   });
 });

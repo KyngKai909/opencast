@@ -4,13 +4,20 @@
 // (apps/stream-relay, docs/stream-relay.md). Everything else (https stream links, official embeds,
 // DASH over https) still plays straight from the source.
 //
+// A238 (the user's decision, extending A237): an https stream link (or an http one's https address)
+// whose server sends no CORS header for Opencast's apps can't be loaded by browsers either, so it's
+// relayed too, in "all" mode: every address in its playlists through the relay, https included.
+//
 // A relay address carries a signature over the upstream's origin (scheme, host and port): HMAC-SHA256
 // with STREAM_RELAY_SECRET, base64url. The Worker relays any address on a signed origin, so a
-// playlist's segments and variants on the same origin work without the API signing each one.
+// playlist's segments and variants on the same origin work without the API signing each one. The
+// mode is inside what's signed (`<origin>|all` for /v2/), so an http-only address can't be turned
+// into one that relays everything.
 //
-//   https://<relay>/v1/<sig>/<b64url(upstream URL)>          the address in full (HLS)
+//   https://<relay>/v1/<sig>/<b64url(upstream URL)>          the address in full (HLS), "http" mode
 //   https://<relay>/v1/<sig>/<b64url(origin)>/<path>?<query> the path kept (DASH: a manifest's
 //                                                            relative addresses resolve as they would)
+//   https://<relay>/v2/…                                     the same two forms, "all" mode (A238)
 
 import { createHmac } from "node:crypto";
 
@@ -30,18 +37,28 @@ export function streamRelayFromEnv(env: NodeJS.ProcessEnv): StreamRelay | null {
 
 const b64url = (text: string) => Buffer.from(text, "utf8").toString("base64url");
 
-/** The signature for one origin (`http://host[:port]`, as `URL.origin` writes it). */
-export function relaySignature(secret: string, origin: string): string {
-  return createHmac("sha256", secret).update(origin).digest("base64url");
+/**
+ * What a relay address may relay. `http` (/v1/, A237): an http stream link; its playlists' https
+ * addresses stay direct. `all` (/v2/, A238): a stream whose server browsers can't load from (no CORS
+ * header); every address in its playlists is relayed, https too.
+ */
+export type RelayMode = "http" | "all";
+
+/** The signature for one origin (`http://host[:port]`, as `URL.origin` writes it), in one mode: the origin alone for /v1/, `<origin>|all` for /v2/. */
+export function relaySignature(secret: string, origin: string, mode: RelayMode = "http"): string {
+  return createHmac("sha256", secret)
+    .update(mode === "all" ? `${origin}|all` : origin)
+    .digest("base64url");
 }
 
-/** An `http://` address, as a relay address: HLS in full, DASH with its path kept. */
-export function relayUrl(relay: StreamRelay, upstream: string, format: "hls" | "dash" = "hls"): string {
+/** An address as a relay address: HLS in full, DASH with its path kept; /v1/ for `http` mode, /v2/ for `all`. */
+export function relayUrl(relay: StreamRelay, upstream: string, format: "hls" | "dash" = "hls", mode: RelayMode = "http"): string {
   const url = new URL(upstream);
   url.hash = "";
-  const sig = relaySignature(relay.secret, url.origin);
-  if (format === "dash") return `${relay.base}/v1/${sig}/${b64url(url.origin)}${url.pathname}${url.search}`;
-  return `${relay.base}/v1/${sig}/${b64url(url.href)}`;
+  const sig = relaySignature(relay.secret, url.origin, mode);
+  const at = `${relay.base}/${mode === "all" ? "v2" : "v1"}/${sig}`;
+  if (format === "dash") return `${at}/${b64url(url.origin)}${url.pathname}${url.search}`;
+  return `${at}/${b64url(url.href)}`;
 }
 
 /** Whether an address is plain `http://` (what the relay is for). */

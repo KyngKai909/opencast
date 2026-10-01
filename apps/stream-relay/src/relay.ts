@@ -1,23 +1,28 @@
 // Opencast's HTTPS stream relay (A237, docs/stream-relay.md): an external station's plain-http stream
 // link, relayed over HTTPS so Opencast's HTTPS apps can play it (browsers block http media on an
-// https page as mixed content). Strictly pass-through: playlists are rewritten in memory and sent on,
+// https page as mixed content); and (A238) an https one whose server sends no CORS header, so
+// browsers can't load it from Opencast's apps, relayed with this relay's own. Strictly pass-through: playlists are rewritten in memory and sent on,
 // segments are streamed through as they arrive, and nothing is kept anywhere (no KV, R2, Durable
 // Objects or Cache API; Cloudflare's edge cache only when RELAY_EDGE_CACHE_SECONDS asks for it).
 //
 //   GET|HEAD /v1/<sig>/<b64url(upstream URL)>             the address in full
 //   GET|HEAD /v1/<sig>/<b64url(origin)>/<path>?<query>    the path kept (a DASH manifest's relative
 //                                                         addresses resolve as at the source)
+//   GET|HEAD /v2/…                                        A238's "all" mode, the same two forms
 //   OPTIONS  (CORS preflight)                             GET /health
 //
-// `sig` is HMAC-SHA256 over the upstream's origin with STREAM_RELAY_SECRET, base64url: the API signs
-// a stream link's origin, and any address on a signed origin is relayed, so its segments and variant
-// playlists work. When a playlist lists another http origin, the relay signs that one itself while
-// rewriting (it's following the listed source's own playlist). Unsigned or badly signed: 403. Only
-// http and https upstreams; never a private or local address (unless RELAY_ALLOW_PRIVATE=1, for
-// `wrangler dev`).
+// `sig` is HMAC-SHA256 with STREAM_RELAY_SECRET, base64url: on /v1/ (A237, "http" mode) over the
+// upstream's origin, on /v2/ (A238, "all" mode) over `<origin>|all`, so one mode's signature never
+// works in the other. The API signs a stream link's origin, and any address on a signed origin is
+// relayed, so its segments and variant playlists work. In playlists, /v1/ relays the http addresses
+// (https ones stay direct); /v2/ relays every address, https too, for a server whose missing CORS
+// header keeps browsers from loading it. When a playlist lists another origin, the relay signs that
+// one itself, in the playlist's own mode, while rewriting (it's following the listed source's own
+// playlist). Unsigned or badly signed: 403. Only http and https upstreams; never a private or local
+// address (unless RELAY_ALLOW_PRIVATE=1, for `wrangler dev`).
 
 import { rewriteHls, rewriteMpd } from "./playlists.js";
-import { b64urlDecode, b64urlEncode, signOrigin, verifyOrigin } from "./sign.js";
+import { b64urlDecode, b64urlEncode, signOrigin, verifyOrigin, type RelayMode } from "./sign.js";
 
 export interface Env {
   /** The same secret as the API's STREAM_RELAY_SECRET (`wrangler secret put STREAM_RELAY_SECRET`). */
@@ -129,9 +134,13 @@ interface Target {
   pathForm: boolean;
 }
 
+/** The mode a relay address's version stands for: /v1/ "http" (A237), /v2/ "all" (A238). */
+const MODES: Record<string, RelayMode> = { v1: "http", v2: "all" };
+const VERSION: Record<RelayMode, string> = { http: "v1", all: "v2" };
+
 /** The upstream a request names, or the response refusing it. */
-async function target(url: URL, env: Env, secret: string): Promise<Target | Response> {
-  const parts = url.pathname.slice("/v1/".length).split("/");
+async function target(url: URL, env: Env, secret: string, mode: RelayMode): Promise<Target | Response> {
+  const parts = url.pathname.slice(`/${VERSION[mode]}/`.length).split("/");
   const [sig, encoded] = parts;
   if (parts.length < 2 || !sig || !encoded) return text(403, "Not signed");
   const decoded = b64urlDecode(encoded);
@@ -151,27 +160,28 @@ async function target(url: URL, env: Env, secret: string): Promise<Target | Resp
   }
   if (upstream.protocol !== "http:" && upstream.protocol !== "https:") return text(400, "Only http and https streams are relayed");
   if (upstream.username || upstream.password) return text(400, "Addresses with a user name or password aren't relayed");
-  if (!(await verifyOrigin(secret, upstream.origin, sig))) return text(403, "Bad signature");
+  if (!(await verifyOrigin(secret, upstream.origin, sig, mode))) return text(403, "Bad signature");
   if (env.RELAY_ALLOW_PRIVATE !== "1" && isPrivateHost(upstream.hostname)) return text(403, "Not a public address");
   upstream.hash = "";
   return { upstream, pathForm };
 }
 
-/** Builds relay addresses on this relay's own origin, signing each origin once per request. */
-function addresses(relayOrigin: string, secret: string) {
+/** Builds relay addresses on this relay's own origin, in the request's own mode, signing each origin once per request. */
+function addresses(relayOrigin: string, secret: string, mode: RelayMode) {
   const sigs = new Map<string, Promise<string>>();
   const sig = (origin: string) => {
     let s = sigs.get(origin);
     if (!s) {
-      s = signOrigin(secret, origin);
+      s = signOrigin(secret, origin, mode);
       sigs.set(origin, s);
     }
     return s;
   };
+  const at = `${relayOrigin}/${VERSION[mode]}`;
   return {
-    full: async (u: URL) => `${relayOrigin}/v1/${await sig(u.origin)}/${b64urlEncode(u.href)}`,
-    prefix: async (origin: string) => `${relayOrigin}/v1/${await sig(origin)}/${b64urlEncode(origin)}`,
-    pathForm: async (u: URL) => `${relayOrigin}/v1/${await sig(u.origin)}/${b64urlEncode(u.origin)}${u.pathname}${u.search}`
+    full: async (u: URL) => `${at}/${await sig(u.origin)}/${b64urlEncode(u.href)}`,
+    prefix: async (origin: string) => `${at}/${await sig(origin)}/${b64urlEncode(origin)}`,
+    pathForm: async (u: URL) => `${at}/${await sig(u.origin)}/${b64urlEncode(u.origin)}${u.pathname}${u.search}`
   };
 }
 
@@ -211,14 +221,15 @@ export async function handle(request: Request, env: Env, fetchFn: typeof fetch =
   }
   if (request.method !== "GET" && request.method !== "HEAD") return text(405, "Method not allowed", { allow: "GET, HEAD, OPTIONS" });
   if (url.pathname === "/" || url.pathname === "/health") return text(200, "Opencast stream relay");
-  if (!url.pathname.startsWith("/v1/")) return text(404, "Not found");
+  const mode = MODES[/^\/(v\d+)\//.exec(url.pathname)?.[1] ?? ""];
+  if (!mode) return text(404, "Not found");
   const secret = env.STREAM_RELAY_SECRET;
   if (!secret) return text(503, "The relay isn't configured");
 
-  const found = await target(url, env, secret);
+  const found = await target(url, env, secret, mode);
   if (found instanceof Response) return found;
   const { upstream, pathForm } = found;
-  const relay = addresses(url.origin, secret);
+  const relay = addresses(url.origin, secret, mode);
   const head = request.method === "HEAD";
   const byPath = kindByPath(upstream);
   // A DASH manifest is served on the path form, so its relative addresses resolve against the relay.
@@ -292,7 +303,9 @@ export async function handle(request: Request, env: Env, fetchFn: typeof fetch =
     const body = new TextDecoder().decode(bytes);
     const start = body.replace(/^﻿/, "").trimStart();
     if (kind === "hls" ? !start.startsWith("#EXTM3U") : !/<MPD[\s>]/.test(body)) return text(502, "Not a playlist");
-    const rewritten = kind === "hls" ? await rewriteHls(body, from, relay.full) : await rewriteMpd(body, from, relay.prefix);
+    // A238: in "all" mode (/v2/) https addresses are relayed too.
+    const all = mode === "all";
+    const rewritten = kind === "hls" ? await rewriteHls(body, from, relay.full, all) : await rewriteMpd(body, from, relay.prefix, all);
     return new Response(rewritten, { status: 200, headers: out });
   }
 

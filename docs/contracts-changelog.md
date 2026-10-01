@@ -2,6 +2,13 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-01: Stream links browsers can't load, and platform feeds (A238)
+
+Additive: three optional fields and two more `waiting` values on `ListedSource`; `Playback` is unchanged. Migration **0045** (after 0044, named by hand): `network.listed_sources.cors`, `cors_detail`, `cors_checked_at`, `platform_feed`.
+
+- `network.ts`: `ListedSource` gains optional `relayReason` (`http` | `cors`, or null: why it plays through the relay, while it does), `cors` (`{ state: "ok" | "blocked" | "unknown", detail, checkedAt }`, or null: whether browsers on Opencast's apps can load the address a viewer's player fetches straight from the source) and `platformFeed` (the other app whose access its address uses, in the desk's words, or null). `waiting` gains `browsers_blocked` (its server sends no CORS header for the app, with the relay not configured) and `platform_feed` (another app's access: never relayed). `playsOver` keeps its values: `relay` now also for a CORS-blocked stream, and null while one waits as `browsers_blocked` or `platform_feed`. The desk is the only reader of `waiting`; a desk built before it would reject a listing waiting for these reasons, so the desk ships with the API.
+- Behaviour: an https stream link (or an http one's https address) is checked for CORS with the app's origin at listing, on a change and hourly (its playlist, first variant and first segment; a DASH MPD and its first init when simple). Blocked, with `STREAM_RELAY_BASE` and `STREAM_RELAY_SECRET` set, `DialRow.playback.url` and `StationPage.playback.url` are the relay's `/v2/` address (`https://<relay>/v2/<sig>/<b64url(address)>`, signed over `<origin>|all`; DASH keeps `format: "dash"` with `…/v2/<sig>/<b64url(origin)>/<path>`), and every address in its playlists is relayed; without them it waits and isn't on the dial, guide or search. A later check that finds CORS allowed plays it from its own address again. Platform feeds (jmp2.uk, Pluto's stitcher with a partner's token or parameters, Samsung TV Plus headends, a partner's JWT) wait and are never relayed; one on the dial before this leaves it at the checks' next pass. A237's `/v1/` addresses for http links are unchanged.
+
 ## 2026-10-01: External stations' http:// stream links (A237)
 
 Additive: two optional fields and one more `waiting` value on `ListedSource`; `Playback` is unchanged. Migration **0044** (after 0043, named by hand): `network.listed_sources.https_url`, `https_checked_at`.

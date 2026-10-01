@@ -344,7 +344,26 @@ export const listedSources = network.table("listed_sources", {
    */
   httpsUrl: text("https_url"),
   /** When https was last tried for an `http://` stream link (at listing, a new address, then hourly). */
-  httpsCheckedAt: at("https_checked_at")
+  httpsCheckedAt: at("https_checked_at"),
+  // ---- A238 (added 2026-10-01, migration 0045): CORS-blocked stream links, and platform feeds ----
+  /**
+   * Whether browsers on Opencast's apps can load the address a viewer's player would fetch straight
+   * from the source (an https stream link, or an http one's https address): `ok`, `blocked` (no
+   * `Access-Control-Allow-Origin` for the app on its playlist, first variant or first segment: it
+   * plays through the relay in "all" mode, or waits), or `unknown` (couldn't tell: it plays as
+   * listed). Null: not checked, or nothing is fetched straight from the source (an http link relayed).
+   */
+  cors: text("cors", { enum: ["ok", "blocked", "unknown"] }),
+  /** What the CORS check found, in the desk's words ("Its segments have no CORS header for Opencast's apps"). */
+  corsDetail: text("cors_detail"),
+  /** When CORS was last checked (at listing, on a change, then hourly with the minute's checks). */
+  corsCheckedAt: at("cors_checked_at"),
+  /**
+   * A238: the stream address uses another app's access, in the desk's words ("Pluto via Samsung TV
+   * Plus"; apps/api lib/platformFeeds.ts). It waits (`platform_feed`) and is never relayed. Null: the
+   * source's own. Set at listing and on a change, and for every listing at the checks' next pass.
+   */
+  platformFeed: text("platform_feed")
 });
 
 /**

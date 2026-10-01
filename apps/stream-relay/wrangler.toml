@@ -1,5 +1,6 @@
 # Opencast's HTTPS stream relay (A237, docs/stream-relay.md): external stations' plain-http stream
-# links, relayed over HTTPS so Opencast's HTTPS apps can play them. Pass-through only: nothing is
+# links, relayed over HTTPS so Opencast's HTTPS apps can play them, and (A238) https ones whose
+# server sends no CORS header, relayed with every address in their playlists. Pass-through only: nothing is
 # stored (no KV, R2 or Durable Objects), and Cloudflare's edge cache is off unless
 # RELAY_EDGE_CACHE_SECONDS says otherwise.
 #

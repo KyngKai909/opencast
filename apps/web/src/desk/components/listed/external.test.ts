@@ -2,7 +2,7 @@
 // Right now, and the outage history, on the mock clock's Saturday, 8:42 pm in the Inland Empire.
 import { describe, expect, it } from "vitest";
 import type { ListedSource } from "@opencast/contracts";
-import { downFor, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail, transportLine } from "./external";
+import { browserNote, downFor, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail, transportLine } from "./external";
 
 const TZ = "America/Los_Angeles";
 const NOW = new Date("2026-09-27T03:42:12Z");
@@ -56,6 +56,31 @@ describe("an http:// stream link (A237)", () => {
     // https links, and listings from before A237, say nothing more.
     expect(transportLine(s({}))).toBeNull();
     expect(transportLine(s({ playsOver: null }))).toBeNull();
+  });
+});
+
+describe("a stream browsers can't load, and another app's access (A238)", () => {
+  it("says a CORS-blocked stream plays through the secure relay, or can't play yet without it", () => {
+    const blocked = { state: "blocked" as const, detail: "Its segments have no CORS header for Opencast's apps", checkedAt: "2026-09-27T03:00:00Z" };
+    expect(transportLine(s({ playsOver: "relay", relayed: true, relayReason: "cors", cors: blocked }))).toBe("Browsers block this stream's server, so it plays through Opencast's secure relay");
+    // An http link upgraded to https whose server blocks browsers says the same.
+    expect(transportLine(s({ streamUrl: "http://colton.example.gov/live.m3u8", playsOver: "relay", relayed: true, relayReason: "cors", cors: blocked }))).toBe("Browsers block this stream's server, so it plays through Opencast's secure relay");
+    // A237's http relay is unchanged.
+    expect(transportLine(s({ streamUrl: "http://colton.example.gov/live.m3u8", playsOver: "relay", relayed: true, relayReason: "http" }))).toBe("Plays through Opencast's secure relay (its address is http)");
+    const waiting = s({ playsOver: null, waiting: "browsers_blocked", onDial: false, cors: blocked });
+    expect(transportLine(waiting)).toBeNull();
+    expect(playsDetail(waiting, TZ)).toBe("Browsers can't play this stream yet");
+    expect(onceWords(waiting)).toBe("its server lets browsers load it, or Opencast's secure relay is set up");
+    expect(browserNote(waiting)).toBe("Browsers can't play this stream yet. Its server doesn't let other sites load it. Its segments have no CORS header for Opencast's apps. It plays once its server allows it, or Opencast's secure relay is set up.");
+    expect(browserNote(s({ cors: { ...blocked, state: "ok", detail: null } }))).toBeNull();
+  });
+
+  it("says a platform feed uses another app's access, and to ask the licensor", () => {
+    const feed = s({ waiting: "platform_feed", onDial: false, platformFeed: "Pluto via Samsung TV Plus", listingState: "checking" });
+    expect(playsDetail(feed, TZ)).toBe("Uses another app's access (Pluto via Samsung TV Plus)");
+    expect(browserNote(feed)).toBe("Uses another app's access (Pluto via Samsung TV Plus). Ask the channel's licensor for its own feed.");
+    expect(onceWords(feed)).toBe("it has a feed of its own from the channel's licensor");
+    expect(transportLine(feed)).toBeNull();
   });
 });
 

@@ -416,20 +416,51 @@ export const ListedSource = z.object({
    * Why it isn't on the dial, when it isn't: `terms_unclear`, `needs_permission`, `needs_terms`
    * (an embed with no terms page recorded), `dash_not_played` (a DASH-only stream link, A201),
    * `other_market` (A200), `down` (hidden while its stream is down), `needs_https` (A237: an
-   * `http://` stream link that doesn't answer over https, with Opencast's relay not configured).
+   * `http://` stream link that doesn't answer over https, with Opencast's relay not configured),
+   * `browsers_blocked` (A238: its server sends no CORS header for Opencast's apps, with the relay not
+   * configured), `platform_feed` (A238: its address uses another app's access; never relayed).
    * Null when it's on the dial.
    */
-  waiting: z.enum(["terms_unclear", "needs_terms", "needs_permission", "dash_not_played", "other_market", "down", "needs_https"]).nullable().optional(),
+  waiting: z.enum(["terms_unclear", "needs_terms", "needs_permission", "dash_not_played", "other_market", "down", "needs_https", "browsers_blocked", "platform_feed"]).nullable().optional(),
   // ---- Added 2026-10-01 (A237: plain-http stream links) ----
   /**
    * How an `http://` stream link reaches HTTPS apps: `https` (the same address answered over https,
    * played straight from the source), `relay` (through Opencast's HTTPS relay), or `needs_https`
    * (neither: it waits). Null for everything else (an https stream link or an embed plays its address
-   * as listed).
+   * as listed). A238: `relay` too for a stream link browsers can't load (no CORS header; `relayReason`
+   * says which), and null while one waits as `browsers_blocked` or `platform_feed`.
    */
   playsOver: z.enum(["https", "relay", "needs_https"]).nullable().optional(),
   /** A237: it plays through Opencast's HTTPS relay (`playsOver` is `relay`). */
   relayed: z.boolean().optional(),
+  // ---- Added 2026-10-01 (A238: CORS-blocked stream links, platform feeds) ----
+  /**
+   * Why it plays through the relay, while it does: `http` (A237: its address is plain http), or
+   * `cors` (A238: its server sends no CORS header for Opencast's apps, so every address in its
+   * playlists is relayed, https too). Null when it isn't relayed.
+   */
+  relayReason: z.enum(["http", "cors"]).nullable().optional(),
+  /**
+   * A238: whether browsers on Opencast's apps can load the address a viewer's player fetches straight
+   * from the source (an https stream link, or an http one's https address), checked at listing, on a
+   * change and hourly: `ok`, `blocked` (no `Access-Control-Allow-Origin` on its playlist, first variant
+   * or first segment), or `unknown` (couldn't tell; it plays as listed). `detail`: what was found.
+   * Null: not checked, or nothing is fetched straight from the source.
+   */
+  cors: z
+    .object({
+      state: z.enum(["ok", "blocked", "unknown"]),
+      detail: z.string().nullable(),
+      checkedAt: Timestamp.nullable()
+    })
+    .nullable()
+    .optional(),
+  /**
+   * A238: its address uses another app's access, in the desk's words ("Pluto via Samsung TV Plus",
+   * "jmp2.uk, which forwards to other apps' feeds"). It waits (`platform_feed`) and is never relayed.
+   * Null: the source's own.
+   */
+  platformFeed: z.string().nullable().optional(),
   /** The stream's checks: the state, since when, the last check and what it saw. */
   health: z
     .object({

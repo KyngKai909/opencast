@@ -104,6 +104,10 @@ export function playsDetail(s: ListedSource, timeZone: string): string {
       return "DASH stream, not played yet";
     case "needs_https":
       return "Needs an https address";
+    case "browsers_blocked":
+      return "Browsers can't play this stream yet";
+    case "platform_feed":
+      return platformFeedWords(s);
     case "other_market":
       return "Outside this market";
   }
@@ -154,8 +158,28 @@ export function nowWords(s: ListedSource, now: Date): { text: string; detail?: s
  * How it plays line itself while it waits for one).
  */
 export function transportLine(s: ListedSource): string | null {
+  // A238: a server browsers can't load from (no CORS header), relayed with everything in its playlists.
+  if (s.playsOver === "relay" && s.relayReason === "cors") return "Browsers block this stream's server, so it plays through Opencast's secure relay";
   if (s.playsOver === "https") return "Plays over https (its listed address is http)";
   if (s.playsOver === "relay") return "Plays through Opencast's secure relay (its address is http)";
+  return null;
+}
+
+/** A238: "Uses another app's access (Pluto via Samsung TV Plus)". */
+export function platformFeedWords(s: ListedSource): string {
+  return s.platformFeed ? `Uses another app's access (${s.platformFeed})` : "Uses another app's access";
+}
+
+/**
+ * A238: the note under How it plays in a listing's details, for a stream browsers can't play yet or
+ * one using another app's access. Null otherwise.
+ */
+export function browserNote(s: ListedSource): string | null {
+  if (s.waiting === "platform_feed") return `${platformFeedWords(s)}. Ask the channel's licensor for its own feed.`;
+  if (s.waiting === "browsers_blocked") {
+    const found = s.cors?.detail ? ` ${s.cors.detail}.` : "";
+    return `Browsers can't play this stream yet. Its server doesn't let other sites load it.${found} It plays once its server allows it, or Opencast's secure relay is set up.`;
+  }
   return null;
 }
 
@@ -172,6 +196,10 @@ export function onceWords(s: ListedSource): string {
       return "Settings allows DASH stream links";
     case "needs_https":
       return "its source answers over https, or Opencast's secure relay is set up";
+    case "browsers_blocked":
+      return "its server lets browsers load it, or Opencast's secure relay is set up";
+    case "platform_feed":
+      return "it has a feed of its own from the channel's licensor";
     case "other_market":
       return "Settings allows other markets' streams";
     case "down":

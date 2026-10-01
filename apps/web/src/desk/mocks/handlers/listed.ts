@@ -87,6 +87,9 @@ export function listedView(l: DbListed): ListedSource | null {
     // A237: the mocks have Opencast's secure relay set up, and no source answers over https.
     playsOver: l.plays === "stream_link" && /^http:\/\//i.test(l.streamUrl) ? "relay" : null,
     relayed: l.plays === "stream_link" && /^http:\/\//i.test(l.streamUrl),
+    // A238: and every server lets browsers load it (none is CORS-blocked, none another app's feed).
+    relayReason: l.plays === "stream_link" && /^http:\/\//i.test(l.streamUrl) ? "http" : null,
+    platformFeed: null,
     evidence: { basis: basisOf(l), termsUrl: l.termsUrl, termsCheckedOn: l.termsCheckedOn, publicBasis: l.publicBasis, permission: l.permission, note: l.note },
     schedule: { source: l.schedule.source, format: l.schedule.format, url: l.calendarUrl, checkedAgainst: l.schedule.checkedAgainst, checkedOn: l.schedule.checkedOn },
     onDial: !l.removed && waiting === null,
