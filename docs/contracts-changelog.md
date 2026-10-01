@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-01: Direct mode in the native apps (A239)
+
+Additive: one optional field on `Playback`, one on `ListedSource`. No migration.
+
+- `stations.ts`: `Playback` gains optional `sourceUrl`, on external stations' stream links only (`DialRow.playback` and `StationPage.playback`): the source's own address (an https stream link's; an http one's https address when it answered there, else its listed http address). `url` is unchanged: what browsers and Cast play (the same address, or the relay's `/v1/` or `/v2/` address, A237 and A238). Absent for embeds and Opencast's own stations. Apps before it ignore it (zod strips unknown keys).
+- `network.ts`: `ListedSource` gains optional `nativeOnly` (true when its server refuses a web page's request, the CORS check's with the app's `Origin`, with an error status, but answers the same request without an `Origin` with a playlist: only the native apps can play it). `cors.state` stays `unknown` for these, with the detail "Its server refuses web pages' requests (it answers only without an Origin header), so it plays in the TV app only"; how it's on the dial doesn't change.
+- Behaviour: the Android TV and Fire TV app and the Opencast app on Android fetch `sourceUrl` with the device's own networking first (no `Origin`, cookies or `Referer`; http allowed) and fall back to `url`. Browsers, Cast and the iPhone app play `url` as before. The CORS check asks once more without an `Origin` only when the first answer was an error status (not when nothing answered).
+
 ## 2026-10-01: Stream links browsers can't load, and platform feeds (A238)
 
 Additive: three optional fields and two more `waiting` values on `ListedSource`; `Playback` is unchanged. Migration **0045** (after 0044, named by hand): `network.listed_sources.cors`, `cors_detail`, `cors_checked_at`, `platform_feed`.

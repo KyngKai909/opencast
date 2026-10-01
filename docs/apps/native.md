@@ -50,7 +50,8 @@ The Opencast app's web build (`apps/web`) runs in a Capacitor WebView, from the 
 | `ios/App/App/OpencastNowPlayingPlugin.swift` | `OpencastNowPlaying` for iOS: Now Playing and `MPRemoteCommandCenter`. |
 | `android/app/src/main/java/org/useopencast/viewer/OpencastCastPlugin.kt`, `CastOptionsProvider.kt` | `OpencastCast` for Android: `play-services-cast-framework` with MediaRouter discovery. |
 | `android/app/src/main/java/org/useopencast/viewer/OpencastNowPlayingPlugin.kt` | `OpencastNowPlaying` for Android: a MediaSession and its notification. |
-| `android/app/src/main/java/org/useopencast/viewer/MainActivity.java` | Registers the Android plugins. |
+| `android/app/src/main/java/org/useopencast/viewer/MainActivity.java` | Registers the Android plugins, and puts direct mode (A239) in front of Capacitor's web view client. |
+| `src/viewer/native/direct.ts`, `packages/player/native/android/…` | Direct mode (A239, Android only): external stream links fetched with the phone's own networking. See [Direct mode](#direct-mode-external-stream-links-a239). |
 
 ### The env, and where the app's files come from
 
@@ -156,6 +157,7 @@ npx cap run ios --target "<simulator UDID>"    # xcrun simctl list devices
 
 - The Cast options provider meta-data, `com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME` → `CastOptionsProvider`.
 - The now-playing notification's action receiver (not exported).
+- `networkSecurityConfig="@xml/network_security_config"` (A239): cleartext permitted, for direct mode's native fetches of http stream links. The web view stays https only (mixed content is never allowed).
 - Permissions:
   - `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`, which the Cast framework needs; its own manifest adds them too.
   - `POST_NOTIFICATIONS`. A media session's notification shows without asking on Android 13 and later; the permission is declared so lint's check passes. The app never asks for it.
@@ -398,6 +400,7 @@ The TypeScript half (`src/native/`) is tested with Vitest. A test also checks th
 | `src/native/platform.ts` | Chooses `fire_tv`, `google_tv` or `android_tv` for `registerTv` and for "This TV" in About this TV. |
 | `src/native/lifecycle.ts`, `AndroidTv.tsx` | Keep the screen on while the picture plays, exit when the sleep timer ends, and pause in the background. |
 | `scripts/android-art.mjs` | Draws the banner, the splash screens and the launcher icons from the brand (`npm run android:art`). |
+| `src/native/direct.ts`, `packages/player/native/android/…`, `res/xml/network_security_config.xml` | Direct mode (A239): external stream links fetched with the TV's own networking. See [Direct mode](#direct-mode-external-stream-links-a239). |
 
 ### SDK levels and toolchain
 
@@ -415,7 +418,7 @@ The TypeScript half (`src/native/`) is tested with Vitest. A test also checks th
 ### Building
 
 1. Set the production env in `apps/tv/.env.production` (git-ignored) or in the shell:
-   - `VITE_API_BASE`: must be `https://…`, because cleartext is off.
+   - `VITE_API_BASE`: must be `https://…`: the page is `https://localhost` and mixed content is never allowed (cleartext is permitted since A239, for direct mode's native fetches only in practice).
    - `VITE_VIEWER_URL`: where "sign in on your phone" points.
 
    Leave `VITE_MOCK` unset. **An empty `VITE_API_BASE` makes the app call `https://localhost/v1`, its own origin.**
@@ -454,10 +457,10 @@ The TypeScript half (`src/native/`) is tested with Vitest. A test also checks th
 | `android:banner="@drawable/banner"` (application and activity) | The 320×180 home-screen banner, required by Play for TV. It's the lockup on the dark ground, `res/drawable-xhdpi/banner.png`. |
 | `screenOrientation="landscape"`, `windowFullscreen`, bars hidden in `MainActivity` | No status bar and no portrait. |
 | `hardwareAccelerated="true"` | Video in the WebView (the default since API 14; stated anyway). |
-| `usesCleartextTraffic="false"` | https only. Debug builds allow http to `localhost` and `10.0.2.2` only (`src/debug/res/xml/dev_server_cleartext.xml`), for `TV_DEV_SERVER`. |
+| `networkSecurityConfig="@xml/network_security_config"` | Cleartext permitted (A239): direct mode fetches http stream links natively. The web view itself stays https only (its page is `https://localhost` and mixed content is never allowed). Debug builds use `src/debug/res/xml/dev_server_cleartext.xml` instead (the same, naming the dev server's hosts). Before A239 this was `usesCleartextTraffic="false"`. |
 | `enableOnBackInvokedCallback="false"` | With target SDK 36, Android 16 would take Back for predictive back and never deliver `KEYCODE_BACK`. TV mode needs it as a key (press and hold). |
 | `<queries><package com.google.android.apps.tv.launcherx/>` | Package visibility, so the app can see whether Google TV's home screen is installed. |
-| No other permissions or features | Only `INTERNET`. No camera, microphone, location or Google Play Services, which Fire TV doesn't have. |
+| No other permissions or features | Only `INTERNET`. No camera, microphone, location or Google Play Services, which Fire TV doesn't have. Direct mode's OkHttp needs nothing more. |
 
 **Store checks the app already meets:**
 - Everything works with the D-pad and OK.
@@ -520,6 +523,30 @@ When the system cancels a key-up (it took the long press), the page lets go of t
 - **Keeping the screen on:** `FLAG_KEEP_SCREEN_ON` is set while the player is playing, tuning or showing a listed station's player. It's cleared when the picture is paused, off air, erroring or stopped, so the TV's screen saver can come back.
 - **Sleep timer:** when it ends, `engine.stop()` stops the picture. The app then clears the flag and finishes the activity, which returns to the TV's home screen. The phone relay and every timer stop with it ("It stops Opencast, not the TV"), and the next launch starts fresh on the last channel. The "Stopped" screen is only for TV browsers now.
 - **Background:** the app pauses what's playing when it leaves the screen (Capacitor's `appStateChange`, on `onStop`). When it comes back it returns to live, unless it was already paused before leaving. Radio doesn't play on behind the home screen; that would need a foreground service and a media session.
+
+### Direct mode: external stream links (A239)
+
+The user decided (A239) that the native apps play external stations' stream links with the device's own networking, as VLC does. Both Android apps have it: this TV app and the Opencast app on Android. The iPhone app doesn't yet (below). docs/stream-relay.md has what it plays that browsers can't.
+
+**How it works.**
+
+1. The dial row's `playback` carries `sourceUrl` (the source's own address) beside `url` (what browsers play: the same address, or the relay's).
+2. The app registers the `OpencastDirect` plugin. Its `info()` answers `{ version: 1, path: "/_opencast/direct/<token>", userAgent }`, the token random per launch. Its being there is how the page knows the app has direct mode (`src/native/direct.ts`, `nativeDirect()`; the phone app's is `src/viewer/native/direct.ts`).
+3. The player loads that row's HLS through an hls.js loader (packages/player `engine/direct.ts`) that fetches `<path>?u=<address>` on the app's own origin: every playlist, segment, key and subtitle of that row, wherever they point.
+4. `DirectWebViewClient` (Capacitor's web view client with one path in front; also the service worker client, for dev:mock) answers that path from `shouldInterceptRequest`: `DirectStreams` checks the token, `DirectFetcher` fetches the address with OkHttp, and the body streams straight through to the web view, with `X-Opencast-Url` naming the address after redirects. Any other request, the API's included, goes to Capacitor as before.
+5. On an error, or no first frame in 4 s, the player plays `url` at once; Stand by is still at 8 s.
+
+**What the source sees:** `User-Agent: Opencast TV (Android)` (the phone app: `Opencast (Android)`), `Accept: */*`, and the player's `Range`. No `Origin`, no cookies (OkHttp's `NO_COOKIES`: Capacitor installs a `CookieHandler` that `HttpURLConnection` and Capacitor's own HTTP plugin would use), no `Referer`. Redirects are followed by hand, up to 5, across http and https. Refused: anything but http(s), user names and passwords in the address, and local or private addresses, by name or by what DNS gives (debug builds allow them, for the dev server's mock streams).
+
+**The shared native code** lives beside the player, in `packages/player/native/android/src/main/java/org/useopencast/direct/` (`DirectFetcher`, `DirectStreams`, `DirectWebViewClient`, `OpencastDirectPlugin`), with its JVM test in `…/src/test/java/…/DirectFetcherTest.java` (OkHttp's MockWebServer on 127.0.0.1). Both apps' `app/build.gradle` add those folders to their `sourceSets` and depend on `com.squareup.okhttp3:okhttp` (`okhttpVersion` in `variables.gradle`, 4.12.0; `mockwebserver` for the test). `./gradlew testDebugUnitTest` runs the test in either project.
+
+**Why a path the web view client answers, not base64 over the bridge.** Measured on the "opencast-tv" emulator (WebView 113), fetching a 4 MB segment from this Mac through `adb reverse`, median of 6: the intercepted path 244 ms (about 130 Mbps), Capacitor's HTTP plugin with base64 216 ms (about 150 Mbps) including the decode; neither stalled the page's main thread by more than 2 ms. Both are far beyond a stream's 2 to 8 Mbps. The path wins on what the emulator doesn't show: base64 inflates every segment by a third and holds it whole three times (the native buffer, the bridge's JSON string, the decoded copy), where the path streams it; the low-memory Fire TV sticks feel that. And Capacitor's HTTP plugin goes through `HttpURLConnection`, which sends and keeps the web view's cookies.
+
+**Shown on the emulator (2026-10-01, debug build against a scratch page and stand-in servers on this Mac):** the plugin's path; the web view itself failing to read a stand-in source that answers 500 and an HTML page to any `Origin`; the same source through direct mode answering 200 with its master (which names an http chunklist on another port); a redirect to another port followed natively; a wrong token answered 403 and a `file:` address 400; and real hls.js through the direct loader playing it (640×360, first frame in 0.2 to 0.3 s, ten seconds played, no errors), with no `Origin`, cookie or `Referer` on any of its 30 requests. Not shown on the emulator: TV mode's own player tuning a dial row in direct mode (covered by packages/player's tests), and a session tied to the viewer's IP (one machine).
+
+**Needs a new build:** direct mode is native code and a manifest change, so it reaches a TV or phone only with a rebuilt and reinstalled APK (`npm run build:android -w @opencast/tv`, then Gradle; the phone app's `npm run build:native -- android`). A new web bundle on an older APK has no `OpencastDirect` plugin and plays `url` as before.
+
+**The iPhone app (follow-up).** WKWebView can't intercept http or https requests, so the same approach needs a custom scheme (`WKURLSchemeHandler`, say `opencast-direct://`) fed by `URLSession`, with the loader pointed at it; and an ATS exception for plain http (`NSAllowsArbitraryLoadsForMedia` covers AVFoundation only, not `URLSession`, so `NSAllowsArbitraryLoads` with a reason for App Review, or per-domain exceptions, which a station list can't know ahead). Safari's own HLS (the native driver, on iPhones without Managed Media Source) can't use a loader at all. Until then the iPhone app plays `url`, as Safari does.
 
 ### Installing
 

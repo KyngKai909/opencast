@@ -13,7 +13,7 @@ import { schema } from "@opencast/db";
 import { Dial, StationPage } from "@opencast/contracts";
 import { CORS_RECHECK_MS, type Fetch } from "../src/v1/modules/network/external.js";
 import { relaySignature, relayUrl } from "../src/v1/lib/streamRelay.js";
-import { firstDashSegment, probeCors } from "../src/v1/lib/streamCors.js";
+import { firstDashSegment, ORIGIN_REFUSED_DETAIL, probeCors } from "../src/v1/lib/streamCors.js";
 import { jwtPartner, platformFeedOf } from "../src/v1/lib/platformFeeds.js";
 import { anon, createHarness, market, type Harness, type User } from "./harness.js";
 
@@ -167,8 +167,8 @@ describe("an https stream link browsers can't load", () => {
       cors: { state: "blocked", detail: "Its playlist has no CORS header for Opencast's apps", checkedAt: "2026-10-01T03:00:00.000Z" },
       platformFeed: null
     });
-    expect((await dialRow("NEWS"))?.playback).toEqual({ kind: "hls", url: v2(NEWS) });
-    expect(StationPage.parse((await anon(h).get("/v1/stations/news").expect(200)).body).playback).toEqual({ kind: "hls", url: v2(NEWS) });
+    expect((await dialRow("NEWS"))?.playback).toEqual({ kind: "hls", url: v2(NEWS), sourceUrl: NEWS });
+    expect(StationPage.parse((await anon(h).get("/v1/stations/news").expect(200)).body).playback).toEqual({ kind: "hls", url: v2(NEWS), sourceUrl: NEWS });
   });
 
   it("without the relay, waits with browsers_blocked, and is still checked every minute at the source", async () => {
@@ -189,7 +189,7 @@ describe("an https stream link browsers can't load", () => {
     const s = stream(NEWS, {});
     expect(net.corsUrls()).toEqual([s.master, s.variant, s.segment]);
     expect(await listing(newsId)).toMatchObject({ onDial: true, waiting: null, playsOver: null, relayed: false, relayReason: null, cors: { state: "ok", detail: null } });
-    expect((await dialRow("NEWS"))?.playback).toEqual({ kind: "hls", url: NEWS });
+    expect((await dialRow("NEWS"))?.playback).toEqual({ kind: "hls", url: NEWS, sourceUrl: NEWS });
   });
 
   it("blocked again later goes back through the relay; a check that can't tell leaves it as it was", async () => {
@@ -211,14 +211,14 @@ describe("an https stream link browsers can't load", () => {
     const body = await add("11.1", "EDGE", SEG);
     expect(net.corsUrls()).toHaveLength(3);
     expect(body).toMatchObject({ onDial: true, playsOver: "relay", relayReason: "cors", cors: { state: "blocked", detail: "Its segments have no CORS header for Opencast's apps" } });
-    expect((await dialRow("EDGE"))?.playback).toEqual({ kind: "hls", url: v2(SEG) });
+    expect((await dialRow("EDGE"))?.playback).toEqual({ kind: "hls", url: v2(SEG), sourceUrl: SEG });
   });
 
   it("allowed everywhere, or not answering the check, plays straight from the source as before", async () => {
     const OK = "https://open.example.org/live/master.m3u8";
     h.deps.externalFetch = fakeFetch(stream(OK, { master: ALLOW, variant: ALLOW, segment: ALLOW }).routes).fn;
     expect(await add("13.1", "OPEN", OK)).toMatchObject({ onDial: true, playsOver: null, relayed: false, relayReason: null, cors: { state: "ok" } });
-    expect((await dialRow("OPEN"))?.playback).toEqual({ kind: "hls", url: OK });
+    expect((await dialRow("OPEN"))?.playback).toEqual({ kind: "hls", url: OK, sourceUrl: OK });
     h.deps.externalFetch = fakeFetch({}).fn;
     expect(await add("17.1", "QUIE", "https://quiet.example.org/live.m3u8")).toMatchObject({ onDial: true, playsOver: null, relayReason: null, cors: { state: "unknown" } });
   });
@@ -240,7 +240,7 @@ describe("an http:// stream link still follows A237", () => {
     expect(net.urls()).toEqual(["https://plain.example.gov/live/index.m3u8"]);
     expect(net.corsUrls()).toEqual([]);
     expect(body).toMatchObject({ playsOver: "relay", relayed: true, relayReason: "http", cors: null });
-    expect((await dialRow("PLAN"))?.playback?.url).toBe(relayUrl(RELAY, HTTP));
+    expect((await dialRow("PLAN"))?.playback).toEqual({ kind: "hls", url: relayUrl(RELAY, HTTP), sourceUrl: HTTP });
   });
 
   it("answering over https where browsers are blocked: its https address through the relay, every address relayed", async () => {
@@ -248,7 +248,58 @@ describe("an http:// stream link still follows A237", () => {
     const HTTPS = "https://upgr.example.gov/live/master.m3u8";
     h.deps.externalFetch = fakeFetch(stream(HTTPS, {}).routes).fn;
     expect(await add("23.1", "UPGR", HTTP)).toMatchObject({ onDial: true, playsOver: "relay", relayReason: "cors", cors: { state: "blocked" } });
-    expect((await dialRow("UPGR"))?.playback).toEqual({ kind: "hls", url: v2(HTTPS) });
+    // A239: the source's own address is its https one (it answered there), for the native apps' direct mode.
+    expect((await dialRow("UPGR"))?.playback).toEqual({ kind: "hls", url: v2(HTTPS), sourceUrl: HTTPS });
+  });
+});
+
+describe("A239: a server that refuses web pages but answers the native apps", () => {
+  // Made-up addresses: a source that answers 500 and an HTML page to any request with an Origin, and
+  // its master without one (naming an http chunklist elsewhere), as some live sources do.
+  const TOON = "https://api.toonami.example/est/playlist.m3u8";
+  const refusing = () => {
+    const calls: Array<{ url: string; origin: string | null }> = [];
+    const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const origin = new Headers(init?.headers).get("origin");
+      calls.push({ url, origin });
+      if (url !== TOON) throw new TypeError("fetch failed");
+      if (origin) return new Response("<html><body>Internal Server Error</body></html>", { status: 500, headers: { "content-type": "text/html" } });
+      return new Response("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1500000\nhttp://n3.toonami.example:1934/live/abc-chunklist-1.m3u8\n");
+    }) as Fetch;
+    return { fn, calls };
+  };
+
+  it("the check asks again without an Origin, and says it plays in the TV app only (still unknown, so browsers play it as before)", async () => {
+    const net = refusing();
+    expect(await probeCors(TOON, APP, net.fn)).toEqual({ state: "unknown", detail: ORIGIN_REFUSED_DETAIL });
+    expect(net.calls).toEqual([
+      { url: TOON, origin: APP },
+      { url: TOON, origin: null }
+    ]);
+    // No answer at all (not an error status) is just "didn't answer", and isn't asked again.
+    const silent = fakeFetch({});
+    expect(await probeCors(TOON, APP, silent.fn)).toEqual({ state: "unknown", detail: "Its playlist didn't answer the check" });
+    expect(silent.calls).toHaveLength(1);
+  });
+
+  let toonId: string;
+
+  it("is on the dial as listed, with its own address for the native apps, and the desk's listing says native only", async () => {
+    h.deps.externalFetch = refusing().fn;
+    const body = await add("29.1", "TOON", TOON);
+    toonId = body.id;
+    expect(body).toMatchObject({ onDial: true, waiting: null, playsOver: null, relayed: false, relayReason: null, nativeOnly: true, cors: { state: "unknown", detail: ORIGIN_REFUSED_DETAIL } });
+    // Browsers get what they had before (the address as listed); the native apps go direct.
+    expect((await dialRow("TOON"))?.playback).toEqual({ kind: "hls", url: TOON, sourceUrl: TOON });
+  });
+
+  it("isn't native only once web pages are let in, or for one that's simply allowed", async () => {
+    // The hourly check finds its server letting web pages in now.
+    h.clock.advance(CORS_RECHECK_MS);
+    await h.services.network.checkExternalStations({ fetch: fakeFetch(stream(TOON, { master: ALLOW, variant: ALLOW, segment: ALLOW }).routes).fn });
+    expect(await listing(toonId)).toMatchObject({ nativeOnly: false, cors: { state: "ok" } });
+    expect((await listing((await add("39.1", "OKAY", "https://okay.example.org/live/master.m3u8")).id)).nativeOnly).toBe(false);
   });
 });
 

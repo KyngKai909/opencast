@@ -90,6 +90,13 @@ export const RETRY_FIRST_MS = 2000;
 export const RETRY_MAX_MS = 30_000;
 /** At Stand by, a picture that still hasn't come this long after its load started is loaded afresh. */
 export const REBUILD_AFTER_MS = 20_000;
+/**
+ * A239, direct mode in the native apps: an external stream link's own address, fetched with the
+ * device's networking, gets this long for its first frame (or fails sooner) before the player falls
+ * back to the row's listed address (the relay's, or the same address through the web view) at once.
+ * Half of STANDBY_MS, so the fallback has the other half before Stand by, which stays at 8 s.
+ */
+export const DIRECT_FIRST_FRAME_MS = 4000;
 
 /** All of it, for the CSS: custom properties on the player (`style={tuningStyle}`). */
 export const tuningStyle: Record<string, string> = {

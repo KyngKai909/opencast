@@ -63,9 +63,9 @@ describe("a DASH stream link (A201)", () => {
     const rows = await dialRows();
     const loma = rows.find((r) => r.station.callSign === "LOMA")!;
     expect(loma).toMatchObject({ onAir: true, now: null, external: { source: "Loma Linda Community Access", plays: "stream_link", schedule: "none" } });
-    expect(loma.playback).toEqual({ kind: "hls", url: LOMA_DASH, format: "dash" });
+    expect(loma.playback).toEqual({ kind: "hls", url: LOMA_DASH, format: "dash", sourceUrl: LOMA_DASH });
     // An HLS stream link's row is as it was: no format.
-    expect(rows.find((r) => r.station.callSign === "COLT")!.playback).toEqual({ kind: "hls", url: COLTON_HLS });
+    expect(rows.find((r) => r.station.callSign === "COLT")!.playback).toEqual({ kind: "hls", url: COLTON_HLS, sourceUrl: COLTON_HLS });
     const page = StationPage.parse((await anon(h).get("/v1/stations/loma").expect(200)).body);
     expect(page).toMatchObject({ onAir: true, playback: { kind: "hls", url: LOMA_DASH, format: "dash" }, external: { down: false } });
   });
@@ -102,7 +102,7 @@ describe("a DASH stream link (A201)", () => {
     h.clock.advance(60_000);
     expect(await h.services.network.checkExternalStations({ fetch: fn })).toMatchObject({ back: 1 });
     const back = (await dialRows()).find((r) => r.station.callSign === "LOMA")!;
-    expect(back.playback).toEqual({ kind: "hls", url: LOMA_DASH, format: "dash" });
+    expect(back.playback).toEqual({ kind: "hls", url: LOMA_DASH, format: "dash", sourceUrl: LOMA_DASH });
     // Only the manifest, never a segment.
     expect(calls.every((u) => u === LOMA_DASH || u === COLTON_HLS)).toBe(true);
   });

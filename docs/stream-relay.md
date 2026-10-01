@@ -8,6 +8,23 @@ Added 2026-10-01. Opencast's apps are served over HTTPS, and browsers block an `
 
 **A238** (2026-10-01, the user's decision, extending A237) adds the streams browsers can't load because their server sends no CORS header, and keeps out the links that use another app's access: see [below](#a238-stream-links-browsers-cant-load).
 
+**A239** (2026-10-01, the user's decision, a general capability) lets Opencast's native Android apps skip the relay: they fetch a stream link's own address with the device's networking, as VLC does. See [Native apps: direct mode](#native-apps-direct-mode-a239).
+
+## How a stream link plays, by app
+
+| The stream link | Browsers and Cast (`playback.url`) | Android TV, Fire TV and the Opencast app on Android (`playback.sourceUrl` first) | iPhone app |
+|---|---|---|---|
+| https, CORS allowed | straight from the source | direct, then `url` (the same address) | as browsers |
+| http, answers over https (A237) | its https address, from the source | direct (the https address), then `url` | as browsers |
+| http, no https (A237) | the relay's `/v1/` address, or waits (`needs_https`) without the relay | direct (the http address), then the relay | as browsers |
+| https, no CORS header (A238) | the relay's `/v2/` address, or waits (`browsers_blocked`) without the relay | direct, then the relay | as browsers |
+| refuses any request with a web page's `Origin` (A239) | as listed: browsers stand by on it (the relay isn't used for it); the desk says "Plays in the TV app only" | direct, then `url` | as browsers |
+| a session tied to the viewer's own IP | can't play (the relay's IP isn't the viewer's) | direct (the viewer's own connection) | as browsers |
+| another app's access (`platform_feed`, A238) | never played or relayed | never played (no `playback`) | never played |
+| an official embed | the source's own player | the source's own player | the source's own player |
+
+A listing waiting (`needs_https`, `browsers_blocked`) is off the dial for everyone, the native apps too: `playback` is null then. Putting such a listing on the dial for the native apps only would need the dial to know who's asking; that's not done (A239's follow-ups).
+
 ## What happens to an `http://` stream link
 
 1. **https first.** When it's listed, when its address changes (A215), and then hourly with the minute's checks, the API tries the same address over https: the same host, path and query, on port 443, or on the link's own port when it names one other than 80. It uses the minute check's light request (a ranged GET of the playlist, a 5 s timeout, the public internet only), and a real HLS or DASH playlist has to come back (not after a redirect back to http). If it answers, the dial plays the https address **straight from the source**, and the desk says "Plays over https (its listed address is http)". If https later stops answering while http still does, the upgrade is dropped at the next minute's check.
@@ -48,6 +65,20 @@ Only addresses that carry another app's access token (narrowed on 2026-10-01 at 
 - any `authToken=`, `token=` or `jwt=` that's a JWT whose payload names a partner (`partner`, `partnerId`, `partnerName`, `embedPartner`, `distributionPartner`, or a partner's `deviceType` or `appName`).
 
 They're matched at listing, on a change, and for every listing at the checks' next pass (each minute, so well within the hour), which takes one that was on the dial before A238 off it. They're never tried over https, checked for CORS or checked every minute.
+
+## Native apps: direct mode (A239)
+
+**The user decided** (A239, docs/open-decisions.md) that the native apps fetch external stream links with the device's own networking, like VLC: no `Origin`, no cookies, no `Referer`, cleartext http allowed, from the viewer's own connection. That plays an http link, a server without CORS headers, a server that refuses any request carrying a web page's `Origin`, and a session tied to the viewer's IP (one the relay can't carry, since the relay's IP isn't the viewer's).
+
+- **The API** adds `playback.sourceUrl` to every external stream link's dial row and station page: the source's own address (an https link's; an http link's https address when it answered there, else its listed http address). `url` is what it always was. Embeds have no `sourceUrl`.
+- **Which apps**: the Android TV and Fire TV app (`apps/tv/android`) and the Opencast app on Android (`apps/web/android`), which register the `OpencastDirect` plugin. Browsers, the Cast receiver and the iPhone app have no plugin and play `url` as before (the iPhone is a follow-up: A239).
+- **How**: the player (packages/player `engine/direct.ts`) loads a row with `sourceUrl` through an hls.js loader that asks the app's own origin for `/_opencast/direct/<token>?u=<address>`; the app's web view client answers that path (`shouldInterceptRequest`) by fetching the address with OkHttp and streaming the body straight through (`X-Opencast-Url` names the address after redirects). Only that row's hls.js uses it: the API's calls and Opencast's own stations go through the web view as before. DASH stream links play `url` (a follow-up).
+- **The order**: `sourceUrl` first; on an error, or no first frame in 4 s, `url` at once; Stand by at 8 s as before. Each new tune, and each round after the retry wait, tries `sourceUrl` first again.
+- **What the source sees**: `User-Agent: Opencast TV (Android)` (or `Opencast (Android)`), `Accept: */*`, the player's `Range`; nothing else. Redirects are followed natively (up to 5, http and https). Only http(s), no user names or passwords, and never a local or private address (by name or what it resolves to), except in debug builds.
+- **Cleartext**: the apps' network security config permits it (Android can't limit it to one HTTP client); the web view stays https only, because its page is `https://localhost`, mixed content is never allowed and the API's address is https.
+- **Health and the desk**: the minute's checks are unchanged (from the server, no `Origin`). The CORS check (A238) asks a second time without an `Origin` when its first request got an error status; a playlist then marks the listing `nativeOnly`, and the desk says "Plays in the TV app only" (`cors` stays `unknown`, so browsers play it as listed, as before). A session tied to the viewer's IP can't be seen from the server and isn't marked.
+- **Cost**: nothing for the relay while direct works; a relayed station played natively costs no Worker requests.
+- **Evidence**: direct mode doesn't make Opencast carry anything (the viewer's device fetches from the source, as a browser would), but its permission or public basis still has to hold before it's listed, as for any stream link.
 
 ## The relay
 

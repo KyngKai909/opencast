@@ -49,7 +49,7 @@ import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
 import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
-import { probeCors, type CorsCheck } from "../../lib/streamCors.js";
+import { ORIGIN_REFUSED_DETAIL, probeCors, type CorsCheck } from "../../lib/streamCors.js";
 import { platformFeedOf } from "../../lib/platformFeeds.js";
 
 /** A check that hasn't answered by then has failed. */
@@ -115,7 +115,8 @@ export interface ExternalDial {
   /** A215: taken off the dial for good (the station page answers 404, "no longer on the dial"). */
   removed: boolean;
   info: ExternalInfo;
-  playback: { kind: "hls" | "embed"; url: string; format?: "dash" } | null;
+  /** A239: `sourceUrl`, a stream link's own address, for the native apps' direct mode. */
+  playback: { kind: "hls" | "embed"; url: string; format?: "dash"; sourceUrl?: string } | null;
 }
 
 export interface ExternalCheckResult {
@@ -505,6 +506,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         relayReason: relayReasonFor(r, rule.relay),
         cors: r.plays === "stream_link" && r.cors && directAddressOf(r) ? { state: r.cors, detail: r.corsDetail, checkedAt: r.corsCheckedAt?.toISOString() ?? null } : null,
         platformFeed: r.platformFeed,
+        // A239: its server refuses web pages but answers the native apps (the CORS check found it).
+        nativeOnly: r.plays === "stream_link" && !r.platformFeed && r.cors === "unknown" && r.corsDetail === ORIGIN_REFUSED_DETAIL && directAddressOf(r) !== null,
         evidence: { basis: r.basis, termsUrl: r.termsUrl, termsCheckedOn: r.termsCheckedOn, publicBasis: r.publicBasis, permission, note: r.waitingNote },
         schedule: { source: r.scheduleSource, format: r.scheduleFormat, url: r.calendarUrl, checkedAgainst: r.guideCheckedAgainst, checkedOn: r.guideCheckedOn },
         onDial: !removed && waiting === null,
@@ -642,12 +645,17 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     });
   }
 
-  /** A dial row's playback: the source's embed or stream link (A237: an http:// one's https or relay address). */
+  /**
+   * A dial row's playback: the source's embed or stream link (A237: an http:// one's https or relay
+   * address). A239: a stream link also carries `sourceUrl`, the source's own address (an http one's
+   * https address when it answered there), which the native apps fetch directly before `url`.
+   */
   function playbackOf(r: Row): ExternalDial["playback"] {
     const url = streamAddress(r);
     if (url === null) return null;
-    const dash = r.plays === "stream_link" && (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash";
-    return { kind: r.plays === "embed" ? "embed" : "hls", url, ...(dash ? { format: "dash" as const } : {}) };
+    if (r.plays !== "stream_link") return { kind: "embed", url };
+    const dash = (r.streamFormat ?? streamFormatOf(r.streamUrl)) === "dash";
+    return { kind: "hls", url, ...(dash ? { format: "dash" as const } : {}), sourceUrl: directAddressOf(r) ?? r.streamUrl };
   }
 
   /**

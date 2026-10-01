@@ -43,6 +43,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    // A239, direct mode: the native half lives beside the player (packages/player/native/android),
+    // shared by the TV app and the Opencast app on Android.
+    sourceSets {
+        main.java.srcDirs += "${rootDir}/../../../packages/player/native/android/src/main/java"
+        test.java.srcDirs += "${rootDir}/../../../packages/player/native/android/src/test/java"
+    }
 }
 
 repositories {
@@ -57,6 +63,9 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // A239, direct mode (DirectFetcher): no cookies, redirects followed by hand, private addresses refused.
+    implementation "com.squareup.okhttp3:okhttp:$okhttpVersion"
+    testImplementation "com.squareup.okhttp3:mockwebserver:$okhttpVersion"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

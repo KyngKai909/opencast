@@ -14,6 +14,7 @@ import { useAccountSettingsSync } from "../components/settings/useTvSettings";
 import { hintsFor, keyHintsHidden, readFirstUse } from "../components/watching/hintRow";
 import { useNotForMeFlag } from "../components/watching/notForMe";
 import { config } from "../config";
+import { nativeDirect } from "../native/direct";
 import { now, MARKET_TZ } from "../lib/clock";
 import { findByRef } from "../lib/stationRef";
 import { contextFor, dispatch, onPictureCommand, type Ui } from "./commands";
@@ -82,6 +83,9 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
       eveningOut: settings.eveningOut,
       tuningSound: { video: settings.tuningSound, radio: settings.radioTuningSound },
       now: () => now().getTime(),
+      // A239: in the Android app, external stream links are fetched with the TV's own networking
+      // first (their playback.sourceUrl), then playback.url. Null in a browser, on Cast and mirroring.
+      direct: mode === "tv" ? nativeDirect() : null,
       onCommand: (c: Command, s?: CommandSource) => {
         if (ui.current && engineRef.current) onPictureCommand(c, ui.current, engineRef.current, s);
       }

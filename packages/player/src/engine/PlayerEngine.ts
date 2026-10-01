@@ -24,6 +24,10 @@
 // - DASH stream links (A201, dash.ts): dash.js, loaded only when one is tuned; never warmed. A
 //   device that can't play DASH skips those stations in the swipe order, and says so on one tuned
 //   directly (status "unplayable").
+// - Direct mode (A239, the native apps only, direct.ts): an external stream link with
+//   `playback.sourceUrl` is fetched with the device's own networking first (no Origin, cookies or
+//   Referer; http allowed), and falls back to `playback.url` (the relay's, or the same address)
+//   on an error or no first frame in DIRECT_FIRST_FRAME_MS. Stand by is still at 8 s.
 //
 // Surfaces read its state (subscribe/getState) and send it commands (handle).
 
@@ -31,13 +35,14 @@ import type { Channel, Command, CommandSource } from "../types";
 import { findByChannel, neighbour, neighbours, type NeighbourOptions } from "../dial";
 import { readEntry, typeKey, type NumberEntry } from "../numberEntry";
 import { Deck, SignedOffError, type WarmMode } from "./Deck";
-import { defaultDriver, nativeDriver, type MediaDriver, type Quality } from "./driver";
+import { defaultDriver, hlsDriver, nativeDriver, type MediaDriver, type Quality } from "./driver";
 import { dashSupport, defaultDashDriver, isDash, type DashSupport } from "./dash";
+import { directLoader, directUrlOf, type DirectTransport } from "./direct";
 import { AudioLevels } from "./meter";
 import { isLive, Prefetch, type Fetch } from "./playlist";
 import { onScreenKey, type OnScreen } from "./timeline";
 import { ChannelChange, type TuningLook, type TuningState } from "../tuning/change";
-import { LAND_MS, REBUILD_AFTER_MS, RETRY_FIRST_MS, RETRY_MAX_MS } from "../tuning/constants";
+import { DIRECT_FIRST_FRAME_MS, LAND_MS, REBUILD_AFTER_MS, RETRY_FIRST_MS, RETRY_MAX_MS } from "../tuning/constants";
 import { Hiss, hissAllowed, pageHasBeenActive } from "../tuning/hiss";
 import { frequencyOf } from "../tuning/sweep";
 
@@ -130,6 +135,14 @@ export interface EngineOptions {
   /** Whether this device can play DASH (detected by default). */
   dashSupport?: () => DashSupport;
   /**
+   * A239, direct mode: how the native app fetches an address with the device's own networking
+   * (the Android apps give one; browsers, Cast and the iPhone don't). With it, an external stream
+   * link's `playback.sourceUrl` is tried first, and `playback.url` is the fallback.
+   */
+  direct?: DirectTransport | null;
+  /** The driver for direct mode's pictures (tests); hls.js loading through `direct` by default. */
+  directDriver?: MediaDriver;
+  /**
    * "Tuning sound": a soft hiss while changing channel, per band. On for the radio band and off for
    * video unless the viewer changes it. It plays only after the viewer has interacted, and not while muted.
    */
@@ -201,11 +214,20 @@ export class PlayerEngine {
   private decks = new Map<string, Deck>();
   private host: HTMLElement | null = null;
   private driver: MediaDriver;
-  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound" | "dashDriver" | "dashSupport">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
+  private o: Required<Omit<EngineOptions, "driver" | "onCommand" | "presets" | "fetch" | "airPlayDriver" | "tuningSound" | "dashDriver" | "dashSupport" | "direct" | "directDriver">> & Pick<EngineOptions, "onCommand"> & { tuningSound: TuningSound };
   /** DASH (A201): made the first time a DASH station is tuned, so an HLS viewer never loads it. */
   private dashDriver: MediaDriver | null;
   private dashSupportFn: () => DashSupport;
   private dashSupportNow: DashSupport | null = null;
+  /** A239: the native app's direct transport, and the driver over it (made on first use). */
+  private direct: DirectTransport | null;
+  private directDriver: MediaDriver | null;
+  /**
+   * A239: stations whose direct attempt failed in this round of loading: their next picture loads
+   * the listed address. Cleared by a new tune and after each wait between rounds, so every round
+   * tries the source's own address first.
+   */
+  private viaListed = new Set<string>();
   /** Changing channel: the static's timing, Stand by at 8 s, and the photosensitivity guard. */
   private change: ChannelChange;
   private hiss: Hiss;
@@ -262,6 +284,8 @@ export class PlayerEngine {
     this.airPlayDriver = options.airPlayDriver ?? nativeDriver();
     this.dashDriver = options.dashDriver ?? null;
     this.dashSupportFn = options.dashSupport ?? dashSupport;
+    this.direct = options.direct ?? null;
+    this.directDriver = options.directDriver ?? null;
     this.audio.setEvenOut(this.o.eveningOut);
     this.hiss = new Hiss(() => this.audio.context());
     this.change = new ChannelChange({
@@ -427,17 +451,34 @@ export class PlayerEngine {
     return this.dashDriver;
   }
 
+  /**
+   * A239: the address direct mode loads for this station now (its stream link's own, `sourceUrl`),
+   * or null: no transport (a browser), not an external stream link, DASH, or its direct attempt
+   * failed this round.
+   */
+  private directAddress(c: Channel): string | null {
+    if (!this.direct || this.viaListed.has(c.station.id)) return null;
+    return directUrlOf(c);
+  }
+
+  private directDriverNow(): MediaDriver {
+    this.directDriver ??= hlsDriver({ loader: directLoader(this.direct!), name: "hls.js direct" });
+    return this.directDriver;
+  }
+
   private deckFor(c: Channel): Deck | null {
     if (!this.host || c.playback?.kind !== "hls") return null;
     let d = this.decks.get(c.station.id);
     if (!d) {
+      const direct = this.directAddress(c);
       // A pre-warmed station starts on the segment already fetched, at its rendition.
-      const start = this.prefetches.get(c.station.id)?.startHint() ?? null;
+      const start = direct ? null : (this.prefetches.get(c.station.id)?.startHint() ?? null);
       d = new Deck({
         stationId: c.station.id,
-        url: c.playback.url,
+        url: direct ?? c.playback.url,
         host: this.host,
-        driver: this.driverFor(c),
+        driver: direct ? this.directDriverNow() : this.driverFor(c),
+        direct: !!direct,
         quality: this.o.quality,
         start,
         fetch: this.fetch,
@@ -461,6 +502,8 @@ export class PlayerEngine {
     if (!c) return;
     this.clearEntry();
     if (stationId !== this.downId) this.downId = null;
+    // A239: a new tune tries the source's own address first again (direct mode).
+    if (!again) this.viaListed.delete(stationId);
     if (source?.who) this.patch({ changedBy: source.who });
     // After stop() (the sleep timer), the same station tunes again from scratch; `again` is a
     // station coming back on air (or Stand by trying again).
@@ -614,10 +657,22 @@ export class PlayerEngine {
           this.signedOff(stationId, this.state.offAir.backAt, null);
           return null;
         }
+        if (deck.direct) {
+          // A239: the source's own address didn't play in direct mode: its listed address (the
+          // relay's, or the same address through the web view) at once, with no wait.
+          this.viaListed.add(stationId);
+          this.dropDeck(stationId);
+          const listed = this.deckFor(c);
+          if (!listed) return null;
+          deck = listed;
+          continue;
+        }
         await new Promise<void>((resolve) => (this.timers.land = setTimeout(resolve, wait)));
         wait = Math.min(wait * 2, RETRY_MAX_MS);
         if (seq !== this.tuneSeq) return null;
         this.dropDeck(stationId);
+        // A239: each round after a wait tries the source's own address first again.
+        this.viaListed.delete(stationId);
         const fresh = this.deckFor(c);
         if (!fresh) return null;
         deck = fresh;
@@ -637,7 +692,8 @@ export class PlayerEngine {
         // frame, which comes or doesn't (Stand by, then a fresh load).
         if (e?.name === "NotAllowedError") resolve("notAllowed");
       });
-      deck.firstFrame(REBUILD_AFTER_MS).then(() => resolve("frame"), reject);
+      // A239: direct mode gives up sooner, so the listed address has time before Stand by (8 s).
+      deck.firstFrame(deck.direct ? DIRECT_FIRST_FRAME_MS : REBUILD_AFTER_MS).then(() => resolve("frame"), reject);
     });
   }
 
@@ -743,7 +799,9 @@ export class PlayerEngine {
     if (mode === "prefetch" || mode === "playlists") {
       for (const n of warmable) {
         const id = n.station.id;
-        if (this.decks.has(id) || n.playback?.kind !== "hls") continue;
+        // A239: a neighbour going direct isn't prefetched: the web view's cache is no help to the
+        // native fetch, and an IP-bound session shouldn't start before it's tuned.
+        if (this.decks.has(id) || n.playback?.kind !== "hls" || this.directAddress(n)) continue;
         prefetch.add(id);
         if (!this.prefetches.has(id)) {
           this.prefetches.set(id, new Prefetch({ url: n.playback.url, quality: this.o.quality, fetch: this.fetch, segment: mode === "prefetch", onChange: () => this.refreshWarm() }));

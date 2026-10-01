@@ -2,7 +2,7 @@
 // Right now, and the outage history, on the mock clock's Saturday, 8:42 pm in the Inland Empire.
 import { describe, expect, it } from "vitest";
 import type { ListedSource } from "@opencast/contracts";
-import { browserNote, downFor, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail, transportLine } from "./external";
+import { browserNote, downFor, nativeOnlyNote, nowWords, onceWords, outageWords, playsDetail, scheduleWords, sourceDetail, transportLine } from "./external";
 
 const TZ = "America/Los_Angeles";
 const NOW = new Date("2026-09-27T03:42:12Z");
@@ -81,6 +81,18 @@ describe("a stream browsers can't load, and another app's access (A238)", () => 
     expect(browserNote(feed)).toBe("Uses another app's access (Pluto via Samsung TV Plus). Ask the channel's licensor for its own feed.");
     expect(onceWords(feed)).toBe("it has a feed of its own from the channel's licensor");
     expect(transportLine(feed)).toBeNull();
+  });
+});
+
+describe("a stream only the native apps can play (A239)", () => {
+  it("says it plays in the TV app only, and why", () => {
+    const refused = s({ nativeOnly: true, cors: { state: "unknown", detail: "Its server refuses web pages' requests (it answers only without an Origin header), so it plays in the TV app only", checkedAt: "2026-09-27T03:00:00Z" } });
+    expect(transportLine(refused)).toBe("Plays in the TV app only");
+    expect(nativeOnlyNote(refused)).toBe("Its server refuses web pages' requests but answers apps. The Android TV and Fire TV app, and the Opencast app on Android, play it straight from the source; browsers, Chromecast and iPhone show Stand by on it.");
+    // Still on the dial, as before: nothing else about it changes.
+    expect(browserNote(refused)).toBeNull();
+    expect(transportLine(s({ nativeOnly: false }))).toBeNull();
+    expect(nativeOnlyNote(s({}))).toBeNull();
   });
 });
 

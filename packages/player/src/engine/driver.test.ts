@@ -98,6 +98,18 @@ describe("hls.js, set up for joins", () => {
   });
 });
 
+describe("hls.js in direct mode (A239)", () => {
+  it("loads through the loader it's given (the native apps' own networking); without one, hls.js's own", () => {
+    class NativeLoader {}
+    const direct = hlsDriver({ loader: NativeLoader as never, name: "hls.js direct" });
+    expect(direct.name).toBe("hls.js direct");
+    direct.attach(document.createElement("video"), "https://api.toonami.example/est/playlist.m3u8", () => {});
+    expect(made[0]!.config.loader).toBe(NativeLoader);
+    hlsDriver().attach(document.createElement("video"), "/mock-hls/beat/master.m3u8", () => {});
+    expect("loader" in made[1]!.config).toBe(false);
+  });
+});
+
 describe("hls.js and the rendition ladder", () => {
   it("never plays the audio-only rendition for a picture, and still starts where the pre-warm fetched", () => {
     hlsDriver().attach(document.createElement("video"), "/x/master.m3u8", () => {}, { start: { bandwidth: 650000, syncCount: 3 } });

@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds only: http to the dev server (TV_DEV_SERVER in capacitor.config.ts). Release keeps cleartext off. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/dev_server_cleartext" />
+<!--
+  Debug builds only: their own network security config (http to the dev server, TV_DEV_SERVER in
+  capacitor.config.ts), in place of the main one. Since A239 the main config permits cleartext for
+  direct mode's native fetches, so this one does too, with the dev server's hosts named as before.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:networkSecurityConfig="@xml/dev_server_cleartext"
+        tools:replace="android:networkSecurityConfig" />
 </manifest>

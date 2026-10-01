@@ -158,11 +158,22 @@ export function nowWords(s: ListedSource, now: Date): { text: string; detail?: s
  * How it plays line itself while it waits for one).
  */
 export function transportLine(s: ListedSource): string | null {
+  // A239: its server refuses web pages' requests but answers the native apps (direct mode).
+  if (s.nativeOnly) return "Plays in the TV app only";
   // A238: a server browsers can't load from (no CORS header), relayed with everything in its playlists.
   if (s.playsOver === "relay" && s.relayReason === "cors") return "Browsers block this stream's server, so it plays through Opencast's secure relay";
   if (s.playsOver === "https") return "Plays over https (its listed address is http)";
   if (s.playsOver === "relay") return "Plays through Opencast's secure relay (its address is http)";
   return null;
+}
+
+/**
+ * A239: under "Plays in the TV app only", why: what the check found, and who plays it. Null for
+ * anything else.
+ */
+export function nativeOnlyNote(s: ListedSource): string | null {
+  if (!s.nativeOnly) return null;
+  return "Its server refuses web pages' requests but answers apps. The Android TV and Fire TV app, and the Opencast app on Android, play it straight from the source; browsers, Chromecast and iPhone show Stand by on it.";
 }
 
 /** A238: "Uses another app's access (Pluto via Samsung TV Plus)". */

@@ -13,7 +13,7 @@ import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
 import { dateAtTime } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
-import { browserNote, changeWords, familyLine, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
+import { browserNote, changeWords, familyLine, nativeOnlyNote, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
 import { channelText } from "./SourceStatus";
 import "./SourceDetails.css";
 
@@ -159,8 +159,9 @@ export function SourceDetails({
           items={[
             { title: PLAYS_LABELS[playsOf(s)], detail: playsDetail(s, tz) || null },
             // A237: an http:// stream link over https from the source, or through the relay; A238: one
-            // whose server blocks browsers, through the relay (with what the check found).
-            ...(transportLine(s) ? [{ title: transportLine(s)!, detail: s.relayReason === "cors" ? (s.cors?.detail ?? null) : null }] : []),
+            // whose server blocks browsers, through the relay (with what the check found); A239: one
+            // only the native apps can play.
+            ...(transportLine(s) ? [{ title: transportLine(s)!, detail: s.relayReason === "cors" ? (s.cors?.detail ?? null) : nativeOnlyNote(s) }] : []),
             ...evidenceRows(s, tz),
             { title: playsOf(s) === "embed" ? "Their player's address" : "Stream address", detail: <span className="nd-mono nd-src__addr">{s.streamUrl}</span> },
             ...earlierRows(s, tz)

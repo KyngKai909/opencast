@@ -2,7 +2,7 @@
 // own HLS where they don't (Safari on iPhone). Behind one interface so the engine is the same
 // either way, and tests can use a fake.
 
-import Hls from "hls.js";
+import Hls, { type HlsConfig } from "hls.js";
 import { parseDateRanges, type HlsDateRange } from "@opencast/contracts";
 import { isMaster, mediaPlaylist, variants, type Fetch } from "./playlist";
 
@@ -224,11 +224,13 @@ function showTextTracks(video: HTMLVideoElement, on: boolean) {
 const MANIFEST_ERRORS = new Set<string>([Hls.ErrorDetails.MANIFEST_LOAD_ERROR, Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT, Hls.ErrorDetails.MANIFEST_PARSING_ERROR, Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR]);
 
 /** hls.js, tuned for joining live: start at the sync point three segments from the edge. */
-export function hlsDriver(): MediaDriver {
+export function hlsDriver(o: { loader?: HlsConfig["loader"]; name?: string } = {}): MediaDriver {
   return {
-    name: "hls.js",
+    name: o.name ?? "hls.js",
     attach(video, url, onFatal, options = {}) {
       const hls = new Hls({
+        // A239: direct mode's loader (the native apps' own networking), for external stream links only.
+        ...(o.loader ? { loader: o.loader } : {}),
         // A pre-warmed start joins on the segment already fetched (3, or more if the playlist moved on).
         liveSyncDurationCount: options.start?.syncCount ?? 3,
         maxBufferLength: 8,

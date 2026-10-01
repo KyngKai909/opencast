@@ -1129,3 +1129,14 @@ For review. Viewers see nothing new: a relayed station plays like any other.
 | The platform feeds' names, in the brackets | "jmp2.uk, which forwards to other apps' feeds"; "Pluto via Samsung TV Plus", "Pluto via The Roku Channel", "Pluto via {partner}", "Pluto via a partner app"; "Samsung TV Plus"; a partner named in a token ("The Roku Channel", "Vizio WatchFree+", "Xumo", "LG Channels", "Amazon Fire TV", or the name as the token gives it) |
 | The CORS check's other findings (`ListedSource.cors.detail`; kept by the API, not shown by the desk yet) | "Its playlist didn't answer the check"; "Its playlist allows Opencast's apps; its variant playlists couldn't be checked"; "Its variant playlists couldn't be checked"; "Its playlists allow Opencast's apps; its segments couldn't be checked"; "Its MPD allows Opencast's apps; its segments couldn't be checked"; "Checked its MPD only (its segments' addresses aren't simple to work out)"; "Not a stream playlist" |
 | Network desk, List a source (and Change, Put back), saved but waiting | "Saved. {News} goes on the dial once its server lets browsers load it, or Opencast's secure relay is set up."; "Saved. {Channel} goes on the dial once it has a feed of its own from the channel's licensor." (the toast's usual start, then these words) |
+
+## Direct mode in the native apps (A239, 2026-10-01)
+
+For review. Viewers see nothing new: a station played in direct mode plays like any other.
+
+| Where | Words |
+|---|---|
+| Network desk, External sources table, How it plays (a third small line) | "Plays in the TV app only" (its server refuses web pages' requests but answers apps) |
+| Network desk, a listing's details, How it plays | a row "Plays in the TV app only", with under it: "Its server refuses web pages' requests but answers apps. The Android TV and Fire TV app, and the Opencast app on Android, play it straight from the source; browsers, Chromecast and iPhone show Stand by on it." |
+| The CORS check's finding (`ListedSource.cors.detail`, state `unknown`) | "Its server refuses web pages' requests (it answers only without an Origin header), so it plays in the TV app only" |
+| The apps' native fetch (developers only: the user agent sources see) | "Opencast TV (Android)"; "Opencast (Android)" |

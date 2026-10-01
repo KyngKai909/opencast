@@ -68,18 +68,32 @@ async function readSome(res: Response, limit: number): Promise<string> {
   return new TextDecoder().decode(all);
 }
 
-/** One light request with the app's origin; the answer, or null when there was none (or an error status). */
-async function ask(url: string, origin: string, range: string, fetchFn: Fetch, timeoutMs: number): Promise<Response | null> {
+/**
+ * A239: the detail kept when a stream's server refuses a web page's request (with the app's `Origin`)
+ * but answers the same request without one, as Opencast's native apps send it: it plays in the native
+ * apps only (`ListedSource.nativeOnly`). The state stays `unknown`, so browsers play it as before.
+ */
+export const ORIGIN_REFUSED_DETAIL = "Its server refuses web pages' requests (it answers only without an Origin header), so it plays in the TV app only";
+
+/**
+ * One light request with the app's origin (none: as a native app asks); the answer, or null when
+ * there was none or it was an error status (`refused` says which: the server answered with an error).
+ */
+async function askFully(url: string, origin: string | null, range: string, fetchFn: Fetch, timeoutMs: number): Promise<{ res: Response | null; refused: boolean }> {
   try {
-    const res = await fetchFn(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: { origin, range } });
+    const res = await fetchFn(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(timeoutMs), headers: origin ? { origin, range } : { range } });
     if (res.status >= 400) {
       await res.body?.cancel().catch(() => undefined);
-      return null;
+      return { res: null, refused: true };
     }
-    return res;
+    return { res, refused: false };
   } catch {
-    return null;
+    return { res: null, refused: false };
   }
+}
+
+async function ask(url: string, origin: string | null, range: string, fetchFn: Fetch, timeoutMs: number): Promise<Response | null> {
+  return (await askFully(url, origin, range, fetchFn, timeoutMs)).res;
 }
 
 /** An address a playlist names, resolved against where the playlist came from; null for anything but http(s). */
@@ -151,8 +165,16 @@ export function firstDashSegment(text: string, base: string): string | null {
  */
 export async function probeCors(streamUrl: string, appOrigin: string, fetchFn: Fetch = publicFetch, timeoutMs = CORS_TIMEOUT_MS): Promise<CorsCheck> {
   const origin = appOrigin.replace(/\/+$/, "");
-  const playlist = await ask(streamUrl, origin, `bytes=0-${PLAYLIST_BYTES - 1}`, fetchFn, timeoutMs);
-  if (!playlist) return { state: "unknown", detail: "Its playlist didn't answer the check" };
+  const { res: playlist, refused } = await askFully(streamUrl, origin, `bytes=0-${PLAYLIST_BYTES - 1}`, fetchFn, timeoutMs);
+  if (!playlist) {
+    // A239: an error status (not silence) is asked again without an Origin, as the native apps ask.
+    // A playlist then: the server refuses web pages only (the native apps play it straight from the
+    // source; browsers can't).
+    const bare = refused ? await ask(streamUrl, null, `bytes=0-${PLAYLIST_BYTES - 1}`, fetchFn, timeoutMs) : null;
+    const head = bare ? (await readSome(bare, 1024).catch(() => "")).trimStart() : "";
+    if (head.startsWith("#EXTM3U") || /<MPD[\s>]/.test(head)) return { state: "unknown", detail: ORIGIN_REFUSED_DETAIL };
+    return { state: "unknown", detail: "Its playlist didn't answer the check" };
+  }
   const allowed = allowsOrigin(playlist, origin);
   const text = allowed ? await readSome(playlist, PLAYLIST_BYTES).catch(() => "") : "";
   if (!allowed) {

@@ -77,7 +77,16 @@ export type ExternalInfo = z.infer<typeof ExternalInfo>;
 export const Playback = z.object({
   kind: z.enum(["hls", "embed"]),
   url: z.string(),
-  format: z.enum(["hls", "dash"]).optional()
+  format: z.enum(["hls", "dash"]).optional(),
+  /**
+   * Added 2026-10-01 (A239, direct mode in the native apps), external stations' stream links only:
+   * the source's own address (an https stream link's, an http one's https address when it answered
+   * there, otherwise its listed http address). `url` is what browsers play: the same address, or
+   * (A237, A238) Opencast's relay's. The native apps (Android TV and Fire TV, the Opencast app on
+   * Android) fetch `sourceUrl` with the device's own networking first, as VLC would, and fall back to
+   * `url`. Absent for embeds and for Opencast's own stations; browsers and Cast ignore it.
+   */
+  sourceUrl: z.string().optional()
 });
 export type Playback = z.infer<typeof Playback>;
 

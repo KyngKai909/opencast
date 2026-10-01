@@ -11,9 +11,12 @@ import { useNotForMeFlag } from "../data/notForMe";
 import { useSavedSettings } from "../layout/SettingsSync";
 import { lockScreenInput, nowPlayingInfo } from "../native/lockScreen";
 import { hasPlugin } from "../native/platform";
+import { nativeDirect } from "../native/direct";
 
-// Neighbours are pre-warmed by their playlists and first segment (no hidden <video>).
-const OPTIONS: EngineOptions = { warm: "prefetch", neighbours: { sameBand: true }, bannerMs: 5000, numberWaitMs: 2000 };
+// Neighbours are pre-warmed by their playlists and first segment (no hidden <video>). A239: in the
+// Android app, external stream links are fetched with the phone's own networking first (their
+// playback.sourceUrl), then playback.url; on the web and the iPhone `direct` is null.
+const OPTIONS: EngineOptions = { warm: "prefetch", neighbours: { sameBand: true }, bannerMs: 5000, numberWaitMs: 2000, direct: nativeDirect() };
 // The lock screen and headset buttons: the web's Media Session, or the apps' own plugin.
 const INPUTS: InputAdapter[] = [lockScreenInput()];
 

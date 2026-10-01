@@ -41,6 +41,8 @@ export interface DeckOptions {
   start?: AttachOptions["start"];
   /** For the browser's own HLS, which polls the playlist for its tags. */
   fetch?: Fetch;
+  /** A239: `url` is an external stream link's own address, fetched with the native app's own networking (direct mode). */
+  direct?: boolean;
   onChange: () => void;
   /** The playlist ended (ENDLIST) and the picture has played out to its end: the station is off air. */
   onSignOff?: (deck: Deck) => void;
@@ -72,7 +74,9 @@ export class Deck {
   private handle: MediaHandle;
   private keeper: ReturnType<typeof setInterval> | null = null;
   private frameWaiters: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
-  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now" | "quality" | "start" | "fetch" | "onSignOff">> & Pick<DeckOptions, "onChange" | "onSignOff">;
+  /** A239: playing the source's own address in direct mode (the engine falls back to the listed address if it fails). */
+  readonly direct: boolean;
+  private opts: Required<Omit<DeckOptions, "host" | "driver" | "onChange" | "now" | "quality" | "start" | "fetch" | "onSignOff" | "direct">> & Pick<DeckOptions, "onChange" | "onSignOff">;
   private now: () => number;
   /** The playlist's DATERANGE tags seen so far, by ID. */
   private ranges = new Map<string, HlsDateRange>();
@@ -87,6 +91,7 @@ export class Deck {
   constructor(o: DeckOptions) {
     this.stationId = o.stationId;
     this.url = o.url;
+    this.direct = o.direct ?? false;
     this.now = o.now ?? (() => performance.now());
     this.createdAt = this.now();
     this.opts = { stationId: o.stationId, url: o.url, warmBuffer: o.warmBuffer ?? 6, activeBuffer: o.activeBuffer ?? 20, onChange: o.onChange, onSignOff: o.onSignOff };

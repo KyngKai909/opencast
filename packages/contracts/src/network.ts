@@ -461,6 +461,14 @@ export const ListedSource = z.object({
    * Null: the source's own.
    */
   platformFeed: z.string().nullable().optional(),
+  // ---- Added 2026-10-01 (A239: direct mode in the native apps) ----
+  /**
+   * A239: only Opencast's native apps can play it: its server refuses a web page's request (the CORS
+   * check, with the app's `Origin`, got an error) but answers the same request without an `Origin`,
+   * as the native apps send it. Browsers play it as listed (and stand by), as before; the desk says
+   * "Plays in the TV app only". Absent or false otherwise.
+   */
+  nativeOnly: z.boolean().optional(),
   /** The stream's checks: the state, since when, the last check and what it saw. */
   health: z
     .object({

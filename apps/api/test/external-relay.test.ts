@@ -101,9 +101,10 @@ describe("an http:// stream link", () => {
     expect(body).toMatchObject({ onDial: true, waiting: null, playsOver: "relay", relayed: true, streamUrl: COLTON_HTTP, streamFormat: "hls" });
     const row = await dialRow("COLT");
     const relayed = `${RELAY.base}/v1/${expectedSig("http://colton.example.gov")}/${Buffer.from(COLTON_HTTP).toString("base64url")}`;
-    expect(row?.playback).toEqual({ kind: "hls", url: relayed });
+    // A239: and the source's own address, for the native apps' direct mode.
+    expect(row?.playback).toEqual({ kind: "hls", url: relayed, sourceUrl: COLTON_HTTP });
     const page = StationPage.parse((await anon(h).get("/v1/stations/colt").expect(200)).body);
-    expect(page.playback).toEqual({ kind: "hls", url: relayed });
+    expect(page.playback).toEqual({ kind: "hls", url: relayed, sourceUrl: COLTON_HTTP });
   });
 
   it("without the relay, waits with needs_https and is off the dial", async () => {
@@ -132,7 +133,7 @@ describe("an http:// stream link", () => {
     expect(later.calls).toEqual([COLTON_HTTP, COLTON_HTTPS]);
     expect(await listing(coltonId)).toMatchObject({ onDial: true, waiting: null, playsOver: "https", relayed: false });
     // Straight from the source over https: no relay, even with none configured.
-    expect((await dialRow("COLT"))?.playback).toEqual({ kind: "hls", url: COLTON_HTTPS });
+    expect((await dialRow("COLT"))?.playback).toEqual({ kind: "hls", url: COLTON_HTTPS, sourceUrl: COLTON_HTTPS });
     // And from the next minute it's checked there.
     const next = fakeFetch({ [COLTON_HTTPS]: hls });
     await h.services.network.checkExternalStations({ fetch: next.fn });
@@ -156,7 +157,7 @@ describe("an http:// stream link", () => {
     h.deps.externalFetch = fakeFetch({ ["https://redlands.example.gov/live/index.m3u8"]: hls }).fn;
     const body = await add("11.1", "RDLS", "http://redlands.example.gov/live/index.m3u8");
     expect(body).toMatchObject({ onDial: true, playsOver: "https", relayed: false });
-    expect((await dialRow("RDLS"))?.playback).toEqual({ kind: "hls", url: "https://redlands.example.gov/live/index.m3u8" });
+    expect((await dialRow("RDLS"))?.playback).toEqual({ kind: "hls", url: "https://redlands.example.gov/live/index.m3u8", sourceUrl: "https://redlands.example.gov/live/index.m3u8" });
   });
 
   it("isn't upgraded when https only redirects back to http", async () => {
@@ -173,7 +174,7 @@ describe("an http:// stream link", () => {
     const body = await add("17.1", "LOMA", LOMA_HTTP);
     expect(body).toMatchObject({ onDial: true, playsOver: "relay", streamFormat: "dash" });
     const origin = "http://lomalinda.example.gov:8080";
-    expect((await dialRow("LOMA"))?.playback).toEqual({ kind: "hls", format: "dash", url: `${RELAY.base}/v1/${expectedSig(origin)}/${Buffer.from(origin).toString("base64url")}/live/manifest.mpd` });
+    expect((await dialRow("LOMA"))?.playback).toEqual({ kind: "hls", format: "dash", url: `${RELAY.base}/v1/${expectedSig(origin)}/${Buffer.from(origin).toString("base64url")}/live/manifest.mpd`, sourceUrl: LOMA_HTTP });
   });
 
   it("changed to another http address (A215), is tried over https afresh", async () => {
@@ -192,7 +193,7 @@ describe("everything else plays as it did", () => {
     const body = await add("21.1", "RIAL", RIALTO_HTTPS);
     expect(tried.calls).toEqual([]);
     expect(body).toMatchObject({ onDial: true, playsOver: null, relayed: false });
-    expect((await dialRow("RIAL"))?.playback).toEqual({ kind: "hls", url: RIALTO_HTTPS });
+    expect((await dialRow("RIAL"))?.playback).toEqual({ kind: "hls", url: RIALTO_HTTPS, sourceUrl: RIALTO_HTTPS });
     const check = fakeFetch({ [RIALTO_HTTPS]: hls });
     await h.services.network.checkExternalStations({ fetch: check.fn });
     expect(check.calls).toContain(RIALTO_HTTPS);
