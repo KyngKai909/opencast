@@ -118,13 +118,13 @@ export function Rockers({ row, up, down, paused, onCommand }: { row: DialRowX | 
 }
 
 /**
- * The TV's guide from the phone: ▲ ▼ ◀ ▶ and OK move and choose on the TV (its remote's keys), Back
- * steps back there. Takes the rockers' place while the TV's guide is open.
+ * The TV's guide or menu from the phone: ▲ ▼ ◀ ▶ and OK move and choose on the TV (its remote's
+ * keys), Back steps back there. Takes the rockers' place while the TV's guide or menu is open.
  */
-export function GuidePad({ onCommand, onBack }: { onCommand: (c: RemoteCommand) => void; onBack: () => void }) {
+export function GuidePad({ onCommand, onBack, label = "Guide on the TV" }: { onCommand: (c: RemoteCommand) => void; onBack: () => void; label?: string }) {
   const focus = (dir: "up" | "down" | "left" | "right") => () => onCommand({ type: "focus", dir });
   return (
-    <div className="vw-rm-pad" role="group" aria-label="Guide on the TV">
+    <div className="vw-rm-pad" role="group" aria-label={label}>
       <div className="vw-rm-pad__keys">
         <button type="button" className="vw-rm-pad__up" aria-label="Up" onClick={focus("up")}>
           <Icon name="up" />
@@ -158,12 +158,32 @@ export function BackToLive({ onCommand }: { onCommand: (c: RemoteCommand) => voi
   );
 }
 
-export function RemoteButtons({ onGuide, onInfo, onKeypad, onLast, guideOpen = false }: { onGuide: () => void; onInfo: () => void; onKeypad: () => void; onLast: () => void; guideOpen?: boolean }) {
+export function RemoteButtons({
+  onGuide,
+  onMenu,
+  onInfo,
+  onKeypad,
+  onLast,
+  guideOpen = false,
+  menuOpen = false
+}: {
+  onGuide: () => void;
+  onMenu: () => void;
+  onInfo: () => void;
+  onKeypad: () => void;
+  onLast: () => void;
+  guideOpen?: boolean;
+  menuOpen?: boolean;
+}) {
   return (
     <div className="vw-rm-row">
       {/* The TV's guide: pressed again, it closes there. */}
       <Button icon="guide" onClick={onGuide} aria-pressed={guideOpen} set={guideOpen}>
         Guide
+      </Button>
+      {/* The TV's menu (its remote's Menu key): settings, captions, the market, presets. */}
+      <Button icon="tv" onClick={onMenu} aria-pressed={menuOpen} set={menuOpen}>
+        Menu
       </Button>
       <Button icon="info" onClick={onInfo}>
         Info

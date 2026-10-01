@@ -67,20 +67,22 @@ function Remote() {
   const send = (c: RemoteCommand) => sendToTv(c);
   const keypad = params.get("sheet") === "keypad";
 
-  // Guide opens the TV's guide (the TV's remote's Guide key): the phone then shows arrows and OK
-  // for it. The TV doesn't say whether its guide is open, so the phone follows what it sent:
-  // Guide again or Back closes it, and a new station on the TV (OK on what's on) means it closed.
-  const [tvGuide, setTvGuide] = useState(false);
+  // Guide and Menu open the TV's guide or menu (the TV's remote's keys): the phone then shows
+  // arrows and OK for it. The TV doesn't say what it has open, so the phone follows what it sent:
+  // the same key again or Back closes it, the other key opens that in its place, and a new station
+  // on the TV (OK on what's on) means it closed.
+  const [tvOpen, setTvOpen] = useState<"guide" | "menu" | null>(null);
+  const tvGuide = tvOpen === "guide";
   const shownStation = useRef(receiver?.stationId ?? null);
   useEffect(() => {
     const id = receiver?.stationId ?? null;
     if (id === shownStation.current) return;
     shownStation.current = id;
-    setTvGuide(false);
+    setTvOpen(null);
   }, [receiver?.stationId]);
-  const guide = () => {
-    send({ type: "guide" });
-    setTvGuide((open) => !open);
+  const toggle = (what: "guide" | "menu") => {
+    send({ type: what });
+    setTvOpen((open) => (open === what ? null : what));
   };
 
   if (session.status === "idle" || session.status === "mirror_stopped") {
@@ -121,19 +123,20 @@ function Remote() {
       {!phone && <RemoteTop />}
       {row ? <NowStrip row={row} paused={paused} now={now} flicker={!litAtOpen.current} /> : <div className="vw-rm-quiet" aria-busy="true" aria-label="Waiting for the TV" />}
       {other && <p className="vw-rm-changed" role="status">{`${other} changed the channel.`}</p>}
-      {tvGuide ? (
+      {tvOpen ? (
         <GuidePad
+          label={tvGuide ? "Guide on the TV" : "Menu on the TV"}
           onCommand={send}
           onBack={() => {
             send({ type: "back" });
-            setTvGuide(false);
+            setTvOpen(null);
           }}
         />
       ) : (
         <Rockers row={row} up={up} down={down} paused={paused} onCommand={send} />
       )}
-      {row && !tvGuide && (paused || receiver?.behindLive) && <BackToLive onCommand={send} />}
-      <RemoteButtons guideOpen={tvGuide} onGuide={guide} onInfo={() => send({ type: "info" })} onKeypad={() => open({ sheet: "keypad" })} onLast={() => send({ type: "last" })} />
+      {row && !tvOpen && (paused || receiver?.behindLive) && <BackToLive onCommand={send} />}
+      <RemoteButtons guideOpen={tvGuide} menuOpen={tvOpen === "menu"} onGuide={() => toggle("guide")} onMenu={() => toggle("menu")} onInfo={() => send({ type: "info" })} onKeypad={() => open({ sheet: "keypad" })} onLast={() => send({ type: "last" })} />
       {/* The phone's own guide (tv 06 "Guide on the phone"): choosing a program there tunes the TV. */}
       {slug && (
         <Button variant="text" size="sm" className="vw-rm-phoneguide" onClick={() => navigate("/guide")}>

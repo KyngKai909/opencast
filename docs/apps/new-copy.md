@@ -1091,3 +1091,8 @@ Nothing changes on air; the Network desk is told and decides with the owners. Fo
 | Network desk, the selected slot with subchannels (full stations) | the slot's line "Independent stations. {Inland Beat}, {Redlands}"; a line per station, "{12.1 BEAT}" with its name, the button "Open {12.1}" (master control); the member's: "{Beat Tapes}. No longer shares an owner with {12.1 BEAT}. Since {September 25}. …" as on the board |
 | Network desk, the rail's Market board | the count, read as "{1} shared call {sign / signs} to look at" |
 | Mocks (development only) | "Beat Tapes" (BEAT 12.2) on the desk's Inland Empire board, handed from Kai M. to Jen Park on September 25 |
+
+## Phone remote: the TV's menu (2026-10-01)
+
+- Remote button row: **Menu** (beside Guide; opens the TV's menu, where Settings and Captions are; pressed again, it closes there).
+- While the TV's menu is open, the arrows-and-OK pad is labelled "Menu on the TV" (the guide's stays "Guide on the TV").

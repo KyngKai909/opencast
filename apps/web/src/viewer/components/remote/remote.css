@@ -45,7 +45,7 @@
 .vw-rm-phoneguide { display: block; margin: 0 auto 4px; }
 /* Back to live: under the rockers while the TV is behind live. */
 .vw-rm-live { display: flex; justify-content: center; padding: 4px 18px 0; }
-.vw-rm-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px 18px; }
+.vw-rm-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 12px 18px; }
 .vw-rm-row .oc-btn { height: 52px; flex-direction: column; gap: 2px; font-size: 12px; padding: 0; }
 .vw-rm-row .oc-btn .oc-i { width: 18px; height: 18px; }
 

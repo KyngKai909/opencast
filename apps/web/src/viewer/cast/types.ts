@@ -50,6 +50,8 @@ export type RemoteCommand =
   | { type: "info" }
   /** The TV's guide opens (or, open, closes), and the arrows, OK and Back then drive it there. */
   | { type: "guide" }
+  /** The TV's menu (settings, captions, the market) opens or closes, driven the same way. */
+  | { type: "menu" }
   | { type: "focus"; dir: "up" | "down" | "left" | "right" }
   | { type: "select" }
   | { type: "back" }
