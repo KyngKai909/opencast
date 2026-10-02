@@ -19,7 +19,7 @@ describe("the page", () => {
 
   it("points the code at the real repo", () => {
     render(<App />);
-    expect(screen.getByRole("link", { name: "Read the code" }).getAttribute("href")).toBe("https://github.com/KyngKai909/untitled-project");
-    expect(screen.getByRole("region", { name: "Run a station locally" }).textContent).toContain("git clone https://github.com/KyngKai909/untitled-project\nnpm install\nnpm run dev");
+    expect(screen.getByRole("link", { name: "Read the code" }).getAttribute("href")).toBe("https://github.com/KyngKai909/opencast");
+    expect(screen.getByRole("region", { name: "Run a station locally" }).textContent).toContain("git clone https://github.com/KyngKai909/opencast\nnpm install\nnpm run dev");
   });
 });

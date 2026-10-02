@@ -1,6 +1,6 @@
 # Opencast: apps prompt (every screen, from the reference files)
 
-You're working in `github.com/KyngKai909/untitled-project`, the Opencast repo, after the platform prompt has restructured it into a monorepo. Your job is to build every app from the reference designs, on a shared UI package and a shared player. There are four:
+You're working in `github.com/KyngKai909/opencast`, the Opencast repo, after the platform prompt has restructured it into a monorepo. Your job is to build every app from the reference designs, on a shared UI package and a shared player. There are four:
 
 - **`apps/web`, the Opencast app.** One account and one sign-in for viewers and creators, like Twitch: the viewer at `/`, master control at `/control`, and Network desk at `/desk` for Opencast admins.
 - **`apps/business`, Opencast for business.** The advertiser side, a separate app for a separate kind of customer.

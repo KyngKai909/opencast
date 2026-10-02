@@ -7,7 +7,7 @@
 // `railway variables --set`) and kept. docs/deploy.md lists every variable and who needs it.
 import { bucket, defineRailway, github, postgres, preserve, project, redis, ref, service, volume } from "railway/iac";
 
-const REPO = "KyngKai909/untitled-project";
+const REPO = "KyngKai909/opencast";
 
 export default defineRailway((ctx) => {
   const production = ctx.isEnvironment("production");

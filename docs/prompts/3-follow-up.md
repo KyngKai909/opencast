@@ -1,6 +1,6 @@
 # Opencast: follow-up prompt (catch-up, watch data, pay-as-you-go, multistreaming, uploads)
 
-You're working in `github.com/KyngKai909/untitled-project`, the Opencast monorepo, after the platform prompt (`prompts/1-platform.md`) and the apps prompt (`prompts/2-apps.md`) have been run. Both prompts were updated while they ran, so some decisions may not be in the code yet. This prompt first checks the repo against the latest versions, then adds six things: watch data, pay-as-you-go billing, built-in multistreaming, direct uploads, the channel-change effect, and external stations.
+You're working in `github.com/KyngKai909/opencast`, the Opencast monorepo, after the platform prompt (`prompts/1-platform.md`) and the apps prompt (`prompts/2-apps.md`) have been run. Both prompts were updated while they ran, so some decisions may not be in the code yet. This prompt first checks the repo against the latest versions, then adds six things: watch data, pay-as-you-go billing, built-in multistreaming, direct uploads, the channel-change effect, and external stations.
 
 ## Ground rules
 

@@ -1,6 +1,6 @@
 # Opencast: platform prompt (repo, backend, Railway)
 
-You're working in `github.com/KyngKai909/untitled-project`, the Opencast repo (package scope `@openchannel`, product name Opencast, a working name). Your job is to turn it into a monorepo, replace the JSON-blob state with a real schema, split the API into modules, extend the playout worker for the product that's now designed, and deploy the services to Railway.
+You're working in `github.com/KyngKai909/opencast`, the Opencast repo (package scope `@openchannel`, product name Opencast, a working name). Your job is to turn it into a monorepo, replace the JSON-blob state with a real schema, split the API into modules, extend the playout worker for the product that's now designed, and deploy the services to Railway.
 
 A second prompt builds the apps (`apps/web`, `apps/business`, `apps/tv`, `apps/site`) at the same time. You and that prompt meet at `packages/contracts`. You own the backend and the contracts; the apps prompt owns everything under `apps/*` except `api` and `worker`, and `packages/ui` and `packages/player`. If you need to change a contract after the apps prompt has started using it, add a version or a new field rather than changing the shape of an existing one, and note it in `docs/contracts-changelog.md`.
 
