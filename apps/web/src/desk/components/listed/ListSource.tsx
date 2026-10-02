@@ -14,19 +14,28 @@
 // A229: on X.n beside an external station on X.1, "Same brand as 15.1 RIVC (share its call sign)",
 // on by default: the call sign is X.1's and the channel tells them apart. Off, it takes its own.
 // Changing X.1's call sign changes its family's: the button names how many, and the form names them.
+//
+// A241 (2026-10-01): What's on has three choices. "Its feed": the address (iCal, RSS, JSON, XMLTV
+// or a webpage with event data), its format (worked out, or chosen), and guide data checked against
+// the published schedule as a tick under it. "Enter it by hand": the weekly slots, where it was
+// checked and the dates it doesn't air (ManualScheduleFields). "None". A page with no event data
+// says so, and offers entering it by hand.
 import { useState, type FormEvent } from "react";
-import { networkApi, type ListedSource, type Market } from "@opencast/contracts";
-import { Button, Checkbox, Field, Modal, Notice, Segmented, TextAreaField, useToast } from "@opencast/ui";
+import { networkApi, ScheduleFormat, type ListedScheduleInput, type ListedSource, type Market } from "@opencast/contracts";
+import { Button, Checkbox, Field, Modal, Notice, Segmented, SelectField, TextAreaField, useToast } from "@opencast/ui";
 import { ApiError } from "../../../api/client";
 import { useApiMutation } from "../../../api/hooks";
 import { errorText } from "../../pages/common";
 import { callSignProblem } from "../setup/draft";
 import { complete, EmbedEvidenceFields, emptyEvidence, evidenceInput, evidenceProblems, isLink, NoteField, StreamEvidenceFields, type EvidenceDraft } from "./EvidenceFields";
-import { changeWarning, familyCallSignChange, familyHeadFor, onceWords, playsOf, sameBrandLabel, type Plays } from "./external";
+import { changeWarning, familyCallSignChange, familyHeadFor, FORMAT_LABELS, NO_EVENT_DATA, onceWords, playsOf, sameBrandLabel, type Plays } from "./external";
+import { manualChanged, manualDraftOf, manualInput, manualProblems, type ManualDraft } from "./manual";
+import { ManualScheduleFields } from "./ManualScheduleFields";
 import { channelText } from "./SourceStatus";
 import "../pipeline/forms.css";
 
-type Schedule = "feed" | "guide" | "none";
+type Schedule = "feed" | "guide" | "manual" | "none";
+type Format = ScheduleFormat | "";
 
 export interface ListSourcePrefill {
   name?: string;
@@ -52,13 +61,18 @@ function draftOf(s: ListedSource) {
     streamUrl: s.streamUrl,
     schedule: (source === "guide_data" ? "guide" : source) as Schedule,
     calendarUrl: s.calendarUrl ?? "",
-    checkedAgainst: s.schedule?.checkedAgainst ?? "",
-    checkedOn: s.schedule?.checkedOn ?? "",
+    // A241: the feed's format as it was read ("" works it out from the answer).
+    format: (source === "feed" || source === "guide_data" ? (s.schedule?.format ?? "") : "") as Format,
+    checkedAgainst: source === "guide_data" ? (s.schedule?.checkedAgainst ?? "") : "",
+    checkedOn: source === "guide_data" ? (s.schedule?.checkedOn ?? "") : "",
     outsideMarket: false,
     // A229: sharing X.1's call sign.
     sameBrand: s.family?.role === "member"
   };
 }
+
+/** The API's field errors under their fields: its message, or (A241) each slot's own words. */
+const fieldErrors = (err: ApiError) => Object.fromEntries(Object.entries(err.fields ?? {}).map(([k, v]) => [k, k.startsWith("slots") ? v : err.message]));
 
 export function ListSource({
   market,
@@ -66,7 +80,8 @@ export function ListSource({
   prefill = {},
   editing,
   onSaved,
-  listings = []
+  listings = [],
+  startByHand = false
 }: {
   market: Market;
   onClose: () => void;
@@ -77,6 +92,8 @@ export function ListSource({
   onSaved?: (saved: ListedSource) => void;
   /** A229: the market's listings, to offer "Same brand as X.1" on a subchannel. */
   listings?: readonly ListedSource[];
+  /** A241: open on "Enter it by hand" (a webpage with no event data, from its details). */
+  startByHand?: boolean;
 }) {
   const toast = useToast();
   const invalidates = [networkApi.listListedSources, networkApi.getBoard, networkApi.listCreators, networkApi.listListedChanges, networkApi.listExternalOutages];
@@ -84,7 +101,7 @@ export function ListSource({
   const update = useApiMutation(networkApi.updateListedSource, { invalidates });
   const [f, setF] = useState(() =>
     editing
-      ? draftOf(editing)
+      ? { ...draftOf(editing), ...(startByHand ? { schedule: "manual" as Schedule } : {}) }
       : {
           name: prefill.name ?? "",
           description: prefill.description ?? "",
@@ -95,12 +112,15 @@ export function ListSource({
           streamUrl: prefill.streamUrl ?? "",
           schedule: "feed" as Schedule,
           calendarUrl: "",
+          format: "" as Format,
           checkedAgainst: "",
           checkedOn: "",
           outsideMarket: false,
           sameBrand: true
         }
   );
+  // A241: the schedule entered by hand; from a page with no event data, where it was checked is that page.
+  const [m, setM] = useState<ManualDraft>(() => manualDraftOf(editing, startByHand ? (editing?.calendarUrl ?? "") : ""));
   // A lead's stream has no permission yet: "Not yet" until someone records it.
   const [d, setD] = useState<EvidenceDraft>(() => emptyEvidence(editing?.embedTerms ?? "allowed", prefill.creatorId ? "not_yet" : "permission"));
   const [nothing, setNothing] = useState(false);
@@ -119,23 +139,20 @@ export function ListSource({
   /** A215: only what changed goes to the API; nothing changed says so. */
   const saveChange = async (s: ListedSource) => {
     const was = draftOf(s);
-    const scheduleChanged = f.schedule !== was.schedule || (f.schedule !== "none" && f.calendarUrl.trim() !== was.calendarUrl) || (f.schedule === "guide" && (f.checkedAgainst.trim() !== was.checkedAgainst || f.checkedOn.trim() !== was.checkedOn));
+    const feedish = f.schedule === "feed" || f.schedule === "guide";
+    const scheduleChanged =
+      f.schedule !== was.schedule ||
+      (feedish && (f.calendarUrl.trim() !== was.calendarUrl || f.format !== was.format)) ||
+      (f.schedule === "guide" && (f.checkedAgainst.trim() !== was.checkedAgainst || f.checkedOn.trim() !== was.checkedOn)) ||
+      (f.schedule === "manual" && manualChanged(m, s));
     const body = {
       ...(f.name.trim() !== was.name ? { name: f.name.trim() } : {}),
       ...(f.description.trim() !== was.description ? { description: f.description.trim() || null } : {}),
       ...(f.streamUrl.trim() !== was.streamUrl ? { streamUrl: f.streamUrl.trim() } : {}),
       ...(f.plays !== was.plays ? { plays: f.plays } : {}),
       ...(f.plays === "embed" && (d.embedTerms !== s.embedTerms || f.plays !== was.plays) ? { embedTerms: d.embedTerms } : {}),
-      ...(scheduleChanged
-        ? {
-            schedule:
-              f.schedule === "none"
-                ? { source: "none" as const }
-                : f.schedule === "feed"
-                  ? { source: "feed" as const, calendarUrl: f.calendarUrl.trim() }
-                  : { source: "guide_data" as const, calendarUrl: f.calendarUrl.trim(), guideData: { checkedAgainst: f.checkedAgainst.trim(), checkedOn: f.checkedOn.trim() } }
-          }
-        : {}),
+      // A241: a new address is worked out afresh unless a format was chosen.
+      ...(scheduleChanged ? { schedule: scheduleInput(f.format !== was.format || f.calendarUrl.trim() === was.calendarUrl ? f.format || null : null) } : {}),
       ...(f.channel.trim() !== was.channel ? { channel: f.channel.trim() } : {}),
       // A229: sharing X.1's call sign, or leaving it with a call sign of its own.
       ...(sharing ? (was.sameBrand && f.channel.trim() === was.channel ? {} : { shareCallSign: true }) : f.callSign !== was.callSign ? { callSign: f.callSign, ...(was.sameBrand ? { shareCallSign: false } : {}) } : {})
@@ -149,8 +166,17 @@ export function ListSource({
       onSaved?.(saved);
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.fields) setErrors(Object.fromEntries(Object.keys(err.fields).map((k) => [k, err.message])));
+      if (err instanceof ApiError && err.fields) setErrors(fieldErrors(err));
     }
+  };
+
+  /** A241: what's on, as the API takes it (`calendarFormat` null works it out; undefined leaves it unsaid). */
+  const scheduleInput = (calendarFormat: ScheduleFormat | null | undefined): ListedScheduleInput => {
+    const format = calendarFormat === undefined ? {} : { calendarFormat };
+    if (f.schedule === "none") return { source: "none" };
+    if (f.schedule === "manual") return manualInput(m);
+    if (f.schedule === "feed") return { source: "feed", calendarUrl: f.calendarUrl.trim(), ...format };
+    return { source: "guide_data", calendarUrl: f.calendarUrl.trim(), ...format, guideData: { checkedAgainst: f.checkedAgainst.trim(), checkedOn: f.checkedOn.trim() } };
   };
 
   const submit = async (e: FormEvent) => {
@@ -163,7 +189,8 @@ export function ListSource({
     // A229: leaving a family needs a call sign of its own.
     else if (!sharing && editing?.family?.role === "member" && f.callSign === editing.station.callSign) errs.callSign = "Give it a call sign of its own, or keep sharing.";
     if (!isLink(f.streamUrl)) errs.streamUrl = f.plays === "embed" ? "Paste the address of their player." : "Paste the stream's address.";
-    if (f.schedule !== "none" && !isLink(f.calendarUrl)) errs.calendarUrl = f.schedule === "feed" ? "Paste the link to their calendar or feed." : "Paste the guide data's address.";
+    if ((f.schedule === "feed" || f.schedule === "guide") && !isLink(f.calendarUrl)) errs.calendarUrl = f.schedule === "feed" ? "Paste the link to their calendar, feed or schedule page." : "Paste the guide data's address.";
+    if (f.schedule === "manual") Object.assign(errs, manualProblems(m));
     if (f.schedule === "guide") {
       if (!isLink(f.checkedAgainst)) errs.checkedAgainst = "Paste the link to their published schedule.";
       if (!isDate(f.checkedOn)) errs.checkedOn = "The day you checked it.";
@@ -185,8 +212,8 @@ export function ListSource({
           streamUrl: f.streamUrl.trim(),
           plays: f.plays,
           embedTerms: f.plays === "embed" ? d.embedTerms : undefined,
-          calendarUrl: f.schedule === "none" ? undefined : f.calendarUrl.trim(),
-          guideData: f.schedule === "guide" ? { checkedAgainst: f.checkedAgainst.trim(), checkedOn: f.checkedOn.trim() } : undefined,
+          // A241: what's on in one shape (a feed, guide data, by hand); none says nothing.
+          schedule: f.schedule === "none" ? undefined : scheduleInput(f.format || undefined),
           evidence: evidenceInput(f.plays, d),
           creatorId: prefill.creatorId,
           outsideMarket: f.outsideMarket || undefined
@@ -195,7 +222,7 @@ export function ListSource({
       toast.show({ message: saved.onDial ? `${name} is on the dial at ${f.channel.trim()}.` : `${name} is saved. It goes on the dial once ${onceWords(saved)}.` });
       onClose();
     } catch (err) {
-      if (err instanceof ApiError && err.fields) setErrors(Object.fromEntries(Object.keys(err.fields).map((k) => [k, err.message])));
+      if (err instanceof ApiError && err.fields) setErrors(fieldErrors(err));
     }
   };
 
@@ -312,27 +339,68 @@ export function ListSource({
           <span className="nd-form__label">What's on</span>
           <Segmented
             label="What's on"
-            value={f.schedule}
+            value={f.schedule === "guide" ? "feed" : f.schedule}
             onChange={(v) => set("schedule")(v)}
             options={[
-              { value: "feed", label: "Their calendar or schedule feed" },
-              { value: "guide", label: "Guide data" },
+              { value: "feed", label: "Its feed" },
+              { value: "manual", label: "Enter it by hand" },
               { value: "none", label: "None" }
             ]}
           />
           {f.schedule === "none" && <p className="nd-form__note">The banner shows the station's name, External, Live and the source. Nothing is made up.</p>}
         </div>
-        {f.schedule === "feed" && (
-          <Field label="Calendar or feed" type="url" placeholder="https://" help="iCal, RSS, JSON or XMLTV. Their real titles and times become the listings." value={f.calendarUrl} onChange={(e) => set("calendarUrl")(e.target.value)} error={errors.calendarUrl} />
-        )}
-        {f.schedule === "guide" && (
+        {(f.schedule === "feed" || f.schedule === "guide") && (
           <>
-            <Field label="Guide data address" type="url" placeholder="https://" value={f.calendarUrl} onChange={(e) => set("calendarUrl")(e.target.value)} error={errors.calendarUrl} />
-            <div className="nd-form__pair">
-              <Field label="Checked against" type="url" placeholder="https://" help="Their published schedule." value={f.checkedAgainst} onChange={(e) => set("checkedAgainst")(e.target.value)} error={errors.checkedAgainst} />
-              <Field label="Date checked" type="date" value={f.checkedOn} onChange={(e) => set("checkedOn")(e.target.value)} error={errors.checkedOn} />
-            </div>
+            <Field
+              label={f.schedule === "guide" ? "Guide data address" : "Calendar, feed or schedule page"}
+              type="url"
+              placeholder="https://"
+              help={f.schedule === "guide" ? undefined : "iCal, RSS, JSON, XMLTV, or a webpage with event data. Their real titles and times become the listings."}
+              value={f.calendarUrl}
+              onChange={(e) => set("calendarUrl")(e.target.value)}
+              error={errors.calendarUrl}
+            />
+            {editing?.calendarSync === "no_event_data" && f.calendarUrl.trim() === (editing.calendarUrl ?? "") && (
+              <Notice tone="standby" icon="warn">
+                {NO_EVENT_DATA}{" "}
+                <Button variant="text" size="sm" onClick={() => setF((x) => ({ ...x, schedule: "manual" }))}>
+                  Enter the schedule by hand instead.
+                </Button>
+              </Notice>
+            )}
+            <SelectField label="Format" value={f.format} onChange={(e) => set("format")(e.target.value as Format)}>
+              <option value="">Work it out from the address</option>
+              {ScheduleFormat.options.map((v) => (
+                <option key={v} value={v}>
+                  {FORMAT_LABELS[v]}
+                </option>
+              ))}
+            </SelectField>
+            <Checkbox
+              checked={f.schedule === "guide"}
+              onChange={(v) => set("schedule")(v ? "guide" : "feed")}
+              label="It's guide data, checked against their published schedule"
+              helper="Someone else's listings for this source, not its own feed."
+              ruled={false}
+            />
+            {f.schedule === "guide" && (
+              <div className="nd-form__pair">
+                <Field label="Checked against" type="url" placeholder="https://" help="Their published schedule." value={f.checkedAgainst} onChange={(e) => set("checkedAgainst")(e.target.value)} error={errors.checkedAgainst} />
+                <Field label="Date checked" type="date" value={f.checkedOn} onChange={(e) => set("checkedOn")(e.target.value)} error={errors.checkedOn} />
+              </div>
+            )}
           </>
+        )}
+        {f.schedule === "manual" && (
+          <ManualScheduleFields
+            value={m}
+            onChange={(next) => {
+              setM(next);
+              setNothing(false);
+            }}
+            errors={errors}
+            timeZone={market.timezone || "America/Los_Angeles"}
+          />
         )}
         {!editing && (
           <Checkbox

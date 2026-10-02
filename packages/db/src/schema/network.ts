@@ -283,7 +283,8 @@ export const listedSources = network.table("listed_sources", {
   streamUrl: text("stream_url").notNull(),
   embedTerms: text("embed_terms", { enum: ["allowed", "unclear"] }).notNull(),
   calendarUrl: text("calendar_url"),
-  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set"] })
+  /** A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. */
+  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data"] })
     .notNull()
     .default("not_set"),
   listingState: text("listing_state", { enum: ["not_listed", "checking", "listed"] })
@@ -309,9 +310,14 @@ export const listedSources = network.table("listed_sources", {
   waitingNote: text("waiting_note"),
   /** The source is outside the market it's listed in (rule `external.other_markets`). */
   outsideMarket: boolean("outside_market").notNull().default(false),
-  /** Where "what's on" comes from: its feed (`calendar_url`), guide data checked against its published schedule, or neither. */
-  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "none"] }).notNull().default("none"),
-  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv"] }),
+  /**
+   * Where "what's on" comes from: its feed (`calendar_url`), guide data checked against its published
+   * schedule, (A241, migration 0046) a weekly schedule entered by hand (`manual_schedule`, checked
+   * against `guide_checked_against` on `guide_checked_on`), or neither.
+   */
+  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "manual", "none"] }).notNull().default("none"),
+  /** A241: `webpage`, a page read for its schema.org JSON-LD event data. */
+  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv", "webpage"] }),
   guideCheckedAgainst: text("guide_checked_against"),
   guideCheckedOn: date("guide_checked_on"),
   /** The stream, checked every minute: unchecked, up, down (still on the dial), hidden (down 5 minutes: off the dial). */
@@ -363,8 +369,27 @@ export const listedSources = network.table("listed_sources", {
    * Plus"; apps/api lib/platformFeeds.ts). It waits (`platform_feed`) and is never relayed. Null: the
    * source's own. Set at listing and on a change, and for every listing at the checks' next pass.
    */
-  platformFeed: text("platform_feed")
+  platformFeed: text("platform_feed"),
+  // ---- A241 (added 2026-10-01, migration 0046): a schedule entered by hand ----
+  /**
+   * The weekly schedule entered by hand (`schedule_source` `manual`): its slots (`days`, `start`,
+   * `end` in the market's time zone, an end before the start running past midnight, `title`, and
+   * optionally `description`, `from` and `until`) and `skipDates` (the dates it doesn't air). Null
+   * for every other source (the change history keeps what it was).
+   */
+  manualSchedule: jsonb("manual_schedule").$type<{ slots: ManualSlotRow[]; skipDates: string[] }>()
 });
+
+/** One weekly slot of a schedule entered by hand (A241). */
+export interface ManualSlotRow {
+  days: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">;
+  start: string;
+  end: string;
+  title: string;
+  description: string | null;
+  from: string | null;
+  until: string | null;
+}
 
 /**
  * An external station's change history (added 2026-09-30, A215, migration 0040): each change to a

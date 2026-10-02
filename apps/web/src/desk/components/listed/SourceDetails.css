@@ -14,3 +14,6 @@
 /* A215: what taking a station off the dial does, as a short list in the confirmation. */
 .nd-off__list { margin: 0; padding: 0 0 0 18px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-70); }
 .nd-off__family { margin-bottom: 12px; color: var(--ink); font-weight: 600; }
+/* A241: a schedule entered by hand, a slot a line; its description quieter. */
+.nd-src__week { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; color: var(--ink); }
+.nd-src__about { color: var(--ink-70); }

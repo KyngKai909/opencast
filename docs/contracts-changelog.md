@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-01: A webpage's event data, and a schedule entered by hand (A241)
+
+Additive: one new module, new enum values on desk-only fields, two optional fields on `ListedSource.schedule`, an optional `schedule` on `addListedSource`, a fourth variant on `updateListedSource.schedule`. `ExternalInfo` (the dial, guide and station page) is unchanged. Migration **0046** (after 0045, named by hand): `network.listed_sources.manual_schedule` (jsonb).
+
+- `manualSchedule.ts` (new): `Weekday` (`mon`…`sun`), `ClockTime` (`HH:MM`), `ManualSlot` (`{ days, start, end, title, description?, from?, until? }`), `ManualScheduleInput` (`{ source: "manual", slots, checkedAgainst, checkedOn, skipDates? }`), and the shared rules and words: `manualScheduleProblems` (a day, 5-minute times that differ, a title of 120 characters at most, a season that ends after it starts, no two slots on at once), `slotText`, `daysText`, `clockRangeText`, `weeklyText` ("Mon–Fri 6:00–9:00 pm: City Council"), `MANUAL_HORIZON_DAYS` (14).
+- `network.ts`: `ScheduleFormat` gains `webpage` (a page read for its schema.org JSON-LD). New `ListedScheduleSource` (`feed`, `guide_data`, `manual`, `none`) and `ListedScheduleInput` (feed, guide data, `ManualScheduleInput`, none). `ListedSource.calendarSync` gains `no_event_data` (a page with no event data a computer can read; not an error). `ListedSource.schedule.source` is `ListedScheduleSource`, and `schedule` gains optional `slots` and `skipDates` (present for `manual` only; `checkedAgainst` and `checkedOn` say where and when it was checked). `ListedField` gains `manualSchedule` and `skipDates` (the change history). `addListedSource.body` gains optional `schedule` (`ListedScheduleInput`), instead of `calendarUrl`, `calendarFormat` and `guideData` (still taken; 400 with both). `updateListedSource.body.schedule` is `ListedScheduleInput` (the three variants it had, plus `manual`). The desk is the only reader of `ListedSource`; a desk built before it would reject a listing with these values, so the desk ships with the API.
+- Behaviour: `ExternalInfo.schedule` (in `DialRow.external` and `StationPage`) keeps its three values; a schedule entered by hand reads `guide_data` there (it is guide data checked against the published schedule), so apps built before it keep reading the dial. Its airings are ordinary listed airings (titles and times; descriptions stay on the desk). A manual schedule is refused with 400 and per-slot fields (`slots.1.start`) when it breaks a rule; `checkedAgainst` and `checkedOn` are required.
+
 ## 2026-10-01: Direct mode in the native apps (A239)
 
 Additive: one optional field on `Playback`, one on `ListedSource`. No migration.

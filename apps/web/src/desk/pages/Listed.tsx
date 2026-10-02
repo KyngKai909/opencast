@@ -30,7 +30,7 @@ export function listedOrder(rows: readonly ListedSource[]): ListedSource[] {
 }
 
 /** A dialog over the page; `source` when it opens with a listing just saved (before the list is read again). */
-type Dialog = { kind: "record" | "change" | "remove" | "restore"; id: string; source?: ListedSource } | null;
+type Dialog = { kind: "record" | "change" | "remove" | "restore"; id: string; source?: ListedSource; byHand?: boolean } | null;
 
 export default function Listed() {
   const { market, loading } = useMarket();
@@ -171,6 +171,7 @@ export default function Listed() {
           onClose={() => select(null)}
           onRecord={() => setDialog({ kind: "record", id: chosen.id })}
           onChange={() => setDialog({ kind: "change", id: chosen.id })}
+          onEnterByHand={() => setDialog({ kind: "change", id: chosen.id, byHand: true })}
           onRemove={() => setDialog({ kind: "remove", id: chosen.id })}
           onRestore={() => setDialog({ kind: "restore", id: chosen.id })}
         />
@@ -181,6 +182,7 @@ export default function Listed() {
           market={market}
           listings={rows}
           editing={dialogFor}
+          startByHand={dialog.byHand}
           onClose={closeDialog}
           // Saved and now waiting for its evidence: straight on to recording it.
           onSaved={(saved) => (needsEvidence(saved) ? setTimeout(() => setDialog({ kind: "record", id: saved.id, source: saved })) : undefined)}

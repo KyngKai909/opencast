@@ -240,6 +240,36 @@ test("External sources: change a listing, take one off the dial for good and put
   await expect(page.getByText("RDLS", { exact: true }).first()).toBeVisible();
 });
 
+// A241: Loma Linda's schedule entered by hand: the week in its details, then a slot added in Change
+// (day chips, times past midnight, a title), refused while it overlaps, saved once it doesn't, and
+// the change in its history.
+test("External sources: a schedule entered by hand (A241)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await page.goto(`${IE}/listed`);
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Loma Linda Community Access/ })).toContainText("Entered by hand");
+  await page.getByText("Loma Linda Community Access").first().click();
+  const details = page.getByRole("dialog", { name: "Loma Linda Community Access" });
+  await expect(details.getByRole("list", { name: "Every week" })).toContainText("Mon–Fri 6:00–9:00 pm: City Council and commissions");
+  await details.getByRole("button", { name: "Change" }).click();
+  const form = page.getByRole("dialog", { name: "Change the listing" });
+  await expect(form.getByRole("radio", { name: "Enter it by hand" })).toHaveAttribute("aria-checked", "true");
+  await form.getByRole("button", { name: "Add a slot" }).click();
+  const slot = form.getByRole("listitem", { name: "Slot 4" });
+  await slot.getByRole("button", { name: "Fri" }).click();
+  await slot.getByLabel("Starts").fill("20:00");
+  await slot.getByLabel("Ends").fill("22:00");
+  await slot.getByLabel("Title").fill("Friday night films");
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(slot).toContainText("“Friday night films” overlaps “City Council and commissions” on Fridays at 8:00 pm.");
+  await slot.getByLabel("Starts").fill("22:00");
+  await slot.getByLabel("Ends").fill("00:30");
+  await expect(slot).toContainText("10:00 pm–12:30 am, 2 hr 30 min, past midnight");
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Loma Linda Community Access is saved. It's on the dial at 9.7.")).toBeVisible();
+  await expect(details.getByRole("list", { name: "Every week" })).toContainText("Fri 10:00 pm–12:30 am: Friday night films");
+  await expect(details.getByRole("list", { name: "Changes" })).toContainText("Its schedule read again");
+});
+
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
 // the catalog station's library, its checklist answered with evidence and sent by Dee, and the
 // second check done by Rae, a rights reviewer: never the first checker.

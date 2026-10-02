@@ -105,6 +105,13 @@ describe("what's on and right now", () => {
     expect(scheduleWords(s({ waiting: "needs_permission" }))).toEqual({ text: "Waiting", tone: "quiet" });
   });
 
+  it("A241: says a webpage's event data, a page without any, and a schedule entered by hand", () => {
+    expect(scheduleWords(s({ calendarSync: "synced", schedule: { ...base.schedule!, source: "feed", format: "webpage" } }))).toEqual({ text: "Their webpage's event data", tone: "ok" });
+    expect(scheduleWords(s({ calendarSync: "no_event_data", schedule: { ...base.schedule!, source: "feed", format: "webpage" } }))).toEqual({ text: "No schedule data on the page", detail: "Enter it by hand instead", tone: "warn" });
+    const manual = { ...base.schedule!, source: "manual" as const, checkedAgainst: "https://x.example.gov/schedule", checkedOn: "2026-09-25", slots: [], skipDates: [] };
+    expect(scheduleWords(s({ calendarSync: "synced", schedule: manual }))).toEqual({ text: "Entered by hand", detail: "Checked against their published schedule", tone: "ok" });
+  });
+
   it("counts the minutes down, and says whether it's still on the dial", () => {
     expect(downFor("2026-09-27T03:28:00Z", NOW)).toBe("14 min");
     expect(downFor("2026-09-27T02:30:00Z", NOW)).toBe("1 hr 12 min");

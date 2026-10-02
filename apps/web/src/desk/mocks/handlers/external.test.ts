@@ -45,10 +45,10 @@ describe("the reference's six rows", () => {
       ["RDLS", "embed", "embed_terms", "feed", true, null, "up"],
       ["ICTV", "stream_link", null, "none", false, "needs_permission", "unchecked"],
       // A201: a DASH stream link on the dial (DASH stream links are played).
-      ["LOMA", "stream_link", "public_source", "none", true, null, "up"],
+      ["LOMA", "stream_link", "public_source", "manual", true, null, "up"],
       ["NASA", "stream_link", "public_source", "guide_data", true, null, "up"],
       // A229: Riverside County's streams sharing RIVC on 15.
-      ["RIVC", "stream_link", "public_source", "none", true, null, "up"],
+      ["RIVC", "stream_link", "public_source", "feed", true, null, "up"],
       ["RIVC", "stream_link", "public_source", "none", true, null, "up"],
       ["RUSD", "embed", null, "none", false, "terms_unclear", "unchecked"],
       ["SBCO", "embed", "embed_terms", "none", false, "down", "hidden"]
@@ -193,5 +193,40 @@ https://ictv.example.net/live/index.m3u8
     expect(r.json.imported).toHaveLength(1);
     expect(r.json.imported[0]).toMatchObject({ displayName: "Fontana Public Access", stage: "found", sourcePlatform: "other", nextAction: "Ask for permission, or confirm it's public", lead: { from: "iptv_list", streamUrl: "https://fontana-access.example.net/live/playlist.m3u8", group: "Public" } });
     expect((await api("POST", "/admin/creators/iptv/preview", { body: { m3u: M3U } })).json.channels[0].already).toBe("lead");
+  });
+});
+
+// ---- A241 (2026-10-01): a webpage's event data, and a schedule entered by hand ----
+describe("what's on: a webpage, or by hand", () => {
+  const listing = { ...base, channel: "9.4", callSign: "RIAL", streamUrl: "https://rialto.example.gov/live.m3u8", plays: "stream_link", evidence: { publicBasis: "Public body" } };
+  const manual = {
+    source: "manual",
+    slots: [
+      { days: ["mon", "tue", "wed", "thu", "fri"], start: "18:00", end: "21:00", title: "City Council" },
+      { days: ["sat"], start: "23:00", end: "01:00", title: "After hours" }
+    ],
+    checkedAgainst: "https://rialto.example.gov/schedule",
+    checkedOn: "2026-09-25",
+    skipDates: ["2026-10-05"]
+  };
+
+  it("lists a schedule entered by hand, counted for the next 14 days, and refuses two slots on at once", async () => {
+    const overlap = await api("POST", "/admin/listed-sources", { body: { ...listing, schedule: { ...manual, slots: [...manual.slots, { days: ["wed"], start: "20:00", end: "22:00", title: "Planning" }] } } });
+    expect(overlap.status).toBe(400);
+    expect(overlap.json.error).toMatchObject({ message: "“Planning” overlaps “City Council” on Wednesdays at 8:00 pm. Two slots can't be on at once.", fields: { "slots.2.start": expect.any(String) } });
+    const unchecked = await api("POST", "/admin/listed-sources", { body: { ...listing, schedule: { ...manual, checkedAgainst: undefined } } });
+    expect(unchecked.status).toBe(400);
+    const ok = await api("POST", "/admin/listed-sources", { body: { ...listing, schedule: manual } });
+    expect(ok.status).toBe(201);
+    // Weekdays Sept 28 to Oct 9 less Oct 5 (9), and Saturday nights Sept 26 and Oct 3 (2).
+    expect(ok.json).toMatchObject({ calendarSync: "synced", upcoming: 11, schedule: { source: "manual", checkedAgainst: "https://rialto.example.gov/schedule", skipDates: ["2026-10-05"] } });
+    expect(ok.json.schedule.slots[1]).toEqual({ days: ["sat"], start: "23:00", end: "01:00", title: "After hours", description: null, from: null, until: null });
+  });
+
+  it("reads a webpage's event data, and says when a page has none", async () => {
+    const events = await api("POST", "/admin/listed-sources", { body: { ...listing, schedule: { source: "feed", calendarUrl: "https://rialto.example.gov/events" } } });
+    expect(events.json).toMatchObject({ calendarSync: "synced", schedule: { source: "feed", format: "webpage" } });
+    const page = await api("PATCH", `/admin/listed-sources/${events.json.id}`, { body: { schedule: { source: "feed", calendarUrl: "https://rialto.example.gov/council.html" } } });
+    expect(page.json).toMatchObject({ calendarSync: "no_event_data", schedule: { format: "webpage" }, onDial: true });
   });
 });

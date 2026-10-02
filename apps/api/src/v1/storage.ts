@@ -391,7 +391,9 @@ function localMultipart(root: string, at: (key: string) => string, secret: strin
       const open: Array<{ key: string; uploadId: string; initiated: Date | null }> = [];
       for (const name of names) {
         const stat = await fs.stat(path.join(base, name)).catch(() => null);
-        if (stat?.isDirectory()) open.push({ key: `${prefix.replace(/\/+$/, "")}/${name}`, uploadId: name, initiated: stat.birthtime ?? stat.mtime });
+        // Its last part written (the folder's mtime), not its creation: still being sent is still alive,
+        // and the time can be set (tests run on a pinned clock, not the file system's).
+        if (stat?.isDirectory()) open.push({ key: `${prefix.replace(/\/+$/, "")}/${name}`, uploadId: name, initiated: stat.mtime });
       }
       return open;
     }

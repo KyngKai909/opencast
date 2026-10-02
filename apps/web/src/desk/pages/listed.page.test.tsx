@@ -130,7 +130,7 @@ describe("List a source", () => {
     fill(d, "Who said yes", "Maria Lopez, City Clerk, City of Rialto");
     fill(d, "Said yes on", "2026-09-24");
     fill(d, "Where it's kept", "Email to network@opencast.tv, Sept 24");
-    fill(d, "Calendar or feed", "https://rialto.example.gov/agenda.ics");
+    fill(d, "Calendar, feed or schedule page", "https://rialto.example.gov/agenda.ics");
     expect(within(d).getByText(/Recorded once and never edited/)).toBeTruthy();
     fireEvent.click(within(d).getByRole("button", { name: "List it" }));
     expect(await screen.findByText("City of Rialto is on the dial at 9.4.")).toBeTruthy();

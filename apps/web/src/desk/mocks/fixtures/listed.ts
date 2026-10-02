@@ -3,10 +3,12 @@
 // the city's written permission; the reference draws a public basis, A215), San Bernardino County
 // (its own player, no schedule found, down 14 minutes and off the dial), NASA on 61.1 (a public
 // stream link with checked guide data), the school district whose terms are unclear, and Inland
-// Community TV, a channel from an IPTV list waiting for its permission.
+// Community TV, a channel from an IPTV list waiting for its permission. A241 (2026-10-01): Loma
+// Linda's schedule entered by hand (checked against its published program grid), and the county
+// library's read from its events page's own event data.
 // Times are the mock clock's: Saturday, September 26, 8:42:12 pm in the Inland Empire.
 
-import type { CreatorStage, ExternalOutage, ListedChange, StreamPermission } from "@opencast/contracts";
+import type { CreatorStage, ExternalOutage, ListedChange, ManualSlot, ScheduleFormat, StreamPermission } from "@opencast/contracts";
 import { CREATOR_IDS, ICTV_STREAM } from "./creators";
 import { U } from "./ids";
 import { STATION_IDS } from "./stations";
@@ -19,7 +21,7 @@ export interface DbListed {
   streamUrl: string;
   embedTerms: "allowed" | "unclear";
   calendarUrl: string | null;
-  calendarSync: "synced" | "calendar_not_found" | "not_set";
+  calendarSync: "synced" | "calendar_not_found" | "not_set" | "no_event_data";
   lastSyncedAt: string | null;
   upcoming: number;
   plays: "embed" | "stream_link";
@@ -29,7 +31,15 @@ export interface DbListed {
   permission: StreamPermission | null;
   /** What's being waited on: "Asked Sept 22". */
   note: string | null;
-  schedule: { source: "feed" | "guide_data" | "none"; format: "ical" | "rss" | "json" | "xmltv" | null; checkedAgainst: string | null; checkedOn: string | null };
+  /** A241: `manual`, a weekly schedule entered by hand (`slots`, `skipDates`); `webpage`, a page's event data. */
+  schedule: {
+    source: "feed" | "guide_data" | "manual" | "none";
+    format: ScheduleFormat | null;
+    checkedAgainst: string | null;
+    checkedOn: string | null;
+    slots?: ManualSlot[];
+    skipDates?: string[];
+  };
   /** The source is outside its market (waits unless Settings allows other markets' streams). */
   outsideMarket: boolean;
   health: { state: "unchecked" | "up" | "down" | "hidden"; since: string | null; lastCheckedAt: string | null; detail: string | null };
@@ -130,10 +140,21 @@ export function seedListed(): DbListed[] {
       streamUrl: ICTV_STREAM, embedTerms: "unclear", creatorId: CREATOR_IDS.ictv
     }),
     // A201: a public-access channel's DASH stream link (.mpd), on the dial now that DASH stream
-    // links are played (Settings, external.dash_stream_links). A mock source, with no schedule.
+    // links are played (Settings, external.dash_stream_links). A241: its schedule entered by hand from
+    // its published program grid, which has no feed.
     listing({
       id: LISTED_IDS.LOMA, stationId: STATION_IDS.LOMA, name: "Loma Linda Community Access", description: "Public access: commissions, the school board and community notices", plays: "stream_link",
       streamUrl: "https://lomalinda.example.gov/live/manifest.mpd", embedTerms: "unclear", publicBasis: "Public access channel, stream published for the public",
+      calendarSync: "synced", lastSyncedAt: "2026-09-27T03:00:00.000Z", upcoming: 16,
+      schedule: {
+        source: "manual", format: null, checkedAgainst: "https://lomalinda.example.gov/community-access/program-grid", checkedOn: "2026-09-25",
+        slots: [
+          { days: ["mon", "tue", "wed", "thu", "fri"], start: "18:00", end: "21:00", title: "City Council and commissions", description: "Whichever meets that night, live from City Hall", from: null, until: null },
+          { days: ["sat", "sun"], start: "09:00", end: "10:30", title: "Community notices", description: null, from: null, until: null },
+          { days: ["sat"], start: "23:00", end: "01:00", title: "Loma Linda after hours", description: "Local music and talks", from: null, until: null }
+        ],
+        skipDates: ["2026-11-26", "2026-12-24", "2026-12-25"]
+      },
       health: { state: "up", since: "2026-09-26T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     }),
     // A229: Riverside County's public streams, sharing RIVC on 15 (15.2 Public Works is listed in the demo).
@@ -145,6 +166,9 @@ export function seedListed(): DbListed[] {
     listing({
       id: LISTED_IDS.RIVC_LIB, stationId: STATION_IDS.RIVC_LIB, name: "Riverside County Library Live", description: "Story times, author talks and classes", plays: "stream_link",
       streamUrl: "https://riverside.example.gov/live/library/index.m3u8", embedTerms: "unclear", publicBasis: "County library, stream published for the public",
+      // A241: the library's events page carries its own event data (schema.org JSON-LD).
+      calendarUrl: "https://riverside.example.gov/library/events", calendarSync: "synced", lastSyncedAt: "2026-09-27T03:00:00.000Z", upcoming: 4,
+      schedule: { source: "feed", format: "webpage", checkedAgainst: null, checkedOn: null },
       health: { state: "up", since: "2026-09-20T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     })
   ];

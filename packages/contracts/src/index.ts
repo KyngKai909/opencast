@@ -44,6 +44,7 @@ export * from "./trust.js";
 export * from "./notifications.js";
 export * from "./waitlist.js";
 export * from "./network.js";
+export * from "./manualSchedule.js";
 export * from "./tv.js";
 export * from "./hls.js";
 export * from "./segments.js";

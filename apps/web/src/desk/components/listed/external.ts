@@ -120,14 +120,27 @@ export function playsDetail(s: ListedSource, timeZone: string): string {
 
 export type Tone = "ok" | "warn" | "quiet";
 
-/** What's on: the source's feed, guide data, or nothing (the banner says Live). */
+/** A241: a feed's format in the desk's words (the List a source form's choices). */
+export const FORMAT_LABELS = { ical: "iCal", rss: "RSS", json: "JSON", xmltv: "XMLTV", webpage: "Webpage (its event data)" } as const;
+
+/** A241: what the desk says when a webpage has no schedule data a computer can read. */
+export const NO_EVENT_DATA = "This page has no schedule data a computer can read.";
+
+/**
+ * What's on: the source's feed, guide data, (A241) a webpage's event data or a schedule entered by
+ * hand, or nothing (the banner says Live).
+ */
 export function scheduleWords(s: ListedSource): { text: string; detail?: string; tone: Tone } {
   if (waitingOffDial(s)) return { text: "Waiting", tone: "quiet" };
   const source = s.schedule?.source ?? (s.calendarUrl ? "feed" : "none");
   if (source === "none") return { text: "No schedule found", detail: "Banner shows name and Live", tone: "warn" };
+  if (source === "manual") return { text: "Entered by hand", detail: "Checked against their published schedule", tone: "ok" };
   if (s.calendarSync === "calendar_not_found") return { text: source === "guide_data" ? "Guide data not found" : "Calendar not found", detail: "Banner shows name and Live", tone: "warn" };
+  // A241: the page answered, with nothing a computer can read; not an error.
+  if (s.calendarSync === "no_event_data") return { text: "No schedule data on the page", detail: "Enter it by hand instead", tone: "warn" };
   if (source === "guide_data") return { text: "Guide data", detail: "Checked, from their published schedule", tone: "ok" };
   const format = s.schedule?.format ?? null;
+  if (format === "webpage") return { text: "Their webpage's event data", tone: "ok" };
   return { text: format === null || format === "ical" ? "Their agenda calendar" : "Their schedule feed", tone: "ok" };
 }
 
@@ -309,7 +322,9 @@ const FIELD_LABELS: Record<ListedChange["fields"][number]["field"], string> = {
   guideCheckedAgainst: "Checked against",
   guideCheckedOn: "Date checked",
   channel: "Channel",
-  callSign: "Call sign"
+  callSign: "Call sign",
+  manualSchedule: "Weekly schedule",
+  skipDates: "Doesn't air on"
 };
 
 const VALUE_WORDS: Record<string, string> = {
@@ -319,6 +334,7 @@ const VALUE_WORDS: Record<string, string> = {
   unclear: "Unclear",
   feed: "Their calendar or schedule feed",
   guide_data: "Guide data",
+  manual: "Entered by hand",
   none: "None"
 };
 
@@ -335,7 +351,14 @@ const EFFECT_WORDS: Record<ListedChange["effects"][number], string> = {
 export function changeWords(c: ListedChange, timeZone: string): { when: string; text: string } {
   const when = dayMonth(c.at, timeZone, { short: true });
   const who = c.by ?? "Opencast";
-  const value = (f: ListedChange["fields"][number], v: string | null) => (v === null || v === "" ? "nothing" : f.field === "plays" || f.field === "embedTerms" || f.field === "schedule" ? (VALUE_WORDS[v] ?? v) : v);
+  const value = (f: ListedChange["fields"][number], v: string | null) =>
+    v === null || v === ""
+      ? "nothing"
+      : f.field === "plays" || f.field === "embedTerms" || f.field === "schedule"
+        ? (VALUE_WORDS[v] ?? v)
+        : f.field === "calendarFormat"
+          ? (FORMAT_LABELS[v as keyof typeof FORMAT_LABELS] ?? v)
+          : v;
   const at = clock(c.at, { timeZone });
   if (c.action === "removed") return { when, text: `${who} took it off the dial for good, ${at}` };
   if (c.action === "restored") {

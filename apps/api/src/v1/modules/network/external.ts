@@ -21,7 +21,10 @@
 //   finds CORS allowed. Links that work only with another app's access (lib/platformFeeds.ts) are
 //   never relayed: they wait (`platform_feed`) and stay listed.
 // - What's on comes from the source's own feed (iCal, RSS, JSON or XMLTV), or guide data checked
-//   against its published schedule; with neither, the banner says Live and the source.
+//   against its published schedule; with neither, the banner says Live and the source. A241: or a
+//   webpage's own event data (schema.org JSON-LD; a page with none is `no_event_data`, not an
+//   error), or a weekly schedule entered by hand and checked against the published schedule, made
+//   into airings for the next 14 days on every save and hourly.
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
 //   request with a timeout, never a segment. Down 5 minutes, it leaves the dial, the guide and the
 //   swipe order until it's back; the Network desk hears both times (`external.station`).
@@ -36,16 +39,17 @@
 //   the family's (the old one held a year for it), X.1 moves only on its own, and taking X.1 off
 //   the dial takes its family with it (A231), when the desk says so; "Put back" brings them back.
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, isSubchannel, parseChannelNumber, type Band, type ChannelNumber } from "@opencast/domain";
-import type { Creator, CreatorStage, ExternalInfo, ExternalOutage, IptvChannel, ListedChange, ListedField, ListedSource, StreamPermission } from "@opencast/contracts";
+import { manualScheduleProblems, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type StreamPermission } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { StationProfile } from "../stations/service.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
 import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../lib/schedules.js";
+import { manualAirings, manualWindow } from "../../lib/manualSchedule.js";
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
 import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
@@ -101,6 +105,8 @@ export interface AddListedInput {
   plays?: "embed" | "stream_link";
   calendarFormat?: ScheduleFormat;
   guideData?: { checkedAgainst: string; checkedOn: string };
+  /** A241: what's on in `updateListedSource`'s shape (a feed, guide data, by hand, or none), instead of the three above. */
+  schedule?: ListedScheduleInput;
   evidence?: EvidenceInput;
   creatorId?: string;
   outsideMarket?: boolean;
@@ -133,10 +139,8 @@ export interface UpdateListedInput {
   streamUrl?: string;
   plays?: "embed" | "stream_link";
   embedTerms?: "allowed" | "unclear";
-  schedule?:
-    | { source: "feed"; calendarUrl: string; calendarFormat?: ScheduleFormat | null }
-    | { source: "guide_data"; calendarUrl: string; calendarFormat?: ScheduleFormat | null; guideData: { checkedAgainst: string; checkedOn: string } }
-    | { source: "none" };
+  /** A241: or `{ source: "manual", slots, checkedAgainst, checkedOn, skipDates? }`, a schedule entered by hand. */
+  schedule?: ListedScheduleInput;
   channel?: string;
   callSign?: string;
   /** A229: true shares X.1's call sign; false (with `callSign`) stops sharing it. */
@@ -198,6 +202,67 @@ const hostOf = (url: string) => {
     return url;
   }
 };
+
+type ManualSchedule = NonNullable<Row["manualSchedule"]>;
+
+/**
+ * A241: a schedule entered by hand as it's kept: each slot's days once and in week order, the
+ * title and description trimmed, the season or null; the skipped dates once, in order.
+ */
+export function normalManual(input: Extract<ListedScheduleInput, { source: "manual" }>): ManualSchedule {
+  return {
+    slots: input.slots.map((s) => ({
+      days: WEEKDAYS.filter((d) => s.days.includes(d)),
+      start: s.start,
+      end: s.end,
+      title: s.title.trim(),
+      description: s.description?.trim() || null,
+      from: s.from ?? null,
+      until: s.until ?? null
+    })),
+    skipDates: [...new Set(input.skipDates ?? [])].sort()
+  };
+}
+
+/** A241: the weekly schedule in the change history's words, descriptions too ("Mon–Fri 6:00–9:00 pm: City Council, “Regular meeting”"). */
+export function manualHistoryText(m: ManualSchedule | null): string | null {
+  if (!m?.slots.length) return null;
+  return sortedSlots(m.slots)
+    .map((s) => `${slotText(s)}${s.description ? `, “${s.description}”` : ""}`)
+    .join("; ");
+}
+
+/** A241: the schedule's skipped dates for the history ("2026-11-26, 2026-12-24"), or null. */
+const skipText = (m: ManualSchedule | null) => (m?.skipDates.length ? m.skipDates.join(", ") : null);
+
+/** A241: the columns that hold what's on, for a schedule as `addListedSource` and `updateListedSource` take it. */
+function scheduleColumns(sc: ListedScheduleInput) {
+  if (sc.source === "none") return { scheduleSource: "none" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null };
+  if (sc.source === "manual") {
+    return { scheduleSource: "manual" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: sc.checkedAgainst, guideCheckedOn: sc.checkedOn, manualSchedule: normalManual(sc) };
+  }
+  return {
+    scheduleSource: sc.source,
+    calendarUrl: sc.calendarUrl,
+    scheduleFormat: sc.calendarFormat ?? null,
+    guideCheckedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
+    guideCheckedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null,
+    manualSchedule: null
+  };
+}
+
+/**
+ * A241: a schedule entered by hand, checked before it's saved: where it was checked (the published
+ * schedule's address and the day, as Phase 6 needs for guide data), then the slots (days, 5-minute
+ * times, a title, no two on at once). 400 with the first problem's words, every problem by field.
+ */
+export function checkManual(sc: ListedScheduleInput | undefined) {
+  if (sc?.source !== "manual") return;
+  if (!sc.checkedAgainst?.trim()) throw badRequest("Say where you checked it: the address of their published schedule.", { checkedAgainst: "Required" });
+  if (!sc.checkedOn?.trim()) throw badRequest("Say when you checked it against their published schedule.", { checkedOn: "Required" });
+  const problems = manualScheduleProblems(sc.slots);
+  if (problems.length) throw badRequest(problems[0]!.message, Object.fromEntries(problems.map((p) => [p.slot === null ? "slots" : `slots.${p.slot}.${p.field}`, p.message])));
+}
 
 /** The fields whose values are addresses (shown in full to admins only). */
 const ADDRESS_FIELDS: ReadonlySet<ListedField> = new Set(["streamUrl", "calendarUrl", "guideCheckedAgainst"]);
@@ -509,7 +574,15 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         // A239: its server refuses web pages but answers the native apps (the CORS check found it).
         nativeOnly: r.plays === "stream_link" && !r.platformFeed && r.cors === "unknown" && r.corsDetail === ORIGIN_REFUSED_DETAIL && directAddressOf(r) !== null,
         evidence: { basis: r.basis, termsUrl: r.termsUrl, termsCheckedOn: r.termsCheckedOn, publicBasis: r.publicBasis, permission, note: r.waitingNote },
-        schedule: { source: r.scheduleSource, format: r.scheduleFormat, url: r.calendarUrl, checkedAgainst: r.guideCheckedAgainst, checkedOn: r.guideCheckedOn },
+        schedule: {
+          source: r.scheduleSource,
+          format: r.scheduleFormat,
+          url: r.calendarUrl,
+          checkedAgainst: r.guideCheckedAgainst,
+          checkedOn: r.guideCheckedOn,
+          // A241: the weekly schedule entered by hand, and the dates it doesn't air.
+          ...(r.scheduleSource === "manual" ? { slots: r.manualSchedule?.slots ?? [], skipDates: r.manualSchedule?.skipDates ?? [] } : {})
+        },
         onDial: !removed && waiting === null,
         waiting,
         health: { state: r.health, since: r.healthSince?.toISOString() ?? null, lastCheckedAt: r.lastCheckedAt?.toISOString() ?? null, detail: r.lastCheckDetail },
@@ -737,7 +810,32 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     if (hideNow) await notifyDesk(row, "hidden", { downSince, hiddenAt: now });
   }
 
+  /**
+   * A241: a schedule entered by hand, made into airings from now to 14 days ahead (the airings from
+   * now on replaced, as a feed's are). The one on air now keeps its title as it was; when nothing
+   * is, the slot on now is added, so the banner has it at once.
+   */
+  async function syncManual(row: Row): Promise<boolean> {
+    const tz = await services.stations.timezoneOf(row.stationId);
+    const now = deps.clock.now();
+    const { from, to } = manualWindow(now);
+    const airings = row.manualSchedule ? manualAirings(row.manualSchedule, tz, from, to) : [];
+    await db.transaction(async (tx) => {
+      await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
+      const earlier = await tx
+        .select({ startsAt: LA.startsAt, endsAt: LA.endsAt })
+        .from(LA)
+        .where(and(eq(LA.listedSourceId, row.id), lt(LA.startsAt, now), gte(LA.startsAt, new Date(now.getTime() - 86_400_000))));
+      const onNow = earlier.some((a) => (a.endsAt ?? new Date(a.startsAt.getTime() + 3_600_000)) > now);
+      const rows = airings.filter((a) => a.start >= now || !onNow);
+      if (rows.length) await tx.insert(LA).values(rows.map((e) => ({ listedSourceId: row.id, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
+      await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now }).where(eq(LS.id, row.id));
+    });
+    return true;
+  }
+
   async function sync(row: Row, fetchFn: Fetch): Promise<boolean> {
+    if (row.scheduleSource === "manual") return syncManual(row);
     if (!row.calendarUrl) return false;
     let events;
     let format: ScheduleFormat;
@@ -746,12 +844,20 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await readSome(response, LIST_BYTES);
       format = row.scheduleFormat ?? detectScheduleFormat(row.calendarUrl, response.headers.get("content-type"), text);
-      events = parseSchedule(text, format, row.calendarUrl);
+      // A241: a webpage's event data without an offset is in the market's time zone.
+      const tz = format === "webpage" ? await services.stations.timezoneOf(row.stationId) : "UTC";
+      events = parseSchedule(text, format, row.calendarUrl, tz);
     } catch {
       await db.update(LS).set({ calendarSync: "calendar_not_found" }).where(eq(LS.id, row.id));
       return false;
     }
     const now = deps.clock.now();
+    // A241: a page with no event data a computer can read says so, and isn't an error: what it
+    // listed before stays (a redesign that drops it for a day doesn't empty the guide).
+    if (format === "webpage" && !events.length) {
+      await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
+      return true;
+    }
     await db.transaction(async (tx) => {
       await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
       const upcoming = events.filter((e) => e.start >= now);
@@ -812,6 +918,21 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       if (plays === "embed" && !input.embedTerms) throw badRequest("Say whether their terms allow embedding.", { embedTerms: "Required for an embed" });
       checkEvidence(plays, input);
       if (input.guideData && !input.calendarUrl) throw badRequest("Guide data needs its address as well as the schedule it was checked against.", { calendarUrl: "Required with guide data" });
+      // A241: what's on as `schedule` (a feed, guide data, by hand or none), or the older three fields; not both.
+      if (input.schedule && (input.calendarUrl !== undefined || input.calendarFormat !== undefined || input.guideData !== undefined)) {
+        throw badRequest("Give what's on as its schedule, or as its calendar address and guide data, not both.", { schedule: "Not with calendarUrl or guideData" });
+      }
+      checkManual(input.schedule);
+      const what = input.schedule
+        ? scheduleColumns(input.schedule)
+        : {
+            scheduleSource: input.guideData ? ("guide_data" as const) : input.calendarUrl ? ("feed" as const) : ("none" as const),
+            calendarUrl: input.calendarUrl ?? null,
+            scheduleFormat: input.calendarFormat ?? null,
+            guideCheckedAgainst: input.guideData?.checkedAgainst ?? null,
+            guideCheckedOn: input.guideData?.checkedOn ?? null,
+            manualSchedule: null
+          };
       const creator = input.creatorId ? (await db.select().from(CR).where(eq(CR.id, input.creatorId)))[0] : null;
       if (input.creatorId && !creator) throw notFound("That lead");
       // One listing on the list per lead (A215: one taken off the dial doesn't count; it stays archived).
@@ -844,7 +965,6 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             name: input.name,
             description: input.description ?? null,
             streamUrl: input.streamUrl,
-            calendarUrl: input.calendarUrl ?? null,
             ...evidence,
             basis: basisFor(evidence),
             streamFormat: plays === "stream_link" ? streamFormatOf(input.streamUrl) : null,
@@ -852,10 +972,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             platformFeed: platformFeedOf(input.streamUrl),
             waitingNote: input.evidence?.note ?? null,
             outsideMarket,
-            scheduleSource: input.guideData ? "guide_data" : input.calendarUrl ? "feed" : "none",
-            scheduleFormat: input.calendarFormat ?? null,
-            guideCheckedAgainst: input.guideData?.checkedAgainst ?? null,
-            guideCheckedOn: input.guideData?.checkedOn ?? null,
+            // What's on (A241: a schedule entered by hand too).
+            ...what,
             creatorId: creator?.id ?? null,
             leadStageBefore: creator?.stage ?? null,
             listingState: "listed"
@@ -870,7 +988,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // A237: an http:// stream link is tried over https straight away; A238: then CORS, where the
       // player would fetch straight from the source (never for another app's access).
       await probeNew(sourceId);
-      if (input.calendarUrl) await part.syncListedSource(sourceId);
+      // Its feed read (or, A241, its schedule entered by hand made into airings) at once.
+      if (what.calendarUrl || what.scheduleSource === "manual") await part.syncListedSource(sourceId);
       return one(sourceId);
     },
 
@@ -903,7 +1022,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That listed source");
       if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
-      if (!row.calendarUrl) throw refused("no_calendar", "Add the source's agenda calendar first.");
+      if (!row.calendarUrl && row.scheduleSource !== "manual") throw refused("no_calendar", "Add the source's agenda calendar first.");
       await sync(row, fetchFn);
       return one(sourceId);
     },
@@ -950,27 +1069,21 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const evidence = { plays, embedTerms, termsUrl: row.termsUrl, termsCheckedOn, publicBasis, streamPermissionId };
       const basis = basisFor(evidence);
 
-      // What's on.
+      // What's on (A241: a schedule entered by hand is checked first).
       const sc = input.schedule;
-      const format = sc && sc.source !== "none" ? sc.calendarFormat : undefined;
-      const schedule = sc
-        ? sc.source === "none"
-          ? { scheduleSource: "none" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null }
-          : {
-              scheduleSource: sc.source,
-              calendarUrl: sc.calendarUrl,
-              scheduleFormat: sc.calendarFormat ?? null,
-              guideCheckedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
-              guideCheckedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null
-            }
-        : null;
+      checkManual(sc);
+      const format = sc && (sc.source === "feed" || sc.source === "guide_data") ? sc.calendarFormat : undefined;
+      const schedule = sc ? scheduleColumns(sc) : null;
+      const wasManual = row.scheduleSource === "manual" ? row.manualSchedule : null;
+      const manualChanged = !!schedule && (manualHistoryText(schedule.manualSchedule) !== manualHistoryText(wasManual) || skipText(schedule.manualSchedule) !== skipText(wasManual));
       const scheduleChanged =
         !!schedule &&
         (schedule.scheduleSource !== row.scheduleSource ||
           schedule.calendarUrl !== row.calendarUrl ||
           (format !== undefined && schedule.scheduleFormat !== row.scheduleFormat) ||
           schedule.guideCheckedAgainst !== row.guideCheckedAgainst ||
-          schedule.guideCheckedOn !== row.guideCheckedOn);
+          schedule.guideCheckedOn !== row.guideCheckedOn ||
+          manualChanged);
 
       // Channel and call sign: the rules for listing.
       const channel = input.channel && input.channel !== ident.channel ? input.channel : null;
@@ -1022,6 +1135,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         if (format !== undefined) note("calendarFormat", row.scheduleFormat, schedule.scheduleFormat);
         note("guideCheckedAgainst", row.guideCheckedAgainst, schedule.guideCheckedAgainst);
         note("guideCheckedOn", row.guideCheckedOn, schedule.guideCheckedOn);
+        // A241: the weekly schedule entered by hand, as one line, and the dates it skips.
+        note("manualSchedule", manualHistoryText(wasManual), manualHistoryText(schedule.manualSchedule));
+        note("skipDates", skipText(wasManual), skipText(schedule.manualSchedule));
       }
       if (channel) note("channel", ident.channel, channel);
       if (callSign) note("callSign", ident.callSign, callSign);
@@ -1031,7 +1147,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const effects: ListedChange["effects"] = [];
       if (basisFor(row) && !basis) effects.push("waits_for_evidence");
       if (restart) effects.push("checks_restart");
-      if (scheduleChanged && schedule?.calendarUrl) effects.push("schedule_reread");
+      if (scheduleChanged && (schedule?.calendarUrl || schedule?.scheduleSource === "manual")) effects.push("schedule_reread");
 
       await db.transaction(async (tx) => {
         await tx
@@ -1152,10 +1268,10 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         }
       }
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
-      if (after?.calendarUrl) await sync(after, fetchFn);
+      if (after?.calendarUrl || after?.scheduleSource === "manual") await sync(after, fetchFn);
       for (const member of family) {
         const [m] = await db.select().from(LS).where(eq(LS.id, member.id));
-        if (m && !m.removedAt && m.calendarUrl) await sync(m, fetchFn);
+        if (m && !m.removedAt && (m.calendarUrl || m.scheduleSource === "manual")) await sync(m, fetchFn);
       }
       return one(sourceId);
     },
@@ -1204,7 +1320,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             onDial: waiting === null,
             down: waiting === "down",
             removed: !!r.removedAt,
-            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource },
+            // A241: a schedule entered by hand is guide data checked against the published schedule,
+            // and reads so on the dial (ExternalSchedule keeps its three values for apps built before it).
+            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource === "manual" ? "guide_data" : r.scheduleSource },
             // Straight from the source: its embed, or its stream link in Opencast's player.
             // A201: a DASH stream link says so (`format: "dash"`); apps before it try it as HLS and stand by.
             // A237: an http:// stream link plays its https address, or the relay's (streamAddress).
@@ -1245,8 +1363,12 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     },
 
     async syncExternalSchedules(options = {}) {
-      // A215: a listing taken off the dial isn't read any more.
-      const rows = await db.select().from(LS).where(and(isNotNull(LS.calendarUrl), isNull(LS.removedAt)));
+      // A215: a listing taken off the dial isn't read any more. A241: a schedule entered by hand is
+      // made into airings again, so its two weeks roll forward.
+      const rows = await db
+        .select()
+        .from(LS)
+        .where(and(or(isNotNull(LS.calendarUrl), eq(LS.scheduleSource, "manual")), isNull(LS.removedAt)));
       let synced = 0;
       let failed = 0;
       for (const row of rows) {

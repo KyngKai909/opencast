@@ -3,6 +3,7 @@ import { endpoint } from "./core.js";
 import { Band, CallSign, ChannelNumber, Colour, DateOnly, Id, Market, Micros, Millis, StationIdent, Timestamp } from "./common.js";
 import { CreatorStage } from "./states.js";
 import { BreakCadence, ExternalPlays, ExternalSchedule, StationIdCadence } from "./stations.js";
+import { ManualScheduleInput, ManualSlot } from "./manualSchedule.js";
 
 export const SlotState = z.enum(["station", "claimable", "listed", "catalog", "held", "open"]);
 export const SLOT_STATE_LABELS = {
@@ -291,9 +292,36 @@ export const HeldEarnings = z.object({
 export const ExternalBasis = z.enum(["embed_terms", "written_permission", "public_source"]);
 export type ExternalBasis = z.infer<typeof ExternalBasis>;
 
-/** A calendar or schedule feed's format. */
-export const ScheduleFormat = z.enum(["ical", "rss", "json", "xmltv"]);
+/**
+ * A calendar or schedule feed's format. Added 2026-10-01 (A241): `webpage`, a web page read for its
+ * embedded event data (schema.org JSON-LD in its `<script type="application/ld+json">` blocks).
+ */
+export const ScheduleFormat = z.enum(["ical", "rss", "json", "xmltv", "webpage"]);
 export type ScheduleFormat = z.infer<typeof ScheduleFormat>;
+
+/**
+ * Where a listing's "what's on" comes from, as the desk sees it: `ExternalSchedule`'s three, and
+ * (added 2026-10-01, A241) `manual`, a weekly schedule entered by hand, checked against the
+ * source's published schedule. The dial, guide and station page (`ExternalInfo.schedule`) keep
+ * `ExternalSchedule`'s three values: a schedule entered by hand reads there as `guide_data`, which
+ * is what it is (guide data checked against the published schedule), so apps built before it keep
+ * reading the dial.
+ */
+export const ListedScheduleSource = z.enum(["feed", "guide_data", "manual", "none"]);
+export type ListedScheduleSource = z.infer<typeof ListedScheduleSource>;
+
+/**
+ * What's on, as `addListedSource` and `updateListedSource` take it (A241 gave both the same shape):
+ * a feed (`calendarUrl`, its format or null to work it out), guide data (`calendarUrl` and
+ * `guideData`), a schedule entered by hand (`ManualScheduleInput`), or none.
+ */
+export const ListedScheduleInput = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("feed"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional() }),
+  z.object({ source: z.literal("guide_data"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional(), guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }) }),
+  ManualScheduleInput,
+  z.object({ source: z.literal("none") })
+]);
+export type ListedScheduleInput = z.infer<typeof ListedScheduleInput>;
 
 /**
  * An external station's stream, checked every minute: `unchecked` (not yet), `up`, `down` (failing,
@@ -345,7 +373,23 @@ export const ExternalOutage = z.object({
 export type ExternalOutage = z.infer<typeof ExternalOutage>;
 
 /** What `updateListedSource` can change, as its change history names it (added 2026-09-30, A215). */
-export const ListedField = z.enum(["name", "description", "streamUrl", "plays", "embedTerms", "calendarUrl", "calendarFormat", "schedule", "guideCheckedAgainst", "guideCheckedOn", "channel", "callSign"]);
+export const ListedField = z.enum([
+  "name",
+  "description",
+  "streamUrl",
+  "plays",
+  "embedTerms",
+  "calendarUrl",
+  "calendarFormat",
+  "schedule",
+  "guideCheckedAgainst",
+  "guideCheckedOn",
+  "channel",
+  "callSign",
+  // ---- Added 2026-10-01 (A241): a schedule entered by hand, as its weekly line, and the dates it skips ----
+  "manualSchedule",
+  "skipDates"
+]);
 export type ListedField = z.infer<typeof ListedField>;
 
 /**
@@ -378,7 +422,12 @@ export const ListedSource = z.object({
   streamUrl: z.string(),
   embedTerms: z.enum(["allowed", "unclear"]),
   calendarUrl: z.string().nullable(),
-  calendarSync: z.enum(["synced", "calendar_not_found", "not_set"]),
+  /**
+   * Added 2026-10-01 (A241): `no_event_data`, a webpage that answered but has no schedule data a
+   * computer can read (no schema.org event with a title and a start). Not an error: its airings
+   * are left as they were, and its stream's health doesn't change.
+   */
+  calendarSync: z.enum(["synced", "calendar_not_found", "not_set", "no_event_data"]),
   listingState: z.enum(["not_listed", "checking", "listed"]),
   lastSyncedAt: Timestamp.nullable(),
   upcoming: z.number().int(),
@@ -400,14 +449,21 @@ export const ListedSource = z.object({
       note: z.string().nullable()
     })
     .optional(),
-  /** Where "what's on" comes from. `url`: the feed; `checkedAgainst`: the published schedule guide data is checked against. */
+  /**
+   * Where "what's on" comes from. `url`: the feed; `checkedAgainst`: the published schedule guide
+   * data (or, A241, a schedule entered by hand) is checked against, and `checkedOn` the day.
+   * Added 2026-10-01 (A241): `source` `manual`, with `slots` (the weekly schedule, in the market's
+   * time zone) and `skipDates` (the dates it doesn't air); both absent for the other sources.
+   */
   schedule: z
     .object({
-      source: ExternalSchedule,
+      source: ListedScheduleSource,
       format: ScheduleFormat.nullable(),
       url: z.string().nullable(),
       checkedAgainst: z.string().nullable(),
-      checkedOn: DateOnly.nullable()
+      checkedOn: DateOnly.nullable(),
+      slots: z.array(ManualSlot).optional(),
+      skipDates: z.array(DateOnly).optional()
     })
     .optional(),
   /** On the dial now: evidence in place, in its market, and not hidden for being down. */
@@ -830,7 +886,7 @@ export const networkApi = {
     path: "/admin/listed-sources",
     auth: "admin",
     summary:
-      "List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations. Added 2026-09-30 (A229): `shareCallSign` on X.n beside an external X.1 shares its call sign (\"Same brand as 15.1\").",
+      "List a source as an external station: its official embed (where its terms allow embedding) or its stream link (with its written permission, or a clearly public source). On the dial only once the evidence is in; same channel and call sign rules as full stations. Added 2026-09-30 (A229): `shareCallSign` on X.n beside an external X.1 shares its call sign (\"Same brand as 15.1\"). Added 2026-10-01 (A241): what's on can be a webpage's own event data (schema.org JSON-LD), or a weekly schedule entered by hand and checked against the source's published schedule (`schedule`), made into airings for the next 14 days at once and hourly.",
     body: z.object({
       marketId: Id,
       band: Band,
@@ -857,11 +913,22 @@ export const networkApi = {
       /** The source is outside this market (a county meeting that covers two). Waits unless `external.other_markets` allows it (A200). */
       outsideMarket: z.boolean().optional(),
       /**
+       * Added 2026-10-01 (A241): what's on, in the same shape `updateListedSource` takes it: a feed,
+       * guide data, a schedule entered by hand (`{ source: "manual", slots, checkedAgainst,
+       * checkedOn, skipDates? }`) or none. Instead of `calendarUrl`, `calendarFormat` and
+       * `guideData` (still taken as before); 400 when both are given.
+       */
+      schedule: ListedScheduleInput.optional(),
+      /**
        * Added 2026-09-30 (A229): "Same brand as 15.1 SBCO". On X.n (n ≥ 2) beside an external
        * station on X.1, share its call sign; `callSign` can then be left out (or must be X.1's).
        * 422 `cannot_share` anywhere else (a full station on X.1, another major or market, X.1 itself).
        */
       shareCallSign: z.boolean().optional()
+    })
+    .refine((b) => !b.schedule || (b.calendarUrl === undefined && b.calendarFormat === undefined && b.guideData === undefined), {
+      message: "Give what's on as `schedule`, or as `calendarUrl` and `guideData`, not both",
+      path: ["schedule"]
     }),
     response: ListedSource,
     status: 201
@@ -912,7 +979,7 @@ export const networkApi = {
     method: "POST",
     path: "/admin/listed-sources/:sourceId/sync",
     auth: "admin",
-    summary: "Sync listings from the agenda calendar now",
+    summary: "Sync listings from the agenda calendar now. Added 2026-10-01 (A241): a webpage is read for its event data (`calendarSync` `no_event_data` when it has none); a schedule entered by hand is made into airings for the next 14 days again",
     params: z.object({ sourceId: Id }),
     response: ListedSource
   }),
@@ -924,7 +991,7 @@ export const networkApi = {
     path: "/admin/listed-sources/:sourceId",
     auth: "admin",
     summary:
-      "A215: change a listing: its name, description, address, how it plays, the embed terms, the schedule feed or guide data, and its channel and call sign (the rules for listing). An edit never puts anything on the dial without evidence that covers what now plays: a written permission covers one exact stream address, so a new address waits for new evidence; embed terms stay for an address on the same host and wait for one on another; a public basis stays; a new way to play needs its own evidence. A new address or way to play is checked afresh (an open outage ends); a new schedule is read again. Every change is kept in the listing's history. 409 `removed` for a listing taken off the dial.",
+      "A215: change a listing: its name, description, address, how it plays, the embed terms, the schedule feed or guide data (A241: or a weekly schedule entered by hand), and its channel and call sign (the rules for listing). An edit never puts anything on the dial without evidence that covers what now plays: a written permission covers one exact stream address, so a new address waits for new evidence; embed terms stay for an address on the same host and wait for one on another; a public basis stays; a new way to play needs its own evidence. A new address or way to play is checked afresh (an open outage ends); a new schedule is read again. Every change is kept in the listing's history. 409 `removed` for a listing taken off the dial.",
     params: z.object({ sourceId: Id }),
     body: z
       .object({
@@ -935,14 +1002,12 @@ export const networkApi = {
         plays: ExternalPlays.optional(),
         /** An embed's terms. */
         embedTerms: z.enum(["allowed", "unclear"]).optional(),
-        /** What's on: a feed (`calendarUrl`, `calendarFormat` or null to work it out), guide data (`calendarUrl` and `guideData`), or none. */
-        schedule: z
-          .discriminatedUnion("source", [
-            z.object({ source: z.literal("feed"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional() }),
-            z.object({ source: z.literal("guide_data"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional(), guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }) }),
-            z.object({ source: z.literal("none") })
-          ])
-          .optional(),
+        /**
+         * What's on: a feed (`calendarUrl`, `calendarFormat` or null to work it out), guide data
+         * (`calendarUrl` and `guideData`), or none. Added 2026-10-01 (A241): a schedule entered by
+         * hand, `{ source: "manual", slots, checkedAgainst, checkedOn, skipDates? }`.
+         */
+        schedule: ListedScheduleInput.optional(),
         /** A new channel, in the same band. */
         channel: ChannelNumber.optional(),
         /**

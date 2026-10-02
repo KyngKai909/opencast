@@ -1,12 +1,22 @@
 // An external station's "what's on" (follow-up Phase 6): the source's own calendar or schedule
 // feed, in whichever of the four shapes sources publish: iCalendar, RSS (with the RSS event
 // module's start and end, else each item's date), JSON (an array of events, or `events` / `items`)
-// or XMLTV (guide data). Titles are the source's own; nothing is made up, and an entry without a
-// title or a start time is left out.
+// or XMLTV (guide data). A241 (2026-10-01): or a web page's own event data, the schema.org JSON-LD
+// in its `<script type="application/ld+json">` blocks (lib/jsonLd.ts). Titles are the source's own;
+// nothing is made up, and an entry without a title or a start time is left out.
 
 import { parseIcs, type CalendarEvent } from "./ics.js";
+import { parseJsonLdEvents } from "./jsonLd.js";
 
-export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv";
+export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv" | "webpage";
+
+/** A241: an answer that's a web page: an HTML type, or text that starts like one. */
+function isWebpage(contentType: string | null, head: string): boolean {
+  if (/^<!doctype\s+html|^<html[\s>]/i.test(head)) return true;
+  // A server that labels everything text/html still sends its feeds as XML or JSON.
+  if (!/text\/html|application\/xhtml\+xml/i.test(contentType ?? "")) return false;
+  return !/^(<\?xml|<rss[\s>]|<feed[\s>]|<tv[\s>]|<!doctype\s+tv|[{[]|BEGIN:VCALENDAR)/i.test(head);
+}
 
 /** The format from the address, then the answer's type, then the text itself. */
 export function detectScheduleFormat(url: string, contentType: string | null, text: string): ScheduleFormat {
@@ -14,6 +24,7 @@ export function detectScheduleFormat(url: string, contentType: string | null, te
   if (path.endsWith(".ics") || /text\/calendar/i.test(contentType ?? "")) return "ical";
   const head = text.trimStart().slice(0, 400);
   if (head.startsWith("BEGIN:VCALENDAR")) return "ical";
+  if (isWebpage(contentType, head)) return "webpage";
   if (head.startsWith("{") || head.startsWith("[") || /json/i.test(contentType ?? "")) return "json";
   if (/<tv[\s>]/i.test(text.slice(0, 2000)) || path.endsWith(".xmltv")) return "xmltv";
   return "rss";
@@ -118,10 +129,12 @@ function parseXmltv(text: string, channel: string | null): CalendarEvent[] {
 
 /**
  * The feed's events. An XMLTV file with several channels is read for the one the address's
- * fragment names (`…/guide.xml#channel=NASA.us`); without one, every programme in it.
+ * fragment names (`…/guide.xml#channel=NASA.us`); without one, every programme in it. A241: a
+ * webpage's event data, a start without an offset read in `timeZone` (the market's).
  */
-export function parseSchedule(text: string, format: ScheduleFormat, url = ""): CalendarEvent[] {
+export function parseSchedule(text: string, format: ScheduleFormat, url = "", timeZone = "UTC"): CalendarEvent[] {
   if (format === "ical") return parseIcs(text);
+  if (format === "webpage") return parseJsonLdEvents(text, timeZone);
   if (format === "json") return parseJson(text);
   if (format === "xmltv") return parseXmltv(text, /#channel=([^&]+)/.exec(url)?.[1] ? decodeURIComponent(/#channel=([^&]+)/.exec(url)![1]) : null);
   return parseRss(text);

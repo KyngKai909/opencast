@@ -270,7 +270,11 @@ describe("direct uploads", () => {
     expect((await kai.get(`/v1/uploads/${left.session.id}`)).body).toMatchObject({ state: "aborted", error: { code: "abandoned" } });
     expect(await exists(path.join(objectsDir(), ".multipart", left.session.id))).toBe(false);
     // Parts in the store with no upload waiting for them go too.
-    await fs.mkdir(path.join(objectsDir(), ".multipart", "11111111-2222-3333-4444-555555555555"), { recursive: true });
+    const stray = path.join(objectsDir(), ".multipart", "11111111-2222-3333-4444-555555555555");
+    await fs.mkdir(stray, { recursive: true });
+    // Last written more than a day before the test's clock (not the file system's).
+    const long = new Date(h.clock.now().getTime() - 25 * 3_600_000);
+    await fs.utimes(stray, long, long);
     const orphaned = await h.services.uploads.sweep({ orphans: true });
     expect(orphaned.orphans).toBe(1);
     expect(await exists(path.join(objectsDir(), ".multipart", "11111111-2222-3333-4444-555555555555"))).toBe(false);
