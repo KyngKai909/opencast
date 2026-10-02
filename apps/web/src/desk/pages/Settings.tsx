@@ -85,6 +85,7 @@ export default function Settings() {
   return (
     <SettingsLayout
       className="nd-settings"
+      titleAs="h1"
       sections={sections.map((s) => ({ id: s.id, label: s.label, href: deskPath(`/settings/${s.id}`) }))}
       active={current.id}
       description={current.description}

@@ -18,10 +18,8 @@ interface Visit {
   name: string;
   path: string | (() => string);
   as?: "dee" | "sam" | null;
-  /** The page's heading (level 1, unless `level` says otherwise). */
+  /** The page's heading (level 1). */
   h1: string | RegExp;
-  /** Settings has no level-1 heading: its frame's "Settings" is level 2, as in the viewer's. */
-  level?: 1 | 2;
   /** And something else it says once its data is in. */
   says?: (page: Page) => ReturnType<Page["getByText"]>;
 }
@@ -43,8 +41,8 @@ const VISITS: Visit[] = [
   { name: "reserved call signs", path: "/desk/reserved-call-signs", h1: "Reserved call signs" },
   { name: "rights claims", path: "/desk/rights-claims", h1: "Rights claims", says: (p) => p.getByText("Stations near the repeat limit") },
   { name: "catalog sponsors", path: "/desk/catalog-sponsors", h1: "Catalog sponsors", says: (p) => p.getByText("Businesses and organizations thanked in the catalog's credit.") },
-  { name: "settings", path: "/desk/settings", h1: "Settings", level: 2, says: (p) => p.getByRole("region", { name: "Pay-as-you-go" }) },
-  { name: "settings, you", path: "/desk/settings/you", h1: "Settings", level: 2, says: (p) => p.getByRole("heading", { name: "Appearance" }) },
+  { name: "settings", path: "/desk/settings", h1: "Settings", says: (p) => p.getByRole("region", { name: "Pay-as-you-go" }) },
+  { name: "settings, you", path: "/desk/settings/you", h1: "Settings", says: (p) => p.getByRole("heading", { name: "Appearance" }) },
   { name: "a page that isn't there", path: "/desk/no-such-page", h1: "There's nothing here." },
   { name: "signed out: the sign-in page", path: "/desk", as: null, h1: "Sign in to Network desk" },
   { name: "signed in off the team", path: "/desk", as: "sam", h1: "This desk is for the Opencast team.", says: (p) => p.getByText("You're signed in as sam@example.com", { exact: false }) }
@@ -67,7 +65,7 @@ for (const v of VISITS) {
     if (who) await signIn(page, who);
     else await signOut(page);
     await page.goto(typeof v.path === "string" ? v.path : v.path());
-    await expect(page.getByRole("heading", { level: v.level ?? 1, name: v.h1 })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: v.h1 })).toBeVisible();
     if (v.says) await expect(v.says(page)).toBeVisible();
     await page.waitForLoadState("networkidle");
     await expect(page.getByText("Something went wrong", { exact: false })).toHaveCount(0);

@@ -18,6 +18,14 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("link", { name: "Ownership" }).className).toContain("--danger");
   });
 
+  it("heads the sub-rail with an h2, or an h1 where it's the page's title", () => {
+    render(<SettingsLayout sections={sections} active="team" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    cleanup();
+    render(<SettingsLayout sections={sections} active="team" titleAs="h1" />);
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeTruthy();
+  });
+
   it("on the phone, lists the sections when none is open", () => {
     render(<SettingsLayout form="phone" sections={sections} active={null} />);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
