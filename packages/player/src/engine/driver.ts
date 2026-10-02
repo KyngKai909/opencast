@@ -5,6 +5,7 @@
 import Hls, { type HlsConfig } from "hls.js";
 import { parseDateRanges, type HlsDateRange } from "@opencast/contracts";
 import { isMaster, mediaPlaylist, variants, type Fetch } from "./playlist";
+import { captionTrackToShow, showTextTracks } from "./textTracks";
 
 /**
  * Picture quality (TV settings, "Picture and sound"): "auto" follows the connection (hls.js's
@@ -215,10 +216,6 @@ export class QualityRules {
 
 // ---------- Drivers ----------
 
-/** Shows or hides the video's caption and subtitle tracks (metadata tracks are left alone). */
-function showTextTracks(video: HTMLVideoElement, on: boolean) {
-  for (const t of Array.from(video.textTracks ?? [])) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
-}
 
 /** Fatal errors about the master playlist itself, which hls.js's startLoad() can't recover from. */
 const MANIFEST_ERRORS = new Set<string>([Hls.ErrorDetails.MANIFEST_LOAD_ERROR, Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT, Hls.ErrorDetails.MANIFEST_PARSING_ERROR, Hls.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR]);
@@ -247,11 +244,22 @@ export function hlsDriver(o: { loader?: HlsConfig["loader"]; name?: string } = {
       let captions = false;
       const applyCaptions = () => {
         hls.subtitleDisplay = captions;
-        if (captions && hls.subtitleTrack < 0 && hls.subtitleTracks?.length) hls.subtitleTrack = 0;
+        // hls.js loads one subtitle rendition: the one textTracks.ts will show (the viewer's language,
+        // else English, else the first), so the track showing is the track with cues.
+        if (captions && hls.subtitleTracks?.length) {
+          const renditions = hls.subtitleTracks.map((t) => ({ kind: "subtitles" as const, language: t.lang ?? "", label: t.name ?? "", mode: "hidden" as TextTrackMode }));
+          const pick = captionTrackToShow(renditions);
+          const i = pick ? renditions.indexOf(pick) : 0;
+          if (hls.subtitleTrack !== i) hls.subtitleTrack = i;
+        }
         showTextTracks(video, captions);
       };
       hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, applyCaptions);
       hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, () => showTextTracks(video, captions));
+      // The captions embedded in the video (CEA-608) get a track of their own when their first words
+      // arrive: one track showing, whichever came first.
+      const onTrack = () => showTextTracks(video, captions);
+      video.textTracks?.addEventListener?.("addtrack", onTrack);
       // Before the first segment loads (the autostart runs after MANIFEST_PARSED's listeners).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         // Pictures only: never the TV ladder's audio-only rendition (ABR mustn't drop to it).
@@ -299,7 +307,10 @@ export function hlsDriver(o: { loader?: HlsConfig["loader"]; name?: string } = {
           applyCaptions();
         },
         setQuality: (q) => quality.set(q),
-        destroy: () => hls.destroy()
+        destroy: () => {
+          video.textTracks?.removeEventListener?.("addtrack", onTrack);
+          hls.destroy();
+        }
       };
     }
   };
