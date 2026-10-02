@@ -2,6 +2,18 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-02: Openers, closers and a station's own off-air card (A242)
+
+Additive: new enums (`IdentCode`, `LibraryCode`), optional fields, and wider inputs. `LogCode` itself keeps its six values, so every log, guide, dial, listing and status response reads as before. Migration **0047** (after 0046, named by hand): `broadcast.log_code` gains `OPN`, `CLS` and `OFF` (`ALTER TYPE … ADD VALUE`); `broadcast.break_rules` gains `station_id_after_opener` and `daily_opener` (boolean, default false).
+
+- `common.ts`: new `IdentCode` (`OPN` an opener, `CLS` a closer, `OFF` an off-air card), `LibraryCode` (`LogCode`'s six and those three), `IDENT_LEGACY_CODE` (`OPN`, `CLS` → `SID`; `OFF` → `OPEN`), `isIdentCode`, `asLogCode`.
+- `library.ts`: `LibraryItem` gains optional `identCode` (`IdentCode`, null otherwise) and `still` (an off-air card that's a picture: `durationMs` null, nothing prepared). For such an item `code` is its legacy code (`SID` or `OPEN`). `updateItem.body.code`, `getLibrary.query.code` and `importLinks.body.code` take `LibraryCode`; `updateItem` answers 409 `on_the_log` (an item on the log made an identity type) and 422 `still_image` (a picture made anything but an off-air card). `upload` takes a picture when `code` is `OFF`.
+- `uploads.ts`: `LibraryUploadFields.code` takes `LibraryCode` (direct uploads mark openers, closers and off-air cards as they mark bumpers and station IDs).
+- `log.ts`: `AsRunRow` gains optional `identCode` (`OPN` | `CLS`, null otherwise): the as-run log records openers and closers as `OPN` and `CLS`, and `code` says `SID` for them. `PlayoutStatus` gains optional `signing` (`on` while the opener airs, `off` while the closer does, else null). Log entries, day templates and log edits refuse identity items: 422 `not_for_the_log` (a problem of that code in an edit).
+- `hls.ts`: `HlsItem` gains `identCode` (`OPN` | `CLS`, default null; the wire attribute `X-OC-IDENT-CODE`); an opener's or closer's item tag says `SID` in `code`.
+- `stations.ts`: `BreakRule` gains optional `stationIdAfterOpener` and `dailyOpener` (always in `getBreakRule`; left out of `setBreakRule`, each stays as set).
+- Behaviour: how older builds tolerate the new codes. The apps check every response against their contracts (`safeParse` of the whole response, the web's and TV app's `call`), so an enum value they don't know fails the whole response; the player checks each DATERANGE tag on its own and drops one that fails. So the new codes never reach a field typed `LogCode`: they can't go on the log (where the dial, guide, station page, listings and the Monitor's `now` and `next` come from), and where an identity item does appear (a library item, an as-run row, an HLS item tag) `code` keeps its legacy value beside `identCode`, a field apps built before drop. A library or as-run screen built before A242 shows an opener or closer as a station ID and an off-air card as open time; nothing fails. New builds read `identCode ?? code`.
+
 ## 2026-10-01: A webpage's event data, and a schedule entered by hand (A241)
 
 Additive: one new module, new enum values on desk-only fields, two optional fields on `ListedSource.schedule`, an optional `schedule` on `addListedSource`, a fourth variant on `updateListedSource.schedule`. `ExternalInfo` (the dial, guide and station page) is unchanged. Migration **0046** (after 0045, named by hand): `network.listed_sources.manual_schedule` (jsonb).

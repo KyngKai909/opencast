@@ -17,8 +17,13 @@ export const tv = pgSchema("tv");
 
 export const band = broadcast.enum("band", ["tv", "radio"]);
 
-/** Log codes. `OPEN` is the design's "holds on the station ID slate" filler. */
-export const logCode = broadcast.enum("log_code", ["PGM", "SPT", "UND", "BMP", "SID", "OPEN"]);
+/**
+ * Log codes. `OPEN` is the design's "holds on the station ID slate" filler. A242 (migration 0047):
+ * `OPN` an opener, `CLS` a closer (library items, channel rows and the as-run log) and `OFF` an
+ * off-air card (library items only: it airs as the sign-off slate, `OPEN`). None of the three is
+ * ever a log entry's or a day template's code.
+ */
+export const logCode = broadcast.enum("log_code", ["PGM", "SPT", "UND", "BMP", "SID", "OPEN", "OPN", "CLS", "OFF"]);
 
 export const rightsBasis = broadcast.enum("rights_basis", [
   "made_it",

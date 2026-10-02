@@ -86,6 +86,7 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
   const itemFor = (itemId: string) => {
     const it = items.find((i) => i.id === itemId);
     if (!it || it.stationId !== stationId) return { problem: { code: "not_found", message: "That item wasn't found." } };
+    if (it.identCode) return { problem: { code: "not_for_the_log", message: "Openers, closers and off-air cards air at sign-off and sign-on, not from the log." } };
     if (!it.rights) return { problem: { code: "rights_unconfirmed", message: "Confirm the rights to air it first." } };
     return { item: it };
   };

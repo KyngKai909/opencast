@@ -3,17 +3,19 @@ import os from "node:os";
 import path from "node:path";
 import { and, asc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { CaptionTrack, ItemHistory, LibraryItem } from "@opencast/contracts";
+import { IDENT_LEGACY_CODE, isIdentCode, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem } from "@opencast/contracts";
 import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { toWebVtt, vttContentId } from "../../lib/captions.js";
 import { createContent, type Content } from "./content.js";
+import { probeBackground } from "../playout/engine/background.js";
 
 export { toWebVtt };
 
-type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
+/** A library item's type: a log code, or (A242) an opener, closer or off-air card. */
+type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN" | IdentCode;
 
 /** What other modules need to know about a library item. */
 export interface ItemRef {
@@ -92,6 +94,12 @@ export interface LibraryService {
   hasLinkImports(programId: string): Promise<boolean>;
   /** A station's own station IDs and bumpers, ready for air with rights confirmed. */
   fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[] }>;
+  /**
+   * A242: a station's own openers, closers and off-air cards, ready for air with rights confirmed,
+   * in library order (oldest first, as station IDs and bumpers). An off-air card can be a still
+   * (`durationMs` null: a picture, held for the sign-off slate's minute).
+   */
+  identity(stationId: string): Promise<{ openers: ItemRef[]; closers: ItemRef[]; offAirCards: ItemRef[] }>;
   /**
    * Added 2026-09-29: which of these stations have a station ID of their own ready with its rights
    * confirmed (the rest air a generated one).
@@ -212,6 +220,9 @@ const F = schema.assetFiles;
 const R = schema.rightsConfirmations;
 const P = schema.programs;
 
+/** A242: an off-air card that's a picture: no length, nothing to prepare (it airs held, as a slate). */
+const isStill = (r: { code: string; durationMs: number | null }) => r.code === "OFF" && r.durationMs === null;
+
 /** Anything under a minute is guessed as a bumper; the station can change it. */
 const guessCode = (durationMs: number | null): LogCode => (durationMs !== null && durationMs < 60_000 ? "BMP" : "PGM");
 
@@ -298,7 +309,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         title: r.title,
         episodeNumber: r.episodeNumber,
         episodeDescription: r.episodeDescription,
-        code: r.code,
+        // A242: an opener, closer or off-air card keeps an old code for apps built before it.
+        code: isIdentCode(r.code) ? IDENT_LEGACY_CODE[r.code] : r.code,
+        identCode: isIdentCode(r.code) ? r.code : null,
+        ...(isStill(r) ? { still: true } : {}),
         source: r.source,
         sourceUrl: r.sourceUrl,
         mediaKind: r.mediaKind,
@@ -414,6 +428,19 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
    * prepares it for air from this original (the fixed ladder, loudness levelled, captions), once;
    * nothing else is made from it here. Its loudness is measured from it for the library.
    */
+  /**
+   * What an upload is: video or audio with a length, or (A242, an off-air card only) a picture:
+   * PNG, JPEG or WebP, with no length. Null when it's none of them.
+   */
+  async function probeItem(file: string, code: LogCode | undefined): Promise<Awaited<ReturnType<typeof deps.media.probe>> | null> {
+    if (code === "OFF") {
+      const picture = await probeBackground(file).catch(() => null);
+      if (picture && !("error" in picture) && picture.kind === "image") return { durationMs: null, mediaKind: "video", width: picture.width, height: picture.height, audioChannels: null };
+    }
+    const probe = await deps.media.probe(file).catch(() => null);
+    return probe && probe.durationMs !== null ? probe : null;
+  }
+
   async function storeInBackground(itemId: string, stationId: string, file: string | UploadedFile, replacing?: { probe: Awaited<ReturnType<typeof deps.media.probe>>; originalName: string }) {
     try {
       await db.update(A).set({ prepProgress: 10 }).where(eq(A.id, itemId));
@@ -440,7 +467,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           const p = replacing.probe;
           await tx
             .update(A)
-            .set({ durationMs: p.durationMs, widthPx: p.width, heightPx: p.height, audioChannels: p.audioChannels ?? null, originalFilename: replacing.originalName })
+            .set({ durationMs: p.durationMs, mediaKind: p.mediaKind, widthPx: p.width, heightPx: p.height, audioChannels: p.audioChannels ?? null, originalFilename: replacing.originalName })
             .where(eq(A.id, itemId));
         }
       });
@@ -450,9 +477,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       // A direct upload starts its preparation for air now (the worker prepares it after what airs
       // within the hour); a form upload's waits until something needs it, as before.
       if (typeof file !== "string") {
-        const [row] = await db.select({ mediaKind: A.mediaKind, durationMs: A.durationMs }).from(A).where(eq(A.id, itemId));
+        const [row] = await db.select({ code: A.code, mediaKind: A.mediaKind, durationMs: A.durationMs }).from(A).where(eq(A.id, itemId));
         const band = (await services.stations.idents([stationId])).get(stationId)?.band ?? "tv";
-        if (row) await services.playout.previews([{ contentId: original.cid, mediaKind: row.mediaKind, band: row.mediaKind === "audio" ? "radio" : band, durationMs: row.durationMs }], { prepare: true });
+        // A still off-air card (A242) has nothing to prepare.
+        if (row && !isStill(row)) await services.playout.previews([{ contentId: original.cid, mediaKind: row.mediaKind, band: row.mediaKind === "audio" ? "radio" : band, durationMs: row.durationMs }], { prepare: true });
       }
     } catch (error) {
       // A replacement that fails leaves the item as it was: the old file still airs.
@@ -588,7 +616,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .innerJoin(F, eq(F.assetId, A.id))
         .where(and(eq(A.status, "ready"), isNull(A.archivedAt), or(gte(R.confirmedAt, since), gte(F.createdAt, since))))
         .limit(limit);
-      return (await toRefs(rows.map((r) => r.asset))).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable);
+      // A still off-air card (A242) has nothing to prepare: it airs as a slate.
+      return (await toRefs(rows.map((r) => r.asset))).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && !isStill(r));
     },
 
     async exportToIpfs(itemId) {
@@ -683,6 +712,17 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .orderBy(asc(A.createdAt));
       const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs);
       return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
+    },
+
+    async identity(stationId) {
+      const rows = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), inArray(A.code, ["OPN", "CLS", "OFF"]), eq(A.status, "ready"), isNull(A.archivedAt)))
+        .orderBy(asc(A.createdAt), asc(A.id));
+      // A still off-air card has no length; everything else needs one.
+      const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && (r.durationMs || isStill(r)));
+      return { openers: refs.filter((r) => r.code === "OPN"), closers: refs.filter((r) => r.code === "CLS"), offAirCards: refs.filter((r) => r.code === "OFF") };
     },
 
     async withOwnStationId(stationIds) {
@@ -796,8 +836,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (fields.captions !== undefined && !toWebVtt(fields.captions)) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
       // A direct upload picked up again after a restart: the item it made already.
       if (options.id && (await db.select({ id: A.id }).from(A).where(eq(A.id, options.id))).length) return service.item(options.id);
-      const probe = await deps.media.probe(file.path).catch(() => null);
-      if (!probe || probe.durationMs === null) throw refused("unreadable_file", "That file can't be read as video or audio.");
+      const probe = await probeItem(file.path, fields.code);
+      if (!probe) throw refused("unreadable_file", fields.code === "OFF" ? "That file can't be read as a picture, video or audio." : "That file can't be read as video or audio.");
       // Keep the upload past the request: multer's temp file is removed when it ends. (A direct
       // upload is in the store already.)
       let kept: string | null = null;
@@ -846,6 +886,13 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     async updateItem(itemId, fields) {
       const row = await itemRow(itemId);
       await checkOwnership(row.stationId, fields);
+      if (fields.code && fields.code !== row.code) {
+        // A242: a picture can only be an off-air card; openers, closers and off-air cards don't go on the log.
+        if (isStill(row)) throw refused("still_image", "It's a picture, so it can only be an off-air card. Upload a clip to use it as something else.");
+        if (isIdentCode(fields.code) && (await services.log.itemUsage(itemId)).upcoming > 0) {
+          throw new HttpError(409, "on_the_log", "It's on the log. Take it off the log first: openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
+        }
+      }
       await db.transaction(async (tx) => {
         const patch: Partial<typeof A.$inferInsert> = {};
         for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription"] as const) {
@@ -1061,12 +1108,13 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (ref?.contentUnavailable) throw new HttpError(409, "claim_open", "A rights claim is open against this file. Answer the claim first.");
       if (row.status === "preparing") throw new HttpError(409, "preparing", "It's still being prepared. Try again when it's ready.");
       // The same checks as an upload: it has to read as video or audio.
-      const probe = await deps.media.probe(file.path).catch(() => null);
-      if (!probe || probe.durationMs === null) throw refused("unreadable_file", "That file can't be read as video or audio.");
-      if (probe.mediaKind !== row.mediaKind) throw refused("wrong_kind", row.mediaKind === "video" ? "That's audio. Replace a video with a video." : "That's video. Replace audio with audio.");
+      // An off-air card (A242) can be a picture or a clip, and change from one to the other.
+      const probe = await probeItem(file.path, row.code);
+      if (!probe) throw refused("unreadable_file", row.code === "OFF" ? "That file can't be read as a picture, video or audio." : "That file can't be read as video or audio.");
+      if (row.code !== "OFF" && probe.mediaKind !== row.mediaKind) throw refused("wrong_kind", row.mediaKind === "video" ? "That's audio. Replace a video with a video." : "That's video. Replace audio with audio.");
       // It has to fit every slot it's already on the log in.
       const { shortestSlotMs } = await services.log.itemSchedule(itemId, 1);
-      if (shortestSlotMs !== null && probe.durationMs > shortestSlotMs + 1000) {
+      if (shortestSlotMs !== null && probe.durationMs !== null && probe.durationMs > shortestSlotMs + 1000) {
         throw refused("too_long_for_log", "The new file is longer than a slot it's on the log in. Make the slot longer first, or use a shorter cut.");
       }
       // The current file airs until the new one is ready.

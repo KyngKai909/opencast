@@ -39,7 +39,8 @@ import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
 import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
-import { GENERATED_SID_MS, generatedStationIdKey } from "./stationId.js";
+import { GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
+import { clockTime } from "../../../lib/time.js";
 
 const FILL_AHEAD_MS = 20 * 60_000;
 const FILL_EVERY_MS = 30_000;
@@ -186,6 +187,10 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       const { stationIds: ids, bumpers } = await services.library.fillers(stationId);
       // No station ID of its own: its generated one.
       if (!ids.length) await queueGeneratedIds([stationId]);
+      // A242: its openers, closers and off-air clips (a picture has nothing to prepare); the automatic ones it needs.
+      const own = await services.library.identity(stationId);
+      await queueGeneratedIdents([stationId]);
+      for (const f of [...own.openers, ...own.closers, ...own.offAirCards.filter((c) => c.durationMs !== null)]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
       for (const f of [...ids, ...bumpers]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
       for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
@@ -286,6 +291,39 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       if (preparer.isReady(key, band)) continue;
       const png = band === "radio" ? null : await planner.slates.stationIdCard(look);
       await preparer.generated({ key, png, band, seconds: GENERATED_SID_MS / 1000 });
+    }
+  }
+
+  /**
+   * The automatic opener and closer (A242, stationId.ts) for stations with none of their own that can
+   * air (every station setting up or on air, unless `stationIds` names them): queued unless prepared.
+   * The opener when the station signs off within 48 hours or opens each broadcast day with it; a
+   * closer for each time it's back within 48 hours (what it says).
+   */
+  async function queueGeneratedIdents(stationIds?: string[]) {
+    const ids = stationIds ?? (await services.stations.airingStationIds());
+    if (!ids.length) return;
+    const idents = await services.stations.idents(ids);
+    const now = deps.clock.now();
+    for (const id of ids) {
+      const ident = idents.get(id);
+      if (!ident) continue;
+      const own = await services.library.identity(id);
+      if (own.openers.length && own.closers.length) continue;
+      const [spans, rule, tz] = await Promise.all([services.log.offAirSpans(id, now, new Date(now.getTime() + READY_AHEAD_MS)), services.stations.breakRule(id), services.stations.timezoneOf(id)]);
+      const wanted: Array<{ kind: IdentKind; back: string | null }> = [];
+      if (!own.openers.length && (spans.length || rule.dailyOpener)) wanted.push({ kind: "opener", back: null });
+      if (!own.closers.length) for (const back of new Set(spans.map((span) => clockTime(new Date(span.backAt), tz)))) wanted.push({ kind: "closer", back });
+      if (!wanted.length) continue;
+      const band: Band = ident.band ?? "tv";
+      bands.set(id, band);
+      const look = { callSign: ident.callSign, channel: ident.channel, name: ident.name, homeCity: ident.homeCity ?? null, colour: ident.colour ?? null };
+      for (const w of wanted) {
+        const key = generatedIdentKey(look, band, w.kind, w.back);
+        if (preparer.isReady(key, band)) continue;
+        const png = band === "radio" ? null : await planner.slates.identCard(look, w.kind, w.back);
+        await preparer.generated({ key, png, band, seconds: GENERATED_IDENT_MS / 1000 });
+      }
     }
   }
 
@@ -454,6 +492,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     /** The readiness check now (tests; the tick runs it hourly). */
     sweep,
     queueGeneratedIds,
+    queueGeneratedIdents,
     warnNotReady,
 
     async tick() {
@@ -475,6 +514,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
         lastRights = now;
         await queueConfirmed().catch((error) => log(`[prepare] queueing confirmed items failed: ${(error as Error).message}`));
         await queueGeneratedIds().catch((error) => log(`[prepare] queueing generated station IDs failed: ${(error as Error).message}`));
+        await queueGeneratedIdents().catch((error) => log(`[prepare] queueing automatic openers and closers failed: ${(error as Error).message}`));
       }
       if (now - lastSweep >= READY_EVERY_MS) {
         lastSweep = now;

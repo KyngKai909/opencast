@@ -1,3 +1,4 @@
+import { asLogCode, isIdentCode } from "@opencast/contracts";
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
@@ -329,7 +330,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       logEntryId: row.id,
       title: titleOf(row, ctx),
       episodeTitle: row.episodeTitle ?? (program && item ? item.title : null),
-      code: row.code,
+      code: asLogCode(row.code),
       kind: row.kind,
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
@@ -351,7 +352,7 @@ export function createLogService(ctx: ModuleContext): LogService {
     return {
       id: row.id,
       kind: row.kind,
-      code: row.code,
+      code: asLogCode(row.code),
       startsAt: airing.startsAt,
       endsAt: airing.endsAt,
       title: airing.title,
@@ -394,7 +395,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       return {
         entryId: row.id,
         kind: row.kind,
-        code: row.code,
+        code: asLogCode(row.code),
         startsAt: entry.startsAt,
         endsAt: entry.endsAt,
         title: entry.title,
@@ -664,6 +665,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!input.itemId) throw badRequest("Choose what airs.", { itemId: "Required" });
       const item = (await services.library.itemsByIds([input.itemId])).get(input.itemId);
       if (!item || item.archived) throw notFound("That item");
+      // A242: never on the log (so the log, guide and dial keep the codes every app knows).
+      if (isIdentCode(item.code)) throw refused("not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
       if (!item.rightsConfirmed) throw refused("rights_unconfirmed", "Confirm the rights to air it first.");
       if (item.stationId !== stationId) {
         if (!input.carriageAgreementId) throw refused("needs_agreement", "Another station's program needs a carriage agreement.");

@@ -2,7 +2,7 @@
 // history (L5) and replacing its file (L6). The Live and programming area owns this file.
 
 import { http } from "msw";
-import { libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
+import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
@@ -106,6 +106,12 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
   };
 }
 
+/** A242: an item's type as the API stores it, as `code` (what apps built before read) and `identCode`. */
+export function typed(code: string): Pick<LibraryItem, "code" | "identCode"> {
+  if (isIdentCode(code)) return { code: IDENT_LEGACY_CODE[code], identCode: code };
+  return { code: code as LibraryItem["code"], identCode: null };
+}
+
 /** A file as the mocks see it. */
 export type MockFile = Pick<File, "name" | "type" | "size">;
 
@@ -117,13 +123,15 @@ export function mockLibraryUpload(request: Request, stationId: string, file: Moc
   if (denied) return denied;
   if (!dbStation(stationId)) return fail(404, "not_found", "That station wasn't found.");
   if (!file) return fail(400, "no_file", "Choose a video or audio file.");
-  if (!/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
-    return fail(415, "not_media", "That file isn't video or audio.");
+  // A242: an off-air card can be a picture.
+  const still = fields.code === "OFF" && (/^image\/(png|jpeg|webp)$/.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name));
+  if (!still && !/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
+    return fail(415, "not_media", fields.code === "OFF" ? "That file isn't a picture, video or audio." : "That file isn't video or audio.");
   }
   const audio = file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name);
   // Under a minute is guessed as a bumper. The mock can't read the length: small files are short.
-  const code = (fields.code as LibraryItem["code"] | undefined) ?? (file.size < 8_000_000 ? "BMP" : "PGM");
-  const item = newItem(stationId, { title: fields.title ?? titleFrom(file.name), code, mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: fields.folderId ?? null });
+  const code = fields.code ?? (file.size < 8_000_000 ? "BMP" : "PGM");
+  const item = newItem(stationId, { title: fields.title ?? titleFrom(file.name), ...typed(code), ...(still ? { still: true } : {}), mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: fields.folderId ?? null });
   getDb().library.items.push(item);
   liveState().preparing[item.id] = Date.now();
   saveLive();
@@ -161,7 +169,7 @@ export const libraryHandlers = [
     const all = lib.items.filter((i) => i.stationId === id);
     let items = all;
     if (q.get("folderId")) items = items.filter((i) => i.folderId === q.get("folderId"));
-    if (q.get("code")) items = items.filter((i) => i.code === q.get("code"));
+    if (q.get("code")) items = items.filter((i) => (i.identCode ?? i.code) === q.get("code"));
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
@@ -191,7 +199,7 @@ export const libraryHandlers = [
     const job = { id: crypto.randomUUID(), status: "running" as const, requestedUrls: parsed.data.urls, items: [] as { sourceUrl: string; title: string | null; status: string; progressPct: number; assetId: string | null }[], error: null, createdAt: now().toISOString(), stationId: id };
     for (const url of parsed.data.urls) {
       const title = titleFrom(decodeURIComponent(new URL(url).pathname.split("/").filter(Boolean).at(-1) ?? new URL(url).hostname));
-      const item = newItem(id, { title, code: parsed.data.code, source: "link", sourceUrl: url, offerable: false, programId: parsed.data.programId ?? null });
+      const item = newItem(id, { title, ...typed(parsed.data.code), source: "link", sourceUrl: url, offerable: false, programId: parsed.data.programId ?? null });
       getDb().library.items.push(item);
       liveState().preparing[item.id] = Date.now();
       job.items.push({ sourceUrl: url, title, status: "running", progressPct: 0, assetId: item.id });
@@ -271,7 +279,14 @@ export const libraryHandlers = [
     if (denied) return denied;
     const parsed = libraryApi.updateItem.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "Check the item's details and try again.");
-    Object.assign(item, parsed.data);
+    const { code, ...rest } = parsed.data;
+    if (code && code !== (item.identCode ?? item.code)) {
+      // A242, as the API: a picture is an off-air card only; openers, closers and cards stay off the log.
+      if (item.still) return fail(422, "still_image", "It's a picture, so it can only be an off-air card. Upload a clip to use it as something else.");
+      if (isIdentCode(code) && usage(item).logEntries) return fail(409, "on_the_log", "It's on the log. Take it off the log first: openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
+      Object.assign(item, typed(code));
+    }
+    Object.assign(item, rest);
     saveDb();
     return reply(libraryApi.getItem.response, withProbe(item));
   }),

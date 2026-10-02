@@ -73,6 +73,10 @@ function isOnAirNow(st: DbStation, t: string) {
   return st.onAir && entry?.kind !== "off_air" && !planned;
 }
 
+/** A242: how long the mock's closer and opener air (BEAT goodnight, BEAT sign-on). */
+const CLOSER_MS = 8_000;
+const OPENER_MS = 6_000;
+
 function status(st: DbStation) {
   const t = now();
   const iso = t.toISOString();
@@ -114,6 +118,8 @@ function status(st: DbStation) {
           }
         : null,
     offAir: off ? { ...off, now: Date.parse(off.startsAt) <= t.getTime() } : null,
+    // A242: the closer (its first seconds off air) or the opener (its last), as the API reads the channel.
+    signing: st.onAir && off && Date.parse(off.startsAt) <= t.getTime() ? (t.getTime() - Date.parse(off.startsAt) < CLOSER_MS ? ("off" as const) : Date.parse(off.backAt) - t.getTime() <= OPENER_MS ? ("on" as const) : null) : null,
     // The next 48 hours of the log: how many items are prepared for air, and the first that isn't.
     readiness: readinessOf(st.ident.id, t.getTime())
   };
@@ -319,6 +325,7 @@ export const logHandlers = [
     if (b.itemId) {
       const it = libraryItem(b.itemId);
       if (!it || it.stationId !== id) return fail(404, "not_found", "That item isn't in your library.");
+      if (it.identCode) return fail(422, "not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
       if (!it.rights) return fail(409, "rights_unconfirmed", "Confirm its rights before it goes on the log.");
       title = it.title;
       endsAt ??= new Date(Date.parse(b.startsAt) + ceilMinute(it.durationMs ?? MIN)).toISOString();

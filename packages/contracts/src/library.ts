@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 
 /** L7 (added 2026-09-29): how a program's airings are captioned, and in what language (BCP 47, "en"). */
 export const Captions = z.object({ mode: z.enum(["none", "generated_live", "generated", "uploaded"]), language: z.string().max(35).nullable() });
@@ -70,6 +70,18 @@ export const LibraryItem = z.object({
   audioLayout: AudioLayout.nullable().optional(),
   /** L7 (added 2026-09-29): its caption track's language, when it has one. */
   captionLanguage: z.string().nullable().optional(),
+  /**
+   * A242 (added 2026-10-02): an opener (`OPN`), closer (`CLS`) or off-air card (`OFF`); null (or
+   * absent) for anything else. `code` then reads `SID` (opener, closer) or `OPEN` (off-air card) for
+   * apps built before it; the item's type is `identCode ?? code`.
+   */
+  identCode: IdentCode.nullable().optional(),
+  /**
+   * A242 (added 2026-10-02): an off-air card that's a picture (PNG, JPEG or WebP), not a clip. It
+   * has no length (`durationMs` null) and nothing to prepare: it airs held for the sign-off
+   * slate's minute.
+   */
+  still: z.boolean().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -213,7 +225,8 @@ export type CaptionTrack = z.infer<typeof CaptionTrack>;
 
 const ItemFields = z.object({
   title: z.string().min(1).max(200),
-  code: LogCode,
+  /** A242 (2026-10-02): `OPN`, `CLS` and `OFF` too (an opener, closer or off-air card). Not while it's on the log. */
+  code: LibraryCode,
   programId: Id.nullable(),
   folderId: Id.nullable(),
   episodeNumber: z.number().int().positive().nullable(),
@@ -228,14 +241,16 @@ export const libraryApi = {
     auth: "user",
     summary: "Every item with its type, rights and status; folders; programs",
     params: StationParams,
-    query: z.object({ folderId: Id.optional(), code: LogCode.optional(), needsAttention: z.coerce.boolean().optional() }),
+    /** `code` (A242): `OPN`, `CLS` or `OFF` lists the openers, closers or off-air cards. */
+    query: z.object({ folderId: Id.optional(), code: LibraryCode.optional(), needsAttention: z.coerce.boolean().optional() }),
     response: Library
   }),
   upload: endpoint({
     method: "POST",
     path: "/stations/:stationId/library/uploads",
     auth: "user",
-    summary: "Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP.",
+    summary:
+      "Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. An off-air card (`code` OFF, A242) can also be a picture (PNG, JPEG or WebP).",
     params: StationParams,
     multipart: true,
     body: ItemFields.partial().extend({
@@ -261,7 +276,7 @@ export const libraryApi = {
     body: z.object({
       urls: z.array(z.url()).min(1).max(50),
       expandPlaylists: z.boolean().default(false),
-      code: LogCode.default("PGM"),
+      code: LibraryCode.default("PGM"),
       programId: Id.optional()
     }),
     response: ImportJob,
@@ -280,7 +295,8 @@ export const libraryApi = {
     method: "PATCH",
     path: "/library/:itemId",
     auth: "user",
-    summary: "Change title, type, program, folder, episode details or break points",
+    summary:
+      "Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`.",
     params: ItemParams,
     body: ItemFields.partial(),
     response: LibraryItem

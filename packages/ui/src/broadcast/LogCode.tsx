@@ -1,7 +1,11 @@
 import { cx } from "../lib/cx";
 
-/** The traffic log's codes: program, spot, underwriting, bumper, station ID; OPEN for unsold break time. */
-export type LogCodeName = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
+/**
+ * The traffic log's codes: program, spot, underwriting, bumper, station ID; OPEN for unsold break
+ * time. A242 (2026-10-02): OPN an opener, CLS a closer and OFF an off-air card, a library's types
+ * that air at sign-on and sign-off (never on the log).
+ */
+export type LogCodeName = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN" | "OPN" | "CLS" | "OFF";
 
 /** What each code stands for, in words (the style guide's Program log note). */
 export const LOG_CODE_WORDS: Record<LogCodeName, string> = {
@@ -10,7 +14,10 @@ export const LOG_CODE_WORDS: Record<LogCodeName, string> = {
   UND: "Underwriting",
   BMP: "Bumper",
   SID: "Station ID",
-  OPEN: "Open"
+  OPEN: "Open",
+  OPN: "Opener",
+  CLS: "Closer",
+  OFF: "Off-air card"
 };
 
 export interface LogCodeProps {

@@ -8,6 +8,7 @@
 // (they're generated from the break rule); spots already held in a break that goes move to the
 // next break rather than being returned. Every published batch is recorded (`log_changes`).
 
+import { isIdentCode } from "@opencast/contracts";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema } from "@opencast/db";
@@ -195,6 +196,10 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
             continue;
           }
           const item = items.get(c.itemId);
+          if (item && isIdentCode(item.code)) {
+            problems.push({ index, code: "not_for_the_log", message: "Openers, closers and off-air cards air at sign-off and sign-on, not from the log." });
+            continue;
+          }
           // A new item's slot is its length in whole minutes, as `update` makes it.
           const length = roundUpToMinute(item?.durationMs ?? 30 * MIN);
           d.next = { ...d.next, assetId: c.itemId, carriageAgreementId: c.carriageAgreementId ?? null, programId: item?.programId ?? null, code: item?.code ?? d.next.code, endsAt: new Date(d.next.startsAt.getTime() + length) };

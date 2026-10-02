@@ -28,7 +28,7 @@
 
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, LogCode, Millis, Ok, Timestamp } from "./common.js";
+import { Id, LibraryCode, Millis, Ok, Timestamp } from "./common.js";
 
 const MiB = 1024 ** 2;
 const GiB = 1024 ** 3;
@@ -81,7 +81,11 @@ export const LOCAL_UPLOAD_PART_PATH = "/uploads/:uploadId/parts/:partNumber/data
 /** What a library upload says about the new item (the old upload's form fields). */
 export const LibraryUploadFields = z.object({
   title: z.string().min(1).max(200).optional(),
-  code: LogCode.optional(),
+  /**
+   * Its type. A242 (2026-10-02): `OPN` (opener), `CLS` (closer) or `OFF` (off-air card) too; an
+   * off-air card can be a picture (PNG, JPEG or WebP) as well as video or audio.
+   */
+  code: LibraryCode.optional(),
   programId: Id.nullable().optional(),
   folderId: Id.nullable().optional(),
   episodeNumber: z.number().int().positive().nullable().optional(),

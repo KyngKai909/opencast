@@ -297,7 +297,18 @@ export function testClip(seconds: number, kind: "video" | "audio" = "video"): Pr
 export async function itemFixture(
   h: Harness,
   stationId: string,
-  fields: { title?: string; durationMs?: number; code?: "PGM" | "SPT" | "UND" | "BMP" | "SID"; programId?: string; source?: "upload" | "link"; rights?: boolean; episodeNumber?: number; location?: string } = {}
+  fields: {
+    title?: string;
+    /** Null: a still (an off-air card that's a picture, A242). */
+    durationMs?: number | null;
+    code?: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPN" | "CLS" | "OFF";
+    programId?: string;
+    source?: "upload" | "link";
+    rights?: boolean;
+    episodeNumber?: number;
+    location?: string;
+    mediaKind?: "video" | "audio";
+  } = {}
 ) {
   const [item] = await h.db
     .insert(schema.assets)
@@ -309,8 +320,8 @@ export async function itemFixture(
       code: fields.code ?? "PGM",
       source: fields.source ?? "upload",
       sourceUrl: fields.source === "link" ? "https://example.com/v" : null,
-      mediaKind: "video",
-      durationMs: fields.durationMs ?? 28.5 * 60_000,
+      mediaKind: fields.mediaKind ?? "video",
+      durationMs: fields.durationMs === undefined ? 28.5 * 60_000 : fields.durationMs,
       status: "ready"
     })
     .returning();

@@ -56,7 +56,8 @@ burned into the picture. The worker writes `#EXT-X-DATERANGE` tags into the play
 The same tags carry SCTE-35 cues for every break.
 
 **Off air is a choice; dead air is a mistake.** A station can schedule off air hours or sign off
-from its log: the playlist ends after a sign-off slate, the dial says when it's back, and nothing
+from its log: its closer airs, then its off-air card, then the playlist ends; it signs back on
+with its opener, and the first program starts on time. The dial says when it's back, and nothing
 warns. Any other gap in the next 24 hours raises warnings, and the worker fills it from the
 library if nobody acts.
 
@@ -241,6 +242,12 @@ flowchart LR
 - **Day templates and off air hours.** A station builds a day once and repeats it (every day,
   weekdays, a given weekday, once). Days run 6:00 am to 6:00 am, and times snap to segment
   boundaries.
+- **Signing off and on** (A242). Off air time airs the station's closer, its off-air card for a
+  minute, then nothing (the playlist ends); the opener ends as the first program starts, in place
+  of the station ID unless the station wants both. Without its own, automatic ones in its look
+  ("12.1 BEAT · Signing off · Back at 6:00 am") and the generated off-air card. Off air too short
+  to go dark keeps the channel on (closer, card, opener). A channel that never signs off can open
+  each broadcast day with its opener, at the first program boundary after 6:00 am.
 
 To see an evening end to end on the dev database:
 

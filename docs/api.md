@@ -86,11 +86,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `getLibrary` | GET | `/stations/:stationId/library` | signed in | Every item with its type, rights and status; folders; programs |
-| `upload` | POST | `/stations/:stationId/library/uploads` | signed in | Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. |
+| `upload` | POST | `/stations/:stationId/library/uploads` | signed in | Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. An off-air card (`code` OFF, A242) can also be a picture (PNG, JPEG or WebP). |
 | `importLinks` | POST | `/stations/:stationId/library/imports` | signed in | Import from links. Link imports stay on this station and come off air the same day if the owner asks. |
 | `getImport` | GET | `/stations/:stationId/library/imports/:jobId` | signed in | Progress of a link import |
 | `getItem` | GET | `/library/:itemId` | signed in | One item |
-| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points |
+| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. |
 | `deleteItem` | DELETE | `/library/:itemId` | signed in | Delete an item. Refused while it's in the log or carried by other stations. |
 | `exportToIpfs` | POST | `/library/:itemId/export-ipfs` | signed in | Export the station's own original to IPFS (owner only). IPFS files are public and can't be taken back. |
 | `confirmRights` | POST | `/library/:itemId/rights` | signed in | Confirm the rights to air it. Needed before it can go on the log. |

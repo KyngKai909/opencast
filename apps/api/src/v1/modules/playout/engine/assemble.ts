@@ -15,8 +15,9 @@
 //     push), appended as they appear; a source that isn't connected airs the prepared stand-by
 //     slate. A source that reconnects starts a new row (a discontinuity), and so does a segment the
 //     copy had to skip (a new `part`): the next row carries on from the segment after it.
-//   - A planned sign-off: the sign-off slate, then the playlist ends (an `end` row: #EXT-X-ENDLIST).
-//     At the back time a new run starts (a new playlist), from the station ID.
+//   - A planned sign-off: the closer and the off-air card (A242), then the playlist ends (an `end`
+//     row: #EXT-X-ENDLIST). At the back time a new run starts (a new playlist), from the opener.
+//     Openers and closers air whole, like station IDs; their item tags say `SID`, with `identCode`.
 //   - When an item's last segment is published, its as-run entry is written with the program
 //     date-times it aired at (a spot's proof frame first, from its published segment, with the bug).
 //
@@ -88,7 +89,7 @@ interface Cursor {
   fresh: boolean;
 }
 
-const isWhole = (s: Segment) => Boolean(s.airingId) || s.code === "UND" || s.code === "BMP" || s.code === "SID";
+const isWhole = (s: Segment) => Boolean(s.airingId) || s.code === "UND" || s.code === "BMP" || s.code === "SID" || s.code === "OPN" || s.code === "CLS";
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
 /** Shortens a row's tags to a new end (or drops those that start after it). */
@@ -336,9 +337,11 @@ export class ChannelAssembler {
     const out: string[] = [];
     if (kind !== "item") {
       out.push(dateRangeTag({ id: `${rowId}-live`, class: HLS_CLASS.live, start, durationSeconds: seconds, attributes: { logEntryId: seg.logEntryId ?? "", sourceId: seg.liveSourceId ?? "" } }));
-    } else if (HlsLogCode.safeParse(seg.code).success && contentId) {
+    } else if (contentId && (HlsLogCode.safeParse(seg.code).success || seg.code === "OPN" || seg.code === "CLS")) {
       const carriedFrom = seg.code === "PGM" && !seg.inBreak ? await this.carriedFrom(seg.agreementId) : null;
-      out.push(dateRangeTag({ id: `${rowId}-item`, class: HLS_CLASS.item, start, durationSeconds: seconds, attributes: { logEntryId: seg.logEntryId ?? null, code: seg.code, contentId, title: seg.label, carriedFrom } }));
+      // An opener or closer (A242) says SID, which players built before it know, and which it is.
+      const ident = seg.code === "OPN" || seg.code === "CLS" ? seg.code : null;
+      out.push(dateRangeTag({ id: `${rowId}-item`, class: HLS_CLASS.item, start, durationSeconds: seconds, attributes: { logEntryId: seg.logEntryId ?? null, code: ident ? "SID" : seg.code, contentId, title: seg.label, carriedFrom, identCode: ident } }));
     }
     if (seg.breakSpan) {
       // The break's own cue: the same ID and times on whichever row carries it.
@@ -359,7 +362,7 @@ export class ChannelAssembler {
       out.push(dateRangeTag({ id: `${rowId}-sign-off`, class: HLS_CLASS.signOff, start, durationSeconds: seconds, attributes: { backAt: seg.backAt?.toISOString() ?? null } }));
     }
     const tv = look.band === "tv";
-    if (tv && look.bug.mode !== "off" && kind !== "stand_by" && !["SID", "UND", "OPEN"].includes(seg.code)) {
+    if (tv && look.bug.mode !== "off" && kind !== "stand_by" && !["SID", "UND", "OPEN", "OPN", "CLS"].includes(seg.code)) {
       const logo = look.bug.mode === "logo" && look.logoUrl ? publicUrl(this.ctx.deps, look.logoUrl) : null;
       const mode = look.bug.mode === "logo" && logo ? "logo" : "call_sign_and_channel";
       const position = ["top_left", "top_right", "bottom_left", "bottom_right"].includes(look.bug.position) ? look.bug.position : "bottom_right";

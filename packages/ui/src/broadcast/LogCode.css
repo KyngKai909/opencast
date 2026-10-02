@@ -10,3 +10,5 @@
 .oc-code--spt { border-color: var(--standby); color: var(--standby); }
 .oc-code--und { border-style: dashed; }
 .oc-code--open { border-style: dashed; color: var(--ink-50); }
+/* A242: an off-air card holds like a slate. Openers and closers keep the plain outline, as station IDs do. */
+.oc-code--off { border-style: dashed; color: var(--ink-50); }

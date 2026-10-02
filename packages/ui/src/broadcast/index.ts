@@ -13,7 +13,7 @@ export { DialRow, type DialRowProps, type DialRowVariant, type DialStation, type
 export { NowLine, type NowLineProps } from "./NowLine";
 export { GuideGrid, guideCells, guideSlots, GUIDE_UNIT_MS, type GuideGridProps, type GuideProgram, type GuideStation, type GuideCell } from "./GuideGrid";
 export { LogCode, LOG_CODE_WORDS, type LogCodeProps, type LogCodeName } from "./LogCode";
-export { CodeSelect, type CodeSelectProps, type SelectableCode } from "./CodeSelect";
+export { CodeSelect, LIBRARY_CODES, type CodeSelectProps, type SelectableCode } from "./CodeSelect";
 export { ProgramLog, type ProgramLogProps, type LogLine } from "./ProgramLog";
 export { LogTimeline, placeBlocks, type LogTimelineProps, type TimelineBlock, type TimelineBlockKind, type PlacedBlock } from "./LogTimeline";
 export { Rundown, type RundownProps, type RundownItem } from "./Rundown";

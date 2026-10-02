@@ -45,7 +45,12 @@ export const HlsItem = z.object({
   contentId: z.string(),
   title: z.string(),
   /** Carried from another station: its call sign. */
-  carriedFrom: z.string().nullable().default(null)
+  carriedFrom: z.string().nullable().default(null),
+  /**
+   * A242 (added 2026-10-02): an opener (`OPN`) or closer (`CLS`). `code` then reads `SID`, so
+   * players built before it (which drop an item whose code they don't know) still read the item.
+   */
+  identCode: z.enum(["OPN", "CLS"]).nullable().default(null)
 });
 export const HlsBreak = z.object({ breakId: z.string() });
 export const HlsLive = z.object({ logEntryId: z.string(), sourceId: z.string() });

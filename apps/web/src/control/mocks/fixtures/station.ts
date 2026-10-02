@@ -69,6 +69,9 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     adsFromPartners: false,
     // Added 2026-09-29: the station ID, bumpers, credit and spots in every break (as before).
     cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } },
+    // A242 (2026-10-02): the opener replaces the station ID at sign-on; no opener each morning.
+    stationIdAfterOpener: false,
+    dailyOpener: false,
     ...o
   };
 }

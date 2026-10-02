@@ -27,6 +27,10 @@ export interface BreakRuleView {
   adsFromPartners: boolean;
   /** How often the station ID, bumpers, credit and spots air in breaks (added 2026-09-29): every break by default. */
   cadence: BreakCadence;
+  /** A242: at sign-on, the opener and then the station ID (off by default: the opener replaces it). */
+  stationIdAfterOpener: boolean;
+  /** A242: the opener at the start of each broadcast day, for a channel that never goes off air. Off by default. */
+  dailyOpener: boolean;
 }
 
 /** What an ad request for ads from partners would carry about a station (nothing sends one yet). */
@@ -231,7 +235,15 @@ export interface StationsService {
   /** `user` (A230): the owner, for a subchannel beside their own X.1; `shareCallSign` shares its call sign. */
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string; shareCallSign?: boolean }, user?: CurrentUser): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
-  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] } }): Promise<BreakRuleView>;
+  setBreakRule(
+    stationId: string,
+    rule: Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener"> & {
+      adsFromPartners?: boolean;
+      cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] };
+      stationIdAfterOpener?: boolean;
+      dailyOpener?: boolean;
+    }
+  ): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -782,7 +794,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         openTimeTo: rule?.openTimeTo ?? "spot_market",
         blockedCategories: blocked.map((b) => b.category).sort(),
         adsFromPartners: rule?.adsFromPartners ?? false,
-        cadence: cadenceOf(rule?.cadence)
+        cadence: cadenceOf(rule?.cadence),
+        stationIdAfterOpener: rule?.stationIdAfterOpener ?? false,
+        dailyOpener: rule?.dailyOpener ?? false
       };
     },
 
@@ -1271,6 +1285,8 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
             openTimeTo: rule.openTimeTo,
             adsFromPartners: rule.adsFromPartners ?? false,
             cadence: cadence ?? null,
+            stationIdAfterOpener: rule.stationIdAfterOpener ?? false,
+            dailyOpener: rule.dailyOpener ?? false,
             updatedAt: deps.clock.now()
           })
           .onConflictDoUpdate({
@@ -1285,6 +1301,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
               openTimeTo: rule.openTimeTo,
               ...(rule.adsFromPartners !== undefined ? { adsFromPartners: rule.adsFromPartners } : {}),
               ...(cadence ? { cadence } : {}),
+              // A242: left out (an app from before), each stays as set.
+              ...(rule.stationIdAfterOpener !== undefined ? { stationIdAfterOpener: rule.stationIdAfterOpener } : {}),
+              ...(rule.dailyOpener !== undefined ? { dailyOpener: rule.dailyOpener } : {}),
               updatedAt: deps.clock.now()
             }
           });

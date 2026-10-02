@@ -38,3 +38,7 @@
 .cc-pm__cd { font-size: 24px; font-weight: 500; letter-spacing: -.03em; }
 .cc-pm .oc-health { border-top: 0; }
 .cc-pm .oc-health__row:first-child { padding-top: 0; }
+
+/* A242: "Signing on" / "Signing off" while the opener or closer airs. */
+.cc-mon__signing { margin-left: 8px; font: 600 12px var(--font-mono); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-sign); padding: 1px 6px; }
+.cc-pm__sec.cc-mon__signing { margin-left: 0; border: 0; padding: 8px 16px 0; font-size: 13px; }

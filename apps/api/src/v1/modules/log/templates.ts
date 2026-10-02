@@ -26,6 +26,7 @@
 // G7's "Repeat this day" (`repeatDay`) makes a template too. G7 copies made before templates
 // (`repeat_groups.template` false) stay as they were: `removeRepeat` still takes them off.
 
+import { asLogCode, isIdentCode } from "@opencast/contracts";
 import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { DayTemplate, DayTemplateEntry, LogDay, TemplateGeneration } from "@opencast/contracts";
@@ -175,7 +176,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       startMinute: localMinute(r.startsAt, tz),
       lengthMs: r.endsAt.getTime() - r.startsAt.getTime(),
       kind: r.kind,
-      code: r.code,
+      code: asLogCode(r.code),
       assetId: r.assetId,
       programId: r.programId,
       carriageAgreementId: r.carriageAgreementId,
@@ -200,6 +201,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         if (!x.itemId) throw badRequest("Choose what airs.", { [`entries.${i}.itemId`]: "Required" });
         const item = items.get(x.itemId);
         if (!item || item.archived) throw notFound("That item");
+        if (isIdentCode(item.code)) throw refused("not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
         if (!item.rightsConfirmed) throw refused("rights_unconfirmed", "Confirm the rights to air it first.");
         if (item.stationId !== stationId && !x.carriageAgreementId) throw refused("needs_agreement", "Another station's program needs a carriage agreement.");
         lengthMs = lengthMs ?? roundUpToMinute(item.durationMs ?? 30 * MIN);
@@ -298,7 +300,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             startTime: minuteText(e.startMinute),
             lengthMs: e.lengthMs,
             kind: e.kind,
-            code: e.code,
+            code: asLogCode(e.code),
             title: title(e),
             itemId: e.assetId,
             programId: e.programId ?? (e.assetId ? (items.get(e.assetId)?.programId ?? null) : null),
@@ -501,7 +503,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             startsAt,
             endsAt,
             kind: e.kind,
-            code: e.code,
+            code: asLogCode(e.code),
             assetId: e.assetId,
             programId: e.programId,
             liveSourceId: e.liveSourceId,

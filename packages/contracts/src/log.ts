@@ -724,6 +724,11 @@ export const PlayoutStatus = z.object({
    */
   offAir: OffAirSpan.extend({ now: z.boolean() }).nullable().optional(),
   /**
+   * A242 (added 2026-10-02): the channel is airing the station's opener (`on`: at sign-on, or
+   * opening the broadcast day) or closer (`off`: at sign-off) right now; null otherwise.
+   */
+  signing: z.enum(["on", "off"]).nullable().optional(),
+  /**
    * Added 2026-09-29 (prepare once, then assemble): the items on the log in the next 48 hours, how
    * many are prepared in every rendition the station's band airs, and the first that isn't
    * (`status`: queued, being prepared, failed, or not asked for yet). Anything not ready at air
@@ -760,13 +765,20 @@ export const PlayoutStatus = z.object({
 
 export const AsRunRow = z.object({
   id: Id,
+  /** An opener or closer (A242) reads `SID` here; `identCode` says which. */
   code: LogCode,
   title: z.string(),
   startedAt: Timestamp,
   endedAt: Timestamp,
   reason: z.enum(["planned", "rotation", "backup_rotation", "station_id_fill", "dead_air_fill", "live", "slate"]),
   itemId: Id.nullable(),
-  airingId: Id.nullable()
+  airingId: Id.nullable(),
+  /**
+   * A242 (added 2026-10-02): the as-run log records an opener as `OPN` and a closer as `CLS`. They
+   * come here, with `code` `SID`, so apps built before it (whose `code` knows six values) still read
+   * the log. Null for everything else.
+   */
+  identCode: z.enum(["OPN", "CLS"]).nullable().optional()
 });
 
 export const playoutApi = {

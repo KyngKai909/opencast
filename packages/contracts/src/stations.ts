@@ -251,7 +251,20 @@ export const BreakRule = z.object({
       /** Added 2026-09-29 (later): how often the station's spots air. Left out, every break. */
       spots: BreakCadence.optional()
     })
-    .optional()
+    .optional(),
+  /**
+   * A242 (added 2026-10-02): at sign-on the opener replaces the station ID; with this on, the
+   * opener airs and then the station ID, both ending as the first program starts. Off by default;
+   * left out of `setBreakRule`, it stays as set.
+   */
+  stationIdAfterOpener: z.boolean().optional(),
+  /**
+   * A242 (added 2026-10-02): for a channel that never goes off air, the opener at the start of each
+   * broadcast day (6:00 am in the market's time zone): at the first program boundary at or after
+   * 6:00 am, where the station ID would air, never cutting into a program. Off by default; left out
+   * of `setBreakRule`, it stays as set.
+   */
+  dailyOpener: z.boolean().optional()
 });
 
 export const Translator = z.object({

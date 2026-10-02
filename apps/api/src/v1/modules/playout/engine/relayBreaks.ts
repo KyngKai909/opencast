@@ -11,7 +11,7 @@ export type RelayBreakHandling = "air_spots" | "station_id_slate";
 
 export interface RelayRowLike {
   inBreak: boolean;
-  /** The log code the row carries: PGM, SPT, UND, BMP, SID, or OPEN (a hold on a slate). */
+  /** The log code the row carries: PGM, SPT, UND, BMP, SID, OPEN (a hold on a slate), or (A242) OPN, CLS. */
   code: string;
   kind?: string;
 }
@@ -23,7 +23,7 @@ export interface RelayBreakSettings {
 }
 
 /** What fills a break's time besides partners: what the station itself chose to air there. */
-const STATION_BREAK_CODES = new Set(["SPT", "UND", "BMP", "SID"]);
+const STATION_BREAK_CODES = new Set(["SPT", "UND", "BMP", "SID", "OPN"]);
 /** What counts as paid promotion when it airs on a relay. */
 const PAID_CODES = new Set(["SPT", "UND"]);
 

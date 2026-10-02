@@ -50,3 +50,18 @@ a.cc-lib-row__title:hover { text-decoration: underline; }
   .cc-gensid__code, .cc-gensid .cc-lib-row__d { display: none; }
   .cc-gensid .cc-lib-status { grid-column: 2 / -1; }
 }
+
+/* A242: "Upload as" in the drop zone, and the sign-off and sign-on sequence. */
+.cc-drop__as { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-70); }
+.cc-drop__as select { height: 32px; border: 1px solid var(--line); border-radius: var(--r-control); background: var(--ground); color: var(--ink); font: 500 13px var(--font-text); padding: 0 8px; }
+.cc-signoff { border: 1px solid var(--hair); border-radius: var(--r-screen); padding: 14px 16px; margin: 0 0 16px; }
+.cc-signoff__line { font: 500 13px var(--font-mono); margin: 0 0 10px; color: var(--ink); }
+.cc-signoff__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cc-signoff__rows li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 10px; align-items: start; }
+.cc-signoff__rows b { display: block; font-size: 14px; font-weight: 600; }
+.cc-signoff__rows small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-signoff__note { font-size: 12.5px; color: var(--ink-70); margin: 10px 0 0; line-height: 1.5; }
+@media (max-width: 767px) {
+  .cc-drop { flex-wrap: wrap; }
+  .cc-drop__end { margin-left: 0; flex-wrap: wrap; }
+}

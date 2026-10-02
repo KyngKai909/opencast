@@ -33,7 +33,7 @@ import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../../context.js";
 import { captionRendition, languageTag, segmentVtt, vttContentId } from "../../../lib/captions.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
-import { isGeneratedStationId } from "./stationId.js";
+import { isGeneratedIdent } from "./stationId.js";
 import { BAND_RENDITIONS, EDGE_FADE_MS, FPS, LADDER, REFERENCE, SEGMENT_MS, TARGET_LUFS, type Band, type Ladder, type Rendition, type RenditionName } from "./ladder.js";
 
 const PI = schema.preparedItems;
@@ -41,7 +41,8 @@ const PR = schema.preparedRenditions;
 const PC = schema.preparedCaptions;
 
 /**
- * The generated station ID's sound (added 2026-09-29): a soft bed, no voice. An A major chord of
+ * The generated station ID's sound (added 2026-09-29), and the automatic opener's and closer's
+ * (A242, 2026-10-02): a soft bed, no voice. An A major chord of
  * sine tones that swells in over 1.5 s, breathes slowly and fades over the last 2.5 s, about
  * -30 LUFS (programs are levelled to -24), so it sits under whatever follows. An FFmpeg aevalsrc
  * expression for a bed `seconds` long.
@@ -406,7 +407,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
       if (wanted.length) {
         source =
           row.kind === "slate"
-            ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)), bed: isGeneratedStationId(key) }
+            ? { kind: "slate", png: row.sourceLocation, seconds: Math.max(1, Math.round((row.durationMs ?? SEGMENT_MS) / 1000)), bed: isGeneratedIdent(key) }
             : { kind: "file", path: await sourceFile(row, dir) };
         const out = path.join(dir, "out");
         result = await transcode({ key, source, mediaKind: row.mediaKind, durationMs: row.durationMs, renditions: wanted, outDir: out });
@@ -476,7 +477,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
   /** Caption tracks uploaded to the items whose current file is this one. */
   async function uploadedTracks(key: string): Promise<CaptionInput[]> {
     // Files from before content IDs (`loc-…`) have no uploaded captions prepared with them.
-    if (key.startsWith("loc-") || key.startsWith("slate-") || isGeneratedStationId(key)) return [];
+    if (key.startsWith("loc-") || key.startsWith("slate-") || isGeneratedIdent(key)) return [];
     const tracks = await services.library.captionTracksForContent(key);
     return tracks.map((t) => ({ vtt: t.vtt, language: t.language, source: "uploaded" as const }));
   }
@@ -510,7 +511,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
    * is prepared for TV. Returns how many tracks were prepared.
    */
   async function prepareCaptions(key: string, extra: CaptionInput[] = []): Promise<number> {
-    if (key.startsWith("slate-") || isGeneratedStationId(key)) return 0;
+    if (key.startsWith("slate-") || isGeneratedIdent(key)) return 0;
     const lengths = await preparer.segmentMs(key, REFERENCE.tv);
     if (!lengths?.length) return 0;
     const tracks = [...extra, ...(await uploadedTracks(key))];

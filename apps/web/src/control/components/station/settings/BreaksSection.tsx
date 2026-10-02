@@ -4,7 +4,10 @@
 // draws it: rows like the frame's "Length"), the
 // hourly cap against broadcast TV, the same spot's limit, categories BEAT never airs, the backup
 // rotation, and "Ads from partners" (a backfill for time still open: only a flag until the backend
-// supports it). Owners and operators change it.
+// supports it). Owners and operators change it. A242 (2026-10-02): signing off and on, beside the
+// station ID's cadence: the sequence (closer, off-air card, off air, opener, then the station ID if
+// the station says so), "Air the station ID after the opener" and "Open each broadcast day with the
+// opener", both off by default (no frame draws them: rows like the frame's Ads from partners).
 
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 import { SPOT_CATEGORIES, spotsApi, stationsApi, type BreakCadences, type BreakRule } from "@opencast/contracts";
@@ -206,6 +209,34 @@ export function BreaksSection({ s }: { s: StationState }) {
             </div>
           );
         })}
+
+        <div className="cc-sec-top cc-sec-top--gap">
+          <h4 className="cc-sec-top__h">Signing off and on</h4>
+          <a className="cc-sec-top__end" href={`${s.base}/library/openers`}>
+            Openers and closers
+          </a>
+        </div>
+        <p className="cc-breaks__seq" aria-label="When you sign off and back on">
+          Closer → Off-air card → off air → Opener → {r.stationIdAfterOpener ? "Station ID" : "(Station ID)"} → first program
+        </p>
+        <div className="cc-row">
+          <div>
+            <b id="cc-sid-after">Air the station ID after the opener</b>
+            <small>{r.stationIdAfterOpener ? "Both air as you sign back on, ending as the first program starts" : "Off: the opener takes the station ID's place as you sign back on"}</small>
+          </div>
+          <Toggle checked={!!r.stationIdAfterOpener} aria-labelledby="cc-sid-after" disabled={!canEdit} onChange={(stationIdAfterOpener) => change({ stationIdAfterOpener })} />
+        </div>
+        <div className="cc-row">
+          <div>
+            <b id="cc-daily-opener">Open each broadcast day with the opener</b>
+            <small>
+              {r.dailyOpener
+                ? `For a channel that never signs off: at the first program after 6:00 am, where the station ID would air. ${cs} never cuts into a program for it`
+                : "For a channel that never signs off. Off: the opener airs only when you sign back on"}
+            </small>
+          </div>
+          <Toggle checked={!!r.dailyOpener} aria-labelledby="cc-daily-opener" disabled={!canEdit} onChange={(dailyOpener) => change({ dailyOpener })} />
+        </div>
       </div>
 
       <div className="cc-breaks__col">

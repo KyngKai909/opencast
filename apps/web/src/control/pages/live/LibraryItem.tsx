@@ -13,7 +13,7 @@ import { useApi } from "../../../api/hooks";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
-import { FolderRail, ItemStatus, refreshLibrary, RightsPane } from "../../components/live/LibraryParts";
+import { FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
 import { preparationWords } from "../../components/onair/readiness";
@@ -24,7 +24,7 @@ import { NotFound, Quiet } from "../common";
 import "./Library.css";
 import "./LibraryItem.css";
 
-const CODE_WORDS: Record<string, string> = { PGM: "Program", SPT: "Spot", UND: "Underwriting", BMP: "Bumper", SID: "Station ID", OPEN: "Open" };
+const CODE_WORDS: Record<string, string> = { PGM: "Program", SPT: "Spot", UND: "Underwriting", BMP: "Bumper", SID: "Station ID", OPEN: "Open", OPN: "Opener", CLS: "Closer", OFF: "Off-air card" };
 const TERMS: Record<string, string> = { barter: "Barter terms", cash: "Cash terms", cash_and_barter: "Cash and barter terms", free: "Free to carry" };
 const dateWords = (x: string) => new Intl.DateTimeFormat("en-US", { timeZone: STATION_TZ, month: "long", day: "numeric" }).format(new Date(x));
 
@@ -90,7 +90,7 @@ export default function LibraryItem() {
 
   return (
     <div className="cc-libwrap">
-      {data && <FolderRail base={s.base} active={folder?.id ?? "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} />}
+      {data && <FolderRail base={s.base} active={folder?.id ?? "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} identity={identityCounts(data.items)} />}
       <div className="cc-item">
         <nav className="cc-item__crumbs" aria-label="Where this is">
           <a href={`${s.base}/library`}>Library</a>
@@ -105,7 +105,8 @@ export default function LibraryItem() {
           <div>
             <h1>{item.title}</h1>
             <p>
-              {CODE_WORDS[item.code]}
+              {CODE_WORDS[typeOf(item)]}
+              {item.still ? ", a picture" : null}
               {item.durationMs != null ? <>, <span className="oc-mono">{duration(item.durationMs)}</span></> : null}. {item.source === "link" ? "Imported from a link" : `Uploaded ${dateWords(item.createdAt)}`}.
             </p>
           </div>
@@ -113,7 +114,12 @@ export default function LibraryItem() {
             <Button size="sm" onClick={() => file.current?.click()} disabled={up.busy}>
               Replace file
             </Button>
-            {item.rights && item.status === "ready" ? (
+            {item.identCode ? (
+              // A242: openers, closers and off-air cards air at sign-off and sign-on, not from the log.
+              <Button size="sm" href={`${s.base}/settings/breaks`}>
+                Sign-off and sign-on
+              </Button>
+            ) : item.rights && item.status === "ready" ? (
               <Button size="sm" href={`${s.base}/log?place=${item.id}`}>Schedule</Button>
             ) : (
               <Button size="sm" disabled title="Confirm its rights, and let it be prepared for air, to schedule it.">
@@ -128,7 +134,7 @@ export default function LibraryItem() {
             <input
               ref={file}
               type="file"
-              accept="video/*,audio/*"
+              accept={item.identCode === "OFF" ? "video/*,audio/*,image/png,image/jpeg,image/webp" : "video/*,audio/*"}
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];

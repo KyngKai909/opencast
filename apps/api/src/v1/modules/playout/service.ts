@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import { asLogCode } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
@@ -41,6 +42,8 @@ export interface PlayoutStatusView {
   next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null } | null;
   /** Planned off air time on now, or the next within 24 hours. */
   offAir?: (OffAirSpanView & { now: boolean }) | null;
+  /** A242: the opener (`on`) or closer (`off`) is airing now. */
+  signing?: "on" | "off" | null;
   /** Added 2026-09-29: whether what's on the log in the next 48 hours is prepared for air. */
   /** G13: counts items, not entries; `firstNotReady.entryId` is its log entry. G14: `failed` and `preparing`. */
   readiness?: {
@@ -70,6 +73,8 @@ export interface AsRunView {
   reason: "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
   itemId: string | null;
   airingId: string | null;
+  /** A242: an opener or closer (`code` then says SID, for apps built before it). */
+  identCode?: "OPN" | "CLS" | null;
 }
 
 /** A program row of the as-run log, for watch data. */
@@ -515,11 +520,20 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const [nextBreak] = (await services.log.breaks(stationId, now, new Date(now.getTime() + 6 * HOUR))).filter((b) => Date.parse(b.startsAt) > now.getTime());
       const onAir = state?.onAir ?? false;
       // G2: since when, and what's next for the preview monitor.
-      const [since, next, offAir, prepared] = await Promise.all([
+      const C = schema.channelItems;
+      const [since, next, offAir, prepared, [airing]] = await Promise.all([
         onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()),
         services.log.nextEntry(stationId, now),
         services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR)),
-        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR)))
+        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR))),
+        // A242: the opener or closer on the channel now ("Signing on", "Signing off").
+        onAir
+          ? db
+              .select({ code: C.code })
+              .from(C)
+              .where(and(eq(C.stationId, stationId), lte(C.startsAt, now), gt(C.endsAt, now), inArray(C.code, ["OPN", "CLS"])))
+              .limit(1)
+          : Promise.resolve([] as Array<{ code: string }>)
       ]);
       const summary = summariseReadiness(prepared);
       const notReady = summary.firstNotReady;
@@ -535,6 +549,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
             : null
         },
         offAir: plannedOff,
+        signing: airing?.code === "OPN" ? "on" : airing?.code === "CLS" ? "off" : null,
         onAirSince: since.get(stationId)?.toISOString() ?? null,
         next: next
           ? {
@@ -550,7 +565,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         onAir,
         now:
           state?.onAir && current
-            ? { title: titles?.title ?? "On air", code: current.code, startedAt: current.startsAt.toISOString(), itemId: current.assetId }
+            ? { title: titles?.title ?? "On air", code: asLogCode(current.code), startedAt: current.startsAt.toISOString(), itemId: current.assetId }
             : null,
         lastError: state?.lastError ?? null,
         // The channel's playlists are assembled; Livepeer only transcodes live blocks' sources.
@@ -569,16 +584,22 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         itemIds: rows.map((r) => r.assetId).filter((v): v is string => Boolean(v)),
         programIds: rows.map((r) => r.programId).filter((v): v is string => Boolean(v))
       });
-      return rows.map((r) => ({
-        id: r.id,
-        code: r.code,
-        title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && r.code !== "UND" && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
-        startedAt: r.startedAt.toISOString(),
-        endedAt: r.endedAt.toISOString(),
-        reason: r.reason,
-        itemId: r.assetId,
-        airingId: r.airingId
-      }));
+      return rows.map((r) => {
+        // A242: the as-run log records openers and closers as OPN and CLS; `code` says SID for apps built before.
+        const ident = r.code === "OPN" || r.code === "CLS" ? r.code : null;
+        const automatic = ident === "OPN" ? "Automatic opener" : ident === "CLS" ? "Automatic closer" : null;
+        return {
+          id: r.id,
+          code: ident ? ("SID" as const) : (r.code as Exclude<typeof r.code, "OPN" | "CLS" | "OFF">),
+          title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && r.code !== "UND" && titles.programs.get(r.programId)) || automatic || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
+          startedAt: r.startedAt.toISOString(),
+          endedAt: r.endedAt.toISOString(),
+          reason: r.reason,
+          itemId: r.assetId,
+          airingId: r.airingId,
+          identCode: ident
+        };
+      });
     },
 
     async catalogCreditsAired(programIds, from, to) {

@@ -22,7 +22,7 @@ Each purpose, and who may send it:
 
 | `purpose.kind` | What it does | Who | Largest |
 |---|---|---|---|
-| `library_item` | A new library item (`fields`: title, code, program, folder, caption text) | station owners, operators | 100 GiB |
+| `library_item` | A new library item (`fields`: title, code, program, folder, caption text). `code` marks its type: `BMP` a bumper, `SID` a station ID, and (A242) `OPN` an opener, `CLS` a closer, `OFF` an off-air card, which may be a picture (PNG, JPEG or WebP) as well as video or audio | station owners, operators | 100 GiB |
 | `library_replace` | L6, a new file for an item | station owners, operators | 100 GiB |
 | `spot_file` | A spot's file and its checks (`scaleToFit` for P2) | business owners, managers | 100 GiB |
 | `order_file` | A brief's file (the business) or a delivery (the maker station) | as the old endpoints | 100 GiB |

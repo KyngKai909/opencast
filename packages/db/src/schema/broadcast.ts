@@ -491,6 +491,10 @@ export const breakRules = broadcast.table(
      * of them. `spots` was added later the same day, in the same column (no migration); without it, every break.
      */
     cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow }>(),
+    /** A242 (migration 0047): at sign-on, the opener and then the station ID (off: the opener replaces it). */
+    stationIdAfterOpener: boolean("station_id_after_opener").notNull().default(false),
+    /** A242 (migration 0047): the opener at the start of each broadcast day (6:00 am local), for a channel that never goes off air. */
+    dailyOpener: boolean("daily_opener").notNull().default(false),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [

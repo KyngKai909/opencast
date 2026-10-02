@@ -5,7 +5,8 @@
 // filled from the spot market shows here as soon as it's saved. Planned off air (G9) reads "Off
 // air, back at 6:00 am" while it's on, and "Signs off at 2:00 am" when it's coming within 24 hours.
 // "Prepared for air" (PlayoutStatus.readiness) says how many of the next 48 hours' items are ready
-// (each item once, G13), and names the first that isn't, linked to that airing on the log.
+// (each item once, G13), and names the first that isn't, linked to that airing on the log. While the
+// opener or closer airs (A242, PlayoutStatus.signing) it says "Signing on" or "Signing off".
 
 import { useMemo, type ReactNode } from "react";
 import { audienceApi, catalogApi, type Offer, playoutApi, stationsApi } from "@opencast/contracts";
@@ -112,8 +113,11 @@ export default function Monitor() {
   const since = status?.onAirSince ?? null;
   const sinceText = since ? (sameDay(since, t) ? clock(since, { timeZone: STATION_TZ }) : monthDay(since)) : null;
   const breakIn = status?.nextBreakAt ? Date.parse(status.nextBreakAt) - t : null;
+  // A242: the opener or closer on air now.
+  const signing = status?.signing === "on" ? "Signing on" : status?.signing === "off" ? "Signing off" : null;
   const description: ReactNode = onAir ? (
     <>
+      {signing ? `${signing}. ` : null}
       {sinceText ? `On air since ${sinceText}.` : "On air."}
       {breakIn !== null && breakIn > 0 && (
         <>
@@ -233,6 +237,7 @@ export default function Monitor() {
       <div className="cc-pm">
         {runBy && <div className="cc-pm__sec">{runBy}</div>}
         <AccountBanner className="cc-pm__banner" />
+        {signing && <div className="cc-pm__sec cc-mon__signing">{signing}</div>}
         {picture}
         {onAir && upNext && (
           <div className="cc-pm__sec cc-pm__next">
@@ -278,6 +283,7 @@ export default function Monitor() {
               <div className="cc-mon__lbl">
                 <Tally state="lit" flicker={false} />
                 Program
+                {signing && <span className="cc-mon__signing">{signing}</span>}
               </div>
               {picture}
             </>
