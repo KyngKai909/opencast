@@ -102,7 +102,7 @@ for (const width of ["web", "phone"] as const) {
   });
 }
 
-test("an external station says External, and Tuning sound is off until turned on (you 01, home 01)", async ({ page }) => {
+test("an external station says External, and Tuning sound is on until turned off (you 01, home 01; on by default since 2026-10-01, A240)", async ({ page }) => {
   await page.setViewportSize(WIDTHS.web);
   await useGround(page, "dark");
   await page.addInitScript(() => {
@@ -117,17 +117,17 @@ test("an external station says External, and Tuning sound is off until turned on
   await expect(page.locator(".oc-tag--listed").first()).toHaveText("External");
   await expect(page.getByText("Listed", { exact: true })).toHaveCount(0);
 
-  // Watching settings: the frame's row, off by default, kept on the account.
+  // Watching settings: the frame's row, on by default (A240), kept on the account.
   await page.goto("/settings/watching");
   const sound = page.getByRole("switch", { name: "Tuning sound" });
-  await expect(sound).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByText("A soft hiss when changing channel. Always on for the radio band unless turned off there")).toBeVisible();
+  await expect(sound).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("A soft hiss when changing channel, on the TV and radio bands. On unless you turn it off")).toBeVisible();
   const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname.endsWith("/me"));
   await sound.click();
-  await expect(sound).toHaveAttribute("aria-checked", "true");
+  await expect(sound).toHaveAttribute("aria-checked", "false");
   expect((await saved).ok()).toBe(true);
   await page.reload();
-  await expect(page.getByRole("switch", { name: "Tuning sound" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("switch", { name: "Tuning sound" })).toHaveAttribute("aria-checked", "false");
 });
 
 test("Not for me: off by default; with the switch on, one vote for what's airing, noted (follow-up Phase 1)", async ({ page }) => {

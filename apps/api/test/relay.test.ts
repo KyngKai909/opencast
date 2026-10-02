@@ -565,7 +565,7 @@ describe("health and failure", () => {
     expect(((await desk.get("/v1/me/notices").expect(200)).body as Array<{ title: string }>).some((n) => n.title === "DOWN's relays are back")).toBe(true);
     await runner.stopAll();
     await engine.stopAll();
-  });
+  }, 30_000); // Several relay ticks and the bus: slow on CI runners.
 });
 
 describe("the Translators page's API", () => {

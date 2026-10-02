@@ -56,7 +56,7 @@ describe("the static's frames", () => {
     expect(moved / a.length).toBeGreaterThan(0.9);
     // ...and exactly the same grains.
     expect([...a].sort()).toEqual([...b].sort());
-  });
+  }, 30_000); // Draws full 1080p frames: slow on CI runners.
 
   it("keeps a constant average brightness: every frame's average luminance is the same", () => {
     const min = Math.min(...frames);
