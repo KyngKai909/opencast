@@ -90,7 +90,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `importLinks` | POST | `/stations/:stationId/library/imports` | signed in | Import from links. Link imports stay on this station and come off air the same day if the owner asks. |
 | `getImport` | GET | `/stations/:stationId/library/imports/:jobId` | signed in | Progress of a link import |
 | `getItem` | GET | `/library/:itemId` | signed in | One item |
-| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. |
+| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. A243: `bumperRole` on anything but a bumper, or `airs` on anything but a bumper, station ID, opener or closer, 400. |
 | `deleteItem` | DELETE | `/library/:itemId` | signed in | Delete an item. Refused while it's in the log or carried by other stations. |
 | `exportToIpfs` | POST | `/library/:itemId/export-ipfs` | signed in | Export the station's own original to IPFS (owner only). IPFS files are public and can't be taken back. |
 | `confirmRights` | POST | `/library/:itemId/rights` | signed in | Confirm the rights to air it. Needed before it can go on the log. |

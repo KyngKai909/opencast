@@ -75,6 +75,10 @@ export interface AsRunView {
   airingId: string | null;
   /** A242: an opener or closer (`code` then says SID, for apps built before it). */
   identCode?: "OPN" | "CLS" | null;
+  /** A243: a bumper's role as it aired, where it aired, and (up next) what it announced. */
+  bumperRole?: "into_break" | "out_of_break" | "up_next" | "any" | null;
+  position?: "open" | "close" | "between" | "boundary" | "open_time" | "sign_on" | null;
+  announced?: { entryId: string | null; title: string } | null;
 }
 
 /** A program row of the as-run log, for watch data. */
@@ -597,7 +601,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
           reason: r.reason,
           itemId: r.assetId,
           airingId: r.airingId,
-          identCode: ident
+          identCode: ident,
+          bumperRole: (r.bumperRole as AsRunView["bumperRole"]) ?? null,
+          position: r.position ?? null,
+          announced: r.announcedTitle ? { entryId: r.announcedEntryId, title: r.announcedTitle } : null
         };
       });
     },

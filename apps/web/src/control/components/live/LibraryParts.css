@@ -65,3 +65,6 @@ a.cc-lib-row__title:hover { text-decoration: underline; }
   .cc-drop { flex-wrap: wrap; }
   .cc-drop__end { margin-left: 0; flex-wrap: wrap; }
 }
+
+/* A243: a bumper's role, small, under its type. */
+.cc-lib-row__role { display: block; margin-top: 3px; font-size: 12px; color: var(--ink-70); }

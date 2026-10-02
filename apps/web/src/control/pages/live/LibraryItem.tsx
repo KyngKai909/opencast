@@ -13,7 +13,8 @@ import { useApi } from "../../../api/hooks";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
-import { FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
+import { bumperCount, FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
+import { AirWindowSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
 import { preparationWords } from "../../components/onair/readiness";
@@ -90,7 +91,7 @@ export default function LibraryItem() {
 
   return (
     <div className="cc-libwrap">
-      {data && <FolderRail base={s.base} active={folder?.id ?? "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} identity={identityCounts(data.items)} />}
+      {data && <FolderRail base={s.base} active={folder?.id ?? "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} identity={identityCounts(data.items)} bumpers={bumperCount(data.items)} />}
       <div className="cc-item">
         <nav className="cc-item__crumbs" aria-label="Where this is">
           <a href={`${s.base}/library`}>Library</a>
@@ -222,6 +223,10 @@ export default function LibraryItem() {
               />
               {item.status === "ready" && !sound && <small className="cc-item__quiet">{readyLine(item)}</small>}
             </section>
+
+            {/* A243: a bumper's role, and when bumpers, station IDs, openers and closers air. */}
+            {typeOf(item) === "BMP" && <BumperRoleSection item={item} radio={s.station.band === "radio"} canEdit={s.can("programming")} />}
+            {WINDOWED.includes(typeOf(item)) && <AirWindowSection item={item} canEdit={s.can("programming")} />}
 
             <section className="cc-item__side" aria-labelledby="cc-rights-h">
               <SecTop id="cc-rights-h" title="Rights" />

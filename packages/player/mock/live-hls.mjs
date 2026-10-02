@@ -27,6 +27,12 @@
 // keeps the parameter, it signs off again a minute or so after each return. `/_signoff?station=prep`
 // switches it on once and answers with the times, as JSON.
 //
+// Up next (A243), switched on the same way: `?upnext=beat` (or `upnext=1`, BEAT) on a /mock-hls
+// request or its page's address (when the page sends its whole address), or once for all
+// requests from then on with `/_upnext?station=beat`. The mock's loop has no bumper of its own, so the station's
+// org.useopencast.up-next tag (the next program's title, drawn by the player) is put over the last
+// twelve seconds of its program; on a channel it's over an up-next bumper.
+//
 // Use it as Connect/Vite middleware: server.middlewares.use("/mock-hls", mockLiveHls()).
 // Options: `latencyMs` delays every playlist and segment, to feel a slow network.
 
@@ -152,7 +158,7 @@ export function stationTimeline({ n, items, slateSegments }) {
 }
 
 /** DATERANGE lines for an item starting at segment `k0` (the contract's dateRangeTag). */
-function tagsFor({ station, it, k0, pdt, seg, backAt, host, breakSegments }) {
+function tagsFor({ station, it, k0, pdt, seg, backAt, host, breakSegments, upNext = false }) {
   // An external station's stream (follow-up Phase 6) is the source's own: none of Opencast's tags.
   if (!contracts || station.external) return [];
   const { dateRangeTag, HLS_CLASS } = contracts;
@@ -187,6 +193,18 @@ function tagsFor({ station, it, k0, pdt, seg, backAt, host, breakSegments }) {
     out.push(dateRangeTag({ id: id("bug"), class: HLS_CLASS.bug, start, durationSeconds: seconds, attributes: bug }));
     for (const l3 of g.lowerThirds ?? []) {
       out.push(dateRangeTag({ id: id(`l3-${l3.at}`), class: HLS_CLASS.lowerThird, start: pdt(k0 + l3.at), durationSeconds: l3.count * seg, attributes: { name: l3.name, title: l3.title } }));
+    }
+    if (upNext && HLS_CLASS.upNext) {
+      const from = k0 + it.count - Math.round(12 / seg);
+      out.push(
+        dateRangeTag({
+          id: id("up-next"),
+          class: HLS_CLASS.upNext,
+          start: pdt(from),
+          durationSeconds: (k0 + it.count - from) * seg,
+          attributes: { logEntryId: `mock-${station.slug}-next`, title: UP_NEXT.title, episodeTitle: UP_NEXT.episodeTitle, startsAt: new Date(pdt(k0 + it.count + breakSegments)).toISOString(), immediate: 1, carriedFrom: null }
+        })
+      );
     }
   }
   if (it.code === "SPT") {
@@ -233,18 +251,26 @@ export function playlist({ timeline, last, window, seg, file, pdt, tags }) {
   return lines.join("\n") + "\n";
 }
 
+/** What up next names in the mock (A243). */
+const UP_NEXT = { title: "Late Crate", episodeTitle: "Crate Session 03" };
+
+/** The slugs a request asks to draw up next for (A243): `upnext`, as `signoff`. */
+function upNextAsked(req) {
+  return signOffAsked(req, "upnext", "beat");
+}
+
 /** The slugs a request asks to sign off: its own `signoff` query, or its page's (the Referer). */
-function signOffAsked(req) {
+function signOffAsked(req, param = "signoff", fallback = DEFAULT_SIGNOFF) {
   const values = [];
   for (const u of [req.url ?? "", req.headers?.referer ?? ""]) {
     try {
-      const v = new URL(u, "http://localhost").searchParams.get("signoff");
+      const v = new URL(u, "http://localhost").searchParams.get(param);
       if (v) values.push(...v.split(","));
     } catch {
       // Not a URL.
     }
   }
-  return values.map((v) => (["1", "on", "true", "yes"].includes(v.toLowerCase()) ? DEFAULT_SIGNOFF : v.toLowerCase()));
+  return values.map((v) => (["1", "on", "true", "yes"].includes(v.toLowerCase()) ? fallback : v.toLowerCase()));
 }
 
 /**
@@ -267,6 +293,8 @@ const logoSvg = (s) =>
 export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0, now = () => Date.now() } = {}) {
   const manifestPath = path.join(root, "manifest.json");
   const started = now();
+  /** Stations up next was switched on for (`/_upnext`). */
+  const upNextOn = new Set();
   let manifest = null;
   const timelines = new Map();
   const load = () => {
@@ -305,6 +333,15 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
     }
 
     const url = decodeURIComponent((req.url ?? "/").split("?")[0]);
+    // A243: switches up next on for a station from now on (`?station=beat`), as `/_signoff` does a sign-off.
+    if (url === "/_upnext") {
+      const slug = new URL(req.url, "http://localhost").searchParams.get("station") ?? "beat";
+      upNextOn.add(slug);
+      res.setHeader("content-type", "application/json");
+      res.setHeader("cache-control", "no-store");
+      res.end(JSON.stringify({ station: slug, upNext: true }));
+      return;
+    }
     if (url === "/_signoff") {
       const slug = signOffAsked(req)[0] ?? new URL(req.url, "http://localhost").searchParams.get("station") ?? DEFAULT_SIGNOFF;
       const station = m.stations.find((s) => s.slug === slug);
@@ -344,7 +381,7 @@ export function mockLiveHls({ root = MOCK_STREAMS_DIR, window = 6, latencyMs = 0
       const breakSegments = n - m.items[0].count;
       const tags = (it, k0) => {
         const so = it.code === "OFF" ? timeline.signOffs.find((x) => x.S === k0) : null;
-        return tagsFor({ station: { ...station, spot }, it, k0, pdt, seg, host, breakSegments, backAt: so ? new Date(pdt(so.B)).toISOString() : null });
+        return tagsFor({ station: { ...station, spot }, it, k0, pdt, seg, host, breakSegments, backAt: so ? new Date(pdt(so.B)).toISOString() : null, upNext: upNextOn.has(station.slug) || upNextAsked(req).includes(station.slug) });
       };
       const r = rendition.name;
       return send("application/vnd.apple.mpegurl", playlist({ timeline, last, window, seg, pdt, tags, file: (a) => (a.kind === "off" ? `${r}_off_${pad(a.file)}.ts` : `${r}_seg_${pad(a.file)}.ts`) }));

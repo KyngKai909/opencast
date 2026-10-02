@@ -66,6 +66,10 @@
 /* The lower third (ui's LowerThird: left 5%, bottom 8%). */
 .oc-ovl--tv .oc-l3__nm { font-size: calc(44 * var(--u)); }
 .oc-ovl--tv .oc-l3__tt { font-size: calc(28 * var(--u)); }
+/* A243: up next, in the lower third's place. */
+.oc-ovl--tv .oc-upnext__k { font-size: calc(28 * var(--u)); }
+.oc-ovl--tv .oc-upnext__t { font-size: calc(44 * var(--u)); }
+.oc-ovl--tv .oc-upnext__d { font-size: calc(28 * var(--u)); }
 /* The code and QR, bottom left, for the spot's last seconds. The panel is the screen colour at 85%. */
 .oc-ovl__code {
   position: absolute; left: 6%; bottom: 7%;

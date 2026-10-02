@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LogEntry } from "@opencast/contracts";
 import type { BreakSlot } from "@opencast/contracts";
-import { breakLine, buildRundown, currentIndex, entrySource, nextBreak, rundownFrom } from "./rundown";
+import { breakLine, breakRows, buildRundown, currentIndex, entrySource, nextBreak, rundownFrom } from "./rundown";
 
 const T = (hhmmss: string) => `2026-09-27T${hhmmss}.000Z`;
 const REEL = { id: "00000000-0000-4000-8000-000000000024", kind: "station" as const, callSign: "REEL", handle: "reel", name: "Saturday Reel", colour: "#9A5412", band: "tv" as const, channel: "24.1", marketSlug: "inland-empire", homeCity: "Riverside" };
@@ -81,5 +81,35 @@ describe("buildRundown", () => {
   it("leaves a break's unsold time open when its rows fall short", () => {
     const short = buildRundown([], [{ ...brk, rows: brk.rows!.slice(0, 2) }]);
     expect(short.at(-1)).toMatchObject({ code: "OPEN", title: "Open", lengthMs: 60_000 });
+  });
+});
+
+describe("bumper sequences in a break (A243)", () => {
+  const slot: BreakSlot = {
+    id: "brk-9",
+    startsAt: "2026-10-03T03:56:00.000Z",
+    lengthMs: 20_000,
+    context: "After Late Crate",
+    origin: "rule",
+    producerShareMs: 0,
+    filledMs: 0,
+    openMs: 0,
+    rows: [
+      { code: "BMP", title: "Right back", lengthMs: 5_000, whose: "station", note: "Into the break", element: { position: "open", role: "into_break", announces: null, fits: true } },
+      { code: "BMP", title: "Up next", lengthMs: 0, whose: "station", note: "Didn't fit: Up next (:08)", element: { position: "open", role: "up_next", announces: { title: "Saturday Reel", startsAt: "2026-10-03T04:00:00.000Z" }, fits: false } },
+      { code: "OPEN", title: "Station ID slate", lengthMs: 10_000, whose: "station", note: null },
+      { code: "SID", title: "Station ID", lengthMs: 5_000, whose: "station", note: null }
+    ]
+  };
+  it("lists a bumper that didn't fit, quieter and with no length, and never names the break by it", () => {
+    const rows = breakRows(slot);
+    expect(rows.map((r) => [r.title, r.source, r.lengthMs, !!r.dropped])).toEqual([
+      ["Right back", "Into the break", 5_000, false],
+      ["Up next", "Didn't fit: Up next (:08)", 0, true],
+      ["Station ID slate", "Holds on the station ID slate", 10_000, false],
+      ["Station ID", "Station ID", 5_000, false]
+    ]);
+    const next = nextBreak(rows, Date.parse("2026-10-03T03:50:00Z"))!;
+    expect(next.first.title).toBe("Right back");
   });
 });

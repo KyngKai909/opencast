@@ -38,7 +38,7 @@ function sameDay(a: string | number, b: string | number) {
 }
 
 function toItems(rows: RundownRow[]): RundownItem[] {
-  return rows.map((r) => ({ id: r.id, at: r.at, code: r.code, title: r.title, source: r.source ?? undefined, length: r.lengthMs }));
+  return rows.map((r) => ({ id: r.id, at: r.at, code: r.code, title: r.title, source: r.source ?? undefined, length: r.lengthMs, ...(r.dropped ? { muted: true } : {}) }));
 }
 
 const SERVICE: Record<string, string> = { youtube: "YouTube", twitch: "Twitch" };

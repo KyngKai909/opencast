@@ -28,3 +28,9 @@
   .cc-item__h { flex-direction: column; align-items: flex-start; }
   .cc-item__end { margin-left: 0; justify-content: flex-start; }
 }
+
+/* A243: a bumper's role, and when an item airs. */
+.cc-item__role { display: grid; gap: 8px; padding: 12px 0 4px; }
+.cc-item__airsform { display: grid; gap: 4px; padding: 8px 0 4px; }
+.cc-item__airsform > .oc-btn { justify-self: start; margin-top: 8px; }
+.cc-item__pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 12px; align-items: start; padding: 4px 0 8px 28px; }

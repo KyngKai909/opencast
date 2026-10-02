@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { Captions, Program } from "./library.js";
 
 export const LogEntry = z.object({
@@ -39,7 +39,19 @@ export const BreakRow = z.object({
   /** Whose time: the station's, the maker's under barter, or the backup rotation's. */
   whose: z.enum(["station", "producer", "backup"]),
   /** "REEL's break time, barter". */
-  note: z.string().nullable()
+  note: z.string().nullable(),
+  /**
+   * A243 (added 2026-10-02): a bumper from the station's sequences, as `BreakContent.element`: where
+   * it airs, its role, what up next names, and whether it fits (one that doesn't has no length).
+   */
+  element: z
+    .object({
+      position: z.enum(["open", "close", "between", "boundary"]),
+      role: BumperRole,
+      announces: z.object({ title: z.string(), startsAt: Timestamp }).nullable(),
+      fits: z.boolean()
+    })
+    .optional()
 });
 export type BreakRow = z.infer<typeof BreakRow>;
 
@@ -778,7 +790,17 @@ export const AsRunRow = z.object({
    * come here, with `code` `SID`, so apps built before it (whose `code` knows six values) still read
    * the log. Null for everything else.
    */
-  identCode: z.enum(["OPN", "CLS"]).nullable().optional()
+  identCode: z.enum(["OPN", "CLS"]).nullable().optional(),
+  /** A243 (added 2026-10-02): a bumper's role as it aired; null for anything else or before it. */
+  bumperRole: BumperRole.nullable().optional(),
+  /**
+   * A243 (added 2026-10-02): where it aired: a break's opening or closing sequence (`open`,
+   * `close`), between programs (`between`), a block's intro or outro (`boundary`, later), open
+   * time (`open_time`) or sign-on (`sign_on`). Null before it.
+   */
+  position: z.enum(["open", "close", "between", "boundary", "open_time", "sign_on"]).nullable().optional(),
+  /** A243 (added 2026-10-02): up next only: what it announced, as the overlay said it. */
+  announced: z.object({ entryId: Id.nullable(), title: z.string() }).nullable().optional()
 });
 
 export const playoutApi = {

@@ -316,9 +316,23 @@ const breakHandlers = [
     const body = stationsApi.setBreakRule.body.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "invalid", "That break rule can't be saved.");
     // Left out, the cadence stays as it was (added 2026-09-29), and so do spots when only they are.
-    const was = breakRuleOf(id).cadence;
-    const cadence = body.data.cadence ? { ...body.data.cadence, spots: body.data.cadence.spots ?? was?.spots } : was;
-    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence };
+    const before = breakRuleOf(id);
+    const was = before.cadence;
+    let cadence = body.data.cadence ? { ...body.data.cadence, spots: body.data.cadence.spots ?? was?.spots } : was;
+    // A243, as the API: the sequences stay when left out, except that a body from before them that
+    // changes how often bumpers air changes the opening and closing ones; sent, the bumpers' cadence
+    // follows the opening one.
+    let bumperSequences = body.data.bumperSequences ?? before.bumperSequences;
+    if (body.data.bumperSequences) {
+      const twice = (["open", "close", "between"] as const).find((p) => new Set(body.data.bumperSequences![p].roles).size !== body.data.bumperSequences![p].roles.length);
+      if (twice) return fail(400, "bad_request", "Each bumper role can be in a position once.");
+      const open = body.data.bumperSequences.open;
+      if (cadence) cadence = { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } };
+    } else if (body.data.cadence && bumperSequences && JSON.stringify(body.data.cadence.bumpers) !== JSON.stringify(was?.bumpers)) {
+      const every = body.data.cadence.bumpers;
+      bumperSequences = { ...bumperSequences, open: { ...bumperSequences.open, ...every }, close: { ...bumperSequences.close, ...every } };
+    }
+    const rule: BreakRule = { ...body.data, fillOrder: normaliseFillOrder(body.data.fillOrder), cadence, bumperSequences };
     if (rule.mode === "every_n_minutes" && !rule.everyMinutes) return fail(400, "invalid", "Say how often breaks come.");
     if (rule.cadence && Object.values(rule.cadence).some((c) => c.every === "n_programs" && !c.n)) return fail(400, "bad_request", "Say after how many programs.");
     if (rule.mode !== "every_n_minutes") rule.everyMinutes = null;

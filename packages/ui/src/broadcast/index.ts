@@ -6,6 +6,7 @@ export { TitleCard, type TitleCardProps, type TitleCardSize } from "./TitleCard"
 export { PictureFrame, type PictureFrameProps } from "./PictureFrame";
 export { Bug, type BugProps } from "./Bug";
 export { LowerThird, type LowerThirdProps } from "./LowerThird";
+export { UpNextCard, type UpNextCardProps } from "./UpNextCard";
 export { PicturePlaceholder, type PicturePlaceholderProps } from "./PicturePlaceholder";
 export { ListingRow, type ListingRowProps } from "./ListingRow";
 export { Dial, DialHeader, type DialProps } from "./Dial";

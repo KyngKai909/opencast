@@ -308,6 +308,11 @@ export async function itemFixture(
     episodeNumber?: number;
     location?: string;
     mediaKind?: "video" | "audio";
+    /** A243: a bumper's role, and when it may air. */
+    bumperRole?: "into_break" | "out_of_break" | "up_next" | "any";
+    airs?: { from?: string; until?: string; dailyFrom?: string; dailyUntil?: string };
+    /** Library order (oldest first). */
+    createdAt?: Date;
   } = {}
 ) {
   const [item] = await h.db
@@ -322,7 +327,13 @@ export async function itemFixture(
       sourceUrl: fields.source === "link" ? "https://example.com/v" : null,
       mediaKind: fields.mediaKind ?? "video",
       durationMs: fields.durationMs === undefined ? 28.5 * 60_000 : fields.durationMs,
-      status: "ready"
+      status: "ready",
+      bumperRole: fields.bumperRole ?? null,
+      airsFrom: fields.airs?.from ?? null,
+      airsUntil: fields.airs?.until ?? null,
+      dailyFrom: fields.airs?.dailyFrom ?? null,
+      dailyUntil: fields.airs?.dailyUntil ?? null,
+      ...(fields.createdAt ? { createdAt: fields.createdAt } : {})
     })
     .returning();
   if (fields.rights !== false) {

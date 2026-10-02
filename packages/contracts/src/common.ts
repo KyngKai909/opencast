@@ -59,6 +59,15 @@ export const isIdentCode = (code: string): code is IdentCode => (IdentCode.optio
 /** A stored code as a log code (A242): an identity code reads as its old one. For responses whose `code` is `LogCode`. */
 export const asLogCode = (code: LogCode | IdentCode): LogCode => (isIdentCode(code) ? IDENT_LEGACY_CODE[code] : code);
 
+/**
+ * A243 (added 2026-10-02): a bumper's role. `into_break` opens a break ("We'll be right back"),
+ * `out_of_break` closes it ("Now back to…"), `up_next` names the next program (the player draws the
+ * title over it, from the guide's own data), `any` a brand sting that airs wherever a bumper is
+ * wanted. A bumper without one reads as `any` (every bumper before A243). Bumpers keep `code` BMP.
+ */
+export const BumperRole = z.enum(["into_break", "out_of_break", "up_next", "any"]);
+export type BumperRole = z.infer<typeof BumperRole>;
+
 export const StationKind = z.enum(["station", "studio", "claimable", "listed", "catalog"]);
 
 export const StationRole = z.enum(["owner", "operator", "host"]);

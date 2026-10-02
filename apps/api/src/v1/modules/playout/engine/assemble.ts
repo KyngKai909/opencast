@@ -6,7 +6,7 @@
 //   - Each item becomes a row: a prepared item's segments (a program joined at the segment nearest
 //     its offset; spots, credits, bumpers and station IDs always in full, from the top), with an
 //     #EXT-X-DISCONTINUITY before it and its DATERANGE tags (item, break with SCTE-35, bug, code,
-//     live, lower third, sign-off).
+//     live, lower third, sign-off; A243: up next, the next program's title over an up-next bumper).
 //   - Open time and holds air the station ID slate, prepared at the length needed (whole seconds,
 //     at most a minute a row). Items not prepared air the same fill, and the station is told.
 //   - A live block points at the live source's segments, always the worker's own copies in storage
@@ -51,6 +51,8 @@ const LIVE_PREROLL_MS = 60_000;
 const PLAN_AHEAD_MS = 15 * 60_000;
 /** A spot's code shows for its last 10 s. */
 const CODE_MS = 10_000;
+/** A243: up next says "Up next" when the program starts within this long of the clip's end, else "Next at 9:00 pm". */
+const UP_NEXT_IMMEDIATE_MS = 2 * 60_000;
 
 export interface ChannelLook extends StationLook {
   band: Band;
@@ -341,7 +343,15 @@ export class ChannelAssembler {
       const carriedFrom = seg.code === "PGM" && !seg.inBreak ? await this.carriedFrom(seg.agreementId) : null;
       // An opener or closer (A242) says SID, which players built before it know, and which it is.
       const ident = seg.code === "OPN" || seg.code === "CLS" ? seg.code : null;
-      out.push(dateRangeTag({ id: `${rowId}-item`, class: HLS_CLASS.item, start, durationSeconds: seconds, attributes: { logEntryId: seg.logEntryId ?? null, code: ident ? "SID" : seg.code, contentId, title: seg.label, carriedFrom, identCode: ident } }));
+      out.push(
+        dateRangeTag({
+          id: `${rowId}-item`,
+          class: HLS_CLASS.item,
+          start,
+          durationSeconds: seconds,
+          attributes: { logEntryId: seg.logEntryId ?? null, code: ident ? "SID" : seg.code, contentId, title: seg.label, carriedFrom, identCode: ident, bumperRole: seg.code === "BMP" ? (seg.bumperRole ?? null) : null }
+        })
+      );
     }
     if (seg.breakSpan) {
       // The break's own cue: the same ID and times on whichever row carries it.
@@ -367,6 +377,22 @@ export class ChannelAssembler {
       const mode = look.bug.mode === "logo" && logo ? "logo" : "call_sign_and_channel";
       const position = ["top_left", "top_right", "bottom_left", "bottom_right"].includes(look.bug.position) ? look.bug.position : "bottom_right";
       out.push(dateRangeTag({ id: `${rowId}-bug`, class: HLS_CLASS.bug, start, durationSeconds: seconds, attributes: { mode, callSign: look.callSign, channel: look.channel, logoUrl: logo, position, opacity: look.bug.opacity } }));
+    }
+    // A243: an up-next bumper's title, drawn by the player over the clip (TV), from the log as it is
+    // now (written this close to air, when edits are locked). "Up next" when the program follows
+    // within two minutes of the clip's end; otherwise "Next at 9:00 pm".
+    if (tv && kind === "item" && seg.code === "BMP" && seg.bumperRole === "up_next" && seg.announces && seconds > 1) {
+      const a = seg.announces;
+      const immediate = Date.parse(a.startsAt) - end <= UP_NEXT_IMMEDIATE_MS ? 1 : 0;
+      out.push(
+        dateRangeTag({
+          id: `${rowId}-up-next`,
+          class: HLS_CLASS.upNext,
+          start: start + 1000,
+          durationSeconds: seconds - 1,
+          attributes: { logEntryId: a.entryId, title: a.title, episodeTitle: a.episodeTitle, startsAt: a.startsAt, immediate, carriedFrom: a.carriedFrom }
+        })
+      );
     }
     // The code on both bands: the radio band's players draw no picture, but its translators do.
     if (seg.code10 && seg.spotId && end - start > 0) {
@@ -397,7 +423,12 @@ export class ChannelAssembler {
       programId: seg.programId ?? null,
       airingId: seg.airingId ?? null,
       agreementId: seg.agreementId ?? null,
-      liveSourceId: seg.liveSourceId ?? null
+      liveSourceId: seg.liveSourceId ?? null,
+      // A243: a bumper's role and where it aired; up next, what it announced.
+      bumperRole: seg.code === "BMP" ? (seg.bumperRole ?? null) : null,
+      position: seg.position ?? null,
+      announcedEntryId: seg.announces?.entryId ?? null,
+      announcedTitle: seg.announces?.title ?? null
     };
   }
 
@@ -424,7 +455,7 @@ export class ChannelAssembler {
   private async hold(seg: Segment, until: number, reason: Segment["reason"] = "station_id_fill") {
     const png = await this.options.slates.stationId(this.options.look);
     const fill: Segment = { ...seg, code: "OPEN", label: "Station ID slate", airingId: undefined, code10: undefined, spotId: undefined, itemId: undefined, slate: "station_id", reason };
-    return this.writeSlate(fill, png, until - this.cursor!.at, { code: "OPEN", label: "Station ID slate", reason, airingId: null, assetId: null });
+    return this.writeSlate(fill, png, until - this.cursor!.at, { code: "OPEN", label: "Station ID slate", reason, airingId: null, assetId: null, bumperRole: null, position: null, announcedEntryId: null, announcedTitle: null });
   }
 
   private reportMissing(missing: { itemId: string; title: string; airsAt: Date }) {
@@ -745,6 +776,10 @@ export class ChannelAssembler {
           carriageAgreementId: row.agreementId,
           liveSourceId: row.liveSourceId,
           reason: row.reason as "planned",
+          bumperRole: row.bumperRole,
+          position: row.position as "open" | null,
+          announcedEntryId: row.announcedEntryId,
+          announcedTitle: row.announcedTitle,
           proofFrameUrl: proof,
           proofFrameAt: proof ? new Date((row.startsAt.getTime() + row.endsAt.getTime()) / 2) : null
         })

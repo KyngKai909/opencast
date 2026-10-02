@@ -155,6 +155,7 @@ export function PlayerSurface({ size = "web", timeZone, hints, lastChannelHint =
           size={size}
           only={overlays === "bug" ? "bug" : undefined}
           codeLift={codeLift}
+          timeZone={timeZone}
           {...graphics}
         />
       )}

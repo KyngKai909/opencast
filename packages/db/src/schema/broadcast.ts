@@ -250,11 +250,28 @@ export const assets = broadcast.table(
     legacyId: text("legacy_id").unique(),
     /** Deleted from the library. Kept, because the as-run log and claims still point at it. */
     archivedAt: at("archived_at"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /**
+     * A243 (migration 0048): a bumper's role (`into_break`, `out_of_break`, `up_next`, `any`). Null
+     * reads as Any (every bumper before it). Only on bumpers (`BMP`).
+     */
+    bumperRole: text("bumper_role", { enum: ["into_break", "out_of_break", "up_next", "any"] }),
+    /**
+     * A243 (migration 0048): when an item may air (bumpers, station IDs, openers, closers): broadcast
+     * dates, inclusive, either end open; and a time of day in the market's time zone (an end before
+     * the start runs past midnight). Outside its window it never airs.
+     */
+    airsFrom: date("airs_from"),
+    airsUntil: date("airs_until"),
+    dailyFrom: time("daily_from"),
+    dailyUntil: time("daily_until")
   },
   (t) => [
     check("link_has_url", sql`${t.source} <> 'link' or ${t.sourceUrl} is not null`),
     check("creator_work_has_work", sql`${t.source} <> 'creator_work' or ${t.creatorWorkId} is not null`),
+    check("assets_bumper_role", sql`${t.bumperRole} is null or (${t.code} = 'BMP' and ${t.bumperRole} in ('into_break', 'out_of_break', 'up_next', 'any'))`),
+    check("assets_air_dates", sql`${t.airsFrom} is null or ${t.airsUntil} is null or ${t.airsUntil} >= ${t.airsFrom}`),
+    check("assets_daily_window", sql`(${t.dailyFrom} is null) = (${t.dailyUntil} is null) and (${t.dailyFrom} is null or ${t.dailyFrom} <> ${t.dailyUntil})`),
     index("assets_station").on(t.stationId)
   ]
 );
@@ -459,6 +476,20 @@ export const rightsConfirmations = broadcast.table(
 );
 
 /** How often a part of the break airs (`break_rules.cadence`). */
+/** A243: a bumper's role. */
+export type BumperRoleRow = "into_break" | "out_of_break" | "up_next" | "any";
+/** A243: one position's sequence (roles in air order) and how often it airs. */
+export interface PositionRuleRow {
+  roles: BumperRoleRow[];
+  every: "break" | "program" | "n_programs" | "hour" | "never";
+  n?: number;
+}
+export interface BumperSequencesRow {
+  open: PositionRuleRow;
+  close: PositionRuleRow;
+  between: PositionRuleRow;
+}
+
 export interface BreakCadenceRow {
   every: "break" | "program" | "n_programs" | "hour" | "never";
   n?: number;
@@ -495,6 +526,12 @@ export const breakRules = broadcast.table(
     stationIdAfterOpener: boolean("station_id_after_opener").notNull().default(false),
     /** A242 (migration 0047): the opener at the start of each broadcast day (6:00 am local), for a channel that never goes off air. */
     dailyOpener: boolean("daily_opener").notNull().default(false),
+    /**
+     * A243 (migration 0048): the bumper sequences, `{ open, close, between }`, each `{ roles, every, n? }`
+     * (roles in air order). Null: the defaults (one into the break, one out of it, as often as
+     * `cadence.bumpers`; none between programs). Stored only once the station changes them.
+     */
+    bumperSequences: jsonb("bumper_sequences").$type<BumperSequencesRow>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [
@@ -907,11 +944,25 @@ export const asRun = broadcast.table(
     /** Proof frame for spots: captured with the station's bug, kept for a year. */
     proofFrameUrl: text("proof_frame_url"),
     proofFrameAt: at("proof_frame_at"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /** A243 (migration 0048): a bumper's role as it aired. */
+    bumperRole: text("bumper_role"),
+    /**
+     * A243 (migration 0048): where it aired: `open` / `close` (a break's opening or closing
+     * sequence), `between` (between programs), `boundary` (a block's intro or outro, later),
+     * `open_time` (open time's fill) or `sign_on` (the opener, A242). Null before 0048.
+     */
+    position: text("position", { enum: ["open", "close", "between", "boundary", "open_time", "sign_on"] }),
+    /** A243 (migration 0048): up next only, what it announced (no foreign key: append-only, and the entry may go). */
+    announcedEntryId: uuid("announced_entry_id"),
+    announcedTitle: text("announced_title")
   },
   (t) => [
     check("as_run_ends_after_start", sql`${t.endedAt} >= ${t.startedAt}`),
-    index("as_run_station_time").on(t.stationId, t.startedAt)
+    check("as_run_position", sql`${t.position} is null or ${t.position} in ('open', 'close', 'between', 'boundary', 'open_time', 'sign_on')`),
+    index("as_run_station_time").on(t.stationId, t.startedAt),
+    /** A243: when each item last aired (least recently aired first). */
+    index("as_run_station_asset_time").on(t.stationId, t.assetId, t.startedAt).where(sql`${t.assetId} is not null`)
   ]
 );
 
@@ -1105,7 +1156,12 @@ export const channelItems = broadcast.table(
     open: boolean("open").notNull().default(false),
     /** The as-run entry written once its last segment was published. */
     asRunId: uuid("as_run_id"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /** A243 (migration 0048): carried to the as-run row (`as_run` has the same four). */
+    bumperRole: text("bumper_role"),
+    position: text("position"),
+    announcedEntryId: uuid("announced_entry_id"),
+    announcedTitle: text("announced_title")
   },
   (t) => [index("channel_items_station_seq").on(t.stationId, t.seq), index("channel_items_station_ends").on(t.stationId, t.endsAt)]
 );

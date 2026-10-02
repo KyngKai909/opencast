@@ -15,6 +15,7 @@ import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { librarySummary, readyLine } from "./logic";
 import { UploadList } from "@opencast/ui/upload";
 import { useUpload } from "./upload";
+import { ROLE_WORDS, roleOf } from "./bumpers";
 import "./LibraryParts.css";
 
 /** An item's type as master control shows it: its identity code (A242), else its log code. */
@@ -42,7 +43,12 @@ export interface FolderRailProps {
   needsAttention: { rightsToConfirm: number; preparing: number };
   /** A242: how many openers, closers and off-air cards. Left out, the group isn't drawn. */
   identity?: { openers: number; closers: number; offAirCards: number };
+  /** A243: how many bumpers (the Bumpers list). Left out, it isn't drawn. */
+  bumpers?: number;
 }
+
+/** A243: how many bumpers, for the rail's Bumpers list. */
+export const bumperCount = (items: Item[]) => items.filter((i) => i.code === "BMP" && !i.identCode).length;
 
 /** Counts for the rail's "Sign-off and sign-on" group (A242). */
 export const identityCounts = (items: Item[]) => ({
@@ -52,7 +58,7 @@ export const identityCounts = (items: Item[]) => ({
 });
 
 /** Folders on the left: the station's own, the sign-off and sign-on lists (A242), then the two "needs attention" lists (04.1). */
-export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention, identity }: FolderRailProps) {
+export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention, identity, bumpers }: FolderRailProps) {
   const link = (key: string, label: string, count: number, warn = false) => (
     <a key={key} href={key === "all" ? `${base}/library` : `${base}/library/${key}`} className={cx(active === key && "cc-folders__on", warn && count > 0 && "cc-folders__warn")} aria-current={active === key ? "page" : undefined}>
       {label}
@@ -67,6 +73,12 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
       {link("all", "All items", total)}
       {folders.filter((f) => !f.parentFolderId).map((f) => link(f.id, f.name, f.itemCount))}
       {link("links", "Imported from links", importedFromLinks, true)}
+      {bumpers !== undefined && (
+        <>
+          <div className="cc-folders__g cc-folders__g--gap">Bumpers</div>
+          {link("bumpers", "All bumpers", bumpers)}
+        </>
+      )}
       {identity && (
         <>
           <div className="cc-folders__g cc-folders__g--gap">Sign-off and sign-on</div>
@@ -305,8 +317,13 @@ export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, 
       width: "128px",
       cell: (i) => {
         const t = typeOf(i);
-        // A picture is an off-air card and nothing else (A242).
-        return <CodeSelect value={t === "OPEN" ? "PGM" : t} codes={i.still ? ["OFF"] : LIBRARY_CODES} label={`Type of ${i.title}`} onChange={(c) => void setCode(i, c)} />;
+        // A picture is an off-air card and nothing else (A242). A243: a bumper's role under its type.
+        return (
+          <>
+            <CodeSelect value={t === "OPEN" ? "PGM" : t} codes={i.still ? ["OFF"] : LIBRARY_CODES} label={`Type of ${i.title}`} onChange={(c) => void setCode(i, c)} />
+            {t === "BMP" && <small className="cc-lib-row__role">{ROLE_WORDS[roleOf(i)]}</small>}
+          </>
+        );
       }
     },
     { key: "runs", header: "Runs", width: "64px", cell: (i) => <span className="cc-lib-row__d">{i.durationMs != null ? duration(i.durationMs) : i.still ? "Still" : "–"}</span> },

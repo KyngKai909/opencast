@@ -100,7 +100,8 @@ const spotsIds = [
 
 const bumpers = [
   item({ title: "Beat Tape Live, trailer", code: "BMP", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") }),
-  item({ title: "Back to the reel", code: "BMP", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") })
+  // A243: a bumper out of the break; the trailer has no role (Any).
+  item({ title: "Back to the reel", code: "BMP", bumperRole: "out_of_break", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") })
 ];
 
 const loose = [item({ title: "Beat Tape Live, September 19", code: "PGM", programId: PROGRAM_IDS.beatTapeLive, durationMs: ms(57), createdAt: at("-7 22:00") })];

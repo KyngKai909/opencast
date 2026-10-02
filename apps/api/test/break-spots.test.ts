@@ -55,10 +55,12 @@ describe("the spots cadence, worked out", () => {
     const context = { programId: "sponsored", producerShareMs: 0 };
     expect(needMs(needs, { ...EVERY_PART, spots: false }, context)).toBe(40_000);
     expect(needMs(needs, { ...EVERY_PART, spots: false }, { ...context, programId: null })).toBe(28_000);
-    expect(needMs(needs, { stationId: true, bumpers: false, underwriting: false, spots: false }, context)).toBe(8_000);
-    expect(needMs(needs, { stationId: false, bumpers: false, underwriting: false, spots: false }, context)).toBe(0);
+    expect(needMs(needs, { stationId: true, bumpersOpen: false, bumpersClose: false, bumpers: false, underwriting: false, spots: false }, context)).toBe(8_000);
+    expect(needMs(needs, { stationId: false, bumpersOpen: false, bumpersClose: false, bumpers: false, underwriting: false, spots: false }, context)).toBe(0);
     // The maker's barter time stays.
-    expect(needMs(needs, { stationId: true, bumpers: false, underwriting: false, spots: false }, { programId: null, producerShareMs: 60_000 })).toBe(68_000);
+    expect(needMs(needs, { stationId: true, bumpersOpen: false, bumpersClose: false, bumpers: false, underwriting: false, spots: false }, { programId: null, producerShareMs: 60_000 })).toBe(68_000);
+    // A243: the break's own chosen bumpers (its sequences), in place of the library's first two.
+    expect(needMs(needs, { ...EVERY_PART, spots: false }, { ...context, programId: null, elementsMs: 13_000 })).toBe(20_000);
   });
 });
 

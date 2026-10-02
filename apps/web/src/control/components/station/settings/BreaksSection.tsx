@@ -8,9 +8,12 @@
 // station ID's cadence: the sequence (closer, off-air card, off air, opener, then the station ID if
 // the station says so), "Air the station ID after the opener" and "Open each broadcast day with the
 // opener", both off by default (no frame draws them: rows like the frame's Ads from partners).
+// A243 (2026-10-02): the ladder's two bumper rows are the bumper sequences ("Opening the break",
+// "Closing the break"), each a row of roles with its own "How often" (SequenceBuilder), and
+// "Between programs" under the ladder; the Bumpers row leaves "How often".
 
 import { useState, type DragEvent, type KeyboardEvent } from "react";
-import { SPOT_CATEGORIES, spotsApi, stationsApi, type BreakCadences, type BreakRule } from "@opencast/contracts";
+import { libraryApi, SPOT_CATEGORIES, spotsApi, stationsApi, type BreakCadences, type BreakRule, type BumperRole, type PositionRule } from "@opencast/contracts";
 import { Button, ChipRow, LogCode, Segmented, Toggle } from "@opencast/ui";
 import { duration } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,8 +36,16 @@ import {
   placeFill,
   ruleLabel,
   TV_MINUTES_PER_HOUR,
-  type FillCode
+  exampleLine,
+  POSITION_WORDS,
+  roleSupply,
+  sequencesOf,
+  upNextTwice,
+  type FillCode,
+  type SequencePosition
 } from "../breakRule";
+import { now as clockNow } from "../../../../lib/clock";
+import { SequenceBuilder } from "./SequenceBuilder";
 import { noMoreThan, perHour } from "../format";
 import { ValueSelect } from "../ValueSelect";
 import "./common.css";
@@ -51,6 +62,8 @@ export function BreaksSection({ s }: { s: StationState }) {
   const params = { stationId: s.id };
   const rule = useApi(stationsApi.getBreakRule, { params });
   const rotations = useApi(spotsApi.getRotations, { params }, { retry: false });
+  // A243: what fills each bumper role (counted under each chip).
+  const bumpers = useApi(libraryApi.getLibrary, { params, query: { code: "BMP" } }, { retry: false });
   // S17: the categories a station can block, from the API (the same list as the constant).
   const categories = useApi(spotsApi.listSpotCategories, {}, { staleTime: Infinity, retry: false });
   const qc = useQueryClient();
@@ -85,6 +98,18 @@ export function BreaksSection({ s }: { s: StationState }) {
 
   const rows = ladderWithPartners(r);
   const cadence = cadenceOf(r);
+  // A243: the bumper sequences; `cadence.bumpers` follows the opening one's.
+  const seq = sequencesOf(r);
+  const items = bumpers.data?.items ?? [];
+  const at = clockNow();
+  const supply = (role: BumperRole) => (bumpers.isLoading ? " " : roleSupply(items, role, at));
+  const setSequence = (position: SequencePosition, next: PositionRule) => {
+    const bumperSequences = { ...seq, [position]: next };
+    const open = bumperSequences.open;
+    change({ bumperSequences, cadence: { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } } as BreakCadences });
+  };
+  const sequenceAt: Record<string, SequencePosition> = { "BMP-in": "open", BMP: "close" };
+  const anyUpNext = (["open", "close", "between"] as const).some((p) => seq[p].roles.includes("up_next"));
   const fills = rows.filter((x) => !x.partner);
   const every = r.everyMinutes ?? 30;
   const modes: { value: Mode; label: string }[] = [
@@ -152,11 +177,12 @@ export function BreaksSection({ s }: { s: StationState }) {
             // The bumpers (into and out of the break) and the station ID have their places.
             const fixed = row.partner || row.fillIndex === null || !canEdit;
             const code = row.code as FillCode;
+            const position = row.partner ? undefined : sequenceAt[row.key];
             return (
               <li
                 key={row.key}
                 id={`cc-fill-${row.key}`}
-                className={[dragging === code && !row.partner ? "cc-lad cc-lad--dragging" : "cc-lad", row.partner && !r.adsFromPartners ? "cc-lad--off" : ""].filter(Boolean).join(" ")}
+                className={[dragging === code && !row.partner ? "cc-lad cc-lad--dragging" : "cc-lad", row.partner && !r.adsFromPartners ? "cc-lad--off" : "", position ? "cc-lad--seq" : ""].filter(Boolean).join(" ")}
                 draggable={!fixed}
                 tabIndex={fixed ? undefined : 0}
                 aria-describedby={fixed ? undefined : "cc-fill-help cc-fill-keys"}
@@ -176,6 +202,7 @@ export function BreaksSection({ s }: { s: StationState }) {
                   <small>{row.detail}</small>
                 </span>
                 <span className="cc-lad__t">{row.time}</span>
+                {position && <SequenceBuilder position={position} title={POSITION_WORDS[position].title} rule={seq[position]} onChange={(next) => setSequence(position, next)} supply={supply} disabled={!canEdit} />}
               </li>
             );
           })}
@@ -186,6 +213,15 @@ export function BreaksSection({ s }: { s: StationState }) {
         <span className="oc-sr-only" aria-live="polite">
           {said}
         </span>
+
+        <div className="cc-sec-top cc-sec-top--gap">
+          <h4 className="cc-sec-top__h">Between programs</h4>
+          <span className="cc-sec-top__sub">{POSITION_WORDS.between.detail}</span>
+        </div>
+        <SequenceBuilder position="between" title="Between programs" rule={seq.between} onChange={(next) => setSequence("between", next)} supply={supply} disabled={!canEdit} />
+        {anyUpNext && <p className="cc-breaks__note">Up next names the next program on your log, as the guide shows it.</p>}
+        {upNextTwice(seq) && <p className="cc-breaks__note">Up next airs once a break. Here it only airs if it isn't earlier in the break.</p>}
+        <p className="cc-breaks__example">{exampleLine(r, items, at)}</p>
 
         <div className="cc-sec-top cc-sec-top--gap">
           <h4 className="cc-sec-top__h">How often</h4>

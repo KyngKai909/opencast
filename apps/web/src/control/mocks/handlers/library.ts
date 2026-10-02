@@ -4,6 +4,7 @@
 import { http } from "msw";
 import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
+import { inWindow } from "../../components/live/bumpers";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
 import type { MockPerson } from "../fixtures/people";
@@ -50,7 +51,15 @@ function audioLayout(i: LibraryItem) {
 }
 
 /** L5, L7: the audio layout and caption language, as the API adds them. */
-const withProbe = (i: LibraryItem): LibraryItem => ({ ...i, audioLayout: audioLayout(i), captionLanguage: i.captions === "none" ? null : "en" });
+const withProbe = (i: LibraryItem): LibraryItem => ({
+  ...i,
+  audioLayout: audioLayout(i),
+  captionLanguage: i.captions === "none" ? null : "en",
+  // A243: a bumper's role (none reads as Any), and whether it's inside its window now.
+  bumperRole: i.code === "BMP" ? (i.bumperRole ?? null) : null,
+  airs: i.airs ?? null,
+  airingNow: inWindow(i.airs, now())
+});
 
 /** Programs with their listing status computed from what they air this week. */
 function programsOf(stationId: string): Program[] {
@@ -170,6 +179,9 @@ export const libraryHandlers = [
     let items = all;
     if (q.get("folderId")) items = items.filter((i) => i.folderId === q.get("folderId"));
     if (q.get("code")) items = items.filter((i) => (i.identCode ?? i.code) === q.get("code"));
+    // A243: bumpers by role (Any includes bumpers without one).
+    const role = q.get("bumperRole");
+    if (role) items = items.filter((i) => i.code === "BMP" && (i.bumperRole ?? "any") === role);
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
@@ -280,6 +292,14 @@ export const libraryHandlers = [
     const parsed = libraryApi.updateItem.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "Check the item's details and try again.");
     const { code, ...rest } = parsed.data;
+    // A243, as the API: a role is a bumper's; a window a bumper's, station ID's, opener's or closer's.
+    const type = code ?? item.identCode ?? item.code;
+    if (rest.bumperRole != null && type !== "BMP") return fail(400, "bad_request", "Only a bumper has a role.");
+    if (rest.airs && (rest.airs.from || rest.airs.until || rest.airs.dailyFrom) && !["BMP", "SID", "OPN", "CLS"].includes(type)) return fail(400, "bad_request", "Only bumpers, station IDs, openers and closers have times they air.");
+    if (rest.airs && Boolean(rest.airs.dailyFrom) !== Boolean(rest.airs.dailyUntil)) return fail(400, "bad_request", "Say both times of day, or neither.");
+    if (rest.airs?.from && rest.airs.until && rest.airs.until < rest.airs.from) return fail(400, "bad_request", "The last day is before the first.");
+    if (type !== "BMP") rest.bumperRole = null;
+    if (!["BMP", "SID", "OPN", "CLS"].includes(type)) rest.airs = null;
     if (code && code !== (item.identCode ?? item.code)) {
       // A242, as the API: a picture is an off-air card only; openers, closers and cards stay off the log.
       if (item.still) return fail(422, "still_image", "It's a picture, so it can only be an off-air card. Upload a clip to use it as something else.");

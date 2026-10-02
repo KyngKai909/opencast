@@ -30,7 +30,12 @@ export const HLS_CLASS = {
   /** A spot's on-screen code and QR, for its last seconds (10 s by default). */
   code: "org.useopencast.code",
   /** The planned sign-off: what the slate says, and when the station is back. */
-  signOff: "org.useopencast.sign-off"
+  signOff: "org.useopencast.sign-off",
+  /**
+   * A243 (added 2026-10-02): an up-next bumper's title, drawn by the player over the clip (never
+   * burned in), from the guide's own data. Players built before it ignore classes they don't know.
+   */
+  upNext: "org.useopencast.up-next"
 } as const;
 export type HlsClass = (typeof HLS_CLASS)[keyof typeof HLS_CLASS];
 
@@ -50,7 +55,12 @@ export const HlsItem = z.object({
    * A242 (added 2026-10-02): an opener (`OPN`) or closer (`CLS`). `code` then reads `SID`, so
    * players built before it (which drop an item whose code they don't know) still read the item.
    */
-  identCode: z.enum(["OPN", "CLS"]).nullable().default(null)
+  identCode: z.enum(["OPN", "CLS"]).nullable().default(null),
+  /**
+   * A243 (added 2026-10-02): a bumper's role, informational only (players built before it drop it).
+   * A role this build doesn't know reads as null rather than failing the item.
+   */
+  bumperRole: z.enum(["into_break", "out_of_break", "up_next", "any"]).nullable().catch(null).default(null)
 });
 export const HlsBreak = z.object({ breakId: z.string() });
 export const HlsLive = z.object({ logEntryId: z.string(), sourceId: z.string() });
@@ -75,6 +85,22 @@ export const HlsCode = z.object({
   qrUrl: z.string()
 });
 export const HlsSignOff = z.object({ backAt: z.string().nullable().default(null) });
+/**
+ * A243 (added 2026-10-02): what an up-next bumper names: the next program as the guide has it
+ * (its title, episode title and start, a carried program's maker). `immediate` 1: it follows this
+ * break ("Up next"); 0: later ("Next at 9:00 pm", in the market's time zone).
+ */
+export const HlsUpNext = z.object({
+  logEntryId: z.string().nullable().default(null),
+  title: z.string(),
+  episodeTitle: z.string().nullable().default(null),
+  /** ISO: the program's start, as the guide has it. */
+  startsAt: z.string(),
+  immediate: z.number().default(1),
+  carriedFrom: z.string().nullable().default(null),
+  /** Later (programming blocks): the block it starts or belongs to. */
+  blockName: z.string().nullable().default(null)
+});
 
 export const HLS_ATTRIBUTES = {
   [HLS_CLASS.item]: HlsItem,
@@ -83,7 +109,8 @@ export const HLS_ATTRIBUTES = {
   [HLS_CLASS.bug]: HlsBug,
   [HLS_CLASS.lowerThird]: HlsLowerThird,
   [HLS_CLASS.code]: HlsCode,
-  [HLS_CLASS.signOff]: HlsSignOff
+  [HLS_CLASS.signOff]: HlsSignOff,
+  [HLS_CLASS.upNext]: HlsUpNext
 } as const;
 
 /** One DATERANGE as read: its id, class, times, the SCTE-35 cues if any, and its Opencast attributes. */

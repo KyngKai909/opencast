@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { BumperRole, DateOnly, IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+
+/** A243: a time of day, "HH:MM" (24-hour), in the market's time zone. */
+const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
+
+/**
+ * A243 (added 2026-10-02): when an item may air. `from` and `until` are broadcast dates (6:00 am to
+ * 6:00 am), inclusive, either open (null); `dailyFrom` and `dailyUntil` a time of day, both or
+ * neither, not the same (an end before the start runs past midnight). All null: any time.
+ */
+export const AirWindow = z.object({
+  from: DateOnly.nullable(),
+  until: DateOnly.nullable(),
+  dailyFrom: TimeOfDay.nullable(),
+  dailyUntil: TimeOfDay.nullable()
+});
+export type AirWindow = z.infer<typeof AirWindow>;
 
 /** L7 (added 2026-09-29): how a program's airings are captioned, and in what language (BCP 47, "en"). */
 export const Captions = z.object({ mode: z.enum(["none", "generated_live", "generated", "uploaded"]), language: z.string().max(35).nullable() });
@@ -82,6 +98,19 @@ export const LibraryItem = z.object({
    * slate's minute.
    */
   still: z.boolean().optional(),
+  /**
+   * A243 (added 2026-10-02): a bumper's role. Null (or absent) reads as `any`, as every bumper did
+   * before it; always null for anything that isn't a bumper. `code` stays `BMP`.
+   */
+  bumperRole: BumperRole.nullable().optional(),
+  /**
+   * A243 (added 2026-10-02): when it may air (bumpers, station IDs, openers and closers): broadcast
+   * dates (inclusive, either end open) and a time of day in the market's time zone (`dailyUntil`
+   * before `dailyFrom` runs past midnight). Null (or absent): any time. Outside it, it never airs.
+   */
+  airs: AirWindow.nullable().optional(),
+  /** A243 (added 2026-10-02): inside its window now (true for an item without one). */
+  airingNow: z.boolean().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -231,7 +260,17 @@ const ItemFields = z.object({
   folderId: Id.nullable(),
   episodeNumber: z.number().int().positive().nullable(),
   episodeDescription: z.string().max(160).nullable(),
-  breakPointsMs: z.array(Millis)
+  breakPointsMs: z.array(Millis),
+  /**
+   * A243 (2026-10-02): a bumper's role (null: Any). On anything but a bumper, 400. Changing an item's
+   * type away from `BMP` clears it.
+   */
+  bumperRole: BumperRole.nullable(),
+  /**
+   * A243 (2026-10-02): when it may air (null: any time). Bumpers, station IDs, openers and closers
+   * only (400 otherwise); changing an item's type to another clears it.
+   */
+  airs: AirWindow.nullable()
 });
 
 export const libraryApi = {
@@ -241,8 +280,11 @@ export const libraryApi = {
     auth: "user",
     summary: "Every item with its type, rights and status; folders; programs",
     params: StationParams,
-    /** `code` (A242): `OPN`, `CLS` or `OFF` lists the openers, closers or off-air cards. */
-    query: z.object({ folderId: Id.optional(), code: LibraryCode.optional(), needsAttention: z.coerce.boolean().optional() }),
+    /**
+     * `code` (A242): `OPN`, `CLS` or `OFF` lists the openers, closers or off-air cards. `bumperRole`
+     * (A243): bumpers with that role (`any` includes bumpers without one).
+     */
+    query: z.object({ folderId: Id.optional(), code: LibraryCode.optional(), needsAttention: z.coerce.boolean().optional(), bumperRole: BumperRole.optional() }),
     response: Library
   }),
   upload: endpoint({
@@ -296,7 +338,7 @@ export const libraryApi = {
     path: "/library/:itemId",
     auth: "user",
     summary:
-      "Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`.",
+      "Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. A243: `bumperRole` on anything but a bumper, or `airs` on anything but a bumper, station ID, opener or closer, 400.",
     params: ItemParams,
     body: ItemFields.partial(),
     response: LibraryItem

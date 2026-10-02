@@ -11,6 +11,7 @@ import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { toWebVtt, vttContentId } from "../../lib/captions.js";
 import { createContent, type Content } from "./content.js";
 import { probeBackground } from "../playout/engine/background.js";
+import { eligible, windowOf, type AirWindowRef, type BumperRole } from "../playout/engine/sequence.js";
 
 export { toWebVtt };
 
@@ -43,6 +44,12 @@ export interface ItemRef {
   archived: boolean;
   /** Where the maker allows breaks inside it. */
   breakPointsMs: number[];
+  /** A243: a bumper's role (null: Any). */
+  bumperRole: BumperRole | null;
+  /** A243: when it may air (null: any time). */
+  airs: AirWindowRef | null;
+  /** Library order (oldest first). */
+  createdAt: Date;
 }
 
 export interface ProgramRef {
@@ -112,7 +119,7 @@ export interface LibraryService {
 
   /** A claimable station's rights: the permission or licence record that covers the work. */
   confirmCreatorWorkRights(db: Executor, itemId: string, input: { permissionRecordId?: string; licenceRecordId?: string }): Promise<void>;
-  library(stationId: string, filter: { folderId?: string; code?: LogCode; needsAttention?: boolean }): Promise<LibraryView>;
+  library(stationId: string, filter: { folderId?: string; code?: LogCode; needsAttention?: boolean; bumperRole?: BumperRole }): Promise<LibraryView>;
   item(itemId: string): Promise<LibraryItem>;
   stationOfItem(itemId: string): Promise<string>;
   stationOfProgram(programId: string): Promise<string>;
@@ -168,6 +175,10 @@ export interface ItemFields {
   episodeNumber?: number | null;
   episodeDescription?: string | null;
   breakPointsMs?: number[];
+  /** A243: a bumper's role (null: Any). */
+  bumperRole?: BumperRole | null;
+  /** A243: when it may air (null: any time). */
+  airs?: AirWindowRef | null;
 }
 
 export interface FolderView {
@@ -222,6 +233,23 @@ const P = schema.programs;
 
 /** A242: an off-air card that's a picture: no length, nothing to prepare (it airs held, as a slate). */
 const isStill = (r: { code: string; durationMs: number | null }) => r.code === "OFF" && r.durationMs === null;
+
+/** A243: the types that can have a window (when they may air). */
+const WINDOWED: string[] = ["BMP", "SID", "OPN", "CLS"];
+
+/** A243: an item's window as columns (none: nothing to change), checked. */
+function airingFields(code: string | null, fields: { airs?: AirWindowRef | null }): Partial<Pick<typeof A.$inferInsert, "airsFrom" | "airsUntil" | "dailyFrom" | "dailyUntil">> {
+  if (fields.airs === undefined) return {};
+  const w = fields.airs;
+  if (w && (w.from || w.until || w.dailyFrom || w.dailyUntil) && code && !WINDOWED.includes(code)) {
+    throw badRequest("Only bumpers, station IDs, openers and closers have times they air.", { airs: "Not for this type" });
+  }
+  if (!w) return { airsFrom: null, airsUntil: null, dailyFrom: null, dailyUntil: null };
+  if (w.from && w.until && w.until < w.from) throw badRequest("The last day is before the first.", { "airs.until": "Before the first day" });
+  if (Boolean(w.dailyFrom) !== Boolean(w.dailyUntil)) throw badRequest("Say both times of day, or neither.", { [w.dailyFrom ? "airs.dailyUntil" : "airs.dailyFrom"]: "Required" });
+  if (w.dailyFrom && w.dailyFrom === w.dailyUntil) throw badRequest("The times of day can't be the same.", { "airs.dailyUntil": "Same as the start" });
+  return { airsFrom: w.from, airsUntil: w.until, dailyFrom: w.dailyFrom, dailyUntil: w.dailyUntil };
+}
 
 /** Anything under a minute is guessed as a bumper; the station can change it. */
 const guessCode = (durationMs: number | null): LogCode => (durationMs !== null && durationMs < 60_000 ? "BMP" : "PGM");
@@ -280,7 +308,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         return Boolean(cid && (!i || i.locked || i.deleted));
       })(),
       archived: r.archivedAt !== null,
-      breakPointsMs: pointsBy.get(r.id) ?? []
+      breakPointsMs: pointsBy.get(r.id) ?? [],
+      bumperRole: r.bumperRole ?? null,
+      airs: windowOf(r),
+      createdAt: r.createdAt
     }));
   }
 
@@ -299,8 +330,13 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
     const rightsBy = new Map(rights.map((r) => [r.assetId, r]));
     const pointsBy = new Map<string, number[]>();
     for (const p of breakPoints) pointsBy.set(p.assetId, [...(pointsBy.get(p.assetId) ?? []), p.offsetMs].sort((a, b) => a - b));
+    // A243: whether an item with a window is inside it now (the market's time).
+    const windowed = [...new Set(rows.filter((r) => windowOf(r)).map((r) => r.stationId))];
+    const zones = new Map(await Promise.all(windowed.map(async (id) => [id, await services.stations.timezoneOf(id)] as const)));
+    const now = deps.clock.now().getTime();
     return rows.map((r) => {
       const right = rightsBy.get(r.id);
+      const airs = windowOf(r);
       return {
         id: r.id,
         stationId: r.stationId,
@@ -350,6 +386,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         })(),
         audioLayout: audioLayoutOf(r.audioChannels),
         captionLanguage: trackLanguage.get(r.id) ?? null,
+        bumperRole: r.code === "BMP" ? (r.bumperRole ?? null) : null,
+        airs,
+        airingNow: airs ? eligible({ airs }, now, zones.get(r.stationId) ?? "UTC") : true,
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -709,7 +748,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .select()
         .from(A)
         .where(and(eq(A.stationId, stationId), inArray(A.code, ["SID", "BMP"]), eq(A.status, "ready"), isNull(A.archivedAt)))
-        .orderBy(asc(A.createdAt));
+        .orderBy(asc(A.createdAt), asc(A.id));
       const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs);
       return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
     },
@@ -780,6 +819,11 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const conditions = [eq(A.stationId, stationId), isNull(A.archivedAt)];
       if (filter.folderId) conditions.push(eq(A.folderId, filter.folderId));
       if (filter.code) conditions.push(eq(A.code, filter.code));
+      // A243: bumpers with a role (Any includes bumpers without one).
+      if (filter.bumperRole) {
+        conditions.push(eq(A.code, "BMP"));
+        conditions.push(filter.bumperRole === "any" ? or(isNull(A.bumperRole), eq(A.bumperRole, "any"))! : eq(A.bumperRole, filter.bumperRole));
+      }
       const [rows, folders, programs, all] = await Promise.all([
         db.select().from(A).where(and(...conditions)).orderBy(asc(A.title)),
         db.select().from(schema.assetFolders).where(eq(schema.assetFolders.stationId, stationId)).orderBy(asc(schema.assetFolders.name)),
@@ -836,6 +880,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       if (fields.captions !== undefined && !toWebVtt(fields.captions)) throw refused("not_captions", "That isn't WebVTT or SRT captions.");
       // A direct upload picked up again after a restart: the item it made already.
       if (options.id && (await db.select({ id: A.id }).from(A).where(eq(A.id, options.id))).length) return service.item(options.id);
+      const timing = airingFields(fields.code ?? null, fields);
       const probe = await probeItem(file.path, fields.code);
       if (!probe) throw refused("unreadable_file", fields.code === "OFF" ? "That file can't be read as a picture, video or audio." : "That file can't be read as video or audio.");
       // Keep the upload past the request: multer's temp file is removed when it ends. (A direct
@@ -868,7 +913,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             audioChannels: probe.audioChannels ?? null,
             originalFilename: file.originalName,
             status: "preparing",
-            prepProgress: 0
+            prepProgress: 0,
+            // A243: a role or window sent with it (a type guessed as a bumper takes a role too).
+            ...(fields.bumperRole !== undefined && (fields.code ?? guessCode(probe.durationMs)) === "BMP" ? { bumperRole: fields.bumperRole } : {}),
+            ...timing
           })
           .returning();
         if (fields.breakPointsMs?.length) await setBreakPoints(tx, row.id, fields.breakPointsMs);
@@ -893,11 +941,18 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           throw new HttpError(409, "on_the_log", "It's on the log. Take it off the log first: openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
         }
       }
+      // A243: a role is a bumper's, and a window a bumper's, station ID's, opener's or closer's. A
+      // new type that can't have them clears them.
+      const code = fields.code ?? row.code;
+      if (fields.bumperRole != null && code !== "BMP") throw badRequest("Only a bumper has a role.", { bumperRole: "Not a bumper" });
+      const timing = airingFields(code, fields);
       await db.transaction(async (tx) => {
-        const patch: Partial<typeof A.$inferInsert> = {};
-        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription"] as const) {
+        const patch: Partial<typeof A.$inferInsert> = { ...timing };
+        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription", "bumperRole"] as const) {
           if (fields[key] !== undefined) (patch as Record<string, unknown>)[key] = fields[key];
         }
+        if (code !== "BMP" && row.bumperRole !== null) patch.bumperRole = null;
+        if (!WINDOWED.includes(code) && windowOf(row)) Object.assign(patch, { airsFrom: null, airsUntil: null, dailyFrom: null, dailyUntil: null });
         if (Object.keys(patch).length) await tx.update(A).set(patch).where(eq(A.id, itemId));
         if (fields.breakPointsMs) await setBreakPoints(tx, itemId, fields.breakPointsMs);
       });
