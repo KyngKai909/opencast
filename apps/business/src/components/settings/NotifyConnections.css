@@ -1,0 +1,23 @@
+/* Settings, Notifications and Connections (biz-settings 04.1: .row2 with .toggle and .lock; .conn). */
+.bz-notif section + section .bz-sec-top { margin-top: 22px; }
+
+.bz-conn__h { margin: 0 0 4px; color: var(--ink); font: 800 26px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.bz-conn__lede { margin: 0 0 14px; font-size: 14.5px; color: var(--ink-70); }
+.bz-conn__row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.bz-conn__row--last { border-bottom: 0; }
+.bz-conn__row b { display: block; font-weight: 600; }
+.bz-conn__row small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.bz-conn__ic { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--ink-70); }
+.bz-conn__ic--off { border-style: dashed; }
+.bz-conn .oc-tag.bz-conn__tag { height: 24px; padding: 0 9px; }
+.bz-conn__pick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+@media (max-width: 767px) {
+  .bz-notif, .bz-conn { padding: 0 16px 24px; }
+}
+.bz-conn__end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.bz-conn__row small.bz-conn__mono { font: 500 12.5px var(--font-mono); color: var(--ink); margin: 1px 0 2px; }
+/* A checkout's secret (not drawn: the settings field, under the row's words) and its webhook address. */
+.bz-conn__secret { display: grid; gap: 4px; margin-top: 10px; max-width: 420px; }
+.bz-conn__secret .bz-conn__pick { margin-top: 6px; }
+.bz-conn__row small.bz-conn__url { overflow-wrap: anywhere; }

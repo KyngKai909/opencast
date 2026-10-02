@@ -680,11 +680,15 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 .day24 { display:flex; height:46px; border-radius:6px; overflow:hidden; border:1px solid var(--line); margin:10px 0 6px; }
 .day24 i { display:flex; align-items:center; justify-content:center; font:600 11px var(--font-text); color:#fff; white-space:nowrap; overflow:hidden; }
 .hours { display:flex; justify-content:space-between; font:500 11px var(--font-mono); color:var(--ink-50); }
-.src-row { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.src-row { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
 .src-row b { display:block; font-weight:600; } .src-row small { display:block; font-size:12.5px; color:var(--ink-70); }
-.src-h { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.src-h { display:grid; grid-template-columns:minmax(0,1fr) 96px 180px 190px 150px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
 .ok-t { font-size:13px; color:var(--ink-70); display:flex; gap:6px; align-items:center; }
-.ok-t svg { width:14px; height:14px; }
+.ok-t svg { width:14px; height:14px; flex:none; }
+.ok-t small { display:block; font-size:11.5px; color:var(--ink-50); }
+.src-row .tier b { font-size:13px; } .src-row .tier small { font-size:11.5px; }
+.dot-up, .dot-down { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.dot-up { background:#3FA66B; } .dot-down { background:var(--live); }
 /* creator phone */
 .perm-page { padding:18px 18px 22px; display:flex; flex-direction:column; flex:1; overflow:auto; }
 .perm-page h2 { margin:10px 0 10px; font:800 28px/1.02 var(--font-display); font-stretch:125%; letter-spacing:-.035em; }
@@ -753,18 +757,18 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 <section class="ref" id="board"><div class="wrap">
   <div class="ch-label"><span class="n">01</span><span>The market board</span></div>
   <h2>Every channel, and what fills it.</h2>
-  <p class="lede">The Inland Empire's TV band as a grid from 2 to 69 and the radio band below it, each slot coloured by what's there: an independent station, a claimable station, a listed city stream, Opencast's catalog station, a call sign held from the waitlist, or open. Above it, how much of tonight is local.</p>
+  <p class="lede">The Inland Empire's TV band as a grid from 2 to 69 and the radio band below it, each slot coloured by what's there: an independent station, a claimable station, an external city stream, Opencast's catalog station, a call sign held from the waitlist, or open. Above it, how much of tonight is local.</p>
   <div class="stage">
     <div class="fit" data-w="1280" data-h="860"><div class="scaler">
       <div class="app nd" data-nav="board" style="height:860px">
-        <div class="mc-title"><div><h2>Inland Empire</h2><p>8 stations, 2 claimable stations on air, 3 listed city streams and the catalog station. 26 people on the waitlist here.</p></div><div class="end"><div class="seg"><button aria-pressed="true">Inland Empire</button><button aria-pressed="false">High Desert</button><button aria-pressed="false">Los Angeles</button></div></div></div>
+        <div class="mc-title"><div><h2>Inland Empire</h2><p>8 stations, 2 claimable stations on air, 3 external city streams and the catalog station. 26 people on the waitlist here.</p></div><div class="end"><div class="seg"><button aria-pressed="true">Inland Empire</button><button aria-pressed="false">High Desert</button><button aria-pressed="false">Los Angeles</button></div></div></div>
         <div class="cov">
           <div><span class="v">71%</span><small>Of tonight's station hours are local programming</small></div>
           <div><span class="v">2</span><small>Claimable stations on air, waiting to be claimed</small></div>
           <div><span class="v">4</span><small>Creators who said yes, not set up yet</small></div>
           <div><span class="v">1</span><small>Station with dead air coming, HALL 90.7</small></div>
         </div>
-        <div class="legend3"><span><i style="background:#8C3B7A"></i>Independent station</span><span><i style="border:2px dashed var(--signal)"></i>Claimable, run by Opencast</span><span><i style="border:1px dashed var(--line)"></i>Listed city stream</span><span><i style="background:var(--ink)"></i>Opencast catalog</span><span><i style="background:repeating-linear-gradient(135deg,var(--hair) 0 3px,transparent 3px 6px)"></i>Held for the waitlist</span><span><i style="border:1px solid var(--hair)"></i>Open</span></div>
+        <div class="legend3"><span><i style="background:#8C3B7A"></i>Independent station</span><span><i style="border:2px dashed var(--signal)"></i>Claimable, run by Opencast</span><span><i style="border:1px dashed var(--line)"></i>External city stream</span><span><i style="background:var(--ink)"></i>Opencast catalog</span><span><i style="background:repeating-linear-gradient(135deg,var(--hair) 0 3px,transparent 3px 6px)"></i>Held for the waitlist</span><span><i style="border:1px solid var(--hair)"></i>Open</span></div>
         <div class="sec-top" style="margin-top:0"><h3>TV band</h3><span class="sub">2 to 69, main channels</span></div>
         <div class="dialmap" id="tvmap" style="margin-top:10px"></div>
         <div class="sec-top"><h3>Radio band</h3><span class="sub">88.1 to 107.9</span></div>
@@ -908,27 +912,32 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 <!-- ================= LISTED ================= -->
 <section class="ref" id="listed"><div class="wrap">
   <div class="ch-label"><span class="n">05</span><span>City streams and the catalog</span></div>
-  <h2>What fills the dial without a creator.</h2>
-  <p class="lede">City and county meeting streams are listed, not restreamed: Network desk keeps each source, syncs its meeting calendar into listings, and checks that its terms allow embedding. The catalog station is Opencast's own, filled from the catalog. Both sit on the board with everything else.</p>
+  <h2>External stations, and what fills the dial without a creator.</h2>
+  <p class="lede">External stations are channels whose video comes straight from the source's own stream, with no Opencast playout, spots or breaks. They play one of two ways: the source's official embedded player where its terms allow it, or its raw stream link, only with permission or for clearly public sources. Network desk keeps each one's schedule and checks its stream, hiding it from the dial while it's down. The catalog station is Opencast's own, filled from the catalog.</p>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app nd" data-nav="listed">
-        <div class="mc-title"><div><h2>Listed sources</h2><p>Public streams on the Inland Empire dial. Viewers get the source's own player.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>List a source</button></div></div>
-        <div class="src-h"><span>Source</span><span>Channel</span><span>Listings</span><span>Embedding</span></div>
-        <div class="src-row"><div><b>City of Redlands</b><small>Council and planning meetings, the city's official stream</small></div><span class="mono">9.1 RDLS</span><span class="ok-t"><svg><use href="#i-check"/></svg>Synced from the agenda calendar</span><span class="ok-t"><svg><use href="#i-check"/></svg>Allowed</span></div>
-        <div class="src-row"><div><b>City of Colton</b><small>Council meetings</small></div><span class="mono">9.2 COLT</span><span class="ok-t"><svg><use href="#i-check"/></svg>Synced</span><span class="ok-t"><svg><use href="#i-check"/></svg>Allowed</span></div>
-        <div class="src-row"><div><b>San Bernardino County</b><small>Board of Supervisors</small></div><span class="mono">9.3 SBCO</span><span class="ok-t" style="color:var(--standby)"><svg><use href="#i-warn"/></svg>Calendar not found</span><span class="ok-t"><svg><use href="#i-check"/></svg>Allowed</span></div>
-        <div class="src-row"><div><b>Riverside Unified School District</b><small>Board meetings</small></div><span class="quiet">Not listed</span><span class="quiet">Checking</span><span class="ok-t" style="color:var(--standby)"><svg><use href="#i-warn"/></svg>Terms unclear</span></div>
+    <div class="fit" data-w="1280" data-h="880"><div class="scaler">
+      <div class="app nd" data-nav="listed" style="height:880px">
+        <div class="mc-title"><div><h2>External sources</h2><p>Stations on the Inland Empire dial that play the source's own stream. No playout, no spots.</p></div><div class="end"><button class="btn btn-primary btn-sm"><svg class="i"><use href="#i-plus"/></svg>List a source</button></div></div>
+        <div class="src-h"><span>Source</span><span>Channel</span><span>How it plays</span><span>What's on</span><span>Right now</span></div>
+        <div class="src-row"><div><b>City of Redlands</b><small>Council and planning meetings</small></div><span class="mono">9.1 RDLS</span><div class="tier"><b>Official embed</b><small>The city's own player, embedding allowed</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
+        <div class="src-row"><div><b>City of Colton</b><small>Council meetings</small></div><span class="mono">9.2 COLT</span><div class="tier"><b>Stream link</b><small>Public body, stream published for the public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Their agenda calendar</span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
+        <div class="src-row"><div><b>San Bernardino County</b><small>Board of Supervisors</small></div><span class="mono">9.3 SBCO</span><div class="tier"><b>Official embed</b><small>The county's own player</small></div><span class="ok-t" style="color:var(--standby)"><svg><use href="#i-warn"/></svg><span>No schedule found<small>Banner shows name and Live</small></span></span><span class="ok-t" style="color:var(--live)"><span class="dot-down"></span><span>Down 14 min<small>Hidden from the dial</small></span></span></div>
+        <div class="src-row"><div><b>NASA</b><small>Launches and live coverage</small></div><span class="mono">61.1 NASA</span><div class="tier"><b>Stream link</b><small>US government, public</small></div><span class="ok-t"><svg><use href="#i-check"/></svg><span>Guide data<small>Checked, from their published schedule</small></span></span><span class="ok-t"><span class="dot-up"></span>Up</span></div>
+        <div class="src-row"><div><b>Riverside Unified School District</b><small>Board meetings</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Official embed</b><small>Terms unclear, asked Sept 22</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
+        <div class="src-row"><div><b>Inland Community TV</b><small>From an IPTV list. A community channel's raw stream</small></div><span class="quiet">Not on the dial</span><div class="tier"><b>Stream link</b><small>Needs their permission. In the creator pipeline</small></div><span class="quiet">Waiting</span><span class="quiet">Not on the dial</span></div>
         <div class="sec-top"><h3>Opencast catalog station</h3></div>
         <div class="row2"><div><b>60.1 OCAT, Opencast Classics</b><small>Filled entirely from the catalog. Made possible by Clear. Also offered to every station for carriage</small></div><div class="end"><button class="btn btn-ghost btn-sm">Open in master control</button></div></div>
         <div class="row2"><div><b>When a local station is ready for 60.1</b><small>The catalog station moves to a free channel so the number can go to someone local</small></div><span></span></div>
       </div>
     </div></div>
     <div class="notes">
-      <div class="note"><h3>Embedding is checked, not assumed</h3><p>A source is only listed when its terms allow embedding. "Terms unclear" means someone asks the district first.</p></div>
-      <div class="note"><h3>Listings come from their calendar</h3><p>Where a city publishes an agenda calendar, meetings appear in the guide automatically with their real titles and times.</p></div>
+      <div class="note"><h3>Two ways to play</h3><p>An official embed uses the source's own player, only where its terms allow embedding. A raw stream link plays in Opencast's player and needs the source's permission, unless it's clearly public: government bodies, public access, NASA and the like.</p></div>
+      <div class="note"><h3>IPTV lists are leads, not listings</h3><p>A channel found on a public IPTV list goes into the creator pipeline first. Once it says yes, it can be added as an external station, or become a full station with spots and earnings.</p></div>
+      <div class="note"><h3>What's on, when we can get it</h3><p>From the source's own calendar or schedule feed, or guide data checked against their published schedule. With neither, the banner shows the station's name, "Live" and the source, and no progress bar. Nothing is made up.</p></div>
+      <div class="note"><h3>Hidden while it's down</h3><p>Each stream is checked every minute. After 5 minutes down, the station leaves the dial and the swipe order; anyone already watching sees Stand by. It comes back on its own when the stream does, and Network desk is told both times.</p></div>
+      <div class="note"><h3>No spots, no earnings</h3><p>External stations never air spots, sponsor credits or partner ads, can't be carried or offered in the market, and show an "External" tag in the banner and guide.</p></div>
       <div class="note"><h3>The catalog station steps aside</h3><p>Opencast's own station holds a channel until a local station wants it, then moves. The dial should fill up with local stations, not with Opencast.</p></div>
-      <div class="note open"><h3>Other markets' streams</h3><p>Whether a city stream from outside a market can be listed in it, for example a county meeting that covers two markets, isn't decided.</p></div>
+      <div class="note open"><h3>Other markets' streams</h3><p>Whether a city stream from outside a market can be added in it as an external station, for example a county meeting that covers two markets, isn't decided.</p></div>
     </div>
   </div>
 </div></section>
@@ -1029,7 +1038,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 <script>
 (function(){
   /* Network desk shell */
-  var NAV = [['Markets',[['board','Market board'],['pipeline','Creator pipeline','4'],['listed','Listed sources','1'],['catalog','Catalog']]],['Stations',[['team','Held earnings','$227'],['claims','Rights claims'],['reserved','Reserved call signs','26']]],['Opencast',[['sponsors','Catalog sponsors'],['settings','Settings']]]];
+  var NAV = [['Markets',[['board','Market board'],['pipeline','Creator pipeline','4'],['listed','External sources','1'],['catalog','Catalog']]],['Stations',[['team','Held earnings','$227'],['claims','Rights claims'],['reserved','Reserved call signs','26']]],['Opencast',[['sponsors','Catalog sponsors'],['settings','Settings']]]];
   document.querySelectorAll('.app.nd').forEach(function(app){
     var nav=app.dataset.nav, content=app.innerHTML;
     var head='<div class="nd-head"><span class="mc-lock"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><span class="div"></span><b>Network desk</b></span><span class="internal">Internal</span><div class="end"><span class="quiet" style="font-size:13px">Opencast team</span><span class="avatar">DA</span></div></div>';

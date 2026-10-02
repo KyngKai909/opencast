@@ -1,0 +1,13 @@
+/* The web player bar (core .a-player). */
+.oc-player-bar {
+  flex: none; height: 72px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px 0 14px;
+  border-top: 1px solid var(--hair); background: var(--raised);
+}
+.oc-player-bar__card { width: 84px; flex: none; padding: 5px 7px; }
+.oc-player-bar__card .oc-shell-card__t { font-size: 10px; }
+.oc-player-bar__text { min-width: 0; }
+.oc-player-bar__title { font: 700 15px/1.2 var(--font-display); letter-spacing: -.01em; }
+.oc-player-bar__station { font-size: 13px; color: var(--ink-70); }
+.oc-player-bar__ctl { margin-left: auto; display: flex; gap: 8px; align-items: center; }

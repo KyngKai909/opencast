@@ -1,0 +1,5 @@
+test-results/
+report/
+.auth/
+# The real-API harness's run state (the throwaway key, the seed's ids): playwright.real.config.ts.
+.real/

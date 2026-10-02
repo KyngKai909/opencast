@@ -1,0 +1,9 @@
+/* network-desk 03.1 .ask: the form, and the message 420px wide on the right. */
+.nd-ask { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 28px; align-items: start; }
+.nd-ask__to { margin-bottom: 16px; }
+.nd-ask__note { margin-top: 14px; }
+.nd-ask__note textarea { min-height: 78px; }
+.nd-ask__send { margin-top: 16px; }
+.nd-ask__sent { margin-top: 16px; }
+.nd-ask__why { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }
+.nd-ask__empty { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--hair); color: var(--ink-70); font-size: 13.5px; }

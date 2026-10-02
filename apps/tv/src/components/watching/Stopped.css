@@ -1,0 +1,4 @@
+.tvw-stopped { background: var(--screen); display: flex; flex-direction: column; justify-content: center; padding: 0 180px; color: var(--ink-70); }
+.tvw-stopped p { margin: 0; font-size: 36px; }
+.tvw-stopped__ok { margin-top: 20px !important; font-size: 28px !important; display: flex; align-items: center; }
+.tvw-stopped .oc-kbd--tv { font-size: 21px; margin-right: 12px; }

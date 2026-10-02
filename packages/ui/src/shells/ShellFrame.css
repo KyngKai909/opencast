@@ -1,0 +1,30 @@
+/* The shared frame (shared-mid .app.mc, .mc-body, .mc-main) and header (.mc-head, .biz-head, .nd-head, .mc-lock). */
+.oc-shell {
+  display: flex; flex-direction: column; position: relative;
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--ground); color: var(--ink);
+  font-size: 15px; line-height: 1.45;
+}
+.oc-shell__body { flex: 1; display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 0; }
+.oc-shell__main { overflow: auto; padding: 22px 28px 28px; position: relative; min-width: 0; }
+.oc-shell__main--flush { padding: 0; }
+
+.oc-shell-head {
+  height: 56px; flex: none;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 22px; border-bottom: 1px solid var(--hair);
+}
+.oc-shell-head--business { gap: 16px; background: var(--raised); }
+.oc-shell-head--desk { background: var(--raised); }
+.oc-shell-head__lock { display: inline-flex; align-items: center; gap: 12px; }
+.oc-shell-head__home { display: inline-flex; text-decoration: none; color: inherit; }
+.oc-shell-head__div { width: 1px; height: 20px; background: var(--line); }
+.oc-shell-head__app { font-weight: 600; font-size: 15px; }
+.oc-shell-head__end { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.oc-shell-head--business .oc-shell-head__end { gap: 14px; }
+/* A quiet line in the header ("New station, step 1 of 5", "Opencast team", "Studios don't broadcast"). */
+.oc-shell-head__note { color: var(--ink-50); font-size: 14px; }
+.oc-shell-head__end .oc-shell-head__note { font-size: 13px; }
+/* "Back to watching" (master control, the Opencast app): a quiet link before the header's end parts. */
+.oc-shell-head__back { color: var(--ink-70); font-size: 14px; text-decoration: none; white-space: nowrap; }
+.oc-shell-head__back:hover { color: var(--ink); text-decoration: underline; }

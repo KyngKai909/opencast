@@ -1,0 +1,24 @@
+/* No-picture screens (style guide Ch. 10 .state; TV 05 .state-full). Sizes in container units, measured
+   against the style guide's 564px screen (474px inside its 8% padding), so they scale with the screen they're on. */
+.oc-slate {
+  font-size: 17px; line-height: 1.6;
+  position: relative; aspect-ratio: 16 / 9; overflow: hidden;
+  background: var(--screen); color: var(--on-screen); border-radius: var(--r-screen);
+  container-type: inline-size;
+  display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 8%;
+}
+.oc-slate__big { font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; font-size: clamp(22px, 8.1cqw, 38px); letter-spacing: -.03em; line-height: 1; margin-bottom: 10px; }
+.oc-slate__small { font-size: clamp(12px, 3.2cqw, 15px); color: var(--on-screen-70); max-width: 36ch; line-height: 1.45; }
+.oc-slate__small .oc-mono { color: var(--on-screen); }
+.oc-slate__bars { position: absolute; left: 0; right: 0; top: 0; height: 12%; }
+.oc-slate__tally { position: absolute; top: 7%; right: 5%; }
+.oc-slate--dead-air .oc-slate__big { color: var(--pic-standby); }
+.oc-slate__freq { font-family: var(--font-mono); font-weight: 500; font-size: clamp(34px, 13.6cqw, 64px); letter-spacing: -.04em; line-height: 1; margin-bottom: 8px; }
+.oc-slate--radio .oc-slate__big { font-size: clamp(18px, 5.5cqw, 26px); }
+.oc-slate__meter { margin-top: 14px; }
+
+/* TV: full screen, ten feet. */
+.oc-slate--tv { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; padding: 0 180px; align-items: stretch; line-height: 1.4; }
+.oc-slate--tv .oc-slate__big { font: 800 150px/1 var(--font-display); font-stretch: var(--wide); letter-spacing: -.045em; margin: 0; }
+.oc-slate--tv .oc-slate__small { font-size: 36px; color: var(--on-screen-70); max-width: 30ch; margin: 26px 0 40px; line-height: 1.4; }
+.oc-slate__actions { display: flex; gap: 20px; }

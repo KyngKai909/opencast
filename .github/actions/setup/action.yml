@@ -1,0 +1,43 @@
+name: Setup
+description: Node 22, the workspace's packages (npm ci, cached), optionally ffmpeg, and the shared packages built.
+
+inputs:
+  ffmpeg:
+    description: Install ffmpeg (the API's media pipeline, the playout tests, the mock HLS streams).
+    default: "false"
+  build-packages:
+    description: Build packages/* (domain, db, contracts) so tsx scripts and Vite find their dist/.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 22
+        cache: npm
+
+    # Nothing in CI may read a repo .env (provider keys). It's git-ignored; make sure it stays that way.
+    - name: No .env in the checkout
+      shell: bash
+      run: |
+        if [ -e .env ]; then echo "::error::.env is in the checkout; CI never reads the repo's .env"; exit 1; fi
+
+    - name: npm ci
+      shell: bash
+      run: npm ci --no-audit --no-fund --prefer-offline
+
+    - name: ffmpeg
+      if: inputs.ffmpeg == 'true'
+      shell: bash
+      run: |
+        if ! command -v ffmpeg >/dev/null; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg >/dev/null
+        fi
+        ffmpeg -hide_banner -version | head -1
+
+    - name: Build packages/*
+      if: inputs.build-packages == 'true'
+      shell: bash
+      run: npx turbo run build --filter='./packages/*' --output-logs=errors-only

@@ -1,0 +1,15 @@
+/* sponsorships .slate: 16:9 in the station's colour, drawn at 440px in the frame (lead 15, name 30,
+   line 14, members 12.5, bug 16 and 10), as widths of the slate so it scales on a phone. */
+.bz-slate {
+  container-type: inline-size;
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-screen); overflow: hidden;
+  background: var(--bz-slate); color: var(--on-station);
+}
+.bz-slate__body { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 8%; }
+.bz-slate__lead { font-size: 3.41cqw; opacity: .85; }
+.bz-slate__who { font: 800 6.82cqw/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; margin: 2.27cqw 0 1.36cqw; }
+.bz-slate__line { font-size: 3.18cqw; line-height: 1.45; opacity: .9; max-width: 44ch; }
+.bz-slate__also { position: absolute; left: 8%; bottom: 8%; font-size: 2.84cqw; opacity: .75; }
+.bz-slate__bug { position: absolute; right: 5%; bottom: 7%; text-align: right; line-height: 1; opacity: .78; }
+.bz-slate__cs { display: block; font: 800 3.64cqw var(--font-display); font-stretch: var(--semi-wide); }
+.bz-slate__ch { font: 500 2.27cqw var(--font-mono); }

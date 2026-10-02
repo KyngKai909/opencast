@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Opencast · Television, run by your neighbors</title>
+    <meta name="description" content="Opencast is a dial of 24/7 local stations run by people and groups where you live. Tune in, cast it to the TV and flip channels with your phone. Or start a station of your own." />
+    <link rel="canonical" href="https://useopencast.org/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Opencast" />
+    <meta property="og:url" content="https://useopencast.org/" />
+    <meta property="og:title" content="Opencast · Television, run by your neighbors" />
+    <meta property="og:description" content="Opencast is a dial of 24/7 local stations run by people and groups where you live. Tune in, cast it to the TV and flip channels with your phone. Or start a station of your own." />
+    <meta property="og:locale" content="en_US" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Opencast · Television, run by your neighbors" />
+    <meta name="twitter:description" content="A dial of 24/7 local stations run by people and groups where you live. Starting in the Inland Empire, California." />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // The ground before the first paint: a saved choice wins over the system's (oc-ground).
+      try {
+        var g = localStorage.getItem("oc-ground");
+        if (g === "dark" || g === "light") document.documentElement.setAttribute("data-theme", g);
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Opencast is a dial of 24/7 local stations run by people and groups where you live. Starting in the Inland Empire, California.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

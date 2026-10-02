@@ -1,0 +1,6 @@
+/* The phone's back bar (shared-mid .p-back). */
+.oc-phone-back { flex: none; display: flex; align-items: center; gap: 6px; padding: 4px 12px 10px; border-bottom: 1px solid var(--hair); }
+.oc-phone-back__title { margin: 0; font: 800 19px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; min-width: 0; }
+/* No arrow (a top-level screen): the title keeps its 6px inset, as biz-settings 05.1 draws it. */
+.oc-phone-back--top .oc-phone-back__title { margin-left: 6px; }
+.oc-phone-back__end { margin-left: auto; margin-right: 6px; display: flex; align-items: center; gap: 8px; }

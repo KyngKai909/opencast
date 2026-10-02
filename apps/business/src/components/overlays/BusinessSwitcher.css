@@ -1,0 +1,22 @@
+/* The business switcher (after station-settings 04.1 .menu-pop, .mp, .mp-sep, .mp-add; biz .biz-sw .lg). */
+.bz-switch--menu {
+  position: fixed; z-index: 20; width: 320px;
+  background: var(--ground); border-radius: var(--r-screen);
+  /* The menu's lift: black on either ground, as master control's draws it. */
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px rgb(0 0 0 / .35);
+  padding: 8px;
+}
+.bz-switch__row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 10px; border-radius: var(--r-control); font-size: 14px; color: var(--ink); text-decoration: none;
+}
+.bz-switch__row:hover, .bz-switch__row--on { background: var(--raised); }
+.bz-switch__row:focus-visible, .bz-switch__add:focus-visible { outline: 2px solid var(--signal); outline-offset: 0; }
+.bz-switch__logo { width: 22px; height: 22px; border-radius: 4px; color: #fff; font: 800 10px var(--font-display); display: grid; place-items: center; }
+.bz-switch__who { min-width: 0; }
+.bz-switch__who b { display: block; font-weight: 600; }
+.bz-switch__who small { font-size: 12px; color: var(--ink-70); }
+.bz-switch__check { color: var(--signal); }
+.bz-switch__sep { height: 1px; background: var(--hair); margin: 6px 4px; }
+.bz-switch__add { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-control); font-size: 14px; font-weight: 600; color: var(--signal); text-decoration: none; }
+.bz-switch--sheet .bz-switch__row { padding: 12px 10px; }

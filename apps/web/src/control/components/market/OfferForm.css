@@ -1,0 +1,47 @@
+/* Offering 02.1 (control/opencast-offering.css: .split, .chk, .row2, .pane, .kv, .m-note) */
+.cc-mk-offer-form__notice { margin-bottom: 14px; }
+.cc-mk-offer-form__split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 28px; }
+.cc-mk-offer-form__split > * { min-width: 0; }
+
+/* A deal to tick (.chk) */
+.cc-mk-chk { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hair); align-items: start; }
+.cc-mk-chk__box { position: relative; width: 20px; height: 20px; margin-top: 2px; cursor: pointer; }
+.cc-mk-chk__box input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: inherit; }
+.cc-mk-chk__bx { width: 20px; height: 20px; border-radius: 4px; border: 1.5px solid var(--line); display: grid; place-items: center; }
+.cc-mk-chk--on .cc-mk-chk__bx { background: var(--signal-fill); border-color: var(--signal-fill); color: var(--on-signal); }
+.cc-mk-chk__box input:focus-visible + .cc-mk-chk__bx { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-mk-chk b { font-weight: 600; display: block; font-size: 14.5px; }
+.cc-mk-chk small { font-size: 12.5px; color: var(--ink-70); display: block; margin-top: 2px; }
+.cc-mk-chk:not(.cc-mk-chk--on) b, .cc-mk-chk:not(.cc-mk-chk--on) small { color: var(--ink-50); }
+.cc-mk-chk__end { font: 500 14px var(--font-mono); }
+.cc-mk-chk__inset { margin-top: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--ink-70); }
+.cc-mk-chk__field { width: 84px; }
+.cc-mk-chk__field--money { width: 100px; }
+.cc-mk-chk__field .oc-field__input { font-size: 14px; }
+.cc-mk-offer-form__error { font-size: 13px; color: var(--standby); margin: 8px 0 0; }
+
+/* Limits (.row2) */
+.cc-mk-limit { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-mk-limit b { display: block; font-weight: 600; font-size: 14.5px; }
+.cc-mk-limit small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.cc-mk-limit__val { font-size: 14px; color: var(--ink-70); }
+
+/* How stations will see it (.pane) */
+.cc-mk-offer-form__pane { border-left: 1px solid var(--hair); padding-left: 28px; }
+.cc-mk-offer-form__h4 { margin: 0 0 10px; font: 700 15px var(--font-display); }
+.cc-mk-offer-form__card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: center; padding: 8px 0 10px; border-top: 1px solid var(--line); }
+.cc-mk-offer-form__tc.oc-tc { padding: 5px 7px; }
+.cc-mk-offer-form__tc .oc-tc__t { font-size: 10.5px; }
+.cc-mk-offer-form__card b { display: block; font: 700 15px/1.2 var(--font-display); }
+.cc-mk-offer-form__card small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.cc-mk-offer-form__kv.oc-kv { margin: 0; }
+.cc-mk-offer-form__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.cc-mk-offer-form__go { margin-top: 14px; }
+
+.cc-mk-offer-form--phone { padding: 16px; }
+.cc-mk-offer-form__h { margin: 0 0 8px; font: 800 19px var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+
+@media (max-width: 1100px) {
+  .cc-mk-offer-form__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-mk-offer-form__pane { border-left: 0; padding-left: 0; }
+}

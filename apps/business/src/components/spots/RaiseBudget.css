@@ -1,0 +1,7 @@
+/* biz-spots 04.1 and 06.2 (.fld label, .amts2, .est). */
+.bz-raise { margin-top: 12px; }
+.bz-raise__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.bz-raise__est { font-size: 13px; color: var(--ink-70); margin: 6px 0 0; }
+.bz-raise__est b { color: var(--ink); }
+.bz-raise__go { margin-top: 14px; }
+.bz-raise__error { font-size: 13px; color: var(--standby); margin: 8px 0 0; }

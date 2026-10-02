@@ -1,0 +1,41 @@
+/* The studio view's parts (live-listings .golive, .cam-bar, .meter-h, .countdown, .l3-edit, .sec-top, .pm-sec). */
+.cc-sec-top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 22px; }
+.cc-sec-top:first-child { margin-top: 0; }
+.cc-sec-top h3 { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.cc-sec-top__end { margin-left: auto; display: flex; gap: 10px; align-items: center; align-self: center; }
+
+.cc-studio__mirror { transform: scaleX(-1); }
+.cc-studio__problem {
+  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px;
+  padding: var(--s4); text-align: center; color: var(--on-screen); background: var(--screen); font-size: 14px;
+}
+.cc-studio__problem b { font: 700 17px/1.2 var(--font-display); }
+.cc-studio__problem span { color: var(--on-screen-70); max-width: 42ch; }
+
+.cc-studio__bar { display: flex; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.cc-studio__bar .oc-field { margin: 0; }
+.cc-studio__cam { width: 260px; flex: none; }
+.cc-studio__mic { position: relative; width: 240px; flex: none; }
+.cc-studio__mic .oc-field__box { padding-right: 90px; }
+.cc-studio__mic .cc-meter { position: absolute; right: 34px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.cc-studio__share { margin-left: auto; }
+.cc-studio__note { font-size: 13px; color: var(--ink-70); margin: 10px 0 0; }
+
+.cc-meter { display: flex; gap: 2px; align-items: center; height: 14px; }
+.cc-meter i { width: 6px; height: 10px; border-radius: 1px; background: var(--ink-70); }
+.cc-meter i.cc-meter__off { background: var(--hair); }
+
+.cc-countdown { border: 1.5px solid var(--standby); border-radius: var(--r-screen); padding: 18px; text-align: center; }
+.cc-countdown__cd { font: 500 56px/1 var(--font-mono); letter-spacing: -.04em; margin: 12px 0 6px; font-variant-numeric: tabular-nums; }
+.cc-countdown small { font-size: 13px; color: var(--ink-70); display: block; }
+.cc-countdown--on { border-color: var(--line); }
+.cc-countdown--on .cc-countdown__cd { margin-top: 0; }
+.cc-countdown--ended { border-color: var(--line); }
+
+.cc-l3-edit { display: grid; gap: 8px; margin: 10px 0 0; }
+.cc-l3-edit .oc-field__label { font-size: 12.5px; }
+
+.cc-speakers h4 { margin: 0 0 8px; font: 700 15px var(--font-display); }
+.cc-speakers .oc-kvrows__row { padding: 8px 0; }
+.cc-speakers .oc-kvrows__row:last-child { border-bottom: 0; }
+.cc-add-speaker { display: grid; gap: 14px; }

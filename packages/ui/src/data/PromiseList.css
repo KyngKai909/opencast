@@ -1,0 +1,12 @@
+/* The numbered promise (biz funding and production orders .promise). */
+.oc-promise { border-top: 2px solid var(--ink); padding-top: 12px; }
+/* Two classes, so a page's own heading rules don't win. */
+.oc-promise .oc-promise__title { margin: 0 0 8px; color: var(--ink); font: 700 16px var(--font-display); }
+.oc-promise__list { margin: 0; padding: 0; list-style: none; counter-reset: oc-promise; }
+.oc-promise__line {
+  counter-increment: oc-promise;
+  display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; color: var(--ink-70);
+}
+.oc-promise__line::before { content: counter(oc-promise); font: 500 12.5px var(--font-mono); color: var(--ink-50); }
+.oc-promise__line b { color: var(--ink); font-weight: 600; }

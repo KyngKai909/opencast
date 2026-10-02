@@ -1,12 +1,17 @@
 # Opencast: apps prompt (every screen, from the reference files)
 
-You're working in `github.com/KyngKai909/untitled-project`, the Opencast repo, after the platform prompt has restructured it into a monorepo. Your job is to build every app from the reference designs: the viewer app, master control, TV mode (including the Chromecast receiver), Opencast for business, Network desk and the marketing site, on a shared UI package and a shared player.
+You're working in `github.com/KyngKai909/opencast`, the Opencast repo, after the platform prompt has restructured it into a monorepo. Your job is to build every app from the reference designs, on a shared UI package and a shared player. There are four:
+
+- **`apps/web`, the Opencast app.** One account and one sign-in for viewers and creators, like Twitch: the viewer at `/`, master control at `/control`, and Network desk at `/desk` for Opencast admins.
+- **`apps/business`, Opencast for business.** The advertiser side, a separate app for a separate kind of customer.
+- **`apps/tv`.** A TV build of the same app for ten-foot screens, and the Chromecast receiver.
+- **`apps/site`.** The marketing page.
 
 A second prompt, the platform prompt, owns the backend at the same time: `apps/api`, `apps/worker`, `packages/domain`, `packages/contracts` and `contracts/`. You own everything else under `apps/` and `packages/ui` and `packages/player`. You meet at `packages/contracts`: read its schemas, never edit them. If you need a field that doesn't exist, add it to `docs/contract-requests.md` and build against a mock until it lands.
 
 ## Before you start
 
-- Don't start until the platform prompt's Phase 2 (restructure) is merged into the `monorepo` branch. Check that `apps/control`, `apps/viewer`, `apps/tv`, `apps/spots`, `apps/desk`, `apps/site`, `packages/ui`, `packages/player` and `packages/contracts` exist. If they don't, stop and say so.
+- Don't start until the platform prompt's Phase 2 (restructure) is merged into the `monorepo` branch. Check that `apps/web`, `apps/business`, `apps/tv`, `apps/site`, `packages/ui`, `packages/player` and `packages/contracts` exist. If they don't, stop and say so.
 - Work on a branch called `apps`, from `monorepo`. Never force-push. Commit at the end of every phase.
 - **Stop at every point marked STOP.** Say what you did and what you found, then wait.
 - Anything marked **Open** isn't decided. Build it so it's easy to change, and list it in `docs/apps/open-questions.md`.
@@ -18,11 +23,11 @@ The designs are in `docs/reference/`, one folder per app. They are self-containe
 | Folder | Files | Builds |
 |---|---|---|
 | `brand/` | `opencast-style.html` (style guide), `opencast-site.html` | Tokens, type, voice; `apps/site` |
-| `viewer/` | `opencast-home.html`, `opencast-you.html`, `opencast-station-pages.html` | `apps/viewer` |
+| `viewer/` | `opencast-home.html`, `opencast-you.html`, `opencast-station-pages.html`, `opencast-tuning.html` | `apps/web`, the viewer area at `/` |
 | `tv/` | `opencast-tv.html`, `opencast-tv-update.html` | `apps/tv` and the Cast receiver |
-| `control/` | `opencast-master-control.html`, `opencast-live-listings.html`, `opencast-station-settings.html`, `opencast-offering.html`, `opencast-market.html`, `opencast-earnings.html`, `opencast-rights.html` | `apps/control` |
-| `business/` | `opencast-biz-funding.html`, `opencast-biz-spots.html`, `opencast-biz-results.html`, `opencast-sponsorships.html`, `opencast-production-orders.html`, `opencast-biz-settings.html` | `apps/spots` |
-| `desk/` | `opencast-network-desk.html` | `apps/desk` |
+| `control/` | `opencast-master-control.html`, `opencast-live-listings.html`, `opencast-station-settings.html`, `opencast-offering.html`, `opencast-market.html`, `opencast-earnings.html`, `opencast-rights.html` | `apps/web`, the master control area at `/control` |
+| `business/` | `opencast-biz-funding.html`, `opencast-biz-spots.html`, `opencast-biz-results.html`, `opencast-sponsorships.html`, `opencast-production-orders.html`, `opencast-biz-settings.html` | `apps/business` |
+| `desk/` | `opencast-network-desk.html`, `opencast-desk-catalog.html`, `opencast-desk-pages.html` | `apps/web`, the Network desk area at `/desk` |
 
 `opencast-sponsorships.html` and `opencast-production-orders.html` show both sides: the business app and master control. Build both halves.
 
@@ -39,7 +44,7 @@ How to read them:
 - Mock Service Worker for every endpoint until the real one exists, with fixtures built from the reference files' illustration data and validated against the contract schemas. Each app runs fully on mocks with `npm run dev:mock`.
 - Styling: the tokens are CSS custom properties, defined once in `packages/ui` from the style guide's Colour, Type, Space and Shape chapters. Every colour, size, radius and font in every app comes from those tokens. If you keep Tailwind (the repo has it), configure it to read the tokens; no hard-coded values.
 - Fonts: Archivo (display, width 125 for idents and headlines), Public Sans (text and buttons), IBM Plex Mono (clock, channel numbers, amounts, log codes only), self-hosted with fallback stacks.
-- Sign-in: Privy, email first, then Apple, Google and wallets, as in `viewer/opencast-you.html`.
+- Sign-in: Opencast's own Privy app (its app ID from configuration, never Clear's), email first, then Apple, Google and wallets, as in `viewer/opencast-you.html`. "Connect Clear" uses Privy's cross-app linking (`useCrossAppAccounts`) with Clear as the provider; show the linked Clear account in settings, and handle Clear sharing read-only (payout address only) as well as full access (funding by a transfer the user confirms).
 - Tests: Vitest for components and logic, Playwright for the flows listed in Phase 9, axe for accessibility.
 
 ## Rules that apply everywhere
@@ -84,7 +89,7 @@ Write `docs/apps/inventory.md`: for every frame in every reference file, the app
 
 Build the design system once:
 - **Tokens** for both grounds, and the TV's always-dark set, from the style guide.
-- **Primitives:** buttons (primary, ghost, text, small, block), fields, toggles, segmented controls, chips, tags (including Live and Listed), the tally, tooltips, toasts with Undo, modals (web) and sheets (phone), notices (the amber standby notice and the plain one).
+- **Primitives:** buttons (primary, ghost, text, small, block), fields, toggles, segmented controls, chips, tags (including Live and External), the tally, tooltips, toasts with Undo, modals (web) and sheets (phone), notices (the amber standby notice and the plain one).
 - **Broadcast components:** channel number and call sign ident, station colour band, title card, picture frame with bug, lower third, listing row, dial row, guide grid with now-line, program log timeline with codes (PGM, SPT, UND, BMP, SID), break bar, schedule list with the tally edge on the current row, progress bar (not a scrub bar), radio band scale with needle, level meter.
 - **Data components:** stat rows (the ruled number groups), key-value lists, tables with mono amounts, timeline (done, current, future), step rails, permissions table, charts (line with a comparison line and shaded breaks, as in the audience page).
 - **Shells:** viewer web (header, nav, market button, player bar), viewer phone (top bar, four tabs, mini player), master control (header with station switcher, clock and tally; rail; setup step rail; the studio variant with no on-air pages), business (header with business switcher and balance; rail; setup step rail), Network desk (header with the Internal mark), and the settings layout (sub-rail and pane) used by viewer, station and business settings.
@@ -97,7 +102,9 @@ Add `apps/gallery`: every component in both grounds and every state, with the re
 
 One player used by the viewer app, TV mode and the Cast receiver:
 - HLS playback with hls.js (native on Safari). Tuning in joins live, mid-program. No scrub bar, except in the syndication market's station preview.
-- Channel changes keep the previous picture until the new one is ready. Pre-warm the neighbouring channels so up and down are fast.
+- Channel changes keep the previous picture until the new one is ready. Pre-warm the neighbouring channels (their playlists and first segment) so up and down are fast.
+- **The player draws the station's bug, lower thirds and on-screen codes and QR** as overlays, timed from `#EXT-X-DATERANGE` tags in the channel's playlist. They aren't in the picture: channels are assembled from segments prepared once, as the platform prompt describes. Place them inside the style guide's safe areas, exactly as the reference frames show them.
+- Handle `#EXT-X-DISCONTINUITY` between items and the switch into and out of live blocks without a visible glitch.
 - The banner on every change: ident, what's on, progress, what's next, clock and tally, for 5 seconds (a setting on TV).
 - Captions (with the size setting), background audio on phones, pause that holds for 30 minutes then offers Back to live.
 - A tuned-in heartbeat every 30 seconds with station and session, as the platform prompt specifies.
@@ -105,22 +112,31 @@ One player used by the viewer app, TV mode and the Cast receiver:
 
 **STOP.** Show the player tuning between three mock stations, the banner, number entry and pre-warming.
 
-## Phase 3: `apps/viewer` (web and phone)
+## One app, three areas
 
-From `viewer/`: the home and dial, tuned in, the guide, station preview, carried from, pledge, share, reminders, first visit and thin markets, sign-in, You, presets (with the replace dialog), managing a pledge, settings (eight sections), the station page, the program page, search (with "Tune to" for numbers) and the radio band.
+`apps/web` holds the viewer, master control and Network desk as areas of one app, each with its own shell exactly as drawn in the reference files.
+- **One session.** A viewer who starts a station, or a station owner who wants to watch, never signs in twice. The avatar menu shows "Master control" to people with a station role and "Network desk" to admins; master control's header has "Back to watching".
+- **Lazy-load each area** by route, so viewers never download master control or the desk.
+- **Roles decide access,** checked by the API on every request. Hiding a route is not security.
+- **`apps/business`** is separate, with its own sign-in screen for businesses, but the same Opencast account: someone who runs a station and also advertises signs in once and can open either.
+- **`apps/tv`** shares the viewer area's code and the player, built for TV screens with the TV shell.
+
+## Phase 3: `apps/web`, the viewer area (web and phone)
+
+From `viewer/`: off air stations on the dial and in the guide with the time they're back, the home and dial, tuned in, the guide, station preview, carried from, pledge, share, reminders, first visit and thin markets, sign-in, You, presets (with the replace dialog), managing a pledge, settings (eight sections), the station page, the program page, search (with "Tune to" for numbers) and the radio band.
 
 - Number keys 1 to 6 tune presets from anywhere on the web; arrow keys change channel on the tuned-in page; `/` opens search.
 - Sign-in appears only when someone saves, reminds or pledges, and completes the action afterwards.
-- A "Run a station or offer your programs" link on You hands off to master control.
+- A "Run a station or offer your programs" link on You opens the master control area in the same session.
 - It's a PWA; the Capacitor wrapper comes in Phase 8.
 
 **STOP.** Show the viewer app on mocks, web and phone widths, both grounds.
 
-## Phase 4: `apps/control` (master control)
+## Phase 4: `apps/web`, the master control area (`/control`)
 
 From `control/`, plus the station halves of `business/opencast-sponsorships.html` and `business/opencast-production-orders.html`:
 - **Sign-on flow A1 to A5** and the Monitor, with the "From the market" suggestions.
-- **Program log** as a timeline with breaks and dead air.
+- **Program log** as a timeline with breaks, dead air, and scheduled off air hours (drawn differently from dead air, and never warned about), with "Repeat this day" (every Saturday, weekdays, every day, once) and the off air hours setting.
 - **Library:** item page and folders.
 - **Live sources** and going live from a browser and a phone, with stand by, countdown, lower thirds and the speaker list.
 - **Listings** with previews.
@@ -130,7 +146,7 @@ From `control/`, plus the station halves of `business/opencast-sponsorships.html
 - **Audience and Earnings,** with held money and statements.
 - **Rights** with claims and answers.
 - **Translators.**
-- **Settings:** identity, breaks, sponsorship, translators, team, notifications, station account, ownership.
+- **Settings:** identity, breaks (including the "Ads from partners" switch, which only sets a flag until the backend supports it), sponsorship, translators, team, notifications, station account, ownership.
 - **The station switcher.**
 
 Roles decide what's visible: owner, operator (sees earnings, can't move money) and host (only their assigned live blocks, lower thirds and cue break). A studio (a station with no channel) gets the studio shell with no on-air pages.
@@ -139,7 +155,7 @@ The rail is the same on every screen: On air (Monitor, Audience, Program log, Li
 
 **STOP.** Show a station's full evening on mocks: sign on, the log, a break filling, a live block going out from the browser, a paused spot handled by the backup rotation, and the earnings page.
 
-## Phase 5: `apps/spots` (Opencast for business)
+## Phase 5: `apps/business` (Opencast for business)
 
 From `business/`:
 - **Getting started:** business details, where customers are, funding.
@@ -165,16 +181,16 @@ From `tv/`: watching with the banner, number entry, the guide with its options d
 
 **STOP.** Show TV mode at 1920 by 1080 with keyboard arrows standing in for the remote, and the receiver responding to mock Cast messages.
 
-## Phase 7: `apps/desk` and `apps/site`
+## Phase 7: the Network desk area (`/desk`) and `apps/site`
 
-- **Network desk,** from `desk/`: the market board, the creator pipeline (including "Already licensed"), asking permission with the station preview, setting up from a recipe, listed sources, the creator's permission page (which needs no account), and held earnings with the escrow's station IDs. Admin sign-in only.
+- **Network desk,** from `desk/`: the market board, the creator pipeline (including "Already licensed"), asking permission with the station preview, setting up from a recipe, external sources, the creator's permission page (which needs no account), and held earnings with the escrow's station IDs. Admin sign-in only.
 - **The site,** from `brand/opencast-site.html`: one page, the working tuner in the hero, the waitlist with four roles (viewer, station with a held call sign, producer, business) posting to the API's waitlist endpoint.
 
 **STOP.** Show both.
 
 ## Phase 8: Native wrappers
 
-- **Viewer app on iOS and Android with Capacitor.**
+- **The Opencast app (`apps/web`) on iOS and Android with Capacitor,** so creators get master control on their phones too, including going live, as the reference files show.
   - **Casting:** the Google Cast sender SDK through a Cast plugin, so iPhones can cast to Chromecast too.
   - **Mirroring:** a custom Swift plugin for the iPhone's external display. When Screen Mirroring connects, it opens a second web view on the external display that loads TV mode with the bridge input adapter, and passes messages between the phone's web view and the TV's. The flows are in `tv/opencast-tv-update.html`: the one-time guide, switching to the remote automatically, the keep-open warning with battery, and "Mirroring stopped" after a lock. Keep the screen awake while mirroring.
   - Lock-screen controls for channel up, down and pause.
@@ -193,7 +209,7 @@ From `tv/`: watching with the banner, number entry, the guide with its options d
   - **TV:** change channel by number and arrows, open the guide, set the sleep timer.
   - **Desk:** set up a claimable station from a recipe.
 - axe checks on every route in both grounds. Contrast checks on station colours.
-- Remove any leftover code from the old `apps/web` that `apps/control` replaced.
+- Remove any leftover master control code from before the redesign.
 
 **STOP.** Report test results, anything still on mocks, and the open questions list.
 

@@ -1,0 +1,9 @@
+/* The header avatar (core .avatar). */
+.oc-shell-avatar {
+  width: 34px; height: 34px; flex: none; padding: 0;
+  border-radius: 50%; background: var(--raised); border: 1px solid var(--line);
+  display: grid; place-items: center;
+  font: 700 13px var(--font-text); color: var(--ink); text-decoration: none;
+}
+button.oc-shell-avatar, a.oc-shell-avatar { cursor: pointer; }
+.oc-shell-avatar--current { box-shadow: 0 0 0 2px var(--ink); }

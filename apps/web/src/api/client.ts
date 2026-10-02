@@ -1,0 +1,111 @@
+// Calls the API from the contracts: each endpoint's method, path and schemas come from
+// @opencast/contracts, so a call can't drift from what the API mounts. Responses are parsed
+// with the endpoint's response schema (extended with fields the apps have asked for, see
+// docs/contract-requests.md), so a wrong shape fails loudly here, not three screens later.
+// One client for the three areas, with the one token source sign-in hands it.
+
+import { API_PREFIX, buildPath, ErrorResponse, type EndpointDef } from "@opencast/contracts";
+import type { z } from "zod";
+import { config } from "../config";
+
+export type Token = () => Promise<string | null>;
+let getToken: Token = async () => null;
+
+/** Sign-in hands the client a way to get the current access token. */
+export function setTokenSource(t: Token) {
+  getToken = t;
+}
+
+/** The current access token, for requests `call` can't make (the remote relay's event streams, uploads, mock mode's own calls). */
+export const accessToken: Token = () => getToken();
+
+/** The same, by the desk's name for it. */
+export const currentToken: Token = accessToken;
+
+/** Why the API ended this sign-in (A1, A3): signed out everywhere, or the account deleted. */
+export type SessionEnd = "signed_out" | "account_deleted";
+let onSessionEnded: (why: SessionEnd) => void = () => {};
+
+/** Sign-in hands the client what to do when the API says the session has ended. */
+export function setSessionEndedHandler(fn: (why: SessionEnd) => void) {
+  onSessionEnded = fn;
+}
+
+let endingHere = false;
+/**
+ * Runs `f` (signing out everywhere, deleting the account: this device ends the session itself)
+ * without treating the 401s that may come before it has signed out as news from elsewhere.
+ */
+export async function endingSessionHere<T>(f: () => Promise<T>): Promise<T> {
+  endingHere = true;
+  try {
+    return await f();
+  } finally {
+    endingHere = false;
+  }
+}
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly fields?: Record<string, string>
+  ) {
+    super(message);
+  }
+}
+
+export interface CallArgs {
+  params?: Record<string, string | number>;
+  query?: Record<string, string | number | boolean | undefined | null>;
+  body?: unknown;
+}
+
+/** Calls an endpoint. `schema` overrides the response schema (an extended one). */
+export async function call<E extends EndpointDef, S extends z.ZodType = E["response"]>(endpoint: E, args: CallArgs = {}, schema?: S): Promise<z.infer<S>> {
+  const path = buildPath(endpoint.path, args.params ?? {});
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(args.query ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
+  const url = `${config.apiBase}${API_PREFIX}${path}${qs.size ? `?${qs}` : ""}`;
+  const headers: Record<string, string> = {};
+  let token: string | null = null;
+  if (endpoint.auth !== "public") {
+    token = await getToken();
+    if (token) headers.authorization = `Bearer ${token}`;
+  }
+  // Multipart endpoints (an upload): the body's fields plus `file`, as form data.
+  let body: BodyInit | undefined;
+  if (args.body instanceof FormData) body = args.body;
+  else if (endpoint.multipart && args.body && typeof args.body === "object") {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(args.body as Record<string, unknown>)) {
+      if (v === undefined || v === null) continue;
+      form.append(k, v instanceof Blob ? v : typeof v === "string" ? v : JSON.stringify(v));
+    }
+    body = form;
+  } else if (args.body !== undefined) {
+    headers["content-type"] = "application/json";
+    body = JSON.stringify(args.body);
+  }
+  const res = await fetch(url, { method: endpoint.method, headers, body });
+  if (res.status === 204) return undefined as z.infer<S>;
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const e = ErrorResponse.safeParse(json);
+    // Signed out everywhere, or the account deleted: every area signs out of this device too.
+    if (e.success && res.status === 401 && token && !endingHere && (e.data.error.code === "signed_out" || e.data.error.code === "account_deleted")) onSessionEnded(e.data.error.code);
+    if (e.success) throw new ApiError(res.status, e.data.error.code, e.data.error.message, e.data.error.fields);
+    // A 404 without the API's error body is a route the API doesn't mount: a proposed endpoint
+    // (each area's api/ext*, docs/contract-requests.md) that hasn't landed. Trying again wouldn't
+    // help. Master control's screens leave out what needs one (control/api/ext.ts, notYet).
+    if (res.status === 404) throw new ApiError(404, "not_available", "This isn't available yet.");
+    throw new ApiError(res.status, "error", "Something went wrong. Try again.");
+  }
+  const parsed = ((schema ?? endpoint.response) as z.ZodType).safeParse(json);
+  if (!parsed.success) {
+    console.error(`${endpoint.method} ${endpoint.path}: the response doesn't match its contract`, parsed.error.issues);
+    throw new ApiError(500, "bad_response", "Something went wrong. Try again.");
+  }
+  return parsed.data as z.infer<S>;
+}

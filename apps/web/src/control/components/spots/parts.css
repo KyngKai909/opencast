@@ -1,0 +1,39 @@
+/* Tabs under the title (production-orders 03.1: .tabs sits 14px under the title). */
+.cc-sp-tabs { margin: -4px 0 14px; }
+
+/* A spot's thumbnail in a row (.sp-row .tc: 5px 7px, 10px words). */
+.cc-sp-thumb.oc-tc { padding: 5px 7px; }
+.cc-sp-thumb .oc-tc__t { font-size: 10px; }
+
+/* The still in the pane (.pic.adpic.cq). */
+.cc-sp-still { container-type: inline-size; position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-screen); overflow: hidden; background: var(--cc-sp-still); color: var(--on-station); margin-bottom: 12px; }
+.cc-sp-still__card { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 8%; }
+.cc-sp-still__card b { font: 800 clamp(14px, 7cqw, 34px)/1 var(--font-display); font-stretch: var(--semi-wide); }
+.cc-sp-still__card span { font-size: clamp(9px, 3cqw, 14px); opacity: .9; margin-top: 4px; }
+.cc-sp-still__qr { position: absolute; right: 6%; top: 10%; width: 18%; aspect-ratio: 1; background: var(--on-station); border-radius: 4px; padding: 4%; }
+.cc-sp-still__qr i {
+  display: block; width: 100%; height: 100%;
+  background:
+    linear-gradient(90deg, var(--screen) 0 30%, transparent 30% 40%, var(--screen) 40% 50%, transparent 50% 70%, var(--screen) 70%) 0 0 / 100% 20%,
+    linear-gradient(90deg, transparent 0 20%, var(--screen) 20% 45%, transparent 45% 60%, var(--screen) 60% 80%, transparent 80%) 0 50% / 100% 20%,
+    linear-gradient(90deg, var(--screen) 0 35%, transparent 35% 55%, var(--screen) 55%) 0 100% / 100% 20%;
+  background-repeat: no-repeat;
+}
+
+.cc-sp-error { margin: 12px 0; font-size: 14px; color: var(--standby); }
+.cc-sp-quiet { color: var(--ink-50); }
+.cc-sp-mono { font-family: var(--font-mono); font-weight: 500; }
+
+/* Paused and back notices above the breaks (biz-spots 05.1: 12px apart, 12px above the table). */
+.cc-sp-notices { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+
+/* Mock mode's stand-in for the business side. */
+.cc-sp-mock { margin-top: var(--s5); padding-top: 12px; border-top: 1px dashed var(--line); max-width: 640px; }
+.cc-sp-mock__h { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); }
+.cc-sp-mock__row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.cc-sp-mock__row > :first-child { flex: 1 1 240px; }
+
+/* On the phone the shell's main has no gutter: each page keeps 16px at the sides. */
+@media (max-width: 767px) {
+  .cc-brk, .cc-spm, .cc-spn, .cc-ord { padding: 14px 16px 24px; }
+}

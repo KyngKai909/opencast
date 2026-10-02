@@ -1,0 +1,4 @@
+/* The proof (.proof): the still 10px under the heading, a 12px caption, the log entry's facts. */
+.bz-proof__still { margin-top: 10px; }
+.bz-proof__cap { margin: 6px 0 0; font-size: 12px; color: var(--ink-50); }
+.bz-proof__kv { margin-top: 10px; }

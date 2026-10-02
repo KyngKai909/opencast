@@ -1,0 +1,53 @@
+/* Ruled tables (.sp-h/.sp-row, .lib-h, .syn-h, .bk-h, .pt, .bs, .ai, .cl …). */
+.oc-table { font-size: 14px; min-width: 0; }
+.oc-table__head,
+.oc-table__row {
+  display: grid; grid-template-columns: var(--oc-table-cols); gap: var(--oc-table-gap, 12px); align-items: center;
+}
+.oc-table__head {
+  font-size: 12.5px; color: var(--ink-50); font-weight: 600;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line);
+}
+.oc-table__row { padding: var(--oc-table-pad, 9px) 0; border-bottom: 1px solid var(--hair); }
+.oc-table__cell { min-width: 0; }
+.oc-table__cell--start { text-align: start; }
+.oc-table__cell--end { text-align: right; }
+.oc-table__cell--center { text-align: center; }
+/* Codes, channels, dates (.sp-row .d, .lib-row .d): 13px mono. */
+.oc-table__cell--mono { font: 500 13px var(--font-mono); }
+/* Times (.pt .t, .rd .t, .bk-row .t): 13px mono, quieter. */
+.oc-table__cell--time { font: 500 13px var(--font-mono); color: var(--ink-70); }
+/* Amounts and counts (.pt .m, .bs .m): 14px mono, right-aligned. */
+.oc-table__cell--amount { font: 500 14px var(--font-mono); }
+.oc-table__cell--quiet { color: var(--ink-70); }
+.oc-table__cell--short { color: var(--standby); }
+
+/* Detail lines run inline under the title in some frames (.bs, .ai, .pt small). */
+.oc-table--inline-detail .oc-lines__detail { display: inline; }
+
+/* Choosable rows (.sp-row { cursor: pointer }). */
+.oc-table__row--choosable { cursor: pointer; }
+/* Selected: the signal edge (.sp-row.sel). */
+.oc-table__row--selected { background: var(--raised); box-shadow: inset 3px 0 0 var(--signal); }
+.oc-table__row--selected > :first-child { margin-left: 10px; }
+/* On now: the tally edge (.pt.now, .rd.now). */
+.oc-table__row--now { background: var(--raised); box-shadow: inset 3px 0 0 var(--tally); }
+.oc-table__row--now > :first-child { padding-left: 10px; }
+/* Needs an answer: the standby edge (rights .cl.sel). */
+.oc-table__row--attention { background: var(--raised); box-shadow: inset 3px 0 0 var(--standby); }
+.oc-table__row--attention > :first-child { padding-left: 10px; }
+/* The total (.bs.total, .row2.total). */
+.oc-table__row--total { border-top: 2px solid var(--ink); border-bottom: 0; }
+.oc-table__row--total .oc-lines__title { font-size: 15px; }
+
+/* Groups: each under a section top (.sec-top), as in statements. */
+.oc-table__group-head { display: block; }
+.oc-table__group-cell {
+  display: flex; align-items: baseline; gap: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 22px; font-size: 15px;
+}
+.oc-table__group:first-child .oc-table__group-cell { margin-top: 0; }
+/* Two classes, so a page's own h3 rules don't win over the section top. */
+.oc-table .oc-table__group-title { margin: 0; color: var(--ink); font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.oc-table__group-sub { font-size: 13px; color: var(--ink-50); }
+.oc-table__group-end { margin-left: auto; display: flex; gap: 8px; }

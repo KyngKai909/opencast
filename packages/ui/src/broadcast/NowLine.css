@@ -1,0 +1,9 @@
+/* The now line (home 05.1 .gd-now; the style guide's .g-now). */
+.oc-now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); z-index: 3; pointer-events: none; }
+.oc-now-line span {
+  position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+  font: 500 11px var(--font-mono); background: var(--ink); color: var(--ground);
+  padding: 1px 5px; border-radius: 2px; white-space: nowrap;
+}
+.oc-now-line--compact { z-index: auto; }
+.oc-now-line--compact span { top: -22px; font: 400 12px/1.6 var(--font-mono); padding: 1px 6px; }

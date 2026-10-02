@@ -1,0 +1,2 @@
+/* The settings page fills the space under the header (you 05.1 .set, full height). */
+.vw-settings.oc-settings--viewer { min-height: 100%; }

@@ -1,8 +1,8 @@
 # Opencast: platform prompt (repo, backend, Railway)
 
-You're working in `github.com/KyngKai909/untitled-project`, the Opencast repo (package scope `@openchannel`, product name Opencast, a working name). Your job is to turn it into a monorepo, replace the JSON-blob state with a real schema, split the API into modules, extend the playout worker for the product that's now designed, and deploy the services to Railway.
+You're working in `github.com/KyngKai909/opencast`, the Opencast repo (package scope `@openchannel`, product name Opencast, a working name). Your job is to turn it into a monorepo, replace the JSON-blob state with a real schema, split the API into modules, extend the playout worker for the product that's now designed, and deploy the services to Railway.
 
-A second prompt builds the apps (`apps/control`, `apps/viewer`, `apps/tv`, `apps/site`, `apps/spots`, `apps/desk`) at the same time. You and that prompt meet at `packages/contracts`. You own the backend and the contracts; the apps prompt owns everything under `apps/*` except `api` and `worker`, and `packages/ui` and `packages/player`. If you need to change a contract after the apps prompt has started using it, add a version or a new field rather than changing the shape of an existing one, and note it in `docs/contracts-changelog.md`.
+A second prompt builds the apps (`apps/web`, `apps/business`, `apps/tv`, `apps/site`) at the same time. You and that prompt meet at `packages/contracts`. You own the backend and the contracts; the apps prompt owns everything under `apps/*` except `api` and `worker`, and `packages/ui` and `packages/player`. If you need to change a contract after the apps prompt has started using it, add a version or a new field rather than changing the shape of an existing one, and note it in `docs/contracts-changelog.md`.
 
 ## Ground rules
 
@@ -22,7 +22,7 @@ The words matter because they become table names, routes and UI copy:
 | Word | Meaning |
 |---|---|
 | Station | Who broadcasts. Has a call sign (3 to 5 capital letters, unique platform-wide), a market, a band and a channel number. |
-| Channel | A station's place on the dial: TV band `2.1` to `69.9`, radio band `88.1` to `107.9` in odd tenths. Unique per market. Subchannels (`12.2`) are for 24/7 carriage. |
+| Channel | A station's place on the dial: TV band `2.1` to `69.9`, radio band `88.2` to `107.8` in even tenths (changed 2026-09-29: even tenths, so no number matches a real US FM station). Unique per market. Subchannels (`12.2`) are for 24/7 carriage. |
 | Market | A local area, such as Inland Empire. Decides dial order. |
 | Program log | What airs, in order, with exact start times. Replaces the playlist queue. |
 | Log codes | `PGM` program, `SPT` spot, `UND` underwriting, `BMP` bumper, `SID` station ID. These map to today's `AssetInsertionCategory` plus station ID. |
@@ -49,6 +49,7 @@ Write `docs/audit.md` covering:
 - how the three Railway services are configured today
 - dead code, duplicated logic and anything that would break during a move
 - the `yt-dlp` import path and what rights checks exist (the reference design keeps link imports but makes them station-local and never offered for carriage)
+- how files are stored today: what's pinned to IPFS through Pinata, what's on local disk, how the worker reads files at air time, and how many gigabytes are pinned
 
 **STOP.** Summarise the audit and list anything that surprised you.
 
@@ -58,14 +59,14 @@ Target layout:
 
 ```
 apps/
-  control/    master control (today's apps/web, moved, behaviour unchanged)
+  web/        the Opencast app, one account and one sign-in for everyone: the viewer at /,
+              master control at /control, Network desk at /desk (admins only). Starts as
+              today's apps/web, whose current pages become the /control area, behaviour unchanged
   api/        today's apps/api
   worker/     today's apps/worker
-  viewer/     empty scaffold, owned by the apps prompt
-  tv/         empty scaffold, owned by the apps prompt
-  site/       empty scaffold, owned by the apps prompt
-  spots/      empty scaffold, owned by the apps prompt
-  desk/       empty scaffold, owned by the apps prompt (Network desk, Opencast's internal tool)
+  business/   empty scaffold, owned by the apps prompt (Opencast for business, the advertiser side)
+  tv/         empty scaffold, owned by the apps prompt (a TV build of the same app, and the Cast receiver)
+  site/       empty scaffold, owned by the apps prompt (the marketing page)
 packages/
   domain/     today's packages/shared (types and pure rules)
   contracts/  new: request and response schemas shared by apps and API
@@ -78,7 +79,7 @@ docs/
 - Rename the package scope to `@opencast/*`. Keep a note of the old `@openchannel/*` names, because the Railway services are still named after them.
 - Keep npm workspaces. Add Turborepo for `build`, `dev`, `typecheck` and `lint` only if it removes real duplication in the root scripts; say which you chose and why.
 - Every app and package gets its own `tsconfig` extending `tsconfig.base.json`, and `npm run typecheck` passes at the root.
-- `apps/control` must run exactly as `apps/web` did: upload, playlist, schedules, Livepeer provisioning, go live and station preview.
+- Today's master control pages in `apps/web` must keep working exactly as before, now under `/control`: upload, playlist, schedules, Livepeer provisioning, go live and station preview.
 - Update `railway.json`, `nixpacks.toml` and the `build:service:*` and `start:service:*` scripts for the new paths, but don't deploy.
 
 **STOP.** Show the tree and confirm the old flow still works locally.
@@ -88,12 +89,12 @@ docs/
 Replace the single `opencast_state` JSON blob with a normalised Postgres schema. Use Drizzle ORM with SQL migrations checked in; if you have a strong reason to prefer Kysely plus `node-pg-migrate`, say so at the STOP. Use one database with these schemas:
 
 - `accounts`: users, sign-in identities, station memberships and roles (owner, operator), advertiser memberships, viewer presets (keys 1 to 6 and beyond), reminders, markets
-- `broadcast`: stations, channels, assets and folders, rights confirmations, program log entries, break rules, schedules, playout state, commands, translators, Livepeer config, live sources, as-run log
+- `broadcast`: stations, channels, assets and folders, rights confirmations, program log entries, day templates and their repeat rules (every day, weekdays, a given weekday, once), scheduled off air hours, break rules, schedules, playout state, commands, translators, Livepeer config, live sources, as-run log
 - `catalog`: carriage offers (per program: terms offered, rates, airings per episode, window, notice period), carriage agreements, approvals
 - `spots`: advertisers, spots, sponsorships (underwriting of a whole station or one program: flat monthly, approved by the station, with credit text), rate cards, targeting (distance, categories), budgets (total and optional daily cap), spot status (draft, listed, paused, ended), rotations and backup rotations, airings, on-screen codes and redemptions, production orders (a station or the house studio making a spot for a business)
 - `ledger`: accounts (including each advertiser's funded balance and a holds account), an append-only double-entry journal, holds against scheduled airings, payouts, statements
 - `trust`: rights claims, answers and their deadlines, takedowns and where each was pulled, each station's standing
-- `network`: markets and their dial (every channel's state: station, claimable, listed, catalog, held, open), reserved call signs from the waitlist, creators in the pipeline and their stage, permission records (exactly which works, when, from which link, a copy sent), licence records (for works published under a licence that allows commercial use, such as CC BY: the licence, its link, the attribution it requires, and when it was last checked), station recipes (template schedules by category), listed sources (city and county streams, embed terms, agenda-calendar sync), claimable-station handovers, and each claimable station's escrowed earnings
+- `network`: markets and their dial (every channel's state: station, claimable, external, catalog, held, open), reserved call signs from the waitlist, creators in the pipeline and their stage, permission records (exactly which works, when, from which link, a copy sent), licence records (for works published under a licence that allows commercial use, such as CC BY: the licence, its link, the attribution it requires, and when it was last checked), station recipes (template schedules by category), external sources (city and county streams, embed terms, agenda-calendar sync), claimable-station handovers, and each claimable station's escrowed earnings
 - `audience`: tuned-in samples per station per minute
 
 Constraints that matter:
@@ -113,7 +114,16 @@ Constraints that matter:
 
 Write a one-time migration script that reads the existing `opencast_state` blob and the JSON files and writes them into the new tables. Keep the old table untouched as a backup. Local development uses Docker Compose Postgres instead of the JSON fallback; remove the JSON fallback once the migration is verified.
 
-**STOP.** Show the schema, the migration result against a copy of production data, and any rows that didn't map cleanly.
+**Storage.** IPFS through Pinata stops being the working store. It costs more per gigabyte than object storage, it charges for reads the worker makes every day, its files are public by default, and a takedown can't guarantee removal. Replace it with this:
+- **Object storage** on Cloudflare R2 (S3-compatible, no charge for reads), behind a `storage` interface so another S3-compatible provider can be swapped in. Every object is keyed by its content ID, computed in the IPFS CID format (CIDv1, raw, sha-256), so identical files are stored once however many stations air them, and any file can move to IPFS later without renaming.
+- **Classes:** the prepared HLS segments every channel airs from (all renditions, see Phase 5) in Standard; the original upload in Infrequent Access. Previews in the syndication market, the business review screen and the spot review queue play the prepared segments directly, so no separate preview renditions are needed.
+- **Assets** point at content IDs, never at files. Deleting an asset removes the object only when no other asset, carriage agreement or claim still references that content ID.
+- **Takedowns** remove the content ID from every station's log, from the worker cache, and from storage once the claim resolves against it; until then the object is locked, not deleted, so it can come back.
+- **IPFS stays for two things only:** the Opencast catalog (public domain, published and pinned on purpose), and "Export to IPFS", a per-item action a station owner takes on its own original, with a warning that IPFS files are public and can't be taken back. Keep Pinata for those, behind the same `storage` interface.
+- **Migration:** copy everything currently pinned into R2 under its content ID, verify each copy by hash, and unpin everything except catalog items. Report the gigabytes moved and the monthly cost before and after at the STOP.
+
+
+**STOP.** Show the schema, the migration result against a copy of production data, any rows that didn't map cleanly, and the storage migration: gigabytes moved to R2, what stayed on IPFS, and the monthly storage cost before and after.
 
 ## Phase 4: API modules and contracts
 
@@ -121,7 +131,9 @@ Split `apps/api` into modules: `accounts`, `stations`, `library`, `log`, `playou
 
 Put every request and response shape in `packages/contracts` as Zod schemas with inferred types. The apps prompt will build against these with mock data, so publish them early: after the first module is done, commit and push the contracts so the apps prompt can start.
 
-Sign-in: Privy for everyone (the same stack as the Clear apps), with email first and Apple, Google and wallets as alternatives. A station's team shares the station's Privy organization wallet through their roles; nobody shares a login. The API verifies Privy tokens. Roles: viewer, station owner, station operator, station host (go live on assigned blocks only), business owner, business manager (spots, sponsorships, orders, results, redeeming codes, adding money and approving orders; never withdrawing or changing funding; an agency can be a manager), business viewer (results, airings and statements only, for a bookkeeper or partner), and Opencast admin (Network desk). Team members sign in with their own accounts from anywhere. A business says where its customers are: a location (a private street address, used for distance), a service area (a city and radius), or online (chosen markets, no distance). It can have more than one location. Stations see only the city, or "Online". Businesses can't turn off the warning that their spots are about to pause. Signing in is optional for viewers; watching needs no account.
+Sign-in: Privy for everyone, with email first and Apple, Google and wallets as alternatives. **Opencast has its own Privy app, separate from Clear's.** Its app ID and secret come from configuration (`PRIVY_APP_ID`, `PRIVY_APP_SECRET`), never hard-coded, so anyone self-hosting Opencast uses their own Privy app. Don't reuse Clear's app ID anywhere. Embedded wallets are created only for people who sign in. A station's team reaches the station's money through their roles, not a shared wallet or login. The API verifies Privy tokens issued to Opencast's app.
+
+**Clear connects as a Privy global wallet.** Clear's Privy app is the provider and Opencast's is the requester. "Connect Clear" in the business app and in station settings calls Privy's cross-app linking (`linkCrossAppAccount` with Clear's provider app ID from configuration, `CLEAR_PRIVY_PROVIDER_APP_ID`): the user approves on a page hosted by Clear, and their Clear wallet is attached to their Opencast account as a linked account. Build for both of Clear's possible settings: read-only (Opencast can verify the address and use it as a payout destination, but funding happens inside Clear) and full access (Opencast can request a signed transfer from the Clear wallet to fund a balance, which the user confirms). Nothing about a Clear account is visible to Opencast until the user links it. Put the cross-app details in `docs/clear-integration.md`, and note that Clear must request global-wallet provider access in its own Privy dashboard. Roles: viewer, station owner, station operator, station host (go live on assigned blocks only), business owner, business manager (spots, sponsorships, orders, results, redeeming codes, adding money and approving orders; never withdrawing or changing funding; an agency can be a manager), business viewer (results, airings and statements only, for a bookkeeper or partner), and Opencast admin (Network desk). Team members sign in with their own accounts from anywhere. A business says where its customers are: a location (a private street address, used for distance), a service area (a city and radius), or online (chosen markets, no distance). It can have more than one location. Stations see only the city, or "Online". Businesses can't turn off the warning that their spots are about to pause. Signing in is optional for viewers; watching needs no account.
 
 Endpoints the designs need, at minimum:
 - the dial for a market, in channel order, with now and next per station
@@ -146,30 +158,48 @@ Endpoints the designs need, at minimum:
 
 ## Phase 5: Playout
 
-Change the worker from a queue loop to a timeline:
+**Prepare once, then assemble.** Prerecorded material is never encoded live. Change the worker from a queue loop that encodes a continuous stream into two jobs:
+
+1. **Prepare, once per file.** When an item's rights are confirmed, transcode it into HLS segments at a fixed ladder (for TV: 1080p, 720p, 480p and 360p, with an audio-only rendition; for the radio band: AAC at 128 and 64 kbps), with aligned keyframes and a fixed segment length (4 seconds unless testing shows a reason to change), and store the segments in R2 under the item's content ID. Use Livepeer's transcode API or FFmpeg on the worker, whichever is cheaper per hour at the audit's volumes; report both at the STOP. Loudness is levelled and captions are generated here, once. Spots, bumpers, station IDs and generated underwriting credits are prepared the same way. Carried programs and catalog items are prepared once for every station that airs them.
+2. **Assemble, continuously.** Each channel's stream is a rolling HLS playlist per rendition, written by the worker, that points at prepared segments in the order the log says, with `#EXT-X-DISCONTINUITY` between items and `#EXT-X-PROGRAM-DATE-TIME` on every item. Writing playlists takes almost no CPU, so a channel costs a few dollars a month, not hundreds. Serve segments from R2 through its custom domain (check Cloudflare's terms for video at scale before launch) and playlists from the API with a short cache.
+
+The channel is on air 24 hours a day either way; only how the picture is made changes. The log is timed to the second but the stream changes item at segment boundaries, so programs, breaks and live blocks are scheduled on segment boundaries, and the log editor snaps to them.
+
+**Live blocks** are the only live encoding. A live source is ingested and transcoded by Livepeer for the block's hours only, to the same rendition ladder. During the block the channel's playlist points at Livepeer's live segments, then returns to prepared segments when the block ends. Verify at the STOP that the renditions line up so players switch cleanly.
+
+**The bug, lower thirds and on-screen codes** are drawn by the player as overlays, timed from `#EXT-X-DATERANGE` tags in the playlist, not burned into the picture. Anywhere the picture leaves Opencast's players (translators, proof frames), the worker composites them in.
+
+The timeline rules:
 - Read the program log as timed entries. Programs start at their times; breaks are generated from the station's break rule (after every program, every N minutes, or none) and always contain a station ID.
+  - **Changed by the user on 2026-09-29:** breaks no longer always contain a station ID. Station IDs follow the station's cadence (every break, after every program, after every N programs, or once an hour at the first break after the top of the hour; every break unless the station changes it), as bumpers and the underwriting credit do (which may also be never). The pre-flight check warns when the cadence and the log would leave more than an hour without a station ID. A station with no station ID of its own airs a generated one (ten seconds in its colour with its call sign, channel, name and city, over a soft sound bed).
+  - **Changed by the user on 2026-09-29 (later):** spots follow a cadence too (the same choices, and never; every break unless the station changes it). A break spots don't air in airs only the parts that do and is as long as they need (nothing is placed or held there; the break that closes a program's slot keeps the slot's time); the hourly cap, the same-spot limit and daily caps apply to the breaks spots do air in, and the spot market promises only those. When bumpers air, one opens the break (before the spots) and one closes it (after the spots and the credit, before the station ID): the same one twice when the library has one, none when it has none. There are no generated bumpers.
 - Fill each break from the station's rotation, within each spot's daily limit and any barter split: break time inside a carried program is divided between the airing station and the producer as the carriage agreement says.
 - Placing a spot in a break creates a hold on the advertiser's balance for that airing (Phase 6). If the hold can't be made, skip that spot, try the next in the rotation, then the station's backup rotation, then station ID and bumpers.
 - An airing that already has a hold always airs, even if the spot is paused afterwards. It's already paid for.
 - Open time with nothing in it airs the station ID and bumpers, never nothing.
 - Underwriting credits are generated, not uploaded. The worker renders each credit as a short slate (10 to 15 seconds) in the station's colour: "Inland Beat is made possible by", then each active sponsor's name and one line of their approved text, set in the style guide's typefaces. Once a month it also renders a members credit from every viewer who opted in to on-air credit when pledging. Credits regenerate automatically when sponsors or members change, and the break's underwriting slot plays the current one. Sponsor text is limited to who they are and where: no prices, offers or calls to action, which is the difference between underwriting and a spot.
-- Mark every break in the HLS output with SCTE-35 style cues (`#EXT-X-DATERANGE` with `SCTE35-OUT` and `SCTE35-IN`, or `EXT-X-CUE-OUT` and `EXT-X-CUE-IN`, whichever Livepeer passes through; test it). Translators set to "Station ID slate" swap the break for a slate on that destination only.
-- Live blocks switch to a live source (Livepeer RTMP ingest) at their start time and back at their end. A live source that isn't connected airs a slate.
-- Keep a rolling 24-hour dead-air check. Emit warnings at 30 and 12 minutes before a gap. If nobody acts, fill the gap by repeating from the library and record that it happened.
-- Write an as-run entry for every item that actually airs, with real start and end times. Billing reads the as-run log, never the planned log.
-- Pre-warm the neighbouring stations' streams where the architecture allows, so channel changes in the viewer apps are fast. If this belongs in the player instead, say so.
+- Mark every break in the playlists with SCTE-35 style cues (`#EXT-X-DATERANGE` with `SCTE35-OUT` and `SCTE35-IN`). They're written by the worker, so nothing has to pass them through.
+- **Translators** (relays to YouTube, Twitch or any RTMP destination) are the one place a continuous encode is needed. Only while a translator is on, the worker reads the channel's own playlist, composites the bug, swaps breaks for the station ID slate where the station chose that, and pushes the result over RTMP. Stream-copy wherever no compositing is needed. Report each translator's egress in gigabytes, because relaying a full channel around the clock is the largest per-station cost.
+- Live blocks switch the playlist to the live source at their start time and back at their end. A live source that isn't connected airs a prepared slate.
+- **Off air is a choice; dead air is a mistake.** A station can schedule off air hours (a standing rule like "every night 2:00 to 6:00 am", or a one-off sign-off entry in the log). During them the channel's playlist ends with `#EXT-X-ENDLIST` after a sign-off slate, the guide and dial show the station as off air with the time it's back, heartbeats stop, and no warning or auto-fill applies. At sign-on the playlist starts again from the station ID.
+- **Day templates.** A station builds a day once and repeats it: every day, weekdays, a given weekday, or once. The log for each future date is generated from its template; editing one date changes only that date, and editing the template changes every future date that hasn't been edited.
+- Keep a rolling 24-hour dead-air check for everything else: any unplanned gap outside off air hours. Emit warnings at 30 and 12 minutes before a gap. If nobody acts, fill the gap by repeating from the library and record that it happened.
+- Write an as-run entry for every item as its segments are published to the playlist, with the program date-times it aired at. Billing reads the as-run log, never the planned log. Proof frames are extracted from the segment that was published during each spot, with the station's bug composited on.
+- Neighbouring channels are cheap to pre-warm, since they're just playlists: the player fetches the next and previous channels' playlists and first segment so channel changes are fast.
 
 Tuned-in counting: viewers' players send a heartbeat every 30 seconds with station and session. Store per-station per-minute concurrency in `audience`. Drop sessions that behave like bots (no media progress, impossible rates) before they count. Billing per thousand tuned in reads these numbers.
 
 Keep the Redis leader lock for worker replicas.
 
-**STOP.** Show a station's evening running end to end locally: programs, a carried program with a barter break, a live block, a dead-air auto-fill, and the as-run log it produced.
+**Readiness check.** Every hour, check the next 48 hours of every station's log: every item must have its prepared segments in storage, in every rendition. An item that isn't ready an hour before it airs raises a warning to the station and Network desk, and the log's usual fill airs in its place if it's still missing at air time. Expose items prepared, items waiting and preparation time in the health endpoint. The worker only needs a small volume, for preparation scratch space and for translators.
+
+**STOP.** Show a station's evening running end to end locally: programs, a carried program with a barter break, a live block through Livepeer switching in and out cleanly, a dead-air auto-fill, one translator relaying, and the as-run log it produced. Report the cost per channel per month for a TV channel and a radio-band channel, split into preparation, assembly, storage, live hours and translators.
 
 ## Phase 6: Money
 
 Sign-in is Privy (decided). Money is split across two providers behind one `payments` interface in the `ledger` module, so spots, catalog and playout never call a provider directly:
 
-- **Clear** holds station wallets and advertiser budgets. Each station and each advertiser gets a Clear business account: a Privy organization wallet holding USDC, with bank deposits and withdrawals through Clear's existing stack (Plaid to link a bank, Bridge for deposit accounts). An advertiser's budget is its Clear balance, and a hold on an airing is an encumbrance on that balance. Station earnings, carriage fees and payouts settle into the station's Clear account.
+- **Clear** holds station wallets and advertiser budgets. Each station and each advertiser gets a Clear business account, which lives in Clear's own systems and Privy app, not Opencast's: a wallet holding USDC, with bank deposits and withdrawals through Clear's existing stack (Plaid to link a bank, Bridge for deposit accounts). Opencast reaches it only through the linked global wallet and Clear's API. Whether Opencast can open a Clear business account on someone's behalf during sign-up, or they must open it in Clear first, is **Open**. An advertiser's budget is its Clear balance, and a hold on an airing is an encumbrance on that balance. Station earnings, carriage fees and payouts settle into the station's Clear account.
 - **Stripe** is the card on-ramp: advertisers topping up by card, and viewers' pledges. A card top-up converts into the advertiser's Clear balance; a pledge settles into the station's Clear account.
 - A **Stripe-only adapter** also exists for anyone running their own copy of Opencast without Clear, using Stripe balances and Stripe Connect Express in place of Clear accounts.
 
@@ -229,14 +259,27 @@ Every movement of money is a balanced ledger entry. A reversal is a new entry, n
 
 Services, each its own Railway service:
 - `api`, `worker`
-- `control` (master control), `viewer` (web app), `spots` (advertiser app), `desk` (Network desk, behind admin sign-in), `site` (marketing), `tv` (TV mode web build and the Chromecast receiver, static)
+- `web` (the Opencast app: viewer, master control and Network desk; the desk's admin-only access is enforced by the API's role checks, not by a separate deploy), `business` (Opencast for business), `site` (marketing, static), `tv` (the TV build and the Chromecast receiver, static)
 - Postgres and Redis as Railway plugins
+- a small Railway volume for the worker (preparation scratch space and translators, start at 20 GB), and R2 credentials as variables on `api` and `worker` only
 
-For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: `api.`, `control.`, `app.`, `spots.`, `www.` and `tv.` on whatever domain is chosen.
+For each service, write its build and start commands, health check, and required variables into `docs/deploy.md` and a per-service `.env.example`. Suggested domains: the root for `site`, `app.` for `web`, `business.`, `tv.` (the Cast receiver's registered URL) and `api.`, on whatever domain is chosen.
 
 Create a `staging` environment first and deploy everything there. Don't point production at the new services until you're told to; the existing `@openchannel/*` services keep running until then.
 
 **STOP.** Give the staging URLs and a checklist for cutting production over.
+
+## Later: ads from partners (programmatic backfill)
+
+Don't build this now, but build Phases 3 to 5 so it can be added without rework: break markers (SCTE-35) on every break, IAB content categories on every station, program and blocked category, content ratings, and a child-directed flag on programs aimed at children.
+
+When it's built:
+- **A station setting, off by default:** "Ads from partners" fills only time still open after the station's own rotation, backup rotation and thank-you credit, and before bumpers and the station ID. The station's hourly cap and blocked categories apply, mapped to IAB categories on every ad request.
+- **Server-side ad insertion** behind an `adfill` interface, so the provider can change: Google Ad Manager's Dynamic Ad Insertion or AWS Elemental MediaTailor, fed by VAST or VMAP requests at each marked break. Start through a FAST aggregator's demand if exchanges won't take Opencast directly at launch. Publish `ads.txt` and `app-ads.txt`.
+- **Per-viewer ads are allowed only in this backfill.** The as-run log records a "partner ads" block with its length and impressions, not individual spots.
+- **Child-directed programs** get no personalized ads.
+- **Money:** its own ledger line per station, "Ads from partners, paid when received". It's never held in advance, never escrowed, and never counted in held money. Record invalid-traffic deductions when the partner reports them. Opencast's share and the pool apply as they do to spots, once set.
+- Tuned-in bot filtering and partner impression counts are reported side by side; spots in the spot market are still billed only on Opencast's own count.
 
 ## Deliverables
 

@@ -1,0 +1,24 @@
+# Local Postgres and Redis. `npm run db:up` starts them; see README.
+# Host ports are offset so they don't collide with other local Postgres/Redis.
+name: opencast
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: opencast
+      POSTGRES_PASSWORD: opencast
+      POSTGRES_DB: opencast
+    ports:
+      - "54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opencast"]
+      interval: 2s
+      retries: 30
+  redis:
+    image: redis:7
+    ports:
+      - "63799:6379"
+volumes:
+  pgdata:

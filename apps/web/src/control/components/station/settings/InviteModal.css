@@ -1,0 +1,5 @@
+/* Invite someone (station-settings 03.2). */
+.cc-invite .oc-field { margin-bottom: 16px; }
+.cc-invite__label { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+.cc-invite .oc-choices { margin-bottom: 16px; }
+.cc-invite__error { margin: 0; font-size: 13px; color: var(--standby); font-weight: 600; }

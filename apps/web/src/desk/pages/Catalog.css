@@ -1,0 +1,64 @@
+/* desk-catalog 01 to 03: the shelf, a series and its items, adding an item with the rights check. */
+.nd-cat .oc-tc { width: 112px; min-height: 0; padding: 5px 7px; }
+.nd-cat .oc-tc .oc-tc__t { font-size: 10.5px; }
+.nd-cat__series b { display: block; font: 700 15px/1.2 var(--font-display); }
+.nd-cat__series small, .nd-cat__basis small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.nd-cat__basis { font-size: 13px; line-height: 1.35; }
+.nd-cat__basis small { color: var(--ink-50); font-size: 12px; }
+.nd-cat__m { font: 500 14px var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd-cat__m small { font-family: var(--font-text); font-size: 12.5px; color: var(--ink-70); }
+.nd-cat__coming { color: var(--ink-50); }
+.nd-cat__empty { margin: 12px 0 0; color: var(--ink-70); font-size: 14px; }
+
+.nd-cat-notes { margin: 16px 0 0; font-size: 13px; color: var(--ink-50); max-width: 80ch; }
+
+/* 02: episodes built from items, the offer on the right. */
+.nd-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 26px; align-items: start; }
+.nd-split--wide { grid-template-columns: minmax(0, 1fr) 360px; }
+.nd-pane { border: 1px solid var(--hair); border-radius: var(--r-card, 10px); padding: 16px 18px; background: var(--raised); }
+.nd-pane h4 { margin: 0 0 8px; font: 700 14px var(--font-text); }
+.nd-pane h4 + .oc-kv { margin-top: 0; }
+.nd-pane__h4 { margin-top: 18px !important; }
+.nd-note { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-70); line-height: 1.45; }
+.nd-it__n { font: 500 12.5px var(--font-mono); color: var(--ink-50); }
+.nd-it__t b { font-weight: 600; display: block; }
+.nd-it__t small { font-size: 12px; color: var(--ink-70); display: block; }
+.nd-it__d { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd-it--out, .nd-it--out small { color: var(--ink-50); }
+.nd-it--out b { color: var(--ink-70); text-decoration: line-through; text-decoration-color: var(--live); }
+.nd-it__removed { color: var(--live); font-size: 12px; }
+.nd-it__checked { font-size: 12px; color: var(--ink-70); }
+.nd-ep-pick { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 0; }
+.nd-rebuilds { margin: 0; padding: 0; list-style: none; }
+.nd-rebuilds li { padding: 8px 0; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); line-height: 1.4; }
+.nd-items-link { color: inherit; text-decoration: none; }
+.nd-items-link:hover b { text-decoration: underline; }
+
+/* 03: the checklist (.check3). */
+.nd-checks { list-style: none; margin: 0; padding: 0; }
+.nd-check { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; align-items: start; }
+.nd-check__ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; font: 800 12px var(--font-text); }
+.nd-check--ok .nd-check__ic { background: var(--ink); color: var(--ground); }
+.nd-check--todo .nd-check__ic { border: 1.5px solid var(--line); }
+.nd-check--warn .nd-check__ic { background: var(--standby-fill); color: var(--on-standby); }
+.nd-check--fail .nd-check__ic { background: var(--live); color: #fff; }
+.nd-check--not_needed .nd-check__ic { border: 1.5px dashed var(--line); color: var(--ink-50); }
+.nd-check b { font-weight: 600; display: block; }
+.nd-check small { font-size: 12.5px; color: var(--ink-70); display: block; margin-top: 2px; }
+.nd-check__ev { font: 500 12px var(--font-mono); color: var(--ink-70); text-align: right; display: grid; gap: 4px; justify-items: end; }
+.nd-check__ev a { color: inherit; }
+.nd-check__edit { grid-column: 2 / -1; display: grid; gap: 10px; padding: 12px; margin-top: 6px; border: 1px solid var(--hair); border-radius: var(--r-control); background: var(--raised); }
+.nd-check__row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.nd-check__file { font-size: 13px; }
+.nd-basis { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); align-items: center; }
+.nd-basis .oc-tc { width: 84px; }
+.nd-basis b { display: block; font-weight: 600; }
+.nd-basis small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.nd-basis .nd-quiet-text { color: var(--ink-50); }
+.nd-actions { display: grid; gap: 8px; margin-top: 14px; }
+.nd-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nd-pick-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow: auto; }
+
+@media (max-width: 900px) {
+  .nd-split, .nd-split--wide { grid-template-columns: minmax(0, 1fr); }
+}

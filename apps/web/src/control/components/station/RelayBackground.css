@@ -1,0 +1,19 @@
+/* A radio station's relay background, below its translators (Translators page, Settings). */
+.cc-rbg { margin-top: 28px; }
+.cc-rbg--loading { min-height: 180px; }
+.cc-rbg__p { margin: 10px 0 14px; font-size: 13.5px; color: var(--ink-70); max-width: 560px; }
+.cc-rbg__body { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.cc-rbg__media { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+/* Without one: the station's colour with its call sign and channel, as relays draw it. */
+.cc-rbg__colour { width: 100%; height: 100%; display: grid; place-items: center; background: var(--cc-rbg-colour); color: var(--on-station); }
+.cc-rbg__colour b { font: 800 clamp(18px, 7cqw, 40px)/1 var(--font-display); letter-spacing: -.03em; }
+.cc-rbg__side { min-width: 0; }
+.cc-rbg__line { margin: 0; font-weight: 600; }
+.cc-rbg__help { margin: 6px 0 12px; font-size: 13px; color: var(--ink-70); }
+.cc-rbg__actions { display: flex; gap: 8px; align-items: center; }
+.cc-rbg__error { margin: 10px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+
+@media (max-width: 767px) {
+  .cc-rbg { margin-top: 0; padding: 16px; }
+  .cc-rbg__body { grid-template-columns: minmax(0, 1fr); }
+}

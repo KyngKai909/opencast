@@ -1,0 +1,14 @@
+/* Mirroring, the iPhone side (tv-update 02: .cc-art, .howto, .m-note; the picture behind the sheet). */
+.vw-mir-pic { position: relative; }
+.vw-mir-pic .oc-player { border-radius: 0; }
+.vw-mir-sheet .oc-modal__head { padding-top: 6px; }
+
+.vw-mir-cc { display: flex; gap: 10px; margin: 14px 0 4px; }
+.vw-mir-cc span { flex: 1; height: 70px; border-radius: 16px; background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair); display: grid; place-items: center; font-size: 12px; color: var(--ink-50); text-align: center; line-height: 1.2; }
+.vw-mir-cc .vw-mir-cc--on { box-shadow: inset 0 0 0 2px var(--signal); color: var(--ink); font-weight: 600; }
+
+.vw-mir-howto { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.vw-mir-howto li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14.5px; align-items: start; }
+.vw-mir-howto__n { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 500 12.5px var(--font-mono); }
+.vw-mir-howto b { font-weight: 600; }
+.vw-mir-note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }

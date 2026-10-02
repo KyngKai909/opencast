@@ -1,29 +1,61 @@
 {
-  "name": "@openchannel/api",
+  "name": "@opencast/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "if [ -n \"$RAILWAY_ENVIRONMENT\" ]; then node dist/server.js; else tsx watch src/server.ts; fi",
+    "dev": "if [ -n \"$RAILWAY_ENVIRONMENT\" ]; then node dist/server.js; else tsx watch --conditions=source src/server.ts; fi",
     "start": "node dist/server.js",
-    "build": "npm run build -w @openchannel/shared && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "echo \"No lint configured for api\""
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "lint": "echo \"No lint configured for api\"",
+    "test": "npm run test:suite && npm run test:realtime",
+    "test:suite": "vitest run --exclude test/playout-relay.test.ts --exclude test/playout-radio-live.test.ts --exclude test/playout-relay-background.test.ts --exclude test/playout-live-audio.test.ts --exclude test/playout-live-copy-realtime.test.ts",
+    "demo:watch-data": "tsx --conditions=source scripts/demo-watch-data.ts",
+    "demo:billing": "tsx --conditions=source scripts/demo-billing.ts",
+    "demo:relay-viewers": "tsx --conditions=source scripts/demo-relay-viewers.ts",
+    "demo:uploads": "tsx --conditions=source scripts/demo-uploads.ts",
+    "storage:move-off-pinata": "tsx --conditions=source scripts/move-off-pinata.ts",
+    "storage:prepare-from-originals": "tsx --conditions=source scripts/prepare-from-originals.ts",
+    "storage:relink-locations": "tsx --conditions=source scripts/relink-locations.ts",
+    "storage:uploads-bucket": "tsx --conditions=source scripts/uploads-bucket.ts",
+    "test:realtime": "vitest run test/playout-relay.test.ts test/playout-radio-live.test.ts test/playout-relay-background.test.ts test/playout-live-audio.test.ts test/playout-live-copy-realtime.test.ts --no-file-parallelism"
   },
   "dependencies": {
-    "@openchannel/shared": "0.1.0",
+    "@aws-sdk/client-s3": "^3.1085.0",
+    "@aws-sdk/s3-request-presigner": "^3.1085.0",
+    "@opencast/contracts": "0.1.0",
+    "@opencast/db": "0.1.0",
+    "@opencast/domain": "0.1.0",
     "cors": "^2.8.5",
+    "drizzle-orm": "^0.45.3",
     "express": "^5.1.0",
+    "jose": "^6.2.12",
     "multer": "^2.0.2",
-    "pg": "^8.20.0",
-    "uuid": "^11.1.0"
+    "qrcode": "^1.5.4",
+    "redis": "^4.7.1",
+    "sharp": "^0.34.5",
+    "stripe": "^22.6.2",
+    "viem": "^2.56.9",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.3.0",
-    "@types/pg": "^8.20.0",
-    "tsx": "^4.20.6"
+    "@types/qrcode": "^1.5.6",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.0",
+    "tsx": "^4.20.6",
+    "vitest": "^3.2.4"
+  },
+  "exports": {
+    "./runtime": {
+      "types": "./src/v1/runtime.ts",
+      "source": "./src/v1/runtime.ts",
+      "import": "./dist/v1/runtime.js",
+      "default": "./dist/v1/runtime.js"
+    }
   }
 }

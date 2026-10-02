@@ -1,0 +1,11 @@
+/* Settings, Ownership (no frame: built from the settings rows and section tops). */
+.cc-owner { max-width: 640px; }
+.cc-owner__p { margin: 12px 0; font-size: 14px; color: var(--ink-70); line-height: 1.5; }
+.cc-owner__ro { margin-top: 14px; }
+.cc-owner__transfer { display: flex; gap: 12px; align-items: flex-end; }
+.cc-owner__transfer .oc-field { flex: 1; margin: 0; }
+
+@media (max-width: 767px) {
+  .cc-owner { max-width: none; padding: 16px 16px 24px; }
+  .cc-owner__transfer { flex-direction: column; align-items: stretch; }
+}

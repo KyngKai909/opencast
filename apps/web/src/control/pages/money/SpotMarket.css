@@ -1,0 +1,26 @@
+/* C.2 (.split, .filters, .sp-row, .pane.spot-detail) and biz-funding 05.1. */
+.cc-spm__split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; }
+.cc-spm__pane { border-left: 1px solid var(--hair); padding-left: 28px; min-width: 0; }
+.cc-spm__filters { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.cc-spm__chips { flex-basis: 100%; min-width: 0; }
+.cc-spm__rate .oc-lines__title .cc-sp-mono { font-size: 13px; }
+.cc-spm__rate .oc-lines__detail { font-size: 13px; color: var(--ink-50); }
+.cc-spm__spot { display: flex; flex-direction: column; min-width: 0; }
+.cc-spm__spot b { font: 700 15px var(--font-display); }
+.cc-spm__spot small { font-size: 12.5px; color: var(--ink-70); }
+.cc-spm__runway .oc-lines__title { font-weight: 700; }
+.cc-spm__runway .oc-lines__detail { margin-top: 6px; font-size: 12.5px; color: var(--ink-50); }
+.cc-spm__empty { margin: 14px 0; font-size: 14px; color: var(--ink-70); }
+.cc-spm__blocked { margin: 12px 0 0; font-size: 13px; color: var(--ink-50); }
+.cc-spm__blocked a { color: var(--ink-70); }
+
+.cc-spm__h { margin: 0; font: 700 15px var(--font-display); }
+.cc-spm__where { margin: 2px 0 0; font-size: 13.5px; color: var(--ink-70); }
+.cc-spm__kv { margin: 10px 0; }
+.cc-spm__acts { display: flex; gap: 8px; align-items: center; }
+.cc-spm__add { flex: 1; }
+.cc-spm__in { flex: 1; display: inline-flex; gap: 8px; align-items: center; }
+.cc-spm__state { margin: 0 0 10px; font-size: 13px; color: var(--ink-70); }
+.cc-spm__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.cc-spm__studio-market { margin-top: 28px; max-width: 980px; }
+.cc-spm__video { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--r-screen); background: var(--screen); }

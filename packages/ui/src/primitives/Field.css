@@ -1,0 +1,45 @@
+/* Fields (the reference's .fld and .field; shared by 14 control and business files). */
+.oc-field { display: block; min-width: 0; }
+.oc-field__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+.oc-field__aside { color: var(--ink-50); font-weight: 500; }
+
+.oc-field__box {
+  display: flex; align-items: center; gap: 8px;
+  height: 44px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--raised);
+  font-size: 15px; color: var(--ink);
+  position: relative;
+}
+.oc-field__box:focus-within { outline: 2px solid var(--signal); outline-offset: 3px; }
+.oc-field__input {
+  flex: 1; min-width: 0; height: 100%;
+  margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; letter-spacing: inherit; color: var(--ink);
+  outline: none;
+}
+.oc-field__input:focus-visible { outline: none; }
+.oc-field__input::placeholder { color: var(--ink-50); opacity: 1; }
+
+/* Amounts and codes: .field with font 500 17px mono (biz spots: rate and budget). */
+.oc-field__box--mono { font: 500 17px var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Inside a row or an option (.chk .field, .cam-bar .field). */
+.oc-field__box--sm { height: 36px; font-size: 14px; }
+.oc-field__box--sm.oc-field__box--mono { font-size: 14px; }
+
+/* A longer answer (.brief .ta). */
+.oc-field__box--area { height: auto; min-height: 74px; align-items: flex-start; padding: 10px 12px; line-height: 1.45; font-size: 14px; }
+.oc-field__box--area .oc-field__input { resize: vertical; line-height: inherit; field-sizing: content; }
+
+/* A select that looks like the other fields: the chevron sits at the end (Category, in biz settings). */
+.oc-field__box--select .oc-field__input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 26px; }
+.oc-field__box--select .oc-field__input option { color: var(--ink); background: var(--ground); }
+.oc-field__chev { position: absolute; right: 12px; pointer-events: none; }
+
+.oc-field__help { font-size: 13px; color: var(--ink-50); margin-top: 6px; }
+.oc-field__ok { font-size: 13px; color: var(--signal); margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+/* Not drawn in the references: a problem reads in standby amber ("needs attention"), with the sign and words. */
+.oc-field__error { font-size: 13px; color: var(--standby); margin-top: 6px; display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.oc-field--error .oc-field__box { border-color: var(--standby); }
+.oc-field--disabled .oc-field__box { opacity: .45; }
+.oc-field--disabled .oc-field__input { cursor: not-allowed; }

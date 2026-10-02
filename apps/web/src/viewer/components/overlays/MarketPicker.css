@@ -1,0 +1,18 @@
+/* First visit's market picker (home 08.1 .fv). On the web it's a Modal; on the phone the same
+   Modal fills the screen, as the frame draws it. */
+.vw-market { display: flex; flex-direction: column; }
+.vw-market__logo { margin-top: 4px; }
+.vw-market__title { font: 800 34px/1 var(--font-display); font-stretch: 125%; letter-spacing: -.04em; margin: 26px 0 12px; }
+.vw-market__lede { font-size: 15px; color: var(--ink-70); margin: 0 0 20px; }
+.vw-market__or { display: block; font-size: 13px; color: var(--ink-50); margin: 16px 0 8px; }
+.vw-market__err { font-size: 13px; color: var(--standby); margin: 8px 0 0; }
+.vw-market__list .oc-choice__end { font-family: var(--font-text); }
+.vw-market__wait { height: 150px; border-top: 1px solid var(--hair); }
+.vw-market__skip { margin: 20px 0 0; text-align: center; font-size: 14px; color: var(--ink-70); }
+
+/* The phone: the whole screen, the page's padding, the footnote at the bottom. */
+.vw-market-full { place-items: stretch; }
+.vw-market-full > .oc-modal { width: 100% !important; /* the Modal sets its width inline */ max-width: none; height: 100%; max-height: none; border-radius: 0; box-shadow: none; }
+.vw-market-full .oc-modal__main { padding: 10px 22px 22px; display: flex; flex-direction: column; }
+.vw-market-full .vw-market { flex: 1; }
+.vw-market-full .vw-market__skip { margin-top: auto; padding-top: 20px; }

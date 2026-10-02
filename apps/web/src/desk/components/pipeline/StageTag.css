@@ -1,0 +1,7 @@
+/* network-desk .stg */
+.nd-stg { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: var(--r-sign); font: 600 12px var(--font-text); border: 1px solid var(--line); color: var(--ink-70); white-space: nowrap; box-sizing: border-box; }
+.nd-stg--yes { border-color: var(--signal); color: var(--signal); }
+.nd-stg--air { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.nd-stg--wait { border-color: var(--standby); color: var(--standby); }
+.nd-stg--no { border-style: dashed; color: var(--ink-50); }
+.nd-stg--lic { border-color: var(--ink); color: var(--ink); background: var(--raised); }

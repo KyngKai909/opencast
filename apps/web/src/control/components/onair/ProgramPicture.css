@@ -1,0 +1,5 @@
+/* The program monitor: the player fills the picture box (the frame keeps 16:9 and the corners). */
+.cc-program .oc-player { position: absolute; inset: 0; aspect-ratio: auto; border-radius: 0; }
+.cc-program__cover { position: absolute; inset: 0; }
+.cc-program__radio { position: absolute; inset: 0; display: grid; place-items: center; color: var(--on-station); }
+.cc-program__radio span { font-size: 14cqw; font-weight: 500; letter-spacing: -.05em; }

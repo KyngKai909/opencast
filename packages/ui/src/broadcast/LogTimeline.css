@@ -1,0 +1,30 @@
+/* The log timeline (master control A3 .tl, .col, .hrs, .blk). */
+.oc-tl { position: relative; display: grid; grid-template-columns: 56px 1fr; padding-top: 10px; }
+.oc-tl__col { position: relative; border-left: 1px solid var(--line); }
+.oc-tl__hl { position: absolute; left: 0; right: 0; height: 1px; background: var(--hair); }
+.oc-tl__hrs { position: relative; }
+.oc-tl__hrs span { position: absolute; left: 0; font: 500 12px var(--font-mono); color: var(--ink-50); transform: translateY(-50%); }
+.oc-tl__item { position: absolute; left: 8px; right: 0; }
+.oc-blk {
+  position: absolute; inset: 0;
+  border-radius: var(--r-control); padding: 5px 10px; font-size: 13px; overflow: hidden;
+  display: flex; gap: 10px; align-items: flex-start;
+  border: 0; margin: 0; background: none; color: inherit; font-family: inherit; text-align: start;
+}
+button.oc-blk { cursor: pointer; }
+.oc-blk .oc-code { flex: none; margin-top: 1px; }
+.oc-blk b { font-weight: 600; font-size: 13.5px; }
+.oc-blk small { color: var(--ink-70); font-size: 12px; }
+.oc-blk--pgm { background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair); }
+.oc-blk--car { background: var(--raised); box-shadow: inset 0 0 0 1px var(--line); border: 1px dashed var(--line); }
+.oc-blk--brk {
+  background: color-mix(in srgb, var(--standby-fill) 22%, var(--ground)); box-shadow: inset 3px 0 0 var(--standby);
+  padding: 0 10px; align-items: center; font-size: 11.5px; color: var(--ink-70);
+}
+/* Dead air: hatched in standby, the one wrong answer. */
+.oc-blk--dead {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby-fill) 18%, transparent) 0 8px, transparent 8px 16px);
+  border: 1.5px dashed var(--standby); color: var(--standby);
+  align-items: center; justify-content: center; font-weight: 600;
+}
+.oc-blk--sel { box-shadow: inset 0 0 0 2px var(--signal); }

@@ -1,0 +1,4 @@
+/* Move to bank (biz funding 04.1's modal: .fld, .kv, .m-note). */
+.cc-move { display: grid; gap: 16px; }
+.cc-move .oc-kv { margin-top: 4px; }
+.cc-move__note { margin: 0; font-size: 13px; color: var(--ink-70); }

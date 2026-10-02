@@ -1,0 +1,20 @@
+/* What You and Presets share (you .pg-h, .sec, .sec-top): page heads and ruled section heads. */
+.vw-y-pg-h { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 22px; }
+.vw-y-pg-h h1 { margin: 0; color: var(--ink); font: 800 34px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.035em; }
+.vw-y-pg-h p { margin: 6px 0 0; font-size: 15px; color: var(--ink-70); }
+.vw-y-pg-h__end { margin-left: auto; display: flex; gap: 10px; }
+.vw-y-sec { margin-top: 30px; min-width: 0; }
+.vw-y-sec-top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.vw-y-sec-top h2 { margin: 0; color: var(--ink); font: 700 19px/1.2 var(--font-display); letter-spacing: -.015em; }
+.vw-y-sec-top__sub { font-size: 13.5px; color: var(--ink-50); }
+.vw-y-sec-top__end { margin-left: auto; }
+.vw-y-link { border: 0; background: none; padding: 0; font: 600 14px var(--font-text); color: var(--signal); text-decoration: none; cursor: pointer; }
+.vw-y-quiet { margin: 12px 0 0; font-size: 14px; color: var(--ink-50); }
+.vw-y-error { margin: 12px 0 0; font-size: 14px; color: var(--standby); }
+/* Quiet placeholders while a section loads. */
+.vw-y-ph { height: 52px; border-bottom: 1px solid var(--hair); }
+.vw-y-ph::before { content: ""; display: block; width: 40%; height: 12px; margin-top: 20px; border-radius: 3px; background: var(--raised); }
+
+/* The phone's section heads (you 06.2 .p-sec-h). */
+.vw-y-psec { display: flex; justify-content: space-between; align-items: baseline; margin: 0; padding: 18px 16px 6px; border-bottom: 1px solid var(--line); font: 600 12.5px var(--font-text); color: var(--ink-50); }
+.vw-y-psec a, .vw-y-psec button { font-size: 12.5px; }

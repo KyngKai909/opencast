@@ -1,0 +1,1 @@
+ALTER TABLE "broadcast"."assets" ADD COLUMN "archived_at" timestamp with time zone;

@@ -1,0 +1,4 @@
+/* Read-only Clear: the words, then the address in mono, broken anywhere so it fits a phone. */
+.bz-clear-ro { margin-top: 12px; }
+.bz-clear-ro__p { margin: 0; font-size: 13.5px; color: var(--ink-70); }
+.bz-clear-ro__addr { margin: 8px 0 0; font: 500 13.5px/1.4 var(--font-mono); color: var(--ink); overflow-wrap: anywhere; user-select: all; }

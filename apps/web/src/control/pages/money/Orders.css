@@ -1,0 +1,28 @@
+/* production-orders 03.1 (.split 400px, .sec-top, .kv, .fld, .m-note) and 06.2. */
+.cc-ord__split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 28px; align-items: start; }
+.cc-ord__brief { min-width: 0; }
+.cc-ord__top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.cc-ord__top h2 { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.cc-ord__top span { font-size: 13px; color: var(--ink-50); }
+.cc-ord__kv { margin: 10px 0; }
+.cc-ord__pane { border-left: 1px solid var(--hair); padding-left: 28px; min-width: 0; }
+.cc-ord__quote h3, .cc-ord__after h3, .cc-ord__paid h3 { margin: 0 0 10px; font: 700 15px var(--font-display); }
+.cc-ord__quote > .oc-field, .cc-ord__quote > * + .oc-field { margin-bottom: 16px; }
+.cc-ord__fld { margin-bottom: 16px; }
+.cc-ord__lb { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.cc-ord__note { font-size: 13px; color: var(--ink-70); margin: 12px 0; }
+.cc-ord__pass { margin-top: 8px; }
+.cc-ord__state { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.cc-ord__state h3 { margin: 0; }
+.cc-ord__paid { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.cc-ord__told { margin: 0; font-size: 14px; color: var(--ink-70); }
+.cc-ord__deliver { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.cc-ord__notes { margin-top: 22px; }
+.cc-ord__note-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-ord__reply { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cc-ord__reply > :first-child { align-self: stretch; }
+.cc-ord__empty { margin: 14px 0; font-size: 14px; color: var(--ink-70); }
+@media (max-width: 767px) {
+  .cc-ord__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-ord__pane { border-left: 0; padding-left: 0; }
+}

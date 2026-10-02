@@ -1067,7 +1067,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   function nowLine(s){
     var bits = [];
     if (s.live) bits.push(liveTag());
-    if (s.listed) bits.push('<span class="tag tag-listed">Listed</span>');
+    if (s.listed) bits.push('<span class="tag tag-listed">External</span>');
     if (s.from) bits.push('<span>Carried from '+s.from+'</span>');
     bits.push('<span>Until <span class="mono">'+s.until+'</span></span>');
     return bits.join('');
@@ -1081,7 +1081,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     }).join('');
   }
   function phRow(s){
-    return '<div class="prow"><span class="ch">'+s.ch+'</span><div class="w"><div class="top"><span class="cs">'+s.cs+'</span>'+(s.live?liveTag():'')+(s.listed?'<span class="tag tag-listed">Listed</span>':'')+'</div><b class="clamp1">'+esc(s.now)+'</b><small>'+(s.from?'From '+s.from+', until ':'Until ')+s.until+'</small></div><div class="tc" style="background:'+s.col+'"><span class="t">'+s.cs+'</span></div></div>';
+    return '<div class="prow"><span class="ch">'+s.ch+'</span><div class="w"><div class="top"><span class="cs">'+s.cs+'</span>'+(s.live?liveTag():'')+(s.listed?'<span class="tag tag-listed">External</span>':'')+'</div><b class="clamp1">'+esc(s.now)+'</b><small>'+(s.from?'From '+s.from+', until ':'Until ')+s.until+'</small></div><div class="tc" style="background:'+s.col+'"><span class="t">'+s.cs+'</span></div></div>';
   }
   function carried(c){
     return '<div class="carried"><div class="tc lg" style="background:'+c.col+'"><span class="t">'+esc(c.t)+'</span><span class="b">From '+c.from+'</span></div><b>'+esc(c.t)+'</b><div class="from">From '+c.from+', carried by '+c.by+' stations</div><div class="where">'+(c.live?'<span style="color:var(--live);font-weight:600">Live</span> ':'')+esc(c.where)+'</div></div>';
@@ -1110,7 +1110,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   /* ----- guide: 8:00 to 11:00 pm in 10-minute units (18) ----- */
   var G = [
     { cs:'CIVC', ch:'7.1', p:[[0,9,'Town Hall: backyard homes and ADUs','8:00 – 9:30',{live:1,on:1}],[9,18,'Planning Commission, Sept 24','9:30 – 11:00']] },
-    { cs:'RDLS', ch:'9.1', p:[[0,7.5,'City Council, Sept 16','Began 7:00, listed',{on:1,cont:1}],[7.5,10.5,'Community calendar','9:15'],[10.5,16.5,'Council Watch','From CIVC'],[16.5,18,'Slide loop','']] },
+    { cs:'RDLS', ch:'9.1', p:[[0,7.5,'City Council, Sept 16','Began 7:00, external',{on:1,cont:1}],[7.5,10.5,'Community calendar','9:15'],[10.5,16.5,'Council Watch','From CIVC'],[16.5,18,'Slide loop','']] },
     { cs:'BEAT', ch:'12.1', p:[[0,3,'Late Crate, ep. 14','8:00'],[3,6,'Saturday Reel','From REEL',{on:1}],[6,12,'Beat Tape Live','9:00 – 10:00',{live:1,sel:1}],[12,18,'Late Crate, ep. 15','10:00']] },
     { cs:'SAZN', ch:'18.1', p:[[0,6,'Tamales for forty','8:00 – 9:00',{on:1}],[6,12,'Orange Street after hours','9:00'],[12,18,'Sazón archive','10:00']] },
     { cs:'REEL', ch:'24.1', p:[[0,6,'Cartoons from 1928 to 1934','8:00 – 9:00',{on:1}],[6,12,'Newsreel hour','9:00'],[12,18,'Cartoons from 1935','10:00']] },

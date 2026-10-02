@@ -1,0 +1,7 @@
+/* Settings, Station account: the Clear wallet under the account's rows (rules, not boxes). */
+.cc-clearwallet { margin-top: 28px; }
+.cc-clearwallet__h { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--line); font: 700 15px var(--font-display); }
+.cc-clearwallet__note { margin: 12px 0 0; font-size: 13.5px; color: var(--ink-70); line-height: 1.45; max-width: 56ch; }
+.cc-clearwallet__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.cc-clearwallet__quiet { min-height: 48px; }
+.cc-clearwallet__error { margin: 12px 0 0; font-size: 13px; color: var(--live); }

@@ -1,0 +1,24 @@
+/* Audience (earnings 01.1: .big4, .chart, .split 1fr 340px, .split-bar; 04.1 on the phone). */
+.cc-aud__stats { margin-bottom: 18px; }
+.cc-aud__split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; margin-top: 14px; }
+.cc-aud__split > .cc-sec + .cc-sec .cc-sec__top { margin-top: 0; }
+.cc-aud__bar { margin: 12px 0 8px; }
+.cc-aud__quiet { color: var(--ink-50); }
+.cc-aud__empty { margin: 0; padding: 12px 0; color: var(--ink-70); font-size: 14px; }
+.cc-aud__error { margin: 0; padding: 12px 0; color: var(--ink-70); border-top: 1px solid var(--line); }
+.cc-aud__live {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--live); margin-right: 10px; vertical-align: 6px; box-shadow: 0 0 6px var(--live);
+}
+@media (max-width: 1080px) {
+  .cc-aud__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-aud__split > .cc-sec + .cc-sec .cc-sec__top { margin-top: 22px; }
+}
+
+.cc-aud-phone__now { padding: 16px 16px 6px; }
+.cc-aud-phone__v { display: block; font: 500 44px/1.1 var(--font-mono); letter-spacing: -.03em; }
+.cc-aud-phone__v .cc-aud__live { vertical-align: 12px; }
+.cc-aud-phone__cap { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 4px; }
+.cc-aud-phone__chart { padding: 0 16px; }
+.cc-aud-phone__rows { padding: 6px 16px 16px; }
+.cc-aud-phone .cc-aud__error, .cc-aud-phone .cc-aud__empty { margin: 16px; }

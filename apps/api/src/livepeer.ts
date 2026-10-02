@@ -1,4 +1,31 @@
 import { LIVEPEER_API_BASE, LIVEPEER_API_KEY, LIVEPEER_RTMP_INGEST_BASE } from "./config.js";
+import { BAND_RENDITIONS, FPS, LADDER, SEGMENT_MS, type Ladder } from "./v1/modules/playout/engine/ladder.js";
+
+/** One of Livepeer's transcode profiles (its stream-creation API). */
+export interface LivepeerProfile {
+  name: string;
+  width: number;
+  height: number;
+  bitrate: number;
+  fps: number;
+  /** Seconds between keyframes, as Livepeer takes it ("4.0"). */
+  gop: string;
+  profile: "H264High";
+}
+
+/**
+ * A live block is transcoded by Livepeer to the same video renditions every prepared item has
+ * (ladder.ts): the same sizes, bitrates and frame rate, with a keyframe every segment, so the
+ * channel's playlists switch into Livepeer's segments (the worker's copies of them in storage,
+ * engine/livecopy.ts) and back without a player changing rendition. (Livepeer makes no audio-only
+ * rendition; the channel's audio-only one is the sound of its smallest, cut by the worker.)
+ */
+export function livepeerProfiles(ladder: Ladder = LADDER): LivepeerProfile[] {
+  return BAND_RENDITIONS.tv
+    .map((name) => ladder[name])
+    .filter((r) => r.kind === "video")
+    .map((r) => ({ name: `${r.height}p`, width: r.width, height: r.height, bitrate: r.videoKbps * 1000, fps: FPS, gop: (SEGMENT_MS / 1000).toFixed(1), profile: "H264High" as const }));
+}
 
 interface LivepeerCreateResponse {
   id?: string;
@@ -67,7 +94,8 @@ export async function createLivepeerStream(name: string): Promise<ProvisionedLiv
     },
     body: JSON.stringify({
       name,
-      record: false
+      record: false,
+      profiles: livepeerProfiles()
     })
   });
 

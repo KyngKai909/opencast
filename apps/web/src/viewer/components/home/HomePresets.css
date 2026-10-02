@@ -1,0 +1,10 @@
+/* Home's presets (01.1 .presets, 02.1 .p-pres). The keys themselves are the ui's PresetKeys. */
+/* The phone strip runs to the screen's edges and scrolls sideways (.p-pres). */
+.vw-presets__hold .oc-presets__strip { margin: 0 -18px; padding: 0 18px; }
+/* A press and hold chooses the key's station, so the phone's own callout and selection stay out of it. */
+.vw-presets__hold { -webkit-touch-callout: none; user-select: none; }
+.vw-presets__error { font-size: 13px; color: var(--standby); margin: 0 0 var(--s2); }
+
+/* Waiting for the presets: the list's six ruled rows, or the strip's height, quiet. */
+.vw-presets__wait { height: calc(6 * 41px + 32px); border-top: 1px solid var(--hair); }
+.vw-presets__wait--strip { height: 76px; border: 0; }

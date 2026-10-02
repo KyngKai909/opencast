@@ -1,0 +1,29 @@
+/* Home (home 01.1 .hero, .mrow, .two-col; 02.1 .p-feat, .p-sec). Blocks are separated by space
+   and rules, never cards. */
+.vw-home__top { display: grid; grid-template-columns: 600px minmax(0, 1fr) 272px; gap: 24px; margin-bottom: 36px; }
+.vw-home__presets { min-width: 0; }
+.vw-home__quiet { grid-column: 1 / span 2; margin: 0; padding: var(--s4) 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink-70); align-self: start; }
+.vw-home__wait-pic { aspect-ratio: 16 / 9; border-radius: var(--r-screen); background: var(--raised); }
+.vw-home__two { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 36px; }
+
+/* A thin market on the web: its dial, with the presets beside it when there are any. */
+.vw-home--thin { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 36px; align-items: start; }
+
+/* Section heads (.sec-h): a title, a quiet line after it, controls at the end. */
+.vw-sec { margin-bottom: 36px; }
+.vw-sec--flush { margin-bottom: 0; }
+.vw-sec--phone { margin: 28px 0 0; }
+.vw-sec-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; flex-wrap: wrap; }
+.vw-sec-h h3 { margin: 0; font: 700 20px/1.2 var(--font-display); letter-spacing: -.015em; }
+.vw-sec-h__sub { color: var(--ink-50); font-size: 14px; }
+.vw-sec-h__end { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.vw-sec--phone .vw-sec-h { align-items: center; }
+.vw-sec--phone .vw-sec-h h3 { font-size: 18px; }
+
+@media (max-width: 1180px) {
+  .vw-home__top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .vw-home__top > .vw-home__presets { grid-column: 1 / -1; }
+}
+@media (max-width: 1000px) {
+  .vw-home__two, .vw-home--thin { grid-template-columns: minmax(0, 1fr); }
+}

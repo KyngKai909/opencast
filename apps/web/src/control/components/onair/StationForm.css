@@ -1,0 +1,33 @@
+/* A.1 Your station (master-control .split, .fld, .fld-row, .swatches, .pane.vis). */
+.cc-sf__split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; }
+.cc-sf__form { min-width: 0; }
+.cc-sf__form > * + *, .cc-sf__row + .cc-sf__fld { margin-top: 16px; }
+.cc-sf__row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.cc-sf__lb { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.cc-sf__help { margin-top: 6px; font-size: 13px; color: var(--ink-50); }
+.cc-sf__sign .oc-field__input { font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; letter-spacing: .01em; }
+.cc-sf__swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cc-sf__sw { width: 30px; height: 30px; padding: 0; border: 0; border-radius: var(--r-control); cursor: pointer; }
+.cc-sf__sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.cc-sf__sw:focus-visible { outline: 2px solid var(--signal); outline-offset: 5px; }
+.cc-sf__hex { width: 120px; }
+.cc-sf__hex .oc-field__box { height: 34px; font-size: 13px; }
+.cc-sf__ok { display: flex; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; color: var(--signal); }
+.cc-sf__bad { margin: 6px 0 0; font-size: 13px; color: var(--standby); }
+.cc-sf__pane { display: flex; flex-direction: column; gap: 14px; border-left: 1px solid var(--hair); padding-left: 28px; }
+.cc-sf__h { margin: 0; font: 700 15px var(--font-display); }
+.cc-sf__lbl { margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-50); }
+.cc-sf .oc-control-foot { margin-top: 18px; }
+
+@media (max-width: 1100px) {
+  .cc-sf__split { grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; }
+  .cc-sf__pane { padding-left: 20px; }
+}
+@media (max-width: 767px) {
+  .cc-sf__split, .cc-sf__row { grid-template-columns: minmax(0, 1fr); }
+  .cc-sf__pane { border-left: 0; padding-left: 0; }
+}
+/* Beside the owner's own station on X.1 (A229): its subchannel, and sharing its call sign. */
+.cc-sf__own { margin-top: 12px; }
+.cc-sf__own-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-sf__share { margin-top: 10px; }

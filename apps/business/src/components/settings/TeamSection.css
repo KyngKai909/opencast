@@ -1,0 +1,36 @@
+/* Settings, Team (biz-settings 02.1: .tm-h, .tm, .role, .perm; 05.2 on the phone: .row2). */
+.bz-team__table .oc-table__head { font-size: 12.5px; }
+.bz-team__pending { font-weight: 600; color: var(--ink-70); }
+.bz-team__pending-av {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px dashed var(--line); background: var(--raised);
+  display: grid; place-items: center; font: 700 14px var(--font-text); color: var(--ink);
+}
+.bz-team__last { font-size: 12.5px; color: var(--ink-70); }
+.bz-team__roles { margin-top: 22px; }
+.bz-team__perm { margin-top: 10px; }
+
+.bz-role {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.bz-role--fixed { border-style: dashed; color: var(--ink-70); }
+.bz-role--pick { padding: 0; position: relative; }
+.bz-role--pick select {
+  appearance: none; -webkit-appearance: none; height: 30px; border: 0; background: none; border-radius: var(--r-control);
+  padding: 0 29px 0 10px; font: 600 13px var(--font-text); color: var(--ink); cursor: pointer;
+}
+.bz-role--pick::after {
+  content: ""; position: absolute; right: 12px; top: 11px; width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); pointer-events: none;
+}
+.bz-role--pick option { color: var(--ink); background: var(--ground); }
+.bz-role--pick:focus-within { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* The phone: the plain list the frame draws, name and role. */
+.bz-team--phone { padding: 0 16px 24px; }
+.bz-team__plist { list-style: none; margin: 0; padding: 0; }
+.bz-team__prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-team__prow b { display: block; font-weight: 600; font-size: 14.5px; overflow-wrap: anywhere; }
+.bz-team__prow small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-team__padd { margin-top: 18px; }

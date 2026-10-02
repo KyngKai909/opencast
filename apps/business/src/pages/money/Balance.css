@@ -1,0 +1,24 @@
+/* biz-funding 03.1: the three numbers (.bal3), the bar (.balbar, 14px above), the runway, then the
+   movements and a 320px settings column (.split), 16px below. */
+.bz-bal__bar { margin: 14px 0 4px; }
+.bz-bal__runway { margin: 6px 0 0; }
+.bz-bal__split { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; margin-top: 16px; align-items: start; }
+.bz-bal__moves .oc-table { margin-top: 0; }
+.bz-bal__settings .oc-kvrows { margin-top: 0; }
+.bz-bal__empty { font-size: 13.5px; color: var(--ink-50); margin: 12px 0 0; }
+.bz-bal__err { font-size: 13.5px; color: var(--standby); margin: 12px 0 0; }
+.bz-bal__more { margin-top: 12px; }
+
+@media (max-width: 1000px) {
+  .bz-bal__split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The phone (06.1, 06.2): two numbers, 12px under the bar, the page 16px in (the phone bar's main). */
+.bz-bal--phone { padding-top: 0; }
+/* Movements at phone width: a narrower day column and amount, so the words keep their room. */
+.bz-bal--phone .oc-moves { --oc-table-cols: 64px minmax(0, 1fr) auto !important; --oc-table-gap: 10px !important; }
+.bz-bal--phone .oc-stats { grid-template-columns: 1fr 1fr; }
+.bz-bal__phone-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.bz-bal--phone .bz-bal__moves,
+.bz-bal--phone .bz-bal__settings { margin-top: 22px; }
+.bz-bal--phone .bz-sectop { flex-wrap: wrap; row-gap: 8px; }

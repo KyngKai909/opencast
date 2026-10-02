@@ -1,0 +1,6 @@
+/* .keypad3: three across, 54px keys ruled in line. */
+.bz-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.bz-keypad__key { height: 54px; border: 1px solid var(--line); border-radius: var(--r-control); background: none; color: var(--ink); font: 500 20px var(--font-mono); cursor: pointer; }
+.bz-keypad__key:hover { background: var(--raised); }
+.bz-keypad__key:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.bz-keypad__key:disabled { color: var(--ink-50); cursor: default; }

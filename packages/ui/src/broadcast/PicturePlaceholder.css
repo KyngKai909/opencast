@@ -1,0 +1,32 @@
+/*
+ * The drawn placeholder pictures (home .pic .scene/.podium/.figure and .pic.reel). These are
+ * illustration colours for a picture, not interface colours, so they live here and nowhere else.
+ */
+.oc-pic-ph {
+  --oc-scene-ground: #2A3A40;
+  --oc-scene-stripe: #33474d;
+  --oc-scene-seam: #2c3e44;
+  --oc-scene-podium: #4A3A2C;
+  --oc-scene-figure: #1d2a30;
+  --oc-reel-ground: #161513;
+  --oc-reel-grain: #1d1c19;
+  --oc-reel-light: #3a3833;
+  --oc-reel-title: #E8E0CC;
+  --oc-reel-sub: #B5AC98;
+  position: absolute; inset: 0; background: var(--oc-scene-ground);
+}
+.oc-pic-ph__scene { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, var(--oc-scene-stripe) 0 18%, var(--oc-scene-seam) 18% 19%); }
+.oc-pic-ph__podium { position: absolute; left: 38%; bottom: 0; width: 24%; height: 40%; background: var(--oc-scene-podium); border-radius: 4px 4px 0 0; }
+.oc-pic-ph__figure { position: absolute; left: 44%; bottom: 36%; width: 12%; aspect-ratio: 1 / 1.1; background: var(--oc-scene-figure); border-radius: 45% 45% 10% 10%; }
+.oc-pic-ph--reel { background: var(--oc-reel-ground); }
+.oc-pic-ph--reel .oc-pic-ph__scene {
+  background:
+    radial-gradient(circle at 50% 46%, var(--oc-reel-light) 0 22%, transparent 22.5%),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px),
+    var(--oc-reel-grain);
+}
+.oc-pic-ph__card { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+.oc-pic-ph__card b { display: block; font: 800 clamp(18px, 6cqw, 56px)/1 var(--font-display); font-stretch: var(--wide); letter-spacing: -.03em; color: var(--oc-reel-title); }
+.oc-pic-ph__card span { display: block; font: 500 clamp(8px, 1.6cqw, 15px) var(--font-mono); color: var(--oc-reel-sub); margin-top: .6em; }
+.oc-pic--tv .oc-pic-ph__card b { font-size: 150px; }
+.oc-pic--tv .oc-pic-ph__card span { font-size: 34px; }

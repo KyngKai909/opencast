@@ -1,0 +1,12 @@
+/* The station switcher (shared-mid .stn-switch; the studio's form in market 04.1). */
+.oc-stn-switch {
+  display: inline-flex; align-items: center; gap: 10px;
+  height: 36px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  background: none; color: var(--ink); cursor: pointer;
+}
+.oc-stn-switch:hover { background: var(--raised); }
+.oc-stn-switch__sw { width: 14px; height: 14px; border-radius: var(--r-sign); background: var(--oc-station); flex: none; }
+.oc-stn-switch__ch { font-size: 14px; }
+.oc-stn-switch__cs { font-size: 14px; }
+.oc-stn-switch__kind { font-size: 12.5px; color: var(--ink-50); }

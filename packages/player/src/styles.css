@@ -1,0 +1,284 @@
+/*
+ * The player. Everything over the picture is sized in units of the player's own width, so the
+ * TV banner is exact at 1920×1080 (from tv/opencast-tv.html) and the same banner scales down in a
+ * web page; text keeps a readable minimum there.
+ */
+.oc-player {
+  --u: calc(100cqw / 1920);
+  position: relative;
+  container-type: inline-size;
+  aspect-ratio: 16 / 9;
+  background: var(--screen);
+  color: var(--on-screen);
+  overflow: hidden;
+  border-radius: var(--r-screen);
+  font-family: var(--font-text);
+}
+.oc-player--tv { border-radius: 0; }
+.oc-player__stage, .oc-player__cover { position: absolute; inset: 0; }
+/* AirPlay's listener (Safari): a video with no stream, never seen. */
+.oc-player__probe { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.oc-player__video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; background: transparent;
+  opacity: 0; pointer-events: none;
+}
+.oc-player__video.is-on { opacity: 1; pointer-events: auto; }
+.oc-player__video::cue {
+  font-family: var(--font-text); font-size: var(--oc-cue, 4.2cqw); line-height: 1.3;
+  color: #fff; background: rgb(10 17 36 / .82);
+}
+.oc-player__cover { background: var(--screen); }
+.oc-player__cover--tuning { background: var(--screen); }
+.oc-player__cover > * { width: 100%; height: 100%; border-radius: 0; }
+.oc-player__embed { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--screen); }
+
+/* ---------- The station's graphics (Overlays.tsx), from the playlist's DATERANGE tags ----------
+   Inside the style guide's safe areas, as the frames draw them. Web and phone sizes come from the
+   viewer frames (.pic .bug, .pic .l3: container units with a floor and a ceiling); TV sizes from
+   tv/opencast-tv.html (.tv .pic .bug 40/22px at right 5%, bottom 6%; .tv .pic .l3 44/28px), in
+   player units so they're exact at 1920. The code is business/opencast-biz-spots.html's .codebug
+   (on a picture about 570px wide), scaled the same way. */
+.oc-ovl { position: absolute; inset: 0; pointer-events: none; }
+/* The bug: bottom right by default; the tag can put it in any corner. */
+.oc-ovl__bug { position: absolute; inset: 0; }
+.oc-ovl__bug[data-position^="top"] .oc-bug { bottom: auto; top: 7%; }
+.oc-ovl__bug[data-position$="left"] .oc-bug { right: auto; left: 3.5%; text-align: left; }
+.oc-ovl__logo {
+  position: absolute; right: 3.5%; bottom: 7%; height: clamp(18px, 3.4cqw, 32px); width: auto; max-width: 20%;
+  object-fit: contain; opacity: var(--bug-opacity);
+}
+.oc-ovl__bug[data-position^="top"] .oc-ovl__logo { bottom: auto; top: 7%; }
+.oc-ovl__bug[data-position$="left"] .oc-ovl__logo { right: auto; left: 3.5%; }
+.oc-ovl--tv .oc-bug { right: 5%; bottom: 6%; }
+.oc-ovl--tv .oc-bug__cs { font-size: calc(40 * var(--u)); }
+.oc-ovl--tv .oc-bug__ch { font-size: calc(22 * var(--u)); }
+.oc-ovl--tv .oc-ovl__bug[data-position^="top"] .oc-bug { top: 6%; }
+.oc-ovl--tv .oc-ovl__bug[data-position$="left"] .oc-bug { left: 5%; }
+.oc-ovl--tv .oc-ovl__logo { right: 5%; bottom: 6%; height: calc(66 * var(--u)); }
+.oc-ovl--tv .oc-ovl__bug[data-position^="top"] .oc-ovl__logo { top: 6%; }
+.oc-ovl--tv .oc-ovl__bug[data-position$="left"] .oc-ovl__logo { left: 5%; }
+/* The TV guide's window (tv 03.1): the bug alone, 22/13px on the 640-wide window, which is the
+   picture at a third of its size, so three times that in the picture's own units. */
+.oc-ovl--tv.oc-ovl--window .oc-bug__cs { font-size: calc(66 * var(--u)); }
+.oc-ovl--tv.oc-ovl--window .oc-bug__ch { font-size: calc(39 * var(--u)); }
+.oc-ovl--tv.oc-ovl--window .oc-ovl__logo { height: calc(109 * var(--u)); }
+/* The lower third (ui's LowerThird: left 5%, bottom 8%). */
+.oc-ovl--tv .oc-l3__nm { font-size: calc(44 * var(--u)); }
+.oc-ovl--tv .oc-l3__tt { font-size: calc(28 * var(--u)); }
+/* The code and QR, bottom left, for the spot's last seconds. The panel is the screen colour at 85%. */
+.oc-ovl__code {
+  position: absolute; left: 6%; bottom: 7%;
+  display: flex; align-items: center; gap: clamp(6px, 1.75cqw, 16px);
+  background: rgb(10 17 36 / .85); color: #fff;
+  padding: clamp(5px, 1.4cqw, 12px) clamp(8px, 2.1cqw, 18px); border-radius: 6px;
+}
+.oc-ovl__qr { display: block; width: clamp(30px, 7.4cqw, 68px); height: auto; aspect-ratio: 1; background: var(--on-tally); border-radius: 2px; }
+.oc-ovl__qr path { fill: var(--on-signal); }
+.oc-ovl__code-c { display: block; font: 500 clamp(11px, 2.8cqw, 24px)/1.15 var(--font-mono); }
+.oc-ovl__code-o { display: block; font-size: clamp(9px, 1.9cqw, 16px); opacity: .8; }
+.oc-ovl--tv .oc-ovl__code { gap: calc(34 * var(--u)); padding: calc(27 * var(--u)) calc(40 * var(--u)); border-radius: calc(20 * var(--u)); }
+.oc-ovl--tv .oc-ovl__qr { width: calc(142 * var(--u)); border-radius: calc(7 * var(--u)); }
+.oc-ovl--tv .oc-ovl__code-c { font-size: calc(54 * var(--u)); }
+.oc-ovl--tv .oc-ovl__code-o { font-size: calc(37 * var(--u)); }
+
+/* The TV's panels (.tv-panel): the dark glass the banner and the number sit on. */
+.oc-banner, .oc-numpad {
+  position: absolute;
+  background: rgb(12 20 42 / .94);
+  border-radius: var(--r-screen);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--pic-ink);
+  --oc-line: var(--line);
+}
+
+/* ---------- The banner (tv 02.1: .banner) ---------- */
+.oc-banner {
+  left: calc(96 * var(--u)); right: calc(96 * var(--u)); bottom: calc(54 * var(--u));
+  padding: calc(34 * var(--u)) calc(40 * var(--u)) calc(26 * var(--u));
+  /* The reference's 380 and 260 are minimums: a longer call sign (RETRO) or channel (99.2) widens its
+     column instead of running into the program's name. */
+  display: grid; grid-template-columns: minmax(calc(380 * var(--u)), max-content) minmax(0, 1fr) minmax(calc(260 * var(--u)), max-content); gap: calc(44 * var(--u));
+}
+.oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; }
+.oc-banner__ch {
+  grid-row: span 2;
+  font: 500 max(calc(76 * var(--u)), 22px)/1 var(--font-mono); letter-spacing: -.05em;
+  padding-right: calc(22 * var(--u)); border-right: 2px solid var(--line);
+}
+.oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
+.oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
+.oc-banner__src { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
+.oc-banner__now h3 {
+  margin: calc(2 * var(--u)) 0 calc(10 * var(--u));
+  font: 800 max(calc(58 * var(--u)), 18px)/1.02 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em;
+}
+.oc-banner__nx { margin-top: calc(14 * var(--u)); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
+.oc-banner__nx b { color: var(--pic-ink); font-weight: 600; }
+.oc-banner__side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: calc(16 * var(--u)); }
+.oc-banner__clock { font: 500 max(calc(44 * var(--u)), 15px) var(--font-mono); letter-spacing: -.03em; }
+.oc-banner__hints {
+  grid-column: 1 / -1; display: flex; gap: calc(40 * var(--u));
+  padding-top: calc(20 * var(--u)); border-top: 1px solid var(--hair);
+  font-size: max(calc(22 * var(--u)), 12px); color: var(--pic-ink-70); align-items: center;
+}
+.oc-banner__hints > span { display: inline-flex; align-items: center; gap: calc(12 * var(--u)); }
+.oc-banner__end { margin-left: auto; }
+/* Casting and mirroring (tv 06.1 .castchip): where the controls are, with where to change channel at the end. */
+.oc-banner__chip { color: var(--pic-ink-70); }
+.oc-banner__chip .oc-i { width: calc(30 * var(--u)); height: calc(24 * var(--u)); min-width: 16px; min-height: 13px; }
+/* "Live from Redlands City Hall": Live in the live colour (tv 06.1). */
+.oc-banner__live { color: var(--live); font-weight: 600; }
+/* On TV the tags are the ten-foot size (.tv .tag). */
+.oc-banner--tv .oc-tag { height: 36px; padding: 0 14px; font-size: 22px; border-width: 1.5px; }
+.oc-banner--tv .oc-tag__dot { width: 10px; height: 10px; }
+
+/* In a web page the banner is shorter: one row, and no hint row unless one is given. */
+.oc-banner--web { grid-template-columns: auto minmax(0, 1fr) auto; gap: max(calc(44 * var(--u)), 14px); padding: max(calc(26 * var(--u)), 10px) max(calc(34 * var(--u)), 12px); left: 3%; right: 3%; bottom: 4%; }
+.oc-banner--web .oc-banner__ch { padding-right: max(calc(22 * var(--u)), 10px); }
+
+/* A narrow picture (a phone's full player): the ident over what's on, the clock and tally beside. */
+@container (max-width: 560px) {
+  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
+  .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
+  .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
+  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
+  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 6px; }
+  .oc-banner--web .oc-banner__ch { font-size: 20px; }
+  .oc-banner--web .oc-banner__cs { font-size: 15px; }
+  .oc-banner--web .oc-banner__clock { font-size: 13px; }
+  .oc-banner--web .oc-banner__nx { font-size: 12px; }
+  .oc-banner--web .oc-banner__hints { display: none; }
+}
+
+/* ---------- Number entry (tv 02.2: .numpad) ---------- */
+.oc-numpad { top: calc(54 * var(--u)); right: calc(96 * var(--u)); padding: calc(26 * var(--u)) calc(36 * var(--u)); text-align: right; }
+.oc-numpad__num { font: 500 max(calc(150 * var(--u)), 40px)/1 var(--font-mono); letter-spacing: -.06em; }
+.oc-numpad__num em { font-style: normal; color: var(--pic-ink-70); opacity: .75; }
+.oc-numpad__caret { display: inline-block; width: max(calc(10 * var(--u)), 3px); height: .8em; background: var(--signal); vertical-align: -.08em; margin-left: calc(6 * var(--u)); }
+.oc-numpad__who { font-size: max(calc(28 * var(--u)), 13px); color: var(--pic-ink-70); margin-top: calc(10 * var(--u)); }
+.oc-numpad__who b { color: var(--pic-ink); font-weight: 600; }
+.oc-numpad__near { margin-top: calc(6 * var(--u)); }
+
+/* ---------- Paused, sound, sleep ---------- */
+.oc-player__paused { position: absolute; left: 4%; top: 6%; display: flex; gap: 12px; align-items: center; }
+.oc-player__unmute, .oc-player__sleep {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: rgb(12 20 42 / .94); color: var(--pic-ink); border: 0;
+  box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-control);
+  padding: 12px 18px; font: 600 15px var(--font-text);
+}
+.oc-player__unmute { cursor: pointer; }
+.oc-player__sleep { display: flex; gap: 14px; align-items: center; top: auto; bottom: 8%; transform: translateX(-50%); }
+/* TV: ten-foot sizes for paused and the sleep fade's notice (nothing under 21px at 1080p). */
+.oc-player--tv .oc-player__paused { left: calc(96 * var(--u)); top: calc(54 * var(--u)); gap: calc(20 * var(--u)); }
+.oc-player--tv .oc-player__paused .oc-tag { height: calc(36 * var(--u)); padding: 0 calc(14 * var(--u)); font-size: calc(22 * var(--u)); border-width: 1.5px; }
+.oc-player--tv .oc-player__sleep {
+  bottom: calc(54 * var(--u)); gap: calc(28 * var(--u)); padding: calc(26 * var(--u)) calc(26 * var(--u)) calc(26 * var(--u)) calc(36 * var(--u));
+  border-radius: var(--r-screen); font: 600 calc(28 * var(--u)) var(--font-text);
+}
+.oc-player--tv .oc-player__sleep .oc-btn, .oc-player--tv .oc-player__paused .oc-btn { height: calc(78 * var(--u)); padding: 0 calc(28 * var(--u)); font-size: calc(30 * var(--u)); }
+/* A bug top left: paused and Back to live move to the top right. */
+.oc-player__paused[data-side="right"] { left: auto; right: 4%; }
+.oc-player--tv .oc-player__paused[data-side="right"] { left: auto; right: calc(96 * var(--u)); }
+/* TV, playing behind live: a small chip where paused sat, on the banner's dark glass. */
+.oc-player__live {
+  position: absolute; left: calc(96 * var(--u)); top: calc(54 * var(--u));
+  display: inline-flex; align-items: center; gap: calc(16 * var(--u));
+  height: calc(52 * var(--u)); padding: 0 calc(22 * var(--u));
+  background: rgb(12 20 42 / .82); color: var(--pic-ink); border: 0;
+  box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-control);
+  font: 600 max(calc(24 * var(--u)), 12px) var(--font-text); cursor: pointer;
+}
+.oc-player__live[data-side="right"] { left: auto; right: calc(96 * var(--u)); }
+.oc-player__live-key { display: inline-flex; align-items: center; gap: calc(10 * var(--u)); color: var(--pic-ink-70); font-weight: 500; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .oc-numpad { animation: oc-panel-in .18s ease-out; }
+  @keyframes oc-panel-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  /* The banner slides in from below the picture (after a channel change, once the static has cleared). */
+  :root:not([data-motion="reduce"]) .oc-banner { animation: oc-banner-in var(--oc-banner-slide, .24s) var(--oc-banner-slide-ease, ease-out); }
+  @keyframes oc-banner-in { from { transform: translateY(140%); } to { transform: none; } }
+}
+
+/* ---------- Changing channel (follow-up Phase 5: viewer/opencast-tuning.html) ----------
+   Timings come from tuning/constants.ts as custom properties on the player (tuningStyle). */
+.oc-tune { position: absolute; inset: 0; pointer-events: none; color: var(--on-screen); }
+/* The static: a canvas at half size, stretched to 2 px grain. Its colour behind the first frame is the grain's average. */
+.oc-tune__static { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; image-rendering: crisp-edges; background: rgb(46 48 56); }
+/* It clears in one roll, top to bottom. */
+.oc-tune__static.is-rolling { animation: oc-tune-roll var(--oc-tune-roll) linear forwards; }
+@keyframes oc-tune-roll { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(100% 0 0 0); } }
+/* Reduced motion: the old picture dims (the screen colour over it), then the pictures crossfade. */
+.oc-tune__dim { position: absolute; inset: 0; background: var(--screen); opacity: calc(1 - var(--oc-tune-dim)); animation: oc-tune-dim var(--oc-tune-fade) linear; transition: opacity var(--oc-tune-fade) linear; }
+@keyframes oc-tune-dim { from { opacity: 0; } }
+.oc-tune.is-clearing .oc-tune__dim { opacity: 0; }
+.oc-player[data-tune="fade"] .oc-player__video { transition: opacity var(--oc-tune-fade) linear; }
+/* The corner number: top right inside title safe, mono numerals and the call sign in Archivo. */
+.oc-tune__osd { position: absolute; top: 6%; right: 6%; text-align: right; line-height: 1; text-shadow: 0 1px 8px rgb(0 0 0 / .5); }
+.oc-tune__n { display: block; font: 500 clamp(28px, 6.7cqw, 64px)/1 var(--font-mono); letter-spacing: -.04em; }
+.oc-tune__c { display: block; font-size: clamp(14px, 2.5cqw, 24px); margin-top: 4px; }
+/* After 800 ms: the program's name and "Tuning in", over the static. */
+.oc-tune__hold { position: absolute; left: 8%; bottom: 12%; text-shadow: 0 1px 8px rgb(0 0 0 / .5); }
+.oc-tune__hold b { display: block; font: 800 clamp(16px, 3.1cqw, 30px)/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+.oc-tune__hold span { font-size: clamp(11px, 1.5cqw, 14px); opacity: .8; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .oc-tune__hold { animation: oc-tune-hold var(--oc-tune-fade) linear; }
+  @keyframes oc-tune-hold { from { opacity: 0; } }
+}
+/* TV: title safe (5%) in the player's units, and set to read across a room. */
+.oc-tune--tv .oc-tune__osd { top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
+.oc-tune--tv .oc-tune__n { font-size: calc(128 * var(--u)); }
+.oc-tune--tv .oc-tune__c { font-size: calc(48 * var(--u)); margin-top: calc(8 * var(--u)); }
+.oc-tune--tv .oc-tune__hold { left: calc(154 * var(--u)); bottom: calc(130 * var(--u)); }
+.oc-tune--tv .oc-tune__hold b { font-size: calc(60 * var(--u)); }
+.oc-tune--tv .oc-tune__hold span { font-size: calc(30 * var(--u)); }
+
+/* ---------- Radio (tv 05.1: .radio-full) ---------- */
+.oc-radio { position: absolute; inset: 0; color: #fff; }
+.oc-radio__drift {
+  position: absolute; left: calc(220 * var(--u)); top: calc(170 * var(--u));
+  /* A few pixels a minute, round a small square: burn-in protection, so it runs even with reduced motion. */
+  animation: oc-radio-drift 1200s linear infinite alternate;
+}
+@keyframes oc-radio-drift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(calc(60 * var(--u)), calc(20 * var(--u))); }
+  50% { transform: translate(calc(40 * var(--u)), calc(70 * var(--u))); }
+  75% { transform: translate(calc(-30 * var(--u)), calc(50 * var(--u))); }
+  100% { transform: translate(calc(-50 * var(--u)), calc(-10 * var(--u))); }
+}
+.oc-radio__f { font: 500 max(calc(330 * var(--u)), 56px)/1 var(--font-mono); letter-spacing: -.07em; }
+.oc-radio__cs { font-size: max(calc(96 * var(--u)), 20px); line-height: 1; margin-top: calc(10 * var(--u)); }
+.oc-radio__sub { font-size: max(calc(34 * var(--u)), 13px); opacity: .88; margin-top: calc(10 * var(--u)); }
+.oc-radio__meter { display: flex; gap: calc(8 * var(--u)); align-items: flex-end; height: calc(80 * var(--u)); margin-top: calc(44 * var(--u)); }
+.oc-radio__meter i { width: max(calc(12 * var(--u)), 3px); height: 8%; background: rgb(255 255 255 / .7); border-radius: 2px; }
+/* No audio analysis yet: while playing, the bars move on their own rhythms. */
+.oc-radio__meter--measured i { animation: none !important; transition: height 60ms linear; }
+.oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: oc-level calc(.55s + var(--i) * 37ms) ease-in-out infinite alternate; animation-delay: calc(var(--i) * -91ms); }
+@keyframes oc-level { from { height: 30%; } to { height: 92%; } }
+@media (prefers-reduced-motion: reduce) {
+  .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
+}
+:root[data-motion="reduce"] .oc-radio--playing .oc-radio__meter:not(.oc-radio__meter--measured) i { animation: none; height: 60%; }
+.oc-radio__tally { position: absolute; top: calc(54 * var(--u)); right: calc(96 * var(--u)); }
+/* Tuning along the band: the new frequency at once, the old station's colour until the sound
+   arrives (then one change of colour), the name dim until then, and the needle sweeping. */
+.oc-radio { transition: background-color var(--oc-tune-fade) linear; }
+.oc-radio__sub { transition: opacity var(--oc-tune-fade) linear; }
+.oc-radio--tuning .oc-radio__sub { opacity: .3; }
+.oc-radio--tuning.is-clearing .oc-radio__sub { opacity: .88; }
+.oc-radio__hold { font-size: max(calc(30 * var(--u)), 12px); opacity: .85; margin-top: calc(8 * var(--u)); }
+.oc-radio__band {
+  position: relative; width: calc(1480 * var(--u)); height: calc(56 * var(--u)); margin-bottom: calc(34 * var(--u));
+  border-bottom: 2px solid rgb(255 255 255 / .7); transition: opacity var(--oc-tune-fade) linear;
+}
+.oc-radio__band.is-clearing { opacity: 0; }
+.oc-radio__needle-track { position: absolute; inset: 0; display: block; will-change: transform; }
+.oc-radio__needle {
+  position: absolute; left: 0; top: calc(-8 * var(--u)); bottom: calc(-12 * var(--u));
+  width: max(calc(6 * var(--u)), 3px); margin-left: min(calc(-3 * var(--u)), -1.5px); border-radius: 2px;
+  background: var(--tally); box-shadow: 0 0 10px var(--tally-glow);
+}
+
+/* The dock: videos wait here, playing, while no surface shows them. */
+.oc-player-dock { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; left: -10px; top: -10px; }

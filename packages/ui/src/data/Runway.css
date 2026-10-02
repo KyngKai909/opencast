@@ -1,0 +1,3 @@
+/* The runway line (biz funding .runway). */
+.oc-runway { font-size: 13.5px; color: var(--ink-70); margin: 0; }
+.oc-runway b { color: var(--ink); }

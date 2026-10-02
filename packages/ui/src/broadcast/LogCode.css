@@ -1,0 +1,12 @@
+/* Log codes (master control .code; the style guide's larger .code). */
+.oc-code {
+  display: inline-block; min-width: 36px; text-align: center;
+  font: 500 11px var(--font-mono); padding: 1px 5px;
+  border-radius: var(--r-sign); border: 1px solid var(--line);
+  text-decoration: none; cursor: inherit;
+}
+.oc-code--guide { min-width: 42px; font-size: 12px; line-height: 1.6; padding: 2px 6px; }
+.oc-code--pgm { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-code--spt { border-color: var(--standby); color: var(--standby); }
+.oc-code--und { border-style: dashed; }
+.oc-code--open { border-style: dashed; color: var(--ink-50); }

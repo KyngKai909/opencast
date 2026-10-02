@@ -1,0 +1,15 @@
+/* What each role can do (.perm in station and business settings). */
+.oc-perm { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.oc-perm thead th,
+.oc-perm thead td {
+  text-align: left; font-weight: 600; font-size: 12.5px; color: var(--ink-50);
+  padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line);
+}
+.oc-perm thead > tr > :not(:first-child),
+.oc-perm tbody td { text-align: center; width: var(--oc-perm-col, 90px); }
+.oc-perm tbody th,
+.oc-perm tbody td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--hair); }
+/* The ability reads as body text, not as a header. */
+.oc-perm__ability { text-align: start; font-weight: 400; }
+.oc-perm__yes { font-weight: 700; }
+.oc-perm__no { color: var(--ink-50); }

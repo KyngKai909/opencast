@@ -1,0 +1,7 @@
+/* A thin market (home 08.2). */
+.vw-thin__dial .oc-dial { border-top: 1px solid var(--line); }
+.vw-sec--phone.vw-thin__own { margin-top: 6px; }
+/* The invitation sits under an ink rule, the one heavy line on the page. */
+.vw-thin__start { border-top: 2px solid var(--ink); padding-top: 14px; }
+.vw-thin__start h3 { margin: 0 0 6px; font: 700 18px var(--font-display); }
+.vw-thin__start p { font-size: 14px; color: var(--ink-70); margin: 0 0 12px; max-width: 60ch; }

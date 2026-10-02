@@ -1,0 +1,11 @@
+/* Amount pickers: .amts/.amt (the viewer's pledge) and .amts2 (business amounts, mono). */
+.oc-amounts__row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.oc-amounts__amt {
+  margin: 0; padding: 1px 6px;
+  border: 1px solid var(--line); border-radius: var(--r-control); background: none;
+  color: var(--ink); cursor: pointer;
+}
+.oc-amounts__amt--sel { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-amounts--text .oc-amounts__amt { height: 52px; font: 600 16px var(--font-text); }
+.oc-amounts--mono .oc-amounts__amt { height: 48px; font: 500 17px var(--font-mono); font-variant-numeric: tabular-nums; }
+.oc-amounts__other { margin-top: 12px; }

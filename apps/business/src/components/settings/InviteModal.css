@@ -1,0 +1,6 @@
+/* Invite someone and Add a location (biz-settings 05.2: .m-main .fld, .seg). */
+.bz-invite { display: grid; gap: 16px; }
+.bz-invite__fld { display: grid; gap: 6px; justify-items: start; }
+.bz-invite__lb { font-size: 13px; font-weight: 600; color: var(--ink); }
+.bz-invite__two { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 8px; }
+.bz-invite .bz-error { margin: 0; }

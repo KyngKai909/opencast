@@ -1,0 +1,72 @@
+/* You (you 02.1: .pg-h, .two, .rem, .pl, .dev, .stn-cta; phone 06.1 .fv2, 06.2 .p-you-top, .p-keys). */
+.vw-you .vw-y-pg-h h1 { font-size: 34px; }
+.vw-you__avatar-ph { width: 56px; height: 56px; border-radius: 50%; border: 1px solid var(--hair); flex: none; }
+.vw-you__presets { margin-top: 6px; }
+.vw-you__keys { margin-top: 12px; }
+.vw-you__keys-ph { height: 106px; margin-top: 12px; border: 1px dashed var(--hair); border-radius: var(--r-control); }
+.vw-you__two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; }
+.vw-you__tvs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 36px; }
+
+/* Reminders */
+.vw-y-rem { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-rem__when { font: 500 13px/1.35 var(--font-mono); color: var(--ink-70); }
+.vw-y-rem__w b { display: block; color: var(--ink); font: 700 15px/1.25 var(--font-display); }
+.vw-y-rem__w small { display: block; font-size: 13px; color: var(--ink-70); }
+.vw-y-rem__flag { display: flex; gap: 6px; align-items: center; margin-top: 3px; font-size: 12.5px; color: var(--ink-50); }
+.vw-y-rem--phone { grid-template-columns: 80px minmax(0, 1fr); padding: 10px 16px; }
+
+/* Supporting */
+.vw-y-pl { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-pl__sw { border-radius: var(--r-control); color: var(--on-station); display: grid; place-items: center; overflow: hidden; font: 800 11px var(--font-display); font-stretch: var(--wide); }
+.vw-y-pl__w { min-width: 0; }
+.vw-y-pl__w b { display: block; font-weight: 600; color: var(--ink); }
+.vw-y-pl__w small { display: block; font-size: 13px; color: var(--ink-70); }
+.vw-y-pl__amt { font: 500 15px var(--font-mono); text-align: right; color: var(--ink); }
+.vw-y-pl__amt small { display: block; font-family: var(--font-text); font-size: 12px; color: var(--ink-50); }
+.vw-y-pl--phone { grid-template-columns: 40px minmax(0, 1fr) auto; width: 100%; padding: 10px 16px; border-width: 0 0 1px; border-style: solid; border-color: var(--hair); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+
+/* Your TVs */
+.vw-y-dev { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-dev__ic { width: 40px; height: 40px; border-radius: var(--r-control); background: var(--raised); color: var(--ink); display: grid; place-items: center; }
+.vw-y-dev__w { min-width: 0; }
+.vw-y-dev__w b { display: block; font-weight: 600; color: var(--ink); }
+.vw-y-dev__w small { display: block; font-size: 13px; color: var(--ink-70); }
+.vw-y-dev--phone { padding: 10px 16px; }
+
+/* Run a station */
+.vw-y-run { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; margin-top: 30px; padding-top: 16px; border-top: 2px solid var(--ink); }
+.vw-y-run h2 { margin: 0 0 4px; color: var(--ink); font: 700 20px var(--font-display); }
+.vw-y-run p { margin: 0; font-size: 14.5px; color: var(--ink-70); }
+.vw-y-run__loading { height: 20px; }
+.vw-y-run--phone { display: flex; align-items: center; gap: 12px; margin: 0; padding: 12px 16px; border-top: 0; border-bottom: 1px solid var(--hair); color: var(--ink); text-decoration: none; }
+.vw-y-run__w { flex: 1; min-width: 0; }
+.vw-y-run__w b { display: block; font-weight: 600; font-size: 15px; }
+.vw-y-run__w small { display: block; font-size: 13px; color: var(--ink-70); }
+
+/* Signed out (06.1 .fv2) */
+.vw-y-out { display: flex; flex-direction: column; }
+.vw-y-out h1 { margin: 6px 0 10px; color: var(--ink); font: 800 30px/1.02 var(--font-display); font-stretch: var(--wide); letter-spacing: -.04em; }
+.vw-y-out__lede { margin: 0 0 16px; font-size: 14.5px; color: var(--ink-70); }
+.vw-y-out__row { padding: 9px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-out__row b { display: block; font-weight: 600; font-size: 15px; color: var(--ink); }
+.vw-y-out__row small { display: block; margin-top: 1px; font-size: 13px; color: var(--ink-70); }
+.vw-y-out__signin { margin-top: 18px; }
+.vw-y-out__settings { margin-top: 10px; }
+.vw-y-out--web { max-width: 560px; padding-top: 12px; }
+.vw-y-out--web h1 { font-size: 34px; }
+.vw-y-out--phone { padding: 18px 22px 22px; }
+
+/* The phone's You (06.2) */
+.vw-you-p__top { display: flex; align-items: center; gap: 12px; padding: 14px 18px 16px; border-bottom: 1px solid var(--hair); color: var(--ink); text-decoration: none; }
+.vw-you-p__who { flex: 1; min-width: 0; }
+.vw-you-p__who b { display: block; font: 800 20px var(--font-display); font-stretch: var(--semi-wide); }
+.vw-you-p__who small { display: block; font-size: 13px; color: var(--ink-70); }
+.vw-you-p__chev { color: var(--ink); }
+.vw-you-p__keys { padding: 12px 16px 4px; }
+.vw-you-p__keys .vw-you__keys-ph { margin-top: 0; height: 180px; }
+.vw-you-p__list .vw-y-quiet, .vw-you-p__list .vw-y-error { margin: 0; padding: 12px 16px; }
+.vw-you-p__list .vw-y-ph { margin: 0 16px; }
+
+@media (max-width: 1023px) {
+  .vw-you__two, .vw-you__tvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}

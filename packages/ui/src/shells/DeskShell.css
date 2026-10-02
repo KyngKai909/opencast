@@ -1,0 +1,6 @@
+/* The desk header's Internal sign (network-desk .nd-head .internal). */
+.oc-desk-shell__internal {
+  font: 600 11.5px var(--font-text); color: var(--standby);
+  border: 1px solid var(--standby); border-radius: var(--r-sign);
+  padding: 2px 7px;
+}

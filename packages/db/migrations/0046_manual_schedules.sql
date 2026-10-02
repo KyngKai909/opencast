@@ -1,0 +1,11 @@
+-- 2026-10-01: A241, two more ways for an external station's "what's on" to come in (the user's decision).
+-- A webpage's own event data: a schedule address that answers with an HTML page is read for its
+-- schema.org JSON-LD (`schedule_format` `webpage`); a page with none is `calendar_sync`
+-- `no_event_data`, not an error. Both are text columns, so no change here.
+-- A schedule entered by hand: `schedule_source` `manual`, its weekly slots and skipped dates in
+-- `manual_schedule` (jsonb: `{ slots: [{ days, start, end, title, description, from, until }],
+-- skipDates }`, times in the market's time zone), checked against the published schedule in the
+-- existing `guide_checked_against` and `guide_checked_on` (both required for it). Its airings go in
+-- `listed_airings` like a feed's, for the next 14 days, made again hourly and on every save.
+-- Named by hand: 0038 is reserved (see 0040), so drizzle-kit's numbering isn't relied on.
+ALTER TABLE "network"."listed_sources" ADD COLUMN "manual_schedule" jsonb;

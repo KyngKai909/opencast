@@ -67,10 +67,8 @@ const checks = [
   {
     key: "DATABASE_URL",
     scope: "root",
-    required: railwayDetected,
-    note: railwayDetected
-      ? "Required for PostgreSQL-backed state in production."
-      : "Optional locally; when unset, JSON file storage is used."
+    required: true,
+    note: "Required. Locally: npm run db:up, then the value in .env.example."
   },
   {
     key: "REDIS_URL",
@@ -91,40 +89,28 @@ const checks = [
     note: "Required only for Livepeer provisioning and RTMP output."
   },
   {
-    key: "UPLOAD_STORAGE_MODE",
-    scope: "root",
-    required: false,
-    note: "local | hybrid | ipfs. Use ipfs to require Pinata upload before saving asset metadata."
-  },
-  {
-    key: "DELETE_LOCAL_AFTER_IPFS",
-    scope: "root",
-    required: false,
-    note: "When true, removes local media files after successful IPFS pin."
-  },
-  {
     key: "PINATA_JWT",
     scope: "root",
     required: false,
-    note: "Required only for IPFS pinning uploads."
+    note: "Required only for the catalog's IPFS pins and a station's \"Export to IPFS\"."
+  },
+  {
+    key: "STREAM_RELAY_BASE",
+    scope: "root",
+    required: false,
+    note: "A237: the HTTPS stream relay's address (docs/stream-relay.md). Unset: http:// stream links play only if they answer over https."
+  },
+  {
+    key: "STREAM_RELAY_SECRET",
+    scope: "root",
+    required: false,
+    note: "A237: the secret relay addresses are signed with; the same value as the Worker's. Needed with STREAM_RELAY_BASE."
   },
   {
     key: "VITE_API_BASE",
     scope: "web",
     required: false,
     note: "Set to API URL for split-service deploys; leave blank for same-origin single-service deploys."
-  },
-  {
-    key: "API_PROXY_BASE_URL",
-    scope: "web",
-    required: false,
-    note: "Recommended for split-service web deploys so /api, /hls and /uploads are proxied to API."
-  },
-  {
-    key: "MEDIA_BASE_URL",
-    scope: "root",
-    required: false,
-    note: "Set to API URL for split worker deployments so worker can fetch uploaded media over HTTP."
   }
 ];
 

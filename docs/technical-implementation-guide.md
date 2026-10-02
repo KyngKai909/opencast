@@ -2,6 +2,8 @@
 
 Last updated: 2026-02-19
 
+> **Superseded for storage and playout (2026-09-29).** This guide describes the February MVP. Pinata/IPFS is no longer the main store: every file is kept in object storage (Cloudflare R2, or any S3-compatible store) by its content ID (a CIDv1, raw, sha-256), originals in Infrequent Access. Playout prepares each file once from its original into HLS segments (`prepared/<cid>/…`, Standard) and assembles channels from them; nothing is materialized into a worker cache. IPFS through Pinata is kept for two things only: the Opencast catalog (pinned on purpose) and a station owner's "Export to IPFS". `storage:move-off-pinata` copies the old pins into object storage and relinks the items that used them. See `docs/architecture.md` (Playout, Storage) for how it works now; the sections below are kept as the history of the MVP and its cost model. The code they walk through (the `/api` routes, `apps/api/src/db.ts` and the JSON state store, the upload compression, and the worker's polling loop) was removed on 2026-09-29; the API is `/v1` (`docs/api.md`).
+
 ## 1. Scope
 
 This guide explains:
@@ -14,8 +16,8 @@ This guide explains:
 Selected production direction for this project:
 
 1. Livepeer as the livestream/transcode/distribution backbone.
-2. IPFS (via Pinata) as canonical source storage for uploaded/extracted originals.
-3. Hot cache/object storage + CDN for low-latency HLS serving to viewers.
+2. ~~IPFS (via Pinata) as canonical source storage for uploaded/extracted originals.~~ Replaced (2026-09): object storage by content ID is the store; IPFS only for the catalog and "Export to IPFS".
+3. Object storage + CDN for low-latency HLS serving to viewers (prepared segments, not a hot cache).
 
 ## 2. How It Works Today (Local MVP)
 
@@ -176,17 +178,12 @@ For public beta, move from per-asset process hops to continuous playout graph:
 
 ## 4.5 Data/Storage Plane
 
-Use a two-tier model aligned to your stated direction:
+What was built instead (2026-09; the February recommendation of IPFS/Pinata for originals and a hot cache was dropped: Pinata costs more per gigabyte than object storage, charges for the reads playout makes, is public by default, and can't guarantee removal after a takedown):
 
-1. Canonical originals: IPFS/Pinata for decentralized, content-addressed storage
-2. Hot media/segments: object storage optimized for serving/transcode cache
-
-Recommendation:
-
-1. Keep live HLS segment serving on low-latency object storage + CDN.
-2. Store source assets and rights metadata against CID in Pinata/IPFS.
-3. Materialize from CID into hot cache before playout/transcode.
-4. Keep CID references in Postgres so channel timelines are reproducible.
+1. Originals: object storage (R2) keyed by content ID (CIDv1, raw, sha-256, the IPFS format, so any file can move to IPFS later without renaming), in Infrequent Access.
+2. Prepared HLS segments: object storage in Standard, under `prepared/<cid>/`, served from the bucket's domain + CDN; playlists from the API with a short cache.
+3. Playout prepares from the original once; there is no cache to materialize into.
+4. Content IDs in Postgres, so channel timelines are reproducible. IPFS (Pinata) only for the catalog and "Export to IPFS".
 
 ## 4.6 Multistream Plane
 

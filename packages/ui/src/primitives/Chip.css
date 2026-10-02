@@ -1,0 +1,17 @@
+/* Chips (the reference's .chip and .chips; .chipset and .blocked wrap at 30px). */
+.oc-chips { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.oc-chips::-webkit-scrollbar { display: none; }
+/* A row that scrolls clips what overflows, so there the focus ring sits inside the chip. */
+.oc-chips:not(.oc-chips--wrap) .oc-chip:focus-visible { outline-offset: -4px; }
+.oc-chips--wrap { flex-wrap: wrap; gap: 6px; overflow: visible; }
+.oc-chip {
+  flex: none;
+  height: 32px; padding: 0 12px; margin: 0;
+  border: 1px solid var(--hair); border-radius: var(--r-control); background: none;
+  font: 500 13px var(--font-text); color: var(--ink-70);
+  white-space: nowrap; cursor: pointer;
+}
+.oc-chip--on { border-color: var(--ink); color: var(--ink); }
+.oc-chip--sm { height: 30px; font-size: 12.5px; }
+.oc-chip--strike.oc-chip--on { text-decoration: line-through; text-decoration-color: var(--live); }
+.oc-chip:disabled { opacity: .45; cursor: not-allowed; }

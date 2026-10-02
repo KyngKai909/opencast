@@ -1,0 +1,37 @@
+# The Foundry tests (contracts/README.md): unit, fuzz, invariant and upgrade-safety, as
+# `npm run contracts:test` runs them. Only when contracts/ (or this file) changes.
+
+name: Contracts
+
+on:
+  push:
+    branches: [staging, dev]
+    paths: ["contracts/**", ".gitmodules", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["contracts/**", ".gitmodules", ".github/workflows/contracts.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: contracts-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      # OpenZeppelin's upgrade checker runs through ffi as `npx @openzeppelin/upgrades-core`.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: forge clean && forge test
+        run: npm run contracts:test

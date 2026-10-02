@@ -1,0 +1,19 @@
+/* The audience chart (earnings .chart, .legend2). */
+.oc-chart { margin: 0; min-width: 0; }
+.oc-chart__box { width: 100%; }
+.oc-chart__svg { display: block; width: 100%; height: auto; max-width: none; overflow: visible; }
+.oc-chart__grid { stroke: var(--hair); stroke-width: 1; }
+.oc-chart__axis { fill: var(--ink-50); font: 500 11px var(--font-mono); }
+.oc-chart__line { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
+.oc-chart__area { fill: var(--ink); opacity: .08; }
+.oc-chart__prev { fill: none; stroke: var(--ink-50); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.oc-chart__now { stroke: var(--tally); stroke-width: 1.5; }
+.oc-chart__nowdot { fill: var(--tally); }
+.oc-chart__band { fill: var(--standby-fill); opacity: .14; }
+.oc-chart__label { fill: var(--ink-70); font: 600 11px var(--font-text); }
+
+.oc-chart__legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--ink-70); margin: 6px 0 0; }
+.oc-chart__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.oc-chart__legend i { width: 18px; height: 0; border-top: 2px solid var(--ink); display: inline-block; }
+.oc-chart__legend i.oc-chart__key--prev { border-top: 1.5px dashed var(--ink-50); }
+.oc-chart__legend i.oc-chart__key--break { height: 10px; border: 0; background: var(--standby-fill); opacity: .35; }

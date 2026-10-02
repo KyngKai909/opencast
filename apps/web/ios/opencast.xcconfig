@@ -1,0 +1,5 @@
+// Opencast's build settings, written by `npm run build:native` from the viewer's env. Info.plist
+// reads OPENCAST_CAST_APP_ID twice: OpencastCastAppId (the Cast plugin checks it against the web
+// build's) and the Bonjour service iOS lets the Cast SDK look for (_<app id>._googlecast._tcp).
+// Empty until the receiver application is registered in the Google Cast console.
+OPENCAST_CAST_APP_ID = 

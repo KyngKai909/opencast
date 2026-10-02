@@ -1,0 +1,36 @@
+/* desk-pages 04, Settings: the sub-rail and pane (.swrap2), the rules' groups (.grp) and rows (.rule2). */
+.nd-settings { margin: -22px -28px -28px; min-height: calc(100vh - 60px); }
+.nd-grp { font-size: 12.5px; color: var(--ink-50); font-weight: 600; margin: 18px 0 4px; }
+section:first-of-type > .nd-grp { margin-top: 0; }
+.nd-rule { display: grid; grid-template-columns: minmax(0, 1fr) 260px 90px; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.nd-rule b { display: block; font-weight: 600; }
+.nd-rule small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.nd-rule__next { color: var(--standby) !important; font-weight: 600; margin-top: 2px; }
+.nd-rule__v { font: 500 13.5px var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.nd-rule__v--unset { color: var(--ink-50); }
+.nd-rule__acts { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+.nd-rule > .oc-button, .nd-rule > button { justify-self: end; }
+.nd-set-top { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; margin: 0 0 12px; }
+.nd-set-p { margin: 0; font-size: 14px; color: var(--ink-70); max-width: 70ch; }
+.nd-roles { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.nd-log { margin-top: 12px; }
+/* Storage maintenance (2026-09-29): one block per job, in the rules' rhythm. */
+.nd-job { padding: 14px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.nd-job__head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.nd-job__head b { display: block; font-weight: 600; }
+.nd-job__head small, .nd-job small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.nd-job__head small { max-width: 70ch; }
+.nd-job__run { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+.nd-job__run progress { flex: 0 1 260px; height: 6px; accent-color: var(--standby); }
+.nd-job__result { margin-top: 10px; }
+.nd-job__v { display: block; font: 500 13.5px var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd-job__v--quiet { color: var(--ink-50); }
+.nd-job__left { margin-top: 2px; color: var(--standby) !important; font-weight: 600; }
+.nd-job__last { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 6px; }
+
+@media (max-width: 900px) {
+  .nd-settings { margin: 0; }
+  .nd-rule { grid-template-columns: minmax(0, 1fr) auto; }
+  .nd-rule__v { grid-column: 1; text-align: left; }
+  .nd-job__head, .nd-job__last { flex-direction: column; align-items: flex-start; gap: 8px; }
+}

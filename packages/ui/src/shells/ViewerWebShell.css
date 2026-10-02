@@ -1,0 +1,36 @@
+/* The viewer app on the web (core .app, .a-head, .a-logo, .a-nav, .a-search, .a-main, .a-pad). */
+.oc-viewer-web {
+  display: flex; flex-direction: column; position: relative;
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--ground); color: var(--ink);
+  font-size: 15px; line-height: 1.45;
+}
+.oc-viewer-web__head {
+  height: 60px; flex: none;
+  display: flex; align-items: center; gap: 22px;
+  padding: 0 28px; border-bottom: 1px solid var(--hair);
+}
+.oc-viewer-web__home { display: inline-flex; text-decoration: none; color: inherit; }
+.oc-viewer-web__nav { display: flex; gap: 20px; height: 100%; }
+.oc-viewer-web__nav-item {
+  display: flex; align-items: center;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  text-decoration: none; color: var(--ink-70); font-weight: 500;
+}
+.oc-viewer-web__nav-item:hover { color: var(--ink); }
+.oc-viewer-web__nav-item--on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
+.oc-viewer-web__search {
+  display: flex; align-items: center; gap: 8px;
+  width: 300px; min-width: 0; flex: 0 1 auto; height: 38px; padding: 0 12px;
+  background: var(--raised); border: 1px solid var(--hair); border-radius: var(--r-control);
+  color: var(--ink-50); font-size: 14px; margin-left: auto;
+  overflow: hidden; text-align: start; cursor: text;
+}
+.oc-viewer-web__kbd {
+  margin-left: auto;
+  font: 500 12px var(--font-mono);
+  border: 1px solid var(--line); border-radius: var(--r-sign);
+  padding: 0 5px; color: var(--ink-50);
+}
+.oc-viewer-web__main { flex: 1; overflow-y: auto; overflow-x: hidden; }
+.oc-viewer-web__pad { padding: 24px 28px 36px; }

@@ -1,0 +1,11 @@
+/* Remote and phones: the pair code under "Pair a phone", in first launch's type (the address in
+   mono, the code large), and the phones list's heading. Ten-foot sizes; nothing under 21px. */
+.tvs-pair { padding: 20px 28px 26px; border-bottom: 1px solid var(--hair); }
+.tvs-pair__how { margin: 0 0 8px; font-size: 26px; color: var(--ink-70); }
+.tvs-pair__url { font-family: var(--font-mono); color: var(--ink); }
+.tvs-pair__code { width: fit-content; font: 500 72px/1.3 var(--font-mono); letter-spacing: .06em; color: var(--ink); }
+/* While the code is on its way: its place, quietly held. */
+.tvs-pair__code--loading { width: 300px; border-radius: var(--r-control); background: var(--raised); }
+.tvs-pair__lasts { display: block; margin-top: 4px; font-size: 22px; line-height: 31px; color: var(--ink-70); }
+.tvs-pair__error { margin: 0; font-size: 24px; color: var(--live); }
+.tvs-settings .tvs-phones__title { margin: 36px 0 6px 28px; font: 600 22px var(--font-text); letter-spacing: .02em; color: var(--ink-50); }

@@ -1,0 +1,25 @@
+/* tv 04.2: the strip (.tv-panel.pstrip) at the foot of the title-safe area, six keys (.pgrid .pt). */
+.tvw-pstrip {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 30px 34px;
+  border-radius: var(--r-screen); background: color-mix(in srgb, var(--screen) 94%, transparent); box-shadow: 0 0 0 1px var(--line);
+  color: var(--ink);
+}
+.tvw-pstrip h4 { margin: 0 0 18px; font: 700 30px var(--font-display); display: flex; justify-content: space-between; align-items: baseline; }
+.tvw-pstrip h4 span { font: 500 22px var(--font-text); color: var(--ink-50); }
+.tvw-pgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; }
+.tvw-pt { border-radius: var(--r-control); border: 2px solid var(--line); padding: 18px 20px; min-width: 0; cursor: pointer; }
+/* A full key's height, so the strip keeps its shape when keys fill. */
+.tvw-pgrid { grid-auto-rows: minmax(195px, auto); }
+.tvw-pt__k { font: 500 22px var(--font-mono); color: var(--ink-50); }
+.tvw-pt__ch { display: block; font: 500 44px/1.1 var(--font-mono); letter-spacing: -.04em; }
+.tvw-pt__cs { display: block; font-size: 28px; }
+.tvw-pt small { display: block; font-size: 21px; color: var(--ink-70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tvw-pt__live { color: var(--live); font-weight: 600; }
+.tvw-pt--empty { border-style: dashed; color: var(--ink-50); }
+.tvw-pt__save { display: block; font: 600 24px var(--font-text); }
+.tvw-pt.tv-focus { outline: none; background: var(--raised); box-shadow: 0 0 0 5px var(--signal); }
+.tvw-pstrip__error { margin: 14px 0 0; font-size: 22px; color: var(--live); }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .tvw-pstrip { animation: tvw-strip-in .22s ease-out; }
+  @keyframes tvw-strip-in { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+}

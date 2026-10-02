@@ -1,0 +1,11 @@
+/* tv 03.2 the options dialog (opencast-tv.css .tv-panel.dlg), centred over the dimmed guide. */
+.tvg-dlg {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 760px; padding: 40px 44px; z-index: 3;
+  background: color-mix(in srgb, var(--screen) 94%, transparent);
+  border-radius: var(--r-screen); box-shadow: 0 0 0 1px var(--line);
+}
+.tvg-dlg__when { font-size: 24px; font-weight: 500; color: var(--ink-70); }
+.tvg-dlg__title { margin: 6px 0 26px; font: 800 52px/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em; }
+.tvg-dlg__line { margin: -8px 0 12px; font-size: 27px; line-height: 1.4; color: var(--ink-70); }
+.tvg-dlg__error { margin: 18px 0 0; font-size: 24px; color: var(--ink); }

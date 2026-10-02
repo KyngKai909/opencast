@@ -1,0 +1,80 @@
+/* The station page (station-pages 01.1 .st-body, .now-card, .days2, .side, .kv2, .lk, .und; 05.1 .ph-acts, .ph-sec). Tokens only. */
+
+/* Section heads, shared by the station and program pages (.sec-top). */
+.vw-sec-top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 26px; }
+.vw-sec-top h2, .vw-sec-top h3 { margin: 0; font: 700 18px/1.2 var(--font-display); letter-spacing: -.015em; }
+.vw-sec-top__sub { font-size: 13px; color: var(--ink-70); }
+.vw-sec-top__end { margin-left: auto; }
+.vw-sec-top__end .oc-btn--text { font-size: 13.5px; height: auto; padding: 0; }
+section:first-child > .vw-sec-top:first-child { margin-top: 0; }
+
+.vw-station__body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; padding: 22px 28px 30px; }
+.vw-station__main > section + section .vw-sec-top { margin-top: 26px; }
+.vw-station__side > section:first-child .vw-sec-top { margin-top: 0; }
+
+/* On now (.now-card). */
+.vw-now { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.vw-now--off { grid-template-columns: minmax(0, 1fr); }
+.vw-now .oc-pic { border-radius: var(--r-screen); }
+.vw-now .oc-pic-ph__card b { font-size: 34px; }
+.vw-now__time { font-size: 13px; color: var(--ink-50); }
+.vw-now__title { display: block; font: 800 24px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.025em; margin: 6px 0 4px; }
+.vw-now__line { margin: 0 0 10px; font-size: 14px; color: var(--ink-70); }
+.vw-now__from { color: var(--signal); font-weight: 600; text-decoration: none; }
+.vw-now__from:hover { text-decoration: underline; }
+.vw-now__next { margin: 0; font-size: 14px; color: var(--ink-70); }
+.vw-now__next b { font-weight: 600; color: var(--ink); }
+.vw-now--off .vw-now__next { margin-top: 10px; }
+
+/* The day tabs (.days2): 30px, 12.5px. */
+.vw-station__days { margin: 12px 0 4px; gap: 4px; }
+.vw-station__days .oc-tabs__tab { height: 30px; padding: 0 11px; font-size: 12.5px; }
+
+/* A future row's title opens its listing. */
+.vw-sch-open { all: unset; cursor: pointer; font-weight: 600; }
+.vw-sch-open:hover { text-decoration: underline; }
+.vw-sch-open:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
+
+.vw-station__empty { margin: 12px 0 0; font-size: 14px; color: var(--ink-70); }
+
+/* The side column. */
+.vw-side__p { font-size: 14px; color: var(--ink-70); margin: 10px 0 0; }
+.vw-side__run { color: var(--ink); font-weight: 600; }
+.vw-side__kv { margin-top: 10px; }
+.vw-side__kv .oc-kv__row { padding: 8px 0; font-size: 13.5px; }
+
+.vw-lk-list, .vw-und-list { list-style: none; margin: 0; padding: 0; }
+.vw-lk { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.vw-lk__ch { font-size: 13px; color: var(--ink-50); }
+.vw-lk__title { display: block; font-weight: 600; color: var(--ink); text-decoration: none; }
+a.vw-lk__title:hover { text-decoration: underline; }
+.vw-lk small { font-size: 12.5px; color: var(--ink-70); }
+.vw-und { font-size: 13.5px; color: var(--ink-70); padding: 8px 0; border-bottom: 1px solid var(--hair); }
+
+/* Loading: quiet blocks where the page will be. */
+.vw-skel { background: var(--raised); border-radius: 4px; }
+.vw-skel--band { height: 182px; border-radius: 0; }
+.vw-skel--band-phone { height: 124px; border-radius: 0; }
+.vw-skel--row { height: 44px; margin: 0 0 8px; }
+.vw-station--error { padding: 24px 28px; }
+.vw-station--error p { margin: 0 0 14px; color: var(--ink-70); }
+
+/* The phone (05.1): the band, three buttons, then one column. */
+.vw-station__acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--hair); }
+.vw-station__acts .oc-btn { padding: 0 6px; font-size: 13.5px; height: 40px; }
+.vw-station__sec { padding: 12px 16px 24px; }
+.vw-station--phone .vw-sec-top { margin-top: 26px; }
+.vw-station--phone .oc-sch2--past { display: none; }
+.vw-station--phone .vw-station__sec > section:first-child .vw-sec-top { margin-top: 0; }
+
+/* Between the phone and the full web width, the side column moves under the schedule. */
+@media (max-width: 1023px) {
+  .vw-station__body { grid-template-columns: minmax(0, 1fr); }
+  .vw-station .oc-band--page { grid-template-columns: auto minmax(0, 1fr); }
+  .vw-station .oc-band--page .oc-band__acts { grid-row: 3; grid-column: 1 / -1; flex-wrap: wrap; margin-top: 14px; }
+}
+@media (max-width: 1023px) and (min-width: 768px) {
+  .vw-now { grid-template-columns: 240px minmax(0, 1fr); }
+}
+.vw-now__radio.oc-tc { aspect-ratio: 16 / 9; }
+.vw-now__radio .oc-tc__t { font-size: 40px; letter-spacing: -.04em; }

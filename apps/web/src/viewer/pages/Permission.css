@@ -1,0 +1,14 @@
+/* The creator's permission page (network-desk .perm-page): phone-first, 406 wide as drawn, centred on
+   wider screens; the lockup, a 28px wide headline, the ruled rows, and the answer buttons. */
+.vw-perm { min-height: 100vh; min-height: 100dvh; background: var(--ground); color: var(--ink); display: flex; justify-content: center; }
+.vw-perm__col { width: 100%; max-width: 406px; box-sizing: border-box; padding: max(18px, env(safe-area-inset-top)) 18px 22px; display: flex; flex-direction: column; }
+.vw-perm__logo { align-self: flex-start; }
+.vw-perm__h { margin: 10px 0; font: 800 28px/1.02 var(--font-display); font-stretch: var(--wide); letter-spacing: -.035em; }
+.vw-perm__lede { font-size: 14.5px; color: var(--ink-70); margin: 0 0 14px; }
+.vw-perm__rows .oc-kvrows__row:first-child { border-top: 0; }
+.vw-perm__yes { margin-top: 16px; }
+.vw-perm__no { margin-top: 8px; }
+.vw-perm__error { margin: 12px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+@media (min-width: 768px) {
+  .vw-perm__col { padding-top: var(--s5); }
+}

@@ -1,0 +1,6 @@
+/* A Results section (.sec-top): 17px display heading over a line rule, 22px above the next one. */
+.bz-sec + .bz-sec { margin-top: 22px; }
+.bz-sec__top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-sec__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.bz-sec__sub { font-size: 13px; color: var(--ink-50); }
+.bz-sec__end { margin-left: auto; display: flex; gap: 8px; }

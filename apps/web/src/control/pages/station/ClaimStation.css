@@ -1,0 +1,24 @@
+/* Claiming a station (rights 05.1: .claim-page, .claim-stats, .steps3), outside the shell. */
+.cc-claimpage { min-height: 100vh; background: var(--ground); color: var(--ink); }
+.cc-claimpage__head { height: 60px; display: flex; align-items: center; gap: 22px; padding: 0 28px; border-bottom: 1px solid var(--hair); }
+.cc-claimpage__app { font-size: 14.5px; color: var(--ink-70); }
+.cc-claimpage__av { margin-left: auto; }
+.cc-claimpage__main { max-width: 760px; margin: 0 auto; padding: 36px 28px; }
+.cc-claimpage__kick { margin: 0; font-size: 14px; color: var(--ink-70); }
+.cc-claimpage__h { margin: 8px 0 12px; font: 800 44px/1 var(--font-display); font-stretch: 125%; letter-spacing: -.04em; }
+.cc-claimpage__lede { margin: 0 0 20px; font-size: 16px; color: var(--ink-70); }
+.cc-claimpage__stats { margin: 18px 0; }
+.cc-claimpage__check { margin-top: 14px; border-top: 1px solid var(--line); }
+.cc-claimpage__no { margin: 18px 0 0; font-size: 14px; color: var(--ink-70); }
+.cc-claimpage__no .oc-btn--text { font-size: 14px; }
+.cc-claimpage__stopped { padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--hair); }
+.cc-claimpage__stopped b { display: block; font-weight: 600; }
+.cc-claimpage__stopped small { font-size: 13px; color: var(--ink-70); }
+.cc-claimpage__error { margin: 10px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.cc-claimpage__modal-p { margin: 0; font-size: 14px; color: var(--ink-70); line-height: 1.5; }
+
+@media (max-width: 767px) {
+  .cc-claimpage__head { padding: 0 16px; gap: 12px; }
+  .cc-claimpage__main { padding: 24px 16px; }
+  .cc-claimpage__h { font-size: 34px; }
+}

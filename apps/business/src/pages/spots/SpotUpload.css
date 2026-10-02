@@ -1,0 +1,14 @@
+/* biz-spots 02.1 (.up: the frame and the checks). */
+.bz-upload__grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 26px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.bz-upload__cap { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-50); }
+.bz-upload__next { margin-top: 16px; }
+.bz-upload__blocked { margin: 12px 0 0; font-size: 13px; color: var(--standby); }
+.bz-upload__again { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.bz-upload__againlabel { font-weight: 600; }
+.bz-codemodal { display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 1023px) {
+  .bz-upload__grid { grid-template-columns: minmax(0, 1fr); }
+}
+.bz-startspot { max-width: 620px; }
+.bz-startspot__later { margin: 18px 0 0; font-size: 13px; color: var(--ink-50); }
+.bz-startspot__later a { color: var(--ink-70); }

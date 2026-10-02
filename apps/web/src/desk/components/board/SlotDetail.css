@@ -1,0 +1,2 @@
+/* The selected slot's row: a line rule above it, 14px under the radio map (network-desk 01.1). */
+.nd-slot-detail { margin-top: 14px; border-top: 1px solid var(--line); }

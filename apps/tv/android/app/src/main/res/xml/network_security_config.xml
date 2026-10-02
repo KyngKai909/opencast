@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A239, direct mode (docs/stream-relay.md, "Native apps"): an external station's stream link is
+  fetched with the TV's own networking (DirectFetcher, OkHttp), and some sources are plain http, so
+  cleartext is permitted for the app. The web view's own traffic stays https all the same: the page
+  is https://localhost, mixed content is never allowed (capacitor.config.ts, allowMixedContent
+  false), and the API's address is https (VITE_API_BASE). Debug builds' dev server
+  (TV_DEV_SERVER=http://localhost:5175) is covered by this too.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!-- Deliberate (A239): direct mode plays http stream links natively. -->
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

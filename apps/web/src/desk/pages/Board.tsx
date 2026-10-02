@@ -1,0 +1,90 @@
+// 01.1 The market board: every channel in a market and what fills it, tonight's local share, and
+// the selected slot. The API answers per band; the board asks for both (components/board/board.ts
+// puts the figures together). A234: under the figures, a flag for each station sharing X.1's call
+// sign whose owners no longer include anyone who owns X.1; the team decides what to do with them.
+
+import { useSearchParams, useNavigate } from "react-router";
+import { networkApi } from "@opencast/contracts";
+import { Button, ControlTitle, Notice, Segmented, StatRow } from "@opencast/ui";
+import { useApi } from "../../api/hooks";
+import { BoardMap } from "../components/board/BoardMap";
+import { bandOfKey, coverage, marketLine, ownersApartDetail, ownersApartSlot, ownersApartTitle, slotKey, statCaptions } from "../components/board/board";
+import { SlotDetail, SlotHint } from "../components/board/SlotDetail";
+import { SlotLegend } from "../components/board/SlotLegend";
+import { useMarket } from "../layout/market";
+import { DEFAULT_TZ } from "../../lib/clock";
+import { ErrorLine, NotFound, Quiet, SecTop } from "./common";
+import "./Board.css";
+import { deskPath } from "../../areas";
+
+export default function Board() {
+  const { slug, market, markets, loading } = useMarket();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const tv = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "tv" } }, { enabled: !!market });
+  const radio = useApi(networkApi.getBoard, { params: { marketSlug: slug }, query: { band: "radio" } }, { enabled: !!market });
+  const creators = useApi(networkApi.listCreators, { query: { marketId: market?.id } }, { enabled: !!market });
+
+  if (loading || (market && (tv.isLoading || radio.isLoading))) return <Quiet />;
+  if (!market) return <NotFound />;
+  if (tv.error || radio.error) return <ErrorLine error={tv.error ?? radio.error} />;
+
+  const c = coverage(tv.data, radio.data);
+  const captions = statCaptions(c);
+  const selected = params.get("ch");
+  const band = selected ? bandOfKey(selected) : null;
+  const slot = selected && band ? (band === "tv" ? tv.data : radio.data)?.slots.find((s) => slotKey(s, band) === selected) : undefined;
+  const select = (key: string) => setParams((p) => (key === p.get("ch") ? p.delete("ch") : p.set("ch", key), p), { replace: true });
+  const stationColour = tv.data?.slots.find((s) => s.state === "station" && s.stations[0]?.colour)?.stations[0]?.colour;
+  const creatorOf = (id: string | null | undefined, stationId: string | undefined) => creators.data?.find((x) => (id ? x.id === id : x.station?.id === stationId));
+  const tz = market.timezone || DEFAULT_TZ;
+  const apart = tv.data?.ownersApart ?? [];
+
+  return (
+    <>
+      <ControlTitle
+        title={market.name}
+        description={marketLine(c)}
+        end={<Segmented label="Market" value={market.slug} onChange={(s) => navigate(deskPath(`/markets/${s}/board`))} options={markets.map((m) => ({ value: m.slug, label: m.name }))} />}
+      />
+      <StatRow
+        size="sm"
+        className="nd-cov"
+        stats={[
+          { value: c.localSharePercent === null ? "Off air" : `${c.localSharePercent}%`, caption: c.localSharePercent === null ? "Nothing airs here tonight yet" : captions.local },
+          { value: String(c.claimableOnAir), caption: captions.claimable },
+          { value: String(c.saidYesNotSetUp), caption: captions.saidYes },
+          { value: String(c.deadAirComing.length), caption: captions.deadAir }
+        ]}
+      />
+      {apart.length > 0 && (
+        <div className="nd-owners-apart" role="list" aria-label="Shared call signs whose owners differ">
+          {apart.map((a) => {
+            const key = ownersApartSlot(a);
+            return (
+              <div role="listitem" key={a.member.id}>
+                <Notice
+                  tone="standby"
+                  swatch={a.member.colour ?? undefined}
+                  title={ownersApartTitle(a)}
+                  detail={ownersApartDetail(a, tz)}
+                  action={
+                    <Button size="sm" onClick={() => setParams((p) => (p.set("ch", key), p), { replace: true })} aria-pressed={selected === key}>
+                      Select {key}
+                    </Button>
+                  }
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <SlotLegend stationColour={stationColour} />
+      <SecTop title="TV band" sub="2 to 69, main channels" first />
+      {tv.data && <BoardMap band="tv" slots={tv.data.slots} columns={17} selected={band === "tv" ? selected : null} onSelect={select} label="TV band, channels 2 to 69" />}
+      <SecTop title="Radio band" sub="88.2 to 107.8" />
+      {radio.data && <BoardMap band="radio" slots={radio.data.slots} columns={20} selected={band === "radio" ? selected : null} onSelect={select} label="Radio band, 88.2 to 107.8" />}
+      {slot && band ? <SlotDetail slot={slot} band={band} marketSlug={market.slug} timeZone={tz} creator={creatorOf(slot.creatorId, slot.stations[0]?.id)} ownersApart={apart} /> : <SlotHint />}
+    </>
+  );
+}

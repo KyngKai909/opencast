@@ -1,0 +1,7 @@
+/* .big-ok: the ring (72px, ink with the ground's check), the offer at 28px, the check's words. */
+.bz-check { text-align: center; padding: 30px 10px 10px; }
+.bz-check__ring { width: 72px; height: 72px; border-radius: 50%; background: var(--ink); color: var(--ground); display: grid; place-items: center; margin: 0 auto 14px; }
+.bz-check__ring svg { width: 34px; height: 34px; }
+.bz-check--no .bz-check__ring { background: none; border: 2px solid var(--standby); color: var(--standby); }
+.bz-check__h { margin: 0 0 6px; font: 800 28px var(--font-display); font-stretch: 112%; letter-spacing: -.02em; }
+.bz-check__p { margin: 0; font-size: 14px; color: var(--ink-70); }

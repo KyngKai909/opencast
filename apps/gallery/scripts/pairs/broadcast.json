@@ -1,0 +1,2877 @@
+[
+  {
+    "id": "ident-guide",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".comp-demo .ident"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Style guide: TV and radio'] .gal-panel[data-theme='{ground}'] .oc-ident--guide"
+    },
+    "ignore": [
+      "font-size",
+      "line-height"
+    ]
+  },
+  {
+    "id": "ident-guide-ch",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".comp-demo .ident .chn"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Style guide: TV and radio'] .gal-panel[data-theme='{ground}'] .oc-ident--guide .oc-ident__ch"
+    }
+  },
+  {
+    "id": "ident-guide-cs",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".comp-demo .ident .cs"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Style guide: TV and radio'] .gal-panel[data-theme='{ground}'] .oc-ident--guide .oc-ident__cs"
+    }
+  },
+  {
+    "id": "ident-guide-nm",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".comp-demo .ident .nm"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Style guide: TV and radio'] .gal-panel[data-theme='{ground}'] .oc-ident--guide .oc-ident__nm"
+    }
+  },
+  {
+    "id": "ident-block",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".w-rail .stn-block"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Block: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-ident--block"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "ident-block-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".w-rail .stn-block .ch"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Block: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-ident--block .oc-ident__ch"
+    }
+  },
+  {
+    "id": "ident-block-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".w-rail .stn-block .cs"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Block: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-ident--block .oc-ident__cs"
+    }
+  },
+  {
+    "id": "ident-block-nm",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".w-rail .stn-block small"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Block: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-ident--block .oc-ident__nm"
+    }
+  },
+  {
+    "id": "ident-inline-ch",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".pm-top .ch"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Inline and switch: master control'] .gal-panel[data-theme='{ground}'] .oc-ident--inline .oc-ident__ch"
+    }
+  },
+  {
+    "id": "ident-inline-cs",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".pm-top .cs"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Inline and switch: master control'] .gal-panel[data-theme='{ground}'] .oc-ident--inline .oc-ident__cs"
+    }
+  },
+  {
+    "id": "ident-switch-ch",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".stn-switch .ch"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Inline and switch: master control'] .gal-panel[data-theme='{ground}'] .oc-ident--switch .oc-ident__ch"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "ident-switch-cs",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".stn-switch .cs"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Inline and switch: master control'] .gal-panel[data-theme='{ground}'] .oc-ident--switch .oc-ident__cs"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "ident-switch-sw",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".stn-switch .sw"
+    },
+    "gallery": {
+      "path": "/ident",
+      "selector": ".gal-state[data-state='Inline and switch: master control'] .gal-panel[data-theme='{ground}'] .oc-ident--switch .oc-ident__sw"
+    },
+    "ignore": [
+      "text-align"
+    ]
+  },
+  {
+    "id": "band-modal",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .stn-band"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Modal: the station preview'] .gal-panel[data-theme='{ground}'] .oc-band--modal"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "band-modal-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .stn-band .ch"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Modal: the station preview'] .gal-panel[data-theme='{ground}'] .oc-band__ch"
+    }
+  },
+  {
+    "id": "band-modal-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .stn-band .cs"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Modal: the station preview'] .gal-panel[data-theme='{ground}'] .oc-band__cs"
+    }
+  },
+  {
+    "id": "band-modal-nm",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .stn-band .nm"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Modal: the station preview'] .gal-panel[data-theme='{ground}'] .oc-band__nm"
+    }
+  },
+  {
+    "id": "band-modal-x",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .stn-band .x"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Modal: the station preview'] .gal-panel[data-theme='{ground}'] .oc-band__x"
+    }
+  },
+  {
+    "id": "band-page",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".st-band"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Page: the station page header'] .gal-panel[data-theme='{ground}'] .oc-band--page"
+    }
+  },
+  {
+    "id": "band-page-ch",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".st-band .ch"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Page: the station page header'] .gal-panel[data-theme='{ground}'] .oc-band__ch"
+    }
+  },
+  {
+    "id": "band-page-cs",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".st-band .cs"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Page: the station page header'] .gal-panel[data-theme='{ground}'] .oc-band__cs"
+    }
+  },
+  {
+    "id": "band-page-nm",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".st-band .nm"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Page: the station page header'] .gal-panel[data-theme='{ground}'] .oc-band__nm"
+    }
+  },
+  {
+    "id": "band-page-acts",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".st-band .acts"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Page: the station page header'] .gal-panel[data-theme='{ground}'] .oc-band__acts"
+    }
+  },
+  {
+    "id": "band-phone",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".ph-band"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Phone: the station page'] .gal-panel[data-theme='{ground}'] .oc-band--phone"
+    }
+  },
+  {
+    "id": "band-phone-ch",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".ph-band .ch"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Phone: the station page'] .gal-panel[data-theme='{ground}'] .oc-band__ch"
+    }
+  },
+  {
+    "id": "band-phone-cs",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".ph-band .cs"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Phone: the station page'] .gal-panel[data-theme='{ground}'] .oc-band__cs"
+    }
+  },
+  {
+    "id": "band-phone-nm",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": ".ph-band .nm"
+    },
+    "gallery": {
+      "path": "/station-band",
+      "selector": ".gal-state[data-state='Phone: the station page'] .gal-panel[data-theme='{ground}'] .oc-band__nm"
+    }
+  },
+  {
+    "id": "tc-lg",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskCarried .tc.lg"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Large: carried widely'] .gal-panel[data-theme='{ground}'] .oc-tc--lg"
+    }
+  },
+  {
+    "id": "tc-lg-t",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskCarried .tc.lg .t"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Large: carried widely'] .gal-panel[data-theme='{ground}'] .oc-tc--lg .oc-tc__t"
+    }
+  },
+  {
+    "id": "tc-lg-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskCarried .tc.lg .b"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Large: carried widely'] .gal-panel[data-theme='{ground}'] .oc-tc--lg .oc-tc__b"
+    }
+  },
+  {
+    "id": "tc-player",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".a-player .tc"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--player"
+    }
+  },
+  {
+    "id": "tc-player-t",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".a-player .tc .t"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--player .oc-tc__t"
+    }
+  },
+  {
+    "id": "tc-row",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .tc"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--row"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "tc-row-t",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .tc .t"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--row .oc-tc__t"
+    }
+  },
+  {
+    "id": "tc-mini",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".p-mini .tc"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--mini"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "tc-mini-t",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".p-mini .tc .t"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--mini .oc-tc__t"
+    }
+  },
+  {
+    "id": "tc-library",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#libRows .lib-row .tc"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--library"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "tc-library-t",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#libRows .lib-row .tc .t"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Row sizes: player, phone row, mini player, library'] .gal-panel[data-theme='{ground}'] .oc-tc--library .oc-tc__t"
+    }
+  },
+  {
+    "id": "tc-dial",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .tc"
+    },
+    "gallery": {
+      "path": "/title-card",
+      "selector": ".gal-state[data-state='Base and dial row'] .gal-panel[data-theme='{ground}'] .oc-tc--dial"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "pic",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-pic"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "pic-corner",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .corner"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-pic__corner"
+    }
+  },
+  {
+    "id": "pic-bug",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .bug"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-bug"
+    }
+  },
+  {
+    "id": "pic-bug-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .bug .cs"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-bug__cs"
+    }
+  },
+  {
+    "id": "pic-bug-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .bug .ch"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-bug__ch"
+    }
+  },
+  {
+    "id": "pic-l3",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .l3"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-l3"
+    }
+  },
+  {
+    "id": "pic-l3-nm",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .l3 .nm"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-l3__nm"
+    }
+  },
+  {
+    "id": "pic-l3-tt",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .l3 .tt"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-l3__tt"
+    }
+  },
+  {
+    "id": "pic-podium",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .podium"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-pic-ph__podium"
+    }
+  },
+  {
+    "id": "pic-figure",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .figure"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-pic-ph__figure"
+    }
+  },
+  {
+    "id": "pic-scene",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".hero .pic .scene"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state^='Home hero: muted preview'] .gal-panel[data-theme='{ground}'] .oc-pic-ph__scene"
+    }
+  },
+  {
+    "id": "pic-reel-card",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": ".pic.reel[style*='max-width:640px'] .card b"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state='Reel title card with the bug'] .gal-panel[data-theme='{ground}'] .oc-pic-ph__card b"
+    }
+  },
+  {
+    "id": "pic-reel-scene",
+    "reference": {
+      "file": "control/opencast-station-settings.html",
+      "selector": ".pic.reel[style*='max-width:640px'] .scene"
+    },
+    "gallery": {
+      "path": "/picture-frame",
+      "selector": ".gal-state[data-state='Reel title card with the bug'] .gal-panel[data-theme='{ground}'] .oc-pic-ph--reel .oc-pic-ph__scene"
+    }
+  },
+  {
+    "id": "listing",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "listing-thumb",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .thumb"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__thumb"
+    }
+  },
+  {
+    "id": "listing-top",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .top"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__top"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "listing-cs",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .top .cs"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__cs"
+    }
+  },
+  {
+    "id": "listing-ch",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .top .chn"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__ch"
+    }
+  },
+  {
+    "id": "listing-now",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .now"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__now"
+    }
+  },
+  {
+    "id": "listing-meta",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .meta"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__meta"
+    }
+  },
+  {
+    "id": "listing-next",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".listing .next"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Listing: live, carried'] .gal-panel[data-theme='{ground}'] .oc-listing__next"
+    }
+  },
+  {
+    "id": "lst",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .lst:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Lines: the station preview'] .gal-panel[data-theme='{ground}'] .oc-lst:nth-child(2)"
+    }
+  },
+  {
+    "id": "lst-lbl",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .lst:nth-child(2) .lbl"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Lines: the station preview'] .gal-panel[data-theme='{ground}'] .oc-lst:nth-child(2) .oc-lst__lbl"
+    }
+  },
+  {
+    "id": "lst-at",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .lst:nth-child(2) .lbl .mono"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Lines: the station preview'] .gal-panel[data-theme='{ground}'] .oc-lst:nth-child(2) .oc-lst__at"
+    }
+  },
+  {
+    "id": "lst-title",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .lst:nth-child(2) b"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Lines: the station preview'] .gal-panel[data-theme='{ground}'] .oc-lst:nth-child(2) .oc-lst__title"
+    }
+  },
+  {
+    "id": "lst-detail",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".modal .lst:nth-child(2) small"
+    },
+    "gallery": {
+      "path": "/listing-row",
+      "selector": ".gal-state[data-state='Lines: the station preview'] .gal-panel[data-theme='{ground}'] .oc-lst:nth-child(2) .oc-lst__detail"
+    }
+  },
+  {
+    "id": "dial",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial"
+    },
+    "ignore": [
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "dial-h",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".mrow .dial-h"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-h"
+    }
+  },
+  {
+    "id": "drow",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row--web"
+    }
+  },
+  {
+    "id": "drow-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .ch"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__ch"
+    }
+  },
+  {
+    "id": "drow-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .stn .cs"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__stn .oc-cs"
+    }
+  },
+  {
+    "id": "drow-name",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .stn small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__stn small"
+    }
+  },
+  {
+    "id": "drow-now-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .now b"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__now b"
+    }
+  },
+  {
+    "id": "drow-now-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .now small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__now small"
+    }
+  },
+  {
+    "id": "drow-nx",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .nx"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__nx"
+    }
+  },
+  {
+    "id": "drow-nx-time",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskDial .drow .nx .mono"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Web: live, listed, carried, off air'] .gal-panel[data-theme='{ground}'] .oc-dial-row__nx .oc-mono"
+    }
+  },
+  {
+    "id": "prow",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone"
+    }
+  },
+  {
+    "id": "prow-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .ch"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone .oc-dial-row__ch"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "prow-top",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .w .top"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone .oc-dial-row__top"
+    }
+  },
+  {
+    "id": "prow-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .w .cs"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone .oc-dial-row__top .oc-cs"
+    }
+  },
+  {
+    "id": "prow-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .w b"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone .oc-dial-row__w b"
+    }
+  },
+  {
+    "id": "prow-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phDial .prow .w small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Phone rows'] .gal-panel[data-theme='{ground}'] .oc-dial-row--phone .oc-dial-row__w small"
+    }
+  },
+  {
+    "id": "mini-listing",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".mini-listing"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Master control preview: on the dial'] .gal-panel[data-theme='{ground}'] .oc-dial-row--preview"
+    }
+  },
+  {
+    "id": "mini-listing-b",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".mini-listing b"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Master control preview: on the dial'] .gal-panel[data-theme='{ground}'] .oc-dial-row--preview b"
+    }
+  },
+  {
+    "id": "mini-listing-small",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": ".mini-listing small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Master control preview: on the dial'] .gal-panel[data-theme='{ground}'] .oc-dial-row--preview small"
+    }
+  },
+  {
+    "id": "rt",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskRadio .rt"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Radio block: home'] .gal-panel[data-theme='{ground}'] .oc-dial-row--radio"
+    }
+  },
+  {
+    "id": "rt-f",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskRadio .rt .f"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Radio block: home'] .gal-panel[data-theme='{ground}'] .oc-dial-row--radio .oc-dial-row__f"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rt-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskRadio .rt .cs"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Radio block: home'] .gal-panel[data-theme='{ground}'] .oc-dial-row--radio .oc-cs"
+    }
+  },
+  {
+    "id": "rt-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskRadio .rt small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state='Radio block: home'] .gal-panel[data-theme='{ground}'] .oc-dial-row--radio small"
+    }
+  },
+  {
+    "id": "rbr-on",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr.on"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--watching"
+    }
+  },
+  {
+    "id": "rbr-on-f",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr.on .f"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--watching .oc-dial-row__f"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rbr",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr:not(.on)"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band:not(.oc-dial-row--watching)"
+    }
+  },
+  {
+    "id": "rbr-f",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr:not(.on) .f"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band:not(.oc-dial-row--watching) .oc-dial-row__f"
+    },
+    "ignore": [
+      "min-height"
+    ]
+  },
+  {
+    "id": "rbr-cs",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr .cs"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band .oc-dial-row__cs"
+    }
+  },
+  {
+    "id": "rbr-b",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr b"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band .oc-dial-row__w b"
+    },
+    "ignore": [
+      "(box)"
+    ]
+  },
+  {
+    "id": "rbr-small",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr small"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band .oc-dial-row__w small"
+    }
+  },
+  {
+    "id": "rbr-nx",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbList .rbr .nx"
+    },
+    "gallery": {
+      "path": "/dial-row",
+      "selector": ".gal-state[data-state^='Radio band list: tally edge'] .gal-panel[data-theme='{ground}'] .oc-dial-row--band .oc-dial-row__nx"
+    }
+  },
+  {
+    "id": "gd-head",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-head"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__head"
+    }
+  },
+  {
+    "id": "gd-head-cell",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-head div:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__head div:nth-child(2)"
+    }
+  },
+  {
+    "id": "gd-row",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-row"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__row"
+    }
+  },
+  {
+    "id": "gd-st",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-st"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__st"
+    }
+  },
+  {
+    "id": "gd-st-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-st .cs"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__st .oc-cs"
+    }
+  },
+  {
+    "id": "gd-st-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-st .ch"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__st .oc-ch"
+    }
+  },
+  {
+    "id": "gd-p-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-p.on"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__p--on"
+    }
+  },
+  {
+    "id": "gd-p",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-row:nth-child(2) .gd-p:not(.on)"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__row:nth-child(2) .oc-guide__p:not(.oc-guide__p--on)"
+    }
+  },
+  {
+    "id": "gd-p-sel",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-p.sel"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__p--sel"
+    }
+  },
+  {
+    "id": "gd-p-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-p b"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__p b"
+    }
+  },
+  {
+    "id": "gd-p-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-p small"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__p small"
+    }
+  },
+  {
+    "id": "gd-p-lv",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-p .lv"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-guide__lv"
+    }
+  },
+  {
+    "id": "gd-now",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-now"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-now-line"
+    }
+  },
+  {
+    "id": "gd-now-label",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskGuide .gd-now span"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Web: 8:00 to 11:00 pm'] .gal-panel[data-theme='{ground}'] .oc-guide--web .oc-now-line span"
+    }
+  },
+  {
+    "id": "gd-phone-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phGuide .gd-st .cs"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Phone: narrow station column'] .gal-panel[data-theme='{ground}'] .oc-guide--phone .oc-guide__st .oc-cs"
+    }
+  },
+  {
+    "id": "gd-phone-p",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phGuide .gd-p"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state^='Phone: narrow station column'] .gal-panel[data-theme='{ground}'] .oc-guide--phone .oc-guide__p"
+    }
+  },
+  {
+    "id": "g-head",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-head"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__head"
+    }
+  },
+  {
+    "id": "g-head-cell",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-head div:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__head div:nth-child(2)"
+    }
+  },
+  {
+    "id": "g-row",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-row"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__row"
+    }
+  },
+  {
+    "id": "g-st",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-st"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__st"
+    }
+  },
+  {
+    "id": "g-st-cs",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-st .cs"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__st .oc-cs"
+    }
+  },
+  {
+    "id": "g-st-ch",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-st .chn"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__st .oc-ch"
+    }
+  },
+  {
+    "id": "g-p-on",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-p.on"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__p--on"
+    }
+  },
+  {
+    "id": "g-p-b",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-p b"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__p b"
+    }
+  },
+  {
+    "id": "g-p-small",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-p small"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-guide__p small"
+    }
+  },
+  {
+    "id": "g-now",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-now"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-now-line"
+    }
+  },
+  {
+    "id": "g-now-label",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-now span"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide--compact .oc-now-line span"
+    }
+  },
+  {
+    "id": "g-wrap",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".g-wrap"
+    },
+    "gallery": {
+      "path": "/guide-grid",
+      "selector": ".gal-state[data-state='Style guide: four half hours'] .gal-panel[data-theme='{ground}'] .oc-guide-wrap--compact"
+    }
+  },
+  {
+    "id": "code-pgm",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .code.pgm"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Master control'] .gal-panel[data-theme='{ground}'] .oc-code--pgm"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-spt",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .code.spt"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Master control'] .gal-panel[data-theme='{ground}'] .oc-code--spt"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-und",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .code.und"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Master control'] .gal-panel[data-theme='{ground}'] .oc-code--und"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-bmp",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .code:not(.pgm):not(.spt):not(.und):not([style])"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Master control'] .gal-panel[data-theme='{ground}'] .oc-code--bmp"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-open",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .code[style]"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Master control'] .gal-panel[data-theme='{ground}'] .oc-code--open"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-guide-pgm",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log .code.pgm"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Style guide size'] .gal-panel[data-theme='{ground}'] .oc-code--pgm"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-guide-spt",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log .code.spt"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Style guide size'] .gal-panel[data-theme='{ground}'] .oc-code--spt"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "code-guide-und",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log .code.und"
+    },
+    "gallery": {
+      "path": "/log-code",
+      "selector": ".gal-state[data-state='Style guide size'] .gal-panel[data-theme='{ground}'] .oc-code--und"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "typesel-pgm",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#libRows .typesel.pgm"
+    },
+    "gallery": {
+      "path": "/code-select",
+      "selector": ".gal-state[data-state='Each code (change one)'] .gal-panel[data-theme='{ground}'] .oc-code-select--pgm"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "typesel-und",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#libRows .typesel.und"
+    },
+    "gallery": {
+      "path": "/code-select",
+      "selector": ".gal-state[data-state='Each code (change one)'] .gal-panel[data-theme='{ground}'] .oc-code-select--und"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "typesel-plain",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#libRows .typesel:not(.pgm):not(.und)"
+    },
+    "gallery": {
+      "path": "/code-select",
+      "selector": ".gal-state[data-state='Each code (change one)'] .gal-panel[data-theme='{ground}'] .oc-code-select--bmp"
+    },
+    "ignore": [
+      "display",
+      "min-height"
+    ]
+  },
+  {
+    "id": "log",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": "table.log"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log"
+    }
+  },
+  {
+    "id": "log-th",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log th"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log th"
+    }
+  },
+  {
+    "id": "log-td",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log tbody tr:first-child td:nth-child(3)"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log tbody tr:first-child td:nth-child(3)"
+    }
+  },
+  {
+    "id": "log-t",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log tbody tr:first-child td.t"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log tbody tr:first-child td.oc-log__t"
+    }
+  },
+  {
+    "id": "log-d",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log tbody tr:first-child td.d"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log tbody tr:first-child td.oc-log__d"
+    }
+  },
+  {
+    "id": "log-src",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log .src"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log .oc-log__src"
+    }
+  },
+  {
+    "id": "log-airing-t",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log tr.airing td.t"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log tr.oc-log__airing td.oc-log__t"
+    }
+  },
+  {
+    "id": "log-airing-td",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".log tr.airing td:nth-child(3)"
+    },
+    "gallery": {
+      "path": "/program-log",
+      "selector": ".gal-state[data-state='The 8:28 break, on air'] .gal-panel[data-theme='{ground}'] .oc-log tr.oc-log__airing td:nth-child(3)"
+    }
+  },
+  {
+    "id": "tl-pgm",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk.pgm"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk--pgm"
+    }
+  },
+  {
+    "id": "tl-car",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk.car"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk--car"
+    }
+  },
+  {
+    "id": "tl-brk",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk.brk"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk--brk"
+    }
+  },
+  {
+    "id": "tl-dead",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk.dead"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk--dead"
+    }
+  },
+  {
+    "id": "tl-code",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk .code"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk .oc-code"
+    }
+  },
+  {
+    "id": "tl-b",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk b"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk b"
+    }
+  },
+  {
+    "id": "tl-small",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .blk small"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-blk small"
+    }
+  },
+  {
+    "id": "tl-hrs",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .hrs span"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-tl__hrs span"
+    }
+  },
+  {
+    "id": "tl-col",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .col"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-tl__col"
+    }
+  },
+  {
+    "id": "tl-hl",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#timeline .col .hl"
+    },
+    "gallery": {
+      "path": "/log-timeline",
+      "selector": ".gal-state[data-state='Saturday evening, dead air selected'] .gal-panel[data-theme='{ground}'] .oc-tl__hl"
+    }
+  },
+  {
+    "id": "rd-now",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd.now"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd--now"
+    }
+  },
+  {
+    "id": "rd",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd:not(.now)"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd:not(.oc-rd--now)"
+    }
+  },
+  {
+    "id": "rd-now-t",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd.now .t"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd--now .oc-rd__t"
+    }
+  },
+  {
+    "id": "rd-t",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd:not(.now) .t"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd:not(.oc-rd--now) .oc-rd__t"
+    }
+  },
+  {
+    "id": "rd-d",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd .d"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd__d"
+    }
+  },
+  {
+    "id": "rd-small",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd small"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd small"
+    }
+  },
+  {
+    "id": "rd-b",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown .rd b"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rd__title"
+    }
+  },
+  {
+    "id": "rundown",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#rundown"
+    },
+    "gallery": {
+      "path": "/rundown",
+      "selector": ".gal-state[data-state='Monitor'] .gal-panel[data-theme='{ground}'] .oc-rundown"
+    }
+  },
+  {
+    "id": "brkbar",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#bkRows .brkbar"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-brkbar"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "brkbar-f",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#bkRows .brkbar i.f"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-brkbar__filled"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "brkbar-th",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#bkRows .brkbar i.th"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-brkbar__barter"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "brkbar-o",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#bkRows .brkbar i.o"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-brkbar__open"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "legend",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-c .legend"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-legend"
+    }
+  },
+  {
+    "id": "legend-span",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-c .legend span"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-legend span"
+    }
+  },
+  {
+    "id": "legend-open",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#flow-c .legend span:last-child i"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Breaks tonight'] .gal-panel[data-theme='{ground}'] .oc-legend__open"
+    }
+  },
+  {
+    "id": "brkbar-n",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#bkRows2 .brkbar i.n"
+    },
+    "gallery": {
+      "path": "/break-bar",
+      "selector": ".gal-state[data-state='Filled, just added'] .gal-panel[data-theme='{ground}'] .oc-brkbar__added"
+    },
+    "ignore": [
+      "font-size",
+      "line-height",
+      "min-height"
+    ]
+  },
+  {
+    "id": "sched-h",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sched h4"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-schedule__h"
+    }
+  },
+  {
+    "id": "sch-now",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch.now"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch--now"
+    }
+  },
+  {
+    "id": "sch-past",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch.past"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch--past"
+    }
+  },
+  {
+    "id": "sch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch:not(.now):not(.past)"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch:not(.oc-sch--now):not(.oc-sch--past)"
+    }
+  },
+  {
+    "id": "sch-time",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch .mono"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch .oc-mono"
+    }
+  },
+  {
+    "id": "sch-b",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch b"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch b"
+    }
+  },
+  {
+    "id": "sch-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#watch-desk .sch small"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Tonight: the tuned-in rail'] .gal-panel[data-theme='{ground}'] .oc-sch small"
+    }
+  },
+  {
+    "id": "sch2-now",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2.now"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2--now"
+    }
+  },
+  {
+    "id": "sch2-past",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2.past"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2--past"
+    }
+  },
+  {
+    "id": "sch2",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2:not(.now):not(.past)"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2:not(.oc-sch2--now):not(.oc-sch2--past)"
+    }
+  },
+  {
+    "id": "sch2-time",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2 .mono"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2 .oc-mono"
+    }
+  },
+  {
+    "id": "sch2-b",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2 b"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2 b"
+    }
+  },
+  {
+    "id": "sch2-small",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#stSched .sch2 small"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the station page'] .gal-panel[data-theme='{ground}'] .oc-sch2 small"
+    }
+  },
+  {
+    "id": "sch2-phone",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#phSched .sch2.now"
+    },
+    "gallery": {
+      "path": "/schedule-list",
+      "selector": ".gal-state[data-state='Week: the phone'] .gal-panel[data-theme='{ground}'] .oc-sch2--now"
+    }
+  },
+  {
+    "id": "prog-tv",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": "#watching .prog"
+    },
+    "gallery": {
+      "path": "/progress-bar",
+      "selector": ".gal-state[data-state='TV banner'] .gal-panel[data-theme='{ground}'] .oc-prog--tv"
+    }
+  },
+  {
+    "id": "prog-tv-bar",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": "#watching .prog .bar"
+    },
+    "gallery": {
+      "path": "/progress-bar",
+      "selector": ".gal-state[data-state='TV banner'] .gal-panel[data-theme='{ground}'] .oc-prog--tv .oc-prog__bar"
+    }
+  },
+  {
+    "id": "prog-tv-mono",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": "#watching .prog .mono"
+    },
+    "gallery": {
+      "path": "/progress-bar",
+      "selector": ".gal-state[data-state='TV banner'] .gal-panel[data-theme='{ground}'] .oc-prog--tv .oc-mono"
+    }
+  },
+  {
+    "id": "prog-sm",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": ".pr-now .prog"
+    },
+    "gallery": {
+      "path": "/progress-bar",
+      "selector": ".gal-state[data-state='Small: the phone remote'] .gal-panel[data-theme='{ground}'] .oc-prog"
+    }
+  },
+  {
+    "id": "prog-sm-bar",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": ".pr-now .prog .bar"
+    },
+    "gallery": {
+      "path": "/progress-bar",
+      "selector": ".gal-state[data-state='Small: the phone remote'] .gal-panel[data-theme='{ground}'] .oc-prog__bar"
+    }
+  },
+  {
+    "id": "scrub",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#preview .scrub"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Market preview: break marks'] .gal-panel[data-theme='{ground}'] .oc-scrub"
+    },
+    "ignore": [
+      "padding-bottom",
+      "height",
+      "(box)"
+    ]
+  },
+  {
+    "id": "scrub-bar",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#preview .scrub .bar"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Market preview: break marks'] .gal-panel[data-theme='{ground}'] .oc-scrub__bar"
+    }
+  },
+  {
+    "id": "scrub-knob",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#preview .scrub .bar b"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Market preview: break marks'] .gal-panel[data-theme='{ground}'] .oc-scrub__bar > b"
+    }
+  },
+  {
+    "id": "scrub-fill",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#preview .scrub .bar i"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Market preview: break marks'] .gal-panel[data-theme='{ground}'] .oc-scrub__bar > i"
+    }
+  },
+  {
+    "id": "scrub-brk",
+    "reference": {
+      "file": "control/opencast-market.html",
+      "selector": "#preview .brkmarks i"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Market preview: break marks'] .gal-panel[data-theme='{ground}'] .oc-scrub__breaks i"
+    },
+    "ignore": [
+      "font-family",
+      "font-size",
+      "font-weight",
+      "line-height",
+      "color",
+      "border-top-color"
+    ]
+  },
+  {
+    "id": "scrub-pin",
+    "reference": {
+      "file": "business/opencast-production-orders.html",
+      "selector": "#review .scrub .pin"
+    },
+    "gallery": {
+      "path": "/scrub-bar",
+      "selector": ".gal-state[data-state='Order review: pinned notes'] .gal-panel[data-theme='{ground}'] .oc-scrub__pin"
+    }
+  },
+  {
+    "id": "rb-scale",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale"
+    }
+  },
+  {
+    "id": "rb-stn",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .stn"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__stn"
+    }
+  },
+  {
+    "id": "rb-stn-cs",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .stn .cs"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__stn .oc-cs"
+    }
+  },
+  {
+    "id": "rb-stn-f",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .stn .f"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__f"
+    }
+  },
+  {
+    "id": "rb-stn-bar",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .stn .bar"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__bar"
+    }
+  },
+  {
+    "id": "rb-lbl",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .lbl"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__lbl"
+    }
+  },
+  {
+    "id": "rb-tick",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .tick:not(.maj)"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__tick:not(.oc-band-scale__tick--maj)"
+    }
+  },
+  {
+    "id": "rb-tick-maj",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .tick.maj"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__tick--maj"
+    }
+  },
+  {
+    "id": "rb-needle",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScale .needle"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Web'] .gal-panel[data-theme='{ground}'] .oc-band-scale__needle"
+    }
+  },
+  {
+    "id": "rb-scale-phone",
+    "reference": {
+      "file": "viewer/opencast-station-pages.html",
+      "selector": "#rbScalePh"
+    },
+    "gallery": {
+      "path": "/band-scale",
+      "selector": ".gal-state[data-state='Phone: scrolls, needle in view'] .gal-panel[data-theme='{ground}'] .oc-band-scale--phone"
+    }
+  },
+  {
+    "id": "meter",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state .meter"
+    },
+    "gallery": {
+      "path": "/level-meter",
+      "selector": ".gal-state[data-state='On a screen'] .gal-panel[data-theme='{ground}'] .oc-meter--sm"
+    },
+    "ignore": [
+      "font-size",
+      "line-height"
+    ]
+  },
+  {
+    "id": "meter-i",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state .meter i"
+    },
+    "gallery": {
+      "path": "/level-meter",
+      "selector": ".gal-state[data-state='On a screen'] .gal-panel[data-theme='{ground}'] .oc-meter--sm i"
+    },
+    "ignore": [
+      "font-size",
+      "line-height"
+    ]
+  },
+  {
+    "id": "meter-md",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .meter"
+    },
+    "gallery": {
+      "path": "/level-meter",
+      "selector": ".gal-state[data-state='On a station colour'] .gal-panel[data-theme='{ground}'] .oc-meter--md"
+    },
+    "ignore": [
+      "min-height",
+      "color",
+      "border-top-color"
+    ]
+  },
+  {
+    "id": "meter-md-i",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .meter i"
+    },
+    "gallery": {
+      "path": "/level-meter",
+      "selector": ".gal-state[data-state='On a station colour'] .gal-panel[data-theme='{ground}'] .oc-meter--md i"
+    },
+    "ignore": [
+      "color",
+      "border-top-color"
+    ]
+  },
+  {
+    "id": "presets-h",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".presets h4"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-presets__h"
+    }
+  },
+  {
+    "id": "presets-h-span",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".presets h4 span"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-presets__h span"
+    }
+  },
+  {
+    "id": "pre-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre.on"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre--on"
+    }
+  },
+  {
+    "id": "pre",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre:not(.on):not(.empty)"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre:not(.oc-pre--on):not(.oc-pre--empty)"
+    }
+  },
+  {
+    "id": "pre-empty",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre.empty"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre--empty"
+    }
+  },
+  {
+    "id": "pre-k-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre.on .k"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre--on .oc-pre__k"
+    }
+  },
+  {
+    "id": "pre-k",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre:not(.on):not(.empty) .k"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre:not(.oc-pre--on):not(.oc-pre--empty) .oc-pre__k"
+    }
+  },
+  {
+    "id": "pre-k-empty",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre.empty .k"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre--empty .oc-pre__k"
+    }
+  },
+  {
+    "id": "pre-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre .ch"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre__ch"
+    }
+  },
+  {
+    "id": "pre-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre .w .cs"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre__w .oc-cs"
+    }
+  },
+  {
+    "id": "pre-small",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre .w small"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre__w small"
+    }
+  },
+  {
+    "id": "pre-empty-w",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#deskPresets .pre.empty .w"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Web list'] .gal-panel[data-theme='{ground}'] .oc-pre--empty .oc-pre__w"
+    }
+  },
+  {
+    "id": "pbtn-on",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn.on"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip'] .gal-panel[data-theme='{ground}'] .oc-pbtn--on"
+    }
+  },
+  {
+    "id": "pbtn",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn:not(.on):not(.empty)"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip'] .gal-panel[data-theme='{ground}'] .oc-pbtn:not(.oc-pbtn--on):not(.oc-pbtn--empty)"
+    }
+  },
+  {
+    "id": "pbtn-k",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn .k"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip'] .gal-panel[data-theme='{ground}'] .oc-pbtn__k"
+    }
+  },
+  {
+    "id": "pbtn-ch",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn .ch"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip'] .gal-panel[data-theme='{ground}'] .oc-pbtn__ch"
+    }
+  },
+  {
+    "id": "pbtn-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn:not(.empty) .cs"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip'] .gal-panel[data-theme='{ground}'] .oc-pbtn .oc-cs"
+    }
+  },
+  {
+    "id": "pbtn-empty",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": "#phPresets .pbtn.empty"
+    },
+    "gallery": {
+      "path": "/preset-keys",
+      "selector": ".gal-state[data-state='Phone strip, none saved'] .gal-panel[data-theme='{ground}'] .oc-pbtn--empty"
+    }
+  },
+  {
+    "id": "radio-panel",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel"
+    },
+    "gallery": {
+      "path": "/radio-panel",
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel"
+    }
+  },
+  {
+    "id": "radio-panel-f",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .f"
+    },
+    "gallery": {
+      "path": "/radio-panel",
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__f"
+    }
+  },
+  {
+    "id": "radio-panel-cs",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .cs"
+    },
+    "gallery": {
+      "path": "/radio-panel",
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__cs"
+    }
+  },
+  {
+    "id": "radio-panel-nm",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .nm"
+    },
+    "gallery": {
+      "path": "/radio-panel",
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-radio-panel__nm"
+    }
+  },
+  {
+    "id": "radio-panel-tally",
+    "reference": {
+      "file": "viewer/opencast-home.html",
+      "selector": ".radio-panel .tally"
+    },
+    "gallery": {
+      "path": "/radio-panel",
+      "selector": ".gal-state[data-state='NITE 88.4, playing'] .gal-panel[data-theme='{ground}'] .oc-tally"
+    },
+    "ignore": [
+      "justify-content"
+    ]
+  },
+  {
+    "id": "slate",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(1) .screen"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Stand by'] .gal-panel[data-theme='{ground}'] .oc-slate--standby"
+    }
+  },
+  {
+    "id": "slate-big",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(1) .big"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Stand by'] .gal-panel[data-theme='{ground}'] .oc-slate__big"
+    }
+  },
+  {
+    "id": "slate-small",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(1) .small"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Stand by'] .gal-panel[data-theme='{ground}'] .oc-slate__small"
+    }
+  },
+  {
+    "id": "slate-bars",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(1) .bars"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Stand by'] .gal-panel[data-theme='{ground}'] .oc-slate__bars"
+    }
+  },
+  {
+    "id": "slate-bar",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(1) .bars i:nth-child(2)"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Stand by'] .gal-panel[data-theme='{ground}'] .oc-slate__bars i:nth-child(2)"
+    }
+  },
+  {
+    "id": "slate-off-big",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(2) .big"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Off air'] .gal-panel[data-theme='{ground}'] .oc-slate__big"
+    }
+  },
+  {
+    "id": "slate-dead-tally",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(3) .tally"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Dead air warning'] .gal-panel[data-theme='{ground}'] .oc-slate__tally"
+    },
+    "ignore": [
+      "line-height",
+      "white-space"
+    ]
+  },
+  {
+    "id": "slate-radio-freq",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(4) .radio-ident"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Radio band'] .gal-panel[data-theme='{ground}'] .oc-slate__freq"
+    }
+  },
+  {
+    "id": "slate-radio-meter",
+    "reference": {
+      "file": "brand/opencast-style.html",
+      "selector": ".state:nth-child(4) .meter"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='Radio band'] .gal-panel[data-theme='{ground}'] .oc-slate__meter"
+    }
+  },
+  {
+    "id": "slate-tv-big",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": ".state-full .big"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='TV: off air, with a way out'] .gal-panel[data-theme='{ground}'] .oc-slate__big"
+    }
+  },
+  {
+    "id": "slate-tv-p",
+    "reference": {
+      "file": "tv/opencast-tv.html",
+      "selector": ".state-full p"
+    },
+    "gallery": {
+      "path": "/slate",
+      "selector": ".gal-state[data-state='TV: off air, with a way out'] .gal-panel[data-theme='{ground}'] .oc-slate__small"
+    }
+  },
+  {
+    "id": "chgrid",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#chgrid"
+    },
+    "gallery": {
+      "path": "/channel-picker",
+      "selector": ".gal-state[data-state='Inland Empire, 2 to 41, 12 chosen'] .gal-panel[data-theme='{ground}'] .oc-chgrid"
+    }
+  },
+  {
+    "id": "cn",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#chgrid .cn:not(.sel):not(.taken)"
+    },
+    "gallery": {
+      "path": "/channel-picker",
+      "selector": ".gal-state[data-state='Inland Empire, 2 to 41, 12 chosen'] .gal-panel[data-theme='{ground}'] .oc-cn:not(.oc-cn--sel):not(.oc-cn--taken)"
+    }
+  },
+  {
+    "id": "cn-sel",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#chgrid .cn.sel"
+    },
+    "gallery": {
+      "path": "/channel-picker",
+      "selector": ".gal-state[data-state='Inland Empire, 2 to 41, 12 chosen'] .gal-panel[data-theme='{ground}'] .oc-cn--sel"
+    }
+  },
+  {
+    "id": "cn-taken",
+    "reference": {
+      "file": "control/opencast-master-control.html",
+      "selector": "#chgrid .cn.taken"
+    },
+    "gallery": {
+      "path": "/channel-picker",
+      "selector": ".gal-state[data-state='Inland Empire, 2 to 41, 12 chosen'] .gal-panel[data-theme='{ground}'] .oc-cn--taken"
+    }
+  }
+]

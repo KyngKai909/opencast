@@ -1,0 +1,26 @@
+/* The player's modals (home 07.1: .carriers .opts, .amts, .check, .m-note, .preview-card, .linkbox). */
+.vw-pm-lede { margin: 0 0 10px; font-size: 14px; color: var(--ink-70); }
+.vw-pm-msg { margin: 0; font-size: 14px; color: var(--ink-70); }
+.vw-pm-quiet > div { height: 48px; border-bottom: 1px solid var(--hair); background: linear-gradient(90deg, var(--raised) 0 40px, transparent 40px 52px, var(--raised) 52px 60%, transparent 60%); background-size: 100% 12px; background-repeat: no-repeat; background-position: 0 50%; opacity: .6; }
+
+/* Carried from: where it airs in your market. */
+.vw-carriers { border-top: 1px solid var(--hair); }
+.vw-carriers__row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.vw-carriers__ch { width: 40px; flex: none; }
+.vw-carriers__cs { font-size: 14px; }
+.vw-carriers__row small { display: block; font-size: 13px; color: var(--ink-70); }
+.vw-carriers__at { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--ink-50); white-space: nowrap; }
+
+/* Pledge. */
+.vw-pledge__amts { margin: 14px 0; }
+.vw-pledge__sum { margin: 0; font-size: 13px; color: var(--ink-70); }
+.vw-pledge .oc-field { margin-bottom: 12px; }
+.vw-pledge .vw-pm-msg { margin-top: 10px; }
+
+/* Share. */
+.vw-share__opts.oc-choices--option { border-top: 0; }
+.vw-share__card { display: grid; grid-template-columns: 120px 1fr; gap: 12px; border: 1px solid var(--hair); border-radius: var(--r-control); padding: 10px; margin-top: 12px; }
+.vw-share__card b { display: block; font: 700 14px/1.25 var(--font-display); }
+.vw-share__card small { display: block; font-size: 12.5px; color: var(--ink-70); }
+.vw-share__link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-control); font-size: 13px; color: var(--ink-70); margin-top: 12px; overflow: hidden; }
+.vw-share__link .oc-mono { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

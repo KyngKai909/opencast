@@ -1,0 +1,8 @@
+/* The Library with its folders (live-listings .libwrap, .item). */
+.cc-libwrap { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 100%; }
+.cc-lib-main { padding: 18px 26px 26px; min-width: 0; }
+@media (max-width: 767px) {
+  .cc-libwrap { grid-template-columns: 1fr; }
+  .cc-libwrap .cc-folders { border-right: 0; border-bottom: 1px solid var(--hair); }
+  .cc-lib-main { padding: 16px; }
+}

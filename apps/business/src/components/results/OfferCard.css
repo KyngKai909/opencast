@@ -1,0 +1,11 @@
+/* The saved offer (.phone-mini): a phone screen, drawn as the customer's picture of it. */
+.bz-offer { margin: 10px 0 0; border: 1px solid var(--line); border-radius: 18px; padding: 16px; }
+.bz-offer p { margin: 0; }
+.bz-offer__from { font-size: 12px; color: var(--ink-50); }
+.bz-offer__h { margin: 6px 0 4px !important; font: 800 22px/1.1 var(--font-display); font-stretch: 112%; }
+.bz-offer__where { font-size: 13px; color: var(--ink-50); }
+.bz-offer__code { margin: 14px 0 6px !important; height: 52px; border: 2px solid var(--ink); border-radius: var(--r-control); display: grid; place-items: center; font: 500 22px var(--font-mono); letter-spacing: .06em; }
+.bz-offer__how { font-size: 12px; color: var(--ink-50); text-align: center; }
+
+/* The Change the offer form (OfferModal). */
+.bz-offer-form { display: grid; gap: 16px; }

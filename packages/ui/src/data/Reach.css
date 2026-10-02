@@ -1,0 +1,6 @@
+/* Category reach (biz funding .reach). */
+.oc-reach { border: 1px solid var(--line); border-radius: var(--r-control); padding: 12px 14px; font-size: 13.5px; }
+.oc-reach__title { font-weight: 600; display: block; font-size: 14.5px; }
+.oc-reach__bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 6px; background: var(--hair); }
+.oc-reach__bar i { background: var(--ink); }
+.oc-reach__detail { color: var(--ink-50); }

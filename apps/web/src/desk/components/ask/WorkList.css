@@ -1,0 +1,10 @@
+/* network-desk .works, .wk, .wk .bx */
+.nd-works { border-top: 1px solid var(--line); }
+.nd-wk { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; align-items: center; cursor: pointer; position: relative; }
+.nd-wk__input { position: absolute; opacity: 0; width: 18px; height: 18px; margin: 0; }
+.nd-wk__bx { width: 18px; height: 18px; border-radius: 4px; background: var(--signal-fill); color: var(--on-signal); display: grid; place-items: center; box-sizing: border-box; }
+.nd-wk--off .nd-wk__bx { background: transparent; border: 1.5px solid var(--line); }
+.nd-wk__input:focus-visible + .nd-wk__bx { outline: 2px solid var(--signal); outline-offset: 2px; }
+.nd-wk__words b { display: block; font-weight: 600; }
+.nd-wk__words small { display: block; color: var(--ink-70); font-size: 12.5px; }
+.nd-wk__state { color: var(--ink-50); font-size: 12.5px; }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Written by `npm run build:native` from the viewer's env. Empty until Opencast's receiver
+     application is registered in the Google Cast console (then Cast is offered). -->
+<resources>
+    <string name="opencast_cast_app_id" translatable="false"></string>
+</resources>

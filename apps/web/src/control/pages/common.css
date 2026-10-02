@@ -1,0 +1,5 @@
+.cc-quiet { min-height: 60vh; }
+.cc-center { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: var(--s3); padding: var(--s5); text-align: center; background: var(--ground); color: var(--ink); }
+.cc-center__h { margin: 0; font: 800 30px/1.1 var(--font-display); font-stretch: 112%; letter-spacing: -.02em; }
+.cc-center__p { margin: 0; color: var(--ink-70); max-width: 42ch; }
+.cc-stub { padding: var(--s5); color: var(--ink-50); font: 500 13px var(--font-mono); }

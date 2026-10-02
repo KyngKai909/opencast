@@ -1,0 +1,6 @@
+/* The desk's modal forms: fields stacked 14px apart, pairs side by side. */
+.nd-form { display: grid; gap: 14px; }
+.nd-form__pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; align-items: start; }
+.nd-form__error { margin: 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.nd-form__label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.nd-form__note { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }

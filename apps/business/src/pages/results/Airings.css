@@ -1,0 +1,16 @@
+/* biz-results 02.1 every airing (.ai) with the proof beside it (.proof, 320px). */
+.bz-air__split { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
+.bz-air__t { display: block; font: 500 12.5px/1.35 var(--font-mono); color: var(--ink-70); }
+.bz-air__st { font-size: 13.5px; }
+.bz-air__ch { font-family: var(--font-mono); color: var(--ink-70); }
+.bz-air__table .oc-lines__title { font-weight: 600; }
+.bz-air__table .oc-table__cell--amount { font-size: 13.5px; }
+.bz-air__quiet { margin: 0; font-size: 14px; color: var(--ink-70); }
+.bz-air__error { margin: 0; color: var(--standby); }
+
+@media (max-width: 1100px) {
+  .bz-air__split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .bz-air__split { gap: 18px; }
+}

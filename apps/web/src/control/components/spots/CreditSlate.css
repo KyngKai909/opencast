@@ -1,0 +1,26 @@
+/* sponsorships .slate: the preview at 420px (lead 15, names 30, line 14, members 12.5) and the
+   on-air slate at 1280px (lead 26, names 64, line 24, members 40, 110px side margin), as widths of
+   the slate so one layout draws both. */
+.cc-slate {
+  container-type: inline-size;
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-screen); overflow: hidden;
+  background: var(--cc-slate); color: var(--on-station);
+}
+.cc-slate__body { position: absolute; inset: 0; text-align: left; display: flex; flex-direction: column; justify-content: center; padding: 0 8%; }
+.cc-slate__lead { font-size: 3.57cqw; opacity: .85; }
+.cc-slate__sponsor { display: flex; flex-direction: column; }
+.cc-slate__who { font: 800 7.14cqw/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; margin: 2.4cqw 0 1.43cqw; }
+.cc-slate__line { font-size: 3.33cqw; line-height: 1.5; opacity: .9; max-width: 44ch; }
+.cc-slate__also { position: absolute; left: 8%; bottom: 8%; font-size: 2.98cqw; opacity: .75; }
+.cc-slate__bug { position: absolute; right: 5%; bottom: 7%; text-align: right; line-height: 1; opacity: .78; }
+.cc-slate__cs { display: block; font: 800 3.8cqw var(--font-display); font-stretch: var(--semi-wide); }
+.cc-slate__ch { font: 500 2.38cqw var(--font-mono); }
+
+.cc-slate--air .cc-slate__body { padding: 0 8.6%; }
+.cc-slate--air .cc-slate__lead { font-size: 2.03cqw; }
+.cc-slate--air .cc-slate__who { font-size: 5cqw; margin: 1.72cqw 0 .78cqw; }
+.cc-slate--air .cc-slate__line { font-size: 1.875cqw; max-width: 40ch; }
+.cc-slate--air .cc-slate__members { font: 800 3.125cqw/1.05 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; margin-top: 3.1cqw; opacity: .9; }
+.cc-slate--air .cc-slate__bug { right: 4.7%; bottom: 6.9%; }
+.cc-slate--air .cc-slate__cs { font-size: 2.19cqw; }
+.cc-slate--air .cc-slate__ch { font-size: 1.17cqw; }

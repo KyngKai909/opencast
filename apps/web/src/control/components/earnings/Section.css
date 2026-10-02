@@ -1,0 +1,5 @@
+/* A money page's section (earnings .sec-top): 17px display heading over a line rule. */
+.cc-sec + .cc-sec .cc-sec__top { margin-top: 22px; }
+.cc-sec__top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.cc-sec__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.cc-sec__sub { font-size: 13px; color: var(--ink-50); }

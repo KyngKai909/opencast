@@ -1,0 +1,23 @@
+/* Settings (biz-settings .swrap, .snav, .spane) inside the business shell's flush main. */
+
+/* Team (02.1): Add someone level with the heading, at its right. */
+.bz-settings--team .oc-settings__pane { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; align-content: start; }
+.bz-settings--team .oc-settings__pane > * { grid-column: 1 / -1; }
+.bz-settings--team .oc-settings__pane > .oc-settings__heading,
+.bz-settings--team .oc-settings__pane > .oc-settings__lede { grid-column: 1; }
+.bz-settings--team .oc-settings__pane > .bz-team__add { grid-column: 2; grid-row: 1 / span 2; align-self: end; margin-bottom: 18px; }
+
+/* Notifications and Connections (04.1): two panes side by side, each with its own heading. */
+.bz-settings--both .oc-settings__pane { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 30px; align-content: start; }
+.bz-settings--both .oc-settings__pane > .oc-settings__heading { grid-column: 1; grid-row: 1; }
+.bz-settings--both .oc-settings__pane > .oc-settings__lede { grid-column: 1; grid-row: 2; margin-bottom: 14px; }
+.bz-settings--both .oc-settings__pane > .bz-notif { grid-column: 1; grid-row: 3; }
+.bz-settings--both .oc-settings__pane > .bz-conn { grid-column: 2; grid-row: 1 / span 3; }
+
+@media (max-width: 1100px) {
+  .bz-settings--both .oc-settings__pane { grid-template-columns: minmax(0, 1fr); }
+  .bz-settings--both .oc-settings__pane > .bz-conn { grid-column: 1; grid-row: 4; margin-top: 30px; }
+}
+
+/* The phone: settings run edge to edge (their rows carry their own 16px), under the phone bar. */
+.bz-settings.oc-settings--phone .oc-settings__phone-lede { padding-bottom: 6px; }

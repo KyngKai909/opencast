@@ -1,0 +1,19 @@
+/* biz-results 05.1 and biz-settings 05.1: the counter's screen (.redeem-field, .big-ok). A phone
+   screen; on the web it keeps the phone's width. */
+.bz-redeem { max-width: 390px; }
+.bz-redeem__field {
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 100%; height: 72px; margin: 14px 0 10px; padding: 0 12px;
+  border: 2px solid var(--ink); border-radius: var(--r-control); background: none; color: var(--ink);
+  font: 500 30px var(--font-mono); letter-spacing: .06em; text-align: center;
+}
+.bz-redeem > .bz-redeem__field:first-child, .oc-sr-only + .bz-redeem__field { margin-top: 0; }
+.bz-redeem__field::placeholder { color: var(--ink-50); }
+.bz-redeem__field:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.bz-redeem__field--set { font-size: 32px; cursor: pointer; }
+.bz-redeem__intro { margin: 0; font-size: 14px; color: var(--ink-50); }
+.bz-redeem__go { margin-top: 18px; }
+.bz-redeem__alt { margin-top: 8px; }
+.bz-redeem__count { margin: 14px 0 0; font-size: 13px; color: var(--ink-50); text-align: center; }
+.bz-redeem__quiet { margin: 0 0 14px; font-size: 14px; color: var(--ink-70); }
+.bz-redeem__error { margin: 10px 0 0; color: var(--standby); font-size: 13.5px; }

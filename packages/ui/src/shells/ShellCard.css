@@ -1,0 +1,11 @@
+/* The players' title card (core .tc). */
+.oc-shell-card {
+  /* New token: the title card's 8px corner. The reference hard-codes it and no shape token has it. */
+  --oc-card-radius: 8px;
+  border-radius: var(--oc-card-radius);
+  background: var(--oc-station, var(--raised));
+  color: var(--on-station);
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 8px 10px; aspect-ratio: 16 / 9; overflow: hidden;
+}
+.oc-shell-card__t { font: 800 13px/1.05 var(--font-display); letter-spacing: -.01em; }

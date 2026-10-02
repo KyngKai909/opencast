@@ -1,0 +1,34 @@
+/* The row menu: the "···" button (the reference's .dots3) and its list, drawn like the station
+   switcher's popover (.menu-pop, .mp in station settings). */
+.oc-menu { position: relative; display: inline-flex; flex: none; }
+.oc-menu__btn {
+  width: 30px; height: 30px; padding: 1px 6px; margin: 0;
+  border: 0; border-radius: var(--r-control); background: none;
+  color: var(--ink-50); font-size: 18px; line-height: 1;
+  cursor: pointer;
+}
+.oc-menu__btn:hover, .oc-menu__btn[aria-expanded="true"] { background: var(--raised); color: var(--ink); }
+
+.oc-menu__list {
+  /* The popover's lift: black, whatever the ground (a new token for the reference's hard-coded shadow). */
+  --oc-menu-lift: 0 18px 40px rgb(0 0 0 / .35);
+  position: absolute; top: calc(100% + 6px); z-index: 5;
+  min-width: 200px; padding: 8px;
+  background: var(--ground); color: var(--ink);
+  border-radius: var(--r-screen);
+  box-shadow: 0 0 0 1px var(--line), var(--oc-menu-lift);
+}
+.oc-menu__list--end { right: 0; }
+.oc-menu__list--start { left: 0; }
+.oc-menu__item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px; margin: 0;
+  border: 0; border-radius: var(--r-control); background: none;
+  font: 600 14px/1.45 var(--font-text); color: var(--ink); text-align: start;
+  cursor: pointer;
+}
+.oc-menu__item:hover, .oc-menu__item:focus { background: var(--raised); }
+.oc-menu__item:focus-visible { outline-offset: -2px; }
+.oc-menu__item:disabled { opacity: .45; cursor: not-allowed; background: none; }
+.oc-menu__item--danger { color: var(--live); }
+.oc-menu__words small { display: block; font-size: 12px; font-weight: 400; color: var(--ink-70); }

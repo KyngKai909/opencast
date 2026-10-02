@@ -1,0 +1,10 @@
+/* network-desk .legend3 */
+.nd-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-70); margin: 4px 0 12px; }
+.nd-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.nd-legend__sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; box-sizing: border-box; }
+.nd-legend__sw--station { background: var(--nd-legend-colour, var(--ink-70)); }
+.nd-legend__sw--claimable { border: 2px dashed var(--signal); }
+.nd-legend__sw--listed { border: 1px dashed var(--line); }
+.nd-legend__sw--catalog { background: var(--ink); }
+.nd-legend__sw--held { background: repeating-linear-gradient(135deg, var(--hair) 0 3px, transparent 3px 6px); }
+.nd-legend__sw--open { border: 1px solid var(--hair); }

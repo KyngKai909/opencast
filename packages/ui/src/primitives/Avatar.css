@@ -1,0 +1,12 @@
+/* Avatars (the reference's .avatar; 40px in team rows, 46px on the phone's You, 56px on the You page). */
+.oc-avatar {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 50%; border: 1px solid var(--line);
+  background: var(--raised); color: var(--ink);
+  display: grid; place-items: center;
+  font: 700 13px var(--font-text);
+}
+.oc-avatar--40 { width: 40px; height: 40px; font-size: 14px; }
+.oc-avatar--46 { width: 46px; height: 46px; font-size: 16px; }
+.oc-avatar--56 { width: 56px; height: 56px; font-size: 19px; }
+.oc-avatar--current { box-shadow: 0 0 0 2px var(--ink); }

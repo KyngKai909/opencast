@@ -1,0 +1,20 @@
+/* desk-pages 01, Rights claims: .rc2 rows with a station swatch, the state sign and mono dates;
+   the selected claim's timeline (.tl2) in the pane on the right. */
+.nd-claims .oc-table__row { font-size: 14px; }
+.nd-claims__sw { display: block; width: 6px; height: 34px; border-radius: 3px; }
+.nd-claims__due { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-70); }
+.nd-claims__empty { margin: 12px 0 0; color: var(--ink-70); font-size: 14px; }
+.nd-claims__h { margin: 0; font: 700 15px/1.25 var(--font-display); }
+.nd-claims__sub { margin: 2px 0 12px; font-size: 12.5px; color: var(--ink-70); }
+.nd-claims__h3 { margin: 16px 0 6px; font: 700 13px var(--font-text); }
+.nd-claims__carriers { list-style: none; margin: 0; padding: 0; }
+.nd-claims__carriers li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--hair); font-size: 13px; }
+.nd-claims__cs { font: 600 13px var(--font-mono); }
+.nd-claims__cl { color: var(--ink-70); text-align: right; }
+.nd-claims__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.nd-claims__note { margin: 12px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-70); }
+.nd-claims__quote { margin: 0 0 12px; padding: 0 0 0 12px; border-left: 2px solid var(--hair); font-size: 14px; line-height: 1.45; }
+.nd-claims__files { display: flex; flex-direction: column; gap: 2px; }
+.nd-claims__files a { color: var(--ink); }
+.nd-claims__foot { margin: 16px 0 0; font-size: 13px; color: var(--ink-70); max-width: 80ch; }
+.nd-claims__foot a { color: var(--ink); }

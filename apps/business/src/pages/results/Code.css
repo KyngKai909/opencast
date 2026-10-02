@@ -1,0 +1,13 @@
+/* biz-results 03.1 codes and customers (.funnel, .src2, .phone-mini). */
+.bz-code__split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; }
+.bz-code__note { margin: 12px 0 0; font-size: 13px; color: var(--ink-50); }
+.bz-code__note + .bz-sec { margin-top: 22px; }
+.bz-code__quiet { margin: 0 0 14px; font-size: 14px; color: var(--ink-70); }
+.bz-code__error { margin: 0; color: var(--standby); }
+/* Clear Pay's mark (.clear-tag): a ring and the name. */
+.bz-clear { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-70); }
+.bz-clear i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; display: inline-block; box-sizing: border-box; }
+
+@media (max-width: 1100px) {
+  .bz-code__split { grid-template-columns: minmax(0, 1fr); }
+}

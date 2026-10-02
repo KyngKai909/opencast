@@ -900,7 +900,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
           </nav>
           <div class="item">
             <div class="crumbs">Library / Late Crate</div>
-            <div class="item-h"><div><h2>Late Crate, ep. 15</h2><p class="quiet" style="margin:4px 0 0;font-size:14px">Program, 29:10. Uploaded September 24.</p></div><div class="end"><button class="btn btn-ghost btn-sm">Replace file</button><button class="btn btn-ghost btn-sm">Schedule</button></div></div>
+            <div class="item-h"><div><h2>Late Crate, ep. 15</h2><p class="quiet" style="margin:4px 0 0;font-size:14px">Program, 29:10. Uploaded September 24.</p></div><div class="end"><button class="btn btn-ghost btn-sm">Replace file</button><button class="btn btn-ghost btn-sm">Schedule</button><button class="btn btn-ghost btn-sm">Export to IPFS</button></div></div>
             <div class="item-grid">
               <div>
                 <div class="pic reel cq" style="border-radius:var(--r-screen)"><div class="scene"></div><div class="card"><div><b style="font-size:40px">Late Crate</b><span>Episode 15</span></div></div></div>
@@ -921,7 +921,9 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
                   <div><span>Picture</span><span>1280 by 720</span></div>
                   <div><span>Sound</span><span>Stereo, levelled to broadcast loudness</span></div>
                   <div><span>Captions</span><span>Generated, English</span></div>
-                  <div><span>Stored</span><span>IPFS, pinned</span></div>
+                  <div><span>Stored</span><span>Once, shared by every station airing it</span></div>
+                  <div><span>Content ID</span><span class="mono" style="font-size:12.5px">bafy&hellip;3xq7</span></div>
+                  <div><span>Ready for tonight</span><span>Cached on the playout server</span></div>
                 </div>
                 <div class="sec-top"><h3>Rights</h3></div>
                 <div class="row2"><div><b>Made by BEAT</b><small>Confirmed by Kai M., September 24</small></div><span></span></div>
@@ -939,7 +941,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       <div class="note"><h3>Folders plus "needs attention"</h3><p>Stations make their own folders. Two automatic ones sit below: items whose rights aren't confirmed, and items still being prepared.</p></div>
       <div class="note"><h3>Scheduled and aired, both shown</h3><p>Future airings come from the log; past ones come from the as-run log, including airings on stations that carry it.</p></div>
       <div class="note"><h3>Deleting is guarded</h3><p>An item in use can't be deleted, and the page says exactly what's using it. Replacing the file keeps its history and schedule.</p></div>
-      <div class="note"><h3>Stored on IPFS</h3><p>The repo already pins originals to IPFS through Pinata. The item says so, so a station knows its masters are kept outside Opencast.</p></div>
+      <div class="note"><h3>Stored once, cached before air</h3><p>Every file is named by its content, so a program carried by 12 stations is stored once. Anything in the next day's log is copied to the playout server ahead of time, so nothing waits on a download at air time.</p></div>
+      <div class="note"><h3>Your masters, portable</h3><p>"Export to IPFS" in the item's menu publishes the station's own original there under the same content ID, for a copy that lives outside Opencast. It's the station's choice, per item, because IPFS files are public and can't be taken back.</p></div>
     </div>
   </div>
 </div></section>

@@ -1,0 +1,30 @@
+/* Preset keys as tiles (you .keys .key; the phone's .p-keys). */
+.vw-y-keys { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; position: relative; }
+.vw-y-keys--compact { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+.vw-y-key { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: var(--r-control); color: var(--ink); }
+.vw-y-key__tune { display: block; width: 100%; min-width: 0; text-align: left; padding: 10px 12px; border: 0; border-radius: var(--r-control); background: none; color: inherit; font: inherit; cursor: pointer; }
+.vw-y-key__tune:hover { background: var(--raised); }
+.vw-y-key__k { display: block; font: 500 12px/22px var(--font-mono); color: var(--ink-50); }
+.vw-y-key__ch { display: block; font: 500 22px/1.15 var(--font-mono); letter-spacing: -.03em; }
+.vw-y-key__cs { display: block; font-size: 14px; }
+.vw-y-key__now { display: block; font-size: 12px; color: var(--ink-70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vw-y-key__grip { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 4px; background: none; color: var(--ink-50); font: 700 12px var(--font-text); letter-spacing: 1px; cursor: grab; touch-action: none; }
+.vw-y-key__grip:hover { color: var(--ink); background: var(--raised); }
+.vw-y-key__menu { position: absolute; right: 4px; bottom: 4px; }
+.vw-y-key__menu .oc-menu__btn { width: 28px; height: 26px; }
+.vw-y-keys--sortable .vw-y-key__tune { padding-right: 34px; }
+.vw-y-key--drag { box-shadow: 0 0 0 2px var(--signal); background: var(--raised); }
+.vw-y-key--drag .vw-y-key__grip { cursor: grabbing; }
+.vw-y-key--over { border-style: dashed; border-color: var(--signal); }
+.vw-y-key--empty { border-style: dashed; color: var(--ink-50); padding: 10px 12px; display: flex; flex-direction: column; min-height: 96px; }
+.vw-y-key__empty { margin-top: auto; font-size: 13px; }
+
+/* The phone's three across. */
+.vw-y-keys--compact .vw-y-key__tune { padding: 8px 10px; }
+.vw-y-keys--compact .vw-y-key__ch { font-size: 18px; }
+.vw-y-keys--compact .vw-y-key__now { font-size: 11.5px; }
+.vw-y-keys--compact .vw-y-key--empty { min-height: 84px; padding: 8px 10px; }
+
+@media (max-width: 767px) {
+  .vw-y-keys { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); }
+}

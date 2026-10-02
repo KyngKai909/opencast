@@ -1,0 +1,16 @@
+/* .credit-edit: raised, line-bordered, 15px at 1.55; flagged words underlined in standby. */
+.bz-credit {
+  display: grid; border: 1px solid var(--line); border-radius: var(--r-control); background: var(--raised);
+}
+.bz-credit:focus-within { outline: 2px solid var(--signal); outline-offset: 3px; }
+.bz-credit__mirror, .bz-credit__input {
+  grid-area: 1 / 1; margin: 0; padding: 12px 14px; border: 0;
+  font: 400 15px/1.55 var(--font-text); letter-spacing: normal;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal;
+}
+.bz-credit__mirror { color: transparent; pointer-events: none; }
+.bz-credit__mirror mark { background: none; color: transparent; box-shadow: inset 0 -2px 0 var(--standby); }
+.bz-credit__input {
+  background: transparent; color: var(--ink); resize: none; overflow: hidden; outline: none;
+  min-height: 0; height: 100%;
+}

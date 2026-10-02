@@ -1,0 +1,25 @@
+/* sponsorships 02.1 (.ns: the choice and the credit, then the preview and the amount at 440px). */
+.bz-ns__grid { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 28px; }
+.bz-ns__sec { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.bz-ns__sec--gap { margin-top: 22px; }
+.bz-ns__sec h2 { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; }
+.bz-ns__sub { font-size: 13px; color: var(--ink-50); }
+.bz-ns__picks { margin-top: 10px; }
+.bz-ns__quiet { margin: 0; font-size: 14px; color: var(--ink-70); }
+.bz-ns__credit { margin-top: 10px; }
+.bz-ns__slate { margin-top: 12px; }
+
+/* .row2 */
+.bz-ns__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-ns__row b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-ns__row small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-ns__m { font: 500 13.5px var(--font-mono); text-align: right; }
+.bz-ns__amount { width: 130px; }
+.bz-ns__amount .oc-field__box { height: 40px; font-size: 16px; }
+
+.bz-ns__send { margin-top: 14px; }
+.bz-ns__why { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-50); }
+
+@media (max-width: 1023px) {
+  .bz-ns__grid { grid-template-columns: 1fr; }
+}

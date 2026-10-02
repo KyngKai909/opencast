@@ -1,0 +1,10 @@
+/* The market's dial on home (01.1 .dial, .chips; 02.1 #phDial). Rows are the ui's DialRow. */
+.vw-dial-chips { margin-bottom: 14px; }
+.vw-dial--phone .oc-dial { border-top: 1px solid var(--line); }
+
+.vw-dial-msg { margin: 0; padding: var(--s3) 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-70); }
+.vw-dial-msg__all { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--signal); cursor: pointer; }
+
+/* Waiting for the dial: ruled rows of the row's height, nothing moving. */
+.vw-dial-wait { border-top: 1px solid var(--line); }
+.vw-dial-wait__row { height: 78px; border-bottom: 1px solid var(--hair); }

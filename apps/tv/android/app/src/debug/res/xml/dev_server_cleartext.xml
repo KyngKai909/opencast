@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only: `npm run dev:mock` over http, through adb reverse (localhost) or the emulator's
+  host (10.0.2.2). A239: cleartext is permitted for the whole app (direct mode's native fetches of
+  http stream links), as in the main config (res/xml/network_security_config.xml).
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,10 @@
+/* The program log table (style guide .log). */
+.oc-log { font-size: 17px; line-height: 1.6; width: 100%; border-collapse: collapse; min-width: 560px; }
+.oc-log th { text-align: left; font: 600 13px var(--font-text); color: var(--ink-50); padding: 0 10px 8px 0; border-bottom: 1px solid var(--line); }
+.oc-log th.oc-log__d { text-align: right; }
+.oc-log td { padding: 11px 10px 11px 0; border-bottom: 1px solid var(--hair); font-size: 15px; vertical-align: top; }
+.oc-log td.oc-log__t { font-family: var(--font-mono); font-size: 14px; white-space: nowrap; color: var(--ink-70); }
+.oc-log td.oc-log__d { font-family: var(--font-mono); font-size: 14px; text-align: right; white-space: nowrap; }
+.oc-log__src { display: block; font-size: 13px; color: var(--ink-50); }
+.oc-log tr.oc-log__airing td { background: var(--raised); }
+.oc-log tr.oc-log__airing td:first-child { box-shadow: inset 3px 0 0 var(--tally); padding-left: 10px; }

@@ -1,0 +1,311 @@
+import { SPOT_CATEGORIES, catalogSponsorsApi as sponsorsApi, spotsApi as api } from "@opencast/contracts";
+import { checkCreditText } from "@opencast/domain";
+import type { ModuleContext } from "../../context.js";
+import type { RouteRegistrar } from "../../http.js";
+import { notFound } from "../../errors.js";
+
+export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) {
+  const { spots, accounts } = services;
+  // Viewers see results, airings and statements only (biz-settings 02.1's "What each role can do"):
+  // not the spot lists, sponsorships or production orders. Those are the owner's and managers'.
+  const everyone = ["owner", "manager", "viewer"] as const;
+  const doers = ["owner", "manager"] as const;
+  const staff = ["owner", "operator"] as const;
+  type User = Parameters<typeof accounts.requireBusiness>[0];
+  const spotBusiness = async (user: User, spotId: string, roles: readonly ("owner" | "manager" | "viewer")[]) =>
+    accounts.requireBusiness(user, await spots.businessOfSpot(spotId), [...roles]);
+
+  // Businesses
+  r.handle(api.createBusiness, ({ user, body }) => spots.createBusiness(user, body));
+  r.handle(api.getBusiness, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    return spots.business(params.businessId);
+  });
+  r.handle(api.updateBusiness, async ({ user, params, body }) => {
+    // Managers change the profile; money settings (auto top-up, tax details) are the owner's.
+    const role = await accounts.requireBusiness(user, params.businessId, [...doers]);
+    if (role !== "owner" && (body.autoTopUp || body.ein !== undefined || body.legalName !== undefined)) {
+      await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    }
+    return spots.updateBusiness(params.businessId, body);
+  });
+  r.handle(api.addLocation, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.addLocation(params.businessId, body);
+  });
+  r.handle(api.removeLocation, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.removeLocation(params.businessId, params.locationId);
+  });
+
+  // Spots
+  r.handle(api.listSpots, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.spots(params.businessId);
+  });
+  r.handle(api.createSpot, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.createSpot(params.businessId, body);
+  });
+  r.handle(api.getSpot, async ({ user, params }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.spot(params.spotId);
+  });
+  r.handle(api.updateSpot, async ({ user, params, body }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.updateSpot(params.spotId, body);
+  });
+  r.handle(api.uploadSpotFile, async ({ user, params, body, file }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.uploadSpotFile(params.spotId, file!, body.scaleToFit);
+  });
+  r.handle(api.matchStations, async ({ user, params, body }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return { stations: await spots.matches(params.spotId, body) };
+  });
+  r.handle(api.submitSpot, async ({ user, params }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.submit(params.spotId);
+  });
+  r.handle(api.pauseSpot, async ({ user, params }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.pause(params.spotId);
+  });
+  r.handle(api.resumeSpot, async ({ user, params }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.resume(params.spotId);
+  });
+  r.handle(api.endSpot, async ({ user, params }) => {
+    await spotBusiness(user, params.spotId, doers);
+    return spots.end(params.spotId);
+  });
+  r.handle(api.listSpotAirings, async ({ user, params }) => {
+    const businessId = await spots.businessOfSpot(params.spotId);
+    await accounts.requireBusiness(user, businessId, [...everyone]);
+    const now = deps.clock.now();
+    const [held, results] = await Promise.all([spots.heldAiringsForSpot(params.spotId, now), spots.results(businessId, now.toISOString().slice(0, 7))]);
+    return { held, aired: results.airings.filter((a) => a.spot.id === params.spotId) };
+  });
+  r.handle(api.reviewQueue, () => spots.reviewQueue());
+  r.handle(api.reviewSpot, ({ params, body }) => spots.review(params.spotId, body.decision));
+
+  // The station side
+  r.handle(api.stationMarket, async ({ user, params, query }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.stationMarket(params.stationId, query);
+  });
+  r.handle(api.getRotations, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.rotations(params.stationId);
+  });
+  r.handle(api.setRotation, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.setRotation(params.stationId, params.kind, body.spotIds);
+  });
+  r.handle(api.getAvails, async ({ user, params, query }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    const now = deps.clock.now();
+    const breaks = await services.log.breaks(params.stationId, now, new Date(now.getTime() + query.hours * 3_600_000));
+    // G1: what's in each break.
+    const contents = await services.log.breakContents(params.stationId, breaks);
+    return {
+      totalOpenMs: breaks.reduce((s, b) => s + b.openMs, 0),
+      breaks: breaks.map((b) => ({
+        breakStartsAt: b.startsAt,
+        context: b.context,
+        lengthMs: b.lengthMs,
+        openMs: b.openMs,
+        producerShareMs: b.producerShareMs,
+        breakId: b.id,
+        origin: b.origin,
+        contents: contents.get(b.startsAt) ?? []
+      }))
+    };
+  });
+
+  // Sponsorships
+  r.handle(api.checkCredit, ({ body }) => {
+    const check = checkCreditText(body.text);
+    // P17: the part that passes ("who you are and where"), and the words each flag is about.
+    let who = body.text;
+    for (const flag of [...check.flags].sort((a, b) => b.start - a.start)) who = who.slice(0, flag.start) + who.slice(flag.end);
+    who = who.replace(/\s+([,.;:!?])/g, "$1").replace(/\s{2,}/g, " ").replace(/^[\s,.;:–-]+|[\s,;:–-]+$/g, "").trim();
+    return { ...check, flags: check.flags.map((f) => ({ ...f, quote: f.text })), who: who || null };
+  });
+  r.handle(api.offerSponsorship, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.offerSponsorship(params.businessId, body);
+  });
+  r.handle(api.listBusinessSponsorships, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.businessSponsorships(params.businessId);
+  });
+  r.handle(api.listStationSponsorships, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.stationSponsorships(params.stationId);
+  });
+  r.handle(api.decideSponsorship, async ({ user, params, body }) => {
+    const { stationId } = await spots.stationOfSponsorship(params.sponsorshipId);
+    await accounts.requireStation(user, stationId, [...staff]);
+    return spots.decideSponsorship(params.sponsorshipId, user.id, body);
+  });
+  r.handle(api.endSponsorship, async ({ user, params }) => {
+    const { businessId } = await spots.stationOfSponsorship(params.sponsorshipId);
+    await accounts.requireBusiness(user, businessId, [...doers]);
+    return spots.endSponsorship(params.sponsorshipId);
+  });
+  r.handle(api.setSponsorshipSettings, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.setSponsorshipSettings(params.stationId, body);
+  });
+
+  // Production orders
+  r.handle(api.listMakers, async ({ user, query }) => {
+    // P18: a maker's history with a business is for that business's team.
+    if (query.businessId) await accounts.requireBusiness(user, query.businessId, [...doers]);
+    return spots.makers(query.businessId);
+  });
+  r.handle(api.orderSpot, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.orderSpot(params.businessId, body);
+  });
+  r.handle(api.listBusinessOrders, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.businessOrders(params.businessId);
+  });
+  // P24: the maker asks to be told when the spot it made is listed.
+  r.handle(api.tellMeWhenListed, async ({ user, params }) => {
+    const { makerStationId } = await spots.partiesOfOrder(params.orderId);
+    await accounts.requireStation(user, makerStationId, [...staff]);
+    return spots.tellMeWhenListed(params.orderId);
+  });
+  // S17: the spot categories, in one list.
+  r.handle(api.listSpotCategories, () => SPOT_CATEGORIES.map((c) => ({ ...c })));
+
+  r.handle(api.listMakerOrders, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.makerOrders(params.stationId);
+  });
+
+  /** Either side of an order can read it; each side does its own steps. */
+  const orderSide = async (user: User, orderId: string, side?: "business" | "maker") => {
+    const parties = await spots.partiesOfOrder(orderId);
+    const asBusiness = side !== "maker" ? await accounts.requireBusiness(user, parties.businessId, [...doers]).catch(() => null) : null;
+    if (asBusiness) return "business" as const;
+    if (side === "business") throw notFound("That order");
+    await accounts.requireStation(user, parties.makerStationId, [...staff]);
+    return "maker" as const;
+  };
+  r.handle(api.getOrder, async ({ user, params }) => {
+    await orderSide(user, params.orderId);
+    return spots.order(params.orderId);
+  });
+  r.handle(api.attachBriefFile, async ({ user, params, file }) => {
+    await orderSide(user, params.orderId, "business");
+    return spots.attachBriefFile(params.orderId, file!);
+  });
+  r.handle(api.quoteOrder, async ({ user, params, body }) => {
+    await orderSide(user, params.orderId, "maker");
+    return spots.quote(params.orderId, body);
+  });
+  r.handle(api.acceptQuote, async ({ user, params }) => {
+    await orderSide(user, params.orderId, "business");
+    return spots.acceptQuote(params.orderId);
+  });
+  r.handle(api.deliverOrder, async ({ user, params, file }) => {
+    await orderSide(user, params.orderId, "maker");
+    return spots.deliver(params.orderId, file!);
+  });
+  r.handle(api.addOrderNote, async ({ user, params, body }) => {
+    await orderSide(user, params.orderId);
+    return spots.addNote(params.orderId, user.id, body);
+  });
+  r.handle(api.markOwnMistake, async ({ user, params }) => {
+    await orderSide(user, params.orderId, "maker");
+    return spots.markOwnMistake(params.orderId, params.noteId);
+  });
+  r.handle(api.reviewDelivery, async ({ user, params, body }) => {
+    // Either side can ask Opencast to review; approving and asking for changes is the business's.
+    await orderSide(user, params.orderId, body.decision === "dispute" ? undefined : "business");
+    return spots.reviewDelivery(params.orderId, body.decision, body.tellMakerWhenListed);
+  });
+  r.handle(api.resolveOrderDispute, ({ params, body }) => spots.resolveDispute(params.orderId, body));
+  r.handle(api.cancelOrder, async ({ user, params }) => {
+    await orderSide(user, params.orderId, "business");
+    return spots.cancelOrder(params.orderId);
+  });
+
+  // Codes and results
+  r.handle(api.scanCode, ({ params, body }) => spots.scan(params.code, body));
+  r.handle(api.saveOffer, ({ params, body }) => spots.saveOffer(params.code, body));
+  r.handle(api.redeemCode, async ({ user, params, body }) => {
+    // Viewers can see redemptions but not mark them.
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.redeem(params.businessId, user.id, body);
+  });
+  r.handle(api.getResults, async ({ user, params, query }) => {
+    await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    return spots.results(params.businessId, query.month, { period: query.period, month: query.month, week: query.week });
+  });
+  // ---- Added 2026-09-29: the business app's requests ----
+
+  r.handle(api.updateLocation, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.updateLocation(params.businessId, params.locationId, body);
+  });
+  r.handle(api.uploadLogo, async ({ user, params, file }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.uploadLogo(params.businessId, file);
+  });
+  r.handle(api.closeBusiness, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.closeBusiness(params.businessId, body.confirmName);
+  });
+  r.handle(api.getConnections, async ({ user, params }) => {
+    const role = await accounts.requireBusiness(user, params.businessId, [...everyone]);
+    return spots.connections(params.businessId, role === "owner");
+  });
+  r.handle(api.connect, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.connect(params.businessId, user.id, params.kind, body);
+  });
+  r.handle(api.disconnect, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, ["owner"]);
+    return spots.disconnect(params.businessId, params.kind);
+  });
+  r.handle(api.redeemCheck, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.checkCode(params.businessId, body);
+  });
+  r.handle(api.redeemToday, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.redeemToday(params.businessId);
+  });
+  r.handle(api.listSponsorTargets, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.sponsorTargets(params.businessId);
+  });
+  r.handle(api.getCategoryReach, ({ params, query }) => spots.categoryReach(params.marketId, query.category));
+  r.handle(api.lookupPlace, ({ query }) => spots.lookupPlace(query.q));
+
+  r.handle(api.stationCustomers, async ({ user, params, query }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return spots.stationCustomers(params.stationId, query.month);
+  });
+
+  // Catalog sponsors (added 2026-09-29): Network desk sells the catalog's credit by series and market;
+  // the business answers an offer from its own side.
+  r.handle(sponsorsApi.getCatalogSponsors, ({ user, query }) => spots.catalogSponsors(user, query.marketId));
+  r.handle(sponsorsApi.catalogSponsorBusinesses, ({ query }) => spots.catalogSponsorBusinesses(query.q));
+  r.handle(sponsorsApi.offerCatalogSponsorship, ({ user, body }) => spots.offerCatalogSponsorship(user, body));
+  r.handle(sponsorsApi.assignCatalogSponsorship, ({ user, body }) => spots.assignCatalogSponsorship(user, body));
+  r.handle(sponsorsApi.endCatalogSponsorship, ({ user, params }) => spots.endCatalogSponsorship(user, params.sponsorshipId));
+  r.handle(sponsorsApi.listBusinessCatalogSponsorships, async ({ user, params }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.businessCatalogSponsorships(params.businessId);
+  });
+  r.handle(sponsorsApi.answerCatalogOffer, async ({ user, params, body }) => {
+    await accounts.requireBusiness(user, params.businessId, [...doers]);
+    return spots.answerCatalogOffer(params.businessId, user.id, params.sponsorshipId, body.decision);
+  });
+}

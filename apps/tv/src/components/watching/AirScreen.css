@@ -1,0 +1,5 @@
+/* tv 05.2 .state-full, over the whole canvas (the title-safe area's inset undone). The layout itself
+   is the TV Slate's; the stand-by variant adds the colour bars. */
+.tvw-full { position: absolute; top: -54px; bottom: -54px; left: -96px; right: -96px; }
+.tvw-air .oc-slate__small .oc-mono { color: var(--ink); }
+.tvw-air__row { display: flex; gap: 20px; }

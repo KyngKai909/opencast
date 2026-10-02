@@ -765,8 +765,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 
   <div class="step-h"><span class="mono">A3</span><h3>Program log</h3></div>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="820"><div class="scaler">
-      <div class="app mc" data-setup="3">
+    <div class="fit" data-w="1280" data-h="960"><div class="scaler">
+      <div class="app mc" data-setup="3" style="height:960px">
         <div class="mc-title"><div><h2>Program log</h2><p>What airs, in order. Build one day and repeat it, then adjust.</p></div><div class="end"><div class="seg"><button aria-pressed="false">Day</button><button aria-pressed="true">Evening</button><button aria-pressed="false">Week</button></div></div></div>
         <div class="days"><button>Mon</button><button>Tue</button><button>Wed</button><button>Thu</button><button>Fri</button><button class="on">Sat</button><button>Sun</button></div>
         <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
@@ -789,7 +789,13 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
               <div><span>Open time goes to</span><span>The spot market</span></div>
             </div>
             <h4 style="margin-top:22px">Repeat this day</h4>
-            <div class="seg"><button aria-pressed="true">Every Saturday</button><button aria-pressed="false">Every day</button><button aria-pressed="false">Once</button></div>
+            <div class="seg"><button aria-pressed="true">Every Saturday</button><button aria-pressed="false">Weekdays</button><button aria-pressed="false">Every day</button><button aria-pressed="false">Once</button></div>
+            <h4 style="margin-top:22px">Off air hours</h4>
+            <div class="kv" style="margin-top:0">
+              <div><span>Sign off</span><span>Every night, 2:00 am</span></div>
+              <div><span>Sign back on</span><span>6:00 am</span></div>
+            </div>
+            <p class="m-note" style="margin-top:6px">Planned off air hours aren't dead air: no warnings, nothing fills them, and viewers see when you're back.</p>
           </div>
         </div>
         <div class="mc-foot"><span class="quiet" style="font-size:13.5px">Programs are placed in whole minutes; breaks are placed for you.</span><div class="end"><button class="btn btn-ghost">Back</button><button class="btn btn-primary">Continue to translators</button></div></div>
@@ -799,24 +805,50 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       <div class="note"><h3>A timeline, not a playlist</h3><p>The repo's queue becomes the day it will actually be. Each program has a start time, breaks are drawn where they'll fall, and a gap is drawn as dead air.</p></div>
       <div class="note"><h3>Breaks come from a rule</h3><p>The repo's three break modes, in plain words. The station sets the rule once; the log places each break and puts a station ID in it.</p></div>
       <div class="note"><h3>Three ways to fill a gap</h3><p>Repeat your own programs, carry someone else's, or sign off. All three are fine; dead air is the only wrong answer.</p></div>
+      <div class="note"><h3>Off air is a choice, dead air is a mistake</h3><p>A station can sign off on a schedule, like every night from 2:00 to 6:00 am. Those hours are off air: the guide shows them, viewers see when the station is back, and nothing warns or fills. Dead air is only an unplanned gap.</p></div>
+      <div class="note"><h3>Build a day once</h3><p>"Repeat this day" makes the day a template: every Saturday, weekdays or every day. Changing one date changes only that date; changing the template changes every future repeat.</p></div>
       <div class="note"><h3>Live shows are blocks too</h3><p>Beat Tape Live at 9:00 is a block with an ingest source instead of a file. Master control switches to it at 9:00 and back when it ends.</p></div>
     </div>
   </div>
 
   <div class="step-h"><span class="mono">A4</span><h3>Translators</h3></div>
   <div class="stage">
-    <div class="fit" data-w="1280" data-h="640"><div class="scaler">
-      <div class="app mc" data-setup="4" style="height:640px">
-        <div class="mc-title"><div><h2>Translators</h2><p>Relay BEAT to other services. Opencast is always on; everything here is optional and can be added any time.</p></div></div>
-        <div class="tr-row"><span class="lg" style="background:#B8261A">YT</span><div><b>YouTube</b><small>Inland Beat channel, connected</small></div><div><div class="lb">Breaks on this translator</div><div class="seg"><button aria-pressed="true">Air spots</button><button aria-pressed="false">Station ID slate</button></div></div><span class="toggle"></span></div>
-        <div class="tr-row"><span class="lg" style="background:#6441A5">TW</span><div><b>Twitch</b><small>Not connected. Twitch expects prerecorded programs to be labelled, which BEAT will do.</small></div><div><div class="lb">Breaks on this translator</div><div class="seg"><button aria-pressed="false">Air spots</button><button aria-pressed="true">Station ID slate</button></div></div><button class="btn btn-ghost btn-sm">Connect</button></div>
-        <div class="tr-row"><span class="lg" style="background:#525C73">RT</span><div><b>Any RTMP address</b><small>For another service or your own server</small></div><div></div><button class="btn btn-ghost btn-sm">Add</button></div>
-        <div class="mc-foot"><span class="quiet" style="font-size:13.5px">Each service has its own rules on breaks and 24/7 streams. Check them before turning spots on.</span><div class="end"><button class="btn btn-ghost">Back</button><button class="btn btn-ghost">Skip for now</button><button class="btn btn-primary">Continue</button></div></div>
+    <div class="fit" data-w="1280" data-h="720"><div class="scaler">
+      <div class="app mc" data-setup="4" style="height:720px">
+        <div class="mc-title"><div><h2>Translators</h2><p>Simulcast BEAT to the platforms you already use. Opencast stays BEAT's home; everything here is optional and can be added any time.</p></div></div>
+        <div class="split" style="grid-template-columns:minmax(0,1fr) 380px">
+          <div>
+            <div class="lb" style="font-size:12.5px;color:var(--ink-50);font-weight:600;margin-bottom:6px">Connected platforms</div>
+            <div class="tr-row" style="grid-template-columns:44px minmax(0,1fr) auto"><span class="lg" style="background:#B8261A">YT</span><div><b>YouTube</b><small>Inland Beat channel, signed in. Opencast starts each broadcast for you</small></div><button class="btn btn-ghost btn-sm">Remove</button></div>
+            <div class="tr-row" style="grid-template-columns:44px minmax(0,1fr) auto"><span class="lg" style="background:#6441A5">TW</span><div><b>Twitch</b><small>inlandbeat, signed in</small></div><button class="btn btn-ghost btn-sm">Remove</button></div>
+            <div class="tr-row" style="grid-template-columns:44px minmax(0,1fr) auto"><span class="lg" style="background:#525C73">+</span><div><b>Add a platform</b><small>Sign in to YouTube or Twitch, or add any other service with its RTMP address and stream key</small></div><button class="btn btn-ghost btn-sm">Add</button></div>
+            <div class="sec-top" style="display:flex;align-items:baseline;gap:12px;padding-bottom:8px;border-bottom:1px solid var(--line);margin-top:22px"><h3 style="margin:0;font:700 17px var(--font-display)">What gets relayed</h3></div>
+            <div class="opts" style="border-top:0">
+              <div class="opt sel"><span class="rad"></span><div><b>Live shows only</b><small>Beat Tape Live and any live block go to every connected platform. The rest of BEAT's schedule stays on Opencast. Free</small></div></div>
+              <div class="opt"><span class="rad"></span><div><b>Everything BEAT airs</b><small>The whole schedule as one continuous stream, to every connected platform at once. Pay as you go, per hour relayed, not per platform</small></div></div>
+            </div>
+          </div>
+          <div class="pane">
+            <h4>On every relay</h4>
+            <div class="lb" style="font-size:12.5px;color:var(--ink-50);font-weight:600;margin:4px 0 6px">During breaks, relays show</div>
+            <div class="seg" style="width:100%"><button aria-pressed="true" style="flex:1">Your spots</button><button aria-pressed="false" style="flex:1">Station ID slate</button></div>
+            <p class="m-note" style="margin-top:8px">With spots on, YouTube streams are marked as containing paid promotion for you. Time filled by ads from partners always shows the slate.</p>
+            <div class="kv" style="margin-top:10px">
+              <div><span>Station bug on relays</span><span class="toggle"></span></div>
+              <div><span>Relayed this month</span><span>Nothing yet</span></div>
+            </div>
+            <p class="m-note">Viewers on YouTube and Twitch are counted from what those platforms report, and shown apart from Opencast viewers in Audience and Earnings.</p>
+          </div>
+        </div>
+        <div class="mc-foot"><span class="quiet" style="font-size:13.5px">If a relay stops, BEAT keeps airing on Opencast. Only the copies elsewhere pause, and they restart on their own.</span><div class="end"><button class="btn btn-ghost">Back</button><button class="btn btn-ghost">Skip for now</button><button class="btn btn-primary">Continue</button></div></div>
       </div>
     </div></div>
     <div class="notes">
-      <div class="note"><h3>Breaks per translator</h3><p>Because breaks are marked in the stream, each translator can air the spot or swap in a station ID slate. A service that restricts burned-in ads gets the slate.</p></div>
-      <div class="note"><h3>Skippable on purpose</h3><p>This is the wedge from earlier: a station can use master control only to run its YouTube channel. But nobody should be blocked from signing on by it.</p></div>
+      <div class="note"><h3>One stream, every platform</h3><p>BEAT sends one stream, and it's split to each connected platform. Adding Twitch next to YouTube costs nothing more, and live shows switch in without the stream on YouTube restarting.</p></div>
+      <div class="note"><h3>Live shows free, everything else by the hour</h3><p>"Live shows only" is the default and free. "Everything BEAT airs" is pay as you go, per hour relayed, whatever the number of platforms.</p></div>
+      <div class="note"><h3>One break setting for all relays</h3><p>Every platform gets the same stream, so breaks are set once: your spots, or the station ID slate. Local businesses only pay for relay viewers the platform can place in their area.</p></div>
+      <div class="note"><h3>Sign in, or paste a key</h3><p>YouTube and Twitch connect by signing in, so Opencast can start broadcasts and read viewer numbers. Anything else takes an RTMP address and key; those viewers can't be counted.</p></div>
+      <div class="note"><h3>Skippable on purpose</h3><p>A station can use master control just to run its channels elsewhere. But nobody should be blocked from signing on by it.</p></div>
     </div>
   </div>
 

@@ -1,0 +1,38 @@
+/* What the settings sections share (biz-settings .sec-top, .row2, .m-note, .lock). */
+.bz-sec-top { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-top: 22px; }
+.bz-sec-top:first-child { margin-top: 0; }
+.bz-sec-top__h { margin: 0; font: 700 17px/1.2 var(--font-display); letter-spacing: -.015em; color: var(--ink); }
+.bz-sec-top__sub { font-size: 13px; color: var(--ink-50); }
+
+.bz-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-row b { display: block; font-weight: 600; font-size: 14.5px; }
+.bz-row small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.bz-row__end { display: flex; gap: 8px; align-items: center; }
+
+.bz-note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+.bz-quiet-note { font-size: 12.5px; color: var(--ink-50); margin: 12px 0 0; }
+.bz-readonly { margin: 0 0 14px; font-size: 13.5px; color: var(--ink-70); }
+.bz-error { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--standby); }
+
+/* A value picked from a short list, drawn as the value itself. A real select. */
+.bz-valsel { position: relative; display: inline-flex; align-items: center; }
+.bz-valsel select {
+  appearance: none; -webkit-appearance: none;
+  height: 30px; padding: 0 22px 0 8px; margin-right: -8px;
+  border: 1px solid transparent; border-radius: var(--r-control); background: none;
+  font: 500 13.5px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); cursor: pointer;
+}
+.bz-valsel select:hover { border-color: var(--hair); }
+.bz-valsel select option { color: var(--ink); background: var(--ground); }
+.bz-valsel::after {
+  content: ""; position: absolute; right: -2px; top: 11px; width: 6px; height: 6px;
+  border-right: 1.5px solid var(--ink-50); border-bottom: 1.5px solid var(--ink-50); transform: rotate(45deg); pointer-events: none;
+}
+
+/* Inline editing in a row: a small field and its buttons. */
+.bz-inline { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
+.bz-inline .oc-field { flex: 1; }
+
+@media (max-width: 767px) {
+  .bz-row { gap: 12px; }
+}

@@ -1,0 +1,13 @@
+/* network-desk .msg */
+.nd-msg { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r-screen); padding: 16px 18px; background: var(--raised); font-size: 14.5px; line-height: 1.55; }
+.nd-msg p { margin: 0 0 10px; }
+.nd-msg__from { font-size: 12.5px; color: var(--ink-50); margin-bottom: 10px; }
+.nd-msg__placeholder { color: var(--ink-50); }
+.nd-msg__sch { border-top: 1px solid var(--hair); margin: 4px 0 12px; padding-top: 10px; font-size: 13px; }
+.nd-msg__sch-h { font-weight: 600; margin-bottom: 4px; }
+.nd-msg__sch-grid { display: grid; gap: 2px 10px; font-size: 12.5px; }
+.nd-msg__row { display: grid; grid-template-columns: 70px 1fr; gap: 10px; }
+.nd-msg__t { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.nd-msg__lnk { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: var(--r-control); background: var(--signal-fill); color: var(--on-signal); font-weight: 600; font-size: 14px; text-decoration: none; }
+a.nd-msg__lnk:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.nd-msg .nd-msg__foot { color: var(--ink-50); font-size: 12.5px; margin: 10px 0 0; }

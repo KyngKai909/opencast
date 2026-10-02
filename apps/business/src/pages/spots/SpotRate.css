@@ -1,0 +1,20 @@
+/* biz-spots 03.1 (.rt, .row2, .fld, .two, .est, .chips). */
+/* The frame draws the two columns centred on each other, with a rule under them. */
+.bz-rate__grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.bz-rate__pay { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.bz-rate__pay b { font-weight: 600; font-size: 14.5px; }
+.bz-rate__rate { margin: 12px 0 16px; max-width: 200px; }
+.bz-rate__two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0 16px; }
+.bz-rate__est { font-size: 13px; color: var(--ink-70); margin: 6px 0 0; }
+.bz-rate__est b { color: var(--ink); }
+.bz-rate__warn { font-size: 13px; color: var(--standby); margin: 6px 0 0; }
+.bz-rate__warn a { color: inherit; }
+.bz-rate__fld { margin-top: 14px; }
+.bz-rate__fld + .bz-rate__fld { margin-top: 16px; }
+.bz-rate__lb { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.bz-rate__preview { margin-top: 22px; }
+.bz-rate__list { margin-top: 16px; }
+.bz-rate__after { font-size: 12.5px; color: var(--ink-50); margin: 8px 0 0; }
+@media (max-width: 1023px) {
+  .bz-rate__grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,0 +1,14 @@
+/* Codes and customers (biz results .funnel, .fn). */
+.oc-funnel { border-top: 2px solid var(--ink); }
+.oc-funnel__row {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr) 90px; gap: 14px; align-items: center;
+  padding: 12px 0; border-bottom: 1px solid var(--hair); font-size: 14px;
+}
+/* The detail runs inline under the title, as .fn small does. */
+.oc-funnel__row .oc-lines__detail { display: inline; }
+.oc-funnel__bar { display: block; height: 18px; border-radius: 3px; background: var(--hair); overflow: hidden; }
+.oc-funnel__bar i { display: block; height: 100%; }
+.oc-funnel__fill--line { background: var(--line); }
+.oc-funnel__fill--ink-70 { background: var(--ink-70); }
+.oc-funnel__fill--ink { background: var(--ink); }
+.oc-funnel__count { font: 500 17px var(--font-mono); text-align: right; }

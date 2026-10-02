@@ -1,0 +1,47 @@
+/* Step rails. The setup rail's right-hand rule belongs to the shell's rail (.mc-rail), not to this. */
+
+/* Vertical: the setup rail (.mc-steps .st, .hint). */
+.oc-steps { padding: 18px 14px; }
+.oc-steps__list { list-style: none; margin: 0; padding: 0; }
+.oc-steps__step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px; font-size: 14.5px; color: var(--ink-50); font-weight: 500;
+}
+.oc-steps__n {
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line);
+  display: grid; place-items: center; font: 500 12px var(--font-mono); flex: none;
+}
+.oc-steps__step--current { color: var(--ink); }
+.oc-steps__step--current .oc-steps__n {
+  border-color: var(--signal); color: var(--signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent);
+}
+.oc-steps__step--done { color: var(--ink-70); }
+.oc-steps__step--done .oc-steps__n { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+.oc-steps__hint {
+  margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--hair);
+  font-size: 13px; color: var(--ink-70); line-height: 1.45;
+}
+
+/* Row: an order's steps across the page (.steps5). */
+.oc-steprow { display: flex; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 2px solid var(--ink); }
+.oc-steprow__step { display: block; flex: 1; padding: 10px 12px 0 0; font-size: 13px; color: var(--ink-50); }
+.oc-steprow__step + .oc-steprow__step { padding-left: 12px; border-left: 1px solid var(--hair); }
+.oc-steprow__n { display: block; font: 500 12px var(--font-mono); margin-bottom: 2px; }
+.oc-steprow__step--done { color: var(--ink-70); }
+.oc-steprow__step--current { color: var(--ink); font-weight: 600; }
+
+/* List: numbered steps with a detail and an action (claim page .steps3). */
+.oc-steplist { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
+.oc-steplist__step {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid var(--hair); align-items: center;
+}
+.oc-steplist__n {
+  width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--line);
+  display: grid; place-items: center; font: 500 13px var(--font-mono);
+}
+.oc-steplist__step--done .oc-steplist__n { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-steplist__step--current .oc-steplist__n { border-color: var(--signal); color: var(--signal); }
+/* .steps3 small is 13px and inline under the title. */
+.oc-steplist__step .oc-lines__detail { display: inline; font-size: 13px; }

@@ -1,0 +1,23 @@
+/* Toasts (the reference's .toast: home, master control, offering, biz funding). */
+.oc-toast {
+  display: flex; gap: 14px; align-items: center;
+  padding: 10px 16px;
+  background: var(--ink); color: var(--ground);
+  border-radius: var(--r-control);
+  font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.oc-toast__undo {
+  margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; font-weight: 700; color: var(--ground);
+  text-decoration: underline; cursor: pointer;
+}
+/* On the ink ground the signal ring would vanish on light; the ground colour reads on both. */
+.oc-toast__undo:focus-visible { outline-color: var(--ground); }
+
+/* Where it sits: centred, 90px up (clear of the web player bar). Apps can move it with --oc-toast-bottom. */
+.oc-toast-region {
+  position: fixed; left: 50%; bottom: var(--oc-toast-bottom, 90px);
+  transform: translateX(-50%);
+  z-index: 12;
+}
+.oc-toast-region--container { position: absolute; }

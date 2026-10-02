@@ -1,0 +1,2 @@
+/* A.2 Library, setup step 2. The lede wraps at the frame's width. */
+.cc-setup-lib__lede { display: block; max-width: 560px; }

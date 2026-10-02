@@ -920,7 +920,7 @@ footer.site-foot { border-top: 1px solid var(--hair); padding: var(--s6) 0 var(-
   <div class="wrap">
     <div class="ch-label"><span class="n">Ch. 10</span><span>When there's no picture</span></div>
     <h2 class="ch-title">Stand by is a message, not an apology.</h2>
-    <p class="ch-lede">Television already solved empty screens: say what's happening and when it will change. Every state without a picture follows that.</p>
+    <p class="ch-lede">Television already solved empty screens: say what's happening and when it will change. Every state without a picture follows that, including the moment between channels. The full motion spec is in the changing channel reference.</p>
 
     <div class="states">
       <figure class="state" style="margin:0"><div class="screen">
@@ -946,6 +946,19 @@ footer.site-foot { border-top: 1px solid var(--hair); padding: var(--s6) 0 var(-
         <div class="small">Radio dramas from the 1940s, until <span class="mono">6:00 am</span></div>
         <div class="meter" aria-hidden="true"><i style="height:40%"></i><i style="height:75%"></i><i style="height:55%"></i><i style="height:95%"></i><i style="height:60%"></i><i style="height:30%"></i><i style="height:70%"></i><i style="height:45%"></i></div>
       </div><figcaption><b>Radio band</b>No picture by design. The frequency is the picture.</figcaption></figure>
+
+      <figure class="state" style="margin:0"><div class="screen" style="background:url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='4'/><feColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.64 0 0 0 0 0.70 0 0 0 0.22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>&quot;) center/cover, #1C2440;position:relative">
+        <div style="position:absolute;top:8%;right:6%;text-align:right;line-height:1"><div class="mono" style="font-size:clamp(26px,4.4vw,52px);letter-spacing:-.04em">18.1</div><div style="font:800 clamp(13px,1.6vw,20px) var(--font-display);font-stretch:125%;margin-top:4px">SAZN</div></div>
+        <div class="big" style="font-size:clamp(18px,2.2vw,26px);margin-top:auto">Tamales for forty</div>
+        <div class="small">Tuning in</div>
+      </div><figcaption><b>Changing channel</b>Soft static and the new channel's number, for at least 300 ms, and for as long as the next channel takes. Never the colour bars, which mean something's wrong.</figcaption></figure>
+
+      <figure class="state" style="margin:0"><div class="screen">
+        <div style="position:relative;width:100%;height:34px;border-bottom:2px solid var(--on-screen-70);margin-bottom:18px"><span style="position:absolute;left:38%;top:-4px;bottom:-6px;width:3px;border-radius:2px;background:#D9301F"></span></div>
+        <div class="radio-ident">94.7</div>
+        <div class="big" style="font-size:clamp(18px,2.2vw,26px)">SOLA, Sola Radio</div>
+        <div class="small">The needle sweeps to the station in 400 ms, with a short hiss on the way.</div>
+      </div><figcaption><b>Tuning the radio band</b>The radio version of changing channel. The hiss is on by default here, and off by default for video.</figcaption></figure>
     </div>
   </div>
 </section>
@@ -1004,7 +1017,7 @@ footer.site-foot { border-top: 1px solid var(--hair); padding: var(--s6) 0 var(-
     <div class="foot-grid">
       <div><a class="brand" href="#top"><svg><use href="#mk-outline"/></svg><span>opencast</span></a><p class="muted" style="font-size:15px;margin-top:12px">Open-source 24/7 broadcasting. Every station runs like a real one. Starting in the Inland Empire, California.</p></div>
       <div><h4>Viewers</h4><ul><li><a href="#">Watch</a></li><li><a href="#">Listen</a></li><li><a href="#">Guide</a></li><li><a href="#">Stations</a></li></ul></div>
-      <div><h4>Broadcasters</h4><ul><li><a href="#">Master control</a></li><li><a href="#">Syndication market</a></li><li><a href="#">Spot market</a></li><li><a href="https://github.com/KyngKai909/untitled-project">Source</a></li></ul></div>
+      <div><h4>Broadcasters</h4><ul><li><a href="#">Master control</a></li><li><a href="#">Syndication market</a></li><li><a href="#">Spot market</a></li><li><a href="https://github.com/KyngKai909/opencast">Source</a></li></ul></div>
       <div><h4>Opencast</h4><ul><li><a href="#">About</a></li><li><a href="#">For advertisers</a></li><li><a href="#top">Brand and style guide</a></li></ul></div>
     </div>
     <p class="foot-note">Stations, programs, people and businesses shown on this page are illustrations. Opencast is a working name. Carriage and revenue terms are described to show how the model works and are not offers.</p>

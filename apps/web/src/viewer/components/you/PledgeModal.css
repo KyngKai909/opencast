@@ -1,0 +1,16 @@
+/* Managing a pledge (you 04.1: .row.sm inside the modal, .amts). */
+.vw-pledge__amts { margin-top: 14px; }
+.vw-pledge__note { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }
+.vw-y-prow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); }
+.vw-y-prow b { display: block; font-weight: 600; font-size: 15px; color: var(--ink); }
+.vw-y-prow small { display: block; font-size: 13px; color: var(--ink-70); margin-top: 1px; }
+.vw-y-prow--last { border-bottom: 0; }
+.vw-y-prow__amt { font-size: 14px; }
+.vw-y-prow small.vw-y-prow__warn { color: var(--standby); }
+.vw-pledge__amts + .vw-y-prow { margin-top: 6px; }
+.vw-y-receipts { list-style: none; margin: 0 0 4px; padding: 0; border-top: 1px solid var(--hair); }
+.vw-y-receipts li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; color: var(--ink-70); }
+.vw-y-receipts li .oc-mono { color: var(--ink); }
+.vw-pledge__confirm { margin: 4px 0; font-size: 15px; color: var(--ink); }
+.vw-pledge__err { margin: 10px 0 0; font-size: 13px; color: var(--standby); }
+.vw-pledge__tax { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); }

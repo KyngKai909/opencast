@@ -1,0 +1,58 @@
+/* Market 02.1 a program, for stations (control/opencast-market.css: .pp-head, .fitbox, .ep2, .row2, .termopt, .kv). */
+.cc-mk-offer__head { display: grid; grid-template-columns: 360px minmax(0, 1fr) 300px; gap: 24px; margin-bottom: 6px; }
+.cc-mk-offer__card.oc-tc--lg .oc-tc__t { font-size: 30px; }
+.cc-mk-offer__from { font-size: 13px; color: var(--ink-50); }
+.cc-mk-offer__h { display: flex; align-items: center; gap: 10px; margin: 4px 0 8px; font: 800 34px/1.02 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.035em; }
+.cc-mk-offer__yours.oc-tag { letter-spacing: 0; }
+.cc-mk-offer__p { font-size: 14.5px; color: var(--ink-70); margin: 0 0 10px; }
+.cc-mk-offer__meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--ink-70); }
+
+/* The fit box: why this program, in standby amber (.fitbox). */
+.cc-mk-fitbox { border: 1.5px solid var(--standby); border-radius: var(--r-screen); padding: 14px 16px; }
+.cc-mk-fitbox__h { margin: 0 0 4px; font: 700 15px var(--font-display); }
+.cc-mk-fitbox__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-mk-fitbox__row:last-child { border-bottom: 0; }
+.cc-mk-fitbox__row b { display: block; font-weight: 600; font-size: 14.5px; }
+.cc-mk-fitbox__row small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+
+.cc-mk-offer__split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; margin-top: 14px; }
+.cc-mk-offer__main, .cc-mk-offer__side { min-width: 0; }
+
+/* Episodes (.ep2) */
+.cc-mk-eps { list-style: none; margin: 0; padding: 0; }
+.cc-mk-ep { display: grid; grid-template-columns: 40px 150px minmax(0, 1fr) 64px auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-mk-ep__n { font: 500 13px var(--font-mono); color: var(--ink-50); }
+.cc-mk-ep__tc.oc-tc { padding: 4px 6px; }
+.cc-mk-ep__tc .oc-tc__t { font-size: 9.5px; }
+.cc-mk-ep__words b { font-weight: 600; display: block; }
+.cc-mk-ep__words small { font-size: 12.5px; color: var(--ink-70); }
+.cc-mk-ep__d { font: 500 13px var(--font-mono); }
+
+/* Also carried by (.row2) */
+.cc-mk-carried { margin: 0; }
+.cc-mk-carried__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.cc-mk-carried__row dt b { display: block; font-weight: 600; font-size: 14.5px; }
+.cc-mk-carried__row dt small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 1px; }
+.cc-mk-carried__row dd { margin: 0; color: var(--ink-50); }
+
+/* Deals (.termopt, .kv) */
+.cc-mk-offer__kv.oc-kv { margin: 10px 0; }
+.cc-mk-offer__acts { display: flex; gap: 10px; }
+.cc-mk-offer__acts > * { flex: 1; }
+.cc-mk-offer__note { font-size: 13px; color: var(--ink-70); margin: 12px 0 0; }
+
+@media (max-width: 1180px) {
+  .cc-mk-offer__head { grid-template-columns: 240px minmax(0, 1fr); }
+  .cc-mk-fitbox { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .cc-mk-offer__head, .cc-mk-offer__split { grid-template-columns: minmax(0, 1fr); }
+  .cc-mk-ep { grid-template-columns: 32px 96px minmax(0, 1fr) auto; }
+  .cc-mk-ep__d { display: none; }
+}
+@media (max-width: 767px) {
+  .cc-mk-offer { padding: 0 16px 24px; }
+  .cc-mk-offer__h { font-size: 28px; }
+  .cc-mk-ep { grid-template-columns: 72px minmax(0, 1fr) auto; }
+  .cc-mk-ep__n { display: none; }
+}

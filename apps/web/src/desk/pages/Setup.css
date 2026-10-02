@@ -1,0 +1,20 @@
+/* network-desk 04.1 .recipe: the recipe, and the station 360px wide on the right. */
+.nd-setup { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 26px; align-items: start; }
+.nd-setup__rows { margin-top: 10px; }
+.nd-setup__quiet { font-size: 13px; color: var(--ink-50); font-family: var(--font-text); white-space: nowrap; }
+.nd-setup__small { font-size: 12.5px; white-space: nowrap; }
+.nd-setup__cs { font-family: var(--font-display); font-stretch: var(--wide); font-weight: 800; letter-spacing: -.005em; }
+.nd-setup__ok { font-size: 13px; color: var(--ink-70); display: inline-flex; gap: 6px; align-items: center; font-family: var(--font-text); white-space: nowrap; }
+.nd-setup__warn { color: var(--standby); font-weight: 600; }
+.nd-setup__go { margin-top: 14px; }
+.nd-setup__done { margin-top: 14px; border-top: 1px solid var(--line); }
+.nd-setup__error { margin: 8px 0 0; font-size: 13px; color: var(--standby); font-weight: 600; }
+.nd-setup__edit { width: 150px; }
+.nd-setup__edit label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.nd-setup__pick { font: 500 13px var(--font-text); color: var(--ink-70); background: transparent; border: 0; border-radius: var(--r-sign); padding: 0 2px; cursor: pointer; }
+.nd-setup__pick:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.nd-setup__pick option { color: var(--ink); background: var(--ground); }
+/* A value that edits when pressed: looks like the value, underlined on hover, ringed on focus. */
+.nd-edit { all: unset; cursor: pointer; border-radius: var(--r-sign); font-family: var(--font-text); color: var(--ink); white-space: nowrap; }
+.nd-edit:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+.nd-edit:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }

@@ -1,0 +1,5 @@
+/* The channel picker (master control A1 .chgrid, .cn). */
+.oc-chgrid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.oc-cn { height: 32px; border: 1px solid var(--line); border-radius: var(--r-control); background: none; font: 500 13px var(--font-mono); color: var(--ink); cursor: pointer; }
+.oc-cn--sel { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-cn--taken { border-style: dashed; border-color: var(--hair); color: var(--ink-50); text-decoration: line-through; cursor: not-allowed; }

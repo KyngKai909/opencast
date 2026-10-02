@@ -1,0 +1,36 @@
+/* sponsorships 03.1 (.req2, .cur-sp, .slate) and 06.1. */
+.cc-spn__grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 28px; align-items: start; }
+.cc-spn__main { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.cc-spn__req { border: 1.5px solid var(--standby); border-radius: var(--r-screen); padding: 16px 18px; }
+.cc-spn__req:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-spn__req h2 { margin: 6px 0 4px; font: 800 22px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+.cc-spn__kv { margin: 0; }
+.cc-spn__acts { display: flex; gap: 10px; margin-top: 14px; }
+.cc-spn__why { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--ink-70); }
+.cc-spn__more { margin: 12px 0 0; font-size: 13px; color: var(--ink-70); }
+
+.cc-spn__h { display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.cc-spn__h h2 { margin: 0; font: 700 17px var(--font-display); }
+.cc-spn__h span { font-size: 13px; color: var(--ink-70); }
+.cc-spn__row { display: grid; grid-template-columns: minmax(0, 1fr) 150px 140px 32px; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; align-items: center; }
+.cc-spn__row .oc-lines__detail { font-size: 12.5px; }
+.cc-spn__when { font-size: 13px; color: var(--ink-70); }
+.cc-spn__m { font: 500 14px var(--font-mono); text-align: right; }
+.cc-spn__m--quiet { color: var(--ink-50); }
+.cc-spn__menu { display: flex; justify-content: flex-end; }
+.cc-spn__empty { margin: 0; padding: 14px 0; font-size: 14px; color: var(--ink-70); }
+
+.cc-spn__preview .cc-spn__h { margin-bottom: 12px; }
+.cc-spn__slate { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: var(--r-screen); }
+.cc-spn__slate:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-spn__note { margin: 12px 0 0; font-size: 13px; color: var(--ink-70); }
+
+/* The phone: the list, then each request's sheet (06.1). */
+.cc-spn__phone-req { display: flex; flex-direction: column; margin-bottom: 24px; border-top: 1px solid var(--line); }
+.cc-spn__phone-link { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--hair); color: inherit; text-decoration: none; }
+.cc-spn__phone-link:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-spn__sheet { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 767px) {
+  .cc-spn__row { grid-template-columns: minmax(0, 1fr) auto 32px; }
+  .cc-spn__when { display: none; }
+}

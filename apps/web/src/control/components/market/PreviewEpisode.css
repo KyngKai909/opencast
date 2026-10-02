@@ -1,0 +1,14 @@
+/* Market 03.1 (control/opencast-market.css: .pv-player .pic, .scrub, .brkmarks, .kv) */
+.cc-mk-preview__pic {
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-screen); overflow: hidden;
+  background: var(--cc-pic, var(--screen)); color: var(--on-station);
+  display: grid; place-items: center; text-align: center; container-type: inline-size;
+}
+.cc-mk-preview__t { font: 800 44px var(--font-display); font-stretch: var(--wide); letter-spacing: -.03em; }
+.cc-mk-preview__e { font: 500 14px var(--font-mono); opacity: .8; margin-top: 6px; }
+.cc-mk-preview__wait { font-size: 14px; margin-top: 14px; }
+.cc-mk-preview__scrub { margin-top: 10px; }
+.cc-mk-preview__kv.oc-kv { margin-top: 12px; }
+@container (max-width: 480px) {
+  .cc-mk-preview__t { font-size: 28px; }
+}

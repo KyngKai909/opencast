@@ -1,0 +1,20 @@
+/* primitives: one @import per component */
+@import "./Tally.css";
+@import "./Button.css";
+@import "./Tag.css";
+@import "./Field.css";
+@import "./Toggle.css";
+@import "./Segmented.css";
+@import "./Chip.css";
+@import "./Tabs.css";
+@import "./Tooltip.css";
+@import "./Toast.css";
+@import "./Modal.css";
+@import "./Sheet.css";
+@import "./Notice.css";
+@import "./Menu.css";
+@import "./ChoiceList.css";
+@import "./Checkbox.css";
+@import "./AmountPicker.css";
+@import "./Avatar.css";
+@import "./Kbd.css";

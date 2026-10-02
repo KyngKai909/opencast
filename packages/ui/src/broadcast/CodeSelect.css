@@ -1,0 +1,17 @@
+/* The log code picker (master control A2 .typesel): a real select under the drawn chip. */
+.oc-code-select {
+  position: relative; display: inline-flex; align-items: center;
+  height: 28px; padding: 0 8px; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-control);
+  font: 500 12px var(--font-mono); background: none; color: var(--ink);
+}
+.oc-code-select__shown { display: inline-flex; align-items: center; gap: 6px; pointer-events: none; }
+.oc-code-select__input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0;
+  font: inherit; cursor: pointer; appearance: none; border: 0; margin: 0;
+}
+.oc-code-select:has(.oc-code-select__input:focus-visible) { outline: 2px solid var(--signal); outline-offset: 3px; }
+.oc-code-select__input:disabled { cursor: not-allowed; }
+.oc-code-select--pgm { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.oc-code-select--spt { color: var(--standby); border-color: var(--standby); }
+.oc-code-select--und { border-style: dashed; }

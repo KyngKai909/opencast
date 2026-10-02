@@ -1,0 +1,29 @@
+/* The setup step rail (shared-mid .mc-rail.mc-steps: master control A1–A5, business getting started). */
+.oc-shell-steps { border-right: 1px solid var(--hair); padding: 18px 14px; overflow: auto; }
+.oc-shell-steps__list { list-style: none; margin: 0; padding: 0; }
+.oc-shell-steps__step { display: flex; align-items: center; gap: 10px; padding: 9px 4px; font-size: 14.5px; color: var(--ink-50); font-weight: 500; }
+.oc-shell-steps__n {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 50%; border: 1.5px solid var(--line);
+  display: grid; place-items: center;
+  font: 500 12px var(--font-mono);
+}
+.oc-shell-steps__step--current { color: var(--ink); }
+.oc-shell-steps__step--current .oc-shell-steps__n { border-color: var(--signal); color: var(--signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent); }
+.oc-shell-steps__step--done { color: var(--ink-70); }
+.oc-shell-steps__step--done .oc-shell-steps__n { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+.oc-shell-steps__hint { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-70); line-height: 1.45; }
+
+/* The phone (no frame draws setup there): the rail becomes a strip of numbered steps above the
+   page, naming only the current one; the hint moves out of the way. */
+@media (max-width: 767px) {
+  .oc-business-setup .oc-shell__body, .oc-control-setup .oc-shell__body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .oc-shell-steps { border-right: 0; border-bottom: 1px solid var(--hair); padding: 10px 16px; overflow: visible; }
+  .oc-shell-steps__list { display: flex; gap: 8px; align-items: center; }
+  .oc-shell-steps__step { padding: 0; }
+  .oc-shell-steps__step:not(.oc-shell-steps__step--current) > :not(.oc-shell-steps__n):not(.oc-sr-only) { display: none; }
+  .oc-shell-steps__step:not(.oc-shell-steps__step--current) { font-size: 0; }
+  .oc-shell-steps__step .oc-shell-steps__n { font-size: 12px; }
+  .oc-shell-steps__hint { display: none; }
+  .oc-business-setup .oc-shell-head__note, .oc-control-setup .oc-shell-head__note { display: none; }
+}

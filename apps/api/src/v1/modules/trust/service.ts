@@ -1,0 +1,446 @@
+// Rights claims: an item comes off air at once, everywhere it's carried, until
+// the station answers. No answer by the deadline removes it from the library,
+// which counts as removed, not upheld.
+
+import { and, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { schema } from "@opencast/db";
+import { CLAIM_ANSWER_SOON_DAYS, claimNext, claimPhase, claimTimeline, repeatStanding, type Claim, type ClaimFacts, type ClaimKind, type DeskClaim, type DeskClaimCarrier, type DeskClaims, type Market, type StationIdent } from "@opencast/contracts";
+import type { ModuleContext } from "../../context.js";
+import type { CurrentUser, UploadedFile } from "../../http.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
+
+export interface StandingView {
+  status: "good" | "offers_paused";
+  openClaims: number;
+  upheldLast12Months: number;
+  threshold: number;
+}
+
+export interface ClaimInput {
+  itemId: string;
+  claimantName: string;
+  claimantRole?: string;
+  claimantContact: string;
+  workKind?: string;
+  claimText: string;
+  rangeStartMs?: number;
+  rangeEndMs?: number;
+  /** Added 2026-09-29: a privacy complaint (default copyright). */
+  kind?: ClaimKind;
+}
+
+export interface TrustService {
+  standing(stationId: string): Promise<StandingView>;
+  /** Items with an open claim: off air everywhere until answered. */
+  offAirItems(itemIds: string[]): Promise<Set<string>>;
+  file(input: ClaimInput): Promise<{ claimId: string; answerDueAt: string }>;
+  claims(stationId: string): Promise<Claim[]>;
+  stationOfClaim(claimId: string): Promise<string>;
+  answer(claimId: string, userId: string, input: { basis: "made_it" | "owner_permission" | "public_domain"; note?: string; attachmentUrl?: string }): Promise<Claim>;
+  remove(claimId: string): Promise<Claim>;
+  resolve(claimId: string, outcome: "upheld" | "withdrawn" | "restored"): Promise<Claim>;
+  /** Network desk (added 2026-09-29): every claim in the caller's markets, with timelines, carriers and figures. */
+  deskClaims(user: CurrentUser, marketId?: string): Promise<DeskClaims>;
+  /** Open claims past their deadline: removed from the library. Run by the scheduler. */
+  expireOverdue(): Promise<number>;
+  /** B6: a file that backs an answer, stored by content ID. */
+  attach(claimId: string, userId: string, file: UploadedFile | null): Promise<{ attachmentUrl: string; fileName: string }>;
+}
+
+/** B6: what an answer can be backed by. */
+const ATTACHMENT_TYPES = /^(application\/pdf|image\/(png|jpeg|gif|webp|heic)|text\/plain)$/;
+const ATTACHMENT_EXTENSIONS = /\.(pdf|png|jpe?g|gif|webp|heic|txt)$/i;
+const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+
+const DAY = 86_400_000;
+
+/** Adds business days (Monday to Friday). */
+export function addBusinessDays(from: Date, days: number): Date {
+  const at = new Date(from);
+  let added = 0;
+  while (added < days) {
+    at.setUTCDate(at.getUTCDate() + 1);
+    const weekday = at.getUTCDay();
+    if (weekday !== 0 && weekday !== 6) added++;
+  }
+  return at;
+}
+
+const EMAIL = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+export function createTrustService({ deps, services }: ModuleContext): TrustService {
+  const { db } = deps;
+  const C = schema.claims;
+  const A = schema.answers;
+  const T = schema.takedowns;
+
+  // The repeat limit and the claim dates, from the rules registry (Network desk Settings, added
+  // 2026-09-29) as they stand now. Their first versions are trust.policy's row (migration 0027), and
+  // a write to trust.policy still reaches it.
+  async function policy() {
+    const [limit, dates] = await Promise.all([services.settings.valueAt("rights.repeat_limit"), services.settings.valueAt("rights.claim_dates")]);
+    return { threshold: limit.upheldIn12Months, answerDays: dates.answerDays, replyDays: dates.counterNoticeBusinessDays };
+  }
+
+  async function views(rows: Array<typeof C.$inferSelect>): Promise<Claim[]> {
+    if (!rows.length) return [];
+    const ids = rows.map((r) => r.id);
+    const [answers, takedowns, titles, attachments] = await Promise.all([
+      db.select().from(A).where(inArray(A.claimId, ids)),
+      db.select().from(T).where(inArray(T.claimId, ids)),
+      services.library.titles({ itemIds: rows.map((r) => r.assetId), programIds: [] }),
+      db.select().from(schema.claimAttachments).where(inArray(schema.claimAttachments.claimId, ids))
+    ]);
+    // B6: an answer's attachment is re-linked each time (the store's links can expire).
+    const fresh = new Map(await Promise.all(attachments.map(async (a) => [a.contentId, await services.library.content.url(a.contentId)] as const)));
+    const linkOf = (claimId: string, url: string | null) => {
+      if (!url) return null;
+      const stored = attachments.find((a) => a.claimId === claimId && url.includes(a.contentId));
+      return stored ? (fresh.get(stored.contentId) ?? url) : url;
+    };
+    const replacements = await services.library.titles({
+      itemIds: takedowns.map((t) => t.replacedWithAssetId).filter((v): v is string => Boolean(v)),
+      programIds: []
+    });
+    const idents = await services.stations.idents([...rows.map((r) => r.stationId), ...takedowns.map((t) => t.stationId)]);
+    const now = deps.clock.now().getTime();
+    return rows.flatMap((r) => {
+      const station = idents.get(r.stationId);
+      if (!station) return [];
+      const answer = answers.find((a) => a.claimId === r.id);
+      return [
+        {
+          id: r.id,
+          kind: r.kind,
+          item: { id: r.assetId, title: titles.items.get(r.assetId) ?? "" },
+          station,
+          claimantName: r.claimantName,
+          claimantRole: r.claimantRole,
+          workKind: r.workKind,
+          claimText: r.claimText,
+          rangeStartMs: r.rangeStartMs,
+          rangeEndMs: r.rangeEndMs,
+          swornStatement: r.swornStatement,
+          state: r.status,
+          receivedAt: r.receivedAt.toISOString(),
+          answerDueAt: r.answerDueAt.toISOString(),
+          daysToAnswer: r.status === "open" && r.kind === "copyright" ? Math.max(0, Math.ceil((r.answerDueAt.getTime() - now) / DAY)) : null,
+          answer: answer
+            ? {
+                basis: answer.basis,
+                note: answer.note,
+                attachmentUrl: linkOf(r.id, answer.attachmentUrl),
+                answeredAt: answer.answeredAt.toISOString(),
+                claimantReplyDueAt: answer.claimantReplyDueAt.toISOString()
+              }
+            : null,
+          takedowns: takedowns
+            .filter((t) => t.claimId === r.id)
+            .flatMap((t) => {
+              const where = idents.get(t.stationId);
+              return where
+                ? [
+                    {
+                      station: where,
+                      pulledAt: t.pulledAt.toISOString(),
+                      airingsReplaced: t.airingsReplaced,
+                      replacedWith: t.replacedWithAssetId ? (replacements.items.get(t.replacedWithAssetId) ?? null) : null,
+                      restoredAt: t.restoredAt?.toISOString() ?? null
+                    }
+                  ]
+                : [];
+            })
+        }
+      ];
+    });
+  }
+
+  async function one(claimId: string) {
+    const [row] = await db.select().from(C).where(eq(C.id, claimId));
+    if (!row) throw notFound("That claim");
+    return row;
+  }
+
+  const service: TrustService = {
+    async standing(stationId) {
+      const { threshold } = await policy();
+      const yearAgo = new Date(deps.clock.now().getTime() - 365 * DAY);
+      const [counts] = await db
+        .select({
+          open: sql<number>`count(*) filter (where ${C.status} = 'open')::int`,
+          // The repeat limit is about copyright: privacy complaints never count toward it.
+          upheld: sql<number>`count(*) filter (where ${C.status} = 'upheld' and ${C.kind} = 'copyright' and ${C.closedAt} >= ${yearAgo})::int`
+        })
+        .from(C)
+        .where(eq(C.stationId, stationId));
+      return {
+        status: counts.upheld >= threshold ? "offers_paused" : "good",
+        openClaims: counts.open,
+        upheldLast12Months: counts.upheld,
+        threshold
+      };
+    },
+
+    async offAirItems(itemIds) {
+      if (!itemIds.length) return new Set();
+      const rows = await db
+        .select({ assetId: C.assetId })
+        .from(C)
+        .where(and(inArray(C.assetId, itemIds), eq(C.status, "open")));
+      return new Set(rows.map((r) => r.assetId));
+    },
+
+    async file(input) {
+      const item = (await services.library.itemsByIds([input.itemId])).get(input.itemId);
+      if (!item || item.archived) throw notFound("That item");
+      const { answerDays } = await policy();
+      const now = deps.clock.now();
+      const answerDueAt = new Date(now.getTime() + answerDays * DAY);
+      const [claim] = await db
+        .insert(C)
+        .values({
+          assetId: item.id,
+          stationId: item.stationId,
+          claimantName: input.claimantName,
+          claimantRole: input.claimantRole ?? null,
+          claimantContact: input.claimantContact,
+          workKind: input.workKind ?? null,
+          claimText: input.claimText,
+          rangeStartMs: input.rangeStartMs ?? null,
+          rangeEndMs: input.rangeEndMs ?? null,
+          swornStatement: true,
+          kind: input.kind ?? "copyright",
+          receivedAt: now,
+          answerDueAt
+        })
+        .returning();
+      // The file is locked: kept, so it can come back, but never aired or exported.
+      await services.library.content.lock(await services.library.contentOfItems([item.id]), claim.id);
+      // Off air at once: every future airing, on the maker and every carrier, and any
+      // other station's item made from the same file.
+      const pulled = await services.log.pullItem(item.id);
+      for (const other of await services.library.itemsSharingContent([item.id])) pulled.push(...(await services.log.pullItem(other)));
+      const stations = new Set([item.stationId, ...pulled.map((p) => p.stationId)]);
+      for (const stationId of stations) {
+        await db.insert(T).values({
+          claimId: claim.id,
+          stationId,
+          pulledAt: now,
+          airingsReplaced: pulled.find((p) => p.stationId === stationId)?.entries ?? 0
+        });
+      }
+      deps.bus.emit("claim.filed", {
+        claimId: claim.id,
+        stationId: item.stationId,
+        itemTitle: item.title,
+        carrierStationIds: [...stations].filter((s) => s !== item.stationId)
+      });
+      return { claimId: claim.id, answerDueAt: answerDueAt.toISOString() };
+    },
+
+    async claims(stationId) {
+      const rows = await db.select().from(C).where(eq(C.stationId, stationId)).orderBy(desc(C.receivedAt));
+      return views(rows);
+    },
+
+    async stationOfClaim(claimId) {
+      return (await one(claimId)).stationId;
+    },
+
+    async answer(claimId, userId, input) {
+      const claim = await one(claimId);
+      if (claim.status !== "open") throw refused("not_open", "That claim has been dealt with.");
+      if (claim.kind === "privacy") throw refused("privacy_claim", "A privacy complaint isn't answered with a rights basis. Opencast reviews it and will be in touch.");
+      const setup = await services.stations.setup(claim.stationId);
+      if (!setup.legalName || !setup.legalContact) {
+        throw refused("legal_details", "Add the station's legal name and contact in Settings first. They're sent with your answer.");
+      }
+      const { replyDays } = await policy();
+      const now = deps.clock.now();
+      await db.transaction(async (tx) => {
+        await tx.insert(A).values({
+          claimId,
+          basis: input.basis,
+          note: input.note ?? null,
+          attachmentUrl: input.attachmentUrl ?? null,
+          attestedBy: userId,
+          legalName: setup.legalName!,
+          legalContact: setup.legalContact!,
+          answeredAt: now,
+          claimantReplyDueAt: addBusinessDays(now, replyDays)
+        });
+        await tx.update(C).set({ status: "answered" }).where(eq(C.id, claimId));
+        // Back on air: the station can put it on the log again.
+        await tx.update(T).set({ restoredAt: now }).where(eq(T.claimId, claimId));
+      });
+      await services.library.content.unlock(await services.library.contentOfItems([claim.assetId]), claimId);
+      return (await views([await one(claimId)]))[0];
+    },
+
+    async remove(claimId) {
+      const claim = await one(claimId);
+      if (claim.status !== "open" && claim.status !== "answered") throw refused("not_open", "That claim has been dealt with.");
+      await services.library.archiveForClaim(claim.assetId);
+      await db.update(C).set({ status: "removed", closedAt: deps.clock.now() }).where(eq(C.id, claimId));
+      return (await views([await one(claimId)]))[0];
+    },
+
+    async resolve(claimId, outcome) {
+      const claim = await one(claimId);
+      if (claim.status !== "open" && claim.status !== "answered") throw new HttpError(409, "not_open", "That claim has been dealt with.");
+      const now = deps.clock.now();
+      if (outcome === "upheld") await services.library.archiveForClaim(claim.assetId);
+      await db.update(C).set({ status: outcome, closedAt: now }).where(eq(C.id, claimId));
+      if (outcome !== "upheld") {
+        await db.update(T).set({ restoredAt: now }).where(and(eq(T.claimId, claimId), sql`${T.restoredAt} is null`));
+        await services.library.content.unlock(await services.library.contentOfItems([claim.assetId]), claimId);
+      }
+      return (await views([await one(claimId)]))[0];
+    },
+
+    async attach(claimId, userId, file) {
+      if (!file) throw badRequest("Choose a file to attach.", { file: "Required" });
+      const claim = await one(claimId);
+      if (claim.status !== "open") throw new HttpError(409, "not_open", "That claim has been dealt with.");
+      if (!ATTACHMENT_TYPES.test(file.mimeType) && !ATTACHMENT_EXTENSIONS.test(file.originalName)) {
+        throw refused("wrong_file_type", "Attach a PDF, a picture or a text file.");
+      }
+      if (file.size > ATTACHMENT_MAX_BYTES) throw refused("too_big", "Attach a file of 20 MB or less.");
+      const content = services.library.content;
+      // Read once or twice: Infrequent Access.
+      const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(schema.claimAttachments)
+          .values({ claimId, contentId: stored.cid, fileName: file.originalName, contentType: file.mimeType || "application/octet-stream", bytes: stored.bytes, uploadedBy: userId, createdAt: deps.clock.now() })
+          .returning();
+        await content.addRef(tx, stored.cid, "claim_attachment", row.id);
+      });
+      return { attachmentUrl: await content.url(stored.cid), fileName: file.originalName };
+    },
+
+    async deskClaims(user, marketId) {
+      // Admins and rights reviewers: every market. A market lead: their own markets.
+      const everywhere = user.isAdmin || (await services.settings.mayDesk(user, "rights"));
+      let markets: Set<string> | null = null;
+      if (marketId) {
+        if (!everywhere) await services.settings.requireDesk(user, { market: marketId });
+        markets = new Set([marketId]);
+      } else if (!everywhere) {
+        const grants = await services.settings.rolesOf(user);
+        markets = new Set(grants.flatMap((g) => (g.role === "market_lead" && g.market ? [g.market.id] : [])));
+      }
+
+      const all = await db.select().from(C).orderBy(desc(C.receivedAt));
+      const profiles = await services.stations.profiles(all.map((r) => r.stationId));
+      const rows = markets ? all.filter((r) => markets.has(profiles.get(r.stationId)?.marketId ?? "")) : all;
+      const claims = await views(rows);
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      const now = deps.clock.now();
+      const { threshold, answerDays, replyDays } = await policy();
+
+      // Carriers under an agreement with nothing on their log still can't air it: they count too.
+      const openRows = rows.filter((r) => claimPhase(r.status) === "open");
+      const items = await services.library.itemsByIds(openRows.map((r) => r.assetId));
+      const programOf = new Map([...items].flatMap(([id, i]) => (i.programId ? [[id, i.programId] as const] : [])));
+      const carriersOf = await services.catalog.carriersOf([...new Set(programOf.values())]);
+      const extraIds = new Set<string>();
+      for (const r of openRows) for (const s of carriersOf.get(programOf.get(r.assetId) ?? "") ?? []) extraIds.add(s);
+      const extraIdents = await services.stations.idents([...extraIds]);
+
+      // Where to write to each maker: its legal contact when that's an email, else an owner's.
+      const makers = [...new Set(rows.map((r) => r.stationId))];
+      const emails = new Map<string, string | null>();
+      await Promise.all(
+        makers.map(async (stationId) => {
+          const legal = (await services.stations.setup(stationId).catch(() => null))?.legalContact?.trim() ?? "";
+          if (EMAIL.test(legal)) return void emails.set(stationId, legal);
+          const owners = await services.accounts.stationMemberIds(stationId, ["owner"]);
+          const people = await services.accounts.peopleByIds(owners);
+          emails.set(stationId, owners.map((o) => people.get(o)?.email ?? null).find((e): e is string => !!e) ?? null);
+        })
+      );
+
+      const marketRows = await services.network.marketsByIds([...new Set([...profiles.values()].map((p) => p.marketId).filter((m): m is string => !!m))]);
+      const attachments = rows.length ? await db.select().from(schema.claimAttachments).where(inArray(schema.claimAttachments.claimId, rows.map((r) => r.id))) : [];
+      const links = new Map(await Promise.all([...new Set(attachments.map((a) => a.contentId))].map(async (cid) => [cid, await services.library.content.url(cid)] as const)));
+
+      const deskClaims: DeskClaim[] = claims.map((c) => {
+        const row = byId.get(c.id)!;
+        const phase = claimPhase(row.status);
+        const facts: ClaimFacts = { kind: row.kind, state: row.status, receivedAt: c.receivedAt, answerDueAt: c.answerDueAt, closedAt: row.closedAt?.toISOString() ?? null, answer: c.answer, takedowns: c.takedowns };
+        const lastRestore = c.takedowns.map((t) => t.restoredAt).filter((v): v is string => !!v).sort().at(-1) ?? null;
+        const carriers: DeskClaimCarrier[] = c.takedowns
+          .filter((t) => t.station.id !== row.stationId)
+          .map((t) => ({ station: t.station, airingsPulled: t.airingsReplaced, pulledAt: t.pulledAt, restoredAt: t.restoredAt }));
+        if (phase === "open") {
+          for (const s of carriersOf.get(programOf.get(row.assetId) ?? "") ?? []) {
+            const ident = extraIdents.get(s);
+            if (s === row.stationId || !ident || carriers.some((k) => k.station.id === s)) continue;
+            carriers.push({ station: ident, airingsPulled: 0, pulledAt: null, restoredAt: row.status === "answered" ? lastRestore : null });
+          }
+        }
+        const marketOf = profiles.get(row.stationId)?.marketId;
+        const market: Market | null = marketOf ? (marketRows.get(marketOf) ?? null) : null;
+        return {
+          ...c,
+          phase,
+          claimantContact: row.claimantContact,
+          market,
+          next: claimNext(facts),
+          carriers,
+          timeline: claimTimeline(facts),
+          stationEmail: emails.get(row.stationId) ?? null,
+          attachments: attachments.filter((a) => a.claimId === c.id).map((a) => ({ fileName: a.fileName, url: links.get(a.contentId) ?? "" }))
+        };
+      });
+
+      // Each maker against the repeat limit (copyright claims upheld in the last 12 months).
+      const yearAgo = now.getTime() - 365 * DAY;
+      const stationRows = new Map<string, { station: StationIdent; open: number; closed: number; upheld: number }>();
+      for (const c of deskClaims) {
+        const row = byId.get(c.id)!;
+        const s = stationRows.get(row.stationId) ?? { station: c.station, open: 0, closed: 0, upheld: 0 };
+        if (c.phase === "open") s.open++;
+        else s.closed++;
+        if (row.status === "upheld" && row.kind === "copyright" && row.closedAt && row.closedAt.getTime() >= yearAgo) s.upheld++;
+        stationRows.set(row.stationId, s);
+      }
+      const stations = [...stationRows.values()]
+        .map((s) => ({ station: s.station, open: s.open, closed: s.closed, upheldLast12Months: s.upheld, standing: repeatStanding(s.upheld, threshold) }))
+        .sort((a, b) => b.upheldLast12Months - a.upheldLast12Months || b.open - a.open || (a.station.callSign ?? a.station.name).localeCompare(b.station.callSign ?? b.station.name));
+
+      const open = deskClaims.filter((c) => c.phase === "open");
+      const due = open.filter((c) => c.state === "open" && c.kind === "copyright" && c.daysToAnswer !== null && c.daysToAnswer <= CLAIM_ANSWER_SOON_DAYS);
+      const carrying = new Set(open.flatMap((c) => c.carriers.map((k) => k.station.id)));
+      return {
+        claims: deskClaims,
+        stations,
+        stats: {
+          open: open.length,
+          offAir: open.filter((c) => c.state === "open").length,
+          answersDue: due.length,
+          soonestAnswerDays: due.length ? Math.min(...due.map((c) => c.daysToAnswer!)) : null,
+          carryingStations: carrying.size,
+          nearRepeatLimit: stations.filter((s) => s.standing !== "good").length
+        },
+        rules: { repeatLimit: threshold, answerDays, counterNoticeBusinessDays: replyDays },
+        canResolve: everywhere
+      };
+    },
+
+    async expireOverdue() {
+      const overdue = await db
+        .select()
+        .from(C)
+        // A privacy complaint has no answer window: Opencast reviews it.
+        .where(and(eq(C.status, "open"), eq(C.kind, "copyright"), lt(C.answerDueAt, deps.clock.now())));
+      for (const claim of overdue) {
+        await services.library.archiveForClaim(claim.assetId);
+        await db.update(C).set({ status: "expired", closedAt: deps.clock.now() }).where(eq(C.id, claim.id));
+      }
+      return overdue.length;
+    }
+  };
+  return service;
+}

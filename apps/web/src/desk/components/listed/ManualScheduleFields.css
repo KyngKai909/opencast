@@ -1,0 +1,18 @@
+/* A241: a schedule entered by hand: each weekly slot a ruled card (days, times, title), then where it
+   was checked and the dates it doesn't air. The reference's form spacing (14px), hairline rules. */
+.nd-manual { display: grid; gap: 14px; }
+.nd-manual__intro { margin: 0; }
+.nd-manual__slots { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.nd-manual__slot { display: grid; gap: 12px; padding: 12px 14px 14px; border: 1px solid var(--hair); border-radius: var(--r-control); }
+.nd-manual__head { display: flex; align-items: center; justify-content: space-between; min-height: 28px; margin-bottom: -6px; }
+.nd-manual__head .nd-form__label { margin: 0; }
+.nd-manual__err { margin-top: -6px; }
+.nd-manual__times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.nd-manual__group { margin: 0; padding: 0; border: 0; min-width: 0; }
+.nd-manual__skip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.nd-manual__skip > .oc-btn { margin-top: 25px; }
+.nd-manual__dates { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.nd-manual__dates li { display: inline-flex; align-items: center; gap: 2px; padding-left: 10px; border: 1px solid var(--hair); border-radius: var(--r-control); font: 500 12.5px var(--font-text); color: var(--ink); }
+@media (max-width: 480px) {
+  .nd-manual__times { grid-template-columns: minmax(0, 1fr); }
+}
