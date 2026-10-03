@@ -2,7 +2,7 @@
    to the very top, under the status bar; what's around it is light and on the picture's own dark
    glass whatever the ground. --vw-sw-bar is the floating bar's top from the screen's bottom. */
 .vw-sw {
-  --vw-sw-bar: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 58px);
+  --vw-sw-bar: calc(max(14px, calc(env(safe-area-inset-bottom, 0px) - 12px)) + 58px);
   --vw-sw-safe: env(safe-area-inset-top, 0px);
   position: relative; height: 100%; overflow: hidden;
   background: var(--screen); color: #fff;
