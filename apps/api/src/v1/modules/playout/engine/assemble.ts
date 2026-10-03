@@ -46,6 +46,8 @@ const LEAD_MS = 20_000;
 const MIN_JOIN_MS = 1_500;
 /** A slate row holds at most this long (longer holds are several rows). */
 const MAX_SLATE_S = 60;
+/** A live block's last this-much stands by in one go; a stand-by slate before it stops short of the block's end. */
+const STAND_BY_TAIL_MS = 1_500;
 /** Live sources are read this far ahead of their block, so they can connect early. */
 const LIVE_PREROLL_MS = 60_000;
 const PLAN_AHEAD_MS = 15 * 60_000;
@@ -683,7 +685,15 @@ export class ChannelAssembler {
     // Written only as it's needed, so the live source takes over as soon as it connects.
     if (c.at > now + 2_000) return false;
     const png = await this.options.slates.standBy(this.options.look);
-    const row = await this.writeSlate(seg, png, Math.min(blockEnd - c.at, MAX_SLATE_S * 1000), { label: "Stand by", reason: "slate" }, "stand_by");
+    // The slate stops short of the block's end (whole seconds, ending 0.5 to 1.5 s before it), so
+    // the channel stays in the block and a source that connects in its last minute still takes
+    // over; only the block's last second or so stands by in one go. Fixed 2026-10-02: a slate
+    // written to the end (a short block, or a long one's last minute) moved the channel on to what
+    // follows, which forgot the stand-by, and when the channel's timeline ran at or just after the
+    // block's start, the slate (rounded to whole seconds) always reached the end: the source never aired.
+    const room = blockEnd - c.at;
+    const ms = room > STAND_BY_TAIL_MS ? Math.floor((room - 500) / 1000) * 1000 : room;
+    const row = await this.writeSlate(seg, png, Math.min(ms, MAX_SLATE_S * 1000), { label: "Stand by", reason: "slate" }, "stand_by");
     if (!row) {
       this.passed.add(`${seg.key}@${seg.startsAt.getTime()}`);
       return true;
