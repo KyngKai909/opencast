@@ -84,6 +84,13 @@ export interface AccountsService {
   cancelReminders(ex: Executor, entryIds: string[]): Promise<Array<{ id: string; userId: string; logEntryId: string }>>;
   /** Entries moved (a new start): their reminders come again at the new start, even if one already went. */
   rearmReminders(ex: Executor, entryIds: string[]): Promise<void>;
+  /**
+   * 2026-10-03: an external station's listed airings going away when its schedule is read again:
+   * each one's reminders move to `to` (the same show, read in at another time), reminded again at
+   * its start, or are deleted when it's null (the show is gone from the source's schedule). Someone
+   * who already has one there keeps that one. Answers how many moved and how many were deleted.
+   */
+  moveListedReminders(ex: Executor, moves: Array<{ from: string; to: string | null }>): Promise<{ moved: number; deleted: number }>;
 
   /** Throws unless the user holds one of the roles (admins count as owner of stations Opencast runs). */
   requireStation(user: CurrentUser, stationId: string, roles: StationRole[]): Promise<StationRole>;
@@ -773,6 +780,31 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
       const R = schema.reminders;
       if (!entryIds.length) return;
       await ex.update(R).set({ notifiedAt: null }).where(and(inArray(R.logEntryId, [...new Set(entryIds)]), sql`${R.notifiedAt} is not null`));
+    },
+
+    async moveListedReminders(ex, moves) {
+      const R = schema.reminders;
+      if (!moves.length) return { moved: 0, deleted: 0 };
+      const rows = await ex.select().from(R).where(inArray(R.listedAiringId, [...new Set(moves.map((m) => m.from))]));
+      if (!rows.length) return { moved: 0, deleted: 0 };
+      const target = new Map(moves.map((m) => [m.from, m.to]));
+      const targets = [...new Set(moves.map((m) => m.to).filter((t): t is string => t !== null))];
+      const there = targets.length ? await ex.select({ userId: R.userId, listedAiringId: R.listedAiringId }).from(R).where(inArray(R.listedAiringId, targets)) : [];
+      const has = new Set(there.map((r) => `${r.userId}@${r.listedAiringId}`));
+      const gone: string[] = [];
+      let moved = 0;
+      for (const r of rows) {
+        const to = target.get(r.listedAiringId!) ?? null;
+        if (!to || has.has(`${r.userId}@${to}`)) {
+          gone.push(r.id);
+          continue;
+        }
+        has.add(`${r.userId}@${to}`);
+        await ex.update(R).set({ listedAiringId: to, notifiedAt: null }).where(eq(R.id, r.id));
+        moved++;
+      }
+      if (gone.length) await ex.delete(R).where(inArray(R.id, gone));
+      return { moved, deleted: gone.length };
     },
 
     async stationRole(user, stationId) {
