@@ -68,11 +68,17 @@ Read the reference file, then the current Program log page, the Breaks page unde
 ## Phase 4: Templates, blocks and the phone
 
 - **Templates:** the list with pattern, label, and dates ahead (generated, and edited in amber), with the precedence note when one is overridden. Opening a template shows its rundown, edited with the same rundown editor. "Reset to template" for an edited date.
-- **Blocks:** move the existing blocks pages under this tab, unchanged except for the shell.
+- **Blocks:** rebuild the blocks pages under this tab as the reference file draws them.
+  - **The list:** each block with its schedule and next airing.
+  - **The block page:** what it airs (intro, outro, block ID, bumpers by role), with "Uses BEAT's" wherever it falls back. Its own bumper order or the station's. The look (colour checked at 4.5:1, logo, what the bug shows) with a live preview of the banner, bug and guide band. Where it airs (templates and one-off dates).
+  - **On the Log tab in edit mode:** a block's start and end are handles (`block_add`, `block_resize`, `block_remove`), and the tray names the programs joining or leaving it.
+  - **Syndication fields** (`owner`, `carried`, `reskin`) are shown read-only.
 - **Phone:**
   - The rundown with health chips, breaks as thin rows, and a break as a bottom sheet.
   - Fill a gap, sign off and move a program work on the phone; templates, blocks and rules stay desktop-only.
   - The dead-air notification opens straight to the gap.
 - Tests: update the existing log, edit, repeat and off-air tests for the new layout. Add Playwright flows for opening a break, publishing an edit, filling dead air from the drawer, and previewing then saving a break rule.
+
+Add a Playwright flow for resizing a block on the log.
 
 **STOP.** Report test results, anything that differs from the reference file, and the new copy list.

@@ -767,6 +767,55 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 
 .btn-xs svg { width:13px; height:13px; }
 
+/* ---------- blocks tab ---------- */
+.blks { display:grid; grid-template-columns:300px minmax(0,1fr); gap:24px; }
+.bcard { display:grid; grid-template-columns:8px minmax(0,1fr); gap:12px; padding:12px 14px; border-radius:12px; box-shadow:inset 0 0 0 1px var(--line); margin-bottom:10px; }
+.bcard.on { box-shadow:inset 0 0 0 1.5px var(--signal); background:var(--raised); }
+.bcard .sw { border-radius:4px; }
+.bcard b { display:block; font:700 15px var(--font-display); } .bcard small { display:block; font-size:12px; color:var(--ink-70); margin-top:2px; line-height:1.35; }
+.bcard small.nx { color:var(--ink); margin-top:6px; font-weight:600; }
+.bdet-h { display:flex; align-items:center; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+.bdet-h .logo { width:44px; height:44px; border-radius:10px; display:grid; place-items:center; font:800 13px var(--font-display); color:#fff; letter-spacing:-.02em; }
+.bdet-h h3 { margin:0; font:800 22px var(--font-display); font-stretch:112%; }
+.bdet-h small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:2px; }
+.bdet-h .end { margin-left:auto; display:flex; gap:8px; }
+.bgrid { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:22px; margin-top:14px; }
+.bsec { margin-bottom:14px; }
+.bsec h4 { margin:0 0 8px; font:700 14.5px var(--font-display); display:flex; align-items:baseline; gap:8px; }
+.bsec h4 small { font:500 12px var(--font-text); color:var(--ink-50); }
+.bprev { position:relative; aspect-ratio:16/9; border-radius:10px; overflow:hidden; background:radial-gradient(120% 90% at 30% 30%, #9a4fb8, #6A3A86 55%, #2a1638); color:#fff; }
+.bprev .ttl { position:absolute; left:6%; top:30%; font:800 26px/1 var(--font-display); font-stretch:112%; }
+.bprev .bn { position:absolute; left:4%; right:4%; bottom:6%; background:rgb(10 17 36 / .86); border-radius:8px; padding:8px 10px; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; }
+.bprev .bn .chn { font:500 15px var(--font-mono); padding-right:8px; border-right:1px solid rgb(255 255 255 / .25); }
+.bprev .bn b { display:block; font-size:12.5px; } .bprev .bn small { font-size:10px; color:#B1B8C9; letter-spacing:.04em; font-weight:700; }
+.bprev .bn .tally { font-size:8px; }
+.bprev .bugl { position:absolute; right:4%; top:6%; width:46px; height:22px; border-radius:5px; background:rgb(255 255 255 / .9); color:#6A3A86; font:800 9px var(--font-display); display:grid; place-items:center; letter-spacing:-.01em; }
+.gband { margin-top:10px; display:grid; grid-template-columns:52px minmax(0,1fr); border-top:1px solid var(--line); }
+.gband .id2 { padding:6px 0; font:800 12px var(--font-display); font-stretch:125%; }
+.gband .tr2 { position:relative; height:44px; }
+.gband .lab { position:absolute; left:0; right:0; top:4px; height:14px; border-radius:3px; background:#6A3A86; color:#fff; font:700 9.5px var(--font-text); letter-spacing:.04em; padding:1px 6px; }
+.gband .c { position:absolute; top:20px; height:22px; border-right:1px solid var(--hair); font-size:10.5px; padding:3px 6px; overflow:hidden; white-space:nowrap; }
+.ctrl { display:grid; grid-template-columns:110px minmax(0,1fr); gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13px; }
+.ctrl > span:first-child { color:var(--ink-70); }
+.swatches { display:flex; gap:6px; } .swatches i { width:22px; height:22px; border-radius:6px; } .swatches i.on { box-shadow:0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.irow { display:grid; grid-template-columns:44px minmax(0,1fr) auto auto; gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13px; }
+.irow b { font-weight:600; display:block; } .irow small { display:block; font-size:11.5px; color:var(--ink-70); }
+.irow .n { font:500 12.5px var(--font-mono); color:var(--ink-70); }
+.irow .fb { font-size:11.5px; color:var(--ink-50); }
+.tg2 { width:34px; height:20px; border-radius:10px; background:var(--ink); position:relative; flex:none; } .tg2::after { content:""; position:absolute; top:3px; right:3px; width:14px; height:14px; border-radius:50%; background:var(--ground); }
+.tg2.off { background:var(--line); } .tg2.off::after { right:auto; left:3px; }
+.order { display:grid; grid-template-columns:90px minmax(0,1fr); gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); font-size:12.5px; }
+.order .roles { display:flex; gap:5px; flex-wrap:wrap; } .order .roles span { height:24px; display:inline-flex; align-items:center; padding:0 8px; border-radius:6px; background:#525C73; color:#fff; font-weight:600; font-size:11px; }
+.order .roles span.u { background:#6B5A2E; }
+.where > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13px; }
+.where b { font-weight:600; display:block; } .where small { font-size:11.5px; color:var(--ink-70); }
+.fallback { margin-top:12px; padding:10px 12px; border-radius:10px; box-shadow:inset 0 0 0 1px var(--line); font-size:12px; color:var(--ink-70); line-height:1.45; }
+/* block on the log, editing */
+.spanrow { position:relative; margin:8px 0 0 0; }
+.spanhandle { display:flex; align-items:center; gap:10px; padding:6px 10px; border-radius:8px; background:color-mix(in srgb, #6A3A86 22%, transparent); box-shadow:inset 0 0 0 1.5px #6A3A86; font-size:12.5px; font-weight:700; }
+.spanhandle .grip { width:30px; height:6px; border-radius:3px; background:#6A3A86; }
+.spanhandle small { font-weight:500; color:var(--ink-70); }
+
 .spec { border-top:2px solid var(--ink); max-width:1080px; }
 .spec div { display:grid; grid-template-columns:200px minmax(0,1fr); gap:16px; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; line-height:1.5; }
 .spec div span:first-child { font-weight:600; }
@@ -821,8 +870,9 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     <li><a href="#edit"><span class="mono">04</span>Editing, and filling dead air</a></li>
     <li><a href="#rules"><span class="mono">05</span>Break rules, with a preview</a></li>
     <li><a href="#templates"><span class="mono">06</span>Templates</a></li>
-    <li><a href="#phone"><span class="mono">07</span>On the phone</a></li>
-    <li><a href="#spec"><span class="mono">08</span>For the build pass</a></li>
+    <li><a href="#blocks"><span class="mono">07</span>Blocks</a></li>
+    <li><a href="#phone"><span class="mono">08</span>On the phone</a></li>
+    <li><a href="#spec"><span class="mono">09</span>For the build pass</a></li>
   </ul>
   <div class="principles">
     <div><h3>Read it like a rundown</h3><p class="muted">The day is a list in air order with real lengths, not a timeline of tiny boxes. Breaks sit inline between programs, collapsed to one line until you open one.</p></div>
@@ -910,8 +960,23 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   </div>
 </div></section>
 
+<section class="ref" id="blocks"><div class="wrap">
+  <div class="ch-label"><span class="n">07</span><span>Blocks</span></div>
+  <h2>A block's look, what it airs, and where it runs.</h2>
+  <p class="lede">The Blocks tab lists the station's programming blocks with when each runs next. Opening one shows everything that makes it a block: what it airs (intro, outro, its ID and bumpers by role, each falling back to the station's), its own bumper order, how it looks on air and in the guide, and where it's on the log. On the Log tab in edit mode, a block's start and end become handles on the rundown.</p>
+  <div class="stage"><div><div id="f-blocks"></div><div id="f-blockplace" style="margin-top:28px"></div></div>
+    <div class="notes">
+      <div class="note"><h3>Falls back, never empty</h3><p>Anything a block doesn't have uses the station's, then an automatic card in the block's look. "Uses BEAT's" says so on the row, so a new block works before it has a single bumper.</p></div>
+      <div class="note"><h3>See it on air</h3><p>The preview shows the block's bug and the banner reading "Late Crate Nights · Beat Tape Live", and the guide band viewers see. Colour, logo and bug choices update it as you go.</p></div>
+      <div class="note"><h3>Members, in plain words</h3><p>A program that starts inside a block is its member to the end, even if it runs past. Moving the block's edges says which programs join or leave, and what airs instead (BEAT's bug and ID).</p></div>
+      <div class="note"><h3>Ends by 6:00 am</h3><p>A block on a template ends by the start of the next broadcast day. Blocks never overlap, and one on air can only change its end.</p></div>
+      <div class="note open"><h3>Blocks in the market</h3><p>Offering a block to other stations (with the maker's look, or the carrier's where allowed) comes with the syndication market. The fields exist; the screens don't yet.</p></div>
+    </div>
+  </div>
+</div></section>
+
 <section class="ref" id="phone"><div class="wrap">
-  <div class="ch-label"><span class="n">07</span><span>On the phone</span></div>
+  <div class="ch-label"><span class="n">08</span><span>On the phone</span></div>
   <h2>Check tonight, fix a gap, see a break.</h2>
   <p class="lede">On the phone the rundown is the whole screen: the health chips on top, rows below, and breaks as thin lines. Tapping a break opens its contents as a sheet. Small fixes (fill a gap, sign off, move a program) work here; building templates and rules is desk work.</p>
   <div class="stage"><div class="phframes" id="f-phone"></div>
@@ -922,7 +987,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 </div></section>
 
 <section class="ref" id="spec"><div class="wrap">
-  <div class="ch-label"><span class="n">08</span><span>For the build pass</span></div>
+  <div class="ch-label"><span class="n">09</span><span>For the build pass</span></div>
   <div class="spec">
     <div><span>Where it lives</span><span>One "Schedule" item in master control's On air group, replacing "Program log" and "Breaks". Tabs: Log (Day and Week views), Templates, Blocks, Break rules. Rotations and the spot market stay under Money; the break rule moves out of station settings into Break rules</span></div>
     <div><span>Data</span><span>No new backend needed for the views: <code>getLog</code> (entries, breaks with rows, gaps, offAir, days, blocks, version), <code>getDeadAir</code>, <code>getBreakRule</code> / <code>setBreakRule</code> (cadence, bumperSequences, openers), day templates, programming blocks, and <code>applyLogChanges</code> for edits (dry run, then publish with <code>base</code>)</span></div>
@@ -933,6 +998,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     <div><span>Add drawer</span><span>Library, Carried, Live, Sign off; fit badges against the space; next unaired episode first for series; quick fill (repeat from library, or sign off until the next program)</span></div>
     <div><span>Break rules</span><span>Scaled break strip; per-part cadence (every break, after each program, every N programs, once an hour, never; station ID can't be never); bumper sequences for open, close and between; timing (when, length, spot cap per hour, same spot per hour); opener options; live preview of the next hour; applies to breaks not yet filled</span></div>
     <div><span>Templates</span><span>List with pattern, label, dates ahead (generated, edited), precedence note; template rundown editor; reset an edited date</span></div>
+    <div><span>Blocks</span><span>List with schedule and next airing; block detail with what it airs (intro, outro, ID, bumpers by role, each showing "Uses BEAT's" when falling back), its own bumper order or the station's, the look (colour checked at 4.5:1, logo, what the bug shows) with a live preview of the banner, bug and guide band, and where it airs (templates and one-off dates). On the Log tab in edit mode, its start and end are handles; the tray names programs joining or leaving. Syndication fields shown read-only</span></div>
     <div><span>Phone</span><span>Rundown, health chips, break sheet, fill gap, sign off, move; templates, blocks and rules on desktop</span></div>
   </div>
 </div></section>
@@ -1056,6 +1122,50 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     '<div><div class="daynav" style="border-top:0"><b>Saturdays</b><span class="tpl"><i></i>Oct 3 edited by Kai, 2 changes</span><span class="end"><span class="btn-xs">Reset Oct 3 to template</span><span class="btn-xs pri">Edit template</span></span></div>'+
     '<div class="rdn">'+R.filter(function(r){ return !r.b && !r.gap && !r.band; }).slice(0,9).map(function(r){ if(r.off) return '<div class="rr off"><span class="bedge"></span><span class="t">'+r.t+'</span><span class="code2 off">OFF</span><div><b>Off air</b><small>Until 6:00 am</small></div><span class="len">4:00:00</span></div>'; return '<div class="rr"><span class="bedge" style="background:'+(r.blk?BLK:'transparent')+'"></span><span class="t">'+r.t+'</span><span class="code2 '+(r.c==='LIVE'?'live':'pgm')+'">'+r.c+'</span><div><b>'+r.ti+'</b><small>'+r.s.replace('. Preparing for air, 62%','')+'</small></div><span class="len">'+r.l+'</span></div>'; }).join('')+'</div></div></div>';
   frame('f-tpl',800, head('Templates')+'<div style="border-top:1px solid var(--line);padding-top:14px"></div>'+tpl);
+  // ---------- blocks tab ----------
+  var bl='<div class="blks"><div>'+
+    '<div class="bcard on"><span class="sw" style="background:'+BLK+'"></span><div><b>Late Crate Nights</b><small>Fridays and Saturdays, 9:00 pm to 1:00 am. Its own look, bumpers and ID</small><small class="nx">Next: tonight at 9:00 pm</small></div></div>'+
+    '<div class="bcard"><span class="sw" style="background:#2E6B5A"></span><div><b>Morning Crates</b><small>Weekdays, 6:00 to 9:00 am. Station\'s bumpers</small><small class="nx">Next: Monday at 6:00 am</small></div></div>'+
+    '<div class="bcard"><span class="sw" style="background:#9A5412"></span><div><b>Sunday Slow</b><small>Not on the log yet</small><small class="nx" style="color:var(--signal)">Place on the log</small></div></div>'+
+    '<span class="btn-xs pri" style="margin-top:6px">'+icon('i-plus')+'New block</span></div>'+
+    '<div><div class="bdet-h"><span class="logo" style="background:'+BLK+'">LCN</span><div><h3>Late Crate Nights</h3><small>"Records after dark, live and from the crates." Made by BEAT 12.1</small></div><div class="end"><span class="btn-xs">Place on the log</span><span class="btn-xs pri">Save</span></div></div>'+
+    '<div class="bgrid"><div>'+
+      '<div class="bsec"><h4>What it airs <small>Anything it doesn\'t have falls back to BEAT\'s</small></h4>'+
+        '<div class="irow"><span class="code2">OPN</span><div><b>Intro</b><small>Just before its first program. 2 in rotation</small></div><span class="n">0:05</span><span class="tg2"></span></div>'+
+        '<div class="irow"><span class="code2">CLS</span><div><b>Outro</b><small>Just after its last program. 1</small></div><span class="n">0:05</span><span class="tg2"></span></div>'+
+        '<div class="irow"><span class="code2">SID</span><div><b>Block ID</b><small>Airs where the station ID would. 3 in rotation</small></div><span class="n">0:05</span><span class="fb"></span></div>'+
+        '<div class="irow"><span class="code2">BMP</span><div><b>Bumpers into the break</b><small>4 of its own</small></div><span class="n">0:05</span><span class="fb"></span></div>'+
+        '<div class="irow"><span class="code2">BMP</span><div><b>Bumpers out of the break</b><small>3 of its own</small></div><span class="n">0:05</span><span class="fb"></span></div>'+
+        '<div class="irow"><span class="code2">BMP</span><div><b>Up next</b><small>None of its own</small></div><span class="n"></span><span class="fb">Uses BEAT\'s</span></div>'+
+        '<span class="btn-xs" style="margin-top:10px">'+icon('i-plus')+'Add from the library</span></div>'+
+      '<div class="bsec"><h4>Bumper order <small>Its own, instead of BEAT\'s</small></h4>'+
+        '<div class="order"><span>Opening a break</span><span class="roles"><span>Into the break</span></span></div>'+
+        '<div class="order"><span>Closing a break</span><span class="roles"><span>Out of the break</span></span></div>'+
+        '<div class="order"><span>Between programs</span><span class="roles"><span class="u">Up next</span><span>Any</span></span></div></div>'+
+    '</div><div>'+
+      '<div class="bsec"><h4>How it looks</h4><div class="bprev"><span class="ttl">Beat Tape Live</span><span class="bugl">LCN</span><div class="bn"><span class="chn">12.1</span><div><small>LATE CRATE NIGHTS</small><b>Beat Tape Live</b></div><span class="tally lit">ON AIR</span></div></div>'+
+        '<div class="gband"><span class="id2">BEAT</span><div class="tr2"><span class="lab">LATE CRATE NIGHTS</span><span class="c" style="left:0;width:48%">Beat Tape Live</span><span class="c" style="left:48%;width:26%">Late Crate</span><span class="c" style="left:74%;width:26%">Slow Hours</span></div></div></div>'+
+      '<div class="ctrl"><span>Colour</span><span class="swatches"><i class="on" style="background:'+BLK+'"></i><i style="background:#8C3B7A"></i><i style="background:#2E6B5A"></i><i style="background:#33507A"></i></span></div>'+
+      '<div class="ctrl"><span>Logo</span><span><span class="btn-xs">Replace</span></span></div>'+
+      '<div class="ctrl"><span>The bug shows</span><span class="segs"><span>BEAT\'s</span><span class="on">Block logo</span><span>Nothing</span></span></div>'+
+      '<div class="bsec" style="margin-top:14px"><h4>Where it airs</h4><div class="where">'+
+        '<div><div><b>Fridays and Saturdays templates</b><small>9:00 pm to 1:00 am. 6 dates ahead</small></div><span class="btn-xs">Open</span></div>'+
+        '<div><div><b>Halloween, Sat Oct 31</b><small>Once, 8:00 pm to 2:00 am</small></div><span class="btn-xs">Open</span></div></div></div>'+
+      '<div class="fallback">Made by BEAT. Offering blocks to other stations, with your look or theirs, comes later with the syndication market.</div>'+
+    '</div></div></div></div>';
+  frame('f-blocks',800, head('Blocks')+'<div style="border-top:1px solid var(--line);padding-top:14px"></div>'+bl);
+  // placing / resizing a block on the log
+  var place='<div class="rdn" style="max-width:820px;margin-top:10px">'+
+    '<div class="rr past"><span class="drag"></span><span class="t">8:30 pm</span><span class="code2 pgm">PGM</span><div><b>Saturday Reel</b><small>Carried from REEL 24.1</small></div><span class="len">29:20</span></div>'+
+    '<div class="spanrow"><div class="spanhandle"><span class="grip"></span>Late Crate Nights starts 9:00 pm <small>Drag to change. Programs that start inside it become its members</small></div></div>'+
+    '<div class="rr"><span class="bedge" style="background:'+BLK+'"></span><span class="t">9:00 pm</span><span class="code2 live">LIVE</span><div><b>Beat Tape Live</b><small>Member. Its intro airs just before</small></div><span class="len">1:00:00</span></div>'+
+    '<div class="rr"><span class="bedge" style="background:'+BLK+'"></span><span class="t">10:00 pm</span><span class="code2 pgm">PGM</span><div><b>Late Crate, ep. 15</b><small>Member</small></div><span class="len">29:10</span></div>'+
+    '<div class="rr"><span class="bedge" style="background:'+BLK+'"></span><span class="t">10:30 pm</span><span class="code2 pgm">PGM</span><div><b>Slow Hours</b><small>Member</small></div><span class="len">1:10:00</span></div>'+
+    '<div class="rr"><span class="bedge" style="background:'+BLK+'"></span><span class="t">12:00 am</span><span class="code2 pgm">PGM</span><div><b>Late Crate, ep. 13</b><small>Member, runs to 12:29 am</small></div><span class="len">29:10</span></div>'+
+    '<div class="spanrow"><div class="spanhandle" style="background:color-mix(in srgb, var(--signal) 14%, transparent);box-shadow:inset 0 0 0 1.5px var(--signal)"><span class="grip" style="background:var(--signal)"></span>Ends 12:30 am, was 1:00 am <small>Its outro airs at 12:29:10 am</small></div></div>'+
+    '<div class="rr"><span class="bedge"></span><span class="t">12:30 am</span><span class="code2 pgm">PGM</span><div><b>Crate Session 01</b><small>Not a member: starts after the block ends</small></div><span class="len">58:40</span></div></div>';
+  var tray2='<div class="tray"><div><b>1 change, checked: nothing blocks publishing</b><ul><li>Late Crate Nights now ends at 12:30 am, was 1:00 am</li><li>Crate Session 01 is no longer part of it: BEAT\'s bug and ID air from 12:30 am</li></ul></div><div class="btns"><span class="btn-xs">Discard</span><span class="btn-xs pri">Publish</span></div></div>';
+  frame('f-blockplace',800, head('Log','<span class="btn-xs">Done editing</span>')+daynav('<span class="hchip" style="color:var(--signal);box-shadow:inset 0 0 0 1px var(--signal)">Editing</span>')+place+tray2, 'In edit mode, a block\'s start and end are handles on the rundown. Programs that start inside it become members, and the tray says what changes.');
   // phone
   var ph=document.getElementById('f-phone');
   function phone(cap,inner){ var f=document.createElement('figure'); f.innerHTML='<div class="mw"><div class="phw"><div class="phs"><div class="sb"><span>8:42</span><span>●●●</span></div>'+inner+'</div></div></div><figcaption><b>'+cap[0]+'</b>'+cap[1]+'</figcaption>'; ph.appendChild(f); }
