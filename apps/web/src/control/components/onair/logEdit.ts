@@ -70,6 +70,8 @@ export function withChange(changes: LogChange[], change: LogChange): LogChange[]
         return { ...c, entry: { ...e, startsAt: change.startsAt, ...(length ? { endsAt: new Date(Date.parse(change.startsAt) + length).toISOString() } : {}) } };
       }
       if (change.op === "resize") return { ...c, entry: { ...e, endsAt: change.endsAt } };
+      // G18: an insert kept at its time says so itself.
+      if (change.op === "keep") return { ...c, entry: { ...e, keepTime: change.keep || undefined } };
       return { ...c, entry: { ...e, itemId: change.itemId, carriageAgreementId: change.carriageAgreementId, endsAt: undefined } };
     });
   }
@@ -94,10 +96,10 @@ export function draftEntries(entries: LogEntry[], changes: LogChange[], items: (
         key,
         change: "inserted",
         kind: c.entry.kind,
-        code: item?.code ?? "PGM",
+        code: item?.code ?? (c.entry.kind === "off_air" ? "OPEN" : "PGM"),
         startsAt,
         endsAt,
-        title: item?.title ?? "Program",
+        title: item?.title ?? (c.entry.kind === "live" ? "Live" : c.entry.kind === "off_air" ? "Off air" : "Program"),
         episodeTitle: null,
         itemId: c.entry.itemId ?? null,
         programId: item?.programId ?? c.entry.programId ?? null,
@@ -105,7 +107,8 @@ export function draftEntries(entries: LogEntry[], changes: LogChange[], items: (
         carriedFrom: item?.carriedFrom ?? null,
         carriageAgreementId: c.entry.carriageAgreementId ?? null,
         repeatGroupId: null,
-        localNote: null
+        localNote: null,
+        ...(c.entry.keepTime ? { keepTime: true } : {})
       });
       continue;
     }
@@ -117,6 +120,8 @@ export function draftEntries(entries: LogEntry[], changes: LogChange[], items: (
       const length = Date.parse(e.endsAt) - Date.parse(e.startsAt);
       out.set(e.id, { ...e, startsAt, endsAt: new Date(Date.parse(startsAt) + length).toISOString(), change: e.change ?? "moved" });
     } else if (c.op === "resize") out.set(e.id, { ...e, endsAt: snapTime(c.endsAt), change: e.change ?? "resized" });
+    // G18: the mark doesn't move anything; the row only says it.
+    else if (c.op === "keep") out.set(e.id, { ...e, keepTime: c.keep });
     else {
       const item = items(c.itemId);
       out.set(e.id, {
@@ -201,14 +206,15 @@ export function timeValue(iso: string, tz = STATION_TZ): string {
 
 /**
  * Putting something on at `at` for `lengthMs`: what comes after moves down just enough, in order,
- * until a gap takes the rest. A locked entry doesn't move (the dry run then says it overlaps).
+ * until a gap takes the rest. A locked entry, or one kept at its time (G18), doesn't move (the dry
+ * run then says it overlaps). The rundown's own moves are in reorder.ts.
  */
 export function rippleFrom(entries: DraftEntry[], at: string, lengthMs: number, locked: (e: DraftEntry) => boolean): LogChange[] {
   const moves: LogChange[] = [];
   let end = Date.parse(at) + lengthMs;
   for (const e of entries.filter((x) => x.startsAt >= at).sort((a, b) => a.startsAt.localeCompare(b.startsAt))) {
     const start = Date.parse(e.startsAt);
-    if (start >= end || locked(e)) break;
+    if (start >= end || locked(e) || e.keepTime) break;
     moves.push({ op: "move", entryId: e.id, startsAt: new Date(end).toISOString() });
     end += Date.parse(e.endsAt) - start;
   }

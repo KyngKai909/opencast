@@ -65,6 +65,8 @@ interface Draft {
   next: DbLogEntry;
   removed: boolean;
   changed: boolean;
+  /** G18: its "Keep at this time" mark was set or cleared (nothing about what airs changes). */
+  marked: boolean;
   index: number;
 }
 
@@ -123,7 +125,8 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
         carriedFrom: null,
         carriageAgreementId: c.entry.carriageAgreementId ?? null,
         repeatGroupId: null,
-        localNote: c.entry.localNote ?? null
+        localNote: c.entry.localNote ?? null,
+        ...(c.entry.keepTime ? { keepTime: true } : {})
       };
       if (c.entry.carriageAgreementId) {
         const same = log.find((e) => e.carriageAgreementId === c.entry.carriageAgreementId);
@@ -151,9 +154,10 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
       problems.push({ index, code: "not_found", message: "That entry isn't on the log any more." });
       continue;
     }
-    const d = drafts.get(orig.id) ?? { orig, next: { ...orig }, removed: false, changed: false, index };
+    const d = drafts.get(orig.id) ?? { orig, next: { ...orig }, removed: false, changed: false, marked: false, index };
     drafts.set(orig.id, d);
-    d.index = index;
+    // A mark isn't where its entry's problems point (as the API's).
+    if (c.op !== "keep") d.index = index;
     if (d.removed) {
       problems.push({ index, code: "removed", message: "It's already coming off the log." });
       continue;
@@ -161,6 +165,16 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
     const lock = lockOf(orig);
     if (lock) {
       problems.push({ index, code: "locked", message: lock });
+      continue;
+    }
+    if (c.op === "keep") {
+      // G18: "Keep at this time".
+      d.next = { ...d.next, keepTime: c.keep };
+      d.marked = true;
+      continue;
+    }
+    if (c.op === "move" && d.next.keepTime) {
+      problems.push({ index, code: "kept", message: `${orig.title} is kept at its time. Turn off Keep at this time to move it.` });
       continue;
     }
     if (c.op === "move") {
@@ -254,6 +268,7 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
     if (c.op === "move") return `${d.orig.title} moves to ${when(d.next.startsAt, d.orig.startsAt)}`;
     if (c.op === "resize") return `${d.orig.title} now ends at ${when(d.next.endsAt, d.orig.endsAt)}`;
     if (c.op === "replace") return `${d.next.title} replaces ${d.orig.title} at ${clockOf(d.next.startsAt)}`;
+    if (c.op === "keep") return c.keep ? `${d.orig.title} keeps its time` : `${d.orig.title} no longer keeps its time`;
     return `${d.orig.title} at ${clockOf(d.orig.startsAt)} comes off the log`;
   });
   const shown = lines.slice(0, 4);
@@ -295,6 +310,12 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
       const next = stationBreaks(stationId).find((b) => b.startsAt > d.orig.startsAt && !b.noSpots);
       if (next && held.length) next.fills.push(...held);
       continue;
+    }
+    if (d.marked) {
+      const row = db.log.find((e) => e.id === d.orig.id)!;
+      if (d.next.keepTime) row.keepTime = true;
+      else delete row.keepTime;
+      times.push(d.orig.startsAt);
     }
     if (!d.changed) continue;
     const shift = Date.parse(d.next.startsAt) - Date.parse(d.orig.startsAt);

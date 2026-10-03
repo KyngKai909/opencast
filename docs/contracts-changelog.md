@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-03: Keep at this time (G18, A246)
+
+Additive: optional fields and one new `LogChange` op (request side). No log code, enum value or field a response already carries changes shape. Migration **0050** (after 0049, written by hand: the journal's gap at 0038 makes drizzle-kit number wrong): `broadcast.log_entries.keep_time` and `broadcast.day_template_entries.keep_time` (boolean, not null, default false).
+
+- `log.ts`: `LogEntry` gains optional `keepTime` (the station marked it "Keep at this time": a fixed point when rows move around it in master control; left out, false). `DayTemplateEntry`, `DayTemplateEntryInput` (`updateTemplate.entries`) and `EntryInput` (`addEntry`, `updateEntry` (left out: as it is), and `LogChange`'s `insert`) gain optional `keepTime`. `LogChange` gains `{ op: "keep", entryId, keep }` (its line "Saturday Reel keeps its time" or "… no longer keeps its time"); `LogChangesResult.changes[].op` takes `keep` (only batches that send one get it back). A `move` of an entry kept at its time, as the batch has left it so far, is the problem `kept` ("Saturday Reel is kept at its time. Turn off Keep at this time to move it."), unless the batch clears the mark first.
+- Behaviour: getLog returns `keepTime` on every entry. Making a template from a day copies the mark into its entries, and generating a date copies it onto the entries made (a template's change of the mark reaches dates already made that weren't edited). Ending a live block early moves the programs after it up as before, stopping at one kept at its time too. A batch that only sets or clears marks changes nothing that airs: it doesn't replan an on-air station and is never the overlap. The window's version (`ProgramLog.version`) doesn't include the mark.
+- How older builds tolerate it: apps drop `keepTime` (zod strips it) and never send `keep`, so never get its `op` back; their moves of a kept entry are refused with `kept` in their words, as any other problem.
+
 ## 2026-10-02: Programming blocks (A244)
 
 Additive: one new module (`blocks.ts`, endpoints under `/stations/:stationId/blocks`), two new shapes in `common.ts`, optional fields, three new `LogChange` ops (request side) and one new optional query and upload field. No log code and no enum value is added anywhere a response already carries: block items keep `BMP`, `SID`, `OPN` and `CLS` (an intro or outro reads `SID` with `identCode`, as A242's), `BreakContent.kind` and `BreakRow.code` keep their values, and `BreakRow.element.role` stays `BumperRole`. Migration 0049.

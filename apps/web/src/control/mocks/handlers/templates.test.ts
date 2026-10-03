@@ -1,6 +1,8 @@
 // @vitest-environment node
 // Day templates and off air hours on the mocks (G8, G9): BEAT's templates, making, changing and
-// stopping one, the off air hours and their 400, and planned off air kept out of dead air.
+// stopping one, the off air hours and their 400, and planned off air kept out of dead air. G18:
+// "Keep at this time" as the API keeps it: the batch's `keep`, a kept entry's move refused, and a
+// template made from a day carrying the mark onto its dates.
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -168,5 +170,46 @@ describe("off air hours (G9)", () => {
 
     const checks = (await api(`/stations/${beat()}/sign-on/checks`)).body.checks;
     expect(checks.find((c: { key: string }) => c.key === "off_air_hours")).toMatchObject({ label: "Off air hours planned", passed: true, blocking: false, detail: expect.stringMatching(/^Off air from .+, back at .+\. Not dead air: no warnings, nothing fills it$/) });
+  });
+});
+
+describe("Keep at this time (G18)", () => {
+  const sat = () => {
+    const win = viewWindow("day", broadcastDay(now()));
+    return { win, path: `/stations/${beat()}/log?from=${encodeURIComponent(win.from)}&to=${encodeURIComponent(win.to)}` };
+  };
+  const lateCrate15 = () => getDb().log.find((e) => e.stationId === beat() && e.title === "Late Crate, ep. 15" && e.localNote !== "Overnight repeat")!;
+
+  it("marks an entry in a batch, checked first and then published, and the log says so", async () => {
+    const id = lateCrate15().id;
+    const check = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "keep", entryId: id, keep: true }] } });
+    expect(check.status).toBe(200);
+    expect(check.body.changes[0]).toMatchObject({ op: "keep", entryId: id, line: "Late Crate, ep. 15 keeps its time" });
+    expect(lateCrate15().keepTime).toBeUndefined();
+    expect((await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { changes: [{ op: "keep", entryId: id, keep: true }] } })).body.applied).toBe(true);
+    const log = (await api(sat().path)).body;
+    expect(log.entries.find((e: { id: string }) => e.id === id).keepTime).toBe(true);
+  });
+
+  it("refuses to move a kept entry, unless the batch clears the mark first", async () => {
+    const e = lateCrate15();
+    e.keepTime = true;
+    const earlier = new Date(Date.parse(e.startsAt) - 60_000).toISOString();
+    const refused = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "move", entryId: e.id, startsAt: earlier }] } });
+    expect(refused.body.problems).toEqual([{ index: 0, code: "kept", message: "Late Crate, ep. 15 is kept at its time. Turn off Keep at this time to move it." }]);
+    const cleared = await api(`/stations/${beat()}/log/changes`, { method: "POST", body: { dryRun: true, changes: [{ op: "keep", entryId: e.id, keep: false }, { op: "move", entryId: e.id, startsAt: earlier }] } });
+    expect(cleared.body.problems).toEqual([]);
+    expect(cleared.body.changes[0].line).toBe("Late Crate, ep. 15 no longer keeps its time");
+  });
+
+  it("puts an entry on kept, and a template made from the day keeps the mark on its dates", async () => {
+    lateCrate15().keepTime = true;
+    const made = await api(`/stations/${beat()}/log/templates`, { method: "POST", body: { fromDay: isoDate(broadcastDay(now())), pattern: "once", onto: isoDate(addDays(broadcastDay(now()), 14)) } });
+    expect(made.status).toBe(201);
+    expect(made.body.template.entries.find((e: { title: string; startTime: string }) => e.title === "Late Crate, ep. 15" && e.startTime === "22:00").keepTime).toBe(true);
+    const onto = addDays(broadcastDay(now()), 14);
+    const w = viewWindow("day", onto);
+    const log = (await api(`/stations/${beat()}/log?from=${encodeURIComponent(w.from)}&to=${encodeURIComponent(w.to)}`)).body;
+    expect(log.entries.filter((e: { keepTime?: boolean }) => e.keepTime).map((e: { title: string }) => e.title)).toEqual(["Late Crate, ep. 15"]);
   });
 });

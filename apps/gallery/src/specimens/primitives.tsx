@@ -17,6 +17,7 @@ import {
   Segmented,
   SelectField,
   Sheet,
+  Drawer,
   Tabs,
   Tag,
   Tally,
@@ -39,6 +40,7 @@ import { specimens } from "../registry";
 const STYLE = "brand/opencast-style.html";
 const MC = "control/opencast-master-control.html";
 const HOME = "viewer/opencast-home.html";
+const SCH = "control/opencast-schedule.html";
 
 /** Lights the tally on demand, to show the switch-on. */
 function TallyDemo({ size, on }: { size: "sm" | "md" | "lg"; on: "ground" | "picture" }) {
@@ -953,6 +955,24 @@ export const primitives = specimens([
         label: "Open it for real",
         note: "Opens over the whole window: Tab stays inside, Escape or the scrim closes, and focus comes back to the button.",
         render: () => <ModalLive />
+      }
+    ]
+  },
+  {
+    id: "drawer",
+    name: "Drawer",
+    group: "Primitives",
+    frame: { width: 1024, height: 560 },
+    from: [{ file: SCH, anchor: "edit", frames: ["04"] }],
+    notes: "A246: the modal's head and body along the right edge, over what it's for (the Schedule's Add drawer). role=\"dialog\", aria-modal; focus moves in and is trapped, Escape and the scrim close it, and focus returns to what opened it. The whole width on the phone.",
+    states: [
+      {
+        label: "Add at a time",
+        render: () => (
+          <Drawer open onClose={() => {}} placement="container" manageFocus={false} title="Add at 11:40 pm" subtitle="20 min free, until Late Crate, ep. 13 at 12:00 am">
+            <p style={{ margin: "16px 0 0" }}>What can go in the space.</p>
+          </Drawer>
+        )
       }
     ]
   },

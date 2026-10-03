@@ -1254,3 +1254,40 @@ For review. The reference (`docs/reference/control/opencast-schedule.html`) draw
 | Spot market, Your rotation | the button "See tonight's breaks" (to the Schedule); C.3's toast and the paused-spot notices keep their words from Breaks |
 | Spot market, the blocked categories line | "Never on {BEAT 12.1}: {Alcohol, Gambling}. Change in Break rules" (was "Change in Settings") |
 | A block with no dates (the block editor's "On the log") | "Not on the log yet. Add it from the Log's edit mode, or in a day template." (was "the Program log's edit mode") |
+
+## The Schedule workspace, Phase 2: the Log tab (A246, 2026-10-03)
+
+For review. The reference (`docs/reference/control/opencast-schedule.html`, sections 01 to 04) draws the rundown, the chips, the pane, the week, edit mode, the tray and the Add drawer, and their words are final ("Tonight at a glance", "Spots placed at 10:09 pm", "Follows the programs", "4 changes, checked: nothing blocks publishing", "Runs 9 min over", "Repeat from your library" and the rest). These are the words beyond its examples. `{}` marks what's filled in.
+
+| Where | Words |
+|---|---|
+| The day nav, arrows (accessible names) | "The day before", "The day after"; on the Week "The week before", "The week after" |
+| The rundown, nothing on the day | "Nothing on the log this day." |
+| The rundown's codes, for screen readers | PGM "Program", LIVE "Live", BRK "Break", GAP "Dead air", OFF "Off air, planned" |
+| A break's line (beyond the reference's) | "{1 spot}, credit, up next, ID"; "{0:30} open" (open time of 15 seconds or more); "Holds on the station ID slate" (nothing else in it) |
+| A program kept at its time (view) | the tag "KEPT" |
+| Planned off air (the hours) | after "Planned, back at {6:00 am}": the link "Change the hours" (the Templates tab's "Every day") |
+| A block's label | "Its own bumpers, {BEAT}'s ID", "Its own ID, {BEAT}'s bumpers", "{BEAT}'s bumpers and ID" (the reference has "Its own bumpers and ID") |
+| Health chips | "Dead air now, {20 min}"; "{2 items} couldn't be prepared"; "{2} spots paused; backup fills {10:29 pm}"; "A spot paused; your station ID and bumpers fill its time" (no break ahead has the backup rotation in it) |
+| Week, a day's header | "No template" (a day no template made); for screen readers ". Open the day"; the regions "The week", "The week's hours" |
+| Week, dead air now | "Dead air now, {1 hr}" |
+| Tonight at a glance, another day | "{Sunday} night at a glance" |
+| Tonight at a glance, rows | "None" (no breaks); "Still open, on the station ID slate" (when open time doesn't go to the spot market) |
+| Under the glance (the reference's "Changes to this day") | the heading "Recent changes"; rows "{Kai M.}, {6:12 pm}" / "{2 changes}"; "{Saturdays} template" / "Made" |
+| A break's pane, its list | bumpers: "Into the break", "Out of the break", "Between programs", "Where the block starts or ends", ". {Late Crate Nights}'s own"; up next: "Up next: {Saturday Reel}, {9:00 pm}"; spots: "From the backup rotation"; the credit: "{Made possible by members}. {Once an hour}"; the ID: "Last in the break"; open: "Open", "Open to the spot market", "Holds on the station ID slate"; before spots are placed, when open time stays the station's: "From the main rotation. {0:30} holds on the station ID slate until then" |
+| A break's why line (beyond the reference's) | "Cued from the booth during {Beat Tape Live}."; "Breaks come every {30} minutes."; "Breaks are cued from the booth."; "no bumpers open the break"; "spots air {once an hour}"; "the station ID airs {once an hour}" |
+| A program picked (view) | rows "From", "Episode", "Note", "Block", "Length", "Keep at this time" / "On"; the button "Change it" |
+| A block picked | its line starts "Block, {8:00 to 9:00 pm}. " before the existing "{2 programs}, {8:00 pm to 8:59 pm}" |
+| Edit mode, the pane with nothing picked | "Editing {Saturday, Sep 26}"; "Drag a row by its handle to move it, or use the arrow keys. Pick a row to type its time, change what airs or keep it at its time. Nothing changes on air until you publish." |
+| Edit mode, a picked program | "Keep at this time" with "Moving the rows around it stops here"; the start's help when kept "Kept at this time. Turn it off to move it."; for a fixed row "{Live, so it keeps its start}. Moving the rows around it stops here." |
+| Edit mode, rows' lines (beyond the reference's) | "Carried, so it keeps its time", "Kept at this time", "Off air, so it keeps its time", "Replaces {Slow Hours}", "locked" |
+| Edit mode, dragging | "Drop here: {10:40 pm}. Joins {Late Crate Nights}" / "In {…}" / "Leaves {…}"; the end of a live block or sign-off while dragged "Ends {10:10 pm}" |
+| Edit mode, rows' buttons (accessible names) | "Move {Late Crate, ep. 15}, {10:00 pm}"; "Keep {…}, {10:00 pm}, at this time" (title "Keep at this time"); "Remove {…}, {10:00 pm}" (title "Remove"); "Change when {Beat Tape Live}, {9:01 pm} ends, now {9:58 pm}"; on a removed row "Undo" ("Undo: {…} stays on"); "Add here, {10:40 pm}" |
+| The tray | "{1 change}, checked: {1 problem blocks} publishing" / "{2 problems block}"; "{2 changes}, checking…"; a date from a template: "Publishing makes {Saturday, Oct 3} an exception to "{Saturdays}"." |
+| The tray, 409 `log_changed` | "The log changed since you started editing." (as before); "Reload to see it as it is now. Your {2 changes are} kept and checked again; any that no longer fit say so here."; the buttons "Discard" and "Reload and keep my changes" |
+| After Publish, the change record | "Published: {4 changes}, by {Kai M.} at {8:43 pm}" with each line; "Close" |
+| Done editing with changes | "Leave without publishing?"; "{2 changes} haven't gone out. Leaving drops them."; "Keep editing", "Discard changes" |
+| The Add drawer | "Nothing after it on this day"; "No time free: it starts where {Late Crate, ep. 13} at {12:00 am}"; over with nothing pushed "{29:10}, runs {9} min over, into {Late Crate, ep. 13}"; "Show all {31}"; "Nothing in your library by that name."; Live: "Program", "No program", "No live sources yet. Add one under Live sources."; quick fill with no end: "Sign off for an hour"; a choice's name ends ". Add it"; the toast "Filled {11:40 pm} to {2:00 am} from your library." |
+| Setup step 3 and the Log without the Schedule's head | "What airs, in order. Build one day and make a template of it, then adjust." (was "…and repeat it, then adjust.") |
+| Templates, with no templates | "No templates yet. On the Log, "Make a template from this day" starts one." (was "…Repeat this day makes one from a day.") |
+| The API's lines (G18) | "{Saturday Reel} keeps its time", "{Saturday Reel} no longer keeps its time"; the problem `kept`: "{Saturday Reel} is kept at its time. Turn off Keep at this time to move it." |

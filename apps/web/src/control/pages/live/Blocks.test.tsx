@@ -138,13 +138,13 @@ describe("the Schedule's Blocks tab and the block editor (A246)", () => {
   });
 });
 
-describe("the program log's rail", () => {
-  it("draws the block beside the timeline and opens its pane", async () => {
+describe("the program log's block", () => {
+  it("draws the block as a label where it starts, and opens its pane from it", async () => {
     renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" canEdit />, { path: "/control/beat/schedule" });
-    const rail = await screen.findByRole("button", { name: "Late Crate Nights, 8:00 pm to 8:59 pm" });
-    fireEvent.click(rail);
+    const label = await screen.findByRole("button", { name: /^Late Crate Nights Block, 8:00 to 9:00 pm/ });
+    fireEvent.click(label);
     const pane = await screen.findByRole("region", { name: "Late Crate Nights" });
-    expect(within(pane).getByText("2 programs, 8:00 pm to 8:59 pm")).toBeTruthy();
+    expect(within(pane).getByText("Block, 8:00 to 9:00 pm. 2 programs, 8:00 pm to 8:59 pm")).toBeTruthy();
     expect(within(pane).getByRole("button", { name: "Change times" })).toBeTruthy();
     expect(within(pane).getByRole("link", { name: "Edit Late Crate Nights" }).getAttribute("href")).toBe(`/control/beat/schedule/blocks/${LATE_CRATE_NIGHTS_ID}`);
   });

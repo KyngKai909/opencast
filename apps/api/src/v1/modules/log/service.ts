@@ -98,6 +98,8 @@ export interface EntryInput {
   episodeTitle?: string;
   episodeDescription?: string;
   localNote?: string;
+  /** G18: "Keep at this time" (left out: false; on `update`, as it is). */
+  keepTime?: boolean;
 }
 
 /** G7: a "Repeat this day" still on the log (a day template, or a G7 copy made before them). */
@@ -438,7 +440,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       repeatGroupId: row.repeatGroupId,
       localNote: row.localNote,
       episodeDescription: airing.episodeDescription ?? null,
-      endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null
+      endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null,
+      keepTime: row.keepTime
     };
   }
 
@@ -1381,7 +1384,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!(row.startsAt <= at && at < row.endsAt)) throw new HttpError(409, "not_on_air", "It can end early only while it's on air.");
       const shift = row.endsAt.getTime() - at.getTime();
       // The programs right after it move up, in order, until a gap, a live block, a carried
-      // program (its times are the carriage agreement's) or a break with spots already held.
+      // program (its times are the carriage agreement's), a break with spots already held, or a
+      // program kept at its time (G18: the station fixed it there; it stays, and so does what follows).
       const after = await db
         .select()
         .from(E)
@@ -1399,7 +1403,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       let cursor = row.endsAt.getTime();
       for (const e of after) {
         if (e.startsAt.getTime() !== cursor) break;
-        if (e.kind !== "program" || e.carriageAgreementId || held.has(e.id)) break;
+        if (e.kind !== "program" || e.carriageAgreementId || held.has(e.id) || e.keepTime) break;
         moving.push(e);
         cursor = e.endsAt.getTime();
       }
@@ -2030,6 +2034,7 @@ export function createLogService(ctx: ModuleContext): LogService {
           episodeTitle: input.episodeTitle ?? null,
           episodeDescription: input.episodeDescription ?? null,
           localNote: input.localNote ?? null,
+          keepTime: input.keepTime ?? false,
           createdBy: userId
         })
         .returning();
@@ -2068,7 +2073,8 @@ export function createLogService(ctx: ModuleContext): LogService {
           carriageAgreementId: merged.carriageAgreementId ?? null,
           ...(input.episodeTitle !== undefined ? { episodeTitle: input.episodeTitle } : {}),
           ...(input.episodeDescription !== undefined ? { episodeDescription: input.episodeDescription } : {}),
-          ...(input.localNote !== undefined ? { localNote: input.localNote } : {})
+          ...(input.localNote !== undefined ? { localNote: input.localNote } : {}),
+          ...(input.keepTime !== undefined ? { keepTime: input.keepTime } : {})
         })
         .where(eq(E.id, entryId))
         .returning();

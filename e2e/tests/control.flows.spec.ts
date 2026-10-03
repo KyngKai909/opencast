@@ -1,7 +1,8 @@
 // Master control's flows (apps prompt, Phase 9), on the mock at its Saturday evening, 8:42 pm:
 // sign on for the first time, carry a program, fill a break from the spot market, approve a
-// sponsorship, edit the log and publish the changes. What each screen says is the reference
-// frames' copy (docs/reference/control); edit mode has no frame (docs/apps/new-copy.md).
+// sponsorship, open a break, edit the log and publish the changes, fill dead air from the Add
+// drawer. What each screen says is the reference frames' copy (docs/reference/control, the Schedule
+// in opencast-schedule.html); copy beyond them is in docs/apps/new-copy.md.
 
 import { expect, test } from "@playwright/test";
 import { signInAs } from "./control.support";
@@ -70,14 +71,18 @@ test("someone new signs on for the first time", async ({ page }) => {
   await expect(generated).toHaveCount(0);
   await page.getByRole("button", { name: "Continue to program log" }).click();
 
-  // 3. Program log (A.4): 24 hours of dead air, filled by repeating the library.
+  // 3. Program log (A.4; A246's Day view, without the Schedule's tabs or the Week): dead air,
+  // filled by repeating the library from the Add drawer's quick fill.
   await expect(page.getByRole("heading", { name: "Program log" })).toBeVisible();
-  await expect(page.getByText(/^Dead air from .+ Sunday\.$/)).toBeVisible();
-  await expect(page.getByText("24 hr with nothing scheduled.")).toBeVisible();
-  await expect(page.getByText("Tape Talks, ep. 1, repeated, with your break rule")).toBeVisible();
-  await page.getByRole("button", { name: "Fill the gap" }).click();
+  await expect(page.getByRole("tab", { name: "Templates" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Week" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Dead air (now|at .+), / })).toBeVisible();
+  await page.getByRole("button", { name: /^Fill/ }).first().click();
+  const drawer = page.getByRole("dialog", { name: /^Add at / });
+  await expect(drawer.getByText("Fills all 24 hr, in order, with the break rule")).toBeVisible();
+  await drawer.getByRole("button", { name: "Fill", exact: true }).click();
   await expect(page.getByText(/^Filled .+ from your library\.$/)).toBeVisible();
-  await expect(page.getByText("24 hr with nothing scheduled.")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Dead air (now|at .+), / })).toHaveCount(0);
   await page.getByRole("link", { name: "Continue to translators" }).click();
 
   // 4. Translators: optional.
@@ -187,44 +192,94 @@ test("BEAT approves a sponsorship", async ({ page }) => {
   await expect(page.getByText("New request")).toHaveCount(0);
 });
 
-test("BEAT edits its log and publishes the changes", async ({ page }) => {
+test("BEAT edits its log and publishes four changes", async ({ page }) => {
   await signInAs(page, "kai");
   // An old link (A246): the Evening is the Schedule's Day now.
   await page.goto("/control/beat/log?view=evening&day=sat");
   await expect(page).toHaveURL(/\/control\/beat\/schedule\?view=day&day=sat$/);
   await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
-  await page.getByRole("button", { name: "Edit log" }).click();
-  await expect(page.getByText("Editing the log.")).toBeVisible();
-  const log = page.getByRole("list", { name: "The log, being edited" });
+  // The rundown opens at now: Saturday Reel on air.
+  await expect(page.getByRole("button", { name: "On air: Saturday Reel, 17 min left" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const log = page.getByRole("list", { name: "The rundown, being edited" });
+  await expect(log).toBeVisible();
+  const tray = page.getByRole("region", { name: "Your changes" });
 
-  // What's airing is locked.
-  await log.getByRole("button", { name: /Saturday Reel/ }).click();
-  await expect(page.getByText("On air now, too late to change.")).toBeVisible();
+  // What's airing is locked, with the reason on its row.
+  await expect(log.getByRole("listitem").filter({ hasText: "Saturday Reel" }).first()).toContainText("On air now, too late to change.");
 
-  // Slow Hours dragged half an hour later (the Day draws 0.5 px a minute), to the nearest minute.
-  const slow = log.getByRole("button", { name: /Slow Hours/ });
-  await slow.scrollIntoViewIfNeeded();
-  const box = (await slow.boundingBox())!;
-  await page.mouse.move(box.x + 40, box.y + 10);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 40, box.y + 16, { steps: 4 });
-  await page.mouse.move(box.x + 40, box.y + 10 + 15, { steps: 4 });
-  await page.mouse.up();
-  await expect(page.getByText("1 change: Slow Hours moves to 11:00 pm")).toBeVisible();
-  await expect(page.getByText("Dead air from 10:30 pm to 11:00 pm (30 min).")).toBeVisible();
+  // 1. Late Crate, ep. 15 kept at its time: a fixed point.
+  await page.getByRole("button", { name: "Keep Late Crate, ep. 15, 10:00 pm, at this time" }).click();
+  await expect(tray.getByText("Late Crate, ep. 15 keeps its time")).toBeVisible();
+  // Beat Tape Live running five minutes longer pushes the rows after it, but stops at the kept
+  // one: the overlap blocks publishing, and Undo takes it out.
+  await page.getByRole("button", { name: "Change when Beat Tape Live, 9:01 pm ends, now 9:58 pm" }).press("ArrowDown");
+  await expect(tray.getByText(/^2 changes, checked: 1 problem blocks publishing$/)).toBeVisible();
+  await expect(tray.getByText(/would overlap Late Crate, ep\. 15/)).toBeVisible();
+  await tray.getByRole("button", { name: "Undo: Beat Tape Live now ends at 10:03 pm" }).click();
+  await expect(tray.getByText("1 change, checked: nothing blocks publishing")).toBeVisible();
 
-  // Then typed: 11:10 pm.
-  const start = page.getByLabel("Starts at");
-  await start.fill("23:10");
-  await start.press("Enter");
-  await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
+  // 2. Slow Hours comes off, struck through until it's published.
+  await page.getByRole("button", { name: "Remove Slow Hours, 10:30 pm" }).click();
+  await expect(log.getByRole("listitem").filter({ hasText: "Coming off the log" })).toBeVisible();
 
-  // Published, all at once; the history says who and when.
-  await page.getByRole("button", { name: "Publish changes" }).click();
+  // 3. Something from the library into the dead air, from the drawer.
+  await log.getByRole("button", { name: /^Fill/ }).first().click();
+  const drawer = page.getByRole("dialog", { name: "Add at 10:28 pm" });
+  await drawer.getByLabel("Search your library").fill("Late Crate, ep. 1");
+  await drawer.getByRole("button", { name: /^Late Crate, ep\. 1 29:00/ }).click();
+  await expect(tray.getByText("Late Crate, ep. 1 goes on at 10:28 pm")).toBeVisible();
+
+  // 4. An overnight repeat a place up, with the arrow keys.
+  await page.getByRole("button", { name: "Move Late Crate, ep. 13, 2:30 am", exact: true }).press("ArrowUp");
+  await expect(tray.getByText("4 changes, checked: nothing blocks publishing")).toBeVisible();
+
+  // Published, all at once; the record says what, who and when.
+  await tray.getByRole("button", { name: "Publish 4 changes" }).click();
+  await expect(page.getByText("4 changes published.")).toBeVisible();
+  await expect(page.getByText(/^Published: 4 changes, by Kai M\. at 8:4\d pm$/)).toBeVisible();
+  await expect(log).toHaveCount(0);
+  await expect(page.getByText("Late Crate, ep. 15 keeps its time")).toBeVisible();
+});
+
+test("BEAT opens a break on the Schedule: what's in it, whose time it is, and why", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule");
+  const log = page.getByRole("list", { name: "The rundown" });
+  await log.getByRole("button", { name: /Spots placed at 9:09 pm/ }).click();
+  await expect(page).toHaveURL(/break=/);
+  const pane = page.getByRole("region", { name: "Break, 9:29:00 pm" });
+  await expect(pane.getByText("During Beat Tape Live. 2:00")).toBeVisible();
+  await expect(pane.getByRole("img", { name: "Credit :15, Open 1:45" })).toBeVisible();
+  await expect(pane.getByText("Spots, placed at 9:09 pm")).toBeVisible();
+  await expect(pane.getByText(/^From the main rotation\. 1:45 /)).toBeVisible();
+  // The maker's barter, in a carried program's break.
+  await log.getByRole("button", { name: /REEL's 1:00 barter/ }).click();
+  const barter = page.getByRole("region", { name: "Break, 8:44:00 pm" });
+  await expect(barter.getByText("REEL's barter").first()).toBeVisible();
+  await expect(barter.getByText(/^REEL's 1:00 is the maker's time under barter\./)).toBeVisible();
+  // The why line links to the rule that made it.
+  await barter.getByRole("link", { name: "Break rules" }).click();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule\/rules$/);
+});
+
+test("BEAT fills dead air from the Add drawer", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule");
+  await page.getByRole("button", { name: "Dead air at 11:40 pm, 2 hr 20 min" }).click();
+  await page.getByRole("list", { name: "The rundown" }).getByRole("button", { name: /^Fill/ }).click();
+  const drawer = page.getByRole("dialog", { name: "Add at 11:40 pm" });
+  await expect(drawer.getByText("2 hr 20 min free, until Late Crate, ep. 12 at 2:00 am")).toBeVisible();
+  await expect(drawer.getByText("Fits").first()).toBeVisible();
+  await drawer.getByLabel("Search your library").fill("Crate Session 01");
+  await drawer.getByRole("button", { name: /^Crate Session 01 1:59:00\. Leaves 21 min Fits/ }).click();
+  // It joins a draft: edit mode, with the change checked.
+  const tray = page.getByRole("region", { name: "Your changes" });
+  await expect(tray.getByText("1 change, checked: nothing blocks publishing")).toBeVisible();
+  await expect(tray.getByText("Crate Session 01 goes on at 11:40 pm")).toBeVisible();
+  await tray.getByRole("button", { name: "Publish 1 change" }).click();
   await expect(page.getByText("1 change published.")).toBeVisible();
-  await expect(page.getByText("Editing the log.")).toHaveCount(0);
-  await expect(page.getByText(/^Last changed by Kai M\. at 8:4\d pm$/)).toBeVisible();
-  await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Dead air at 1:39 am, 21 min$/ })).toBeVisible();
 });
 
 // A246: every page the Schedule replaced still opens, on the right tab, with its query kept.
@@ -237,7 +292,7 @@ test("the old log, breaks and blocks addresses land on the Schedule's tabs with 
     { from: "/log?view=day", to: "/schedule", query: { view: "day" }, tab: "Log" },
     { from: "/log?view=evening&day=sat", to: "/schedule", query: { view: "day", day: "sat" }, tab: "Log" },
     { from: "/log?view=week", to: "/schedule", query: { view: "week" }, tab: "Log" },
-    { from: "/log?day=2026-10-03&edit=1", to: "/schedule", query: { day: "2026-10-03", edit: "1" }, tab: "Log", shows: "Editing the log." },
+    { from: "/log?day=2026-10-03&edit=1", to: "/schedule", query: { day: "2026-10-03", edit: "1" }, tab: "Log", shows: /^Editing\. This date becomes an exception to "/ },
     { from: "/log?fill=2026-10-04T06:40:00.000Z", to: "/schedule", query: { fill: "2026-10-04T06:40:00.000Z" }, tab: "Log" },
     { from: "/log?day=2026-10-03&entry=e1&block=s1", to: "/schedule", query: { day: "2026-10-03", entry: "e1", block: "s1" }, tab: "Log" },
     { from: "/log?place=item-1", to: "/schedule", query: { edit: "1", add: "item-1" }, tab: "Log" },

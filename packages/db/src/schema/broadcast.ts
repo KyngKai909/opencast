@@ -656,6 +656,11 @@ export const logEntries = broadcast.table(
      * entry for, with `repeat_group_id` the template. Null for entries made by hand and for G7 copies.
      */
     templateDate: date("template_date"),
+    /**
+     * G18 (migration 0050): "Keep at this time", a fixed point the station marked. Moving rows in
+     * master control stops here, and a live block ending early doesn't move it up.
+     */
+    keepTime: boolean("keep_time").notNull().default(false),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -748,6 +753,8 @@ export const dayTemplateEntries = broadcast.table(
     localNote: text("local_note"),
     episodeTitle: text("episode_title"),
     episodeDescription: text("episode_description"),
+    /** G18 (migration 0050): "Keep at this time", copied onto each date the template makes. */
+    keepTime: boolean("keep_time").notNull().default(false),
     createdAt: createdAt()
   },
   (t) => [

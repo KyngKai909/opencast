@@ -1,10 +1,10 @@
 // A246: the Schedule workspace (opencast-schedule, Control 08): one place for the day, the
 // templates, the blocks and the break rule, in master control's On air group. Its tabs are routes:
-// the Log (`/schedule`: the program log, Day and Week, with `day`, `view`, `edit`, `fill`, `entry`
-// and `block` as before), Templates (`/schedule/templates`, and one at `/:templateId`), Blocks
-// (`/schedule/blocks`: pages/live/Blocks.tsx) and Break rules (`/schedule/rules`). Phase 1 hosts
-// what exists under the Schedule's head: the log page, the template list with the off air hours
-// above it (the "Every day" rule), and the break rule from station settings, as it was.
+// the Log (`/schedule`: the day as a rundown and the Week, with `day`, `view`, `edit`, `fill`,
+// `entry`, `block`, `break` and `add`; Phase 2), Templates (`/schedule/templates`, and one at
+// `/:templateId`), Blocks (`/schedule/blocks`: pages/live/Blocks.tsx) and Break rules
+// (`/schedule/rules`). Templates is the list with the off air hours above it (the "Every day"
+// rule); Break rules is the break rule from station settings, as it was, until Phase 3.
 
 import { useParams } from "react-router";
 import { LogPage } from "../../components/onair/LogPage";
@@ -36,7 +36,7 @@ function Templates() {
       <div className="cc-sch__templates">
         <OffAirHoursSection stationId={s.id} callSign={s.label} phone={phone} everyDay />
         <TemplateList stationId={s.id} phone={phone} picked={templateId} dateHref={(date) => `${scheduleHref(s.base)}?day=${date}`} className="" />
-        {none && <p className="cc-sch__empty">No templates yet. On the Log, Repeat this day makes one from a day.</p>}
+        {none && <p className="cc-sch__empty">No templates yet. On the Log, "Make a template from this day" starts one.</p>}
       </div>
     </div>
   );

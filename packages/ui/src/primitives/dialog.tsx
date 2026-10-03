@@ -1,5 +1,5 @@
-// What Modal and Sheet share: the focus trap, Escape, the head, body and foot. Not exported from
-// the package; use Modal (web) or Sheet (phone).
+// What Modal, Sheet and Drawer share: the focus trap, Escape, the head, body and foot. Not exported from
+// the package; use Modal (web), Sheet (phone) or Drawer (a side panel on the web).
 
 import { useEffect, useId, useRef, type CSSProperties, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { cx } from "../lib/cx";
@@ -69,7 +69,7 @@ export interface DialogContentProps {
 }
 
 export interface DialogShellProps extends DialogContentProps {
-  kind: "modal" | "sheet";
+  kind: "modal" | "sheet" | "drawer";
   onClose: () => void;
   /** Show the close button in the head (or on the band). */
   showClose: boolean;
@@ -99,7 +99,7 @@ export function DialogShell(props: DialogShellProps) {
 
   return (
     <div
-      className={cx("oc-backdrop", kind === "sheet" && "oc-backdrop--sheet", placement === "container" && "oc-backdrop--container", className)}
+      className={cx("oc-backdrop", kind === "sheet" && "oc-backdrop--sheet", kind === "drawer" && "oc-backdrop--drawer", placement === "container" && "oc-backdrop--container", className)}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -114,7 +114,7 @@ export function DialogShell(props: DialogShellProps) {
     >
       <div
         ref={panel}
-        className={cx(kind === "modal" ? "oc-modal" : "oc-sheet", panelClassName)}
+        className={cx(kind === "modal" ? "oc-modal" : kind === "drawer" ? "oc-drawer" : "oc-sheet", panelClassName)}
         style={panelStyle}
         role="dialog"
         aria-modal={manageFocus ? true : undefined}

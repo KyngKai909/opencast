@@ -58,11 +58,13 @@ describe("the Monitor's Prepared for air", () => {
   it("the log picks out the airing it links to", async () => {
     const id = lateCrate15().id;
     renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" />, { path: `/?day=2026-09-26&entry=${id}` });
-    const title = await screen.findAllByText("Late Crate, ep. 15");
-    const picked = title.map((t) => t.closest(".oc-blk")).filter((b) => b?.classList.contains("oc-blk--sel"));
-    // The 10:00 pm airing (the evening's window has only that one), not the dead air's pane.
+    const title = await screen.findAllByText("Late Crate, ep. 15", { selector: "b" });
+    const picked = title.map((t) => t.closest("li")).filter((li) => li?.classList.contains("cc-rr--sel"));
+    // The 10:00 pm airing, not the overnight repeat; its pane is open.
     expect(picked).toHaveLength(1);
-    expect(document.querySelectorAll(".oc-blk--sel")).toHaveLength(1);
+    expect(picked[0]!.textContent).toContain("10:00 pm");
+    expect(document.querySelectorAll(".cc-rr--sel")).toHaveLength(1);
+    expect(await screen.findByRole("region", { name: "Late Crate, ep. 15" })).toBeTruthy();
   });
 });
 

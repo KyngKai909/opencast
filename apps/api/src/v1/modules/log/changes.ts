@@ -24,7 +24,7 @@ import type { OffAirSpanView } from "./offair.js";
 import type { BreakSlotView, ReminderNews } from "./service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
-type Input = { kind: Row["kind"]; startsAt: string; endsAt?: string; itemId?: string; programId?: string; liveSourceId?: string; carriageAgreementId?: string; episodeTitle?: string; episodeDescription?: string; localNote?: string };
+type Input = { kind: Row["kind"]; startsAt: string; endsAt?: string; itemId?: string; programId?: string; liveSourceId?: string; carriageAgreementId?: string; episodeTitle?: string; episodeDescription?: string; localNote?: string; keepTime?: boolean };
 type Checked = { startsAt: Date; endsAt: Date; code: Row["code"]; programId: string | null };
 type Gap = { startsAt: string; endsAt: string };
 
@@ -109,7 +109,9 @@ interface Draft {
   moved: boolean;
   resized: boolean;
   newItem: boolean;
-  /** The last change about it (where its problems point). */
+  /** G18: a `keep` changes its "Keep at this time" (`next.keepTime`). */
+  marked: boolean;
+  /** The last change about it other than a `keep` (where its problems point). */
   index: number;
 }
 
@@ -178,6 +180,8 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         if (start <= t) return onAir ? "On air now, too late to change." : "It has already started.";
         return `Airs in ${Math.max(1, Math.ceil((start - t) / 1000))} s, too late to change.`;
       };
+      // G18: titles for a refused move of a kept entry, fetched only if one is.
+      let titlesKept: Map<string, string> | null = null;
       const tooSoon = onAir ? `That's too soon: the channel is already set for the next ${LOG_EDIT_LEAD_MS / 1000} seconds.` : "That's in the past.";
 
       for (const [index, c] of changes.entries()) {
@@ -201,9 +205,10 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
           problems.push({ index, code: "not_found", message: "That entry isn't on the log any more." });
           continue;
         }
-        const d = drafts.get(orig.id) ?? { orig, next: { ...orig }, removed: false, moved: false, resized: false, newItem: false, index };
+        const d = drafts.get(orig.id) ?? { orig, next: { ...orig }, removed: false, moved: false, resized: false, newItem: false, marked: false, index };
         drafts.set(orig.id, d);
-        d.index = index;
+        // G18: a mark changes nothing about when it airs, so a move's or a resize's problems stay theirs.
+        if (c.op !== "keep") d.index = index;
         if (d.removed) {
           problems.push({ index, code: "removed", message: "It's already coming off the log." });
           continue;
@@ -214,6 +219,12 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
           continue;
         }
         if (c.op === "move") {
+          // G18: a kept entry is a fixed point; the batch clears the mark first to move it.
+          if (d.next.keepTime) {
+            titlesKept ??= await h.titles(current);
+            problems.push({ index, code: "kept", message: `${titlesKept.get(orig.id) ?? "Untitled"} is kept at its time. Turn off Keep at this time to move it.` });
+            continue;
+          }
           const startsAt = snapDate(new Date(c.startsAt));
           const length = d.next.endsAt.getTime() - d.next.startsAt.getTime();
           d.next = { ...d.next, startsAt, endsAt: new Date(startsAt.getTime() + length) };
@@ -235,6 +246,9 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
           const length = roundUpToMinute(item?.durationMs ?? 30 * MIN);
           d.next = { ...d.next, assetId: c.itemId, carriageAgreementId: c.carriageAgreementId ?? null, programId: item?.programId ?? null, code: item?.code ?? d.next.code, endsAt: new Date(d.next.startsAt.getTime() + length) };
           d.newItem = true;
+        } else if (c.op === "keep") {
+          d.next = { ...d.next, keepTime: c.keep };
+          d.marked = true;
         } else {
           d.removed = true;
         }
@@ -275,9 +289,11 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       // airings of the same carried episode the batch adds are counted against each other here.
       await batchCarriage();
 
-      // The stretch the batch touches, before and after.
+      // The stretch the batch touches, before and after. G18: an entry only marked (or unmarked)
+      // airs as it did, so it touches nothing (and isn't checked for overlaps below).
+      const markedOnly = (d: Draft) => d.marked && !d.removed && !d.moved && !d.resized && !d.newItem;
       const touched = [
-        ...[...drafts.values()].flatMap((d) => [d.orig.startsAt, d.orig.endsAt, d.next.startsAt, d.next.endsAt]),
+        ...[...drafts.values()].filter((d) => !markedOnly(d)).flatMap((d) => [d.orig.startsAt, d.orig.endsAt, d.next.startsAt, d.next.endsAt]),
         ...inserts.flatMap((i) => [i.row.startsAt, i.row.endsAt])
       ].map((d) => d.getTime());
       // Nothing found to change (every entry gone): the stretch is now.
@@ -297,7 +313,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       const titleAfter = (r: Row) => titlesNext.get(r.id) ?? titlesNow.get(r.id) ?? "Untitled";
 
       // Overlaps: a changed or inserted entry against anything else on the log after the batch.
-      const mine = new Map<string, number>([...[...drafts.values()].filter((d) => !d.removed).map((d) => [d.orig.id, d.index] as const), ...inserts.map((i) => [i.row.id, i.index] as const)]);
+      const mine = new Map<string, number>([...[...drafts.values()].filter((d) => !d.removed && !markedOnly(d)).map((d) => [d.orig.id, d.index] as const), ...inserts.map((i) => [i.row.id, i.index] as const)]);
       const reported = new Set<string>();
       // An entry with a problem already (locked, too soon, its rights) isn't also said to overlap.
       const troubled = new Set(problems.map((p) => p.index));
@@ -371,6 +387,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         if (c.op === "move") return `${title} moves to ${when(d.next.startsAt, d.orig.startsAt)}`;
         if (c.op === "resize") return `${title} now ends at ${when(d.next.endsAt, d.orig.endsAt)}`;
         if (c.op === "replace") return `${titleAfter(d.next)} replaces ${title} at ${clock(d.next.startsAt)}`;
+        if (c.op === "keep") return c.keep ? `${title} keeps its time` : `${title} no longer keeps its time`;
         return `${title} at ${clock(d.orig.startsAt)} comes off the log`;
       });
       const summary = summaryOf(lines);
@@ -423,6 +440,8 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       // Publish: everything at once, or nothing.
       const removed = [...drafts.values()].filter((d) => d.removed);
       const updated = live;
+      // G18: entries whose "Keep at this time" the batch sets or clears (and leaves on the log).
+      const marked = [...drafts.values()].filter((d) => d.marked && !d.removed);
       const insertedIds = new Map<Insert, string>();
       let news: ReminderNews[] = [];
       const recordRow = await db.transaction(async (tx) => {
@@ -438,6 +457,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
             .set({ startsAt: d.next.startsAt, endsAt: d.next.endsAt, code: d.next.code, assetId: d.next.assetId, programId: d.next.programId, carriageAgreementId: d.next.carriageAgreementId })
             .where(eq(E.id, d.orig.id));
         }
+        for (const d of marked) await tx.update(E).set({ keepTime: d.next.keepTime }).where(eq(E.id, d.orig.id));
         for (const ins of inserts) {
           const [row] = await tx
             .insert(E)
@@ -454,6 +474,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
               episodeTitle: ins.input.episodeTitle ?? null,
               episodeDescription: ins.input.episodeDescription ?? null,
               localNote: ins.input.localNote ?? null,
+              keepTime: ins.input.keepTime ?? false,
               createdBy: userId
             })
             .returning({ id: E.id });
@@ -482,6 +503,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       await h.markEdited(stationId, [
         ...removed.map((d) => d.orig.templateDate ?? d.orig.startsAt),
         ...updated.flatMap((d) => [d.orig.templateDate ?? d.orig.startsAt, d.next.startsAt]),
+        ...marked.map((d) => d.orig.templateDate ?? d.orig.startsAt),
         ...inserts.map((i) => i.row.startsAt),
         // A244: a block's span marks its days (both, when it crosses 6:00 am).
         ...blocks.list.flatMap((sd) => [
@@ -766,6 +788,7 @@ function pseudoRow(stationId: string, input: Input, startsAt: Date): Row {
     episodeDescription: input.episodeDescription ?? null,
     endedEarlyAt: null,
     templateDate: null,
+    keepTime: input.keepTime ?? false,
     createdBy: null,
     createdAt: new Date(0)
   };

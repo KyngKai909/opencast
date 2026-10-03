@@ -65,6 +65,8 @@ export interface TemplateEntryInput {
   episodeTitle?: string;
   episodeDescription?: string;
   localNote?: string;
+  /** G18: "Keep at this time" (left out: false). */
+  keepTime?: boolean;
 }
 
 /** A244: a programming block in a day template, as sent. */
@@ -195,7 +197,9 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       liveSourceId: r.liveSourceId,
       localNote: r.localNote,
       episodeTitle: r.episodeTitle,
-      episodeDescription: r.episodeDescription
+      episodeDescription: r.episodeDescription,
+      // G18: the day's fixed points stay fixed on each date the template makes.
+      keepTime: r.keepTime
     }));
   }
 
@@ -272,7 +276,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         liveSourceId: x.liveSourceId ?? null,
         localNote: x.localNote ?? null,
         episodeTitle: x.episodeTitle ?? null,
-        episodeDescription: x.episodeDescription ?? null
+        episodeDescription: x.episodeDescription ?? null,
+        keepTime: x.keepTime ?? false
       });
     }
     // In the broadcast day's order: "23:00" comes before "01:00".
@@ -356,7 +361,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             carriageAgreementId: e.carriageAgreementId,
             episodeTitle: e.episodeTitle,
             episodeDescription: e.episodeDescription,
-            localNote: e.localNote
+            localNote: e.localNote,
+            keepTime: e.keepTime
           })
         ),
       dates: dates.filter((d) => d.templateId === g.id).map((d) => ({ date: d.date, edited: Boolean(d.editedAt), entries: d.entries, skipped: d.skipped })),
@@ -593,6 +599,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             localNote: e.localNote,
             episodeTitle: e.episodeTitle,
             episodeDescription: e.episodeDescription,
+            keepTime: e.keepTime,
             repeatGroupId: t.id,
             templateDate: date
           });
@@ -625,10 +632,10 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             const want = wanted.get(key);
             if (want && !kept.has(key)) {
               kept.add(key);
-              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId) {
+              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId || row.keepTime !== want.keepTime) {
                 await tx
                   .update(E)
-                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId })
+                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime })
                   .where(eq(E.id, row.id));
               }
             } else if (row.startsAt > now) {

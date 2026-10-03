@@ -34,6 +34,14 @@
   --on-screen: #ECE9E1;
   --on-screen-70: #B1B8C9;
   --scrim: rgb(4 8 20 / .7);
+  /* A246: a break's parts (the schedule's strip and fill bar), each carrying white text at 4.5:1 and 3:1 against the ground. */
+  --brk-bumper: #5D6884;
+  --brk-spots: #9A4687;
+  --brk-barter: #4A6A9C;
+  --brk-credit: #2F7562;
+  --brk-id: #56648E;
+  --brk-upnext: #7A6633;
+  --on-brk: #FFFFFF;
 }
 
 /* ---------- Light ground ---------- */
@@ -61,6 +69,14 @@
     --on-screen: #ECE9E1;
     --on-screen-70: #B1B8C9;
     --scrim: rgb(15 24 48 / .55);
+    /* A246: a break's parts, as the schedule reference draws them on the light ground. */
+    --brk-bumper: #525C73;
+    --brk-spots: #8C3B7A;
+    --brk-barter: #33507A;
+    --brk-credit: #2E6B5A;
+    --brk-id: #1F2A44;
+    --brk-upnext: #6B5A2E;
+    --on-brk: #FFFFFF;
   }
 }
 [data-theme="light"] {
@@ -86,6 +102,14 @@
   --on-screen: #ECE9E1;
   --on-screen-70: #B1B8C9;
   --scrim: rgb(15 24 48 / .55);
+  /* A246: a break's parts, as the schedule reference draws them on the light ground. */
+  --brk-bumper: #525C73;
+  --brk-spots: #8C3B7A;
+  --brk-barter: #33507A;
+  --brk-credit: #2E6B5A;
+  --brk-id: #1F2A44;
+  --brk-upnext: #6B5A2E;
+  --on-brk: #FFFFFF;
 }
 /* TV is always dark, even when it or a parent asks for light: this comes after the light rules. */
 [data-ground="tv"],
@@ -112,6 +136,14 @@
   --on-screen: #ECE9E1;
   --on-screen-70: #B1B8C9;
   --scrim: rgb(4 8 20 / .7);
+  /* A246: a break's parts (the schedule's strip and fill bar), each carrying white text at 4.5:1 and 3:1 against the ground. */
+  --brk-bumper: #5D6884;
+  --brk-spots: #9A4687;
+  --brk-barter: #4A6A9C;
+  --brk-credit: #2F7562;
+  --brk-id: #56648E;
+  --brk-upnext: #7A6633;
+  --on-brk: #FFFFFF;
 }
 
 /* ---------- The same on every ground ---------- */

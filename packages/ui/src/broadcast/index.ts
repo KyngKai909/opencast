@@ -19,6 +19,7 @@ export { ProgramLog, type ProgramLogProps, type LogLine } from "./ProgramLog";
 export { LogTimeline, TimelineBands, bandLabel, placeBand, placeBlocks, type LogTimelineProps, type TimelineBand, type TimelineBandsProps, type TimelineBlock, type TimelineBlockKind, type PlacedBlock } from "./LogTimeline";
 export { Rundown, type RundownProps, type RundownItem } from "./Rundown";
 export { BreakBar, breakPartWords, type BreakBarProps, type BreakPart, type BreakPartKind } from "./BreakBar";
+export { BreakStrip, BREAK_KIND_WORDS, breakKindClass, type BreakStripProps, type BreakStripPart, type BreakKind } from "./BreakStrip";
 export { BreakLegend, type BreakLegendProps } from "./BreakLegend";
 export { ScheduleList, scheduleStatus, type ScheduleListProps, type ScheduleItem, type ScheduleStatus } from "./ScheduleList";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";

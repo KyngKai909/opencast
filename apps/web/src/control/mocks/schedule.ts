@@ -202,7 +202,7 @@ export function generate(stationId: string, opts: { dates?: string[]; through?: 
       const want = wanted.get(key);
       if (want && !kept.has(key)) {
         kept.add(key);
-        Object.assign(row, { repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId });
+        Object.assign(row, { repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime });
       } else if (row.startsAt > t0) {
         removeWithBreaks(row.id);
         totals.removed++;

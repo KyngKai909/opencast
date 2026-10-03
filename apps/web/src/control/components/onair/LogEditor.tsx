@@ -1,26 +1,28 @@
-// Edit mode on the program log (the user's request of 2026-09-29; no frame draws it). "Edit log"
-// makes the log editable again for owners and operators: move a program by dragging it or typing a
-// start, replace what airs, change a live block's length, take something off, or put something on
-// before or after another, from the library or a program the station carries. Breaks follow the
-// programs. Nothing goes out until "Publish changes": the draft is checked by the API as a whole
-// (a dry run) and summed up first ("3 changes: Late Crate moves to 9:10 pm, …"), with overlaps,
-// dead air, held spots and anything locked said before it's published, all at once. On air, the
-// entry airing now and anything inside the assembler's lead is locked; the rest goes live when
-// it's published. The draft is kept for this tab (sessionStorage), so a trip to the market and back
-// keeps it. Every published batch is in the log's history, with who and when.
+// Edit mode on the program log (the user's request of 2026-09-29; A246 draws it, opencast-schedule
+// 04). "Edit" makes the Schedule's rundown a draft for owners and operators: move a program by
+// dragging it or typing a start, replace what airs, change a live block's or a sign-off's end, take
+// something off, put something on from the Add drawer, or keep a row at its time (G18). Breaks
+// follow the programs. Nothing goes out until it's published: the draft is checked by the API as a
+// whole (a dry run) and summed up in the tray at the foot ("4 changes, checked: nothing blocks
+// publishing"), with overlaps, dead air, held spots and anything locked said before it goes out,
+// all at once. On air, the entry airing now and anything inside the assembler's lead is locked. The
+// draft is kept for this tab (sessionStorage), so a trip to the market and back keeps it; it begins
+// from the whole broadcast day, and a draft kept from another window is dropped. When someone else
+// changes the day meanwhile (409 `log_changed`), it reloads the log and keeps the draft, checked
+// again against the new version. Every published batch is in the log's history, with who and when.
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { blocksApi, catalogApi, libraryApi, logApi, type LibraryItem, type LogChange, type LogChangesResult, type LogEntry, type ProgramLog } from "@opencast/contracts";
-import { Button, ChoiceList, Field, LogCode, Modal, Notice, Segmented, SelectField, TimelineBands, clock, clockRange, duration, placeBlocks, useToast, type TimelineBand, type TimelineBlock } from "@opencast/ui";
+import { blocksApi, libraryApi, logApi, type LibraryItem, type LogChange, type LogChangeRecord, type LogChangesResult, type LogEntry, type ProgramLog } from "@opencast/contracts";
+import { Button, Field, Modal, SelectField, Toggle, clock, duration, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { LOG_READS } from "./data";
 import { airable } from "./repeat";
-import { draftBreaks, draftEntries, draftSpans, dragTo, insertId, isBlockChange, lockOf, newSpanId, rippleFrom, spanAt, spanPieces, timeValue, typedTime, wholeMinutes, withChange, type DraftEntry, type DraftItem, type DraftSpan } from "./logEdit";
+import { draftBreaks, draftEntries, draftSpans, insertId, isBlockChange, lockOf, newSpanId, timeValue, typedTime, wholeMinutes, withChange, type DraftEntry, type DraftItem, type DraftSpan } from "./logEdit";
+import { FIXED_WORDS, fixedReason } from "./reorder";
 import { dayClock, spanText } from "./time";
-import { stationLabel } from "../../station/slug";
 
 const MIN = 60_000;
 
@@ -53,7 +55,7 @@ function writeDraft(stationId: string, draft: Draft | null) {
   }
 }
 
-const itemOf = (i: LibraryItem): DraftItem => ({ id: i.id, title: i.title, durationMs: i.durationMs, code: i.code, programId: i.programId });
+export const itemOf = (i: LibraryItem): DraftItem => ({ id: i.id, title: i.title, durationMs: i.durationMs, code: i.code, programId: i.programId });
 
 export type LogEdit = ReturnType<typeof useLogEdit>;
 
@@ -61,18 +63,26 @@ export type LogEdit = ReturnType<typeof useLogEdit>;
 export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: { stationId: string; log: ProgramLog | undefined; win: { from: string; to: string }; active: boolean; onAir: boolean; now: number; onDone: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const [draft, setDraft] = useState<Draft | null>(() => (active ? readDraft(stationId) : null));
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [publishError, setPublishError] = useState<ApiError | null>(null);
   const [publishing, setPublishing] = useState(false);
+  // The record of the batch just published, shown until it's closed.
+  const [published, setPublished] = useState<LogChangeRecord | null>(null);
+  const keys = useRef(0);
 
-  // A draft begins from the log as it's shown; leaving edit mode (publishing, discarding) drops it.
-  // Leaving the page keeps it for the tab.
+  // A draft begins from the log as it's shown (the whole broadcast day); leaving edit mode
+  // (publishing, discarding) drops it. Leaving the page keeps it for the tab, unless it was begun
+  // from another window (a day, or the old Evening view).
   const wasActive = useRef(active);
   useEffect(() => {
     if (!active) {
       if (wasActive.current) writeDraft(stationId, null);
       setDraft(null);
-    } else if (!draft && log) setDraft(readDraft(stationId) ?? { base: log.version ? { ...win, version: log.version } : null, changes: [], items: {}, seq: 0 });
+    } else if (!draft && log) {
+      const kept = readDraft(stationId);
+      const fits = kept && (!kept.base || (kept.base.from === win.from && kept.base.to === win.to));
+      setDraft(fits ? kept : { base: log.version ? { ...win, version: log.version } : null, changes: [], items: {}, seq: 0 });
+    }
     wasActive.current = active;
   }, [active, draft, log, stationId, win.from, win.to]);
   useEffect(() => {
@@ -98,6 +108,11 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
   });
 
   const entries = useMemo(() => draftEntries(log?.entries ?? [], changes, (id) => items.get(id)), [log?.entries, changes, items]);
+  // Coming off the log: kept in the draft's rows, struck through.
+  const removed = useMemo(() => {
+    const gone = new Set(changes.flatMap((c) => (c.op === "remove" ? [c.entryId] : [])));
+    return (log?.entries ?? []).filter((e) => gone.has(e.id));
+  }, [log?.entries, changes]);
   // A244: programming blocks' spans as the draft leaves them.
   const blockList = useApi(blocksApi.listBlocks, { params: { stationId } }, { enabled: active, retry: false });
   const spans = useMemo(
@@ -113,7 +128,7 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
   const locked = (e: Pick<LogEntry, "id" | "startsAt" | "endsAt">) => lockOf(original.get(e.id) ?? e, now, onAir);
 
   const result = body ? check.data : undefined;
-  // Problems and changes by entry, to mark them on the timeline.
+  // Problems and changes by entry, to mark them on the rundown.
   const entryOfChange = (i: number) => {
     const c = changes[i];
     return c ? (isBlockChange(c) ? (c.op === "block_add" ? (c.key ? newSpanId(c.key) : null) : c.spanId) : c.op === "insert" ? (c.key ? insertId(c.key) : null) : c.entryId) : null;
@@ -122,16 +137,23 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
 
   const shownWindow = draft?.base && draft.base.from === win.from && draft.base.to === win.to;
   const conflict =
-    (check.error?.code === "log_changed" ? check.error : null) ??
-    (publishError?.code === "log_changed" ? publishError : null) ??
-    (shownWindow && log?.version && draft?.base && log.version !== draft.base.version ? new ApiError(409, "log_changed", "The log changed since you started editing. Reload it to see what changed, then make your changes again.") : null);
+    ((check.error?.code === "log_changed" ? check.error : null) ??
+      (publishError?.code === "log_changed" ? publishError : null) ??
+      (shownWindow && log?.version && draft?.base && log.version !== draft.base.version ? new ApiError(409, "log_changed", "The log changed since you started editing.") : null));
 
   const refresh = () => Promise.all([...LOG_READS, logApi.listLogChanges].map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })));
+  /** The draft takes the day's version as it is now (its changes stay), then everything reads again. */
+  const rebase = async () => {
+    const fresh = await call(logApi.getLog, { params: { stationId }, query: { from: win.from, to: win.to } });
+    setDraft((d) => (d && fresh.version ? { ...d, base: { from: win.from, to: win.to, version: fresh.version } } : d));
+    await refresh();
+  };
 
   return {
     draft,
     changes,
     entries,
+    removed,
     breaks,
     spans,
     blocks: blockList.data?.blocks ?? [],
@@ -140,15 +162,30 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
     result,
     checking: check.isFetching,
     checkError: check.error && check.error.code !== "log_changed" ? check.error.message : null,
-    conflict,
+    conflict: conflict || null,
     publishing,
     publishError: publishError && publishError.code !== "log_changed" ? publishError.message : null,
+    published,
     troubled,
     locked,
     /** Adds a change (and the item it puts on the log, if any). */
-    add(change: LogChange | LogChange[], item?: DraftItem) {
+    add(change: LogChange | LogChange[], item?: DraftItem | DraftItem[]) {
       setPublishError(null);
-      setDraft((d) => (d ? { ...d, changes: (Array.isArray(change) ? change : [change]).reduce(withChange, d.changes), items: item ? { ...d.items, [item.id]: item } : d.items } : d));
+      const more = Object.fromEntries((Array.isArray(item) ? item : item ? [item] : []).map((i) => [i.id, i]));
+      setDraft((d) => (d ? { ...d, changes: (Array.isArray(change) ? change : [change]).reduce(withChange, d.changes), items: { ...d.items, ...more } } : d));
+    },
+    /**
+     * G18: "Keep at this time", on or off. Turning it back the way the log has it takes the change
+     * out of the draft rather than adding its opposite.
+     */
+    keep(entry: DraftEntry) {
+      setPublishError(null);
+      setDraft((d) => {
+        if (!d) return d;
+        const at = d.changes.findIndex((c) => c.op === "keep" && c.entryId === entry.id);
+        if (at >= 0) return { ...d, changes: d.changes.filter((_, i) => i !== at) };
+        return { ...d, changes: withChange(d.changes, { op: "keep", entryId: entry.id, keep: !entry.keepTime }) };
+      });
     },
     /** Takes one change back out of the draft. */
     drop(index: number) {
@@ -156,9 +193,15 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
     },
     /** A key for an insert (it has no id until it's published). */
     nextKey() {
-      const key = `k${(draft?.seq ?? 0) + 1}-${Date.now().toString(36)}`;
-      setDraft((d) => (d ? { ...d, seq: d.seq + 1 } : d));
+      // Several at once (a quick fill's inserts) each get their own.
+      keys.current = Math.max(keys.current, draft?.seq ?? 0) + 1;
+      const key = `k${keys.current}-${Date.now().toString(36)}`;
+      setDraft((d) => (d ? { ...d, seq: Math.max(d.seq, keys.current) } : d));
       return key;
+    },
+    /** "Check again": the dry run, asked for afresh. */
+    recheck() {
+      void check.refetch();
     },
     async publish() {
       if (!draft || !changes.length) return;
@@ -168,6 +211,7 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
         const r = await call(logApi.applyLogChanges, { params: { stationId }, body: { dryRun: false, ...(draft.base ? { base: draft.base } : {}), changes } });
         writeDraft(stationId, null);
         setDraft(null);
+        setPublished(r.record);
         await refresh();
         toast.show({ message: r.changes.length === 1 ? "1 change published." : `${r.changes.length} changes published.` });
         onDone();
@@ -177,19 +221,27 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
         setPublishing(false);
       }
     },
+    /** Closes the record of what was just published. */
+    closePublished() {
+      setPublished(null);
+    },
     discard() {
       writeDraft(stationId, null);
       setDraft(null);
       setPublishError(null);
       onDone();
     },
-    /** After a conflict: the log as it is now, and a fresh draft from it. */
+    /**
+     * After a conflict: the log as it is now, and the draft kept, checked again against the new
+     * version. A change to an entry that's gone comes back from the check as a problem.
+     */
     async reload() {
-      writeDraft(stationId, null);
       setPublishError(null);
-      await refresh();
-      setDraft(null);
-    }
+      await rebase();
+    },
+    /** After something written at once (a fill with nothing drafted): the draft takes the new version. */
+    rebase
+
   };
 }
 
@@ -207,247 +259,13 @@ export function draftGaps(entries: DraftEntry[], offAir: NonNullable<ProgramLog[
   return gaps.filter((g) => Date.parse(g.endsAt) - Date.parse(g.startsAt) >= 5 * MIN || g.endsAt === to);
 }
 
-export interface EditTimelineProps {
-  blocks: TimelineBlock[];
-  from: string;
-  to: string;
-  pxPerMinute: number;
-  maxHeight?: number;
-  entries: Map<string, DraftEntry>;
-  locked: (e: DraftEntry) => string | null;
-  troubled: Set<string>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onMove: (id: string, startsAt: string) => void;
-  /** A244: programming blocks' spans as the draft leaves them, their rails beside the column. */
-  spans?: DraftSpan[];
-  /** Spans with a problem in the draft. */
-  troubledSpans?: Set<string>;
-  onSelectSpan?: (id: string) => void;
-  onResizeSpan?: (id: string, edge: "start" | "end", at: string) => void;
-}
-
-/** A244: the draft's spans as rails: solid where their programs air (as the draft leaves them), dashed elsewhere. */
-export function draftBands(spans: DraftSpan[], entries: Array<Pick<LogEntry, "id" | "kind" | "startsAt" | "endsAt">>, troubled?: Set<string>): TimelineBand[] {
-  return spans.map((sp) => ({ id: sp.id, label: sp.name, start: sp.startsAt, end: sp.endsAt, pieces: spanPieces(sp, entries).map((p) => ({ start: p.startsAt, end: p.endsAt })), colour: sp.colour, problems: troubled?.has(sp.id) ? 1 : 0 }));
-}
-
 /**
- * The timeline in edit mode: the log as the draft leaves it, drawn as the log's timeline is. A
- * program, live block or sign-off can be dragged to a new start (to the nearest whole minute, a
- * segment boundary) or moved a minute at a time with the arrow keys (five with Shift); a press
- * picks it for the pane. What's locked stays put.
+ * The picked entry in edit mode: its start, its end (a live block, a sign-off), what airs, keeping
+ * it at its time (G18), putting something on before or after it (the Add drawer), and taking it off.
  */
-export function EditTimeline({ blocks, from, to, pxPerMinute, maxHeight, entries, locked, troubled, selectedId, onSelect, onMove, spans = [], troubledSpans, onSelectSpan, onResizeSpan }: EditTimelineProps) {
-  const a0 = Date.parse(from);
-  const total = ((Date.parse(to) - a0) / MIN) * pxPerMinute;
-  const hours: number[] = [];
-  for (let h = a0; h <= Date.parse(to); h += 3_600_000) hours.push(h);
-  const drag = useRef<{ id: string; y: number; moved: boolean } | null>(null);
-  const [offset, setOffset] = useState<{ id: string; dy: number } | null>(null);
-
-  const down = (id: string) => (e: PointerEvent<HTMLButtonElement>) => {
-    const entry = entries.get(id);
-    if (!entry || locked(entry)) return;
-    drag.current = { id, y: e.clientY, moved: false };
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-  };
-  const move = (e: PointerEvent<HTMLButtonElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const dy = e.clientY - d.y;
-    if (Math.abs(dy) > 3) d.moved = true;
-    if (d.moved) setOffset({ id: d.id, dy });
-  };
-  const up = (id: string) => (e: PointerEvent<HTMLButtonElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    setOffset(null);
-    if (!d || d.id !== id || !d.moved) return;
-    const entry = entries.get(id)!;
-    const startsAt = dragTo(entry.startsAt, e.clientY - d.y, pxPerMinute);
-    if (startsAt !== entry.startsAt) onMove(id, startsAt);
-  };
-  const key = (id: string) => (e: KeyboardEvent<HTMLButtonElement>) => {
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-    const entry = entries.get(id);
-    if (!entry || locked(entry)) return;
-    e.preventDefault();
-    const minutes = (e.shiftKey ? 5 : 1) * (e.key === "ArrowUp" ? -1 : 1);
-    onMove(id, dragTo(entry.startsAt, minutes * pxPerMinute, pxPerMinute));
-  };
-
-  return (
-    <div className={`oc-tl cc-edit__tl${spans.length ? " oc-tl--bands" : ""}`} style={maxHeight ? { maxHeight, overflow: "auto" } : undefined}>
-      <div className="oc-tl__hrs" style={{ height: total }}>
-        <div aria-hidden="true">
-          {hours.map((h, i) => (
-            <span key={h} style={{ top: i * 60 * pxPerMinute }}>
-              {clock(h, { timeZone: STATION_TZ }).replace(":00 ", " ")}
-            </span>
-          ))}
-        </div>
-        {spans.length > 0 && (
-          <TimelineBands
-            bands={draftBands(spans, [...entries.values()], troubledSpans)}
-            from={from}
-            to={to}
-            pxPerMinute={pxPerMinute}
-            timeZone={STATION_TZ}
-            selectedId={selectedId}
-            onSelect={onSelectSpan ? (b) => onSelectSpan(b.id) : undefined}
-            onResize={onResizeSpan ? (b, edge, at) => onResizeSpan(b.id, edge, at) : undefined}
-          />
-        )}
-      </div>
-      <div className="oc-tl__col" style={{ height: total }} role="list" aria-label="The log, being edited">
-        {hours.map((h, i) => (
-          <div key={h} className="oc-tl__hl" style={{ top: i * 60 * pxPerMinute }} />
-        ))}
-        {placeBlocks(blocks, from, pxPerMinute).map(({ block: b, top, height }) => {
-          const entry = entries.get(b.id);
-          const span = clockRange(b.start, b.end, { timeZone: STATION_TZ });
-          const style = { top: top + (offset?.id === b.id ? offset.dy : 0), height };
-          if (!entry || b.kind === "brk" || b.kind === "dead") {
-            const words = b.kind === "brk" ? <span className="oc-sr-only">{`Break ${duration(Date.parse(String(b.end)) - Date.parse(String(b.start)))}, ${span}`}</span> : b.kind === "dead" ? `Dead air, ${span}` : (
-              <>
-                <LogCode code={b.code ?? "PGM"} />
-                <div>
-                  <b>{b.title}</b> <small>{b.source}</small>
-                  <span className="oc-sr-only">, {span}</span>
-                </div>
-              </>
-            );
-            return (
-              <div key={b.id} role="listitem" className="oc-tl__item" style={style}>
-                <div className={`oc-blk oc-blk--${b.kind}`}>{words}</div>
-              </div>
-            );
-          }
-          const lock = locked(entry);
-          const classes = [
-            "oc-blk",
-            `oc-blk--${b.kind}`,
-            "cc-edit__blk",
-            b.id === selectedId && "oc-blk--sel",
-            entry.change && "cc-edit__blk--changed",
-            lock && "cc-edit__blk--locked",
-            troubled.has(b.id) && "cc-edit__blk--problem",
-            offset?.id === b.id && "cc-edit__blk--dragging"
-          ]
-            .filter(Boolean)
-            .join(" ");
-          const state = [entry.change === "inserted" ? "new" : entry.change, lock ? "locked" : null, troubled.has(b.id) ? "has a problem" : null].filter(Boolean).join(", ");
-          return (
-            <div key={b.id} role="listitem" className="oc-tl__item" style={style}>
-              <button
-                type="button"
-                className={classes}
-                aria-pressed={b.id === selectedId}
-                aria-roledescription={lock ? undefined : "draggable"}
-                data-entry={b.id}
-                onPointerDown={down(b.id)}
-                onPointerMove={move}
-                onPointerUp={up(b.id)}
-                onPointerCancel={() => {
-                  drag.current = null;
-                  setOffset(null);
-                }}
-                onClick={() => onSelect(b.id)}
-                onKeyDown={key(b.id)}
-              >
-                <LogCode code={b.code ?? "PGM"} />
-                <div>
-                  <b>{b.title}</b> <small>{b.source}</small>
-                  {/* A244: dropped here, it's the block's. */}
-                  {offset?.id === b.id && spanAt(spans, dragTo(entry.startsAt, offset.dy, pxPerMinute)) && <small className="cc-edit__in">In {spanAt(spans, dragTo(entry.startsAt, offset.dy, pxPerMinute))!.name}</small>}
-                  <span className="oc-sr-only">
-                    , {span}
-                    {state ? `, ${state}` : ""}
-                  </span>
-                </div>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** The top of the pane in edit mode: what the draft does, and publishing it. */
-export function ChangesSection({ edit }: { edit: LogEdit }) {
-  const r = edit.result;
-  const count = edit.changes.length;
-  const blocked = !!r?.problems.length || !!edit.conflict;
-  return (
-    <section className="cc-log__sec cc-edit__changes" aria-label="Your changes">
-      <h2 className="cc-log__h">Your changes</h2>
-      {edit.conflict ? (
-        <Notice
-          tone="standby"
-          title="The log changed since you started editing."
-          action={
-            <Button size="sm" onClick={() => void edit.reload()}>
-              Reload
-            </Button>
-          }
-        >
-          Reloading drops your changes. Make them again on the log as it is now.
-        </Notice>
-      ) : !count ? (
-        <p className="cc-log__quiet">No changes yet. Drag a program to move it, or pick one to change it.</p>
-      ) : (
-        <>
-          <p className="cc-edit__summary" aria-live="polite">
-            {r ? r.summary : edit.checking ? "Checking your changes…" : null}
-          </p>
-          {r && (
-            <ul className="cc-edit__lines">
-              {r.changes.map((c) => (
-                <li key={c.index}>
-                  <span>{c.line}</span>
-                  <Button variant="text" size="sm" onClick={() => edit.drop(c.index)} aria-label={`Undo: ${c.line}`}>
-                    Undo
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!!r?.problems.length && (
-            <ul className="cc-edit__problems" aria-label="Problems">
-              {r.problems.map((p, i) => (
-                <li key={i}>{p.index === null ? p.message : `${r.changes[p.index]?.line ?? "A change"}: ${p.message}`}</li>
-              ))}
-            </ul>
-          )}
-          {!!r?.warnings.length && (
-            <ul className="cc-edit__warnings" aria-label="Before you publish">
-              {r.warnings.map((w, i) => (
-                <li key={i}>{w.message}</li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-      {edit.checkError && <p className="cc-log__err">{edit.checkError}</p>}
-      {edit.publishError && <p className="cc-log__err">{edit.publishError}</p>}
-      <div className="cc-edit__actions">
-        <Button variant="ink" size="sm" onClick={() => void edit.publish()} disabled={!count || blocked || !r || edit.checking || edit.publishing}>
-          Publish changes
-        </Button>
-        <Button size="sm" onClick={edit.discard} disabled={edit.publishing}>
-          {count ? "Discard" : "Done"}
-        </Button>
-      </div>
-      {count > 0 && !blocked && <p className="cc-log__note">Everything goes out at once. On air, the channel switches at the next item.</p>}
-    </section>
-  );
-}
-
-/** The picked entry in edit mode: its start, its end (a live block, a sign-off), what airs, and taking it off. */
-export function EntrySection({ edit, entry, base, onInsert, onClose }: { edit: LogEdit; entry: DraftEntry; base: string | null; onInsert: (where: "before" | "after") => void; onClose: () => void }) {
+export function EntrySection({ edit, entry, base, onAdd, onClose }: { edit: LogEdit; entry: DraftEntry; base: string | null; onAdd: (at: string) => void; onClose: () => void }) {
   const lock = edit.locked(entry);
+  const fixed = fixedReason(entry, !!lock);
   const [start, setStart] = useState(timeValue(entry.startsAt));
   const [end, setEnd] = useState(timeValue(entry.endsAt));
   const [error, setError] = useState<string | null>(null);
@@ -499,12 +317,23 @@ export function EntrySection({ edit, entry, base, onInsert, onClose }: { edit: L
             mono
             size="sm"
             value={start}
+            disabled={!!entry.keepTime}
             onChange={(e) => setStart(e.target.value)}
             onBlur={commitStart}
             onKeyDown={(e) => e.key === "Enter" && commitStart()}
-            help="Snapped to the nearest 4 seconds, where the channel can change."
+            help={entry.keepTime ? "Kept at this time. Turn it off to move it." : "Snapped to the nearest 4 seconds, where the channel can change."}
             error={error ?? undefined}
           />
+          {entry.kind !== "off_air" && (
+            <div className="cc-edit__keep">
+              <span>
+                Keep at this time
+                <small>Moving the rows around it stops here</small>
+              </span>
+              <Toggle label="Keep at this time" checked={!!entry.keepTime} onChange={() => edit.keep(entry)} />
+            </div>
+          )}
+          {fixed && fixed !== "locked" && fixed !== "kept" && <p className="cc-log__note">{FIXED_WORDS[fixed]}. Moving the rows around it stops here.</p>}
           {entry.kind !== "program" && (
             <Field label={entry.kind === "live" ? "Ends at" : "Back on at"} mono size="sm" value={end} onChange={(e) => setEnd(e.target.value)} onBlur={commitEnd} onKeyDown={(e) => e.key === "Enter" && commitEnd()} />
           )}
@@ -527,10 +356,10 @@ export function EntrySection({ edit, entry, base, onInsert, onClose }: { edit: L
             </SelectField>
           )}
           <div className="cc-edit__actions">
-            <Button size="sm" onClick={() => onInsert("before")}>
+            <Button size="sm" onClick={() => onAdd(entry.startsAt)}>
               Put on before
             </Button>
-            <Button size="sm" onClick={() => onInsert("after")}>
+            <Button size="sm" onClick={() => onAdd(entry.endsAt)}>
               Put on after
             </Button>
           </div>
@@ -543,135 +372,44 @@ export function EntrySection({ edit, entry, base, onInsert, onClose }: { edit: L
   );
 }
 
-type Source = "library" | "carried";
-
 /**
- * Putting something on before or after an entry: from the library, or an episode of a program the
- * station carries (the market's own). What comes after moves down just enough.
+ * Under "Tonight at a glance" (A246, decision 2): the log's last few published batches, who and
+ * when ("Kai M., 6:12 pm · 2 changes"), and the template that made the day. A record doesn't say
+ * which date it changed, so these are the station's latest.
  */
-export function InsertDialog({ edit, stationId, anchor, where, base, onClose }: { edit: LogEdit; stationId: string; anchor: DraftEntry; where: "before" | "after"; base: string | null; onClose: () => void }) {
-  const [source, setSource] = useState<Source>("library");
-  const [chosen, setChosen] = useState<string | null>(null);
-  const [agreementId, setAgreementId] = useState<string | null>(null);
-  const agreements = useApi(catalogApi.listAgreements, { params: { stationId } }, { retry: false });
-  const carrying = (agreements.data?.carrying ?? []).filter((a) => !a.endsAt || Date.parse(a.endsAt) > clockNow().getTime());
-  const agreement = carrying.find((a) => a.id === agreementId) ?? carrying[0];
-  const offer = useApi(catalogApi.getOffer, { params: { offerId: agreement?.offerId ?? "" } }, { enabled: source === "carried" && !!agreement?.offerId, retry: false });
-
-  const library = airable(edit.library?.items ?? []);
-  const episodes = (offer.data?.episodes ?? []).filter((e) => e.durationMs);
-  const at = where === "after" ? anchor.endsAt : anchor.startsAt;
-
-  const put = () => {
-    const key = edit.nextKey();
-    let item: DraftItem | undefined;
-    let entry: Extract<LogChange, { op: "insert" }>["entry"];
-    if (source === "library") {
-      const i = library.find((x) => x.id === chosen);
-      if (!i) return;
-      item = itemOf(i);
-      entry = { kind: "program", startsAt: at, itemId: i.id };
-    } else {
-      const ep = episodes.find((x) => x.id === chosen);
-      if (!ep || !agreement) return;
-      item = { id: ep.id, title: agreement.program.title, durationMs: ep.durationMs, programId: agreement.program.id, carriageAgreementId: agreement.id, carriedFrom: agreement.maker };
-      entry = { kind: "program", startsAt: at, itemId: ep.id, carriageAgreementId: agreement.id, programId: agreement.program.id };
-    }
-    const length = wholeMinutes(item.durationMs ?? 30 * MIN);
-    // Before an entry, it moves down too; after one, what follows it does.
-    const ripple = rippleFrom(edit.entries, at, length, (e) => !!edit.locked(e));
-    edit.add([{ op: "insert", key, entry }, ...ripple], item);
-    onClose();
-  };
-
-  const options = source === "library"
-    ? library.map((i) => ({ value: i.id, title: i.title, helper: duration(wholeMinutes(i.durationMs ?? 0)) }))
-    : episodes.map((e) => ({ value: e.id, title: e.title, helper: duration(wholeMinutes(e.durationMs ?? 0)) }));
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      width={460}
-      eyebrow={`${where === "after" ? "After" : "Before"} ${anchor.title}, ${clock(at, { timeZone: STATION_TZ })}`}
-      title="Put something on"
-      subtitle="What comes after it moves down to make room."
-      footer={
-        <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={put} disabled={!chosen}>
-            Put it on
-          </Button>
-        </>
-      }
-    >
-      <Segmented
-        label="From"
-        value={source}
-        onChange={(v) => {
-          setSource(v);
-          setChosen(null);
-        }}
-        options={[
-          { value: "library", label: "Your library" },
-          { value: "carried", label: "Programs you carry" }
-        ]}
-        className="cc-edit__from"
-      />
-      {source === "carried" && carrying.length > 1 && (
-        <SelectField label="Program" size="sm" value={agreement?.id ?? ""} onChange={(e) => (setAgreementId(e.target.value), setChosen(null))}>
-          {carrying.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.program.title}, from {stationLabel(a.maker)}
-            </option>
-          ))}
-        </SelectField>
-      )}
-      {options.length ? (
-        <ChoiceList label="What goes on" options={options} value={chosen} onChange={setChosen} className="cc-edit__choices" />
-      ) : (
-        <p className="cc-log__quiet">{source === "library" ? "Nothing in your library can air yet." : agreements.isLoading || offer.isLoading ? null : "You don't carry anything yet."}</p>
-      )}
-      {source === "carried" && base && (
-        <p className="cc-log__note">
-          <a className="cc-log__link" href={`${base}/market`}>
-            Find more in the syndication market
-          </a>
-          . Your changes are kept while you look.
-        </p>
-      )}
-    </Modal>
-  );
-}
-
-/** "Last changed by Kai M. at 8:42 pm", and the last few batches published. */
-export function LogHistory({ stationId }: { stationId: string }) {
-  const history = useApi(logApi.listLogChanges, { params: { stationId }, query: { limit: 5 } }, { retry: false });
+export function DayChanges({ stationId, origin }: { stationId: string; origin: string | null }) {
+  const history = useApi(logApi.listLogChanges, { params: { stationId }, query: { limit: 3 } }, { retry: false });
   const list = history.data?.changes ?? [];
-  if (!list.length) return null;
-  const [last] = list;
+  if (!list.length && !origin) return null;
   const at = (iso: string) => (clockNow().getTime() - Date.parse(iso) < 20 * 3_600_000 ? clock(iso, { timeZone: STATION_TZ }) : dayClock(iso));
   return (
-    <section className="cc-log__sec cc-edit__history" aria-label="Changes to the log">
-      <h2 className="cc-log__h">Changes</h2>
-      <p className="cc-log__note cc-edit__last">{last.by.name ? `Last changed by ${last.by.name} at ${at(last.at)}` : `Last changed at ${at(last.at)}`}</p>
-      <ul className="cc-edit__past">
+    <section className="cc-glance__sec" aria-labelledby="cc-day-changes">
+      <h3 className="cc-glance__h3" id="cc-day-changes">
+        Recent changes
+      </h3>
+      <dl className="cc-kv2">
         {list.map((c) => (
-          <li key={c.id}>
-            <span>{c.summary}</span>
-            <small>
+          <div key={c.id} title={c.lines.join("\n")}>
+            <dt>
               {c.by.name ?? "Someone"}, {at(c.at)}
-            </small>
-          </li>
+            </dt>
+            <dd>{c.count === 1 ? "1 change" : `${c.count} changes`}</dd>
+          </div>
         ))}
-      </ul>
+        {origin && (
+          <div>
+            <dt>{origin}</dt>
+            <dd>Made</dd>
+          </div>
+        )}
+      </dl>
     </section>
   );
 }
 
 /**
  * A244: a programming block's span picked in edit mode: its start and end (typed, like an entry's;
- * dragging its rail's edges does the same), and taking it off this day. One on air keeps its start.
+ * typed, as an entry's), and taking it off this day. One on air keeps its start.
  */
 export function SpanSection({ edit, span, onAir, onClose }: { edit: LogEdit; span: DraftSpan; onAir: boolean; onClose: () => void }) {
   const [start, setStart] = useState(timeValue(span.startsAt));
