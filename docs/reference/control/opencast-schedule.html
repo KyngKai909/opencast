@@ -685,6 +685,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
 .wk .ev.gap { background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby) 30%, transparent) 0 5px, transparent 5px 10px); color:var(--standby); box-shadow:inset 0 0 0 1px var(--standby); }
 .wk .ev.offx { background:repeating-linear-gradient(135deg, var(--hair) 0 5px, transparent 5px 10px); color:var(--ink-50); }
 .wk .ev.bkk { left:0; right:auto; width:4px; padding:0; border-radius:2px; }
+.wk .ev.livex { box-shadow:inset 0 0 0 2px #ECE9E1; }
+.wk .ev.livex small { color:#FF8A78; opacity:1; }
 .wk .nowl { position:absolute; left:0; right:0; height:2px; background:var(--live); z-index:2; }
 /* edit */
 .rr .drag { width:14px; height:18px; color:var(--ink-50); display:grid; place-items:center; } .rr .drag svg { width:14px; height:14px; }
@@ -915,6 +917,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   <p class="lede">The Week view lays out each broadcast day as a column, with programs as blocks in their source colour, blocks as a bar down the edge, and dead air and off air striped. Each day's header says which template made it and whether it was edited. Clicking a day opens it in the Day view.</p>
   <div class="stage"><div id="f-week"></div>
     <div class="notes">
+      <div class="note"><h3>Colours in the week</h3><p>Your own programs in BEAT's colour, carried ones in their maker's, live shows in the station's colour with a live dot. Red is kept for "on air now"; amber for dead air.</p></div>
       <div class="note"><h3>Where the week comes from</h3><p>"Weekdays", "Saturdays", "Sunday, once": each column names its template, with an amber dot when the date was edited by hand.</p></div>
       <div class="note"><h3>Gaps stand out</h3><p>Dead air is the only amber in the week, so a gap on Thursday at 11 pm is visible from across the room.</p></div>
     </div>
@@ -928,6 +931,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   <div class="stage"><div><div id="f-edit"></div><div id="f-add" style="margin-top:28px"></div></div>
     <div class="notes">
       <div class="note"><h3>The tray tells the truth</h3><p>Each change is a line ("Late Crate, ep. 15 moves to 10:10 pm"), followed by what it does elsewhere: held spots moving to the next break, reminders being moved, dead air left behind.</p></div>
+      <div class="note"><h3>Dragging reorders, up to a fixed point</h3><p>Dropping a row puts it right after the row above, and later rows shift down, but only as far as the next fixed point: a live block, a carried program with a time window, a block edge, off air, or any row marked "Keep at this time". Exact times can still be typed, and arrow keys move a row one place.</p></div>
       <div class="note"><h3>Locked near air</h3><p>The row on air and anything starting in the next 20 seconds can't move, with the reason on the row.</p></div>
       <div class="note"><h3>What fits</h3><p>The drawer knows the space: "Fits", "Runs 9 min over" with what it pushes, and "Next episode" for series. Quick fill repeats from the library or signs off until the next program.</p></div>
       <div class="note"><h3>Templates aren't touched</h3><p>Editing a day made from a template makes that date an exception, and says so before publishing. Editing the template itself happens on the Templates tab.</p></div>
@@ -943,6 +947,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     <div class="notes">
       <div class="note"><h3>Cadence as choices</h3><p>Every break, after each program, every 2 programs (or 3, 4…), once an hour, or never, for spots, the credit, bumpers and the station ID. The station ID can't be never, so that choice is crossed out.</p></div>
       <div class="note"><h3>See it before saving</h3><p>The preview rebuilds 9:00 to 10:00 pm with the rules as set. Changing "credit: once an hour" to "every break" visibly adds a green segment to every row.</p></div>
+      <div class="note"><h3>What can air</h3><p>Blocked categories, the backup rotation and ads from partners live here too, so everything about breaks saves together.</p></div>
       <div class="note"><h3>When it applies</h3><p>New rules apply to breaks not yet filled; breaks within 20 minutes keep what they have. Blocks with their own bumper order say so here.</p></div>
     </div>
   </div>
@@ -954,6 +959,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   <p class="lede">The Templates tab lists each day template with its pattern and the dates it has made three weeks ahead: plain for generated, amber for dates edited by hand. Opening one shows its rundown, edited the same way as a day, with the choice to reset edited dates back to it.</p>
   <div class="stage"><div id="f-tpl"></div>
     <div class="notes">
+      <div class="note"><h3>Every day comes first</h3><p>Off air hours are a standing rule for every day, so they sit above the templates rather than inside one. "Make a template from this day" on the Log tab starts a new one.</p></div>
       <div class="note"><h3>Which wins</h3><p>Where two templates cover a date, the more specific wins: once, then a weekday, then weekdays, then every day. The template list says when one is overridden.</p></div>
       <div class="note"><h3>Exceptions are visible</h3><p>Edited dates are amber squares, and "Reset to template" brings one back in line.</p></div>
     </div>
@@ -968,7 +974,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     <div class="notes">
       <div class="note"><h3>Falls back, never empty</h3><p>Anything a block doesn't have uses the station's, then an automatic card in the block's look. "Uses BEAT's" says so on the row, so a new block works before it has a single bumper.</p></div>
       <div class="note"><h3>See it on air</h3><p>The preview shows the block's bug and the banner reading "Late Crate Nights · Beat Tape Live", and the guide band viewers see. Colour, logo and bug choices update it as you go.</p></div>
-      <div class="note"><h3>Members, in plain words</h3><p>A program that starts inside a block is its member to the end, even if it runs past. Moving the block's edges says which programs join or leave, and what airs instead (BEAT's bug and ID).</p></div>
+      <div class="note"><h3>Members, in plain words</h3><p>A program that starts inside a block is its member to the end, even if it runs past. While dragging an edge, the app shows who joins or leaves; the tray's lines come from the server's check, so they can never disagree.</p></div>
+      <div class="note"><h3>Placing a block</h3><p>"Place on the log" opens a menu: on a date (the Log tab's edit mode, ready to place) or in a template (the template editor).</p></div>
       <div class="note"><h3>Ends by 6:00 am</h3><p>A block on a template ends by the start of the next broadcast day. Blocks never overlap, and one on air can only change its end.</p></div>
       <div class="note open"><h3>Blocks in the market</h3><p>Offering a block to other stations (with the maker's look, or the carrier's where allowed) comes with the syndication market. The fields exist; the screens don't yet.</p></div>
     </div>
@@ -999,6 +1006,8 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     <div><span>Break rules</span><span>Scaled break strip; per-part cadence (every break, after each program, every N programs, once an hour, never; station ID can't be never); bumper sequences for open, close and between; timing (when, length, spot cap per hour, same spot per hour); opener options; live preview of the next hour; applies to breaks not yet filled</span></div>
     <div><span>Templates</span><span>List with pattern, label, dates ahead (generated, edited), precedence note; template rundown editor; reset an edited date</span></div>
     <div><span>Blocks</span><span>List with schedule and next airing; block detail with what it airs (intro, outro, ID, bumpers by role, each showing "Uses BEAT's" when falling back), its own bumper order or the station's, the look (colour checked at 4.5:1, logo, what the bug shows) with a live preview of the banner, bug and guide band, and where it airs (templates and one-off dates). On the Log tab in edit mode, its start and end are handles; the tray names programs joining or leaving. Syndication fields shown read-only</span></div>
+    <div><span>Decisions from the first build pass</span><span>Dragging reorders and shifts later rows only up to the next fixed point (live, carried with a window, block edge, off air, or "Keep at this time"). Off air hours sit above the templates as an every-day rule; "Repeat this day" becomes "Make a template from this day"; the change history sits under "Tonight at a glance". Blocked categories, the backup rotation, fill order and ads from partners live on Break rules under one Save. Paused-spot notices go to the Spot market, with a Schedule chip when one affects tonight. Break bumpers and Up next are independent. Saving a template says how many dates are rebuilt and how many edited dates are kept. Quick fill joins a pending draft instead of publishing on its own. Live programs use the station's colour with a live marker, never solid red. Block membership while dragging is computed in the app, but the tray uses the dry run. The block page has one Save (clips and uploads save immediately), warns before leaving with unsaved changes, and previews the next real airing or a labelled sample</span></div>
+    <div><span>Contract requests</span><span>Next unaired episode per series, per-item preparation status (if the readiness check isn't already reachable), block membership changes in <code>applyLogChanges</code> dry runs, and a dry-run preview for <code>setBreakRule</code></span></div>
     <div><span>Phone</span><span>Rundown, health chips, break sheet, fill gap, sign off, move; templates, blocks and rules on desktop</span></div>
   </div>
 </div></section>
@@ -1042,11 +1051,12 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       if(r.off) return '<div class="rr off">'+blk+'<span class="t">'+r.t+'</span><span class="code2 off">OFF</span><div><b>'+r.ti+'</b><small>'+r.s+'</small></div><span class="len">'+r.l+'</span></div>';
       var st=r.st||''; return '<div class="rr '+st+'">'+blk+'<span class="t">'+r.t+'</span><span class="code2 '+(r.c==='LIVE'?'live':'pgm')+'">'+r.c+'</span><div><b>'+r.ti+(st==='now'?'<span class="tagl"><i></i>ON AIR</span>':'')+'</b><small'+(r.warn?' style="color:var(--standby)"':'')+'>'+r.s+'</small></div><span class="len">'+r.l+'</span></div>';
     }).join(''); }
-  var chips='<div class="hchips"><span class="hchip live"><i></i>On air: Saturday Reel, 17 min left</span><span class="hchip warn"><i></i>Dead air at 11:40 pm, 20 min</span><span class="hchip warn"><i></i>1 item still preparing</span><span class="hchip off"><i></i>Off air 2:00 to 6:00 am, planned</span></div>';
-  function daynav(extra){ return '<div class="daynav"><span class="arw l">'+icon('i-down')+'</span><b>Saturday, Oct 3</b><span class="arw r">'+icon('i-down')+'</span><span class="btn-xs">Today</span><span class="tpl"><i></i>From "Saturdays", edited</span><span class="end">'+(extra||'<span class="seg"><button aria-pressed="true">Day</button><button aria-pressed="false">Week</button></span>')+'</span></div>'; }
+  var chips='<div class="hchips"><span class="hchip live"><i></i>On air: Saturday Reel, 17 min left</span><span class="hchip warn"><i></i>Dead air at 11:40 pm, 20 min</span><span class="hchip warn"><i></i>1 item still preparing</span><span class="hchip off"><i></i>Off air 2:00 to 6:00 am, planned</span><span class="hchip warn"><i></i>A spot paused; backup fills 10:29 pm</span></div>';
+  function daynav(extra){ return '<div class="daynav"><span class="arw l">'+icon('i-down')+'</span><b>Saturday, Oct 3</b><span class="arw r">'+icon('i-down')+'</span><span class="btn-xs">Today</span><span class="tpl"><i></i>From "Saturdays", edited</span><span class="btn-xs">Make a template from this day</span><span class="end">'+(extra||'<span class="seg"><button aria-pressed="true">Day</button><button aria-pressed="false">Week</button></span>')+'</span></div>'; }
   function head(tab,end){ return '<div class="sch-top"><h2>Schedule</h2><div class="sch-tabs">'+['Log','Templates','Blocks','Break rules'].map(function(x){ return '<span'+(x===tab?' class="on"':'')+'>'+x+'</span>'; }).join('')+'</div><div class="end">'+(end||'')+'</div></div>'; }
   function frame(id,h,inner,cap){ var el=document.getElementById(id); el.innerHTML='<div class="fit" data-w="1280" data-h="'+h+'"><div class="scaler"><div class="app mc" data-nav="schedule" data-air="on" style="height:'+h+'px">'+inner+'</div></div></div>'+(cap?'<p class="cap">'+cap+'</p>':''); }
   var glance='<div class="pane2"><h4>Tonight at a glance</h4><span class="sub">Saturday, 6:00 pm to 6:00 am</span><div class="kv2"><div><span>Programs</span><span>7 hr 40 min</span></div><div><span>Breaks</span><span>14, 15 min in all</span></div><div><span>Spots placed so far</span><span>9</span></div><div><span>Still open, to the spot market</span><span>3:30</span></div><div><span>Barter time owed to makers</span><span>1:30</span></div></div>'+
+    '<div style="margin-top:14px"><h4 style="font-size:14px">Changes to this day</h4><div class="kv2" style="margin-top:6px"><div><span>Kai, 6:12 pm</span><span>2 changes</span></div><div><span>Template, Sept 19</span><span>Made</span></div></div></div>'+
     '<div style="margin-top:18px"><h4>Next break, 8:59:20 pm</h4><span class="sub">After Saturday Reel. 0:40</span>'+strip([['prod',30,"REEL's barter"],['sid',5,'ID'],['open',5,'']])+'<div class="why">REEL\'s 0:30 is the maker\'s time under barter. The rest holds on the station ID slate. <a href="#rules">Break rules</a></div></div></div>';
   frame('f-day',800, head('Log','<span class="btn-xs">'+icon('i-plus')+'Add</span><span class="btn-xs pri">Edit</span>')+daynav()+chips+'<div class="schg"><div class="rdn">'+rows({start:4})+'</div>'+glance+'</div>');
   var bpane='<div class="pane2"><h4>Break, 10:29:10 pm</h4><span class="sub">After Late Crate, ep. 15. 0:50. Inside Late Crate Nights</span>'+strip([['bmp',5,'Bmp'],['open',30,'0:30 open'],['und',10,'Credit'],['sid',5,'ID']])+
@@ -1066,7 +1076,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   days.forEach(function(d,k){ var evs=wkd.map(function(e){ var hh=Math.floor(e[0]); var lab=((hh%12)||12)+':'+(e[0]%1?'30':'00'); return ev(e[0],e[1],e[2]+'<small>'+lab+'</small>',e[3]); });
     if(k===3){ evs[9]=ev(23,1,'Dead air<small>11 pm, 1 hr</small>','', 'gap'); }
     if(k>=4){ evs.push('<div class="ev bkk" style="top:'+((21-H0)*PX)+'px;height:'+(4*PX)+'px;background:'+BLK+'"></div>'); }
-    if(k===5){ evs[10]=ev(21,1,'Beat Tape Live<small>Live</small>','#B8261A'); evs[11]=ev(23.67,.33,'Dead air','', 'gap'); }
+    if(k===5){ evs[10]=ev(21,1,'Beat Tape Live<small>● Live</small>','#8C3B7A','livex'); evs[11]=ev(23.67,.33,'Dead air','', 'gap'); }
     evs.push(ev(25,1,'Off air<small>2 to 6 am</small>','', 'offx'));
     cols+='<div class="col">'+evs.join('')+(k===5?'<div class="nowl" style="top:'+((20.7-H0)*PX)+'px"></div>':'')+'</div>'; });
   var whead='<div class="wk"><div class="hd"></div>'+days.map(function(d,k){ return '<div class="hd'+(k===5?' today':'')+'">'+d[0]+', '+d[1]+'<small>'+d[2]+(d[3]?' · <span style="color:var(--standby)">edited</span>':'')+'</small></div>'; }).join('')+cols+'</div>';
@@ -1075,7 +1085,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
   var er=[
     '<div class="rr now lock"><span class="drag"></span><span class="t">8:30 pm</span><span class="code2 pgm">PGM</span><div><b>Saturday Reel<span class="tagl"><i></i>ON AIR</span></b><small>On air now, can\'t change</small></div><span class="len">29:20</span></div>',
     '<div class="rr brk"><span class="drag"></span><span class="t">8:59:20</span><span class="code2">BRK</span><span class="bline">'+bfill([['prod',30],['sid',5],['open',5]])+'<span>Follows the programs</span></span><span class="len">0:40</span></div>',
-    '<div class="rr moved"><span class="drag">'+icon('i-guide')+'</span><span class="t">9:00 pm</span><span class="code2 live">LIVE</span><div><b>Beat Tape Live</b><small>Now ends 10:10 pm, was 10:00 pm</small></div><span class="len">1:10:00</span></div>',
+    '<div class="rr moved"><span class="drag">'+icon('i-guide')+'</span><span class="t">9:00 pm</span><span class="code2 live">LIVE</span><div><b>Beat Tape Live <span class="code2" style="margin-left:6px;font-size:9.5px">FIXED</span></b><small>Live, so it keeps its start. Now ends 10:10 pm, was 10:00 pm</small></div><span class="len">1:10:00</span></div>',
     '<div class="rr moved"><span class="drag">'+icon('i-guide')+'</span><span class="t">10:10 pm</span><span class="code2 pgm">PGM</span><div><b>Late Crate, ep. 15</b><small>Moved from 10:00 pm</small></div><span class="len">29:10</span></div>',
     '<div class="rr rem"><span class="drag">'+icon('i-guide')+'</span><span class="t">10:30 pm</span><span class="code2 pgm">PGM</span><div><b>Slow Hours</b><small>Coming off the log</small></div><span class="len">1:10:00</span></div>',
     '<div class="rr brk"><span class="drag"></span><span class="t">10:39:10</span><span class="code2">BRK</span><span class="bline">'+bfill([['bmp',5],['spt',30],['und',10],['sid',5]])+'<span>Held spots move here</span></span><span class="len">0:50</span></div>',
@@ -1083,7 +1093,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     '<div class="addhere">Add here</div>',
     '<div class="rr gap"><span class="drag"></span><span class="t">11:40 pm</span><span class="code2" style="color:var(--standby)">GAP</span><div><b>Dead air</b><small>Still 20 min until 12:00 am</small></div><span class="act"><span class="btn-xs warn">Fill</span></span></div>'
   ].join('');
-  var tray='<div class="tray"><div><b>4 changes, checked: nothing blocks publishing</b><ul><li>Beat Tape Live now ends at 10:10 pm</li><li>Late Crate, ep. 15 moves to 10:10 pm</li><li>Slow Hours comes off the log; 3 viewers\' reminders move to its next airing, Tuesday</li><li>Crate Session 03 goes on at 10:40 pm</li><li class="w">Held spots in the 10:29 pm break move to the 10:39 pm break</li><li class="w">Dead air from 11:40 pm to 12:00 am is still there</li></ul></div><div class="btns"><span class="btn-xs">Discard</span><span class="btn-xs">Check again</span><span class="btn-xs pri">Publish 4 changes</span></div></div>';
+  var tray='<div class="tray"><div><b>4 changes, checked: nothing blocks publishing</b><ul><li>Beat Tape Live now ends at 10:10 pm</li><li>Late Crate, ep. 15 moves to 10:10 pm; rows after it shift down as far as the next fixed point</li><li>Slow Hours comes off the log; 3 viewers\' reminders move to its next airing, Tuesday</li><li>Crate Session 03 goes on at 10:40 pm</li><li class="w">Held spots in the 10:29 pm break move to the 10:39 pm break</li><li class="w">Dead air from 11:40 pm to 12:00 am is still there</li></ul></div><div class="btns"><span class="btn-xs">Discard</span><span class="btn-xs">Check again</span><span class="btn-xs pri">Publish 4 changes</span></div></div>';
   frame('f-edit',800, head('Log','<span class="btn-xs">Done editing</span>')+daynav('<span class="hchip" style="color:var(--signal);box-shadow:inset 0 0 0 1px var(--signal)">Editing. This date becomes an exception to "Saturdays"</span>')+'<div class="rdn" style="max-width:820px;margin-top:10px">'+er+'</div>'+tray, 'Edit mode: moved rows in blue, a new row outlined, a removed row struck through, and the tray with every change and its effects.');
   // add drawer
   var drawer='<div class="drawer"><h3>Add at 11:40 pm</h3><div class="sub">20 min free, until Late Crate, ep. 13 at 12:00 am</div><div class="dtabs"><span class="on">Library</span><span>Carried</span><span>Live</span><span>Sign off</span></div><div class="dsearch">'+icon('i-search')+'Search your library</div>'+
@@ -1101,25 +1111,25 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     '<span class="c-bmp" style="flex:5">Bumper<small>0:05</small></span><span class="c-spt" style="flex:90">Spots<small>up to 1:30</small></span><span class="c-und" style="flex:10">Credit<small>0:10</small></span><span class="c-bmp" style="flex:5">Bumper<small>0:05</small></span><span class="c-sid" style="flex:5">ID<small>0:05</small></span></div>'+
     '<div class="after">Then between programs<span class="c-upn">Up next 0:05</span>Outside the break, so partner ads never replace it</div></div>'+
     '<div class="cad">'+cadRow('c-spt','Spots','Your rotation, then backups, then the spot market',O,0)+cadRow('c-und','Thank-you credit','Members and sponsors',O,3)+cadRow('c-bmp','Bumpers','Into and out of the break',O,0)+cadRow('c-sid','Station ID','Always last. Can\'t be never',O,1,4)+cadRow('c-upn','Up next','Between programs',O,1)+'</div>'+
-    '<div class="timing"><div><small>Breaks come</small><b style="font-family:var(--font-text);font-size:14px;font-weight:700">After every program</b></div><div><small>Length</small><b>2:00</b></div><div><small>Spot time per hour</small><b>3:00</b></div><div><small>Same spot per hour</small><b>2</b></div></div></div>'+
+    '<div style="margin-top:16px"><h4 style="margin:0 0 8px;font:700 15px var(--font-display)">What can air in your breaks</h4><div class="cad" style="margin-top:0"><div class="r" style="grid-template-columns:180px minmax(0,1fr)"><div><b>Never on BEAT</b><small>Spots in these categories don\'t reach your market</small></div><div class="segs"><span class="on">Alcohol</span><span class="on">Gambling</span><span>Cannabis</span><span class="on">Political</span><span>Payday loans</span></div></div><div class="r" style="grid-template-columns:180px minmax(0,1fr)"><div><b>Backup rotation</b><small>When a spot pauses</small></div><span style="font-size:13px">Redlands Hardware, Citrus Valley Farmers Market</span></div><div class="r" style="grid-template-columns:180px minmax(0,1fr)"><div><b>Ads from partners</b><small>Only time still open. Paid later</small></div><span class="segs"><span>On</span><span class="on">Off</span></span></div></div></div><div class="timing"><div><small>Breaks come</small><b style="font-family:var(--font-text);font-size:14px;font-weight:700">After every program</b></div><div><small>Length</small><b>2:00</b></div><div><small>Spot time per hour</small><b>3:00</b></div><div><small>Same spot per hour</small><b>2</b></div></div></div>'+
     '<div class="prev"><h4>Preview: 7:00 to 8:00 pm</h4><div class="sub">Rebuilt with the rules as set. Nothing is saved yet</div>'+
     '<div class="row"><span class="t">7:00</span><span>Tamales for forty, ep. 3 <span class="quiet">carried</span></span></div>'+
     '<div class="row"><span class="t">7:28:40</span>'+strip([['bmp',5,''],['prod',60,'SAZN barter'],['und',10,'Credit'],['bmp',5,''],['sid',5,'ID']])+'</div>'+
     '<div class="row"><span class="t">7:30</span><span>Late Crate, ep. 14</span></div>'+
     '<div class="row"><span class="t">7:59:10</span>'+strip([['bmp',5,''],['spt',30,'Spot'],['bmp',5,''],['sid',5,'ID']])+'</div>'+
     '<div class="row"><span class="t">8:00</span><span>Crate Talk</span></div>'+
-    '<div class="applies">Applies to breaks not yet filled. Breaks in the next 20 minutes keep what they have. <b>Late Crate Nights</b> uses its own bumper order during the block.</div>'+
+    '<div class="applies">Everything on this page saves together. Applies to breaks not yet filled. Breaks in the next 20 minutes keep what they have. <b>Late Crate Nights</b> uses its own bumper order during the block.</div>'+
     '<div style="display:flex;gap:8px;margin-top:14px"><span class="btn-xs">Reset</span><span class="btn-xs pri">Save break rules</span></div></div></div>';
-  frame('f-rules',800, head('Break rules')+'<div style="border-top:1px solid var(--line)"></div>'+rules);
+  frame('f-rules',1000, head('Break rules')+'<div style="border-top:1px solid var(--line)"></div>'+rules);
   // templates
   function dots(arr){ return '<div class="dots">'+arr.map(function(x){ return '<i class="'+x[1]+'">'+x[0]+'</i>'; }).join('')+'</div>'; }
-  var tpl='<div class="tpls"><div>'+
+  var tpl='<div class="tpls"><div>'+'<div class="tcard" style="box-shadow:none;border:1.5px dashed var(--line)"><b>Every day</b><small>Off air every night, 2:00 to 6:00 am. Applies to every template and date</small><span class="btn-xs" style="margin-top:8px">Change</span></div>'+
     '<div class="tcard"><b>Weekdays</b><small>Monday to Friday. 15 dates ahead</small>'+dots([['5','g'],['6','g'],['7','g'],['8','g'],['9','g'],['12','g'],['13','g'],['14','g']])+'</div>'+
     '<div class="tcard on"><b>Saturdays</b><small>"After work". Every Saturday from Sept 19. 3 dates ahead</small>'+dots([['3','e'],['10','g'],['17','g'],['24','g']])+'</div>'+
     '<div class="tcard"><b>Sundays</b><small>Every Sunday. 3 dates ahead</small>'+dots([['4','g'],['11','g'],['18','g']])+'</div>'+
     '<div class="tcard"><b>Halloween</b><small>Once, Sat Oct 31. Overrides Saturdays that day</small>'+dots([['31','g']])+'</div>'+
     '<span class="btn-xs pri" style="margin-top:6px">'+icon('i-plus')+'New template</span></div>'+
-    '<div><div class="daynav" style="border-top:0"><b>Saturdays</b><span class="tpl"><i></i>Oct 3 edited by Kai, 2 changes</span><span class="end"><span class="btn-xs">Reset Oct 3 to template</span><span class="btn-xs pri">Edit template</span></span></div>'+
+    '<div><div class="daynav" style="border-top:0"><b>Saturdays</b><span class="tpl"><i></i>Oct 3 edited by Kai, 2 changes</span><span class="end"><span class="btn-xs">Reset Oct 3 to template</span><span class="btn-xs pri">Edit template</span></span></div><div class="applies" style="margin:0 0 8px">Saving changes here rebuilds 3 upcoming Saturdays. Oct 3, edited by hand, is kept as an exception.</div>'+
     '<div class="rdn">'+R.filter(function(r){ return !r.b && !r.gap && !r.band; }).slice(0,9).map(function(r){ if(r.off) return '<div class="rr off"><span class="bedge"></span><span class="t">'+r.t+'</span><span class="code2 off">OFF</span><div><b>Off air</b><small>Until 6:00 am</small></div><span class="len">4:00:00</span></div>'; return '<div class="rr"><span class="bedge" style="background:'+(r.blk?BLK:'transparent')+'"></span><span class="t">'+r.t+'</span><span class="code2 '+(r.c==='LIVE'?'live':'pgm')+'">'+r.c+'</span><div><b>'+r.ti+'</b><small>'+r.s.replace('. Preparing for air, 62%','')+'</small></div><span class="len">'+r.l+'</span></div>'; }).join('')+'</div></div></div>';
   frame('f-tpl',800, head('Templates')+'<div style="border-top:1px solid var(--line);padding-top:14px"></div>'+tpl);
   // ---------- blocks tab ----------
@@ -1128,7 +1138,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
     '<div class="bcard"><span class="sw" style="background:#2E6B5A"></span><div><b>Morning Crates</b><small>Weekdays, 6:00 to 9:00 am. Station\'s bumpers</small><small class="nx">Next: Monday at 6:00 am</small></div></div>'+
     '<div class="bcard"><span class="sw" style="background:#9A5412"></span><div><b>Sunday Slow</b><small>Not on the log yet</small><small class="nx" style="color:var(--signal)">Place on the log</small></div></div>'+
     '<span class="btn-xs pri" style="margin-top:6px">'+icon('i-plus')+'New block</span></div>'+
-    '<div><div class="bdet-h"><span class="logo" style="background:'+BLK+'">LCN</span><div><h3>Late Crate Nights</h3><small>"Records after dark, live and from the crates." Made by BEAT 12.1</small></div><div class="end"><span class="btn-xs">Place on the log</span><span class="btn-xs pri">Save</span></div></div>'+
+    '<div><div class="bdet-h"><span class="logo" style="background:'+BLK+'">LCN</span><div><h3>Late Crate Nights <span style="font:500 12px var(--font-text);color:var(--ink-50)">Edit</span></h3><small>"Records after dark, live and from the crates." Made by BEAT 12.1</small></div><div class="end"><span class="btn-xs">Place on the log '+icon('i-down')+'</span><span class="btn-xs pri">Save</span></div></div>'+
     '<div class="bgrid"><div>'+
       '<div class="bsec"><h4>What it airs <small>Anything it doesn\'t have falls back to BEAT\'s</small></h4>'+
         '<div class="irow"><span class="code2">OPN</span><div><b>Intro</b><small>Just before its first program. 2 in rotation</small></div><span class="n">0:05</span><span class="tg2"></span></div>'+
@@ -1137,7 +1147,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
         '<div class="irow"><span class="code2">BMP</span><div><b>Bumpers into the break</b><small>4 of its own</small></div><span class="n">0:05</span><span class="fb"></span></div>'+
         '<div class="irow"><span class="code2">BMP</span><div><b>Bumpers out of the break</b><small>3 of its own</small></div><span class="n">0:05</span><span class="fb"></span></div>'+
         '<div class="irow"><span class="code2">BMP</span><div><b>Up next</b><small>None of its own</small></div><span class="n"></span><span class="fb">Uses BEAT\'s</span></div>'+
-        '<span class="btn-xs" style="margin-top:10px">'+icon('i-plus')+'Add from the library</span></div>'+
+        '<div style="display:flex;gap:8px;margin-top:10px"><span class="btn-xs">'+icon('i-plus')+'Add from the library</span><span class="btn-xs">Upload</span></div><div class="why" style="margin-top:6px">Added clips and uploads save straight away; everything else saves with Save.</div></div>'+
       '<div class="bsec"><h4>Bumper order <small>Its own, instead of BEAT\'s</small></h4>'+
         '<div class="order"><span>Opening a break</span><span class="roles"><span>Into the break</span></span></div>'+
         '<div class="order"><span>Closing a break</span><span class="roles"><span>Out of the break</span></span></div>'+
@@ -1151,7 +1161,7 @@ section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
       '<div class="bsec" style="margin-top:14px"><h4>Where it airs</h4><div class="where">'+
         '<div><div><b>Fridays and Saturdays templates</b><small>9:00 pm to 1:00 am. 6 dates ahead</small></div><span class="btn-xs">Open</span></div>'+
         '<div><div><b>Halloween, Sat Oct 31</b><small>Once, 8:00 pm to 2:00 am</small></div><span class="btn-xs">Open</span></div></div></div>'+
-      '<div class="fallback">Made by BEAT. Offering blocks to other stations, with your look or theirs, comes later with the syndication market.</div>'+
+      '<div class="fallback">Made by BEAT. Offering blocks to other stations, with your look or theirs, comes later with the syndication market.</div><span class="btn-xs" style="margin-top:10px">Archive block</span>'+
     '</div></div></div></div>';
   frame('f-blocks',800, head('Blocks')+'<div style="border-top:1px solid var(--line);padding-top:14px"></div>'+bl);
   // placing / resizing a block on the log
