@@ -372,11 +372,25 @@ export class ChannelAssembler {
       out.push(dateRangeTag({ id: `${rowId}-sign-off`, class: HLS_CLASS.signOff, start, durationSeconds: seconds, attributes: { backAt: seg.backAt?.toISOString() ?? null } }));
     }
     const tv = look.band === "tv";
-    if (tv && look.bug.mode !== "off" && kind !== "stand_by" && !["SID", "UND", "OPEN", "OPN", "CLS"].includes(seg.code)) {
-      const logo = look.bug.mode === "logo" && look.logoUrl ? publicUrl(this.ctx.deps, look.logoUrl) : null;
-      const mode = look.bug.mode === "logo" && logo ? "logo" : "call_sign_and_channel";
+    // A244: during a programming block, its bug: its logo (`logo`, with one; even when the station's
+    // bug is off), the station's (`station`, or `logo` without a logo), or none (`off`). The
+    // station's position and opacity either way.
+    const block = seg.block ?? null;
+    const blockLogo = block && block.bug === "logo" && block.logoUrl ? publicUrl(this.ctx.deps, block.logoUrl) : null;
+    const bugOn = block?.bug === "off" ? false : blockLogo ? true : look.bug.mode !== "off";
+    if (tv && bugOn && kind !== "stand_by" && !["SID", "UND", "OPEN", "OPN", "CLS"].includes(seg.code)) {
+      const logo = blockLogo ?? (look.bug.mode === "logo" && look.logoUrl ? publicUrl(this.ctx.deps, look.logoUrl) : null);
+      const mode = logo ? "logo" : "call_sign_and_channel";
       const position = ["top_left", "top_right", "bottom_left", "bottom_right"].includes(look.bug.position) ? look.bug.position : "bottom_right";
-      out.push(dateRangeTag({ id: `${rowId}-bug`, class: HLS_CLASS.bug, start, durationSeconds: seconds, attributes: { mode, callSign: look.callSign, channel: look.channel, logoUrl: logo, position, opacity: look.bug.opacity } }));
+      out.push(
+        dateRangeTag({
+          id: `${rowId}-bug`,
+          class: HLS_CLASS.bug,
+          start,
+          durationSeconds: seconds,
+          attributes: { mode, callSign: look.callSign, channel: look.channel, logoUrl: logo, position, opacity: look.bug.opacity, blockId: blockLogo ? block!.id : null }
+        })
+      );
     }
     // A243: an up-next bumper's title, drawn by the player over the clip (TV), from the log as it is
     // now (written this close to air, when edits are locked). "Up next" when the program follows
@@ -390,7 +404,7 @@ export class ChannelAssembler {
           class: HLS_CLASS.upNext,
           start: start + 1000,
           durationSeconds: seconds - 1,
-          attributes: { logEntryId: a.entryId, title: a.title, episodeTitle: a.episodeTitle, startsAt: a.startsAt, immediate, carriedFrom: a.carriedFrom }
+          attributes: { logEntryId: a.entryId, title: a.title, episodeTitle: a.episodeTitle, startsAt: a.startsAt, immediate, carriedFrom: a.carriedFrom, blockName: a.blockName ?? null }
         })
       );
     }
@@ -428,7 +442,9 @@ export class ChannelAssembler {
       bumperRole: seg.code === "BMP" ? (seg.bumperRole ?? null) : null,
       position: seg.position ?? null,
       announcedEntryId: seg.announces?.entryId ?? null,
-      announcedTitle: seg.announces?.title ?? null
+      announcedTitle: seg.announces?.title ?? null,
+      // A244: the programming block it aired in.
+      programBlockId: seg.block?.id ?? null
     };
   }
 
@@ -780,6 +796,7 @@ export class ChannelAssembler {
           position: row.position as "open" | null,
           announcedEntryId: row.announcedEntryId,
           announcedTitle: row.announcedTitle,
+          programBlockId: row.programBlockId,
           proofFrameUrl: proof,
           proofFrameAt: proof ? new Date((row.startsAt.getTime() + row.endsAt.getTime()) / 2) : null
         })

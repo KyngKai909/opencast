@@ -7,7 +7,7 @@
 // A243 (2026-10-02): the bumpers at /library/bumpers, with a chip per role (?role=up_next).
 
 import { useParams, useSearchParams } from "react-router";
-import { libraryApi, stationsApi, type BumperRole, type LibraryCode, type LibraryItem } from "@opencast/contracts";
+import { blocksApi, libraryApi, stationsApi, type BumperRole, type LibraryCode, type LibraryItem } from "@opencast/contracts";
 import { ChipRow, ControlTitle } from "@opencast/ui";
 import { useApi } from "../../../api/hooks";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
@@ -30,13 +30,16 @@ const SPECIAL: Record<string, { title: string; keep: (i: LibraryItem) => boolean
 };
 
 export default function Library() {
-  const { folderId = "all" } = useParams();
+  const { folderId: folderParam = "all", blockId } = useParams();
+  // A244: a programming block's list (/library/blocks/:blockId).
+  const folderId = blockId ? `blocks/${blockId}` : folderParam;
   const [params, setParams] = useSearchParams();
   const s = useStation();
   const phone = useIsPhone();
   useShellOptions({ flush: true });
   const identityList = IDENT_LISTS.some((l) => l.key === folderId);
   const rule = useApi(stationsApi.getBreakRule, { params: { stationId: s.id } }, { enabled: identityList, retry: false });
+  const blocks = useApi(blocksApi.listBlocks, { params: { stationId: s.id } }, { retry: false });
   const lib = useApi(
     libraryApi.getLibrary,
     { params: { stationId: s.id }, query: {} },
@@ -54,7 +57,10 @@ export default function Library() {
   }
   const data = lib.data;
   const folder = data.folders.find((f) => f.id === folderId);
-  const special = SPECIAL[folderId];
+  const block = blockId ? blocks.data?.blocks.find((b) => b.id === blockId) : undefined;
+  const special = block
+    ? { title: block.name, keep: (i: LibraryItem) => i.programBlockId === block.id, empty: `Nothing in ${block.name} yet. Drop its bumpers, ID, intro or outro here.` }
+    : SPECIAL[folderId];
   // A243: the Bumpers list's chips: all of them, or one role.
   const role = folderId === "bumpers" ? (params.get("role") as BumperRole | null) : null;
   const listed = special ? data.items.filter(special.keep) : folder ? data.items.filter((i) => i.folderId === folder.id) : data.items;
@@ -66,7 +72,7 @@ export default function Library() {
 
   return (
     <div className="cc-libwrap">
-      <FolderRail base={s.base} active={folder || special ? folderId : "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} identity={identityCounts(data.items)} bumpers={bumperCount(data.items)} />
+      <FolderRail base={s.base} active={folder || special ? folderId : "all"} total={data.items.length} folders={data.folders} importedFromLinks={data.importedFromLinks} needsAttention={data.needsAttention} identity={identityCounts(data.items)} bumpers={bumperCount(data.items)} blocks={(blocks.data?.blocks ?? []).map((b) => ({ id: b.id, name: b.name, count: data.items.filter((i) => i.programBlockId === b.id).length }))} />
       <div className="cc-lib-main">
         <ControlTitle title={special?.title ?? folder?.name ?? "Library"} description={folder || special ? undefined : `Everything ${callSign} can put on air. Each item is prepared for air when it arrives, and each needs its type set and its rights confirmed.`} />
         {identityList && (
@@ -87,7 +93,7 @@ export default function Library() {
             />
           </div>
         )}
-        <UploadDrop stationId={s.id} folderId={folder?.id ?? null} code={special?.code} />
+        <UploadDrop stationId={s.id} folderId={folder?.id ?? null} code={special && "code" in special ? special.code : undefined} programBlockId={block?.id ?? null} />
         {items.length > 0 && <LibrarySummary items={items} />}
         <LibraryTable
           items={items}
@@ -95,6 +101,7 @@ export default function Library() {
           label={special?.title ?? folder?.name ?? "Library"}
           onRights={(i) => openRights(i.id)}
           hrefFor={(i) => `${s.base}/library/items/${i.id}${folder ? `?folder=${folder.id}` : ""}`}
+          blocks={new Map((blocks.data?.blocks ?? []).map((b) => [b.id, { name: b.name, colour: b.colour }]))}
           empty={empty ?? special?.empty ?? (folder ? "Nothing in this folder yet." : "The library is empty. Drop files here, or import from a link.")}
         />
         {/* The generated station ID (added 2026-09-29): with all items, read-only. */}

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { BlockBand, BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { Captions, Program } from "./library.js";
+import { BlockSpan, DayTemplateBlock } from "./blocks.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -51,7 +52,9 @@ export const BreakRow = z.object({
       announces: z.object({ title: z.string(), startsAt: Timestamp }).nullable(),
       fits: z.boolean()
     })
-    .optional()
+    .optional(),
+  /** A244 (added 2026-10-02): a programming block's intro, outro, ID or bumper, as `BreakContent.block`. */
+  block: z.object({ id: Id, name: z.string(), part: z.enum(["intro", "outro", "id", "bumper"]), fits: z.boolean() }).optional()
 });
 export type BreakRow = z.infer<typeof BreakRow>;
 
@@ -187,7 +190,12 @@ export const DayTemplate = z.object({
   /** Dates from tomorrow on that were generated from it, and whether each was edited since. */
   dates: z.array(z.object({ date: DateOnly, edited: z.boolean(), entries: z.number().int(), skipped: z.number().int() })),
   createdAt: Timestamp,
-  updatedAt: Timestamp.nullable()
+  updatedAt: Timestamp.nullable(),
+  /**
+   * A244 (added 2026-10-02): the programming blocks in it, generated onto each date with its entries
+   * (a date edited by hand keeps its own). Each ends by 6:00 am, when the next broadcast day starts.
+   */
+  blocks: z.array(DayTemplateBlock).optional()
 });
 export type DayTemplate = z.infer<typeof DayTemplate>;
 
@@ -260,7 +268,13 @@ export const ProgramLog = z.object({
    * airs and a live block ended early). An edit sends it back (`applyLogChanges`'s `base`); if the
    * log changed in the window since, the edit is refused with 409 `log_changed`.
    */
-  version: z.string().optional()
+  version: z.string().optional(),
+  /**
+   * A244 (added 2026-10-02): programming blocks on the log in the window: where each is placed,
+   * where it airs (its members), and what to look at (a member running past its end, nothing in
+   * it yet, no room for its intro).
+   */
+  blocks: z.array(BlockSpan).optional()
 });
 
 export const DeadAirStatus = z.object({
@@ -338,13 +352,23 @@ export const LOG_EDIT_LEAD_MS = 20_000;
  * - `resize`: a new end (a live block's length, a sign-off's back-on time, a program's slot).
  * - `remove`: off the log.
  * - `insert`: a new entry, as `addEntry` takes it. `key` is the app's own name for it, echoed back.
+ * - `block_add` (A244, 2026-10-02): a programming block placed on the log from `startsAt` to
+ *   `endsAt` (up to 24 hours; it may cross 6:00 am on a date). Programs starting inside it are its.
+ * - `block_resize` (A244): a span's new start or end. One on air can only change its end, and not
+ *   to sooner than `LOG_EDIT_LEAD_MS` from now (`block_locked`).
+ * - `block_remove` (A244): the span comes off (its programs stay). Not while it's on air.
+ * Blocks never overlap (`block_overlap`).
  */
 export const LogChange = z.discriminatedUnion("op", [
   z.object({ op: z.literal("move"), entryId: Id, startsAt: Timestamp }),
   z.object({ op: z.literal("replace"), entryId: Id, itemId: Id, carriageAgreementId: Id.optional() }),
   z.object({ op: z.literal("resize"), entryId: Id, endsAt: Timestamp }),
   z.object({ op: z.literal("remove"), entryId: Id }),
-  z.object({ op: z.literal("insert"), key: z.string().max(64).optional(), entry: EntryInput })
+  z.object({ op: z.literal("insert"), key: z.string().max(64).optional(), entry: EntryInput }),
+  // A244 (added 2026-10-02): programming blocks on this date's log.
+  z.object({ op: z.literal("block_add"), key: z.string().max(64).optional(), blockId: Id, startsAt: Timestamp, endsAt: Timestamp }),
+  z.object({ op: z.literal("block_resize"), spanId: Id, startsAt: Timestamp.optional(), endsAt: Timestamp.optional() }),
+  z.object({ op: z.literal("block_remove"), spanId: Id })
 ]);
 export type LogChange = z.infer<typeof LogChange>;
 
@@ -377,9 +401,12 @@ export const LogChangesResult = z.object({
   changes: z.array(
     z.object({
       index: z.number().int(),
-      op: z.enum(["move", "replace", "resize", "remove", "insert"]),
-      /** The entry (an insert's once published; null before). */
+      /** A244 (2026-10-02): `block_add`, `block_resize`, `block_remove` too (only for batches that send them). */
+      op: z.enum(["move", "replace", "resize", "remove", "insert", "block_add", "block_resize", "block_remove"]),
+      /** The entry (an insert's once published; null before, and for block changes). */
       entryId: Id.nullable(),
+      /** A244 (added 2026-10-02): a block change's span (a `block_add`'s once published). */
+      spanId: Id.nullable().optional(),
       key: z.string().nullable(),
       /** "Late Crate moves to 9:10 pm". */
       line: z.string(),
@@ -392,7 +419,7 @@ export const LogChangesResult = z.object({
     z.object({
       /** The change it's about (null: the batch as a whole). */
       index: z.number().int().nullable(),
-      /** `locked`, `overlap`, `not_found`, `too_soon`, or the rule's own code (`rights_unconfirmed`, a carriage limit…). */
+      /** `locked`, `overlap`, `not_found`, `too_soon`, or the rule's own code (`rights_unconfirmed`, a carriage limit…). A244: `block_overlap`, `block_locked`, `block_archived`. */
       code: z.string(),
       message: z.string()
     })
@@ -550,7 +577,12 @@ export const logApi = {
         onto: DateOnly,
         until: DateOnly.nullable(),
         fromDay: DateOnly,
-        entries: z.array(DayTemplateEntryInput).max(200)
+        entries: z.array(DayTemplateEntryInput).max(200),
+        /**
+         * A244 (added 2026-10-02): replaces its programming blocks. Each ends by 6:00 am (400
+         * `block_crosses_day`), and they don't overlap.
+         */
+        blocks: z.array(z.object({ blockId: Id, startTime: WallClock, lengthMs: Millis })).max(24)
       })
       .partial(),
     response: z.object({ template: DayTemplate, generated: TemplateGeneration })
@@ -726,10 +758,14 @@ export const PlayoutStatus = z.object({
       /** The card's colour: the maker's (carried) or the station's. */
       colour: z.string().nullable(),
       /** No stored stills yet: always null. */
-      pictureUrl: z.string().nullable()
+      pictureUrl: z.string().nullable(),
+      /** A244 (added 2026-10-02): the programming block it's part of, when it enters one ("Late Crate Nights starts at 9:00 pm"); else null. */
+      block: BlockBand.nullable().optional()
     })
     .nullable()
     .optional(),
+  /** A244 (added 2026-10-02): the programming block on air now ("Late Crate Nights · until 1:00 am"), or null. */
+  block: BlockBand.nullable().optional(),
   /**
    * Added 2026-09-29: planned off air time on now (`now` true: the channel shows the sign-off slate,
    * then ends until `backAt`), else the next within 24 hours ("Signs off at 2:00 am"); null for none.
@@ -800,7 +836,9 @@ export const AsRunRow = z.object({
    */
   position: z.enum(["open", "close", "between", "boundary", "open_time", "sign_on"]).nullable().optional(),
   /** A243 (added 2026-10-02): up next only: what it announced, as the overlay said it. */
-  announced: z.object({ entryId: Id.nullable(), title: z.string() }).nullable().optional()
+  announced: z.object({ entryId: Id.nullable(), title: z.string() }).nullable().optional(),
+  /** A244 (added 2026-10-02): the programming block it aired in, or null. */
+  block: z.object({ id: Id, name: z.string() }).nullable().optional()
 });
 
 export const playoutApi = {

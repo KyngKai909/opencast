@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-351 endpoints in 22 modules.
+357 endpoints in 23 modules.
 
 ## accounts (35)
 
@@ -464,3 +464,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `completeUpload` | POST | `/uploads/:uploadId/complete` | signed in | Every part is in: the upload becomes `checking` and the API takes it from there (content ID, stored once, the checks, preparation). Answers at once; follow it with `getUpload`. Calling it again answers the same. 409 `parts_missing` (a part the store doesn't have, or an ETag that doesn't match), `not_uploading` (aborted). |
 | `abortUpload` | DELETE | `/uploads/:uploadId` | signed in | Cancel an upload: its parts are deleted. An upload that's already finished is left as it is. Uploads left unfinished for 24 hours are aborted by themselves. |
 | `getUpload` | GET | `/uploads/:uploadId` | signed in | An upload's state, content ID and what it made. The person who started it only (404 otherwise). |
+
+## blocks (6)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `listBlocks` | GET | `/stations/:stationId/blocks` | signed in | A244: the station's programming blocks (owner, operator), with their items, schedule and next airing |
+| `getBlock` | GET | `/stations/:stationId/blocks/:blockId` | signed in | A244: one programming block (owner, operator), with where it's on the log (`onLog`) |
+| `createBlock` | POST | `/stations/:stationId/blocks` | signed in | A244: make a programming block (owner, operator). A name the station already has is 409 `block_name_taken`; a colour under 4.5:1 against white is 400. Put it on the log with `applyLogChanges` (`block_add`) or a day template. |
+| `updateBlock` | PATCH | `/stations/:stationId/blocks/:blockId` | signed in | A244: change a programming block's name, description, colour, bug, intro, outro or bumper order (owner, operator). `removeLogo` takes its logo off. |
+| `uploadBlockLogo` | POST | `/stations/:stationId/blocks/:blockId/logo` | signed in | A244: upload the block's logo (owner, operator): a PNG, JPEG or WebP, at least 128 pixels on its short side. Stored at 512 pixels at most. 422 `not_an_image`, `logo_size`. |
+| `archiveBlock` | DELETE | `/stations/:stationId/blocks/:blockId` | signed in | A244: archive a programming block (owner, operator). While it's on the log from now on, 409 `block_on_log` ("Late Crate Nights is on the log 3 more times. Take it off the log first."); with `takeOffLog`, its spans ahead come off every date nobody edited, it leaves its day templates, and dates edited by hand keep theirs (`kept`). Its items go back to being the station's. |

@@ -11,9 +11,9 @@
 // and summed up, published at once (LogEditor.tsx). `?edit=1` keeps edit mode across a visit to
 // the market; the draft itself is kept for the tab.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { stationsApi, type ProgramLog, type StationIdent } from "@opencast/contracts";
+import { stationsApi, type LogChange, type ProgramLog, type StationIdent } from "@opencast/contracts";
 import {
   Button,
   ControlFoot,
@@ -30,6 +30,7 @@ import {
   snapSpan,
   snapTime,
   useToast,
+  type TimelineBand,
   type TimelineBlock
 } from "@opencast/ui";
 import { useApi, useApiMutation } from "../../../api/hooks";
@@ -45,7 +46,8 @@ import { stationLabel } from "../../station/slug";
 import { DayOrigin, RepeatDaySection } from "./RepeatDay";
 import { entrySource } from "./rundown";
 import { DAY_KEYS, DAY_SHORT, broadcastDay, isoDate, spanText, viewWindow, weekOf, weekdayOf, type LogView, type Ymd } from "./time";
-import { ChangesSection, draftGaps, EditTimeline, EntrySection, InsertDialog, LogHistory, useLogEdit } from "./LogEditor";
+import { AddBlockDialog, ChangesSection, draftGaps, EditTimeline, EntrySection, InsertDialog, LogHistory, SpanSection, useLogEdit } from "./LogEditor";
+import { spanSummary } from "../live/blocks";
 import "./LogPage.css";
 
 const MIN = 60_000;
@@ -160,6 +162,18 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
   const edit = useLogEdit({ stationId, log: log.data, win, active: editing, onAir: !!playout.data?.onAir, now: t, onDone: () => set("edit", null) });
   const [picked, setPicked] = useState<string | null>(null);
   const [inserting, setInserting] = useState<"before" | "after" | null>(null);
+  // A244: a programming block's span picked in edit mode, and "Add a block".
+  const [pickedSpan, setPickedSpan] = useState<string | null>(null);
+  const [addingBlock, setAddingBlock] = useState(false);
+  // A change asked for from outside edit mode, made once its draft exists.
+  const [pending, setPending] = useState<LogChange | null>(null);
+  useEffect(() => {
+    if (pending && edit.draft) {
+      edit.add(pending);
+      setPending(null);
+    }
+  }, [pending, edit.draft]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   if (log.isLoading) return <Quiet />;
   if (log.isError) return <ControlTitle title="Program log" description={log.error.message} />;
@@ -174,6 +188,12 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
   };
 
   const blocks = log.data ? timelineBlocks(log.data, win.from, win.to, t) : [];
+  // A244: programming blocks, as rails beside the timeline; `?block=` opens one's pane.
+  const spans = log.data?.blocks ?? [];
+  const bands: TimelineBand[] = spans.map((b) => ({ id: b.id, label: b.name, start: b.startsAt, end: b.endsAt, pieces: b.pieces.map((p) => ({ start: p.startsAt, end: p.endsAt })), colour: b.colour, problems: b.problems.length }));
+  const blockParam = params.get("block");
+  const pickedBlock = !editing && blockParam ? spans.find((b) => b.id === blockParam) : undefined;
+  const editSpan = editing && pickedSpan ? edit.spans.find((x) => x.id === pickedSpan) : undefined;
   const drafted = new Map(edit.entries.map((e) => [e.id, e]));
   const pickedEntry = editing && picked ? drafted.get(picked) : undefined;
   const pxPerMinute = view === "day" ? 0.5 : 1.12;
@@ -188,11 +208,24 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
         entries={drafted}
         locked={edit.locked}
         troubled={edit.troubled}
-        selectedId={picked}
-        onSelect={setPicked}
+        selectedId={pickedSpan ?? picked}
+        onSelect={(id) => {
+          setPickedSpan(null);
+          setPicked(id);
+        }}
         onMove={(id, startsAt) => {
           edit.add({ op: "move", entryId: id, startsAt });
           setPicked(id);
+        }}
+        spans={edit.spans}
+        troubledSpans={edit.troubled}
+        onSelectSpan={(id) => {
+          setPicked(null);
+          setPickedSpan(id);
+        }}
+        onResizeSpan={(id, edge, at) => {
+          edit.add({ op: "block_resize", spanId: id, ...(edge === "start" ? { startsAt: at } : { endsAt: at }) });
+          setPickedSpan(id);
         }}
       />
     ) : view === "week" ? (
@@ -218,14 +251,73 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
         pxPerMinute={pxPerMinute}
         timeZone={STATION_TZ}
         maxHeight={phone ? undefined : setup ? 430 : 540}
-        selectedId={entryParam && !fillParam ? entryParam : selected ? `gap:${selected.key}` : undefined}
+        selectedId={entryParam && !fillParam ? entryParam : selected && !pickedBlock ? `gap:${selected.key}` : undefined}
         selectable={(b) => b.kind === "dead"}
-        onSelect={(b) => set("fill", b.id.slice("gap:".length))}
+        onSelect={(b) => {
+          set("block", null);
+          set("fill", b.id.slice("gap:".length));
+        }}
         className="cc-log__tl"
+        bands={bands}
+        selectedBandId={pickedBlock?.id ?? null}
+        onSelectBand={(b) => set("block", b.id)}
       />
     );
 
-  const fillSection = selected && !phone && (
+  // A244: a block's pane: where it airs, what to look at, and changing it.
+  const blockSection = pickedBlock && (
+    <section className="cc-log__sec cc-log__block" aria-label={pickedBlock.name}>
+      <div className="cc-log__hrow">
+        <h2 className="cc-log__h">
+          <span className="cc-log__swatch" style={{ background: pickedBlock.colour ?? "var(--ink-70)" }} aria-hidden="true" />
+          {pickedBlock.name}
+        </h2>
+        <Button variant="text" size="sm" onClick={() => set("block", null)}>
+          Close
+        </Button>
+      </div>
+      <p className="cc-log__quiet">{spanSummary(pickedBlock)}</p>
+      {pickedBlock.problems.length > 0 && (
+        <ul className="cc-edit__warnings" aria-label="To look at">
+          {pickedBlock.problems.map((p) => (
+            <li key={p.code + p.message}>{p.message}</li>
+          ))}
+        </ul>
+      )}
+      <div className="cc-edit__actions">
+        {canEdit && (
+          <Button
+            size="sm"
+            onClick={() => {
+              setPickedSpan(pickedBlock.id);
+              startEditing();
+            }}
+          >
+            Change times
+          </Button>
+        )}
+        {canEdit && Date.parse(pickedBlock.startsAt) > t && (
+          <Button
+            size="sm"
+            variant="text"
+            onClick={() => {
+              setPending({ op: "block_remove", spanId: pickedBlock.id });
+              startEditing();
+            }}
+          >
+            Take the block off this day
+          </Button>
+        )}
+        {base && (
+          <Button size="sm" variant="text" href={`${base}/blocks/${pickedBlock.blockId}`}>
+            Edit {pickedBlock.name}
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+
+  const fillSection = selected && !phone && !pickedBlock && (
     <section className="cc-log__sec">
       <h2 className="cc-log__h">Fill {spanText(selected.startsAt, selected.endsAt)}</h2>
       <FillOptions fill={fill} label={`How should ${spanText(selected.startsAt, selected.endsAt)} be filled?`} />
@@ -306,6 +398,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
         p.set("edit", "1");
         p.delete("fill");
         if (view === "week") p.set("view", "evening");
+        p.delete("block");
         return p;
       },
       { replace: true }
@@ -350,7 +443,17 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
       <div className={view === "week" ? "cc-log__split cc-log__split--week" : "cc-log__split"}>
         <div className="cc-log__main">
           {editing && (
-            <Notice tone="plain" icon={null} title="Editing the log." className="cc-edit__bar">
+            <Notice
+              tone="plain"
+              icon={null}
+              title="Editing the log."
+              className="cc-edit__bar"
+              action={
+                <Button size="sm" onClick={() => setAddingBlock(true)}>
+                  Add a block
+                </Button>
+              }
+            >
               {onAirNow ? "Nothing changes on air until you publish. What's on now, and anything starting in the next 20 seconds, stays as it is." : "Nothing changes until you publish."}
             </Notice>
           )}
@@ -372,9 +475,11 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
               <>
                 <ChangesSection edit={edit} />
                 {pickedEntry && <EntrySection edit={edit} entry={pickedEntry} base={base} onInsert={setInserting} onClose={() => setPicked(null)} />}
+                {editSpan && <SpanSection edit={edit} span={editSpan} onAir={onAirNow} onClose={() => setPickedSpan(null)} />}
               </>
             ) : (
               <>
+                {blockSection}
                 {fillSection}
                 {canEdit && <LogHistory stationId={stationId} />}
                 {breaksSection}
@@ -393,6 +498,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
           </Button>
         </ControlFoot>
       )}
+      {editing && addingBlock && <AddBlockDialog edit={edit} base={base} near={win.from} onClose={() => setAddingBlock(false)} />}
       {editing && pickedEntry && inserting && <InsertDialog edit={edit} stationId={stationId} anchor={pickedEntry} where={inserting} base={base} onClose={() => setInserting(null)} />}
       {sheetGap && (
         <Sheet

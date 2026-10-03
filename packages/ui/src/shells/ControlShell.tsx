@@ -17,6 +17,7 @@ export type ControlPage =
   | "breaks"
   | "market"
   | "library"
+  | "blocks"
   | "listings"
   | "spot-market"
   | "sponsors"
@@ -42,6 +43,8 @@ export const CONTROL_RAIL = [
     label: "Programming",
     items: [
       { id: "library", label: "Library" },
+      // A244: programming blocks.
+      { id: "blocks", label: "Blocks" },
       { id: "listings", label: "Listings" }
     ]
   },

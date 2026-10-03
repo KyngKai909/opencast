@@ -149,6 +149,9 @@ export interface PoolItem {
   airs?: AirWindowRef | null;
 }
 
+/** A244: a programming block's own elements between programs: its intro (entering it) and outro (leaving it). */
+export type BlockRole = "intro" | "outro";
+
 /** The station's bumpers by role, in library order. Untagged bumpers are Any. */
 export function poolsOf<T extends PoolItem>(bumpers: T[]): Record<BumperRole, T[]> {
   const pools: Record<BumperRole, T[]> = { into_break: [], out_of_break: [], up_next: [], any: [] };
@@ -161,8 +164,11 @@ export function chainOf(role: BumperRole): BumperRole[] {
   return role === "into_break" || role === "out_of_break" ? [role, "any"] : [role];
 }
 
-/** Room goes to these first when a break is short (after held spots, the station ID and the credit). */
-export const ROLE_PRIORITY: Record<BumperRole, number> = { into_break: 0, out_of_break: 1, up_next: 2, any: 3 };
+/**
+ * Room goes to these first when a break is short (after held spots, the station ID and the credit).
+ * A244: a block's intro, then its outro, before any bumper.
+ */
+export const ROLE_PRIORITY: Record<BumperRole | BlockRole, number> = { intro: -2, outro: -1, into_break: 0, out_of_break: 1, up_next: 2, any: 3 };
 
 /** What up next names: the next program as the guide has it. */
 export interface Announce {
@@ -172,12 +178,15 @@ export interface Announce {
   /** ISO, the program's start. */
   startsAt: string;
   carriedFrom: string | null;
+  /** A244: the programming block the program is part of. */
+  blockName?: string | null;
 }
 
-/** One bumper in a sequence. */
+/** One bumper in a sequence, or (A244) a programming block's intro or outro between programs (`boundary`). */
 export interface Element {
-  position: Position;
-  role: BumperRole;
+  position: Position | "boundary";
+  role: BumperRole | BlockRole;
+  /** The library item; "" for a block's automatic card (`generated`). */
   itemId: string;
   title: string;
   lengthMs: number;
@@ -185,6 +194,12 @@ export interface Element {
   alternates: string[];
   /** Up next: what it names. */
   announces?: Announce;
+  /** A244: the programming block it airs in (a member's break, or a block's intro or outro); absent: the station's. */
+  blockId?: string;
+  /** A244: it's the block's own item (its bumper, intro or outro), not the station's. */
+  ofBlock?: boolean;
+  /** A244: a block's automatic intro or outro card (five seconds in its look; TV only). */
+  generated?: boolean;
 }
 
 /** The between-programs elements before a program (A243): at its start, `ms` long. */
@@ -206,6 +221,8 @@ export const ROTATES_FROM = 3;
  */
 export class SequenceDecider<T extends PoolItem> {
   private readonly pools: Record<BumperRole, T[]>;
+  /** A244: each programming block's own pools, searched before the station's during the block. */
+  private readonly blockPools = new Map<string, Record<BumperRole, T[]>>();
   private readonly order = new Map<string, number>();
   private readonly last: Map<string, number>;
   private readonly aired: Array<{ id: string; at: number }>;
@@ -214,23 +231,38 @@ export class SequenceDecider<T extends PoolItem> {
   constructor(
     bumpers: T[],
     private readonly tz: string,
-    seed: { last?: Map<string, number>; aired?: Array<{ id: string; at: number }> } = {}
+    seed: { last?: Map<string, number>; aired?: Array<{ id: string; at: number }> } = {},
+    blocks: Map<string, T[]> = new Map()
   ) {
     this.pools = poolsOf(bumpers);
     bumpers.forEach((b, i) => this.order.set(b.id, i));
+    for (const [blockId, own] of blocks) {
+      this.blockPools.set(blockId, poolsOf(own));
+      own.forEach((b, i) => this.order.set(b.id, bumpers.length + i));
+    }
     this.last = new Map(seed.last ?? []);
     this.aired = [...(seed.aired ?? [])].sort((a, b) => a.at - b.at);
   }
 
-  /** Whether any pool these roles use rotates (and so needs history). */
+  /**
+   * Where a role's bumper comes from (A244: block, then station): the block's role pool, the
+   * block's Any (not for up next), then the station's chain.
+   */
+  private chain(role: BumperRole, blockId?: string | null): Array<{ pool: T[]; ofBlock: boolean }> {
+    const own = blockId ? this.blockPools.get(blockId) : undefined;
+    return [...(own ? chainOf(role).map((p) => ({ pool: own[p], ofBlock: true })) : []), ...chainOf(role).map((p) => ({ pool: this.pools[p], ofBlock: false }))];
+  }
+
+  /** Whether any pool these roles use rotates (and so needs history), the blocks' included. */
   rotates(roles: Iterable<BumperRole>): boolean {
-    for (const role of roles) for (const pool of chainOf(role)) if (this.pools[pool].length >= ROTATES_FROM) return true;
+    const all = [this.pools, ...this.blockPools.values()];
+    for (const role of roles) for (const pools of all) for (const pool of chainOf(role)) if (pools[pool].length >= ROTATES_FROM) return true;
     return false;
   }
 
-  /** Whether a role has anything at all (in or out of its window). */
-  has(role: BumperRole): boolean {
-    return chainOf(role).some((p) => this.pools[p].length > 0);
+  /** Whether a role has anything at all (in or out of its window), in a block's chain or the station's. */
+  has(role: BumperRole, blockId?: string | null): boolean {
+    return this.chain(role, blockId).some((c) => c.pool.length > 0);
   }
 
   /** What aired (the as-run log) before `t` counts from now on. */
@@ -241,17 +273,25 @@ export class SequenceDecider<T extends PoolItem> {
     }
   }
 
-  /** The bumper for a role at `t` (and the rest of its pool in pick order), or null. `used`: already in this break. */
-  pick(role: BumperRole, t: number, used: Set<string>): { item: T; alternates: T[] } | null {
+  /**
+   * The bumper for a role at `t` (and the rest of its pool in pick order), or null. `used`: already
+   * in this break. A244: during a block (`blockId`), its own pools come first; `ofBlock` says the
+   * pick is the block's.
+   */
+  pick(role: BumperRole, t: number, used: Set<string>, blockId?: string | null): { item: T; alternates: T[]; ofBlock: boolean } | null {
     this.fold(t);
-    for (const pool of chainOf(role)) {
-      const ready = this.pools[pool].filter((b) => b.durationMs && eligible(b, t, this.tz));
+    const chain = this.chain(role, blockId);
+    for (const [i, { pool, ofBlock }] of chain.entries()) {
+      const ready = pool.filter((b) => b.durationMs && eligible(b, t, this.tz));
       if (!ready.length) continue;
       const ordered =
         ready.length >= ROTATES_FROM
           ? [...ready].sort((a, b) => (this.last.get(a.id) ?? -Infinity) - (this.last.get(b.id) ?? -Infinity) || this.order.get(a.id)! - this.order.get(b.id)!)
           : [...ready.filter((b) => !used.has(b.id)), ...ready.filter((b) => used.has(b.id))];
-      return { item: ordered[0], alternates: ordered.slice(1) };
+      // Substitutes when the pick isn't prepared at air time: the rest of its pool, then the rest of
+      // its chain (A244: a block's own, then the station's).
+      const later = chain.slice(i + 1).flatMap((c) => c.pool.filter((b) => b.durationMs && eligible(b, t, this.tz)));
+      return { item: ordered[0], alternates: [...ordered.slice(1), ...later.filter((b) => !ordered.includes(b))], ofBlock };
     }
     return null;
   }
@@ -288,25 +328,48 @@ export function pickElements<T extends PoolItem>(
   roles: BumperRole[],
   t: number,
   used: Set<string>,
-  announce: () => Announce | null
+  announce: () => Announce | null,
+  blockId?: string | null
 ): Element[] {
   const out: Element[] = [];
   for (const role of roles) {
     let announces: Announce | undefined;
     if (role === "up_next") {
-      if (!decider.has("up_next")) continue;
+      if (!decider.has("up_next", blockId)) continue;
       const next = announce();
       if (!next) continue;
       announces = next;
     }
-    const picked = decider.pick(role, t, used);
+    const picked = decider.pick(role, t, used, blockId);
     if (!picked) continue;
     used.add(picked.item.id);
     // In air order: a later bumper in the break counts as aired later (a millisecond a place).
     decider.record(picked.item.id, t + used.size);
-    out.push({ position, role, itemId: picked.item.id, title: picked.item.title, lengthMs: picked.item.durationMs!, alternates: picked.alternates.map((a) => a.id), ...(announces ? { announces } : {}) });
+    out.push({
+      position,
+      role,
+      itemId: picked.item.id,
+      title: picked.item.title,
+      lengthMs: picked.item.durationMs!,
+      alternates: picked.alternates.map((a) => a.id),
+      ...(announces ? { announces } : {}),
+      ...(blockId ? { blockId } : {}),
+      ...(picked.ofBlock ? { ofBlock: true } : {})
+    });
   }
   return out;
+}
+
+/**
+ * A244: a block's own sequences decide whether a position airs in a break where they say so
+ * plainly (every break, after every program, never); once an hour and every N programs follow the
+ * station's cadence (it's decided once, station-wide, in order).
+ */
+export function blockPositionAirs(rule: PositionRule, b: { afterProgram: boolean }, station: boolean): boolean {
+  if (rule.every === "break") return true;
+  if (rule.every === "never") return false;
+  if (rule.every === "program") return b.afterProgram;
+  return station;
 }
 
 /** How long a break's chosen bumpers run (its sequences and the boundary after it): the room the filler keeps. */
@@ -320,7 +383,7 @@ export function elementsMs(slot: { elements?: { open: Element[]; close: Element[
  * next, Any; in sequence order within a role). Returns each element with whether it fits, in
  * sequence order.
  */
-export function fitElements<E extends { role: BumperRole; lengthMs: number }>(elements: E[], roomMs: number): Array<E & { fits: boolean }> {
+export function fitElements<E extends { role: BumperRole | BlockRole; lengthMs: number }>(elements: E[], roomMs: number): Array<E & { fits: boolean }> {
   const order = elements.map((e, i) => ({ e, i })).sort((a, b) => ROLE_PRIORITY[a.e.role] - ROLE_PRIORITY[b.e.role] || a.i - b.i);
   let left = roomMs;
   const fits = new Set<number>();

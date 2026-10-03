@@ -141,6 +141,17 @@ export default function About() {
             </div>
           )}
         </div>
+        {/* A244: the station's programming blocks ("Late Crate Nights, Saturdays, 9:00 pm to 1:00 am"). */}
+        {(page.data?.blocks ?? []).slice(0, 2).map((b) => (
+          <div key={b.id} className="tvg-about__slot tvg-about__block">
+            <small>Block</small>
+            <b>
+              <span className="tvg-about__swatch" style={{ background: b.colour ?? "var(--ink-70)" }} aria-hidden="true" />
+              {b.name}
+            </b>
+            {b.schedule && <span>{b.schedule}</span>}
+          </div>
+        ))}
         <div className="tvg-about__actions">
           {external?.down && station.id !== player.currentId ? (
             // Off the dial: nothing to tune to until it's back.

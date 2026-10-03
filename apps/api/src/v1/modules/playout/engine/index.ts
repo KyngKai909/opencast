@@ -184,14 +184,16 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     }
     for (const stationId of stationIds) {
       // Station IDs and bumpers can air any time; so can what fills dead air, a little later.
-      const { stationIds: ids, bumpers } = await services.library.fillers(stationId);
+      const { stationIds: ids, bumpers, blocks } = await services.library.fillers(stationId);
       // No station ID of its own: its generated one.
       if (!ids.length) await queueGeneratedIds([stationId]);
       // A242: its openers, closers and off-air clips (a picture has nothing to prepare); the automatic ones it needs.
       const own = await services.library.identity(stationId);
       await queueGeneratedIdents([stationId]);
       for (const f of [...own.openers, ...own.closers, ...own.offAirCards.filter((c) => c.durationMs !== null)]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
-      for (const f of [...ids, ...bumpers]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
+      // A244: programming blocks' own IDs, bumpers, intros and outros too (their automatic cards are asked for by the planner).
+      const blockItems = [...(blocks ?? new Map()).values()].flatMap((b) => [...b.stationIds, ...b.bumpers, ...b.intros, ...b.outros]);
+      for (const f of [...ids, ...bumpers, ...blockItems]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
       for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
     // Barter breaks inside carried programs air the producer's spots: their rotations too.

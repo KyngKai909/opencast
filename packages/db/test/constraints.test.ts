@@ -329,6 +329,52 @@ describe("program log", () => {
   });
 });
 
+describe("programming blocks (A244)", () => {
+  const block = (tx: Tx, stationId: string, fields: { name?: string; owner?: string; source?: string | null; colour?: string | null; reskin?: string } = {}) =>
+    tx.one<{ id: string }>(
+      `INSERT INTO broadcast.program_blocks (station_id, owner_station_id, source_block_id, name, colour, reskin) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [stationId, fields.owner ?? stationId, fields.source ?? null, fields.name ?? "Late Crate Nights", fields.colour ?? null, fields.reskin ?? "owner_only"]
+    );
+
+  test("spans never overlap on a station", async (tx) => {
+    const s = await station(tx);
+    const b = await block(tx, s.id);
+    const span = (start: string, end: string) =>
+      tx.run(`INSERT INTO broadcast.program_block_spans (station_id, block_id, starts_at, ends_at) VALUES ($1, $2, $3, $4)`, [s.id, b.id, start, end]);
+    await span("2026-10-04 04:00Z", "2026-10-04 08:00Z");
+    await tx.rejects(/program_block_spans_no_overlap/, () => span("2026-10-04 07:00Z", "2026-10-04 09:00Z"));
+    await tx.accepts(() => span("2026-10-04 08:00Z", "2026-10-04 09:00Z"));
+    // Up to 24 hours, ending after it starts.
+    await tx.rejects(/program_block_span_length/, () => span("2026-10-06 04:00Z", "2026-10-07 05:00Z"));
+  });
+
+  test("a block of its own is its station's (a carried copy, later, points at the maker's)", async (tx) => {
+    const maker = await station(tx, { callSign: "REEL" });
+    const carrier = await station(tx, { callSign: "BEAT" });
+    await tx.rejects(/own_block_is_owners/, () => block(tx, carrier.id, { owner: maker.id }));
+    const theirs = await block(tx, maker.id, { name: "Saturday Matinee" });
+    await tx.accepts(() => block(tx, carrier.id, { owner: maker.id, source: theirs.id, name: "Saturday Matinee" }));
+  });
+
+  test("a block's colour holds 4.5:1 against white, and its name is the station's once", async (tx) => {
+    const s = await station(tx);
+    await tx.rejects(/program_block_colour_contrast/, () => block(tx, s.id, { colour: "#F0F0F0" }));
+    await block(tx, s.id, { colour: "#1F5C99" });
+    await tx.rejects(/program_blocks_name/, () => block(tx, s.id, { name: "late crate nights" }));
+  });
+
+  test("only bumpers, station IDs, intros (OPN) and outros (CLS) belong to a block, on its own station", async (tx) => {
+    const s = await station(tx);
+    const other = await station(tx, { callSign: "REEL" });
+    const b = await block(tx, s.id);
+    const a = await asset(tx, s.id);
+    await tx.rejects(/assets_block_kinds/, () => tx.run(`UPDATE broadcast.assets SET program_block_id = $1 WHERE id = $2`, [b.id, a.id]));
+    await tx.accepts(() => tx.run(`UPDATE broadcast.assets SET code = 'BMP', program_block_id = $1 WHERE id = $2`, [b.id, a.id]));
+    const theirs = await asset(tx, other.id);
+    await tx.rejects(/its station's own/, () => tx.run(`UPDATE broadcast.assets SET code = 'SID', program_block_id = $1 WHERE id = $2`, [b.id, theirs.id]));
+  });
+});
+
 describe("link imports", () => {
   async function program(tx: Tx, stationId: string) {
     return tx.one<{ id: string }>(`INSERT INTO broadcast.programs (station_id, title) VALUES ($1, 'Saturday Reel') RETURNING id`, [

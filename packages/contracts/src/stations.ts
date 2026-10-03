@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import {
+  AiringBlock,
   Band,
+  BlockBand,
   BumperRole,
   CallSign,
   ChannelNumber,
@@ -36,7 +38,12 @@ export const Airing = z.object({
    * 6:00 am"). Planned off air (the station's off air hours, or a sign-off on its log) is one
    * airing from sign-off to sign-on, with `logEntryId` the sign-off entry's when there is one.
    */
-  backAt: Timestamp.nullable().optional()
+  backAt: Timestamp.nullable().optional(),
+  /**
+   * A244 (added 2026-10-02): the programming block it's part of ("Late Crate Nights"), or null.
+   * Apps built before it drop it and show the title alone.
+   */
+  block: AiringBlock.nullable().optional()
 });
 export type Airing = z.infer<typeof Airing>;
 
@@ -126,7 +133,16 @@ export const Dial = z.object({
   nearby: z.array(z.object({ market: Market, miles: z.number(), rows: z.array(DialRow) }))
 });
 
-export const GuideRow = z.object({ station: StationIdent, airings: z.array(Airing) });
+export const GuideRow = z.object({
+  station: StationIdent,
+  airings: z.array(Airing),
+  /**
+   * A244 (added 2026-10-02): the station's programming blocks in the window, each from its first
+   * member's start to its last member's end (not clipped to the window: the grid clips). Absent or
+   * empty: none. The guide draws a thin band above the row's programs.
+   */
+  blocks: z.array(BlockBand).optional()
+});
 
 export const StationPage = z.object({
   station: StationIdent,
@@ -150,7 +166,30 @@ export const StationPage = z.object({
    * Follow-up Phase 6 (added 2026-09-30), external stations only: as on the dial, and `down` while
    * it's off the dial because its stream is down (the page stays; `playback` is null then).
    */
-  external: ExternalInfo.extend({ down: z.boolean() }).optional()
+  external: ExternalInfo.extend({ down: z.boolean() }).optional(),
+  /**
+   * A244 (added 2026-10-02): the station's programming blocks on its log in the next 14 days: what
+   * each is, when it airs ("Saturdays, 9:00 pm to 1:00 am" from its day template, else its next
+   * date's times), its next airing and the programs in it. Absent or empty: none (external and
+   * claimable stations have none).
+   */
+  blocks: z
+    .array(
+      z.object({
+        id: Id,
+        name: z.string(),
+        description: z.string().nullable(),
+        logoUrl: z.string().nullable(),
+        colour: Colour.nullable(),
+        /** "Saturdays, 9:00 pm to 1:00 am"; null when it has no regular time. */
+        schedule: z.string().nullable(),
+        /** When it next airs (its first member's start), or null. */
+        next: Timestamp.nullable(),
+        /** The program titles in its next airing, in order. */
+        programs: z.array(z.string())
+      })
+    )
+    .optional()
 });
 
 export const SearchResult = z.object({

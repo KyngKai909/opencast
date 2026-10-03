@@ -3,6 +3,7 @@
 // and the between sequence at program boundaries.
 import { describe, expect, it } from "vitest";
 import {
+  blockPositionAirs,
   BoundaryDecider,
   chainOf,
   defaultSequences,
@@ -184,5 +185,60 @@ describe("between programs", () => {
   it("boundaries that are over go by the as-run log", () => {
     // Every 2: it aired at 3:30 (the station wasn't on at 3:00), so the next is 4:30.
     expect(run({ between: { roles: ["any"], every: "n_programs", n: 2 } }, { settledBefore: at("2026-10-03T04:00:00Z"), times: [at("2026-10-03T03:29:50Z")] })).toEqual(["03:30", "04:30", "05:30"]);
+  });
+});
+
+// A244: programming blocks. Each choice resolves block, then station, then automatic.
+describe("a programming block's pools come first", () => {
+  const station = [bumper("Right back", "into_break"), bumper("Back to it", "out_of_break"), bumper("Up next", "up_next"), bumper("Sting")];
+  const blocks = new Map([["lcn", [bumper("LCN in", "into_break"), bumper("LCN sting")]]]);
+  const t = at("2026-10-04T04:56:00Z");
+
+  it("its role pool, then its Any (not for up next), then the station's chain", () => {
+    const d = new SequenceDecider(station, LA, {}, blocks);
+    expect(d.pick("into_break", t, new Set(), "lcn")).toMatchObject({ item: { id: "LCN in" }, ofBlock: true });
+    expect(d.pick("out_of_break", t, new Set(), "lcn")).toMatchObject({ item: { id: "LCN sting" }, ofBlock: true });
+    expect(d.pick("any", t, new Set(), "lcn")).toMatchObject({ item: { id: "LCN sting" }, ofBlock: true });
+    // Up next never falls to an Any sting: the block has none of its own, so the station's.
+    expect(d.pick("up_next", t, new Set(), "lcn")).toMatchObject({ item: { id: "Up next" }, ofBlock: false });
+    // Outside the block, the station's alone.
+    expect(d.pick("into_break", t, new Set())).toMatchObject({ item: { id: "Right back" }, ofBlock: false });
+    expect(d.has("up_next", "lcn")).toBe(true);
+  });
+
+  it("a block's own pools count for taking turns", () => {
+    const three = new Map([["lcn", [bumper("A"), bumper("B"), bumper("C")]]]);
+    expect(new SequenceDecider([bumper("Sting")], LA, {}, three).rotates(["any"])).toBe(true);
+    expect(new SequenceDecider([bumper("Sting")], LA).rotates(["any"])).toBe(false);
+  });
+
+  it("an element in a block says so; the block's own picks say they're its", () => {
+    const d = new SequenceDecider(station, LA, {}, blocks);
+    const picked = pickElements(d, "open", ["into_break", "up_next"], t, new Set(), () => ({ entryId: "e", title: "Saturday Reel", episodeTitle: null, startsAt: "2026-10-04T05:00:00.000Z", carriedFrom: null, blockName: "Late Crate Nights" }), "lcn");
+    expect(picked).toEqual([
+      expect.objectContaining({ itemId: "LCN in", blockId: "lcn", ofBlock: true }),
+      expect.objectContaining({ itemId: "Up next", blockId: "lcn", announces: expect.objectContaining({ blockName: "Late Crate Nights" }) })
+    ]);
+    expect(picked[1].ofBlock).toBeUndefined();
+  });
+
+  it("its own order airs where it says plainly; once an hour and every N programs follow the station's cadence", () => {
+    expect(blockPositionAirs({ roles: ["any"], every: "break" }, { afterProgram: false }, false)).toBe(true);
+    expect(blockPositionAirs({ roles: ["any"], every: "never" }, { afterProgram: true }, true)).toBe(false);
+    expect(blockPositionAirs({ roles: ["any"], every: "program" }, { afterProgram: false }, true)).toBe(false);
+    expect(blockPositionAirs({ roles: ["any"], every: "hour" }, { afterProgram: false }, true)).toBe(true);
+  });
+
+  it("a block's intro, then its outro, get room before any bumper", () => {
+    const fitted = fitElements(
+      [
+        { role: "outro" as const, lengthMs: 5_000 },
+        { role: "any" as const, lengthMs: 3_000 },
+        { role: "intro" as const, lengthMs: 6_000 }
+      ],
+      11_000
+    );
+    expect(fitted.map((e) => `${e.role} ${e.fits}`)).toEqual(["outro true", "any false", "intro true"]);
+    expect(fitElements([{ role: "outro" as const, lengthMs: 5_000 }, { role: "intro" as const, lengthMs: 6_000 }], 6_000).map((e) => e.fits)).toEqual([false, true]);
   });
 });

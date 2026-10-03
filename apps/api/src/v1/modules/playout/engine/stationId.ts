@@ -42,5 +42,22 @@ export function generatedIdentKey(look: StationLook, band: Band, kind: IdentKind
   return `${kind === "opener" ? "opn" : "cls"}-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
 }
 
-/** Anything Opencast makes over the soft bed: the generated station ID, the automatic opener and closer. */
-export const isGeneratedIdent = (key: string) => /^(sid|opn|cls)-/.test(key);
+// A programming block's automatic intro and outro (A244, added 2026-10-02): for a block with no
+// intro (or outro) of its own that can air. Five seconds, full screen in the block's colour (else the
+// station's) with its logo and name (slates.ts, `blockCard`): "Late Crate Nights" over "on 12.1 BEAT",
+// and "That was Late Crate Nights". TV only (the radio band has no automatic cards). Prepared like the
+// generated station ID, under a key made from what it shows, so a new name, logo or colour (the
+// block's or the station's) is a new one.
+
+export const GENERATED_BLOCK_CARD_MS = 5_000;
+/** Bumped when the picture or the bed changes. */
+const BLOCK_CARD_VERSION = 1;
+
+/** What a block's automatic intro or outro shows, as its prepared key (`blk-…`). */
+export function blockCardKey(look: StationLook, band: Band, block: { name: string; logoContentId: string | null; colour: string | null }, kind: "intro" | "outro"): string {
+  const content = { kind, block: block.name, logo: block.logoContentId, colour: block.colour ?? look.colour, callSign: look.callSign, channel: look.channel, band, v: BLOCK_CARD_VERSION };
+  return `blk-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
+}
+
+/** Anything Opencast makes over the soft bed: the generated station ID, the automatic opener and closer, and (A244) a block's automatic cards. */
+export const isGeneratedIdent = (key: string) => /^(sid|opn|cls|blk)-/.test(key);

@@ -27,7 +27,9 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.content_refs",
     "broadcast.content_previews",
     "broadcast.content_preview_needs",
-    "broadcast.caption_tracks"
+    "broadcast.caption_tracks",
+    // Added 2026-10-02 (A244): programming blocks (the block itself; where it airs is the log's).
+    "broadcast.program_blocks"
   ],
   log: [
     "broadcast.log_entries",
@@ -39,7 +41,10 @@ export const MODULE_TABLES: Record<string, string[]> = {
     "broadcast.day_template_dates",
     "broadcast.off_air_hours",
     // Added 2026-09-29: edit mode's history.
-    "broadcast.log_changes"
+    "broadcast.log_changes",
+    // Added 2026-10-02 (A244): where programming blocks air, on dates and in day templates.
+    "broadcast.program_block_spans",
+    "broadcast.day_template_blocks"
   ],
   playout: [
     "broadcast.playout_state",

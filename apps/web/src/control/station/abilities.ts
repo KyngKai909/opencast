@@ -42,6 +42,7 @@ export const PAGE_ABILITY: Record<ControlPage, Ability> = {
   breaks: "programming",
   market: "programming",
   library: "programming",
+  blocks: "programming",
   listings: "programming",
   "spot-market": "spots",
   sponsors: "spots",

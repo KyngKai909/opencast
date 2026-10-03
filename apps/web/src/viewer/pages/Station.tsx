@@ -28,6 +28,7 @@ import { MARKET_TZ, now as clockNow, useNow } from "../../lib/clock";
 import { useBack, useLink, useOpenOverlay, useTuneIn } from "../components/station/actions";
 import { SecTop, StationSide } from "../components/station/StationSide";
 import { StationListing } from "../components/station/StationListing";
+import { StationBlocks } from "../components/station/StationBlocks";
 import { broadcastDayKey, clockAfter, onDay, weekTabs } from "../components/station/when";
 import { isOffAir, stationSlug } from "../components/watch/logic";
 import { BackAt } from "../components/watch/lines";
@@ -230,7 +231,17 @@ export default function StationPage() {
   const programDescription = (a: AiringX) => page.programs.find((p) => p.id === a.programId)?.description ?? null;
 
   // Off air isn't something to be reminded of: no bell on its row.
-  const items: ScheduleItem[] = rows.map((a) => ({ id: a.logEntryId ?? a.listedAiringId ?? a.startsAt, start: a.startsAt, end: a.endsAt, title: a.title, subtitle: rowSubtitle(a), remindable: !isOffAir(a) }));
+  // A244: a programming block's member names its block above its title, as the banner does.
+  const titleOf = (a: AiringX) =>
+    a.block ? (
+      <>
+        <span className="vw-sch-blk">{a.block.name}</span>
+        {a.title}
+      </>
+    ) : (
+      a.title
+    );
+  const items: ScheduleItem[] = rows.map((a) => ({ id: a.logEntryId ?? a.listedAiringId ?? a.startsAt, start: a.startsAt, end: a.endsAt, title: titleOf(a), subtitle: rowSubtitle(a), remindable: !isOffAir(a) }));
   const status = scheduleStatus(items, t);
   const openable = items.map((it, i) => (status[i] === "next" && !isOffAir(rows[i]) && (rows[i]!.logEntryId || rows[i]!.listedAiringId) ? { ...it, title: <button type="button" className="vw-sch-open" onClick={() => setListing(rows[i]!)}>{it.title}</button> } : it));
   const byId = new Map(items.map((it, i) => [it.id, rows[i]!]));
@@ -279,6 +290,7 @@ export default function StationPage() {
             {schedHeading}
             {tonightLeft ? <ScheduleList items={openable} now={t} variant="week-phone" timeZone={MARKET_TZ} /> : <p className="vw-station__empty">Nothing else tonight.</p>}
           </section>
+          <StationBlocks blocks={page.blocks} timeZone={MARKET_TZ} />
           <StationSide page={page} marketName={marketName} phone />
         </div>
         {listingEl}
@@ -334,6 +346,7 @@ export default function StationPage() {
               )}
             </div>
           </section>
+          <StationBlocks blocks={page.blocks} timeZone={MARKET_TZ} />
         </div>
         <aside className="vw-station__side" aria-label={`About ${s.sharesCallSign && s.channel ? `${cs} ${s.channel}` : cs}`}>
           <StationSide page={page} marketName={marketName} />

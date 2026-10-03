@@ -2,6 +2,7 @@
 // history (L5) and replacing its file (L6). The Live and programming area owns this file.
 
 import { http } from "msw";
+import { blockById } from "../blocks";
 import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { inWindow } from "../../components/live/bumpers";
@@ -58,7 +59,9 @@ const withProbe = (i: LibraryItem): LibraryItem => ({
   // A243: a bumper's role (none reads as Any), and whether it's inside its window now.
   bumperRole: i.code === "BMP" ? (i.bumperRole ?? null) : null,
   airs: i.airs ?? null,
-  airingNow: inWindow(i.airs, now())
+  airingNow: inWindow(i.airs, now()),
+  // A244: the programming block it belongs to.
+  programBlockId: i.programBlockId ?? null
 });
 
 /** Programs with their listing status computed from what they air this week. */
@@ -183,6 +186,8 @@ export const libraryHandlers = [
     const role = q.get("bumperRole");
     if (role) items = items.filter((i) => i.code === "BMP" && (i.bumperRole ?? "any") === role);
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
+    // A244: a programming block's items.
+    if (q.get("programBlockId")) items = items.filter((i) => i.programBlockId === q.get("programBlockId"));
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
       items: items.map(withProbe),
@@ -298,8 +303,14 @@ export const libraryHandlers = [
     if (rest.airs && (rest.airs.from || rest.airs.until || rest.airs.dailyFrom) && !["BMP", "SID", "OPN", "CLS"].includes(type)) return fail(400, "bad_request", "Only bumpers, station IDs, openers and closers have times they air.");
     if (rest.airs && Boolean(rest.airs.dailyFrom) !== Boolean(rest.airs.dailyUntil)) return fail(400, "bad_request", "Say both times of day, or neither.");
     if (rest.airs?.from && rest.airs.until && rest.airs.until < rest.airs.from) return fail(400, "bad_request", "The last day is before the first.");
+    // A244, as the API: bumpers, station IDs, openers and closers can be a block's (the station's own block).
+    if (rest.programBlockId && !["BMP", "SID", "OPN", "CLS"].includes(type)) return fail(400, "bad_request", "Only bumpers, station IDs, openers and closers can be part of a block.");
+    if (rest.programBlockId && blockById(rest.programBlockId)?.stationId !== item.stationId) return fail(404, "not_found", "That block wasn't found.");
     if (type !== "BMP") rest.bumperRole = null;
-    if (!["BMP", "SID", "OPN", "CLS"].includes(type)) rest.airs = null;
+    if (!["BMP", "SID", "OPN", "CLS"].includes(type)) {
+      rest.airs = null;
+      rest.programBlockId = null;
+    }
     if (code && code !== (item.identCode ?? item.code)) {
       // A242, as the API: a picture is an off-air card only; openers, closers and cards stay off the log.
       if (item.still) return fail(422, "still_image", "It's a picture, so it can only be an off-air card. Upload a clip to use it as something else.");

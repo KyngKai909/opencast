@@ -167,6 +167,38 @@ export class Slates {
   }
 
   /**
+   * A programming block's automatic intro or outro (A244, added 2026-10-02): full screen in the
+   * block's colour (else the station's), its logo (when it has one, `logo`: the picture on this
+   * worker's disk) above its name, and under it "on 12.1 BEAT" (intro) or, for the outro, the name
+   * reads "That was Late Crate Nights". Inside title safe.
+   */
+  async blockCard(station: StationLook, block: { name: string; colour: string | null; logoContentId: string | null }, kind: "intro" | "outro", logo: string | null): Promise<string> {
+    const cx = FRAME.width / 2;
+    const title = kind === "intro" ? block.name : `That was ${block.name}`;
+    const size = title.length > 18 ? Math.max(56, Math.round(1100 / (title.length * 0.6))) : 96;
+    const under = kind === "intro" ? `on ${identLine(station)}` : identLine(station);
+    const fill = block.colour ?? background(station);
+    const logoBox = 200;
+    const logoCentre = 230;
+    const titleY = logo ? 430 : 370;
+    const underY = logo ? 500 : 450;
+    return this.cached("blk", { kind, name: block.name, colour: fill, logo: block.logoContentId, line: under, v: 1 }, async (file) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
+          <rect width="100%" height="100%" fill="${fill}"/>
+          <text x="${cx}" y="${titleY}" font-family="${DISPLAY}" font-size="${size}" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-2">${esc(title)}</text>
+          <text x="${cx}" y="${underY}" font-family="${TEXT}" font-size="44" font-weight="600" fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle">${esc(under)}</text>
+        </svg>`;
+      const base = await sharp(Buffer.from(svg), { density: 72 }).resize(FRAME.width, FRAME.height).png().toBuffer();
+      const mark = logo ? await sharp(logo).resize(logoBox, logoBox, { fit: "inside" }).png().toBuffer().catch(() => null) : null;
+      const meta = mark ? await sharp(mark).metadata() : null;
+      await sharp(base)
+        .composite(mark && meta?.width && meta.height ? [{ input: mark, left: Math.round(cx - meta.width / 2), top: Math.round(logoCentre - meta.height / 2) }] : [])
+        .png()
+        .toFile(file);
+    });
+  }
+
+  /**
    * A station's own off-air card when it's a picture (A242): fitted inside the frame, letterboxed on
    * black, as a PNG the slate is made from. `source` is the picture on this worker's disk; `id` what
    * it is (its content ID), so it's drawn once.

@@ -14,7 +14,7 @@ import { logApi, type DayTemplate, type LogDay, type TemplateGeneration } from "
 import { Button, Field, KeyValueList, Modal, Notice, Segmented, Sheet, useToast } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { LOG_READS, useTemplates } from "./data";
-import { copyDetail, copyName, dayOriginOf, generationLines, oldCopies, repeatOptions, shortDate, templateDetail, templateName, type LogRepeat, type RepeatPattern } from "./templates";
+import { copyDetail, copyName, dayOriginOf, generationLines, oldCopies, repeatOptions, shortDate, templateBlocksText, templateDetail, templateName, type LogRepeat, type RepeatPattern } from "./templates";
 import { DAY_WORDS, addDays, broadcastDay, isoDate, localTime, monthDay, weekdayOf, type Ymd } from "./time";
 import { now } from "../../../lib/clock";
 
@@ -233,6 +233,8 @@ export function RepeatDaySection({ stationId, day, repeats, phone, dateHref }: R
         detail: (
           <>
             {templateDetail(t)}
+            {/* A244: its programming blocks. */}
+            {templateBlocksText(t) && <span className="cc-log__tblocks">Blocks in this template: {templateBlocksText(t)}</span>}
             {next && (
               <>
                 {" "}

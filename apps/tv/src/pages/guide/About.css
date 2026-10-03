@@ -22,3 +22,5 @@
 .tvg-about__ph { height: 34px; margin: 0 0 18px; border-radius: var(--r-control); background: color-mix(in srgb, var(--ink) 6%, transparent); }
 .tvg-about__ph--sm { width: 40%; }
 .tvg-about__ph--lg { height: 56px; width: 80%; }
+/* A244: a programming block on the station's info, its colour beside its name. */
+.tvg-about__swatch { display: inline-block; width: 22px; height: 22px; border-radius: 4px; margin-right: 12px; vertical-align: -2px; }

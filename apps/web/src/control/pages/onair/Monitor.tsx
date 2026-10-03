@@ -24,6 +24,7 @@ import { STATION_TZ, useNow } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Monitor.css";
+import { startsWords, untilWords } from "../../components/live/blocks";
 import { controlPath } from "../../../areas";
 import { stationLabel } from "../../station/slug";
 
@@ -238,6 +239,13 @@ export default function Monitor() {
         {runBy && <div className="cc-pm__sec">{runBy}</div>}
         <AccountBanner className="cc-pm__banner" />
         {signing && <div className="cc-pm__sec cc-mon__signing">{signing}</div>}
+        {onAir && status?.block && (
+          <div className="cc-pm__sec">
+            <span className="cc-mon__block" style={{ ["--cc-block" as string]: status.block.colour ?? "var(--ink-70)" }}>
+              {untilWords(status.block)}
+            </span>
+          </div>
+        )}
         {picture}
         {onAir && upNext && (
           <div className="cc-pm__sec cc-pm__next">
@@ -284,6 +292,12 @@ export default function Monitor() {
                 <Tally state="lit" flicker={false} />
                 Program
                 {signing && <span className="cc-mon__signing">{signing}</span>}
+                {/* A244: the programming block on air. */}
+                {status?.block && (
+                  <span className="cc-mon__block" style={{ ["--cc-block" as string]: status.block.colour ?? "var(--ink-70)" }}>
+                    {untilWords(status.block)}
+                  </span>
+                )}
               </div>
               {picture}
             </>
@@ -298,6 +312,7 @@ export default function Monitor() {
                 <div className="cc-mon__card" style={{ background: next.colour ?? undefined }}>
                   <b>{next.title}</b>
                   {next.detail && <span>{next.detail}</span>}
+                  {next.block && <span className="cc-mon__blockstart">{startsWords(next.block)}</span>}
                 </div>
               </PictureFrame>
             </>

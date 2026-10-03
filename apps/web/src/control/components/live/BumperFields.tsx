@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { libraryApi, type AirWindow, type BumperRole, type LibraryItem } from "@opencast/contracts";
-import { Button, Checkbox, Field, KeyValueList, Segmented, useToast } from "@opencast/ui";
+import { Button, Checkbox, Field, KeyValueList, Segmented, SelectField, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { now as clockNow } from "../../../lib/clock";
@@ -115,6 +115,49 @@ export function AirWindowSection({ item, canEdit }: { item: LibraryItem; canEdit
             {error}
           </p>
         )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * A244: "Part of a block", for bumpers, station IDs, openers and closers: "None, it's BEAT's" or
+ * one of the station's programming blocks. Saved at once. The helper says what that means for the
+ * type: "Airs only during Late Crate Nights.", "Airs as Late Crate Nights' ID.", "Its intro".
+ */
+export function BlockSection({ item, callSign, blocks, canEdit }: { item: LibraryItem; callSign: string; blocks: Array<{ id: string; name: string }>; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [value, setValue] = useState(item.programBlockId ?? "");
+  useEffect(() => setValue(item.programBlockId ?? ""), [item]);
+  const type = item.identCode ?? item.code;
+  const name = blocks.find((b) => b.id === value)?.name;
+  const helper = !name ? null : type === "SID" ? `Airs as ${name}'${name.endsWith("s") ? "" : "s"} ID.` : type === "OPN" ? "Its intro" : type === "CLS" ? "Its outro" : `Airs only during ${name}.`;
+  const pick = async (next: string) => {
+    const was = value;
+    setValue(next);
+    try {
+      await call(libraryApi.updateItem, { params: { itemId: item.id }, body: { programBlockId: next || null } });
+      await refreshLibrary(qc);
+    } catch (e) {
+      setValue(was);
+      toast.show({ message: e instanceof Error ? e.message : "Something went wrong. Try again." });
+    }
+  };
+  if (!blocks.length && !item.programBlockId) return null;
+  return (
+    <section className="cc-item__side" aria-labelledby="cc-block-h">
+      <SecTop id="cc-block-h" title="Part of a block" />
+      <div className="cc-item__role">
+        <SelectField label="Block" size="sm" value={value} disabled={!canEdit} onChange={(e) => void pick(e.target.value)}>
+          <option value="">None, it's {callSign}'s</option>
+          {blocks.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </SelectField>
+        {helper && <small className="cc-item__quiet">{helper}</small>}
       </div>
     </section>
   );

@@ -1,0 +1,37 @@
+/* A244: programming blocks: the list of cards, and the block editor's sections (built like Settings'). */
+.cc-blks { max-width: 880px; }
+.cc-blks__list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.cc-blks__card { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; padding: 12px; border-radius: var(--r-card, 10px); background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair); color: inherit; text-decoration: none; }
+.cc-blks__card:hover { box-shadow: inset 0 0 0 1px var(--line); }
+.cc-blks__card:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-blks__swatch { width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center; color: #fff; font: 700 20px/1 var(--font-display); overflow: hidden; }
+.cc-blks__swatch img { width: 100%; height: 100%; object-fit: contain; }
+.cc-blks__text { display: grid; gap: 2px; min-width: 0; }
+.cc-blks__text b { font-size: 15px; }
+.cc-blks__text small { font-size: 12.5px; color: var(--ink-70); }
+
+.cc-blk { display: grid; gap: 0; margin-top: 8px; }
+.cc-blk__sec { padding: 18px 0; border-top: 1px solid var(--line); }
+.cc-blk__sec:first-of-type { border-top: 0; }
+.cc-blk__h { margin: 0 0 10px; font: 700 16px/1.25 var(--font-display); }
+.cc-blk__look { display: grid; grid-template-columns: 72px 1fr; gap: 16px; align-items: start; }
+.cc-blk__mark { width: 72px; height: 72px; border-radius: 10px; display: grid; place-items: center; color: #fff; font: 700 28px/1 var(--font-display); overflow: hidden; }
+.cc-blk__mark img { width: 100%; height: 100%; object-fit: contain; }
+.cc-blk__fields { display: grid; gap: 12px; max-width: 520px; }
+.cc-blk__row { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 8px 0; }
+.cc-blk__row > div:first-child { display: grid; gap: 2px; }
+.cc-blk__row b { font-size: 14px; }
+.cc-blk__row small { font-size: 12.5px; color: var(--ink-70); }
+.cc-blk__row--col { flex-direction: column; align-items: stretch; }
+.cc-blk__uses { color: var(--ink) !important; }
+.cc-blk__acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cc-blk__roles { list-style: none; margin: 0; padding: 0; }
+.cc-blk__seq { display: grid; gap: 14px; margin-top: 14px; }
+.cc-blk__placed { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
+.cc-blk__quiet { color: var(--ink-70); font-size: 14px; margin: 0; }
+.cc-blk__err { color: var(--standby); font-size: 13px; }
+.cc-blk__sec--end { display: flex; }
+@media (max-width: 767px) {
+  .cc-blk__look { grid-template-columns: 1fr; }
+  .cc-blk__row { flex-direction: column; }
+}

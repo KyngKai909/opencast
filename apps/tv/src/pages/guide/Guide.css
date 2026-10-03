@@ -47,3 +47,4 @@
 /* Under the options dialog, the guide and the picture in its window dim (the reference's filter). */
 .tvg--dim > .tvg__window, .tvg--dim > .tvg__top, .tvg--dim > .tvg__grid { filter: brightness(.45); }
 .oc-tv-shell:has(.tvg--dim) .oc-tv-shell__picture { filter: brightness(.45); }
+.tvg__block { font-size: 24px; font-weight: 600; color: var(--ink-70); margin-top: 4px; }

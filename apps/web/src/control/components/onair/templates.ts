@@ -95,3 +95,16 @@ export function generationLines(g: TemplateGeneration): Array<{ label: string; v
   if (g.exceptions) lines.push({ label: "Edited dates left as they are", value: String(g.exceptions) });
   return lines;
 }
+
+/** A244: "Late Crate Nights, 9:00 pm to 1:00 am": a template's blocks, with their times; null with none. */
+export function templateBlocksText(t: Pick<DayTemplate, "blocks">): string | null {
+  const blocks = t.blocks ?? [];
+  if (!blocks.length) return null;
+  const clockOf = (hhmm: string, plusMs = 0) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = (h * 60 + m + Math.round(plusMs / 60_000)) % 1440;
+    const hh = Math.floor(total / 60);
+    return `${((hh + 11) % 12) + 1}:${String(total % 60).padStart(2, "0")} ${hh < 12 ? "am" : "pm"}`;
+  };
+  return blocks.map((b) => `${b.name}, ${clockOf(b.startTime)} to ${clockOf(b.startTime, b.lengthMs)}`).join("; ");
+}

@@ -105,7 +105,9 @@ export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> |
         // Planned off air (G9): one block from sign-off to sign-on, "Off air, Signs on at 6:00 am".
         if (isOffAir(a)) return { id, title: a.title, start: a.startsAt, end: a.endsAt, detail: createElement(BackAt, { at: a.backAt ?? a.endsAt, timeZone }) };
         return { id, title: a.title, start: a.startsAt, end: a.endsAt, live: a.live, listed: a.kind === "listed", carriedFrom: a.carriedFrom?.callSign ?? undefined };
-      })
+      }),
+      // A244: its programming blocks, as bands above its programs.
+      ...(r.blocks?.length ? { blocks: r.blocks.map((b) => ({ id: b.id, name: b.name, start: b.startsAt, end: b.endsAt, colour: b.colour })) } : {})
     }));
 }
 

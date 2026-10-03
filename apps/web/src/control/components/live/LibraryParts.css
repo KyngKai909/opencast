@@ -68,3 +68,6 @@ a.cc-lib-row__title:hover { text-decoration: underline; }
 
 /* A243: a bumper's role, small, under its type. */
 .cc-lib-row__role { display: block; margin-top: 3px; font-size: 12px; color: var(--ink-70); }
+/* A244: a programming block's item, its dot in the block's colour. */
+.cc-lib-row__block { display: inline-flex; align-items: center; gap: 6px; }
+.cc-lib-row__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }

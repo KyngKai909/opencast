@@ -5,7 +5,7 @@
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { libraryApi, RIGHTS_BASIS_LABELS } from "@opencast/contracts";
+import { libraryApi, RIGHTS_BASIS_LABELS, blocksApi } from "@opencast/contracts";
 import { Button, Checkbox, KeyValueList, Modal, PictureFrame, PicturePlaceholder, duration, useToast } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
@@ -14,7 +14,7 @@ import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { bumperCount, FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
-import { AirWindowSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
+import { AirWindowSection, BlockSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
 import { preparationWords } from "../../components/onair/readiness";
@@ -41,6 +41,7 @@ export default function LibraryItem() {
   const lib = useApi(libraryApi.getLibrary, { params: { stationId: s.id }, query: {} });
   const itemQ = useApi(libraryApi.getItem, { params: { itemId } }, { refetchInterval: (q) => (q.state.data?.status === "preparing" ? 2000 : false) });
   const history = useApi(libraryApi.getItemHistory, { params: { itemId } }, { retry: false });
+  const blocks = useApi(blocksApi.listBlocks, { params: { stationId: s.id } }, { retry: false });
   const file = useRef<HTMLInputElement>(null);
   // L6: the new file goes straight to storage in parts (follow-up Phase 4), then through the same checks.
   const up = useUpload({
@@ -227,6 +228,8 @@ export default function LibraryItem() {
             {/* A243: a bumper's role, and when bumpers, station IDs, openers and closers air. */}
             {typeOf(item) === "BMP" && <BumperRoleSection item={item} radio={s.station.band === "radio"} canEdit={s.can("programming")} />}
             {WINDOWED.includes(typeOf(item)) && <AirWindowSection item={item} canEdit={s.can("programming")} />}
+            {/* A244: a bumper, station ID, opener or closer can be a programming block's. */}
+            {WINDOWED.includes(typeOf(item)) && <BlockSection item={item} callSign={s.label} blocks={blocks.data?.blocks ?? []} canEdit={s.can("programming")} />}
 
             <section className="cc-item__side" aria-labelledby="cc-rights-h">
               <SecTop id="cc-rights-h" title="Rights" />

@@ -1,4 +1,4 @@
-import { libraryApi as api } from "@opencast/contracts";
+import { blocksApi, libraryApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { notFound } from "../../errors.js";
@@ -8,6 +8,32 @@ export function libraryRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const staff = ["owner", "operator"] as const;
   const canEditStation = (user: Parameters<typeof accounts.requireStation>[0], stationId: string) =>
     accounts.requireStation(user, stationId, [...staff]);
+
+  // A244: programming blocks.
+  r.handle(blocksApi.listBlocks, async ({ user, params }) => {
+    await canEditStation(user, params.stationId);
+    return { blocks: await library.blocks.list(params.stationId) };
+  });
+  r.handle(blocksApi.getBlock, async ({ user, params }) => {
+    await canEditStation(user, params.stationId);
+    return library.blocks.get(params.stationId, params.blockId);
+  });
+  r.handle(blocksApi.createBlock, async ({ user, params, body }) => {
+    await canEditStation(user, params.stationId);
+    return library.blocks.create(params.stationId, body);
+  });
+  r.handle(blocksApi.updateBlock, async ({ user, params, body }) => {
+    await canEditStation(user, params.stationId);
+    return library.blocks.update(params.stationId, params.blockId, body);
+  });
+  r.handle(blocksApi.uploadBlockLogo, async ({ user, params, file }) => {
+    await canEditStation(user, params.stationId);
+    return library.blocks.uploadLogo(params.stationId, params.blockId, file);
+  });
+  r.handle(blocksApi.archiveBlock, async ({ user, params, query }) => {
+    await canEditStation(user, params.stationId);
+    return library.blocks.archive(params.stationId, params.blockId, Boolean(query.takeOffLog));
+  });
 
   r.handle(api.getLibrary, async ({ user, params, query }) => {
     await canEditStation(user, params.stationId);

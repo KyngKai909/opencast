@@ -91,20 +91,27 @@ plan.ts             the run sheet: programs at their times, split around breaks 
                     automatic ones in its look; short off air time keeps the channel on: closer, card,
                     opener, or the card alone); the daily opener at the first program boundary at or
                     after 6:00 am with fill before it; open time = station ID and bumpers (the Any
-                    ones, in their windows), never nothing
+                    ones, in their windows), never nothing. A244: programming blocks: each segment
+                    says the block it airs in (a member, its breaks, the open time between members);
+                    in a block its ID airs first where the station ID would, its bumpers before the
+                    station's; its intro and outro air between programs (its own, else a `blk-…`
+                    card in its look once prepared; never at sign-on)
 sequence.ts         bumper roles and sequences (A243): the defaults (one into the break, one out, as
                     before), when an item may air (broadcast dates, a time of day), each role's chain
                     (into and out of a break fall back to Any; up next never), picks decided in order
                     in the log's break walk (least recently aired first from three in a pool, from the
                     as-run log; library order below that), up next once a break, fitting by priority,
-                    and whether the between sequence airs at each program boundary
+                    and whether the between sequence airs at each program boundary. A244: a block's
+                    pools come first in its chain (block role, block Any, then the station's), its
+                    own order where it says plainly, and its intro and outro first by priority
 fill.ts             places spots in stored breaks, holding the money first: rotation, then backup rotation,
                     within the hourly cap, same-spot limit, blocked categories and dayparts; the
                     producer's barter share from the producer's rotation (the producer is paid)
 assemble.ts         per station on air: the run sheet becomes the channel's timeline (`channel_items`):
                     prepared segments in log order, a discontinuity and program date-time per item, and
                     DATERANGE tags (bug, lower thirds, codes, SCTE-35 break cues, A243's up next: the
-                    next program's title over an up-next bumper, from the guide's own data). Nothing
+                    next program's title over an up-next bumper, from the guide's own data; A244: a
+                    block's logo as the bug over its members, `blockId` on the bug tag). Nothing
                     is encoded.
                     As each item's segments are published: an as-run row, a proof frame for spots
                     (proof.ts), and settlement

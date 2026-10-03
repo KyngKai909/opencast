@@ -73,7 +73,12 @@ export const HlsBug = z.object({
   logoUrl: z.string().nullable().default(null),
   position: z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]),
   /** 0 to 100. */
-  opacity: z.number().min(0).max(100)
+  opacity: z.number().min(0).max(100),
+  /**
+   * A244 (added 2026-10-02): during a programming block whose bug is its logo, the block (`logoUrl`
+   * is then the block's, `mode` `logo`, so players built before it draw it as any logo). Null otherwise.
+   */
+  blockId: z.string().nullable().optional()
 });
 export const HlsLowerThird = z.object({ name: z.string(), title: z.string().nullable().default(null) });
 export const HlsCode = z.object({
@@ -98,7 +103,7 @@ export const HlsUpNext = z.object({
   startsAt: z.string(),
   immediate: z.number().default(1),
   carriedFrom: z.string().nullable().default(null),
-  /** Later (programming blocks): the block it starts or belongs to. */
+  /** A244 (2026-10-02): the programming block the program is part of ("Up next · Late Crate Nights · Saturday Reel"). */
   blockName: z.string().nullable().default(null)
 });
 

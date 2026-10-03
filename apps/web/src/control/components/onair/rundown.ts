@@ -60,7 +60,7 @@ export function breakRows(b: BreakSlot): RundownRow[] {
   const out: RundownRow[] = [];
   let at = start;
   rows.forEach((r, i) => {
-    out.push({ id: `${id}:r${i}`, at: iso(at), code: r.code, title: r.title, source: r.note ?? CODE_SOURCE[r.code], lengthMs: r.lengthMs, kind: "break", breakId: id, ...(r.element && !r.element.fits ? { dropped: true } : {}) });
+    out.push({ id: `${id}:r${i}`, at: iso(at), code: r.code, title: r.title, source: r.note ?? CODE_SOURCE[r.code], lengthMs: r.lengthMs, kind: "break", breakId: id, ...((r.element && !r.element.fits) || (r.block && !r.block.fits) ? { dropped: true } : {}) });
     at += r.lengthMs;
   });
   const rest = start + b.lengthMs - at;

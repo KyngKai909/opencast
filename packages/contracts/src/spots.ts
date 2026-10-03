@@ -304,7 +304,13 @@ export const BreakContent = z.object({
       announces: z.object({ title: z.string(), startsAt: Timestamp }).nullable(),
       fits: z.boolean()
     })
-    .optional()
+    .optional(),
+  /**
+   * A244 (added 2026-10-02): a programming block's own: its intro or outro (between programs, `kind`
+   * `station_id`), its ID (where the station ID would air, `kind` `station_id`) or one of its
+   * bumpers (`kind` `bumper`), and whether it fits.
+   */
+  block: z.object({ id: Id, name: z.string(), part: z.enum(["intro", "outro", "id", "bumper"]), fits: z.boolean() }).optional()
 });
 export type BreakContent = z.infer<typeof BreakContent>;
 

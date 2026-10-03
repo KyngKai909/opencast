@@ -31,7 +31,7 @@ import { and, asc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, sql } from 
 import { schema } from "@opencast/db";
 import type { DayTemplate, DayTemplateEntry, LogDay, TemplateGeneration } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
-import { badRequest, notFound, refused } from "../../errors.js";
+import { badRequest, HttpError, notFound, refused } from "../../errors.js";
 import { addDays, localDate, roundUpToMinute, tzOffsetMinutes, zonedTime } from "../../lib/time.js";
 import { snapToSegment } from "../../lib/segments.js";
 
@@ -40,6 +40,8 @@ const TE = schema.dayTemplateEntries;
 const TD = schema.dayTemplateDates;
 const E = schema.logEntries;
 const B = schema.breaks;
+const TB = schema.dayTemplateBlocks;
+const SP = schema.programBlockSpans;
 
 /** How far ahead dates are generated. */
 export const TEMPLATE_HORIZON_DAYS = 21;
@@ -65,6 +67,16 @@ export interface TemplateEntryInput {
   localNote?: string;
 }
 
+/** A244: a programming block in a day template, as sent. */
+export interface TemplateBlockInput {
+  blockId: string;
+  startTime: string;
+  lengthMs: number;
+}
+
+/** A244: the words for a block that would run past 6:00 am in a template. */
+export const BLOCK_CROSSES_DAY = "A block in a day template ends by 6:00 am, when the next broadcast day starts. Make it two blocks, or place it on the date.";
+
 export interface TemplateOps {
   list(stationId: string): Promise<DayTemplate[]>;
   get(stationId: string, templateId: string): Promise<DayTemplate>;
@@ -75,7 +87,7 @@ export interface TemplateOps {
   update(
     stationId: string,
     templateId: string,
-    input: { name?: string | null; pattern?: Pattern; weekday?: number; onto?: string; until?: string | null; fromDay?: string; entries?: TemplateEntryInput[] }
+    input: { name?: string | null; pattern?: Pattern; weekday?: number; onto?: string; until?: string | null; fromDay?: string; entries?: TemplateEntryInput[]; blocks?: TemplateBlockInput[] }
   ): Promise<{ template: DayTemplate; generated: TemplateGeneration }>;
   /** Takes a repeat (template or G7 copy) off the log from now on. */
   remove(stationId: string, groupId: string): Promise<number>;
@@ -187,6 +199,40 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     }));
   }
 
+  /**
+   * A244: a broadcast day's programming blocks as template blocks (spans starting in it). One that
+   * runs past the day's end (6:00 am) is refused: a template's blocks end by then.
+   */
+  async function snapshotBlocks(stationId: string, day: string, tz: string) {
+    const { from, to } = broadcastDay(day, tz);
+    const spans = await db
+      .select()
+      .from(SP)
+      .where(and(eq(SP.stationId, stationId), gte(SP.startsAt, from), lt(SP.startsAt, to)))
+      .orderBy(asc(SP.startsAt));
+    if (spans.some((sp) => sp.endsAt > to)) throw refused("block_crosses_day", BLOCK_CROSSES_DAY);
+    return spans.map((sp) => ({ blockId: sp.blockId, startMinute: localMinute(sp.startsAt, tz), lengthMs: sp.endsAt.getTime() - sp.startsAt.getTime() }));
+  }
+
+  /** A244: template blocks as sent: the station's blocks (not archived), ending by 6:00 am, not overlapping. */
+  async function blocksFromInput(stationId: string, list: TemplateBlockInput[]) {
+    const refs = await services.library.blocks.refs(list.map((b) => b.blockId));
+    const out = list.map((b, i) => {
+      const ref = refs.get(b.blockId);
+      if (!ref || ref.stationId !== stationId || ref.archived) throw notFound("That block");
+      const [hh, mm] = b.startTime.split(":").map(Number);
+      const startMinute = hh * 60 + mm;
+      if (!b.lengthMs || b.lengthMs <= 0) throw badRequest("Say how long it runs.", { [`blocks.${i}.lengthMs`]: "Required" });
+      if (dayOrder(startMinute) * MIN + b.lengthMs > 1440 * MIN) throw new HttpError(400, "block_crosses_day", BLOCK_CROSSES_DAY, { [`blocks.${i}.lengthMs`]: "Past 6:00 am" });
+      return { blockId: b.blockId, startMinute, lengthMs: b.lengthMs };
+    });
+    out.sort(byDayOrder);
+    for (let i = 1; i < out.length; i++) {
+      if (dayOrder(out[i - 1].startMinute) * MIN + out[i - 1].lengthMs > dayOrder(out[i].startMinute) * MIN) throw new HttpError(400, "block_overlap", "Blocks can't overlap.", { blocks: "Overlap" });
+    }
+    return out;
+  }
+
   /** Entries sent for a template, checked as the log checks them (times are checked per date). */
   async function fromInput(stationId: string, list: TemplateEntryInput[]) {
     const items = await services.library.itemsByIds(list.map((x) => x.itemId).filter((v): v is string => Boolean(v)));
@@ -267,10 +313,12 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
     const tz = await services.stations.timezoneOf(stationId);
     const tomorrow = addDays(broadcastDate(deps.clock.now(), tz), 1);
     const ids = groups.map((g) => g.id);
-    const [entries, dates] = await Promise.all([
+    const [entries, dates, blocks] = await Promise.all([
       db.select().from(TE).where(inArray(TE.templateId, ids)).orderBy(asc(TE.startMinute)),
-      db.select().from(TD).where(and(inArray(TD.templateId, ids), gte(TD.date, tomorrow))).orderBy(asc(TD.date))
+      db.select().from(TD).where(and(inArray(TD.templateId, ids), gte(TD.date, tomorrow))).orderBy(asc(TD.date)),
+      db.select().from(TB).where(inArray(TB.templateId, ids))
     ]);
+    const blockRefs = await services.library.blocks.refs(blocks.map((b) => b.blockId));
     const items = await services.library.itemsByIds(entries.map((e) => e.assetId).filter((v): v is string => Boolean(v)));
     const programIds = entries.map((e) => e.programId ?? (e.assetId ? items.get(e.assetId)?.programId : null)).filter((v): v is string => Boolean(v));
     const programs = await services.library.programsByIds([...new Set(programIds)]);
@@ -313,7 +361,16 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         ),
       dates: dates.filter((d) => d.templateId === g.id).map((d) => ({ date: d.date, edited: Boolean(d.editedAt), entries: d.entries, skipped: d.skipped })),
       createdAt: g.createdAt.toISOString(),
-      updatedAt: g.updatedAt?.toISOString() ?? null
+      updatedAt: g.updatedAt?.toISOString() ?? null,
+      // A244: its programming blocks, in the broadcast day's order.
+      ...(blocks.some((b) => b.templateId === g.id)
+        ? {
+            blocks: blocks
+              .filter((b) => b.templateId === g.id)
+              .sort(byDayOrder)
+              .map((b) => ({ id: b.id, blockId: b.blockId, name: blockRefs.get(b.blockId)?.name ?? "Block", colour: blockRefs.get(b.blockId)?.colour ?? null, startTime: minuteText(b.startMinute), lengthMs: b.lengthMs }))
+          }
+        : {})
     }));
   }
 
@@ -348,7 +405,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const now = deps.clock.now();
       const today = broadcastDate(now, tz);
       checkPattern({ ...input, fromDay: input.fromDay }, today);
-      const entries = await snapshot(stationId, input.fromDay, tz);
+      const [entries, blocks] = await Promise.all([snapshot(stationId, input.fromDay, tz), snapshotBlocks(stationId, input.fromDay, tz)]);
       const [row] = await db.transaction(async (tx) => {
         const inserted = await tx
           .insert(G)
@@ -365,6 +422,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
           })
           .returning();
         if (entries.length) await tx.insert(TE).values(entries.map((e) => ({ ...e, templateId: inserted[0].id })));
+        if (blocks.length) await tx.insert(TB).values(blocks.map((b) => ({ ...b, templateId: inserted[0].id })));
         return inserted;
       });
       const generated = await ops.generate(stationId, { through: input.pattern === "once" ? input.onto : undefined });
@@ -382,10 +440,16 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       const until = pattern === "once" ? onto : input.until !== undefined ? input.until : current.pattern === "once" ? null : current.endsOn;
       if (input.pattern || input.onto || input.until !== undefined) checkPattern({ pattern, onto, until, fromDay: current.startsOn }, today);
       const entries = input.entries ? await fromInput(stationId, input.entries) : input.fromDay ? await snapshot(stationId, input.fromDay, tz) : null;
+      // A244: its blocks, as sent (`blocks` replaces them), or from the day again.
+      const blocks = input.blocks ? await blocksFromInput(stationId, input.blocks) : input.fromDay ? await snapshotBlocks(stationId, input.fromDay, tz) : null;
       const [row] = await db.transaction(async (tx) => {
         if (entries) {
           await tx.delete(TE).where(eq(TE.templateId, templateId));
           if (entries.length) await tx.insert(TE).values(entries.map((e) => ({ ...e, templateId })));
+        }
+        if (blocks) {
+          await tx.delete(TB).where(eq(TB.templateId, templateId));
+          if (blocks.length) await tx.insert(TB).values(blocks.map((b) => ({ ...b, templateId })));
         }
         return tx
           .update(G)
@@ -420,6 +484,10 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         db,
         upcoming.filter((e) => !(e.templateDate && edited.includes(e.templateDate)))
       );
+      // A244: its programming blocks come off the same dates.
+      const spans = await db.select({ id: SP.id, templateDate: SP.templateDate }).from(SP).where(and(eq(SP.repeatGroupId, groupId), gt(SP.startsAt, now)));
+      const goingSpans = spans.filter((sp) => !(sp.templateDate && edited.includes(sp.templateDate)));
+      if (goingSpans.length) await db.delete(SP).where(inArray(SP.id, goingSpans.map((sp) => sp.id)));
       if (row.template) {
         const tz = await services.stations.timezoneOf(stationId);
         await db.delete(TD).where(and(eq(TD.templateId, groupId), gt(TD.date, broadcastDate(now, tz)), isNull(TD.editedAt)));
@@ -472,7 +540,21 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             .orderBy(asc(TE.startMinute))
         : [];
       const itemIds = [...new Set(templateEntries.map((e) => e.assetId).filter((v): v is string => Boolean(v)))];
-      const [items, pulled] = await Promise.all([services.library.itemsByIds(itemIds), services.trust.offAirItems(itemIds)]);
+      // A244: the templates' programming blocks (an archived block is made no more).
+      const templateBlocks = templates.length ? await db.select().from(TB).where(inArray(TB.templateId, templates.map((t) => t.id))) : [];
+      const [items, pulled, blockRefs] = await Promise.all([services.library.itemsByIds(itemIds), services.trust.offAirItems(itemIds), services.library.blocks.refs(templateBlocks.map((b) => b.blockId))]);
+
+      /** A244: a date's spans from its template. */
+      function spansFor(t: Group, date: string) {
+        return templateBlocks
+          .filter((b) => b.templateId === t.id && blockRefs.get(b.blockId) && !blockRefs.get(b.blockId)!.archived)
+          .map((b) => {
+            const startsAt = templateInstant(date, b.startMinute, tz);
+            return { stationId, blockId: b.blockId, startsAt, endsAt: new Date(startsAt.getTime() + snapToSegment(b.lengthMs)), repeatGroupId: t.id, templateDate: date };
+          })
+          .filter((sp) => sp.startsAt > now);
+      }
+      const spanKey = (x: { startsAt: Date; endsAt: Date; blockId: string }) => [x.startsAt.getTime(), x.endsAt.getTime(), x.blockId].join("|");
 
       /** A date's entries from its template: what can air (rights, claims, carriage limits). */
       async function desiredFor(t: Group, date: string) {
@@ -566,6 +648,36 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
               totals.created++;
             } catch {
               // Overlaps something already on the log, or breaks a carriage limit: the log stays.
+              skipped++;
+            }
+          }
+          // A244: its programming blocks, the same way: kept, made, or taken off (a span that would
+          // overlap one already on the date is skipped there, and counted).
+          const existingSpans = rec
+            ? await tx
+                .select()
+                .from(SP)
+                .where(and(eq(SP.stationId, stationId), eq(SP.repeatGroupId, rec.templateId), eq(SP.templateDate, date)))
+            : [];
+          const wantedSpans = new Map((win ? spansFor(win, date) : []).map((sp) => [spanKey(sp), sp]));
+          const keptSpans = new Set<string>();
+          for (const sp of existingSpans) {
+            const key = spanKey(sp);
+            const want = wantedSpans.get(key);
+            if (want && !keptSpans.has(key)) {
+              keptSpans.add(key);
+              if (sp.repeatGroupId !== want.repeatGroupId) await tx.update(SP).set({ repeatGroupId: want.repeatGroupId }).where(eq(SP.id, sp.id));
+            } else if (sp.startsAt > now) {
+              await tx.delete(SP).where(eq(SP.id, sp.id));
+            }
+          }
+          for (const [key, sp] of wantedSpans) {
+            if (keptSpans.has(key)) continue;
+            try {
+              await tx.transaction(async (savepoint) => {
+                await savepoint.insert(SP).values(sp);
+              });
+            } catch {
               skipped++;
             }
           }

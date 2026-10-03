@@ -12,6 +12,9 @@ import { toWebVtt, vttContentId } from "../../lib/captions.js";
 import { createContent, type Content } from "./content.js";
 import { probeBackground } from "../playout/engine/background.js";
 import { eligible, windowOf, type AirWindowRef, type BumperRole } from "../playout/engine/sequence.js";
+import { createBlockOps, type BlockOps } from "./blocks.js";
+
+export type { BlockRef } from "./blocks.js";
 
 export { toWebVtt };
 
@@ -48,8 +51,18 @@ export interface ItemRef {
   bumperRole: BumperRole | null;
   /** A243: when it may air (null: any time). */
   airs: AirWindowRef | null;
+  /** A244: the programming block it belongs to (null: the station's own). */
+  programBlockId: string | null;
   /** Library order (oldest first). */
   createdAt: Date;
+}
+
+/** A244: a programming block's own items that can air: its IDs, bumpers, intros and outros, in library order. */
+export interface BlockFillers {
+  stationIds: ItemRef[];
+  bumpers: ItemRef[];
+  intros: ItemRef[];
+  outros: ItemRef[];
 }
 
 export interface ProgramRef {
@@ -99,8 +112,12 @@ export interface LibraryService {
   /** A claimable station's works from its creator: how many are prepared for air, of how many (N5). */
   creatorWorkImports(stationIds: string[]): Promise<Map<string, { done: number; total: number }>>;
   hasLinkImports(programId: string): Promise<boolean>;
-  /** A station's own station IDs and bumpers, ready for air with rights confirmed. */
-  fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[] }>;
+  /**
+   * A station's own station IDs and bumpers, ready for air with rights confirmed. A244: a
+   * programming block's items are never in the station's; they're in `blocks`, per block (its IDs,
+   * bumpers, intros and outros).
+   */
+  fillers(stationId: string): Promise<{ stationIds: ItemRef[]; bumpers: ItemRef[]; blocks: Map<string, BlockFillers> }>;
   /**
    * A242: a station's own openers, closers and off-air cards, ready for air with rights confirmed,
    * in library order (oldest first, as station IDs and bumpers). An off-air card can be a still
@@ -112,6 +129,8 @@ export interface LibraryService {
    * confirmed (the rest air a generated one).
    */
   withOwnStationId(stationIds: string[]): Promise<Set<string>>;
+  /** A244: programming blocks (the block itself; where it airs is the log's). */
+  blocks: BlockOps;
   /** Programs ready to repeat (for filling dead air), most recent first. */
   repeatable(stationId: string, limit: number): Promise<ItemRef[]>;
   /** A claimable station's import of a covered creator work (the file comes later). */
@@ -119,7 +138,7 @@ export interface LibraryService {
 
   /** A claimable station's rights: the permission or licence record that covers the work. */
   confirmCreatorWorkRights(db: Executor, itemId: string, input: { permissionRecordId?: string; licenceRecordId?: string }): Promise<void>;
-  library(stationId: string, filter: { folderId?: string; code?: LogCode; needsAttention?: boolean; bumperRole?: BumperRole }): Promise<LibraryView>;
+  library(stationId: string, filter: { folderId?: string; code?: LogCode; needsAttention?: boolean; bumperRole?: BumperRole; programBlockId?: string }): Promise<LibraryView>;
   item(itemId: string): Promise<LibraryItem>;
   stationOfItem(itemId: string): Promise<string>;
   stationOfProgram(programId: string): Promise<string>;
@@ -179,6 +198,8 @@ export interface ItemFields {
   bumperRole?: BumperRole | null;
   /** A243: when it may air (null: any time). */
   airs?: AirWindowRef | null;
+  /** A244: the programming block it belongs to (null: the station's). */
+  programBlockId?: string | null;
 }
 
 export interface FolderView {
@@ -311,6 +332,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       breakPointsMs: pointsBy.get(r.id) ?? [],
       bumperRole: r.bumperRole ?? null,
       airs: windowOf(r),
+      programBlockId: r.programBlockId ?? null,
       createdAt: r.createdAt
     }));
   }
@@ -389,6 +411,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         bumperRole: r.code === "BMP" ? (r.bumperRole ?? null) : null,
         airs,
         airingNow: airs ? eligible({ airs }, now, zones.get(r.stationId) ?? "UTC") : true,
+        programBlockId: r.programBlockId ?? null,
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -460,7 +483,15 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const [folder] = await db.select({ stationId: schema.assetFolders.stationId }).from(schema.assetFolders).where(eq(schema.assetFolders.id, fields.folderId));
       if (!folder || folder.stationId !== stationId) throw badRequest("That folder isn't this station's.");
     }
+    // A244: a block's items are its station's own, on a block that isn't archived.
+    if (fields.programBlockId) {
+      const [block] = await db.select({ stationId: schema.programBlocks.stationId, archivedAt: schema.programBlocks.archivedAt }).from(schema.programBlocks).where(eq(schema.programBlocks.id, fields.programBlockId));
+      if (!block || block.stationId !== stationId || block.archivedAt) throw notFound("That block");
+    }
   }
+
+  /** A244: the types that can belong to a programming block (its bumpers, ID, intro and outro). */
+  const BLOCK_KINDS: string[] = ["BMP", "SID", "OPN", "CLS"];
 
   /**
    * Keeps the upload: the original, stored once by its content ID in Infrequent Access. Playout
@@ -607,6 +638,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
 
   const service: LibraryService = {
     content,
+    blocks: createBlockOps(ctx, content),
 
     async storageUse() {
       const CR = schema.contentRefs;
@@ -747,17 +779,31 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const rows = await db
         .select()
         .from(A)
-        .where(and(eq(A.stationId, stationId), inArray(A.code, ["SID", "BMP"]), eq(A.status, "ready"), isNull(A.archivedAt)))
+        .where(and(eq(A.stationId, stationId), inArray(A.code, ["SID", "BMP"]), eq(A.status, "ready"), isNull(A.archivedAt), isNull(A.programBlockId)))
         .orderBy(asc(A.createdAt), asc(A.id));
       const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs);
-      return { stationIds: refs.filter((r) => r.code === "SID"), bumpers: refs.filter((r) => r.code === "BMP") };
+      // A244: a block's items air only during the block (its intros and outros are A242's types).
+      const own = refs.filter((r) => !r.programBlockId);
+      const blocks = new Map<string, BlockFillers>();
+      const inBlocks = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), sql`${A.programBlockId} is not null`, inArray(A.code, ["SID", "BMP", "OPN", "CLS"]), eq(A.status, "ready"), isNull(A.archivedAt)))
+        .orderBy(asc(A.createdAt), asc(A.id));
+      for (const r of (await toRefs(inBlocks)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && r.durationMs)) {
+        const b = blocks.get(r.programBlockId!) ?? { stationIds: [], bumpers: [], intros: [], outros: [] };
+        (r.code === "SID" ? b.stationIds : r.code === "BMP" ? b.bumpers : r.code === "OPN" ? b.intros : b.outros).push(r);
+        blocks.set(r.programBlockId!, b);
+      }
+      return { stationIds: own.filter((r) => r.code === "SID"), bumpers: own.filter((r) => r.code === "BMP"), blocks };
     },
 
     async identity(stationId) {
       const rows = await db
         .select()
         .from(A)
-        .where(and(eq(A.stationId, stationId), inArray(A.code, ["OPN", "CLS", "OFF"]), eq(A.status, "ready"), isNull(A.archivedAt)))
+        // A244: a block's intros and outros are the block's, never the station's openers and closers.
+        .where(and(eq(A.stationId, stationId), inArray(A.code, ["OPN", "CLS", "OFF"]), eq(A.status, "ready"), isNull(A.archivedAt), isNull(A.programBlockId)))
         .orderBy(asc(A.createdAt), asc(A.id));
       // A still off-air card has no length; everything else needs one.
       const refs = (await toRefs(rows)).filter((r) => r.rightsConfirmed && (r.contentId || r.location) && !r.contentUnavailable && (r.durationMs || isStill(r)));
@@ -770,7 +816,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .selectDistinct({ stationId: A.stationId })
         .from(A)
         .innerJoin(R, eq(R.assetId, A.id))
-        .where(and(inArray(A.stationId, stationIds), eq(A.code, "SID"), eq(A.status, "ready"), isNull(A.archivedAt)));
+        .where(and(inArray(A.stationId, stationIds), eq(A.code, "SID"), eq(A.status, "ready"), isNull(A.archivedAt), isNull(A.programBlockId)));
       return new Set(rows.map((r) => r.stationId));
     },
 
@@ -824,6 +870,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         conditions.push(eq(A.code, "BMP"));
         conditions.push(filter.bumperRole === "any" ? or(isNull(A.bumperRole), eq(A.bumperRole, "any"))! : eq(A.bumperRole, filter.bumperRole));
       }
+      // A244: a programming block's items.
+      if (filter.programBlockId) conditions.push(eq(A.programBlockId, filter.programBlockId));
       const [rows, folders, programs, all] = await Promise.all([
         db.select().from(A).where(and(...conditions)).orderBy(asc(A.title)),
         db.select().from(schema.assetFolders).where(eq(schema.assetFolders.stationId, stationId)).orderBy(asc(schema.assetFolders.name)),
@@ -916,6 +964,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             prepProgress: 0,
             // A243: a role or window sent with it (a type guessed as a bumper takes a role too).
             ...(fields.bumperRole !== undefined && (fields.code ?? guessCode(probe.durationMs)) === "BMP" ? { bumperRole: fields.bumperRole } : {}),
+            // A244: uploaded straight into a block (its bumper, ID, intro or outro).
+            ...(fields.programBlockId && BLOCK_KINDS.includes(fields.code ?? guessCode(probe.durationMs)) ? { programBlockId: fields.programBlockId } : {}),
             ...timing
           })
           .returning();
@@ -945,13 +995,16 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       // new type that can't have them clears them.
       const code = fields.code ?? row.code;
       if (fields.bumperRole != null && code !== "BMP") throw badRequest("Only a bumper has a role.", { bumperRole: "Not a bumper" });
+      // A244: bumpers, station IDs, openers and closers can belong to a block.
+      if (fields.programBlockId && !BLOCK_KINDS.includes(code)) throw badRequest("Only bumpers, station IDs, openers and closers can be part of a block.", { programBlockId: "Not for this type" });
       const timing = airingFields(code, fields);
       await db.transaction(async (tx) => {
         const patch: Partial<typeof A.$inferInsert> = { ...timing };
-        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription", "bumperRole"] as const) {
+        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription", "bumperRole", "programBlockId"] as const) {
           if (fields[key] !== undefined) (patch as Record<string, unknown>)[key] = fields[key];
         }
         if (code !== "BMP" && row.bumperRole !== null) patch.bumperRole = null;
+        if (!BLOCK_KINDS.includes(code) && row.programBlockId !== null) patch.programBlockId = null;
         if (!WINDOWED.includes(code) && windowOf(row)) Object.assign(patch, { airsFrom: null, airsUntil: null, dailyFrom: null, dailyUntil: null });
         if (Object.keys(patch).length) await tx.update(A).set(patch).where(eq(A.id, itemId));
         if (fields.breakPointsMs) await setBreakPoints(tx, itemId, fields.breakPointsMs);

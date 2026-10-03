@@ -68,6 +68,30 @@ export const asLogCode = (code: LogCode | IdentCode): LogCode => (isIdentCode(co
 export const BumperRole = z.enum(["into_break", "out_of_break", "up_next", "any"]);
 export type BumperRole = z.infer<typeof BumperRole>;
 
+/**
+ * A244 (added 2026-10-02): the programming block an airing belongs to ("Late Crate Nights"), as the
+ * dial, guide, station page and banner name it. A program or live block is a member of a block when
+ * it starts inside one of the block's spans on the station's log.
+ */
+export const AiringBlock = z.object({ id: Id, name: z.string(), colour: Colour.nullable() });
+export type AiringBlock = z.infer<typeof AiringBlock>;
+
+/**
+ * A244 (added 2026-10-02): a programming block as viewers see it on a station's schedule: from its
+ * first member's start to its last member's end (a member that runs past the span keeps it on air
+ * to its end). Off-air time inside a span splits it in two. `id` is the block's.
+ */
+export const BlockBand = z.object({
+  id: Id,
+  name: z.string(),
+  colour: Colour.nullable(),
+  /** The block's logo (absolute URL), or null. */
+  logoUrl: z.string().nullable(),
+  startsAt: Timestamp,
+  endsAt: Timestamp
+});
+export type BlockBand = z.infer<typeof BlockBand>;
+
 export const StationKind = z.enum(["station", "studio", "claimable", "listed", "catalog"]);
 
 export const StationRole = z.enum(["owner", "operator", "host"]);

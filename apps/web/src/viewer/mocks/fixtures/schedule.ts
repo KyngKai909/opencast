@@ -2,7 +2,7 @@
 // page's schedule for BEAT, the radio rows). Times are local to the market on the base day: the
 // reference's Saturday in mock mode, or today with the real clock.
 
-import type { Airing, StationIdent } from "@opencast/contracts";
+import type { Airing, AiringBlock, BlockBand, StationIdent } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { STATIONS, stationByRef, uid } from "./stations";
 
@@ -23,7 +23,20 @@ export interface MockAiring {
   programId: string | null;
   /** Planned off air (G9): its off air hours, or a sign-off on its log. `end` is when it's back. */
   offAir?: boolean;
+  /** A244: the programming block it's part of. */
+  block?: AiringBlock;
 }
+
+/** A244: BEAT's programming block tonight, Late Crate and the Saturday Reel (as master control's mock has it). */
+export const LATE_CRATE_NIGHTS: AiringBlock & { description: string; logoUrl: string | null; schedule: string } = {
+  id: "00000000-0000-4000-8000-0000000b1001",
+  name: "Late Crate Nights",
+  colour: "#1F5C99",
+  description: "Records after dark: Late Crate, then the Saturday Reel.",
+  logoUrl: null,
+  schedule: "Saturdays, 8:00 pm to 9:00 pm"
+};
+const LCN: AiringBlock = { id: LATE_CRATE_NIGHTS.id, name: LATE_CRATE_NIGHTS.name, colour: LATE_CRATE_NIGHTS.colour };
 
 // The base day, in the market's zone (Pacific time, UTC-7 in September).
 const OFFSET_HOURS = 7;
@@ -72,7 +85,7 @@ export const PROGRAMS: Record<string, { id: string; title: string; maker: string
   "desert-rock": { id: P("desert-rock"), title: "Desert country, all night", maker: "DUST", description: "All night.", category: "Music" }
 };
 
-function a(callSign: string, start: string, end: string, title: string, program: keyof typeof PROGRAMS | null, o: Partial<Pick<MockAiring, "episodeTitle" | "episodeDescription" | "note" | "live" | "listed" | "carriedFrom" | "offAir">> = {}): MockAiring {
+function a(callSign: string, start: string, end: string, title: string, program: keyof typeof PROGRAMS | null, o: Partial<Pick<MockAiring, "episodeTitle" | "episodeDescription" | "note" | "live" | "listed" | "carriedFrom" | "offAir" | "block">> = {}): MockAiring {
   const s = stationByRef(callSign)!;
   return { id: uid(800000 + ++n), stationId: s.ident.id, title, start: at(start), end: at(end), programId: program ? PROGRAMS[program].id : null, ...o };
 }
@@ -96,8 +109,8 @@ export const AIRINGS: MockAiring[] = [
   a("COLT", "+3 18:00", "+3 20:00", "Planning Commission", null, { listed: true, live: true }),
   // BEAT 12.1 (the station page's schedule)
   a("BEAT", "18:00", "20:00", "Crate Session 02", "crate-session", { note: "From the library" }),
-  a("BEAT", "20:00", "20:30", "Late Crate, ep. 14", "late-crate", { episodeTitle: "ep. 14", note: "Beat showcase" }),
-  a("BEAT", "20:30", "21:00", "Saturday Reel", "saturday-reel", { carriedFrom: "REEL", episodeTitle: "Cartoons from 1928 to 1934", episodeDescription: "Animated shorts from the late silent and early sound era, restored and in the public domain. Tonight: a steamboat, a haunted barn and a long-lost jazz short." }),
+  a("BEAT", "20:00", "20:30", "Late Crate, ep. 14", "late-crate", { episodeTitle: "ep. 14", note: "Beat showcase", block: LCN }),
+  a("BEAT", "20:30", "21:00", "Saturday Reel", "saturday-reel", { block: LCN, carriedFrom: "REEL", episodeTitle: "Cartoons from 1928 to 1934", episodeDescription: "Animated shorts from the late silent and early sound era, restored and in the public domain. Tonight: a steamboat, a haunted barn and a long-lost jazz short." }),
   a("BEAT", "21:00", "22:00", "Beat Tape Live", "beat-tape-live", { live: true, note: "Live from the Redlands studio" }),
   a("BEAT", "22:00", "23:00", "Late Crate, ep. 15", "late-crate", { episodeTitle: "ep. 15", note: "Beat showcase" }),
   a("BEAT", "23:00", "24:00", "Slow Hours", "slow-hours", { carriedFrom: "HALL" }),
@@ -152,8 +165,21 @@ export function toAiring(x: MockAiring): Airing {
     endsAt: x.end,
     live: !!x.live,
     carriedFrom: x.carriedFrom ? identOf(x.carriedFrom) : null,
-    programId: x.programId
+    programId: x.programId,
+    ...(x.block ? { block: x.block } : {})
   };
+}
+
+/** A244: a station's programming blocks in a window: each run of airings in one block, first to last. */
+export function blockBandsIn(airings: MockAiring[]): BlockBand[] {
+  const out: BlockBand[] = [];
+  for (const x of [...airings].sort((p, q) => p.start.localeCompare(q.start))) {
+    if (!x.block) continue;
+    const last = out[out.length - 1];
+    if (last && last.id === x.block.id && last.endsAt >= x.start) last.endsAt = x.end > last.endsAt ? x.end : last.endsAt;
+    else out.push({ id: x.block.id, name: x.block.name, colour: x.block.colour, logoUrl: null, startsAt: x.start, endsAt: x.end });
+  }
+  return out;
 }
 
 export function airingsFor(stationId: string): MockAiring[] {

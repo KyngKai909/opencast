@@ -330,6 +330,13 @@
       "when": 1790976683311,
       "tag": "0048_bumper_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790989192416,
+      "tag": "0049_programming_blocks",
+      "breakpoints": true
     }
   ]
 }

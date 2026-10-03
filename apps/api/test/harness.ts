@@ -313,6 +313,8 @@ export async function itemFixture(
     airs?: { from?: string; until?: string; dailyFrom?: string; dailyUntil?: string };
     /** Library order (oldest first). */
     createdAt?: Date;
+    /** A244: a programming block's own (its bumper, ID, intro or outro). */
+    programBlockId?: string;
   } = {}
 ) {
   const [item] = await h.db
@@ -333,6 +335,7 @@ export async function itemFixture(
       airsUntil: fields.airs?.until ?? null,
       dailyFrom: fields.airs?.dailyFrom ?? null,
       dailyUntil: fields.airs?.dailyUntil ?? null,
+      programBlockId: fields.programBlockId ?? null,
       ...(fields.createdAt ? { createdAt: fields.createdAt } : {})
     })
     .returning();

@@ -2,6 +2,7 @@
 // that follows the time of night (▲ ▼ keep the time, ◀ ▶ move a program), CH paging six stations
 // at a time, numbers jumping to a channel, and what each cell and the header say.
 
+import type { BlockBand } from "@opencast/contracts";
 import type { Command } from "@opencast/player";
 import { clock, clockRange } from "@opencast/ui";
 import type { AiringX, StationIdentX } from "../../api/ext";
@@ -20,6 +21,17 @@ export const PAGE = 6;
 export interface GuideRowData {
   station: StationIdentX;
   airings: AiringX[];
+  /** A244: the station's programming blocks (the guide's band above its row). */
+  blocks?: BlockBand[];
+}
+
+/** A244: a programming block's band on a row: its name and colour, first program to last. */
+export interface GuideBand {
+  id: string;
+  name: string;
+  colour: string | null;
+  start: number;
+  end: number;
 }
 
 /** A place in a row: an airing, or the time a station is off air between airings. */
@@ -44,6 +56,8 @@ export interface Cell {
 export interface GuideRow {
   station: StationIdentX;
   cells: Cell[];
+  /** A244: its programming blocks; empty with none. Focus never lands on them. */
+  bands: GuideBand[];
 }
 
 export interface GuideModel {
@@ -117,7 +131,11 @@ export function rowCells(row: GuideRowData, from: number, to: number): Cell[] {
 /** The guide's rows: the TV band, then the radio band, each in channel order. */
 export function buildModel(tv: GuideRowData[], radio: GuideRowData[], from: number, to: number): GuideModel {
   const order = (rows: GuideRowData[]) => [...rows].sort((a, b) => channelValue(a.station.channel) - channelValue(b.station.channel));
-  const rows = [...order(tv), ...order(radio)].map((r) => ({ station: r.station, cells: rowCells(r, from, to) }));
+  const rows = [...order(tv), ...order(radio)].map((r) => ({
+    station: r.station,
+    cells: rowCells(r, from, to),
+    bands: (r.blocks ?? []).map((b) => ({ id: b.id, name: b.name, colour: b.colour, start: ms(b.startsAt), end: ms(b.endsAt) })).filter((b) => b.end > from && b.start < to)
+  }));
   return { rows, earliest: from, latest: to };
 }
 
@@ -345,4 +363,9 @@ export function guideCommand(c: Command, m: GuideModel | null, f: GuideFocus | n
     default:
       return { handled: false };
   }
+}
+
+/** A244: "Part of Late Crate Nights", for the focused cell's details; null outside a block. */
+export function blockLine(c: Cell): string | null {
+  return c.airing?.block ? `Part of ${c.airing.block.name}` : null;
 }

@@ -45,6 +45,8 @@ export interface FolderRailProps {
   identity?: { openers: number; closers: number; offAirCards: number };
   /** A243: how many bumpers (the Bumpers list). Left out, it isn't drawn. */
   bumpers?: number;
+  /** A244: the station's programming blocks, a list each with how many items are theirs. */
+  blocks?: Array<{ id: string; name: string; count: number }>;
 }
 
 /** A243: how many bumpers, for the rail's Bumpers list. */
@@ -58,7 +60,7 @@ export const identityCounts = (items: Item[]) => ({
 });
 
 /** Folders on the left: the station's own, the sign-off and sign-on lists (A242), then the two "needs attention" lists (04.1). */
-export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention, identity, bumpers }: FolderRailProps) {
+export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention, identity, bumpers, blocks }: FolderRailProps) {
   const link = (key: string, label: string, count: number, warn = false) => (
     <a key={key} href={key === "all" ? `${base}/library` : `${base}/library/${key}`} className={cx(active === key && "cc-folders__on", warn && count > 0 && "cc-folders__warn")} aria-current={active === key ? "page" : undefined}>
       {label}
@@ -87,6 +89,13 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
           {link("openers", "Openers", identity.openers)}
         </>
       )}
+      {/* A244: one list per programming block (its bumpers, ID, intro and outro). */}
+      {blocks && blocks.length > 0 && (
+        <>
+          <div className="cc-folders__g cc-folders__g--gap">Blocks</div>
+          {blocks.map((b) => link(`blocks/${b.id}`, b.name, b.count))}
+        </>
+      )}
       <div className="cc-folders__g cc-folders__g--gap">Needs attention</div>
       {link("rights", "Rights to confirm", needsAttention.rightsToConfirm, true)}
       {link("preparing", "Preparing for air", needsAttention.preparing)}
@@ -102,7 +111,7 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
  * Resume, Retry and Cancel, then "Checking" while the API reads it; once it's in the library below,
  * it leaves the list.
  */
-export function UploadDrop({ stationId, folderId, code: preset }: { stationId: string; folderId?: string | null; code?: LibraryCode }) {
+export function UploadDrop({ stationId, folderId, code: preset, programBlockId }: { stationId: string; folderId?: string | null; code?: LibraryCode; programBlockId?: string | null }) {
   const qc = useQueryClient();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
@@ -114,7 +123,8 @@ export function UploadDrop({ stationId, folderId, code: preset }: { stationId: s
   const card = as === "OFF";
   const up = useUpload({
     id: `library-${stationId}`,
-    purpose: () => ({ kind: "library_item", stationId, fields: { ...(folderId ? { folderId } : {}), ...(as ? { code: as } : {}) } }),
+    // A244: dropped into a block's list, it's the block's (a bumper, ID, intro or outro).
+    purpose: () => ({ kind: "library_item", stationId, fields: { ...(folderId ? { folderId } : {}), ...(as ? { code: as } : {}), ...(programBlockId ? { programBlockId } : {}) } }),
     clearFinishedAfterMs: 4000,
     onFinished: () => void refreshLibrary(qc),
     onBatchDone: ({ finished, failed }) => {
@@ -270,9 +280,11 @@ export interface LibraryTableProps {
   hrefFor?: (i: Item) => string;
   onOpen?: (i: Item) => void;
   empty?: string;
+  /** A244: the station's programming blocks, by id (a block's item shows its dot and name). */
+  blocks?: Map<string, { name: string; colour: string | null }>;
 }
 
-export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, empty }: LibraryTableProps) {
+export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, empty, blocks }: LibraryTableProps) {
   const qc = useQueryClient();
   const toast = useToast();
   const setCode = async (i: Item, code: SelectableCode) => {
@@ -308,6 +320,13 @@ export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, 
             <b className="cc-lib-row__title">{i.title}</b>
           )}
           <small>{itemOrigin(i)}</small>
+          {/* A244: a programming block's item: its dot and name. */}
+          {i.programBlockId && blocks?.get(i.programBlockId) && (
+            <small className="cc-lib-row__block">
+              <span className="cc-lib-row__dot" style={{ background: blocks.get(i.programBlockId)!.colour ?? "var(--ink-70)" }} aria-hidden="true" />
+              {blocks.get(i.programBlockId)!.name}
+            </small>
+          )}
         </>
       )
     },

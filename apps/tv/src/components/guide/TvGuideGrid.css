@@ -41,3 +41,15 @@
 /* Loading: quiet blocks where the cells will be. */
 .tvg-grid__ph { margin: 4px; border-radius: var(--r-control); background: color-mix(in srgb, var(--ink) 4%, transparent); }
 .tvg-grid__ph--st { display: block; margin: 0; width: 180px; height: 30px; }
+
+/* A244: a programming block's band above the row's cells: its colour, its name in white, at the TV
+   type scale's smallest (18px here: a label, not reading text). The row keeps its height (title
+   safe), its cells a little shorter; focus never lands on the band. */
+.tvg-grid__row--blocks { grid-template-rows: 22px 1fr; }
+.tvg-grid__row--blocks .tvg-grid__st { grid-row: 1 / span 2; }
+.tvg-grid__row--blocks .tvg-cell { grid-row: 2; margin-top: 2px; padding-top: 2px; padding-bottom: 2px; }
+.tvg-band {
+  grid-row: 1; margin: 3px 4px 0; padding: 0 10px; border-radius: 4px; background: var(--ink-70); color: #fff;
+  font: 600 18px/19px var(--font-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.tvg-band--cont::before { content: "‹ " / ""; }

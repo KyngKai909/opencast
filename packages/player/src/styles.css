@@ -119,6 +119,9 @@
 }
 .oc-banner__nx { margin-top: calc(14 * var(--u)); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
 .oc-banner__nx b { color: var(--pic-ink); font-weight: 600; }
+/* A244: a programming block's name before the title, lighter; after the next title, quieter. */
+.oc-banner__blk { font-weight: 500; color: var(--pic-ink-70); }
+.oc-banner__nxb { font-weight: 400; color: var(--pic-ink-70); }
 .oc-banner__side { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: calc(16 * var(--u)); }
 .oc-banner__clock { font: 500 max(calc(44 * var(--u)), 15px) var(--font-mono); letter-spacing: -.03em; }
 .oc-banner__hints {

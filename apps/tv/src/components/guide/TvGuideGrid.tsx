@@ -82,8 +82,14 @@ export function TvGuideGrid({ rows, from, now, timeZone, focusedKey, onCell }: T
       {rows.map((r, ri) => {
         const programs = r.cells.map((c) => ({ id: c.key, title: c.airing?.title ?? (c.nothingListed ? r.station.name : ""), start: c.start, end: c.end }));
         const placed = guideCells(programs, from, to, now);
+        // A244: a programming block's band above the row's cells (never focused).
+        const bands = guideCells(
+          r.bands.map((b) => ({ id: `${b.id}:${b.start}`, title: b.name, start: b.start, end: b.end })),
+          from,
+          to
+        );
         return (
-          <div key={r.station.id} className="tvg-grid__row" role="row" aria-label={[r.station.channel, r.station.callSign].filter(Boolean).join(" ")}>
+          <div key={r.station.id} className={cx("tvg-grid__row", bands.length > 0 && "tvg-grid__row--blocks")} role="row" aria-label={[r.station.channel, r.station.callSign].filter(Boolean).join(" ")}>
             <div className="tvg-grid__st" role="rowheader">
               <span className="tvg-grid__ch oc-mono">{r.station.channel}</span>
               {isExternal(r.station) ? (
@@ -97,6 +103,14 @@ export function TvGuideGrid({ rows, from, now, timeZone, focusedKey, onCell }: T
                 <span className="tvg-grid__cs oc-cs">{r.station.callSign ?? r.station.name}</span>
               )}
             </div>
+            {bands.map((b) => {
+              const band = r.bands.find((x) => `${x.id}:${x.start}` === b.program.id)!;
+              return (
+                <div key={b.program.id} className={cx("tvg-band", b.began && "tvg-band--cont")} style={{ gridColumn: `${b.colStart} / ${b.colEnd}`, ...(band.colour ? { background: band.colour } : {}) }} aria-hidden="true">
+                  {band.name}
+                </div>
+              );
+            })}
             {placed
               .filter((p) => p.colEnd > p.colStart)
               .map((p) => {

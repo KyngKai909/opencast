@@ -111,6 +111,12 @@ export const LibraryItem = z.object({
   airs: AirWindow.nullable().optional(),
   /** A243 (added 2026-10-02): inside its window now (true for an item without one). */
   airingNow: z.boolean().optional(),
+  /**
+   * A244 (added 2026-10-02): the programming block it belongs to (a bumper, station ID, opener or
+   * closer: the block's bumper, ID, intro or outro), or null: the station's own. A block's items air
+   * only during the block.
+   */
+  programBlockId: Id.nullable().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -270,7 +276,13 @@ const ItemFields = z.object({
    * A243 (2026-10-02): when it may air (null: any time). Bumpers, station IDs, openers and closers
    * only (400 otherwise); changing an item's type to another clears it.
    */
-  airs: AirWindow.nullable()
+  airs: AirWindow.nullable(),
+  /**
+   * A244 (2026-10-02): the programming block it belongs to (null: the station's). Bumpers, station
+   * IDs, openers and closers only (400 otherwise); the block must be the station's own and not
+   * archived (404). Changing the type to another clears it.
+   */
+  programBlockId: Id.nullable()
 });
 
 export const libraryApi = {
@@ -282,9 +294,17 @@ export const libraryApi = {
     params: StationParams,
     /**
      * `code` (A242): `OPN`, `CLS` or `OFF` lists the openers, closers or off-air cards. `bumperRole`
-     * (A243): bumpers with that role (`any` includes bumpers without one).
+     * (A243): bumpers with that role (`any` includes bumpers without one). `programBlockId` (A244):
+     * that block's items.
      */
-    query: z.object({ folderId: Id.optional(), code: LibraryCode.optional(), needsAttention: z.coerce.boolean().optional(), bumperRole: BumperRole.optional() }),
+    query: z.object({
+      folderId: Id.optional(),
+      code: LibraryCode.optional(),
+      needsAttention: z.coerce.boolean().optional(),
+      bumperRole: BumperRole.optional(),
+      /** A244: a programming block's items. */
+      programBlockId: Id.optional()
+    }),
     response: Library
   }),
   upload: endpoint({

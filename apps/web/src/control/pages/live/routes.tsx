@@ -1,6 +1,7 @@
 // The Live and programming area's routes, under `/control/:callSign`.
 
 import { Route } from "react-router";
+import Blocks from "./Blocks";
 import Library from "./Library";
 import LibraryItem from "./LibraryItem";
 import Listings from "./Listings";
@@ -20,5 +21,9 @@ export const liveStationRoutes = (
     <Route path="library" element={<Library />} />
     <Route path="library/items/:itemId" element={<LibraryItem />} />
     <Route path="library/:folderId" element={<Library />} />
+    {/* A244: a programming block's items. */}
+    <Route path="library/blocks/:blockId" element={<Library />} />
+    <Route path="blocks" element={<Blocks />} />
+    <Route path="blocks/:blockId" element={<Blocks />} />
   </>
 );

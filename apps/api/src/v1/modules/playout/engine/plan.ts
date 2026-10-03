@@ -40,7 +40,8 @@ import { asLogCode } from "@opencast/contracts";
 import type { ModuleContext } from "../../../context.js";
 import { objectKey, sha256FromCid } from "../../../storage.js";
 import type { ItemRef } from "../../library/service.js";
-import type { BreakSlotView } from "../../log/service.js";
+import type { BlockPlan, BreakSlotView } from "../../log/service.js";
+import type { BlockRef } from "../../library/blocks.js";
 import { clockTime } from "../../../lib/time.js";
 import { broadcastDate, broadcastDay } from "../../log/templates.js";
 import { CREDIT_MS, STATION_ID_MS } from "./fill.js";
@@ -48,14 +49,26 @@ import { identLine, Slates, type StationLook } from "./slates.js";
 import { hourStartIn, partsOf } from "./cadence.js";
 import { catalogCreditBreaks } from "./catalogCredit.js";
 import type { Band } from "./ladder.js";
-import { GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
+import { blockCardKey, GENERATED_BLOCK_CARD_MS, GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
 import { bumpersIn } from "./cadence.js";
 import { defaultElements, eligible, fitElements, type AirWindowRef, type Announce, type Boundary, type BumperRole, type Element } from "./sequence.js";
 
 /** A station ID or bumper to air: the library's, or the generated station ID. */
 type FillerRef = Pick<ItemRef, "id" | "title" | "contentId" | "location" | "mediaKind" | "durationMs"> & { generated?: boolean; bumperRole?: BumperRole | null; airs?: AirWindowRef | null };
 
-/** `OPN` an opener, `CLS` a closer (A242). */
+/**
+ * A244: the programming block a segment airs in, and what the bug shows there: the block's logo
+ * (`logo`, with one), the station's (`station`), or none (`off`). Null: the station's, explicitly
+ * (a between-programs bumper at a block's edge, a sign-off or sign-on).
+ */
+export interface SegmentBlock {
+  id: string;
+  name: string;
+  bug: "station" | "logo" | "off";
+  logoUrl: string | null;
+}
+
+/** `OPN` an opener, `CLS` a closer (A242); A244: a block's intro (`OPN`) and outro (`CLS`) too. */
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN" | "OPN" | "CLS";
 export type AsRunReason = "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
 
@@ -96,10 +109,12 @@ export interface Segment {
   missing?: { itemId: string; title: string; contentId: string; airsAt: Date };
   /** A243: a bumper's role as it airs here (its sequence's), for the as-run log and the item tag. */
   bumperRole?: BumperRole;
-  /** A243: where it airs: a break's opening or closing sequence, between programs, open time, or (A242) sign-on. */
-  position?: "open" | "close" | "between" | "open_time" | "sign_on";
+  /** A243: where it airs: a break's opening or closing sequence, between programs, open time, (A242) sign-on, or (A244) a block's intro or outro (`boundary`). */
+  position?: "open" | "close" | "between" | "boundary" | "open_time" | "sign_on";
   /** A243: up next only, what it names (the player draws the title over it). */
   announces?: Announce;
+  /** A244: the programming block it airs in (null: the station's). */
+  block?: SegmentBlock | null;
 }
 
 import { DEAD_AIR_NOTE } from "../../log/service.js";
@@ -367,7 +382,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         if (next > from.getTime()) start = Math.min(start, next - DAILY_OPENER_LEAD_MS);
       }
       const lookback = new Date(start - 6 * 3_600_000);
-      const [allEntries, { breaks, boundaries }, allFillers, station, credits, members, offAirSpans, paused, allIdentity] = await Promise.all([
+      const [allEntries, { breaks, boundaries, blocks: blockPlan }, allFillers, station, credits, members, offAirSpans, paused, allIdentity] = await Promise.all([
         services.log.entries(stationId, lookback, to),
         services.log.breakPlan(stationId, lookback, to),
         services.library.fillers(stationId),
@@ -392,10 +407,36 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const generated = await generatedId(stationId, station, !allFillers.stationIds.length);
         if (generated) fillers.stationIds.push(generated);
       }
+      // A244: each programming block's own items that are prepared (its IDs, bumpers, intros, outros).
+      const blockFillers = new Map(
+        [...(allFillers.blocks ?? new Map())].map(([id, f]) => [
+          id,
+          { stationIds: f.stationIds.filter((x) => fileAt(stationId, x)), bumpers: f.bumpers.filter((x) => fileAt(stationId, x)), intros: f.intros.filter((x) => fileAt(stationId, x)), outros: f.outros.filter((x) => fileAt(stationId, x)) }
+        ])
+      );
+      /** A244: what a segment in a block carries (its bug), or null for the station's. */
+      const segBlock = (blockId: string | null | undefined): SegmentBlock | null => {
+        const ref = blockId ? blockPlan.refs.get(blockId) : undefined;
+        return ref ? { id: ref.id, name: ref.name, bug: ref.bug, logoUrl: ref.logoUrl } : null;
+      };
+      /** A244: the block on air at `t` (its members and the open time between them), if any. */
+      const pieceAt = (t: number) => blockPlan.pieces.find((p) => p.s <= t && t < p.e)?.blockId ?? null;
+      /**
+       * A244: the station IDs and bumpers in a block's context (its own first: its ID airs where the
+       * station ID would). Open time loops the block's Any bumpers, else the station's, else every
+       * bumper but up next.
+       */
+      const fillersFor = (blockId: string | null): typeof fillers => {
+        const own = blockId ? blockFillers.get(blockId) : undefined;
+        if (!own) return fillers;
+        const isAny = (b: FillerRef) => !b.bumperRole || b.bumperRole === "any";
+        const loop = own.bumpers.filter(isAny).length ? own.bumpers.filter(isAny) : fillers.bumpers.filter(isAny).length ? fillers.bumpers.filter(isAny) : [...own.bumpers, ...fillers.bumpers].filter((b) => b.bumperRole !== "up_next");
+        return { stationIds: [...own.stationIds, ...fillers.stationIds], bumpers: loop, tz };
+      };
       // A243: the between-programs bumpers before each program (a closing break carves them from its end, open time from its own).
       const boundaryAt = new Map(boundaries.map((b) => [Date.parse(b.at), b]));
       const carved = new Set<number>();
-      const preparedBumper = new Map(fillers.bumpers.map((b) => [b.id, b]));
+      const preparedBumper = new Map([...fillers.bumpers, ...[...blockFillers.values()].flatMap((f) => f.bumpers)].map((b) => [b.id, b]));
       /** An element's bumper, prepared and in its window; else the next in its chain that is. */
       const resolve = (e: Element, t: number): FillerRef | null => {
         for (const id of [e.itemId, ...e.alternates]) {
@@ -404,30 +445,87 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         }
         return null;
       };
-      const elementSegment = (e: Element, ref: FillerRef, at: number, key: string, where: { inBreak: boolean; breakId?: string }): Segment => ({
-        key,
-        startsAt: new Date(at),
-        endsAt: new Date(at + ref.durationMs!),
-        code: "BMP",
-        label: ref.title,
-        source: { kind: "file", location: fileAt(stationId, ref)!, seekMs: 0, mediaKind: ref.mediaKind, contentId: ref.contentId ?? undefined },
-        reason: "planned",
-        inBreak: where.inBreak,
-        breakId: where.breakId,
-        itemId: ref.id,
-        bumperRole: e.role,
-        position: e.position,
-        ...(e.announces ? { announces: e.announces } : {})
-      });
-      /** A boundary's bumpers that fit `room`, resolved, in order. */
-      const boundaryFit = (b: Boundary, room: number) =>
-        fitElements(
-          b.elements.flatMap((e) => {
-            const ref = resolve(e, Date.parse(b.at));
-            return ref ? [{ ...e, ref, lengthMs: ref.durationMs! }] : [];
-          }),
-          room
-        ).filter((e) => e.fits);
+      /** A244: a block's logo on this worker's disk (for its automatic cards), or null. */
+      const logoFile = async (cid: string | null): Promise<string | null> => {
+        if (!cid) return null;
+        const file = path.join(slatesDir, `block-logo-${cid}`);
+        try {
+          await fs.access(file);
+          return file;
+        } catch {
+          try {
+            await fs.mkdir(slatesDir, { recursive: true });
+            const partial = `${file}.${process.pid}.${Date.now()}.part`;
+            await deps.storage.objects.download(objectKey.file(cid), partial, sha256FromCid(cid));
+            await fs.rename(partial, file);
+            return file;
+          } catch {
+            return null;
+          }
+        }
+      };
+      /** A244: a block's automatic intro or outro card, once it's prepared (it's asked for until then). */
+      const blockCard = async (ref: BlockRef, kind: "intro" | "outro"): Promise<{ location: string; key: string } | null> => {
+        if (station.band === "radio") return null;
+        const key = blockCardKey(station, station.band, ref, kind);
+        const at = fileAt(stationId, { contentId: key, location: null });
+        if (at) return { location: at, key };
+        if (options.wantGenerated) {
+          const png = await slates.blockCard(station, ref, kind, await logoFile(ref.logoContentId)).catch(() => null);
+          if (png) await options.wantGenerated({ stationId, key, band: station.band, png, seconds: GENERATED_BLOCK_CARD_MS / 1000 }).catch(() => undefined);
+        }
+        return null;
+      };
+      /** One element as it airs: a bumper, or (A244) a block's intro or outro: its own, or its card once prepared. */
+      type Resolved = Element & { lengthMs: number; label: string; source: SegmentSource; itemId: string; generated?: boolean };
+      const resolveAny = async (e: Element, t: number): Promise<Resolved | null> => {
+        if (e.role === "intro" || e.role === "outro") {
+          const ref = e.blockId ? blockPlan.refs.get(e.blockId) : undefined;
+          if (!ref) return null;
+          if (!e.generated) {
+            const pool = (e.role === "intro" ? blockFillers.get(ref.id)?.intros : blockFillers.get(ref.id)?.outros) ?? [];
+            for (const id of [e.itemId, ...e.alternates]) {
+              const item = pool.find((x) => x.id === id);
+              if (item && eligible(item, t, tz)) return { ...e, lengthMs: item.durationMs!, label: item.title, itemId: item.id, source: { kind: "file", location: fileAt(stationId, item)!, seekMs: 0, mediaKind: item.mediaKind, contentId: item.contentId ?? undefined } };
+            }
+          }
+          // No intro (or outro) of its own that's ready: the card in its look, once prepared (never a slate).
+          const card = await blockCard(ref, e.role);
+          return card ? { ...e, lengthMs: GENERATED_BLOCK_CARD_MS, label: `${ref.name} ${e.role}`, itemId: "", generated: true, source: { kind: "file", location: card.location, seekMs: 0, mediaKind: "video", contentId: card.key } } : null;
+        }
+        const ref = resolve(e, t);
+        return ref ? { ...e, lengthMs: ref.durationMs!, label: ref.title, itemId: ref.id, source: { kind: "file", location: fileAt(stationId, ref)!, seekMs: 0, mediaKind: ref.mediaKind, contentId: ref.contentId ?? undefined } } : null;
+      };
+      const elementSegment = (e: Resolved, at: number, key: string, where: { inBreak: boolean; breakId?: string }): Segment => {
+        const blockEl = e.role === "intro" || e.role === "outro";
+        return {
+          key,
+          startsAt: new Date(at),
+          endsAt: new Date(at + e.lengthMs),
+          code: blockEl ? (e.role === "intro" ? "OPN" : "CLS") : "BMP",
+          label: e.label,
+          source: e.source,
+          // A block's automatic card is a slate in the as-run log (no library item).
+          reason: e.generated ? "slate" : "planned",
+          inBreak: where.inBreak,
+          breakId: where.breakId,
+          itemId: e.itemId || undefined,
+          ...(blockEl ? {} : { bumperRole: e.role as Exclude<Element["role"], "intro" | "outro"> }),
+          position: e.position,
+          ...(e.announces ? { announces: e.announces } : {}),
+          // Between programs, a bumper is the block's only between two of its members; an intro or outro is its block's.
+          ...((e.position === "between" || e.position === "boundary") && blockPlan.pieces.length ? { block: segBlock(e.blockId) } : {})
+        };
+      };
+      /** A boundary's elements that fit `room`, resolved, in order. */
+      const boundaryFit = async (b: Boundary, room: number) => {
+        const resolved: Resolved[] = [];
+        for (const e of b.elements) {
+          const r = await resolveAny(e, Date.parse(b.at));
+          if (r) resolved.push(r);
+        }
+        return fitElements(resolved, room).filter((e) => e.fits);
+      };
       // A242: openers and closers that are prepared; off-air cards that are pictures, or prepared clips.
       const identity = {
         openers: allIdentity.openers.filter((f) => fileAt(stationId, f)),
@@ -481,8 +579,10 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const catalogCredit = programId && catalogBreaks.has(slot.startsAt) ? catalog.get(programId) : undefined;
         const sponsors = catalogCredit ? [{ ...catalogCredit.sponsor, programId }] : credits.filter((c) => c.programId === null || c.programId === programId);
         const thanked = catalogCredit ? [] : members.named;
+        // A244: in a block, its ID first (where the station ID would air).
+        const context = fillersFor(slot.blockId ?? null);
         // Room for the station ID after it (the generated one is ten seconds).
-        const sidRoom = parts.stationId ? (fillers.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
+        const sidRoom = parts.stationId ? (context.stationIds[0]?.generated ? GENERATED_SID_MS : STATION_ID_MS) : 0;
         let left = slot.lengthMs - spotMs;
         const creditMs = parts.underwriting && (sponsors.length || thanked.length) && left >= sidRoom + 10_000 ? Math.min(CREDIT_MS, left - sidRoom) : 0;
         left -= creditMs;
@@ -495,15 +595,15 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         const chosen = slot.elements ?? defaultElements(fillers.bumpers, { open: bumpersIn(parts, "open"), close: bumpersIn(parts, "close") }, start, tz);
         const boundary = slot.boundary && Date.parse(slot.boundary.at) === end && !carved.has(end) ? slot.boundary : null;
         if (boundary) carved.add(end);
-        const fitted = fitElements(
-          [...chosen.open, ...chosen.close, ...(boundary?.elements ?? [])].flatMap((e) => {
-            const ref = resolve(e, e.position === "between" ? end : start);
-            return ref ? [{ ...e, ref, lengthMs: ref.durationMs! }] : [];
-          }),
-          room
-        ).filter((e) => e.fits);
-        // The between bumpers end the break's time, outside its SCTE-35 span (partners' ads never replace them).
-        const between = fitted.filter((e) => e.position === "between");
+        const resolved: Resolved[] = [];
+        for (const e of [...chosen.open, ...chosen.close, ...(boundary?.elements ?? [])]) {
+          const r = await resolveAny(e, e.position === "between" || e.position === "boundary" ? end : start);
+          if (r) resolved.push(r);
+        }
+        const fitted = fitElements(resolved, room).filter((e) => e.fits);
+        // The between bumpers (A244: and a block's outro and intro) end the break's time, outside its
+        // SCTE-35 span (partners' ads never replace them).
+        const between = fitted.filter((e) => e.position === "between" || e.position === "boundary");
         const spanEnd = end - between.reduce((sum, e) => sum + e.lengthMs, 0);
 
         const out: Segment[] = [];
@@ -514,7 +614,7 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
             .forEach((e, i) => {
               // The first two keep the keys they had before A243.
               const k = i === 0 ? `${key}:bmp:${position === "open" ? "in" : "out"}` : `${key}:bmp:${position}:${i}`;
-              out.push(elementSegment(e, e.ref, cursor, k, { inBreak: true, breakId: slot.id ?? undefined }));
+              out.push(elementSegment(e, cursor, k, { inBreak: true, breakId: slot.id ?? undefined }));
               cursor += e.lengthMs;
             });
         bumpers("open");
@@ -559,14 +659,16 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
         }
         bumpers("close");
         // What's left holds on the station ID slate, then the station ID (when it airs).
-        out.push(...(await filler(stationId, new Date(cursor), spanEnd - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, fillers, station, { bumpers: false, stationId: parts.stationId })));
+        out.push(...(await filler(stationId, new Date(cursor), spanEnd - cursor, { key, reason: "planned", inBreak: true, breakId: slot.id ?? undefined }, context, station, { bumpers: false, stationId: parts.stationId })));
         // Reported when the break airs; if the file arrives first, the break is planned again with it.
         if (missing && out[afterSpots]) out[afterSpots] = { ...out[afterSpots], missing };
         const breakSpan = { startsAt: new Date(start), lengthMs: spanEnd - start };
         const inSpan: Segment[] = out.map((seg) => ({ ...seg, breakSpan }));
         cursor = spanEnd;
-        for (const [i, e] of between.entries()) {
-          inSpan.push(elementSegment(e, e.ref, cursor, `${key}:bmp:between:${i}`, { inBreak: false }));
+        for (const e of between) {
+          // Between bumpers keep their keys from before A244; a block's intro and outro have their own.
+          const k = e.role === "intro" || e.role === "outro" ? `${key}:${e.role}` : `${key}:bmp:between:${between.filter((x) => x.position === "between").indexOf(e)}`;
+          inSpan.push(elementSegment(e, cursor, k, { inBreak: false }));
           cursor += e.lengthMs;
         }
         return inSpan;
@@ -574,15 +676,17 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
 
       const openTime = async (a: number, b: number) => {
         if (b <= a) return;
+        // A244: open time inside a block (between its members) airs its ID and bumpers first.
+        const context = fillersFor(pieceAt(a));
         // A243: open time just before a program ends with its between bumpers (whatever fits, the station ID kept).
         const boundary = boundaryAt.get(b);
-        const fit = boundary && !carved.has(b) ? boundaryFit(boundary, b - a - (fillers.stationIds[0]?.durationMs ?? STATION_ID_MS)) : [];
+        const fit = boundary && !carved.has(b) ? await boundaryFit(boundary, b - a - (context.stationIds[0]?.durationMs ?? STATION_ID_MS)) : [];
         if (boundary && !carved.has(b)) carved.add(b);
         const cut = b - fit.reduce((sum, e) => sum + e.lengthMs, 0);
-        segments.push(...(await filler(stationId, new Date(a), cut - a, { key: `open:${a}`, reason: "station_id_fill", inBreak: false }, fillers, station)));
+        segments.push(...(await filler(stationId, new Date(a), cut - a, { key: `open:${a}`, reason: "station_id_fill", inBreak: false }, context, station)));
         let at = cut;
         for (const [i, e] of fit.entries()) {
-          segments.push(elementSegment(e, e.ref, at, `open:${a}:between:${i}`, { inBreak: false }));
+          segments.push(elementSegment(e, at, e.role === "intro" || e.role === "outro" ? `open:${a}:${e.role}` : `open:${a}:between:${i}`, { inBreak: false }));
           at += e.lengthMs;
         }
       };
@@ -725,6 +829,15 @@ export function createPlanner({ deps, services }: ModuleContext, options: Planne
       }
       await openTime(cursor, to.getTime());
       if (rule.dailyOpener) await dailyOpeners(segments, { start, to: to.getTime(), tz, entries, offAirBlocks, opener: openerAt, sidMs: sidAfterOpenerMs, station, stationId, fillers });
+      // A244: every segment says the programming block it airs in (by its time: a member, its
+      // breaks, the open time between members), unless it said already. A sign-off, sign-on or
+      // daily opener is always the station's.
+      if (blockPlan.pieces.length) {
+        for (const seg of segments) {
+          if (seg.block !== undefined) continue;
+          seg.block = seg.code === "OPN" || seg.code === "CLS" ? null : segBlock(pieceAt(seg.startsAt.getTime()));
+        }
+      }
       return segments.filter((seg) => seg.endsAt.getTime() > from.getTime() && seg.startsAt.getTime() < to.getTime() && seg.endsAt > seg.startsAt);
     }
   };
