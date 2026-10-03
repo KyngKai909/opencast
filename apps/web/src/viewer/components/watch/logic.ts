@@ -1,6 +1,6 @@
 // The rules behind the tuned-in page, kept out of the components so they can be tested: which
-// station a URL means, keeping the URL in step with the channel on air, the swipe on the phone,
-// tonight's rows, and the radio band's wrap hint.
+// station a URL means, keeping the URL in step with the channel on air, the dial's neighbours and
+// tonight's rows. (The phone and tablet's swipe has its own: components/swipe.)
 
 import { neighbour, type Command } from "@opencast/player";
 import type { AiringX, DialRowX, StationPageX } from "../../api/ext";
@@ -78,55 +78,12 @@ export function urlForChannel(playingId: string | null, lastSynced: string | nul
   return lastSynced !== null && playingId !== null && playingId !== lastSynced ? playingId : null;
 }
 
-/** How far a finger must travel on the picture before a swipe changes channel. */
-export const SWIPE_MIN_PX = 56;
-/** …or this share of the picture's height, whichever is more. */
-export const SWIPE_SHARE = 0.22;
-/** The next station shows over the picture once the finger has moved this far. */
-export const SWIPE_PREVIEW_PX = 12;
-
-/**
- * A vertical swipe on the picture: up (the finger moves up) goes up the dial, down goes down.
- * Short or sideways movements don't count.
- */
-export function swipeChannel(dy: number, height: number, dx = 0): "up" | "down" | null {
-  const need = Math.max(SWIPE_MIN_PX, height * SWIPE_SHARE);
-  if (Math.abs(dy) < need || Math.abs(dx) > Math.abs(dy)) return null;
-  return dy < 0 ? "up" : "down";
-}
-
-/** Which way the swipe is heading, for the channel shown over the picture while it moves. */
-export function swipePreview(dy: number, dx = 0): "up" | "down" | null {
-  if (Math.abs(dy) < SWIPE_PREVIEW_PX || Math.abs(dx) > Math.abs(dy)) return null;
-  return dy < 0 ? "up" : "down";
-}
-
 /**
  * The dial's neighbour, the way the player moves: in channel order, within the band, wrapping.
  * `skipDash`: this device can't play DASH, so the player skips DASH stream links (A226).
  */
 export function neighbourOf(channels: DialRowX[], currentId: string | null, dir: "up" | "down", skipDash = false): DialRowX | null {
   return neighbour(channels, currentId, dir, { sameBand: true, skipDash }) as DialRowX | null;
-}
-
-function channelKey(ch: string | null): number {
-  const [a, b] = (ch ?? "9999.9").split(".").map(Number);
-  return (a ?? 0) * 100 + (b ?? 0);
-}
-
-/** "Down wraps to 104.4, up is 90.8": where the buttons go, and whether they wrap at the band's ends. */
-export function bandHint(channels: DialRowX[], currentId: string | null): string | null {
-  const cur = channels.find((c) => c.station.id === currentId);
-  if (!cur) return null;
-  const down = neighbourOf(channels, currentId, "down");
-  const up = neighbourOf(channels, currentId, "up");
-  if (!down || !up) return null;
-  const here = channelKey(cur.station.channel);
-  const d = down.station.channel ?? "";
-  const u = up.station.channel ?? "";
-  const dWraps = channelKey(down.station.channel) > here;
-  const uWraps = channelKey(up.station.channel) < here;
-  return `Down ${dWraps ? "wraps to" : "is"} ${d}, up ${uWraps ? "wraps to" : "is"} ${u}`;
 }
 
 /** The instant of the next midnight in a time zone. */

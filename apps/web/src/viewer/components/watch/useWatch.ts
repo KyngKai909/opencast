@@ -12,7 +12,8 @@ import { useNowPlaying, useTune } from "../../player/PlayerRoot";
 import { useApiAs } from "./overlay";
 import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, watchKey, withOutsideStation } from "./logic";
 
-export function useWatch(stationRef: string | undefined) {
+export function useWatch(stationRef: string | undefined, o: { arrows?: boolean } = {}) {
+  const arrows = o.arrows !== false;
   const [s, engine] = usePlayer();
   const channels = useChannels();
   const slug = useMarketSlug();
@@ -86,17 +87,17 @@ export function useWatch(stationRef: string | undefined) {
   }, [playingId, engineChannels, navigate]);
 
   // Arrow keys change channel on this page, and only here; the space bar (or k) pauses and resumes;
-  // l (or End) goes back to live (watchKey).
+  // l (or End) goes back to live (watchKey). The swipe home (A245) moves with its own arrow keys.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const cmd = watchKey(e);
-      if (!cmd) return;
+      if (!cmd || (!arrows && cmd.type === "channel")) return;
       e.preventDefault();
       engine.handle(cmd, { input: "keyboard" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [engine]);
+  }, [engine, arrows]);
 
   // The page shows the station the URL names; the URL follows the channel.
   const shown = target ?? inDial ?? outside;

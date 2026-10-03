@@ -256,6 +256,14 @@ export class Deck {
     await this.video.play();
   }
 
+  /**
+   * swipe home 01: shown beside the picture on screen while the finger drags (still warm and
+   * silent); the surface places it.
+   */
+  setPeek(on: boolean) {
+    this.video.classList.toggle("is-peek", on);
+  }
+
   /** On screen: visible, and audible unless muted. */
   show(muted: boolean) {
     this.role = "active";

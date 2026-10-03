@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, DialRowX } from "../../api/ext";
-import { backAtOf, bandHint, callSignLabelOf, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, swipeChannel, swipePreview, tonightRows, tuneForUrl, urlForChannel, watchKey } from "./logic";
+import { backAtOf, callSignLabelOf, isOffAir, liveRest, listingText, nextMidnight, resolveStation, stationSlug, tonightRows, tuneForUrl, urlForChannel, watchKey } from "./logic";
 
 const TZ = "America/Los_Angeles";
 // Saturday, September 26, 2026 at 8:42 pm in Redlands (UTC−7).
@@ -89,39 +89,6 @@ describe("keeping the URL in step with the channel", () => {
     last = nav;
     // The new URL names what's already on: nothing more to tune.
     expect(tuneForUrl("s", playing)).toBeNull();
-  });
-});
-
-describe("the swipe on the picture", () => {
-  it("needs a real vertical movement", () => {
-    expect(swipeChannel(-30, 200)).toBeNull();
-    expect(swipeChannel(-56, 200)).toBe("up");
-    expect(swipeChannel(60, 200)).toBe("down");
-  });
-  it("scales with a tall picture", () => {
-    // 22% of 400px is 88px.
-    expect(swipeChannel(-80, 400)).toBeNull();
-    expect(swipeChannel(-90, 400)).toBe("up");
-  });
-  it("ignores a sideways drag", () => {
-    expect(swipeChannel(-70, 200, 120)).toBeNull();
-  });
-  it("shows the next channel as soon as the finger moves", () => {
-    expect(swipePreview(-5)).toBeNull();
-    expect(swipePreview(-14)).toBe("up");
-    expect(swipePreview(20)).toBe("down");
-  });
-});
-
-describe("the radio band's hint", () => {
-  it("says where down wraps at the bottom of the band", () => {
-    expect(bandHint(DIAL, "n")).toBe("Down wraps to 104.4, up is 90.8");
-  });
-  it("says where up wraps at the top", () => {
-    expect(bandHint(DIAL, "v")).toBe("Down is 102.0, up wraps to 88.4");
-  });
-  it("stays in the band", () => {
-    expect(bandHint(DIAL, "h")).toBe("Down is 88.4, up is 102.0");
   });
 });
 

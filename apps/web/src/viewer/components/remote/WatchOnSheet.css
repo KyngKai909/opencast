@@ -15,7 +15,3 @@
 .vw-wo__quiet { display: grid; }
 .vw-wo__quiet i { height: 61px; border-bottom: 1px solid var(--hair); background: linear-gradient(90deg, var(--raised) 0 36px, transparent 36px 48px, var(--raised) 48px 55%, transparent 55%); background-size: 100% 16px; background-repeat: no-repeat; background-position: 0 50%; opacity: .6; }
 
-/* The cast button in the full player's top bar: signal while a TV plays. */
-.vw-wph__cast--on { color: var(--signal); }
-/* With the cast button beside share, the hint keeps to one line at 390. */
-.vw-wph__top:has(.vw-wph__cast) { gap: 4px; }

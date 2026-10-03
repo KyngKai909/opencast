@@ -1,37 +1,32 @@
 // Home is a dial, not a feed (viewer/opencast-home.html 01, 02, 08.2): the live hero and the
 // presets, your market's stations in channel order, programs carried widely, what's coming up
 // live and the radio band. A thin market says plainly that it's small. First visit is the market
-// picker (components/overlays/MarketPicker.tsx), over this page.
+// picker (components/overlays/MarketPicker.tsx), over this page. That's the web's home: on phones
+// and tablets the home is the picture (A245, the swipe home), and these sections live in Guide.
 
 import { useState } from "react";
-import { useAuth } from "../../auth/AuthProvider";
-import { useDial, useMarkets, useMarketSlug, useMe, usePresets } from "../data/viewer";
-import { useDevice } from "../device/store";
+import { useDial, useMarkets, useMarketSlug, usePresets } from "../data/viewer";
 import { useIsPhone, useShellOptions } from "../layout/shell";
+import { SwipeStart } from "../components/swipe/SwipeHome";
 import { MARKET_TZ, useNow } from "../../lib/clock";
 import { Hero } from "../components/home/Hero";
 import { HomePresets } from "../components/home/HomePresets";
 import { MarketDial } from "../components/home/MarketDial";
 import { CarriedWidely, ComingUpLive, RadioBlock } from "../components/home/Sections";
-import { ThinMarket } from "../components/home/ThinMarket";
+import { ThinMarket, useShowNearby } from "../components/home/ThinMarket";
 import { CHIP_ALL, isThin, pickHero } from "../components/home/logic";
 import "./Home.css";
-
-function useShowNearby(): boolean {
-  const auth = useAuth();
-  const me = useMe();
-  const device = useDevice();
-  const s = auth.signedIn ? me.data?.settings.market : device.settings.market;
-  return s?.showNearby !== false;
-}
 
 function errorText(e: unknown): string | null {
   return e ? ((e as Error).message ?? "Something went wrong. Try again.") : null;
 }
 
 export default function HomePage() {
+  return useIsPhone() ? <SwipeStart /> : <DialHome />;
+}
+
+function DialHome() {
   useShellOptions({});
-  const phone = useIsPhone();
   const slug = useMarketSlug();
   const markets = useMarkets();
   const tv = useDial("tv");
@@ -53,21 +48,7 @@ export default function HomePage() {
   const hasPresets = presets.some((p) => p.key !== null);
 
   if (thin && tv.data) {
-    const thinPage = <ThinMarket marketName={marketName} tv={tv.data} radio={radio.data} phone={phone} showNearby={showNearby} now={now} timeZone={timeZone} />;
-    if (phone)
-      return (
-        <div className="vw-home vw-home--phone">
-          {hasPresets && (
-            <section className="vw-sec vw-sec--phone" aria-labelledby="vw-presets-h">
-              <div className="vw-sec-h">
-                <h3 id="vw-presets-h">Presets</h3>
-              </div>
-              <HomePresets phone />
-            </section>
-          )}
-          {thinPage}
-        </div>
-      );
+    const thinPage = <ThinMarket marketName={marketName} tv={tv.data} radio={radio.data} phone={false} showNearby={showNearby} now={now} timeZone={timeZone} />;
     return (
       <div className={hasPresets ? "vw-home vw-home--thin" : "vw-home"}>
         <div className="vw-home__main">{thinPage}</div>
@@ -80,24 +61,7 @@ export default function HomePage() {
     );
   }
 
-  const dial = <MarketDial marketName={marketName} rows={tv.data?.rows} error={errorText(tv.error)} phone={phone} chip={chip} onChip={setChip} at={now} timeZone={timeZone} />;
-
-  if (phone) {
-    return (
-      <div className="vw-home vw-home--phone">
-        {pick && <Hero pick={pick} phone timeZone={timeZone} />}
-        <section className="vw-sec vw-sec--phone" aria-labelledby="vw-presets-h">
-          <div className="vw-sec-h">
-            <h3 id="vw-presets-h">Presets</h3>
-          </div>
-          <HomePresets phone />
-        </section>
-        {dial}
-        <CarriedWidely items={tv.data?.carriedWidely ?? []} phone timeZone={timeZone} />
-        <ComingUpLive items={tv.data?.comingUpLive ?? []} phone now={now} timeZone={timeZone} />
-      </div>
-    );
-  }
+  const dial = <MarketDial marketName={marketName} rows={tv.data?.rows} error={errorText(tv.error)} phone={false} chip={chip} onChip={setChip} at={now} timeZone={timeZone} />;
 
   return (
     <div className="vw-home">

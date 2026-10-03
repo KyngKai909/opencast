@@ -1,5 +1,6 @@
-// Back to live beside play and pause on the tuned-in page (web and phone): shown while behind live
-// (paused, or playing on from a pause), and it goes back to live.
+// Back to live beside play and pause on the web's tuned-in page: shown while behind live (paused,
+// or playing on from a pause), and it goes back to live. (Phones and tablets: the swipe home's own,
+// components/swipe/SwipeScreen.test.tsx.)
 
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -18,7 +19,6 @@ vi.mock("../../cast/useCast", () => ({ watchOnOffered: () => false }));
 vi.mock("./NotForMe", () => ({ NotForMe: () => null }));
 
 const { WatchWeb } = await import("./WatchWeb");
-const { WatchPhone } = await import("./WatchPhone");
 type W = Parameters<typeof WatchWeb>[0]["w"];
 
 const row = (band: "tv" | "radio") => ({
@@ -49,11 +49,7 @@ function watch(o: { band?: "tv" | "radio"; status?: string; behindLive?: boolean
 
 const live = () => screen.queryByRole("button", { name: "Back to live" });
 
-describe.each([
-  ["web", WatchWeb, "tv"],
-  ["phone", WatchPhone, "tv"],
-  ["phone, radio band", WatchPhone, "radio"]
-] as const)("Back to live on the %s", (_name, Watch, band) => {
+describe.each([["web", WatchWeb, "tv"]] as const)("Back to live on the %s", (_name, Watch, band) => {
   it("isn't there at the live edge", () => {
     render(<Watch w={watch({ band }).w} />);
     expect(live()).toBeNull();
@@ -79,11 +75,6 @@ describe("beside play and pause", () => {
     expect(play.nextElementSibling).toBe(live());
   });
 
-  it("phone, radio band: under the play button's row", () => {
-    render(<WatchPhone w={watch({ band: "radio", status: "paused", behindLive: true }).w} />);
-    const controls = screen.getByRole("button", { name: "Play" }).parentElement!;
-    expect(controls.nextElementSibling).toBe(live());
-  });
 });
 
 describe("AirPlay on the tuned-in page (Safari)", () => {
@@ -96,11 +87,7 @@ describe("AirPlay on the tuned-in page (Safari)", () => {
     expect(engine.showAirPlayPicker).toHaveBeenCalledOnce();
   });
 
-  it.each([
-    ["web", WatchWeb, "tv"],
-    ["phone", WatchPhone, "tv"],
-    ["phone, radio band", WatchPhone, "radio"]
-  ] as const)("%s: while AirPlaying, says where it's playing, and Stop takes it back", (_n, Watch, band) => {
+  it.each([["web", WatchWeb, "tv"]] as const)("%s: while AirPlaying, says where it's playing, and Stop takes it back", (_n, Watch, band) => {
     const { w, engine } = watch({ band, airPlay: { available: true, active: true } });
     render(<Watch w={w} />);
     const line = screen.getByRole("status");

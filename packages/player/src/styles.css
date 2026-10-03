@@ -24,6 +24,15 @@
   opacity: 0; pointer-events: none;
 }
 .oc-player__video.is-on { opacity: 1; pointer-events: auto; }
+/* The swipe home (A245): the picture fills its box (a phone's screen, a tablet's), and while the
+   finger drags the next station's warm picture shows beside it, placed by --oc-peek-y (100% below,
+   -100% above, 0 where the snap left it). */
+.oc-player--fill { aspect-ratio: auto; width: 100%; height: 100%; border-radius: 0; }
+.oc-player--fill[data-fit="cover"] .oc-player__video { object-fit: cover; }
+/* The peek sits over the old picture (where the snap leaves it) and under everything drawn on top. */
+.oc-player--fill .oc-player__stage { isolation: isolate; }
+.oc-player__video.is-peek { opacity: 1; z-index: 1; transform: translateY(var(--oc-peek-y, 100%)); }
+.oc-player__video.is-peek.is-on { transform: none; }
 .oc-player__video::cue {
   font-family: var(--font-text); font-size: var(--oc-cue, 4.2cqw); line-height: 1.3;
   color: #fff; background: rgb(10 17 36 / .82);

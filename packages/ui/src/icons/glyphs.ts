@@ -1,4 +1,5 @@
-// Generated from the SVG symbols in docs/reference (36 symbols, identical in every file).
+// Generated from the SVG symbols in docs/reference (36 symbols, identical in every file), and the
+// five the swipe home adds (viewer/opencast-swipe-home.html: star, star-f, heart, keypad, bksp).
 // Regenerate rather than edit: the drawings are the reference's.
 
 export interface Glyph {
@@ -36,6 +37,11 @@ export const ICONS = {
   "back": { viewBox: "0 0 20 20", body: "<path d=\"M8 5L3 10l5 5M3 10h9a5 5 0 0 1 0 10\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>" },
   "info": { viewBox: "0 0 20 20", body: "<circle cx=\"10\" cy=\"10\" r=\"7.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"/><path d=\"M10 9v5\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\"/><circle cx=\"10\" cy=\"6.3\" r=\"1.1\" fill=\"currentColor\"/>" },
   "keys": { viewBox: "0 0 20 20", body: "<g fill=\"currentColor\"><circle cx=\"5\" cy=\"5\" r=\"1.6\"/><circle cx=\"10\" cy=\"5\" r=\"1.6\"/><circle cx=\"15\" cy=\"5\" r=\"1.6\"/><circle cx=\"5\" cy=\"10\" r=\"1.6\"/><circle cx=\"10\" cy=\"10\" r=\"1.6\"/><circle cx=\"15\" cy=\"10\" r=\"1.6\"/><circle cx=\"5\" cy=\"15\" r=\"1.6\"/><circle cx=\"10\" cy=\"15\" r=\"1.6\"/><circle cx=\"15\" cy=\"15\" r=\"1.6\"/></g>" },
+  "star": { viewBox: "0 0 20 20", body: "<path d=\"M10 2.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2L2.5 8l5.2-.7z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linejoin=\"round\"/>" },
+  "star-f": { viewBox: "0 0 20 20", body: "<path d=\"M10 2.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2L2.5 8l5.2-.7z\" fill=\"currentColor\"/>" },
+  "heart": { viewBox: "0 0 20 20", body: "<path d=\"M10 16.5S3 12.4 3 7.6A3.6 3.6 0 0 1 10 6a3.6 3.6 0 0 1 7 1.6c0 4.8-7 8.9-7 8.9z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linejoin=\"round\"/>" },
+  "keypad": { viewBox: "0 0 20 20", body: "<g fill=\"currentColor\"><circle cx=\"5\" cy=\"4\" r=\"1.6\"/><circle cx=\"10\" cy=\"4\" r=\"1.6\"/><circle cx=\"15\" cy=\"4\" r=\"1.6\"/><circle cx=\"5\" cy=\"9\" r=\"1.6\"/><circle cx=\"10\" cy=\"9\" r=\"1.6\"/><circle cx=\"15\" cy=\"9\" r=\"1.6\"/><circle cx=\"5\" cy=\"14\" r=\"1.6\"/><circle cx=\"10\" cy=\"14\" r=\"1.6\"/><circle cx=\"15\" cy=\"14\" r=\"1.6\"/><circle cx=\"10\" cy=\"18.2\" r=\"1.6\"/></g>" },
+  "bksp": { viewBox: "0 0 20 20", body: "<path d=\"M7 4h9.5A1.5 1.5 0 0 1 18 5.5v9a1.5 1.5 0 0 1-1.5 1.5H7l-5-6z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><path d=\"M9.5 7.5l5 5M14.5 7.5l-5 5\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"/>" },
   "chev": { viewBox: "0 0 20 20", body: "<path d=\"M8 5l5 5-5 5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>" },
   "mail": { viewBox: "0 0 20 20", body: "<rect x=\"2.5\" y=\"4.5\" width=\"15\" height=\"11\" rx=\"1.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M3 5.5l7 5 7-5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/>" },
   "wallet": { viewBox: "0 0 20 20", body: "<rect x=\"2.5\" y=\"5\" width=\"15\" height=\"11\" rx=\"2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M13 10.5h4.5\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M4 5l9-2.5V5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"/>" },

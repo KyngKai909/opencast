@@ -135,6 +135,21 @@ Route plan used below (React Router):
 `/` dial (home) · `/watch/:callSign` tuned in · `/guide` · `/radio` · `/presets` · `/you` · `/you/pledges/:pledgeId` · `/settings` and `/settings/:section` (`account`, `market`, `watching`, `notifications`, `tvs`, `appearance`, `privacy`, `data`) · `/:handle` station page (matches the drawn share URL `useopencast.org/beat/…`) · `/:handle/:shareSlug` share landing · `/:handle/pledge` (TV QR, from the TV file) · `/program/:programId` · `/tv` TV code entry (from the TV file) · search is an overlay on any route (`?q=`), and `/search` is the phone tab.
 Overlays are search params on the route underneath, so Esc and Back return to exactly where you were: `?station=CIVC` (preview), `?modal=carried|pledge|share|market|replace-key`, `?listing=<logEntryId>`, `?signin=<preset|remind|pledge>&…`. At phone width a Modal renders as a Sheet.
 
+### Viewer: the swipe home (viewer/opencast-swipe-home.html, A245, 2026-10-02)
+
+On **phones and tablets** (the apps, and phone and tablet browsers) the home is the picture; a computer's browser keeps the dial (home 01.1). Routes there:
+
+| Route | On phones and tablets |
+|---|---|
+| `/` | Opens on live TV: what's playing, else the last channel (Start on: Last channel), else preset 1 or the dial's first; replaced by that station's `/watch/:stationRef`. First visit: the market picker over the empty screen |
+| `/watch/:stationRef` | The swipe home on that station (the URL follows the channel). While casting or mirroring it goes to `/remote` |
+| `/radio` | The swipe home on the radio band (the radio station playing, or the band's first in the order) |
+| `/guide` | The guide in the swipe's order, with Carried widely, Coming up live and the radio band under it, and a thin market's note on top; a tablet on its side keeps the live picture beside it |
+| `/search` | Search, now on tablets too (with the live picture beside it on its side) |
+| `?sheet=tune` | The Tune pad, over any page |
+
+Frames: 01 the working demo; 02 at rest, mid-drag, the detent, not ready; 03 paused and behind live; 04 the Tune pad (portrait, no station, landscape); 05 landscape with and without the buttons; 06 Guide, Search and You with the floating bar and the mini player; 07 tablet portrait and landscape (Watch, Tune, Guide, Search, You); 08 the gesture's numbers and rules. Components: `@opencast/ui` ViewerPhoneShell (`floating`), MiniPlayer (`progress`, `onDismiss`), GuideGrid (`section`, `tunedId`, `onTune`), PlayerSurface (`fill`); `apps/web/src/viewer/components/swipe/`. Data: no new endpoints (stations.getDial, accounts.listPresets, stations.getGuide, as before).
+
 ### Viewer: viewer/opencast-home.html
 
 | # | Frame | Route | Components | Data (contract) | States |

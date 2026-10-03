@@ -4,6 +4,7 @@
 export type { Channel, Command, CommandType, CommandSource } from "./types";
 export { inChannelOrder, neighbour, neighbours, findByChannel, type NeighbourOptions } from "./dial";
 export { readEntry, typeKey, noStationText, type NumberEntry } from "./numberEntry";
+export { swipeOrder, orderIds, stepId, orderPlace, boundaryFrom, preloadIds, bandOf, type SwipeOrder, type OrderIds, type OrderDir, type OrderPlace, type Boundary, type Band } from "./order";
 export { PlayerEngine, CAPTION_SCALE, captionLineFor, TUNING_SOUND_DEFAULTS, tuningSoundFrom, prefersReducedMotion, type TuningSound, type PlayerState, type EngineOptions, type CaptionMode, type CaptionSize, type Status, type TuneRecord } from "./engine/PlayerEngine";
 export { Deck, SignedOffError, type WarmMode, type DeckWarmMode, type DeckState } from "./engine/Deck";
 export { defaultDriver, hlsDriver, nativeDriver, JOIN_CONFIG, type MediaDriver, type MediaHandle, type AttachOptions, type PlaylistInfo, type Quality } from "./engine/driver";

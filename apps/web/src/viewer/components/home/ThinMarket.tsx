@@ -1,8 +1,12 @@
 // A thin market (home 08.2): its stations shown as they are, both bands in one list, then the
 // nearest market under its own heading and distance, then an invitation to start a station.
-// Nothing from elsewhere is passed off as local.
+// Nothing from elsewhere is passed off as local. On phones and tablets (A245) it's a note at the
+// top of Guide: the guide below already lists the market's own stations.
 
 import { Button, Dial } from "@opencast/ui";
+import { useAuth } from "../../../auth/AuthProvider";
+import { useMe } from "../../data/viewer";
+import { useDevice } from "../../device/store";
 import type { DialX } from "../../api/ext";
 import { openChannelsText, soFarText, thinRows } from "./logic";
 import { StationRow } from "./MarketDial";
@@ -12,7 +16,16 @@ import { CONTROL } from "../../../areas";
 /** How many of the nearby market's stations are shown (the frame shows three). */
 export const NEARBY_ROWS = 3;
 
-export function ThinMarket({ marketName, tv, radio, phone, showNearby, now, timeZone }: { marketName: string; tv: DialX; radio: DialX | undefined; phone: boolean; showNearby: boolean; now: Date; timeZone: string }) {
+/** Settings, Market: "Show nearby markets" (on unless turned off). */
+export function useShowNearby(): boolean {
+  const auth = useAuth();
+  const me = useMe();
+  const device = useDevice();
+  const s = auth.signedIn ? me.data?.settings.market : device.settings.market;
+  return s?.showNearby !== false;
+}
+
+export function ThinMarket({ marketName, tv, radio, phone, showNearby, now, timeZone, note = false }: { marketName: string; tv: DialX; radio: DialX | undefined; phone: boolean; showNearby: boolean; now: Date; timeZone: string; note?: boolean }) {
   const rows = thinRows(tv.rows, radio?.rows ?? []);
   const variant = phone ? "phone" : "web";
   const nearby = showNearby ? tv.nearby[0] ?? radio?.nearby[0] : undefined;
@@ -25,7 +38,7 @@ export function ThinMarket({ marketName, tv, radio, phone, showNearby, now, time
           <h3 id="vw-thin-h">{marketName}</h3>
           <span className="vw-sec-h__sub">{soFarText(rows.length)}</span>
         </div>
-        {rows.length > 0 && (
+        {rows.length > 0 && !note && (
           <Dial header={!phone} label={marketName} className="vw-thin__dial">
             {rows.map((r) => (
               <StationRow key={r.station.id} row={r} variant={variant} at={now} timeZone={timeZone} detail={r.station.band === "radio" ? "Radio band" : undefined} />
