@@ -1,4 +1,4 @@
-// A244: the block editor (/:callSign/blocks/:blockId; no frame draws it: built like Settings'
+// A244: the block editor (/:callSign/schedule/blocks/:blockId since A246; no frame draws it: built like Settings'
 // sections). Name and look (name, description, colour, logo, what the bug shows); intro and outro
 // (each a switch, and what airs: its own, or a :05 card in its look); its ID; its bumpers by role
 // (added from the library, or uploaded straight into it from its library list); its bumper order
@@ -90,7 +90,7 @@ export function BlockEditor({ block }: { block: ProgramBlock }) {
       const r = await call(blocksApi.archiveBlock, { params: { stationId: s.id, blockId: block.id }, query: takeOffLog ? { takeOffLog: true } : {} });
       await refresh();
       toast.show({ message: r.kept ? `${block.name} is archived. ${r.kept} edited ${r.kept === 1 ? "date keeps its" : "dates keep theirs"}.` : `${block.name} is archived.` });
-      navigate(`${s.base}/blocks`);
+      navigate(`${s.base}/schedule/blocks`);
     } catch (e) {
       if (e instanceof ApiError && e.code === "block_on_log") setArchiving({ message: e.message });
       else if (e instanceof ApiError) setArchiving({ message: e.message });
@@ -275,11 +275,11 @@ export function BlockEditor({ block }: { block: ProgramBlock }) {
         {placed.length ? (
           <ul className="cc-blk__placed">
             {placed.map((p, i) => (
-              <li key={i}>{p.date ? <a href={`${s.base}/log?day=${p.date.slice(0, 10)}`}>{p.text}</a> : p.text}</li>
+              <li key={i}>{p.date ? <a href={`${s.base}/schedule?day=${p.date.slice(0, 10)}`}>{p.text}</a> : p.text}</li>
             ))}
           </ul>
         ) : (
-          <p className="cc-blk__quiet">Not on the log yet. Add it from the Program log's edit mode, or in a day template.</p>
+          <p className="cc-blk__quiet">Not on the log yet. Add it from the Log's edit mode, or in a day template.</p>
         )}
       </section>
 

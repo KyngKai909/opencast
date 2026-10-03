@@ -20,8 +20,8 @@ export interface TabsProps<V extends string = string> {
   onChange?: (value: V) => void;
   /** The list's name for screen readers ("Market", "Day"). */
   label: string;
-  /** underline: the reference's .tabs (Browse, Offered by BEAT…). days: the program log's day buttons (.days). */
-  variant?: "underline" | "days";
+  /** underline: the reference's .tabs (Browse, Offered by BEAT…). days: the program log's day buttons (.days). pill: the Schedule's tabs (.sch-tabs, A246). */
+  variant?: "underline" | "days" | "pill";
   className?: string;
 }
 

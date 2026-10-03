@@ -1,4 +1,4 @@
-// Settings, Breaks (station-settings 02.1): when breaks come and how long they run, what fills
+// Settings, Breaks (station-settings 02.1; A246: the Schedule's Break rules tab, moved as it was): when breaks come and how long they run, what fills
 // every break in order (a bumper into and out of the break and the station ID fixed; A143), how
 // often spots, the credit, bumpers and the station ID air (the cadence, added 2026-09-29; no frame
 // draws it: rows like the frame's "Length"), the
@@ -56,6 +56,11 @@ type Mode = BreakRule["mode"];
 const LENGTHS = [60, 90, 120, 150, 180, 240].map((s) => ({ value: s * 1000, label: duration(s * 1000) }));
 const CAPS = Array.from({ length: 16 }, (_, i) => (i + 1) * 30_000).map((v) => ({ value: v, label: duration(v) }));
 const SAME_SPOT = [1, 2, 3, 4].map((n) => ({ value: n, label: perHour(n) }));
+
+/** The break rule's lede (station-settings 02.1); A246: under the Schedule's Break rules tab. */
+export function breaksLede(cs: string): string {
+  return `Applied to every break ${cs} airs, including breaks inside carried programs where ${cs} sells the time.`;
+}
 
 export function BreaksSection({ s }: { s: StationState }) {
   const cs = s.label;
@@ -332,7 +337,7 @@ export function BreaksSection({ s }: { s: StationState }) {
             <small>{rotations.isLoading ? " " : rotations.error ? (rotations.error as Error).message : backupNames || "No backups yet"}</small>
           </div>
           {s.can("spots") && (
-            <Button size="sm" href={`${s.base}/breaks?rotation=backup`}>
+            <Button size="sm" href={`${s.base}/spot-market/rotation?show=backup`}>
               Edit
             </Button>
           )}

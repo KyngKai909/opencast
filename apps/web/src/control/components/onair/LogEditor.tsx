@@ -757,7 +757,7 @@ export function AddBlockDialog({ edit, base, near, onClose }: { edit: LogEdit; b
       )}
       {base && (
         <p className="cc-log__note">
-          <a className="cc-log__link" href={`${base}/blocks/new`}>
+          <a className="cc-log__link" href={`${base}/schedule/blocks/new`}>
             New block…
           </a>
         </p>

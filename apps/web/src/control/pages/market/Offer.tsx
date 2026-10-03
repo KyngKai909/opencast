@@ -209,7 +209,7 @@ function MainAction({ offer: o, carrying, term, inModal }: { offer: OfferDetailX
   }
   if (carrying)
     return (
-      <Button variant="primary" block={block} onClick={() => navigate(`${s.base}/log/place/${o.id}?term=${carrying.term}`)}>
+      <Button variant="primary" block={block} onClick={() => navigate(`${s.base}/schedule/place/${o.id}?term=${carrying.term}`)}>
         Choose a slot
       </Button>
     );

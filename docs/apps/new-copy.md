@@ -1218,3 +1218,17 @@ For review. No frame draws them: the rows and words follow the library's own (A.
 | Station page (web) | the section "Blocks": per block its logo, name, description, "{Saturdays}, {9:00 pm} to {1:00 am}", "Next: {Sat Oct 10}, {Saturday Reel and Late Crate}"; in the schedule, a member's block name above its title |
 | TV station info | "Block", "{Late Crate Nights}", "{Saturdays, 9:00 pm to 1:00 am}" |
 
+
+## The Schedule workspace, Phase 1 (A246, 2026-10-02)
+
+For review. The reference (`docs/reference/control/opencast-schedule.html`) draws the rail item "Schedule", the head "Schedule" and the tabs "Log", "Templates", "Blocks" and "Break rules", and the Templates tab's "Every day" card; those words are final. Phase 1 hosts the pages that already existed under that head, so these are the words around the move.
+
+| Where | Words |
+|---|---|
+| The phone's top bar on every Schedule tab, and on Place it in the log | "Schedule" (was "Program log" on Place it in the log) |
+| Templates, the "Every day" card (the off air hours, above the templates) | "Every day" (the reference's title, in place of "Off air hours"); under the hours: "Off air hours apply to every template and date." (the reference's card line is "Off air every night, 2:00 to 6:00 am. Applies to every template and date"; the hours keep their existing rows until Phase 4 draws the card) |
+| Templates, with no templates | "No templates yet. On the Log, Repeat this day makes one from a day." |
+| Station settings, Breaks (the link left behind) | "Break rules moved to the Schedule." "When breaks come, what fills them and how often each part airs are set beside the log now." The button "Open Break rules" |
+| Spot market, Your rotation | the button "See tonight's breaks" (to the Schedule); C.3's toast and the paused-spot notices keep their words from Breaks |
+| Spot market, the blocked categories line | "Never on {BEAT 12.1}: {Alcohol, Gambling}. Change in Break rules" (was "Change in Settings") |
+| A block with no dates (the block editor's "On the log") | "Not on the log yet. Add it from the Log's edit mode, or in a day template." (was "the Program log's edit mode") |

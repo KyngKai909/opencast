@@ -37,12 +37,10 @@ export function can(role: Role | null | undefined, ability: Ability): boolean {
 export const PAGE_ABILITY: Record<ControlPage, Ability> = {
   monitor: "programming",
   audience: "seeMoney",
-  "program-log": "programming",
+  schedule: "programming",
   "live-sources": "live",
-  breaks: "programming",
   market: "programming",
   library: "programming",
-  blocks: "programming",
   listings: "programming",
   "spot-market": "spots",
   sponsors: "spots",

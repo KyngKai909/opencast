@@ -220,16 +220,54 @@ export function RepeatDaySection({ stationId, day, repeats, phone, dateHref }: R
   const templates = useTemplates(stationId);
   const [open, setOpen] = useState<Open>(null);
   const list = templates.data?.templates ?? [];
-  const date = isoDate(day);
   // The template built from this day, if there is one: the choices show how it repeats.
-  const own = [...list].reverse().find((t) => t.fromDay === date);
+  const own = [...list].reverse().find((t) => t.fromDay === isoDate(day));
+
+  return (
+    <section className="cc-log__sec" aria-labelledby="cc-log-repeat">
+      <h2 className="cc-log__h" id="cc-log-repeat">
+        Repeat this day
+      </h2>
+      <Segmented<RepeatPattern | "">
+        label="Repeat this day"
+        value={own?.pattern ?? ""}
+        onChange={(v) => v && setOpen({ kind: "repeat", pattern: v, template: own, day })}
+        options={repeatOptions(weekdayOf(day))}
+      />
+      <TemplateList stationId={stationId} repeats={repeats} phone={phone} dateHref={dateHref} />
+      {open?.kind === "repeat" && <RepeatDialog stationId={stationId} day={open.day} template={open.template} pattern={open.pattern} phone={phone} onClose={() => setOpen(null)} />}
+    </section>
+  );
+}
+
+export interface TemplateListProps {
+  stationId: string;
+  /** `getLog.repeats`: G7's one-time copies, listed after the templates. Left out, none. */
+  repeats?: LogRepeat[];
+  phone: boolean;
+  /** Where a date opens on the log ("?day=2026-10-03"). */
+  dateHref: (date: string) => string;
+  /** A246: the template picked out (the Templates tab's `/schedule/templates/:templateId`). */
+  picked?: string;
+  className?: string;
+}
+
+/**
+ * The station's templates with their names, dates and edited dates, each changed (renamed,
+ * repeated differently) or stopped, and G7's one-time copies. The log pane's Repeat this day and
+ * (A246) the Schedule's Templates tab both list them.
+ */
+export function TemplateList({ stationId, repeats, phone, dateHref, picked, className = "cc-log__templates" }: TemplateListProps) {
+  const templates = useTemplates(stationId);
+  const [open, setOpen] = useState<Open>(null);
+  const list = templates.data?.templates ?? [];
   const copies = oldCopies(repeats, list);
 
   const rows = [
     ...list.map((t) => {
       const next = t.dates[0];
       return {
-        title: templateName(t),
+        title: t.id === picked ? <span aria-current="true">{templateName(t)}</span> : templateName(t),
         detail: (
           <>
             {templateDetail(t)}
@@ -269,21 +307,12 @@ export function RepeatDaySection({ stationId, day, repeats, phone, dateHref }: R
   ];
 
   return (
-    <section className="cc-log__sec" aria-labelledby="cc-log-repeat">
-      <h2 className="cc-log__h" id="cc-log-repeat">
-        Repeat this day
-      </h2>
-      <Segmented<RepeatPattern | "">
-        label="Repeat this day"
-        value={own?.pattern ?? ""}
-        onChange={(v) => v && setOpen({ kind: "repeat", pattern: v, template: own, day })}
-        options={repeatOptions(weekdayOf(day))}
-      />
+    <>
       {templates.isError && !(templates.error instanceof ApiError && templates.error.status === 404) && <p className="cc-log__quiet">{templates.error.message}</p>}
-      {rows.length > 0 && <KeyValueList variant="rows" items={rows} className="cc-log__templates" />}
+      {rows.length > 0 && <KeyValueList variant="rows" items={rows} className={className} />}
       {open?.kind === "repeat" && <RepeatDialog stationId={stationId} day={open.day} template={open.template} pattern={open.pattern} phone={phone} onClose={() => setOpen(null)} />}
       {open?.kind === "stop" && <StopDialog stationId={stationId} what={open.what} phone={phone} onClose={() => setOpen(null)} />}
-    </section>
+    </>
   );
 }
 

@@ -7,19 +7,24 @@ afterEach(cleanup);
 
 describe("ShellRail", () => {
   it("builds the fixed rail with links from linkTo and the app's extras", () => {
-    const groups = buildRail(CONTROL_RAIL, { breaks: { count: "3:30", warn: true } }, (p) => `/beat/${p}`);
+    const groups = buildRail(CONTROL_RAIL, { listings: { count: "2", warn: true } }, (p) => `/beat/${p}`);
     expect(groups.map((g) => g.label)).toEqual(["On air", "Market", "Programming", "Money", "Station"]);
-    expect(groups[0].items[4]).toMatchObject({ id: "breaks", label: "Breaks", href: "/beat/breaks", count: "3:30", warn: true });
+    // A246: Schedule in On air, in the reference's order; Blocks is one of its tabs, Breaks one of its parts.
+    expect(groups[0].items.map((i) => i.label)).toEqual(["Monitor", "Audience", "Schedule", "Live sources"]);
+    expect(groups[0].items[2]).toMatchObject({ id: "schedule", label: "Schedule", href: "/beat/schedule" });
+    expect(groups[2].items.map((i) => i.label)).toEqual(["Library", "Listings"]);
+    expect(groups[3].items.map((i) => i.label)).toEqual(["Spot market", "Sponsors", "Earnings"]);
+    expect(groups[2].items[1]).toMatchObject({ id: "listings", href: "/beat/listings", count: "2", warn: true });
   });
 
   it("marks the active page and the amber count", () => {
-    const groups = buildRail(CONTROL_RAIL, { breaks: { count: "3:30", warn: true, countLabel: "of breaks unfilled" }, library: { count: 7 } }, (p) => `#${p}`);
+    const groups = buildRail(CONTROL_RAIL, { listings: { count: "2", warn: true, countLabel: "need a description" }, library: { count: 7 } }, (p) => `#${p}`);
     render(<ShellRail groups={groups} active="monitor" />);
     expect(screen.getByRole("link", { name: "Monitor" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "Audience" }).getAttribute("aria-current")).toBeNull();
-    const breaks = screen.getByRole("link", { name: /Breaks/ });
-    expect(breaks.textContent).toBe("Breaks3:30, of breaks unfilled");
-    expect(breaks.querySelector(".oc-shell-rail__count--warn")).not.toBeNull();
+    const listings = screen.getByRole("link", { name: /Listings/ });
+    expect(listings.textContent).toBe("Listings2, need a description");
+    expect(listings.querySelector(".oc-shell-rail__count--warn")).not.toBeNull();
     expect(screen.getByRole("link", { name: /Library/ }).querySelector(".oc-shell-rail__count--warn")).toBeNull();
   });
 

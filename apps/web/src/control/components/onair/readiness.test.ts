@@ -58,13 +58,13 @@ describe("readiness, by item and with what failed (G13, G14)", () => {
     expect(readinessLine({ items: 13, ready: 12, firstNotReady: first("preparing") }, NOW)!.parts.item!.entryId).toBeNull();
   });
 
-  it("links to the airing's broadcast day on the log, the whole day when it's outside the evening", () => {
-    // 10:00 pm Saturday: Saturday's evening.
-    expect(logEntryHref("/control/beat", "e15", "2026-09-27T05:00:00.000Z")).toBe("/control/beat/log?day=2026-09-26&entry=e15");
-    // 3:30 am Sunday is still Saturday's broadcast day, after the evening's 2:00 am.
-    expect(logEntryHref("/control/beat", "e15r", "2026-09-27T10:30:00.000Z")).toBe("/control/beat/log?day=2026-09-26&view=day&entry=e15r");
+  it("links to the airing's broadcast day on the Schedule's Log, which shows the whole day (A246)", () => {
+    // 10:00 pm Saturday.
+    expect(logEntryHref("/control/beat", "e15", "2026-09-27T05:00:00.000Z")).toBe("/control/beat/schedule?day=2026-09-26&entry=e15");
+    // 3:30 am Sunday is still Saturday's broadcast day.
+    expect(logEntryHref("/control/beat", "e15r", "2026-09-27T10:30:00.000Z")).toBe("/control/beat/schedule?day=2026-09-26&entry=e15r");
     // 8:00 pm Sunday.
-    expect(logEntryHref("/control/beat", "e", "2026-09-28T03:00:00.000Z")).toBe("/control/beat/log?day=2026-09-27&entry=e");
+    expect(logEntryHref("/control/beat", "e", "2026-09-28T03:00:00.000Z")).toBe("/control/beat/schedule?day=2026-09-27&entry=e");
   });
 
   it("offers the pre-flight's fix only when an item couldn't be prepared", () => {

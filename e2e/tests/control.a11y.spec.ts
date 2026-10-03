@@ -30,9 +30,14 @@ const ROUTES: Route[] = [
   kai("/monitor", "Master control"),
   kai("/monitor?switch=1"),
   kai("/monitor?modal=sign-off"),
-  kai("/log"),
-  kai("/log?view=day"),
-  kai("/log?view=week"),
+  // A246: the Schedule, a tab per route.
+  kai("/schedule"),
+  kai("/schedule?view=week"),
+  kai("/schedule/templates"),
+  kai("/schedule/blocks"),
+  kai("/schedule/blocks/new"),
+  kai("/schedule/blocks/00000000-0000-4000-8000-0000000b1001"),
+  kai("/schedule/rules"),
   { path: "/control/hall/monitor", as: "kai" },
   // Live and programming.
   kai(`/live-sources`),
@@ -59,9 +64,8 @@ const ROUTES: Route[] = [
   kai(`/market/offered`),
   kai(`/market/offered/requests/${uid(620001)}`),
   kai(`/market/offered/${uid(280002)}/offer`),
-  kai(`/log/place/${uid(600001)}`),
+  kai(`/schedule/place/${uid(600001)}`),
   // Money.
-  kai(`/breaks`),
   kai(`/spot-market`),
   kai(`/spot-market/rotation`),
   kai(`/spot-market/${uid(520001)}`),

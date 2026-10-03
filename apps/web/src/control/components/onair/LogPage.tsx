@@ -10,8 +10,12 @@
 // "Edit log" (owners and operators, 2026-09-29) makes the log editable: a draft of changes, checked
 // and summed up, published at once (LogEditor.tsx). `?edit=1` keeps edit mode across a visit to
 // the market; the draft itself is kept for the tab.
+// A246: the Schedule's Log tab (`head`): the Schedule's head instead of the title, Day and Week (Day
+// first; Evening went, and `?view=evening` reads as Day), and the pane without the break rule (on
+// the Break rules tab) or the off air hours (on the Templates tab, as the "Every day" rule). Setup
+// step 3 is as it was.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { stationsApi, type LogChange, type ProgramLog, type StationIdent } from "@opencast/contracts";
 import {
@@ -61,6 +65,8 @@ export interface LogPageProps {
   setup?: { back: string; next: string };
   /** Owners and operators: "Edit log", and the log's history. */
   canEdit?: boolean;
+  /** A246: the Schedule's Log tab: its head, given the log's buttons for its end. */
+  head?: (end: ReactNode) => ReactNode;
 }
 
 /** The marker on an off air block's title: the log's CSS draws the block as the calm off air band. */
@@ -119,11 +125,14 @@ export function openGaps(windowGaps: Gap[], deadAir: Gap[], windowTo: string, t:
     });
 }
 
-export function LogPage({ stationId, station, base, setup, canEdit = false }: LogPageProps) {
+export function LogPage({ stationId, station, base, setup, canEdit = false, head }: LogPageProps) {
   const phone = useIsPhone();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
-  const view = (["day", "evening", "week"].includes(params.get("view") ?? "") ? params.get("view") : "evening") as LogView;
+  // The Schedule's Log has Day and Week; setup keeps the Evening, its first view.
+  const views: LogView[] = head ? ["day", "week"] : ["day", "evening", "week"];
+  const dayView: LogView = head ? "day" : "evening";
+  const view = (views.includes(params.get("view") as LogView) ? params.get("view") : dayView) as LogView;
   const editing = canEdit && params.get("edit") === "1" && view !== "week";
   // Edit mode counts down to what's locked, to the second.
   const t = useNow(editing ? 1_000 : 30_000).getTime();
@@ -176,7 +185,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
 
 
   if (log.isLoading) return <Quiet />;
-  if (log.isError) return <ControlTitle title="Program log" description={log.error.message} />;
+  if (log.isError) return head ? <>{head(null)}<p className="cc-log__err" role="alert">{log.error.message}</p></> : <ControlTitle title="Program log" description={log.error.message} />;
 
   const first = gaps[0];
   // A day of this week by its key; another week's by its date.
@@ -309,7 +318,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
           </Button>
         )}
         {base && (
-          <Button size="sm" variant="text" href={`${base}/blocks/${pickedBlock.blockId}`}>
+          <Button size="sm" variant="text" href={`${base}/schedule/blocks/${pickedBlock.blockId}`}>
             Edit {pickedBlock.name}
           </Button>
         )}
@@ -328,7 +337,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
     </section>
   );
 
-  const breaksSection = (
+  const breaksSection = !head && (
     <section className="cc-log__sec">
       <h2 className="cc-log__h">Breaks</h2>
       {rule.data ? (
@@ -375,14 +384,14 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
     />
   );
 
-  const offAirSection = view !== "week" && <OffAirHoursSection stationId={stationId} callSign={stationLabel(station)} phone={phone} />;
+  const offAirSection = view !== "week" && !head && <OffAirHoursSection stationId={stationId} callSign={stationLabel(station)} phone={phone} />;
 
   // Fill it: the gap's pane (from the week, on the evening of the gap's day).
   const fillFrom = (g: Gap & { key: string }) =>
     setParams(
       (p) => {
         if (view === "week") {
-          p.set("view", "evening");
+          p.set("view", dayView);
           p.set("day", dayValue(broadcastDay(g.startsAt)));
         }
         p.set("fill", g.key);
@@ -397,7 +406,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
       (p) => {
         p.set("edit", "1");
         p.delete("fill");
-        if (view === "week") p.set("view", "evening");
+        if (view === "week") p.set("view", dayView);
         p.delete("block");
         return p;
       },
@@ -405,31 +414,26 @@ export function LogPage({ stationId, station, base, setup, canEdit = false }: Lo
     );
   const onAirNow = !!playout.data?.onAir;
 
+  const VIEW_LABELS: Record<LogView, string> = { day: "Day", evening: "Evening", week: "Week" };
+  const titleEnd = (
+    <div className="cc-log__end">
+      {canEdit && !editing && (
+        <Button size="sm" onClick={startEditing}>
+          Edit log
+        </Button>
+      )}
+      <Segmented
+        label="View"
+        value={view}
+        onChange={(v) => set("view", v)}
+        options={views.filter((v) => !(editing && v === "week")).map((v) => ({ value: v, label: VIEW_LABELS[v] }))}
+      />
+    </div>
+  );
+
   return (
     <div className={setup ? "cc-log cc-log--setup" : "cc-log"}>
-      <ControlTitle
-        title="Program log"
-        description="What airs, in order. Build one day and repeat it, then adjust."
-        end={
-          <div className="cc-log__end">
-            {canEdit && !editing && (
-              <Button size="sm" onClick={startEditing}>
-                Edit log
-              </Button>
-            )}
-            <Segmented
-              label="View"
-              value={view}
-              onChange={(v) => set("view", v)}
-              options={[
-                { value: "day", label: "Day" },
-                { value: "evening", label: "Evening" },
-                ...(editing ? [] : [{ value: "week" as const, label: "Week" }])
-              ]}
-            />
-          </div>
-        }
-      />
+      {head ? head(titleEnd) : <ControlTitle title="Program log" description="What airs, in order. Build one day and repeat it, then adjust." end={titleEnd} />}
       {view !== "week" && (
         <Tabs
           variant="days"

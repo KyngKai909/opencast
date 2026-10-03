@@ -68,6 +68,7 @@ const FUND = "business/opencast-biz-funding.html";
 const SPOTS = "business/opencast-biz-spots.html";
 const BSET = "business/opencast-biz-settings.html";
 const ORDERS = "business/opencast-production-orders.html";
+const SCHEDULE = "control/opencast-schedule.html";
 const TV = "tv/opencast-tv.html";
 
 const FILL_OPTIONS = [
@@ -155,8 +156,23 @@ function ChipMultiDemo({ strike, start, options, label }: { strike?: boolean; st
   return <ChipRow multiple layout="wrap" strike={strike} label={label} value={v} onChange={setV} options={options.map((o) => ({ value: o, label: o }))} />;
 }
 
-function TabsDemo({ variant }: { variant: "underline" | "days" }) {
-  const [v, setV] = useState(variant === "days" ? "Sat" : "offered");
+function TabsDemo({ variant }: { variant: "underline" | "days" | "pill" }) {
+  const [v, setV] = useState(variant === "days" ? "Sat" : variant === "pill" ? "log" : "offered");
+  if (variant === "pill")
+    return (
+      <Tabs
+        variant="pill"
+        label="Schedule"
+        value={v}
+        onChange={setV}
+        items={[
+          { value: "log", label: "Log" },
+          { value: "templates", label: "Templates" },
+          { value: "blocks", label: "Blocks" },
+          { value: "rules", label: "Break rules" }
+        ]}
+      />
+    );
   if (variant === "days")
     return <Tabs variant="days" label="Day" value={v} onChange={setV} items={["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => ({ value: d, label: d }))} />;
   return (
@@ -757,12 +773,14 @@ export const primitives = specimens([
       { file: MARKET, anchor: "browse", frames: ["01.1"] },
       { file: OFFER, anchor: "offered", frames: ["01.1"] },
       { file: ORDERS, anchor: "quote", frames: ["03.1"] },
-      { file: MC, anchor: "flow-a", frames: ["A.4"] }
+      { file: MC, anchor: "flow-a", frames: ["A.4"] },
+      { file: SCHEDULE, anchor: "day", frames: ["01"] }
     ],
-    notes: "A tablist. Underlined for a page's views, with a mono standby count of what's waiting; bordered buttons for the program log's days. Arrow keys, Home and End move and show.",
+    notes: "A tablist. Underlined for a page's views, with a mono standby count of what's waiting; bordered buttons for the program log's days; pills for the Schedule's tabs (A246). Arrow keys, Home and End move and show.",
     states: [
       { label: "Underlined, with a count", render: () => <TabsDemo variant="underline" /> },
-      { label: "Days", render: () => <TabsDemo variant="days" /> }
+      { label: "Days", render: () => <TabsDemo variant="days" /> },
+      { label: "Pills (the Schedule)", render: () => <TabsDemo variant="pill" /> }
     ]
   },
   {

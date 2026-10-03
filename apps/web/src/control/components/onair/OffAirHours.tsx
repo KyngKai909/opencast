@@ -151,10 +151,15 @@ export interface OffAirHoursSectionProps {
   stationId: string;
   callSign: string;
   phone: boolean;
+  /**
+   * A246: the Schedule's Templates tab shows the hours first, as the "Every day" rule that applies
+   * to every template and date (opencast-schedule 06), in a dashed card above the templates.
+   */
+  everyDay?: boolean;
 }
 
 /** The pane's "Off air hours", as the frame draws it, with Change. */
-export function OffAirHoursSection({ stationId, callSign, phone }: OffAirHoursSectionProps) {
+export function OffAirHoursSection({ stationId, callSign, phone, everyDay = false }: OffAirHoursSectionProps) {
   const hours = useOffAirHours(stationId);
   const t = useNow(60_000).getTime();
   const [editing, setEditing] = useState(false);
@@ -173,10 +178,10 @@ export function OffAirHoursSection({ stationId, callSign, phone }: OffAirHoursSe
   if (next) items.push({ label: "Next", value: next });
 
   return (
-    <section className="cc-log__sec" aria-labelledby="cc-log-offair">
+    <section className={everyDay ? "cc-log__sec cc-sch__everyday" : "cc-log__sec"} aria-labelledby="cc-log-offair">
       <div className="cc-log__hrow">
         <h2 className="cc-log__h" id="cc-log-offair">
-          Off air hours
+          {everyDay ? "Every day" : "Off air hours"}
         </h2>
         {hours.data && (
           <Button variant="text" size="sm" onClick={() => setEditing(true)}>
@@ -191,6 +196,7 @@ export function OffAirHoursSection({ stationId, callSign, phone }: OffAirHoursSe
       ) : hours.data ? (
         <p className="cc-log__quiet">No off air hours. {callSign} stays on around the clock.</p>
       ) : null}
+      {everyDay && <p className="cc-log__note">Off air hours apply to every template and date.</p>}
       <p className="cc-log__note">{OFF_AIR_NOTE}</p>
       {editing && <OffAirHoursForm stationId={stationId} callSign={callSign} hours={hours.data} phone={phone} onClose={() => setEditing(false)} />}
     </section>

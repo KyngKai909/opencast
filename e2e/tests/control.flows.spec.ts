@@ -136,16 +136,15 @@ test("BEAT carries a program from the syndication market", async ({ page }) => {
   await expect(row).toContainText("One sponsor credit an hour");
 });
 
-test("BEAT fills a break from the spot market", async ({ page }) => {
+test("BEAT fills its rotation from the spot market; the rotation tab says what was added", async ({ page }) => {
   await signInAs(page, "kai");
+  // A246: Breaks went to the Schedule; its old address lands there.
   await page.goto("/control/beat/breaks");
-
-  // Breaks tonight (C.1): open time across tonight's breaks.
-  await expect(page.getByRole("heading", { name: "Breaks tonight" })).toBeVisible();
-  await expect(page.getByText("4:15 open across 4 breaks. Open time with nothing in it airs your station ID and bumpers.")).toBeVisible();
-  await page.getByRole("link", { name: "Fill from the spot market" }).click();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule$/);
+  await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
 
   // The spot market (C.2): add Orange Street Coffee.
+  await page.goto("/control/beat/spot-market");
   await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
   await expect(page.getByText("Spots businesses have listed for stations in the Inland Empire. You choose which air on BEAT 12.1.")).toBeVisible();
   const orange = page.getByRole("row").filter({ hasText: "Orange Street Coffee" });
@@ -153,13 +152,12 @@ test("BEAT fills a break from the spot market", async ({ page }) => {
   await page.getByRole("button", { name: "Add Orange Street Coffee to your rotation" }).click();
   await expect(orange).toContainText("In rotation");
 
-  // Breaks tonight, filled (C.3): the spot is in tonight's breaks.
-  await page.getByRole("link", { name: /^Breaks/ }).first().click();
-  await expect(page.getByRole("heading", { name: "Breaks tonight" })).toBeVisible();
-  await expect(page.getByText(":30 open across 4 breaks. Rotation: 1 spot.")).toBeVisible();
-  const during = page.getByRole("row").filter({ hasText: "During Saturday Reel" });
-  await expect(during).toContainText("Orange Street");
-  await expect(page.getByText("Just added")).toBeVisible();
+  // Your rotation: C.3's toast says where it starts (it was on Breaks), and the way to tonight's breaks.
+  await page.getByRole("tab", { name: "Your rotation" }).click();
+  await expect(page.getByText(/^Orange Street Coffee added\. It starts in the \d{1,2}:\d\d (am|pm) break\.$/)).toBeVisible();
+  await page.getByRole("link", { name: "See tonight's breaks" }).click();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule$/);
+  await expect(page.getByRole("tab", { name: "Log" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("BEAT approves a sponsorship", async ({ page }) => {
@@ -191,8 +189,10 @@ test("BEAT approves a sponsorship", async ({ page }) => {
 
 test("BEAT edits its log and publishes the changes", async ({ page }) => {
   await signInAs(page, "kai");
+  // An old link (A246): the Evening is the Schedule's Day now.
   await page.goto("/control/beat/log?view=evening&day=sat");
-  await expect(page.getByRole("heading", { name: "Program log" })).toBeVisible();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule\?view=day&day=sat$/);
+  await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Edit log" }).click();
   await expect(page.getByText("Editing the log.")).toBeVisible();
   const log = page.getByRole("list", { name: "The log, being edited" });
@@ -201,14 +201,14 @@ test("BEAT edits its log and publishes the changes", async ({ page }) => {
   await log.getByRole("button", { name: /Saturday Reel/ }).click();
   await expect(page.getByText("On air now, too late to change.")).toBeVisible();
 
-  // Slow Hours dragged half an hour later (1.12 px a minute), to the nearest minute.
+  // Slow Hours dragged half an hour later (the Day draws 0.5 px a minute), to the nearest minute.
   const slow = log.getByRole("button", { name: /Slow Hours/ });
   await slow.scrollIntoViewIfNeeded();
   const box = (await slow.boundingBox())!;
   await page.mouse.move(box.x + 40, box.y + 10);
   await page.mouse.down();
-  await page.mouse.move(box.x + 40, box.y + 20, { steps: 4 });
-  await page.mouse.move(box.x + 40, box.y + 10 + 33.6, { steps: 4 });
+  await page.mouse.move(box.x + 40, box.y + 16, { steps: 4 });
+  await page.mouse.move(box.x + 40, box.y + 10 + 15, { steps: 4 });
   await page.mouse.up();
   await expect(page.getByText("1 change: Slow Hours moves to 11:00 pm")).toBeVisible();
   await expect(page.getByText("Dead air from 10:30 pm to 11:00 pm (30 min).")).toBeVisible();
@@ -225,6 +225,46 @@ test("BEAT edits its log and publishes the changes", async ({ page }) => {
   await expect(page.getByText("Editing the log.")).toHaveCount(0);
   await expect(page.getByText(/^Last changed by Kai M\. at 8:4\d pm$/)).toBeVisible();
   await expect(page.getByText("1 change: Slow Hours moves to 11:10 pm")).toBeVisible();
+});
+
+// A246: every page the Schedule replaced still opens, on the right tab, with its query kept.
+test("the old log, breaks and blocks addresses land on the Schedule's tabs with their query", async ({ page }) => {
+  await signInAs(page, "kai");
+  const LCN = "00000000-0000-4000-8000-0000000b1001";
+  const offer = "00000000-0000-4000-8000-000000600001";
+  const cases: Array<{ from: string; to: string; query?: Record<string, string>; tab?: string; shows?: string | RegExp }> = [
+    { from: "/log", to: "/schedule", tab: "Log" },
+    { from: "/log?view=day", to: "/schedule", query: { view: "day" }, tab: "Log" },
+    { from: "/log?view=evening&day=sat", to: "/schedule", query: { view: "day", day: "sat" }, tab: "Log" },
+    { from: "/log?view=week", to: "/schedule", query: { view: "week" }, tab: "Log" },
+    { from: "/log?day=2026-10-03&edit=1", to: "/schedule", query: { day: "2026-10-03", edit: "1" }, tab: "Log", shows: "Editing the log." },
+    { from: "/log?fill=2026-10-04T06:40:00.000Z", to: "/schedule", query: { fill: "2026-10-04T06:40:00.000Z" }, tab: "Log" },
+    { from: "/log?day=2026-10-03&entry=e1&block=s1", to: "/schedule", query: { day: "2026-10-03", entry: "e1", block: "s1" }, tab: "Log" },
+    { from: "/log?place=item-1", to: "/schedule", query: { edit: "1", add: "item-1" }, tab: "Log" },
+    { from: "/log?switch=1", to: "/schedule", query: { switch: "1" }, tab: "Log" },
+    { from: `/log/place/${offer}?term=barter`, to: `/schedule/place/${offer}`, query: { term: "barter" }, shows: /^Place / },
+    { from: "/breaks", to: "/schedule", tab: "Log" },
+    { from: "/breaks?rotation=backup", to: "/spot-market/rotation", query: { show: "backup" } },
+    { from: "/blocks", to: "/schedule/blocks", tab: "Blocks" },
+    { from: "/blocks/new", to: "/schedule/blocks/new", tab: "Blocks", shows: "Make the block" },
+    { from: `/blocks/${LCN}`, to: `/schedule/blocks/${LCN}`, tab: "Blocks", shows: "All blocks" }
+  ];
+  for (const c of cases) {
+    await page.goto(`/control/beat${c.from}`);
+    await expect.poll(() => new URL(page.url()).pathname, { message: c.from }).toBe(`/control/beat${c.to}`);
+    expect(Object.fromEntries(new URL(page.url()).searchParams), c.from).toEqual(c.query ?? {});
+    if (c.tab) await expect(page.getByRole("tab", { name: c.tab, exact: true }), c.from).toHaveAttribute("aria-selected", "true");
+    if (c.shows) await expect(page.getByText(c.shows).first(), c.from).toBeVisible();
+    // The rail lights Schedule for each of them but the rotation.
+    if (c.to.startsWith("/schedule")) await expect(page.getByRole("link", { name: "Schedule", exact: true }), c.from).toHaveAttribute("aria-current", "page");
+  }
+
+  // Station settings keeps a link where the break rule was.
+  await page.goto("/control/beat/settings/breaks");
+  await expect(page.getByText("Break rules moved to the Schedule.")).toBeVisible();
+  await page.getByRole("link", { name: "Open Break rules" }).click();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule\/rules$/);
+  await expect(page.getByRole("tab", { name: "Break rules" })).toHaveAttribute("aria-selected", "true");
 });
 
 test("BEAT's Audience shows watch time and where people left; Offering your programs adds up every station (follow-up Phase 1)", async ({ page }) => {

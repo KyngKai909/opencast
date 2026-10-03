@@ -47,8 +47,8 @@ const renderAt = (path: string) =>
     <ShellOptionsProvider>
       <StationProvider value={beat}>
         <Routes>
-          <Route path="/control/beat/blocks" element={<Blocks />} />
-          <Route path="/control/beat/blocks/:blockId" element={<Blocks />} />
+          <Route path="/control/beat/schedule/blocks" element={<Blocks />} />
+          <Route path="/control/beat/schedule/blocks/:blockId" element={<Blocks />} />
         </Routes>
       </StationProvider>
     </ShellOptionsProvider>,
@@ -104,10 +104,12 @@ describe("a block in words", () => {
   });
 });
 
-describe("the Blocks page and the block editor", () => {
+describe("the Schedule's Blocks tab and the block editor (A246)", () => {
   it("lists the station's blocks with when they're on and their next date", async () => {
-    renderAt("/control/beat/blocks");
-    expect(await screen.findByRole("heading", { name: "Blocks" })).toBeTruthy();
+    renderAt("/control/beat/schedule/blocks");
+    expect(await screen.findByRole("heading", { level: 1, name: "Schedule" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Blocks" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("link", { name: /Late Crate Nights/ }).getAttribute("href")).toBe(`/control/beat/schedule/blocks/${LATE_CRATE_NIGHTS_ID}`);
     const list = screen.getByRole("list", { name: "Your blocks" });
     expect(within(list).getByText("Late Crate Nights")).toBeTruthy();
     expect(within(list).getByText("Every Saturday, 8:00 pm to 9:00 pm")).toBeTruthy();
@@ -116,35 +118,35 @@ describe("the Blocks page and the block editor", () => {
   });
 
   it("makes a new block and opens its editor", async () => {
-    renderAt("/control/beat/blocks/new");
+    renderAt("/control/beat/schedule/blocks/new");
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Saturday Matinee" } });
     fireEvent.click(screen.getByRole("button", { name: "Make the block" }));
-    expect(await screen.findByRole("heading", { level: 1, name: "Saturday Matinee" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "Saturday Matinee" })).toBeTruthy();
     expect(screen.getByText("No intro of its own yet, so a :05 card with the block's name and logo")).toBeTruthy();
     expect(screen.getByText("No ID of its own, so your station ID airs.")).toBeTruthy();
   });
 
   it("turns the outro off, and archives only once it's off the log", async () => {
-    renderAt(`/control/beat/blocks/${LATE_CRATE_NIGHTS_ID}`);
-    expect(await screen.findByRole("heading", { level: 1, name: "Late Crate Nights" })).toBeTruthy();
+    renderAt(`/control/beat/schedule/blocks/${LATE_CRATE_NIGHTS_ID}`);
+    expect(await screen.findByRole("heading", { level: 2, name: "Late Crate Nights" })).toBeTruthy();
     fireEvent.click(screen.getByRole("switch", { name: "Outro" }));
     expect(await screen.findByText("No outro.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Archive Late Crate Nights" }));
     expect(await screen.findByText("Late Crate Nights is on the log 1 more time. Take it off the log first.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Take it off the log and archive" }));
-    await waitFor(() => expect(screen.queryByRole("heading", { level: 1, name: "Late Crate Nights" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("heading", { level: 2, name: "Late Crate Nights" })).toBeNull());
   });
 });
 
 describe("the program log's rail", () => {
   it("draws the block beside the timeline and opens its pane", async () => {
-    renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" canEdit />, { path: "/control/beat/log" });
+    renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" canEdit />, { path: "/control/beat/schedule" });
     const rail = await screen.findByRole("button", { name: "Late Crate Nights, 8:00 pm to 8:59 pm" });
     fireEvent.click(rail);
     const pane = await screen.findByRole("region", { name: "Late Crate Nights" });
     expect(within(pane).getByText("2 programs, 8:00 pm to 8:59 pm")).toBeTruthy();
     expect(within(pane).getByRole("button", { name: "Change times" })).toBeTruthy();
-    expect(within(pane).getByRole("link", { name: "Edit Late Crate Nights" }).getAttribute("href")).toBe(`/control/beat/blocks/${LATE_CRATE_NIGHTS_ID}`);
+    expect(within(pane).getByRole("link", { name: "Edit Late Crate Nights" }).getAttribute("href")).toBe(`/control/beat/schedule/blocks/${LATE_CRATE_NIGHTS_ID}`);
   });
 });
 

@@ -135,7 +135,7 @@ describe("the Library's openers, closers and off-air cards", () => {
     renderAt(`/control/beat/library/items/${beatItem("BEAT test card").id}`);
     expect(await screen.findByRole("heading", { name: "BEAT test card" })).toBeTruthy();
     expect(screen.getByText(/^Off-air card, a picture\./)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Sign-off and sign-on" }).getAttribute("href")).toBe("/control/beat/settings/breaks");
+    expect(screen.getByRole("link", { name: "Sign-off and sign-on" }).getAttribute("href")).toBe("/control/beat/schedule/rules");
     expect(screen.queryByRole("link", { name: "Schedule" })).toBeNull();
   });
 });

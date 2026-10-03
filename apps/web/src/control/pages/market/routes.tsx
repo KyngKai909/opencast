@@ -24,7 +24,8 @@ export const marketStationRoutes = (
     <Route path="market/offered" element={<Offered />} />
     <Route path="market/offered/requests/:requestId" element={<Offered />} />
     <Route path="market/offered/:programId/offer" element={<OfferProgram />} />
-    <Route path="log/place/:offerId" element={<PlaceInLog />} />
+    {/* A246: on the Schedule (the old /log/place/:offerId redirects here). */}
+    <Route path="schedule/place/:offerId" element={<PlaceInLog />} />
     {/* A studio's pages. */}
     <Route path="programs" element={<StudioPrograms />} />
     <Route path="carriers" element={<StudioCarriers />} />

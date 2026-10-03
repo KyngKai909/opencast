@@ -1,13 +1,13 @@
-// station-settings: Identity, Breaks, Sponsorship, Translators, Team (+ invite), Notifications,
+// station-settings: Identity, Breaks (A246: moved to the Schedule's Break rules tab; a link is left
+// here), Sponsorship, Translators, Team (+ invite), Notifications,
 // Station account, Ownership (/settings/:section). On the web a sub-rail and a pane; on the phone
 // the list of sections, each its own screen with a back arrow. Hosts never get here (the layout
 // sends them to their live blocks); operators see what they can't change as read-only.
 
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
-import { SettingsLayout, type SettingsSection } from "@opencast/ui";
+import { Button, Notice, SettingsLayout, type SettingsSection } from "@opencast/ui";
 import SponsorshipSettings, { sponsorshipDescription } from "../../components/spots/SponsorshipSettings";
 import StationAccount from "../../components/earnings/StationAccount";
-import { BreaksSection } from "../../components/station/settings/BreaksSection";
 import { IdentitySection } from "../../components/station/settings/IdentitySection";
 import { InviteModal } from "../../components/station/settings/InviteModal";
 import { NotificationsSection } from "../../components/station/settings/NotificationsSection";
@@ -46,7 +46,7 @@ function lede(id: string, s: StationState, phone: boolean) {
     case "identity":
       return `How ${cs} appears on the dial, in the guide and on its own picture.`;
     case "breaks":
-      return `Applied to every break ${cs} airs, including breaks inside carried programs where ${cs} sells the time.`;
+      return undefined;
     case "sponsorship":
       return sponsorshipDescription(cs);
     case "translators":
@@ -71,7 +71,21 @@ function Body({ id, s, phone }: { id: string; s: StationState; phone: boolean })
     case "identity":
       return <IdentitySection s={s} />;
     case "breaks":
-      return <BreaksSection s={s} />;
+      // A246: the break rule lives on the Schedule now, beside the log it shapes.
+      return (
+        <Notice
+          tone="plain"
+          icon={null}
+          title="Break rules moved to the Schedule."
+          action={
+            <Button size="sm" href={`${s.base}/schedule/rules`}>
+              Open Break rules
+            </Button>
+          }
+        >
+          When breaks come, what fills them and how often each part airs are set beside the log now.
+        </Notice>
+      );
     case "sponsorship":
       return <SponsorshipSettings />;
     case "translators":
