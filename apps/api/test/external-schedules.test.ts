@@ -19,6 +19,41 @@ const page = (...blocks: string[]) =>
   `<!DOCTYPE html><html><head><title>Schedule</title>${blocks.map((b) => `<script type="application/ld+json">${b}</script>`).join("\n")}</head><body><h1>Schedule</h1></body></html>`;
 const titles = (html: string, tz = LA) => parseJsonLdEvents(html, tz).map((e) => [e.summary, e.start.toISOString(), e.end?.toISOString() ?? null]);
 
+describe("a JSON schedule", () => {
+  const rows = (text: string) => parseSchedule(text, "json").map((e) => [e.uid, e.summary, e.start.toISOString(), e.end?.toISOString() ?? null]);
+
+  it("reads an array, and the lists sources put under a name", () => {
+    const ev = { id: "a", title: "Morning Show", start: "2026-10-04T15:00:00Z", end: "2026-10-04T16:00:00Z" };
+    const row = ["a", "Morning Show", "2026-10-04T15:00:00.000Z", "2026-10-04T16:00:00.000Z"];
+    expect(rows(JSON.stringify([ev]))).toEqual([row]);
+    expect(rows(JSON.stringify({ events: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ items: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ schedule: [ev] }))).toEqual([row]);
+    expect(rows(JSON.stringify({ data: { events: [ev] } }))).toEqual([row]);
+    expect(rows(JSON.stringify({ something: [ev] }))).toEqual([]);
+  });
+
+  it("reads a show-schedule plugin's { now, active, upcoming }: what's on now first, a weekly show's repeats as they're listed, once each", () => {
+    const show = (id: string, title: string, start: string, end: string) => ({ id, title, host: "", description: "…", recurrence: "custom", intervalDays: 7, timezone: LA, start, end, sourceId: id });
+    const feed = {
+      now: "2026-10-03T23:10:00.000Z",
+      active: show("show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"),
+      upcoming: [
+        show("show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"),
+        show("show-2", "Late Film", "2026-10-04T00:00:00.000Z", "2026-10-04T02:00:00.000Z"),
+        show("show-2", "Late Film", "2026-10-11T00:00:00.000Z", "2026-10-11T02:00:00.000Z")
+      ]
+    };
+    expect(rows(JSON.stringify(feed))).toEqual([
+      ["show-1", "Evening Hour", "2026-10-03T23:00:00.000Z", "2026-10-04T00:00:00.000Z"],
+      ["show-2", "Late Film", "2026-10-04T00:00:00.000Z", "2026-10-04T02:00:00.000Z"],
+      ["show-2", "Late Film", "2026-10-11T00:00:00.000Z", "2026-10-11T02:00:00.000Z"]
+    ]);
+    // Nothing on now.
+    expect(rows(JSON.stringify({ ...feed, active: null }))).toHaveLength(3);
+  });
+});
+
 describe("a webpage's event data (JSON-LD)", () => {
   it("is recognised by its type or how it starts, and never mistaken for a feed", () => {
     expect(detectScheduleFormat("https://city.example.gov/meetings", "text/html; charset=utf-8", "<html><head></head></html>")).toBe("webpage");

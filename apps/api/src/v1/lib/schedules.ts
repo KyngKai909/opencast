@@ -1,6 +1,6 @@
 // An external station's "what's on" (follow-up Phase 6): the source's own calendar or schedule
 // feed, in whichever of the four shapes sources publish: iCalendar, RSS (with the RSS event
-// module's start and end, else each item's date), JSON (an array of events, or `events` / `items`)
+// module's start and end, else each item's date), JSON (an array of events, or an object holding them as `events`, `items`, `upcoming` and the like)
 // or XMLTV (guide data). A241 (2026-10-01): or a web page's own event data, the schema.org JSON-LD
 // in its `<script type="application/ld+json">` blocks (lib/jsonLd.ts). Titles are the source's own;
 // nothing is made up, and an entry without a title or a start time is left out.
@@ -75,6 +75,28 @@ function parseRss(text: string): CalendarEvent[] {
   return events;
 }
 
+/** Where a schedule's lists go in the shapes seen in the wild; the single object for what's on now comes first. */
+const JSON_NOW_KEYS = ["active", "current", "now_playing", "nowPlaying", "onNow"];
+const JSON_LIST_KEYS = ["events", "items", "upcoming", "schedule", "shows", "programs", "programmes", "airings", "entries", "data", "results"];
+
+/**
+ * A JSON schedule's events: an array, or an object holding them under one of the usual names
+ * (`{ "active": {…}, "upcoming": [ … ] }` from a show-schedule plugin, 2026-10-03), one level down
+ * too (`{ "data": { "events": [ … ] } }`).
+ */
+function jsonEventList(data: unknown, depth = 0): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object" || depth > 1) return [];
+  const o = data as Record<string, unknown>;
+  const list: unknown[] = [];
+  for (const k of JSON_NOW_KEYS) if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k])) list.push(o[k]);
+  for (const k of JSON_LIST_KEYS) {
+    const found = jsonEventList(o[k], depth + 1);
+    if (found.length) return [...list, ...found];
+  }
+  return list;
+}
+
 function parseJson(text: string): CalendarEvent[] {
   let data: unknown;
   try {
@@ -82,12 +104,13 @@ function parseJson(text: string): CalendarEvent[] {
   } catch {
     return [];
   }
-  const list = Array.isArray(data) ? data : ((data as { events?: unknown[]; items?: unknown[] })?.events ?? (data as { items?: unknown[] })?.items ?? []);
+  const list = jsonEventList(data);
   const pick = (o: Record<string, unknown>, keys: string[]) => {
     for (const k of keys) if (typeof o[k] === "string" && (o[k] as string).trim()) return (o[k] as string).trim();
     return null;
   };
   const events: CalendarEvent[] = [];
+  const seen = new Set<string>();
   for (const item of list) {
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
@@ -95,6 +118,10 @@ function parseJson(text: string): CalendarEvent[] {
     const start = date(pick(o, ["start", "startsAt", "start_time", "startTime", "startDate", "dtstart"]));
     if (!summary || !start) continue;
     const end = date(pick(o, ["end", "endsAt", "end_time", "endTime", "endDate", "dtend"]));
+    // What's on now can be listed twice (on its own and in the list): once is enough.
+    const key = `${summary}@${start.getTime()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const id = o.id ?? o.uid;
     events.push({ uid: id === undefined || id === null ? null : String(id), summary, start, end: end && end > start ? end : null });
   }
