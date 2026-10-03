@@ -7,7 +7,7 @@
 // player (its static, corner number, bug and banner) is the one specified elsewhere.
 //
 // Around the picture: the market, the TV and Radio bands and search at the top (full bleed under
-// the status bar, fading from the edge), the five buttons on the right, the position line, and the
+// the status bar, fading from the edge), the five buttons on the right, the position line (read out, not shown), and the
 // shell's floating bar. In landscape the labels drop, the tabs and band switch go (phones), and the
 // buttons fade after 3 seconds. Tablets keep the picture 16:9 in portrait, with the station's
 // colour around it.

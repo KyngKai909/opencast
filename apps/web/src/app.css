@@ -5,3 +5,9 @@ html, body, #root { height: 100%; }
 body { font-size: 15px; line-height: 1.45; overscroll-behavior-y: none; }
 #root { display: flex; flex-direction: column; }
 #root > * { flex: 1; min-height: 0; }
+/* Installed to an iPhone's home screen (black-translucent status bar), 100% is the screen less the
+   status bar, which left a band of ground under the app (2026-10-03). Pinned to the screen's edges
+   instead, the app reaches the bottom. */
+@media (display-mode: standalone) {
+  #root { position: fixed; inset: 0; height: auto; }
+}
