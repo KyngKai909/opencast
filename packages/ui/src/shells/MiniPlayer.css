@@ -7,6 +7,7 @@
   margin: 0 10px 6px; padding: 8px;
   border-radius: var(--oc-mini-radius);
   background: var(--raised); box-shadow: 0 0 0 1px var(--hair);
+  position: relative; touch-action: pan-x;
 }
 /* With onOpen, the card and title are one button spanning the first two columns. */
 .oc-mini-player__open {
@@ -19,3 +20,6 @@
 .oc-mini-player__title { font: 700 14px/1.2 var(--font-display); }
 .oc-mini-player__station { font-size: 12px; color: var(--ink-70); }
 .oc-mini-player__ctl { display: flex; gap: 6px; align-items: center; }
+/* swipe home 06: the program's progress as a thin line along the bottom (not a scrub bar). */
+.oc-mini-player__bar { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; border-radius: 1px; background: var(--hair); overflow: hidden; }
+.oc-mini-player__bar i { display: block; height: 100%; background: var(--ink); }

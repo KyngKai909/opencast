@@ -29,6 +29,7 @@ import { BackToLive, NowStrip, RemotePad, RemotePresets, RemoteRow, RemoteTop, R
 import { presetStrip, rockerNeighbours } from "../components/remote/logic";
 import { mirrorGuideHref } from "../components/remote/WatchOnSheet";
 import { useOverlayParams } from "../components/watch/overlay";
+import { RemoteSwipe } from "../components/swipe/RemoteSwipe";
 import { stationSlug } from "../components/watch/logic";
 import { inChannelOrder } from "@opencast/player";
 import "../components/remote/remote.css";
@@ -111,7 +112,14 @@ function Remote() {
   return (
     <div className="vw-rm">
       {!phone && <RemoteTop />}
-      {row ? <NowStrip row={row} paused={paused} now={now} flicker={!litAtOpen.current} /> : <div className="vw-rm-quiet" aria-busy="true" aria-label="Waiting for the TV" />}
+      {row ? (
+        // Swiping here changes the TV's channel, as the swipe home does on the phone (A245).
+        <RemoteSwipe onChannel={(dir) => send({ type: "channel", dir })}>
+          <NowStrip row={row} paused={paused} now={now} flicker={!litAtOpen.current} />
+        </RemoteSwipe>
+      ) : (
+        <div className="vw-rm-quiet" aria-busy="true" aria-label="Waiting for the TV" />
+      )}
       {other && <p className="vw-rm-changed" role="status">{`${other} changed the channel.`}</p>}
       {/* At the top, like a TV remote's middle: the arrows round OK with the quick keys. */}
       <RemotePad open={tvOpen} onCommand={send} onOpenChange={setTvOpen} />

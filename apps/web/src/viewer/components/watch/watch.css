@@ -1,15 +1,7 @@
-/* Tuned in (home 03.1 .w-grid, .w-left, .w-bar, .w-rail; 04.1 and 04.2 the phone's full player). */
+/* Tuned in (home 03.1 .w-grid, .w-left, .w-bar, .w-rail). Phones and tablets: components/swipe/swipe.css. */
 
 /* ---------- The picture (both) ---------- */
 .vw-pic { position: relative; container-type: inline-size; }
-.vw-pic--swipe { touch-action: none; user-select: none; -webkit-user-select: none; }
-.vw-pic__next {
-  position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 4px;
-  background: var(--pic-scrim); color: var(--pic-ink); pointer-events: none;
-  transform: translateY(var(--vw-dy, 0));
-}
-.vw-pic__ch { font-size: clamp(32px, 12cqw, 64px); font-weight: 500; letter-spacing: -.04em; line-height: 1; }
-.vw-pic__cs { font-size: clamp(18px, 6cqw, 30px); line-height: 1; }
 
 /* ---------- Web ---------- */
 .vw-watch { display: grid; grid-template-columns: minmax(0, 1fr) 340px; height: 100%; }
@@ -52,41 +44,6 @@
   .vw-watch { grid-template-columns: minmax(0, 1fr); height: auto; }
   .vw-watch__rail { border-left: 0; border-top: 1px solid var(--hair); overflow: visible; }
 }
-
-/* ---------- Phone: the full player ---------- */
-.vw-wph__top { justify-content: space-between; }
-.vw-wph__topline { font-size: 13px; color: var(--ink-50); margin: 0 auto; text-align: center; }
-.vw-wph__pic .oc-player { border-radius: 0; }
-.vw-wph__pad { padding: 14px 18px 24px; }
-.vw-wph__id { display: flex; align-items: center; gap: 10px; }
-.vw-wph__tally { margin-left: auto; }
-.vw-wph__id .vw-wph__live { margin-left: auto; }
-.vw-wph__id .vw-wph__live + .vw-wph__tally { margin-left: 0; }
-.vw-wph__acts { margin-top: 14px; }
-.vw-wph .vw-w-sched { margin-top: 20px; }
-
-/* The swipe's buttons: out of sight until focused. */
-.vw-wph__sr { position: absolute; left: 8px; top: 8px; display: flex; gap: 8px; }
-.vw-wph__sr button {
-  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-  border: 0; padding: 0; margin: 0;
-}
-.vw-wph__sr button:focus-visible {
-  position: static; width: auto; height: 34px; clip: auto; padding: 0 12px;
-  background: var(--pic-scrim); color: var(--pic-ink); border-radius: var(--r-control); font: 600 13px var(--font-text);
-}
-
-/* Radio: the station's colour is the picture (the player's radio screen, as a square panel). */
-.vw-wph__radio { margin: 0 18px; }
-.vw-wph__radio .oc-player { aspect-ratio: 1 / 1; }
-.vw-wph--radio .vw-wph__pad { padding-top: 16px; }
-.vw-wph__rtitle { margin-top: 0; }
-.vw-wph__controls { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 22px 0 6px; }
-.vw-wph__step.oc-icon-btn { width: 52px; height: 52px; }
-.vw-wph__play.oc-icon-btn { width: 68px; height: 68px; border-radius: 50%; background: var(--ink); color: var(--ground); border-color: var(--ink); }
-.vw-wph__play.oc-icon-btn svg { width: 26px; height: 26px; }
-.vw-wph--radio .vw-wph__live { display: flex; margin: 4px auto 14px; }
-.vw-wph__hint { text-align: center; font-size: 12.5px; color: var(--ink-50); margin: 0 0 16px; }
 
 /* AirPlay: while the picture plays on an AirPlay TV, a quiet line under it with Stop. */
 .vw-airplay { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 14px; color: var(--ink-70); }

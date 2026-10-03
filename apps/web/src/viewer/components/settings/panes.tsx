@@ -150,7 +150,7 @@ function MarketPane() {
 
 export const CAPTION_PX = { small: 12, medium: 15, large: 19 } as const;
 
-function WatchingPane() {
+function WatchingPane({ phone }: { phone: boolean }) {
   const { settings, save, error } = useSettings();
   const w = settings.watching ?? {};
   const size = w.captionSize ?? "medium";
@@ -216,8 +216,9 @@ function WatchingPane() {
         )}
       />
       <SettingRow
-        title="Muted previews on the dial"
-        help="The live hero plays with no sound"
+        // Phones and tablets open on the picture (A245, the swipe home); the web's dial has the hero.
+        title={phone ? "Muted previews" : "Muted previews on the dial"}
+        help={phone ? "Watch opens with no sound until you tap" : "The live hero plays with no sound"}
         control={({ labelId, helpId }) => <Toggle checked={w.mutedPreviews ?? true} onChange={(v) => void save({ watching: { mutedPreviews: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
       <SettingRow
@@ -569,7 +570,7 @@ export function SectionPane({ id, phone }: { id: SectionId; phone: boolean }): R
     case "market":
       return <MarketPane />;
     case "watching":
-      return <WatchingPane />;
+      return <WatchingPane phone={phone} />;
     case "notifications":
       return <NotificationsPane phone={phone} />;
     case "tvs":

@@ -11,7 +11,7 @@ import { call } from "../../api/client";
 import { useAuth } from "../../auth/AuthProvider";
 import { useMe, usePresets } from "../data/viewer";
 import { useDevice } from "../device/store";
-import { useIsPhone, useShellOptions } from "../layout/shell";
+import { useLandscape, useShellOptions, useViewerLayout } from "../layout/shell";
 import { useNow } from "../../lib/clock";
 import { useTune } from "../player/PlayerRoot";
 import { useCastSession } from "../cast/session";
@@ -25,7 +25,11 @@ import "../components/you/sections.css";
 import "./You.css";
 
 export default function YouPage() {
-  const phone = useIsPhone();
+  // A tablet spreads You into columns (A245; swipe home 07): the web's layout, two columns
+  // upright and three on its side, in the phone shell with the floating bar.
+  const layout = useViewerLayout();
+  const landscape = useLandscape();
+  const phone = layout === "phone";
   const auth = useAuth();
   // The phone's You has no top bar (06.1, 06.2); its rows run edge to edge.
   useShellOptions(phone ? { top: null, padded: false } : {});
@@ -37,7 +41,7 @@ export default function YouPage() {
     return <SignedOutYou form={phone ? "phone" : "web"} devicePresets={device.presets.length} onSignIn={() => auth.openSignIn()} onSettings={() => navigate("/settings")} />;
   return (
     <>
-      {phone ? <YouPhone /> : <YouWeb />}
+      {phone ? <YouPhone /> : <YouWeb columns={layout === "tablet" ? (landscape ? 3 : 2) : undefined} />}
       {pledgeId && <PledgeModal pledgeId={pledgeId} />}
     </>
   );
@@ -95,7 +99,7 @@ function ErrorLine({ error }: { error: unknown }) {
   );
 }
 
-function YouWeb() {
+function YouWeb({ columns }: { columns?: 2 | 3 }) {
   const y = useYou();
   const navigate = useNavigate();
   const me = y.me.data;
@@ -106,7 +110,7 @@ function YouWeb() {
   const name = me?.displayName ?? me?.email ?? "";
 
   return (
-    <div className="vw-you">
+    <div className={columns ? `vw-you vw-you--cols${columns}` : "vw-you"}>
       <div className="vw-y-pg-h">
         {me ? <Avatar name={name} size={56} decorative /> : <span className="vw-you__avatar-ph" />}
         <div>

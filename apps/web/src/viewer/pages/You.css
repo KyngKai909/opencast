@@ -70,3 +70,9 @@
 @media (max-width: 1023px) {
   .vw-you__two, .vw-you__tvs { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
+
+/* Tablets (A245; swipe home 07): two columns upright, three on its side, nothing below the fold. */
+.vw-you--cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 32px; align-items: start; }
+.vw-you--cols3 > .vw-y-pg-h, .vw-you--cols3 > .vw-y-sec:not(.vw-you__presets), .vw-you--cols3 > .vw-y-run, .vw-you--cols3 > :not(.vw-y-sec):not(.vw-you__two):not(.vw-y-pg-h) { grid-column: 1 / -1; }
+.vw-you--cols3 > .vw-you__two { display: contents; }
+.vw-you--cols3 .vw-y-keys { grid-template-columns: repeat(3, minmax(0, 1fr)); }

@@ -2,9 +2,13 @@
 // with each station at its frequency and the needle where you're tuned (it sweeps to the next
 // station in 400 ms, and the player plays the band's soft hiss: follow-up Phase 5), then the same
 // stations as rows. Clicking a mark or a row tunes in; the arrow keys move along the band. The station you're
-// on gets the tally edge and "You're here" (never a lit tally in a list: open question A2).
+// on gets the tally edge and "You're here" (never a lit tally in a list: open question A2). On
+// phones and tablets the radio band is the swipe home's Radio (A245): `/radio` opens it on the
+// band's first station in the order (or the radio station already playing), and the swipe goes
+// through the radio presets, then the band by frequency, with the needle sweep instead of static.
 
 import { useEffect, useMemo, type ReactNode } from "react";
+import { Navigate } from "react-router";
 import { BandScale, DialRow, LiveText, bandStep, type BandStation } from "@opencast/ui";
 import { tuningStyle } from "@opencast/player";
 import type { DialRowX } from "../api/ext";
@@ -15,6 +19,8 @@ import { useNowPlaying, useTune } from "../player/PlayerRoot";
 import { radioDetail, stationsText } from "../components/home/logic";
 import { dialNow } from "../components/home/MarketDial";
 import { useOpenStation } from "../components/home/nav";
+import { useSwipeOrders } from "../components/swipe/useSwipeOrder";
+import { stationSlug } from "../components/watch/logic";
 import "./Radio.css";
 
 function frequencyOf(r: DialRowX): number {
@@ -41,6 +47,26 @@ function arrowsAreFree(e: KeyboardEvent): boolean {
 }
 
 export default function RadioPage() {
+  return useIsPhone() ? <RadioOnSwipe /> : <RadioBand />;
+}
+
+/** Phones and tablets: the swipe home, on the radio band. */
+function RadioOnSwipe() {
+  useShellOptions({ player: false, padded: false, picture: true });
+  const orders = useSwipeOrders();
+  const np = useNowPlaying();
+  const radio = useDial("radio");
+  const playing = np.row?.station.band === "radio" ? np.row : null;
+  const to = playing ?? orders.radio.rows[0] ?? null;
+  if (to) return <Navigate to={`/watch/${stationSlug(to.station)}`} replace />;
+  return (
+    <div className="vw-sw vw-sw--empty" aria-busy={!radio.data}>
+      {radio.data && <p className="vw-sw__wait">No stations on the radio band here yet.</p>}
+    </div>
+  );
+}
+
+function RadioBand() {
   const phone = useIsPhone();
   const slug = useMarketSlug();
   const radio = useDial("radio");

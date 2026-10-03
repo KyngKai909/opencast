@@ -19,3 +19,50 @@
   font-size: 11px; font-weight: 600; color: var(--ink-50); text-decoration: none;
 }
 .oc-viewer-phone__tab--on { color: var(--ink); }
+
+/* ---------- The floating bar (A245; swipe home 08, "Floating bar") ----------
+   The four tabs in a pill on the left, the round Tune button on its own at the right, floating
+   14 px from the screen's edges and 22 px above the home indicator. On the picture it's dark glass;
+   on the app's ground (Guide, Search, You) the raised colour. The page runs underneath. */
+.oc-viewer-phone--floating { --oc-float-gap: 14px; --oc-float-bottom: max(22px, env(safe-area-inset-bottom, 0px)); --oc-float-h: 58px; padding-bottom: 0; }
+.oc-viewer-phone--floating .oc-viewer-phone__main { position: relative; }
+/* The page clears the bar (and the mini player above it) at the end of its scroll. */
+.oc-viewer-phone--barred:not(.oc-viewer-phone--picture) .oc-viewer-phone__main { padding-bottom: calc(var(--oc-float-bottom) + var(--oc-float-h) + 16px); }
+.oc-viewer-phone--barred.oc-viewer-phone--mini:not(.oc-viewer-phone--picture) .oc-viewer-phone__main { padding-bottom: calc(var(--oc-float-bottom) + var(--oc-float-h) + 82px); }
+/* The picture is full bleed to the very top, under the status bar; its own top bar pads itself. */
+.oc-viewer-phone--picture { padding-top: 0; background: var(--screen); }
+.oc-viewer-phone--picture .oc-viewer-phone__main { overflow: hidden; }
+.oc-viewer-phone__float {
+  position: absolute; left: var(--oc-float-gap); right: var(--oc-float-gap); bottom: var(--oc-float-bottom); z-index: 5;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  pointer-events: none; transition: opacity .25s;
+}
+.oc-viewer-phone__float > * { pointer-events: auto; }
+.oc-viewer-phone__float--hidden { opacity: 0; }
+.oc-viewer-phone__float--hidden > * { pointer-events: none; }
+.oc-viewer-phone__pill {
+  display: flex; gap: 2px; padding: 5px; border-radius: 999px;
+  background: color-mix(in srgb, var(--raised) 90%, transparent); color: var(--ink);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 0 0 1px var(--line), 0 10px 30px rgb(0 0 0 / .25);
+}
+.oc-viewer-phone__ftab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 56px; height: 46px; border-radius: 999px; border: 0; padding: 0; background: none; cursor: pointer;
+  font: 600 10px var(--font-text); color: var(--ink-70); text-decoration: none;
+}
+.oc-viewer-phone__ftab--on { color: var(--ink); background: var(--hair); }
+.oc-viewer-phone__tune {
+  flex: none; width: var(--oc-float-h); height: var(--oc-float-h); border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--signal-fill); color: var(--on-signal); box-shadow: 0 10px 30px rgb(0 0 0 / .4); cursor: pointer;
+}
+.oc-viewer-phone__tune:focus-visible, .oc-viewer-phone__ftab:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+/* Over the picture: dark glass, light words, whatever the ground. */
+.oc-viewer-phone--picture .oc-viewer-phone__pill { background: rgb(10 17 36 / .72); color: #fff; box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 10px 30px rgb(0 0 0 / .35); }
+.oc-viewer-phone--picture .oc-viewer-phone__ftab { color: rgb(255 255 255 / .72); }
+.oc-viewer-phone--picture .oc-viewer-phone__ftab--on { color: #fff; background: rgb(255 255 255 / .12); }
+.oc-viewer-phone--picture .oc-viewer-phone__tune { background: #6CCFEA; color: #0F1830; }
+/* The mini player floats above the bar. */
+.oc-viewer-phone__mini { position: absolute; left: var(--oc-float-gap); right: var(--oc-float-gap); bottom: calc(var(--oc-float-bottom) + var(--oc-float-h) + 12px); z-index: 4; }
+.oc-viewer-phone__mini .oc-mini-player { margin: 0; box-shadow: 0 0 0 1px var(--line), 0 10px 24px rgb(0 0 0 / .25); }
+@media (prefers-reduced-motion: reduce) { .oc-viewer-phone__float { transition: none; } }

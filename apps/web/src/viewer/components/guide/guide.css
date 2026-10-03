@@ -24,3 +24,12 @@
 
 /* The phone (home 05.2): 760px for three hours, as drawn; the phone's window is six, so twice that. */
 .vw-guide--phone .oc-guide--phone { min-width: 1520px; }
+
+/* Phones and tablets (A245; swipe home 06): a thin market's note on top, the old home's sections
+   under the grid, and on a tablet on its side the live picture in a column beside it all. */
+.vw-guide__thin { padding: 0 18px; }
+.vw-guide__thin .vw-sec--phone:first-child { margin-top: 8px; }
+.vw-guide__more { padding: 0 18px 8px; }
+.vw-guide__split { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); align-items: start; }
+.vw-guide__split .vw-side { position: sticky; top: 0; }
+.vw-guide__main { min-width: 0; }

@@ -111,6 +111,31 @@ export function gridRows(guide: GuideX | undefined, only?: ReadonlySet<string> |
     }));
 }
 
+/**
+ * The guide in the swipe's order (A245; swipe home 06): the presets first, then the rest of the band,
+ * so the guide and the swipe never disagree. Each part has its heading when there are presets
+ * ("Your presets", then "The dial", or "The band" on radio); a station outside the order (a nearby
+ * market's) comes last.
+ */
+export function inSwipeOrder(rows: GuideStation[], order: { ids: readonly string[]; presets: number }, band: "tv" | "radio"): GuideStation[] {
+  const at = (id: string) => {
+    const i = order.ids.indexOf(id);
+    return i < 0 ? Infinity : i;
+  };
+  const sorted = [...rows].sort((a, b) => at(a.id) - at(b.id));
+  if (!order.presets) return sorted;
+  let dialHeaded = false;
+  return sorted.map((r, k) => {
+    const i = at(r.id);
+    if (k === 0 && i < order.presets) return { ...r, section: "Your presets" };
+    if (i >= order.presets && !dialHeaded) {
+      dialHeaded = true;
+      return { ...r, section: band === "radio" ? "The band" : "The dial" };
+    }
+    return r;
+  });
+}
+
 /** Finds a listing's airing and station in the guide. */
 export function findListing(guide: GuideX | undefined, key: string | null) {
   if (!guide || !key) return null;
