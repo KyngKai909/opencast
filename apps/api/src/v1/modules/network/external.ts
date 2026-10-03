@@ -24,7 +24,10 @@
 //   against its published schedule; with neither, the banner says Live and the source. A241: or a
 //   webpage's own event data (schema.org JSON-LD; a page with none is `no_event_data`, not an
 //   error), or a weekly schedule entered by hand and checked against the published schedule, made
-//   into airings for the next 14 days on every save and hourly.
+//   into airings for the next 14 days on every save and hourly. 2026-10-03: what's on now is kept
+//   from a feed too (one that lists only what's on now showed nothing), and a feed is read again
+//   every 2 minutes, not hourly, while its listing has nothing stored past the next 5 minutes.
+//   A read changes airings in place, so viewers' reminders on them stay (or follow the show).
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
 //   request with a timeout, never a segment. Down 5 minutes, it leaves the dial, the guide and the
 //   swipe order until it's back; the Network desk hears both times (`external.station`).
@@ -39,7 +42,7 @@
 //   the family's (the old one held a year for it), X.1 moves only on its own, and taking X.1 off
 //   the dial takes its family with it (A231), when the desk says so; "Put back" brings them back.
 
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, isSubchannel, parseChannelNumber, type Band, type ChannelNumber } from "@opencast/domain";
 import { manualScheduleProblems, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type StreamPermission } from "@opencast/contracts";
@@ -49,6 +52,7 @@ import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
 import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../lib/schedules.js";
+import type { CalendarEvent } from "../../lib/ics.js";
 import { manualAirings, manualWindow } from "../../lib/manualSchedule.js";
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
@@ -77,6 +81,15 @@ const LIST_TIMEOUT_MS = 15_000;
  * settings). Its call sign stays its own, held a year on the waitlist's side like one's.
  */
 export const REMOVED_CHANNEL_HOLD_MS = CHANNEL_HOLD_AFTER_SIGN_OFF_MS;
+/** How often a listing's schedule is read again. */
+export const SCHEDULE_REREAD_MS = 60 * 60_000;
+/**
+ * 2026-10-03: sooner, while what's stored for a feed runs out within RUNNING_DRY_MS (a feed that
+ * lists only what's on now goes stale when the show ends): it's read again this often until it
+ * lists what's next.
+ */
+export const RUNNING_DRY_REREAD_MS = 2 * 60_000;
+export const RUNNING_DRY_MS = 5 * 60_000;
 
 export type Fetch = typeof fetch;
 type Row = typeof LS.$inferSelect;
@@ -169,7 +182,8 @@ export interface ExternalPart {
   /** The worker's minute: every listing that could be on the dial, checked. */
   checkExternalStations(options?: { fetch?: Fetch }): Promise<ExternalCheckResult>;
   /**
-   * Hourly: each listing's feed read again, and (A215) the channels of listings taken off the dial
+   * Each minute (2026-10-03): the listings that are due read again (hourly, or every 2 minutes while
+   * a feed's guide is about to run dry), and (A215) the channels of listings taken off the dial
    * 90 days ago freed; (A223) full stations' too, 90 days after they signed off for good.
    */
   syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number; releasedStations?: number }>;
@@ -337,6 +351,24 @@ export function directAddressOf(row: { plays: Row["plays"]; streamUrl?: string; 
 /** A238: its direct address's server sends no CORS header for Opencast's apps (at the last check). */
 function corsBlocked(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: string | null; cors?: Row["cors"] }): boolean {
   return row.cors === "blocked" && directAddressOf(row) !== null;
+}
+
+/**
+ * 2026-10-03: one read per address in a schedule pass: listings that share a feed (one keyed by
+ * channel, for a brand's channels) read it once, and each gets the same answer.
+ */
+function oncePerAddress(fetchFn: Fetch): Fetch {
+  const answers = new Map<string, Promise<{ status: number; type: string | null; text: string }>>();
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    let answer = answers.get(url);
+    if (!answer) {
+      answer = fetchFn(input, init).then(async (res) => ({ status: res.status, type: res.headers.get("content-type"), text: res.ok ? await readSome(res, LIST_BYTES) : "" }));
+      answers.set(url, answer);
+    }
+    const { status, type, text } = await answer;
+    return new Response([204, 205, 304].includes(status) ? null : text, { status, headers: type ? { "content-type": type } : {} });
+  }) as Fetch;
 }
 
 /** Up to `limit` bytes of an answer's body as text, then the rest is let go unread. */
@@ -811,6 +843,50 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
   }
 
   /**
+   * 2026-10-03: a listing's airings in `scope` (those not over yet) made into `events`, keeping ids
+   * (viewers' reminders point at them): an airing at the same start with the same external id (when
+   * both have one), else the same title, is updated in place; new ones are added; the rest go, their
+   * reminders moved to the same show read in at another time within a day, else deleted (the show
+   * is gone from the source's schedule). Reminders are the only thing that points at an airing.
+   */
+  async function replaceAirings(tx: Executor, sourceId: string, scope: SQL | undefined, events: CalendarEvent[]) {
+    const old = await tx.select().from(LA).where(and(eq(LA.listedSourceId, sourceId), scope));
+    const same = (a: { externalId: string | null; title: string }, e: CalendarEvent) => (a.externalId && e.uid ? a.externalId === e.uid : a.title === e.summary);
+    const used = new Set<string>();
+    const kept: Array<{ id: string; title: string; externalId: string | null; startsAt: Date }> = [];
+    const fresh: CalendarEvent[] = [];
+    for (const e of events) {
+      const match = old.find((a) => !used.has(a.id) && a.startsAt.getTime() === e.start.getTime() && same(a, e));
+      if (!match) {
+        fresh.push(e);
+        continue;
+      }
+      used.add(match.id);
+      kept.push({ id: match.id, title: e.summary, externalId: e.uid, startsAt: e.start });
+      if (match.title !== e.summary || match.endsAt?.getTime() !== e.end?.getTime() || match.externalId !== e.uid) {
+        await tx.update(LA).set({ title: e.summary, endsAt: e.end, externalId: e.uid }).where(eq(LA.id, match.id));
+      }
+    }
+    const added = fresh.length
+      ? await tx
+          .insert(LA)
+          .values(fresh.map((e) => ({ listedSourceId: sourceId, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })))
+          .returning({ id: LA.id, title: LA.title, externalId: LA.externalId, startsAt: LA.startsAt })
+      : [];
+    const gone = old.filter((a) => !used.has(a.id));
+    if (!gone.length) return;
+    const now = [...kept, ...added];
+    const moves = gone.map((a) => {
+      const to = now
+        .filter((n) => (a.externalId && n.externalId ? a.externalId === n.externalId : a.title === n.title) && Math.abs(n.startsAt.getTime() - a.startsAt.getTime()) <= 86_400_000)
+        .sort((x, y) => Math.abs(x.startsAt.getTime() - a.startsAt.getTime()) - Math.abs(y.startsAt.getTime() - a.startsAt.getTime()))[0];
+      return { from: a.id, to: to?.id ?? null };
+    });
+    await services.accounts.moveListedReminders(tx, moves);
+    await tx.delete(LA).where(inArray(LA.id, gone.map((a) => a.id)));
+  }
+
+  /**
    * A241: a schedule entered by hand, made into airings from now to 14 days ahead (the airings from
    * now on replaced, as a feed's are). The one on air now keeps its title as it was; when nothing
    * is, the slot on now is added, so the banner has it at once.
@@ -821,20 +897,27 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
     const { from, to } = manualWindow(now);
     const airings = row.manualSchedule ? manualAirings(row.manualSchedule, tz, from, to) : [];
     await db.transaction(async (tx) => {
-      await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
       const earlier = await tx
         .select({ startsAt: LA.startsAt, endsAt: LA.endsAt })
         .from(LA)
         .where(and(eq(LA.listedSourceId, row.id), lt(LA.startsAt, now), gte(LA.startsAt, new Date(now.getTime() - 86_400_000))));
       const onNow = earlier.some((a) => (a.endsAt ?? new Date(a.startsAt.getTime() + 3_600_000)) > now);
       const rows = airings.filter((a) => a.start >= now || !onNow);
-      if (rows.length) await tx.insert(LA).values(rows.map((e) => ({ listedSourceId: row.id, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
+      // 2026-10-03: ids kept, and reminders with them (replaceAirings).
+      await replaceAirings(tx, row.id, gte(LA.startsAt, now), rows);
       await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now }).where(eq(LS.id, row.id));
     });
     return true;
   }
 
+  /**
+   * 2026-10-03: when each listing's schedule was last tried in this process, read or not, so a
+   * feed that fails isn't tried every pass (lastSyncedAt is only set by a read that worked).
+   */
+  const lastTried = new Map<string, number>();
+
   async function sync(row: Row, fetchFn: Fetch): Promise<boolean> {
+    lastTried.set(row.id, deps.clock.now().getTime());
     if (row.scheduleSource === "manual") return syncManual(row);
     if (!row.calendarUrl) return false;
     let events;
@@ -846,7 +929,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       format = row.scheduleFormat ?? detectScheduleFormat(row.calendarUrl, response.headers.get("content-type"), text);
       // A241: a webpage's event data without an offset is in the market's time zone.
       const tz = format === "webpage" ? await services.stations.timezoneOf(row.stationId) : "UTC";
-      events = parseSchedule(text, format, row.calendarUrl, tz);
+      // 2026-10-03: a feed keyed by channel is read for this listing's, found by its name or stream.
+      events = parseSchedule(text, format, row.calendarUrl, tz, { name: row.name, streamUrl: row.streamUrl });
     } catch {
       await db.update(LS).set({ calendarSync: "calendar_not_found" }).where(eq(LS.id, row.id));
       return false;
@@ -859,9 +943,13 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       return true;
     }
     await db.transaction(async (tx) => {
-      await tx.delete(LA).where(and(eq(LA.listedSourceId, row.id), gte(LA.startsAt, now)));
-      const upcoming = events.filter((e) => e.start >= now);
-      if (upcoming.length) await tx.insert(LA).values(upcoming.map((e) => ({ listedSourceId: row.id, title: e.summary, startsAt: e.start, endsAt: e.end, externalId: e.uid })));
+      // 2026-10-03: what's still on is kept with what's to come (a feed that lists only what's on
+      // now had nothing stored). When the read lists what's on now, it replaces what was stored for
+      // now, so nothing is doubled; when it doesn't (a feed of what's next only), what's stored
+      // for now stays, as before. Ids are kept, and reminders with them (replaceAirings).
+      const still = events.filter((e) => (e.end ? e.end > now : e.start >= now));
+      const listsNow = still.some((e) => e.start < now);
+      await replaceAirings(tx, row.id, listsNow ? or(gte(LA.startsAt, now), gt(LA.endsAt, now)) : gte(LA.startsAt, now), still);
       await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
     });
     return true;
@@ -1169,7 +1257,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         // A new address starts its health afresh: the old one's outage ends (kept in the history).
         if (restart) await endOutage(tx, sourceId, "address_changed");
         // The old feed's airings from now on go; the new feed is read below.
-        if (schedule && scheduleChanged) await tx.delete(LA).where(and(eq(LA.listedSourceId, sourceId), gte(LA.startsAt, deps.clock.now())));
+        // 2026-10-03: their reminders are deleted with them (a reminder never blocks the change).
+        if (schedule && scheduleChanged) await replaceAirings(tx, sourceId, gte(LA.startsAt, deps.clock.now()), []);
         if (name || description !== undefined || callSign || number) {
           await services.stations.changeManaged(tx, row.stationId, {
             ...(name ? { name } : {}),
@@ -1369,18 +1458,47 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         .select()
         .from(LS)
         .where(and(or(isNotNull(LS.calendarUrl), eq(LS.scheduleSource, "manual")), isNull(LS.removedAt)));
+      // 2026-10-03: the worker runs this pass every minute, but only the listings that are due are
+      // read: each hourly, and a feed whose last read worked every 2 minutes while nothing stored
+      // for it ends more than 5 minutes from now. Cheap: one small query over those few listings,
+      // and one read per address a pass (a brand's channels can share one feed).
+      const now = deps.clock.now().getTime();
+      const since = (row: Row) => now - Math.max(lastTried.get(row.id) ?? 0, row.lastSyncedAt?.getTime() ?? 0);
+      const hourly = rows.filter((row) => since(row) >= SCHEDULE_REREAD_MS);
+      const sooner = rows.filter((row) => !hourly.includes(row) && row.scheduleSource !== "manual" && row.calendarSync === "synced" && since(row) >= RUNNING_DRY_REREAD_MS);
+      const soon = new Date(now + RUNNING_DRY_MS);
+      const stocked = new Set(
+        sooner.length
+          ? (
+              await db
+                .selectDistinct({ id: LA.listedSourceId })
+                .from(LA)
+                // An airing without an end is taken as an hour long, as the guide takes it.
+                .where(and(inArray(LA.listedSourceId, sooner.map((r) => r.id)), or(gt(LA.endsAt, soon), and(isNull(LA.endsAt), gt(LA.startsAt, new Date(soon.getTime() - 3_600_000))))))
+            ).map((r) => r.id)
+          : []
+      );
+      const due = [...hourly, ...sooner.filter((row) => !stocked.has(row.id))];
+      const fetchFn = oncePerAddress(options.fetch ?? publicFetch);
       let synced = 0;
       let failed = 0;
-      for (const row of rows) {
-        if (await sync(row, options.fetch ?? publicFetch)) synced++;
-        else failed++;
+      for (const row of due) {
+        // 2026-10-03: one listing that throws (not a feed that can't be read: sync says so) is
+        // counted as failed and logged; the others are still read.
+        try {
+          if (await sync(row, fetchFn)) synced++;
+          else failed++;
+        } catch (error) {
+          failed++;
+          console.error(`[external] schedule read for ${row.name} (${row.id}) failed`, error);
+        }
       }
       // A215: 90 days after a listing was taken off the dial its channel is freed, as a full station's is.
-      const due = await db
+      const held = await db
         .select()
         .from(LS)
         .where(and(isNotNull(LS.removedAt), isNull(LS.channelReleasedAt), lte(LS.removedAt, new Date(deps.clock.now().getTime() - REMOVED_CHANNEL_HOLD_MS))));
-      for (const row of due) {
+      for (const row of held) {
         await db.transaction(async (tx) => {
           await services.stations.releaseChannel(tx, row.stationId);
           await tx.update(LS).set({ channelReleasedAt: deps.clock.now() }).where(eq(LS.id, row.id));
@@ -1388,7 +1506,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       }
       // A223: a full station that signed off for good 90 days ago lets its channel go too.
       const releasedStations = await services.stations.releaseSignedOffChannels();
-      return { synced, failed, released: due.length, releasedStations };
+      return { synced, failed, released: held.length, releasedStations };
     },
 
     async previewIptvList(input, fetchFn = publicFetch) {

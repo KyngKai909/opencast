@@ -2,6 +2,10 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-03: External stations' schedule feeds (no shape change)
+
+- Behaviour: a feed's show that's on now is kept (a feed that lists only what's on now showed nothing), so `DialRow.now` and the guide have it. Feeds are read hourly and every 2 minutes while a listing's guide is about to run dry (A212). A re-read keeps a listed airing's `id` when the show is the same (same start, same external id or title), so reminders on it stay; a reminder on a show that moves goes with it (the same show within a day, reminded again at its start), and one on a show gone from the source's schedule is deleted. A JSON feed keyed by channel is read for the station's own channel.
+
 ## 2026-10-02: Programming blocks (A244)
 
 Additive: one new module (`blocks.ts`, endpoints under `/stations/:stationId/blocks`), two new shapes in `common.ts`, optional fields, three new `LogChange` ops (request side) and one new optional query and upload field. No log code and no enum value is added anywhere a response already carries: block items keep `BMP`, `SID`, `OPN` and `CLS` (an intro or outro reads `SID` with `identCode`, as A242's), `BreakContent.kind` and `BreakRow.code` keep their values, and `BreakRow.element.role` stays `BumperRole`. Migration 0049.
