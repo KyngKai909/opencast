@@ -72,3 +72,8 @@ body:has(.vw-search-layer) .oc-viewer-web__search { visibility: hidden; }
   .vw-res:not(.vw-res--phone):not(.vw-res--st) .vw-res__when { grid-column: 2; grid-row: 2; margin-top: -10px; }
   .vw-res:not(.vw-res--phone):not(.vw-res--st) .vw-res__act { grid-column: 3; grid-row: 1 / span 2; }
 }
+
+/* A tablet on its side (A245): the results, and the live picture beside them. */
+.vw-search--side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; }
+.vw-search--side .vw-side { border-right: 0; border-left: 1px solid var(--hair); position: sticky; top: 0; }
+.vw-search__main { min-width: 0; }

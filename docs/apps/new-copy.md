@@ -1218,3 +1218,25 @@ For review. No frame draws them: the rows and words follow the library's own (A.
 | Station page (web) | the section "Blocks": per block its logo, name, description, "{Saturdays}, {9:00 pm} to {1:00 am}", "Next: {Sat Oct 10}, {Saturday Reel and Late Crate}"; in the schedule, a member's block name above its title |
 | TV station info | "Block", "{Late Crate Nights}", "{Saturdays, 9:00 pm to 1:00 am}" |
 
+## The swipe home (A245, 2026-10-02)
+
+For review. The reference (`viewer/opencast-swipe-home.html`) draws most of the words: the tabs (Watch, Guide, Search, You), the buttons (Preset, Remind, Pledge, Share, Guide), "Preset 2 of 3", "Dial, 4 of 5", "End of your presets" / "The dial, in channel order", "Back to your presets", "End of the dial" / "Back to preset 1", "Start of your presets" / "To the end of the dial", "Paused at 8:42 pm", "Back to live" with "0:48 behind", the Tune pad's "Channel", "TV 2 to 69, radio 88.1 to 107.9", "Type a channel or frequency. It tunes 2 seconds after you stop, or press Tune.", "{SAZN 18.1}" over "Now: {Tamales for forty}, {18 min} left", "Radio band. Now: …", "No station on {45}" / "Nearest is {LUPE 33.1}.", Cancel and Tune, the guide's "Your presets" and "The dial", and "Watch full screen". These are new:
+
+| Where | Words |
+|---|---|
+| The position line, radio band | "Band, {3} of {4}" |
+| The detent, the radio band | "End of your presets" / "The band, by frequency"; "End of the band", "Start of the band", "To the end of the band" |
+| The detent, no presets | "End of the dial" / "Back to the start"; "Start of the dial" / "To the end of the dial" |
+| The detent, every station a preset | "End of your presets" / "Back to preset 1"; "Start of your presets" / "To your last preset" |
+| The detent from the dial back | "Back to your presets" / "Preset {3}" |
+| The right-hand buttons, accessible names | "Add to presets", "Preset {1}. Open presets", "Remind me: {Beat Tape Live}, {9:00 pm}", "Remind me (nothing scheduled next)", "Pledge", "Share", "Guide"; the group "This station"; a long press shows the name |
+| The top bar, accessible names | the bands' group "Band" ("TV", "Radio"); "Cast" / "Watching on {Living room TV}"; "AirPlay"; "Search" |
+| Screen readers and the keyboard | "Next channel: {SAZN 18.1}", "Previous channel: {PREP 31.1}" (or "Next channel", "Previous channel" with nowhere to go), "{Inland Beat}'s page"; Back to live's name "Back to live, {0:48} behind" |
+| The floating bar | the tabs' navigation "Tabs"; the Tune button's name "Tune by number" |
+| The Tune pad | out of range: "No channel {75}" / "TV runs 2 to 69, radio 88.1 to 107.9."; no station on a band with none: "Nothing on that band here yet."; a station off air: "Off air now."; the keys' names "Point", "Delete", the group "Keys"; the dialog "Tune by number" |
+| The mini player | its line "{BEAT 12.1}, {18 min} left"; a swipe down stops it |
+| Guide, the radio band | "The band" (the dial's heading on radio); a station's column: "Tune in to {BEAT 12.1}"; the watched row, for screen readers: ", watching" |
+| Guide and Search, a tablet on its side | the column's name "Watching"; nothing on: "Nothing on. Tap a station in the guide to tune in."; "Remind" |
+| The home, waiting | "No stations on the dial here yet."; `/radio`: "No stations on the radio band here yet." |
+| Settings, Watching (phones and tablets) | "Muted previews", help "Watch opens with no sound until you tap" (the web keeps "Muted previews on the dial", "The live hero plays with no sound") |
+

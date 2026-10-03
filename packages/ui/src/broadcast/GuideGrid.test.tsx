@@ -110,3 +110,15 @@ describe("programming block bands", () => {
     expect(render(<GuideGrid rows={[{ ...withBlock, blocks: [{ id: "x", name: "Earlier", start: at(17), end: at(19) }] }]} from={at(20)} to={at(23)} />).container.querySelector(".oc-guide__row--blocks")).toBeNull();
   });
 });
+
+describe("the swipe home's guide (A245)", () => {
+  it("heads each part of the order, tints the station being watched, and tunes from a station's column", () => {
+    const onTune = vi.fn();
+    const rows: GuideStation[] = [{ ...ROWS[1], section: "Your presets" }, { ...ROWS[0], section: "The dial" }];
+    const { getByRole, getAllByRole, container } = render(<GuideGrid rows={rows} from={at(20)} to={at(23)} tunedId="rdls" onTune={onTune} />);
+    expect(getAllByRole("heading").map((h) => h.textContent)).toEqual(["Your presets", "The dial"]);
+    expect(container.querySelector(".oc-guide__row--tuned")?.getAttribute("aria-label")).toBe("RDLS 9.1");
+    fireEvent.click(getByRole("button", { name: "Tune in to CIVC 7.1" }));
+    expect(onTune).toHaveBeenCalledWith(rows[1]);
+  });
+});

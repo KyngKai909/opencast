@@ -99,3 +99,6 @@
 .vw-rm-empty { padding: 28px 18px; display: grid; gap: 14px; justify-items: start; }
 .vw-rm-empty h1 { margin: 0; font: 800 22px/1.1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
 .vw-rm-empty p { margin: 0; font-size: 14px; color: var(--ink-70); }
+
+/* The now strip takes the swipe home's vertical swipe for the TV's channel (A245). */
+.vw-rm-swipe { touch-action: pan-x; }

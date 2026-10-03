@@ -42,8 +42,19 @@ for (const width of ["web", "phone"] as const) {
       await expect(market).toBeHidden();
       await expect(page.getByRole("button", { name: /Inland Empire/ }).first()).toBeVisible();
 
-      // Tune in: PREP 31.1 from the dial.
-      await page.getByRole("button", { name: "Tune in to PREP 31.1: Football: Redlands East Valley at Citrus Valley" }).click();
+      // Tune in: PREP 31.1 from the dial on the web; on the phone the home is the picture (A245),
+      // and the Tune button's pad takes the number.
+      if (width === "web") await page.getByRole("button", { name: "Tune in to PREP 31.1: Football: Redlands East Valley at Citrus Valley" }).click();
+      else {
+        // The home has opened on the start of the dial (the URL is the station's).
+        await expect(page).toHaveURL(/\/watch\/civc$/);
+        await page.getByRole("button", { name: "Tune by number" }).click();
+        const pad = page.getByRole("dialog", { name: "Tune by number" });
+        await pad.getByRole("button", { name: "3", exact: true }).click();
+        await pad.getByRole("button", { name: "1", exact: true }).click();
+        await expect(pad).toContainText("PREP 31.1");
+        await pad.getByRole("button", { name: "Tune", exact: true }).click();
+      }
       await expect(page).toHaveURL(/\/watch\/prep$/);
       await expect(page.getByRole("heading", { name: "Football: Redlands East Valley at Citrus Valley" }).first()).toBeVisible();
 

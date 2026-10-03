@@ -1,0 +1,69 @@
+/* The Tune pad (swipe home 04, 08; the reference's .kp): the picture dimmed but playing behind it,
+   the pad on the screen's dark glass whatever the ground. A sheet from the bottom in portrait, a
+   panel on the right in landscape, a panel above the Tune button on tablets. */
+.vw-pad { position: fixed; inset: 0; z-index: 30; background: rgb(5 8 15 / .45); color: #ECE9E1; font-family: var(--font-text); }
+.vw-pad__sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box;
+  padding: 14px 18px calc(26px + env(safe-area-inset-bottom, 0px));
+  border-radius: 24px 24px 0 0; background: rgb(15 24 48 / .96);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 -1px 0 rgb(255 255 255 / .12); outline: none;
+}
+.vw-pad__grab { width: 40px; height: 4px; border-radius: 2px; background: rgb(255 255 255 / .3); margin: 0 auto 12px; }
+.vw-pad__disp { display: flex; align-items: baseline; gap: 10px; min-height: 62px; border-bottom: 2px solid #ECE9E1; padding-bottom: 6px; }
+.vw-pad__num { font: 500 54px/1 var(--font-mono); letter-spacing: -.04em; }
+.vw-pad__num em { font-style: normal; color: #8F98AE; }
+/* The reference's #5A6480 is under 4.5:1 on the pad: the band line's grey instead. */
+.vw-pad__ph { color: #8F98AE; font-size: 34px; }
+.vw-pad__caret { width: 2px; height: 44px; background: #6CCFEA; align-self: center; animation: vw-pad-blink 1s steps(2) infinite; }
+@keyframes vw-pad-blink { 50% { opacity: 0; } }
+.vw-pad__band { margin-left: auto; align-self: center; max-width: 110px; text-align: right; font: 600 10.5px/1.3 var(--font-text); color: #8F98AE; }
+.vw-pad__match { min-height: 42px; margin-top: 8px; font-size: 13px; line-height: 1.35; color: #B1B8C9; }
+.vw-pad__match b { display: block; color: #ECE9E1; font: 800 16px var(--font-display); font-stretch: var(--wide, 125%); }
+.vw-pad__match--none b { color: #F0B43C; font-stretch: 100%; font-weight: 700; font-family: var(--font-text); }
+.vw-pad__count { height: 3px; border-radius: 2px; background: rgb(255 255 255 / .12); overflow: hidden; margin: 6px 0 12px; }
+.vw-pad__count i { display: block; height: 100%; width: 0; background: #6CCFEA; }
+.vw-pad__count i.is-run { animation: vw-pad-count 2s linear forwards; }
+@keyframes vw-pad-count { to { width: 100%; } }
+.vw-pad__keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.vw-pad__keys button { height: 58px; border-radius: 14px; border: 0; background: rgb(255 255 255 / .08); color: #ECE9E1; font: 500 26px var(--font-mono); cursor: pointer; }
+.vw-pad__keys button:active { background: rgb(255 255 255 / .18); }
+.vw-pad__keys .vw-pad__fn { color: #B1B8C9; display: grid; place-items: center; }
+.vw-pad__acts { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; margin-top: 12px; }
+.vw-pad__acts button { height: 50px; border-radius: 14px; border: 0; font: 700 15px var(--font-text); cursor: pointer; }
+.vw-pad__cancel { background: none; color: #ECE9E1; box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .3); }
+.vw-pad__go { background: #6CCFEA; color: #0F1830; }
+.vw-pad__go:disabled { opacity: .4; cursor: default; }
+.vw-pad button:focus-visible { outline: 2px solid #6CCFEA; outline-offset: 2px; }
+
+/* Landscape (a phone on its side): a panel on the right; the picture keeps playing on the left. */
+.vw-pad--side .vw-pad__sheet {
+  left: auto; top: 0; width: 330px; border-radius: 24px 0 0 24px;
+  padding: max(14px, env(safe-area-inset-top, 0px)) calc(18px + env(safe-area-inset-right, 0px)) 14px 18px;
+  box-shadow: -1px 0 0 rgb(255 255 255 / .12); overflow-y: auto;
+}
+.vw-pad--side .vw-pad__band { display: none; }
+.vw-pad--side .vw-pad__num { font-size: 36px; }
+.vw-pad--side .vw-pad__ph { font-size: 24px; }
+.vw-pad--side .vw-pad__disp { min-height: 42px; }
+.vw-pad--side .vw-pad__caret { height: 30px; }
+.vw-pad--side .vw-pad__match { min-height: 32px; margin-top: 4px; font-size: 11.5px; }
+.vw-pad--side .vw-pad__match b { font-size: 13.5px; }
+.vw-pad--side .vw-pad__count { margin: 4px 0 8px; }
+.vw-pad--side .vw-pad__keys { gap: 5px; }
+.vw-pad--side .vw-pad__keys button { height: 33px; font-size: 17px; border-radius: 9px; }
+.vw-pad--side .vw-pad__acts { margin-top: 7px; }
+.vw-pad--side .vw-pad__acts button { height: 34px; border-radius: 9px; font-size: 13px; }
+
+/* Tablets: a panel above the Tune button, so the picture stays in view while typing. */
+.vw-pad--panel { background: rgb(5 8 15 / .3); }
+.vw-pad--panel .vw-pad__sheet {
+  left: auto; right: 24px; top: auto; width: 400px; bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 58px + 18px);
+  border-radius: 24px; padding: 18px 20px 20px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .12), 0 24px 60px rgb(0 0 0 / .5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vw-pad__caret { animation: none; }
+}
+:root[data-motion="reduce"] .vw-pad__caret { animation: none; }

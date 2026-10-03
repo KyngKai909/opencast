@@ -33,23 +33,30 @@ interface Visit {
 }
 
 const heading = (name: string | RegExp) => (p: Page) => p.getByRole("heading", { name }).first();
+/** The phone's home is the picture (A245, the swipe home): its Tune button is there whatever's on. */
+const swipeHome = (p: Page) => p.getByRole("button", { name: "Tune by number" });
+const onWeb = (web: (p: Page) => Locator) => (p: Page, width: Width) => (width === "web" ? web(p) : swipeHome(p));
 const dialog = (name: string | RegExp) => (p: Page) => p.getByRole("dialog", { name });
 
 const VISITS: Visit[] = [
-  { name: "home", path: "/", sees: heading(/Town Hall/) },
-  { name: "home, signed out", path: "/", signedIn: false, sees: heading(/Town Hall/) },
+  { name: "home", path: "/", sees: onWeb(heading(/Town Hall/)) },
+  { name: "home, signed out", path: "/", signedIn: false, sees: onWeb(heading(/Town Hall/)) },
   { name: "first visit", path: "/", signedIn: false, market: false, sees: dialog("Where are you tuning in from?") },
   { name: "market picker", path: "/?modal=market", sees: dialog("Where are you tuning in from?") },
-  { name: "radio band", path: "/radio", sees: heading("Radio band") },
+  { name: "radio band", path: "/radio", sees: (p, width) => (width === "web" ? heading("Radio band")(p) : p.getByRole("button", { name: "Radio", pressed: true })) },
   { name: "tuned in, TV", path: "/watch/civc", sees: heading(/Town Hall/) },
   { name: "tuned in, radio", path: "/watch/nite", sees: heading(/Radio dramas/) },
   {
     name: "carried from",
     path: "/watch/beat",
+    only: "web",
     open: async (p) => p.getByRole("button", { name: "Carried from REEL 24.1" }).first().click(),
     sees: dialog(/Saturday Reel|Carried/)
   },
+  // The phone's swipe home has no carried-from line to press: the modal by its address.
+  { name: "carried from, phone", path: `/watch/beat?modal=carried&program=${SATURDAY_REEL}`, only: "phone", sees: dialog(/Saturday Reel|Carried/) },
   { name: "pledge", path: "/watch/beat?modal=pledge&station=BEAT", sees: dialog("Pledge to Inland Beat") },
+  { name: "tune pad", path: "/watch/beat?sheet=tune", only: "phone", sees: dialog("Tune by number") },
   { name: "share", path: "/watch/beat?modal=share&station=BEAT", sees: dialog("Share") },
   { name: "watch on", path: "/watch/civc?sheet=watch-on", only: "phone", sees: dialog("Watch on") },
   { name: "guide", path: "/guide", sees: heading("Tonight") },
