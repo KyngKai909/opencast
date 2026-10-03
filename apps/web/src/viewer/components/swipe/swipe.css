@@ -92,8 +92,9 @@
 .vw-sw__rb:disabled { opacity: .45; cursor: default; }
 .vw-sw__tip { position: absolute; right: calc(100% + 8px); top: 10px; white-space: nowrap; padding: 6px 10px; border-radius: 8px; background: rgb(10 17 36 / .9); font: 600 12px var(--font-text); text-shadow: none; }
 
-/* The position line: "Preset 2 of 3", "Dial, 4 of 5". */
-.vw-sw__pos { position: absolute; left: 18px; bottom: calc(var(--vw-sw-bar) + 174px); z-index: 4; font: 500 11px var(--font-mono); letter-spacing: .02em; text-transform: uppercase; opacity: .85; text-shadow: 0 1px 6px rgb(0 0 0 / .6); pointer-events: none; }
+/* The position line ("Preset 2 of 3", "Dial, 4 of 5") is for screen readers only: the user
+   asked for it off the screen (2026-10-03). It still announces each change. */
+.vw-sw__pos { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; pointer-events: none; }
 .vw-sw__nfm { position: absolute; left: 12px; bottom: calc(var(--vw-sw-bar) + 196px); z-index: 4; }
 .vw-sw__nfm .oc-btn, .vw-sw__nfm .vw-nfm { color: #fff; text-shadow: 0 1px 6px rgb(0 0 0 / .6); }
 
@@ -147,7 +148,6 @@
 .vw-sw--land .oc-banner--web .oc-banner__hints { display: none; }
 .vw-sw--land .oc-player__unmute { top: 30%; }
 .vw-sw--land .vw-sw__rail { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: auto; top: 50%; transform: translateY(-50%); gap: 9px; }
-.vw-sw--land .vw-sw__pos { left: calc(18px + env(safe-area-inset-left, 0px)); bottom: auto; top: 16px; }
 .vw-sw--land .vw-sw__osd, .vw-sw--land .oc-tune__osd { top: 18px; right: 78px; }
 .vw-sw--land .vw-sw__live--above_bar.oc-btn, .vw-sw--land .vw-sw__live--above_banner.oc-btn { bottom: auto; top: 18px; }
 .vw-sw--land .vw-sw__nfm { left: auto; right: 78px; bottom: 14px; }
@@ -171,7 +171,6 @@
 .vw-sw--tablet.vw-sw--port .oc-ovl { inset: calc(var(--vw-sw-safe) + 120px) 0 auto 0; height: auto; aspect-ratio: 16 / 9; }
 .vw-sw--tablet.vw-sw--port .oc-player__stage { background: var(--screen); }
 .vw-sw--tablet.vw-sw--port .vw-sw__rail { flex-direction: row; gap: 18px; right: 22px; bottom: auto; top: calc(var(--vw-sw-safe) + 120px + 56.25vw + 22px); }
-.vw-sw--tablet.vw-sw--port .vw-sw__pos { bottom: auto; top: calc(var(--vw-sw-safe) + 120px + 56.25vw + 40px); left: 22px; font-size: 13px; }
 .vw-sw--tablet.vw-sw--port .vw-sw__nfm { bottom: auto; top: calc(var(--vw-sw-safe) + 120px + 56.25vw + 64px); left: 16px; }
 .vw-sw--tablet.vw-sw--port .oc-banner--web { left: 22px; right: 22px; bottom: calc(var(--vw-sw-bar) + 24px); border-radius: 16px; }
 .vw-sw--tablet.vw-sw--port .vw-sw__osd, .vw-sw--tablet.vw-sw--port .oc-tune__osd { top: calc(var(--vw-sw-safe) + 150px); right: 32px; }
@@ -179,7 +178,6 @@
 .vw-sw--tablet .vw-sw__ic { width: 52px; height: 52px; }
 .vw-sw--tablet .vw-sw__rb { font-size: 12px; }
 /* Landscape: close to TV mode. The picture fills the screen, buttons on the right, the banner bottom left. */
-.vw-sw--tablet.vw-sw--land .vw-sw__pos { top: calc(var(--vw-sw-safe) + 74px); font-size: 13px; }
 .vw-sw--tablet.vw-sw--land .oc-banner--web { left: 22px; right: auto; width: min(560px, 55%); bottom: calc(var(--vw-sw-bar) + 18px); border-radius: 16px; }
 .vw-sw--tablet.vw-sw--land .vw-sw__osd, .vw-sw--tablet.vw-sw--land .oc-tune__osd { top: calc(var(--vw-sw-safe) + 74px); right: 96px; }
 .vw-sw--tablet.vw-sw--land .vw-sw__live--above_bar.oc-btn { top: auto; bottom: calc(var(--vw-sw-bar) + 14px); }

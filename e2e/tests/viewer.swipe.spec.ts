@@ -56,7 +56,7 @@ test("swiping: presets first, then the detent into the dial; a ready picture arr
   await expect(page).toHaveURL(/\/watch\/beat$/);
   const player = page.locator(".oc-player").first();
   await expect(player).toHaveAttribute("data-status", "playing");
-  await expect(page.getByText("Preset 1 of 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("Preset 1 of 2", { exact: true })).toBeAttached();
   await expect(page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Watch" })).toHaveAttribute("aria-current", "page");
   // The first tap gives the sound (Muted previews), and doesn't pause.
   await page.mouse.click(150, 400);
@@ -67,7 +67,7 @@ test("swiping: presets first, then the detent into the dial; a ready picture arr
   await watchForStatic(page);
   await drag(page, -320);
   await expect(page).toHaveURL(/\/watch\/sazn$/);
-  await expect(page.getByText("Preset 2 of 2", { exact: true })).toBeVisible();
+  await expect(page.getByText("Preset 2 of 2", { exact: true })).toBeAttached();
   await expect(player).toHaveAttribute("data-status", "playing");
   expect(await sawStatic(page)).toBe(false);
 
@@ -82,7 +82,7 @@ test("swiping: presets first, then the detent into the dial; a ready picture arr
   // A longer pull goes: the dial's first, CIVC 7.1.
   await drag(page, -700);
   await expect(page).toHaveURL(/\/watch\/civc$/);
-  await expect(page.getByText(/^Dial, 1 of \d+$/)).toBeVisible();
+  await expect(page.getByText(/^Dial, 1 of \d+$/)).toBeAttached();
 
   // Sideways does nothing.
   await page.mouse.move(80, 500);
