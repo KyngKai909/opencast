@@ -45,6 +45,10 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
       )
     ) : null;
   const title = air ? air.title : c.station.kind === "listed" && c.onAir ? c.station.name : "Off air";
+  // A244: a programming block's member: "Late Crate Nights · Saturday Reel" (the block lighter). The
+  // Next line names the block only when the next program enters another one.
+  const block = air && air.kind !== "off_air" ? (air.block ?? null) : null;
+  const nextBlock = next?.block && next.block.id !== block?.id ? next.block : null;
   // Casting or mirroring, the hint row says where the controls are, and Back isn't a key there.
   // Casting and mirroring show only a chip: the phone has the controls, so there's no Back hint.
   // The TV app keeps its key hints beside a phone's chip, and Back still works there.
@@ -60,12 +64,23 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
       </div>
       <div className="oc-banner__now">
         {source && <span className="oc-banner__src">{source}</span>}
-        <h3>{title}</h3>
+        <h3 aria-label={block ? `${block.name} · ${title}` : undefined}>
+          {block && (
+            <span className="oc-banner__blk">
+              {block.name}
+              <span aria-hidden="true"> · </span>
+            </span>
+          )}
+          {title}
+        </h3>
         {air && air.kind !== "off_air" && <ProgressBar start={air.startsAt} end={air.endsAt} now={now} timeZone={timeZone} size={size === "tv" ? "tv" : "sm"} />}
         {next && (
           <div className="oc-banner__nx">
             Next at <span className="oc-mono">{clock(next.startsAt, { timeZone, suffix: false })}</span>
-            <b>{next.title}</b>
+            <b>
+              {next.title}
+              {nextBlock && <span className="oc-banner__nxb"> · {nextBlock.name}</span>}
+            </b>
             {next.live && <Tag variant="live">Live</Tag>}
           </div>
         )}

@@ -200,12 +200,14 @@ describe("off air hours", () => {
     expect(await h.services.log.gaps(reel, new Date("2026-10-27T08:59:00.000Z"), new Date("2026-10-27T09:01:00.000Z"))).toEqual([]);
   });
 
-  it("the run sheet airs the sign-off slate, goes dark, and signs back on with the station ID", async () => {
+  it("the run sheet airs the closer and the sign-off slate, goes dark, and signs back on with the opener", async () => {
     const planner = createPlanner({ deps: h.deps, services: h.services });
     const segments = await planner.plan(reel, new Date("2026-10-27T08:59:00.000Z"), new Date("2026-10-27T13:01:00.000Z"));
     const shape = segments.map((s) => `${s.startsAt.toISOString().slice(11, 19)} ${s.code} ${s.source.kind}`);
-    // REEL has no station ID of its own: its generated one (ten seconds, prepared like any item; 2026-09-29).
-    expect(shape.slice(-5)).toEqual(["08:59:50 SID file", "09:00:00 OPEN image", "09:01:00 OPEN off", "12:59:50 SID file", "13:00:00 PGM file"]);
+    // REEL has no station ID, closer or opener of its own: its generated station ID (ten seconds,
+    // 2026-09-29) before the hours, then the automatic closer and opener (five seconds each, A242),
+    // the opener in place of the station ID.
+    expect(shape.slice(-6)).toEqual(["08:59:50 SID file", "09:00:00 CLS file", "09:00:05 OPEN image", "09:01:05 OPEN off", "12:59:55 OPN file", "13:00:00 PGM file"]);
     const dark = segments.find((s) => s.source.kind === "off")!;
     expect(dark.source).toEqual({ kind: "off", backAt: new Date(T0600) });
   });

@@ -3,6 +3,7 @@
 // here (so gaps leave it out and nothing warns about it) and call `generate` for the dates a log
 // window covers; the template handlers (handlers/templates.ts) write through it.
 
+import { templateBlocksOf } from "./blocks";
 import type { DayTemplate, LogDay, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
 import { now, STATION_TZ } from "../../lib/clock";
 import { addDays, broadcastDay, isoDate, localTime, weekdayOf } from "../components/onair/time";
@@ -94,7 +95,12 @@ export function templateView(t: DbTemplate): DayTemplate {
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(({ date, edited, entries, skipped }) => ({ date, edited, entries, skipped })),
     createdAt: t.createdAt,
-    updatedAt: t.updatedAt
+    updatedAt: t.updatedAt,
+    // A244: its programming blocks.
+    ...(() => {
+      const blocks = templateBlocksOf(t.id);
+      return blocks.length ? { blocks } : {};
+    })()
   };
 }
 

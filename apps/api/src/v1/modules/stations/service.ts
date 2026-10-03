@@ -9,6 +9,7 @@ import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, notFound, refused } from "../../errors.js";
 import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackground.js";
 import { cadenceOf, type BreakCadence } from "../playout/engine/cadence.js";
+import { defaultSequences, sequenceProblems, sequencesOf, type BumperSequences } from "../playout/engine/sequence.js";
 import { kindOfTranslator } from "../relays/platforms.js";
 
 export type StationKind = "station" | "studio" | "claimable" | "listed" | "catalog";
@@ -27,6 +28,12 @@ export interface BreakRuleView {
   adsFromPartners: boolean;
   /** How often the station ID, bumpers, credit and spots air in breaks (added 2026-09-29): every break by default. */
   cadence: BreakCadence;
+  /** A242: at sign-on, the opener and then the station ID (off by default: the opener replaces it). */
+  stationIdAfterOpener: boolean;
+  /** A242: the opener at the start of each broadcast day, for a channel that never goes off air. Off by default. */
+  dailyOpener: boolean;
+  /** A243: the bumper sequences (open, close, between), the defaults filled in. `cadence.bumpers` reads as `open.every`. */
+  bumperSequences: BumperSequences;
 }
 
 /** What an ad request for ads from partners would carry about a station (nothing sends one yet). */
@@ -231,7 +238,17 @@ export interface StationsService {
   /** `user` (A230): the owner, for a subchannel beside their own X.1; `shareCallSign` shares its call sign. */
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string; shareCallSign?: boolean }, user?: CurrentUser): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
-  setBreakRule(stationId: string, rule: Omit<BreakRuleView, "adsFromPartners" | "cadence"> & { adsFromPartners?: boolean; cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] } }): Promise<BreakRuleView>;
+  setBreakRule(
+    stationId: string,
+    rule: Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener" | "bumperSequences"> & {
+      adsFromPartners?: boolean;
+      cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] };
+      stationIdAfterOpener?: boolean;
+      dailyOpener?: boolean;
+      /** A243: left out (an app from before), they stay as set; `cadence.bumpers` alone sets `open.every` and `close.every`. */
+      bumperSequences?: BumperSequences;
+    }
+  ): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -782,7 +799,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         openTimeTo: rule?.openTimeTo ?? "spot_market",
         blockedCategories: blocked.map((b) => b.category).sort(),
         adsFromPartners: rule?.adsFromPartners ?? false,
-        cadence: cadenceOf(rule?.cadence)
+        // A243: `cadence.bumpers` reads as the opening sequence's cadence.
+        ...(() => {
+          const cadence = cadenceOf(rule?.cadence);
+          const bumperSequences = sequencesOf(rule?.bumperSequences, cadence.bumpers);
+          const open = bumperSequences.open;
+          return { cadence: { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } }, bumperSequences };
+        })(),
+        stationIdAfterOpener: rule?.stationIdAfterOpener ?? false,
+        dailyOpener: rule?.dailyOpener ?? false
       };
     },
 
@@ -1257,6 +1282,27 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         }
         cadence = cadenceOf({ ...rule.cadence, spots: rule.cadence.spots ?? (await service.breakRule(stationId)).cadence.spots });
       }
+      // A243: the bumper sequences. Sent, they're stored as sent (and the bumpers' cadence follows the
+      // opening one); left out, they stay, except that a body from before them that changes how often
+      // bumpers air changes both the opening and closing sequence's.
+      // Stored only once they're not the defaults (null: the defaults, from `cadence.bumpers`).
+      let bumperSequences: BumperSequences | null | undefined;
+      if (rule.bumperSequences) {
+        const problems = sequenceProblems(rule.bumperSequences);
+        if (problems) throw badRequest("Each bumper role can be in a position once, four at most. Say after how many programs.", problems);
+        bumperSequences = sequencesOf(rule.bumperSequences);
+        if (cadence) {
+          cadence = { ...cadence, bumpers: { every: bumperSequences.open.every, ...(bumperSequences.open.n ? { n: bumperSequences.open.n } : {}) } };
+          if (JSON.stringify(bumperSequences) === JSON.stringify(defaultSequences(cadence.bumpers))) bumperSequences = null;
+        }
+      } else if (cadence) {
+        const [stored] = await db.select({ bumperSequences: schema.breakRules.bumperSequences }).from(schema.breakRules).where(eq(schema.breakRules.stationId, stationId));
+        if (stored?.bumperSequences) {
+          const was = sequencesOf(stored.bumperSequences);
+          const every = { every: cadence.bumpers.every, ...(cadence.bumpers.every === "n_programs" ? { n: cadence.bumpers.n } : {}) };
+          if (was.open.every !== every.every || was.open.n !== every.n) bumperSequences = { ...was, open: { ...was.open, ...every }, close: { ...was.close, ...every } };
+        }
+      }
       await db.transaction(async (tx) => {
         await tx
           .insert(schema.breakRules)
@@ -1271,6 +1317,9 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
             openTimeTo: rule.openTimeTo,
             adsFromPartners: rule.adsFromPartners ?? false,
             cadence: cadence ?? null,
+            stationIdAfterOpener: rule.stationIdAfterOpener ?? false,
+            dailyOpener: rule.dailyOpener ?? false,
+            bumperSequences: bumperSequences ?? null,
             updatedAt: deps.clock.now()
           })
           .onConflictDoUpdate({
@@ -1285,6 +1334,10 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
               openTimeTo: rule.openTimeTo,
               ...(rule.adsFromPartners !== undefined ? { adsFromPartners: rule.adsFromPartners } : {}),
               ...(cadence ? { cadence } : {}),
+              // A242: left out (an app from before), each stays as set.
+              ...(rule.stationIdAfterOpener !== undefined ? { stationIdAfterOpener: rule.stationIdAfterOpener } : {}),
+              ...(rule.dailyOpener !== undefined ? { dailyOpener: rule.dailyOpener } : {}),
+              ...(bumperSequences !== undefined ? { bumperSequences } : {}),
               updatedAt: deps.clock.now()
             }
           });

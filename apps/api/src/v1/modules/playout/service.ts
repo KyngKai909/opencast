@@ -1,5 +1,6 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import { asLogCode, type BlockBand } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { forbidden, refused } from "../../errors.js";
@@ -38,9 +39,13 @@ export interface PlayoutStatusView {
   output: { livepeerEnabled: boolean; playbackUrl: string | null; bitrateKbps?: number | null };
   nextBreakAt: string | null;
   onAirSince?: string | null;
-  next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null } | null;
+  next?: { title: string; detail: string | null; code: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN"; startsAt: string; producer: string | null; colour: string | null; pictureUrl: string | null; block?: BlockBand | null } | null;
+  /** A244: the programming block on air now. */
+  block?: BlockBand | null;
   /** Planned off air time on now, or the next within 24 hours. */
   offAir?: (OffAirSpanView & { now: boolean }) | null;
+  /** A242: the opener (`on`) or closer (`off`) is airing now. */
+  signing?: "on" | "off" | null;
   /** Added 2026-09-29: whether what's on the log in the next 48 hours is prepared for air. */
   /** G13: counts items, not entries; `firstNotReady.entryId` is its log entry. G14: `failed` and `preparing`. */
   readiness?: {
@@ -70,6 +75,14 @@ export interface AsRunView {
   reason: "planned" | "rotation" | "backup_rotation" | "station_id_fill" | "dead_air_fill" | "live" | "slate";
   itemId: string | null;
   airingId: string | null;
+  /** A242: an opener or closer (`code` then says SID, for apps built before it). */
+  identCode?: "OPN" | "CLS" | null;
+  /** A243: a bumper's role as it aired, where it aired, and (up next) what it announced. */
+  bumperRole?: "into_break" | "out_of_break" | "up_next" | "any" | null;
+  position?: "open" | "close" | "between" | "boundary" | "open_time" | "sign_on" | null;
+  announced?: { entryId: string | null; title: string } | null;
+  /** A244: the programming block it aired in. */
+  block?: { id: string; name: string } | null;
 }
 
 /** A program row of the as-run log, for watch data. */
@@ -515,12 +528,24 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const [nextBreak] = (await services.log.breaks(stationId, now, new Date(now.getTime() + 6 * HOUR))).filter((b) => Date.parse(b.startsAt) > now.getTime());
       const onAir = state?.onAir ?? false;
       // G2: since when, and what's next for the preview monitor.
-      const [since, next, offAir, prepared] = await Promise.all([
+      const C = schema.channelItems;
+      const [since, next, offAir, prepared, [airing]] = await Promise.all([
         onAir ? service.onAirSince([stationId]) : Promise.resolve(new Map<string, Date>()),
         services.log.nextEntry(stationId, now),
         services.log.offAirSpans(stationId, now, new Date(now.getTime() + 24 * HOUR)),
-        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR)))
+        bandOf(stationId).then((band) => logReadiness({ deps, services }, stationId, band, now, new Date(now.getTime() + 48 * HOUR))),
+        // A242: the opener or closer on the channel now ("Signing on", "Signing off"). A244: a block's
+        // intro or outro (`boundary`) isn't a sign-on or sign-off.
+        onAir
+          ? db
+              .select({ code: C.code })
+              .from(C)
+              .where(and(eq(C.stationId, stationId), lte(C.startsAt, now), gt(C.endsAt, now), inArray(C.code, ["OPN", "CLS"]), or(isNull(C.position), ne(C.position, "boundary"))))
+              .limit(1)
+          : Promise.resolve([] as Array<{ code: string }>)
       ]);
+      // A244: the programming block on now, and the one the next program enters.
+      const blocks = await services.log.blockStatus(stationId, now, next?.entry.id ?? null);
       const summary = summariseReadiness(prepared);
       const notReady = summary.firstNotReady;
       const plannedOff = offAir[0] ? { ...offAir[0], now: Date.parse(offAir[0].startsAt) <= now.getTime() } : null;
@@ -535,6 +560,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
             : null
         },
         offAir: plannedOff,
+        signing: airing?.code === "OPN" ? "on" : airing?.code === "CLS" ? "off" : null,
         onAirSince: since.get(stationId)?.toISOString() ?? null,
         next: next
           ? {
@@ -544,13 +570,15 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
               startsAt: next.entry.startsAt,
               producer: next.producer,
               colour: next.colour,
-              pictureUrl: null
+              pictureUrl: null,
+              ...(blocks.next ? { block: blocks.next } : {})
             }
           : null,
+        ...(blocks.now ? { block: blocks.now } : {}),
         onAir,
         now:
           state?.onAir && current
-            ? { title: titles?.title ?? "On air", code: current.code, startedAt: current.startsAt.toISOString(), itemId: current.assetId }
+            ? { title: titles?.title ?? "On air", code: asLogCode(current.code), startedAt: current.startsAt.toISOString(), itemId: current.assetId }
             : null,
         lastError: state?.lastError ?? null,
         // The channel's playlists are assembled; Livepeer only transcodes live blocks' sources.
@@ -565,20 +593,36 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .from(schema.asRun)
         .where(and(eq(schema.asRun.stationId, stationId), gte(schema.asRun.startedAt, from), lt(schema.asRun.startedAt, to)))
         .orderBy(asc(schema.asRun.startedAt));
-      const titles = await services.library.titles({
-        itemIds: rows.map((r) => r.assetId).filter((v): v is string => Boolean(v)),
-        programIds: rows.map((r) => r.programId).filter((v): v is string => Boolean(v))
+      const [titles, blocks] = await Promise.all([
+        services.library.titles({
+          itemIds: rows.map((r) => r.assetId).filter((v): v is string => Boolean(v)),
+          programIds: rows.map((r) => r.programId).filter((v): v is string => Boolean(v))
+        }),
+        services.library.blocks.refs(rows.map((r) => r.programBlockId).filter((v): v is string => Boolean(v)))
+      ]);
+      return rows.map((r) => {
+        // A242: the as-run log records openers and closers as OPN and CLS; `code` says SID for apps built before.
+        const ident = r.code === "OPN" || r.code === "CLS" ? r.code : null;
+        // A244: a block's intro or outro (between programs) is the block's; its automatic card has no item.
+        const block = r.programBlockId ? blocks.get(r.programBlockId) : undefined;
+        const blockPart = block && r.position === "boundary" ? (ident === "OPN" ? `${block.name} intro` : `${block.name} outro`) : null;
+        const automatic = blockPart ?? (ident === "OPN" ? "Automatic opener" : ident === "CLS" ? "Automatic closer" : null);
+        return {
+          id: r.id,
+          code: ident ? ("SID" as const) : (r.code as Exclude<typeof r.code, "OPN" | "CLS" | "OFF">),
+          title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && r.code !== "UND" && titles.programs.get(r.programId)) || automatic || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
+          startedAt: r.startedAt.toISOString(),
+          endedAt: r.endedAt.toISOString(),
+          reason: r.reason,
+          itemId: r.assetId,
+          airingId: r.airingId,
+          identCode: ident,
+          bumperRole: (r.bumperRole as AsRunView["bumperRole"]) ?? null,
+          position: r.position ?? null,
+          announced: r.announcedTitle ? { entryId: r.announcedEntryId, title: r.announcedTitle } : null,
+          block: block ? { id: block.id, name: block.name } : null
+        };
       });
-      return rows.map((r) => ({
-        id: r.id,
-        code: r.code,
-        title: (r.assetId && titles.items.get(r.assetId)) || (r.programId && r.code !== "UND" && titles.programs.get(r.programId)) || (r.code === "SID" ? "Station ID" : r.reason === "live" ? "Live" : "Slate"),
-        startedAt: r.startedAt.toISOString(),
-        endedAt: r.endedAt.toISOString(),
-        reason: r.reason,
-        itemId: r.assetId,
-        airingId: r.airingId
-      }));
     },
 
     async catalogCreditsAired(programIds, from, to) {

@@ -186,7 +186,8 @@ describe("listings", () => {
 describe("the library", () => {
   it("counts what needs attention and marks the programs whose listings need a description", async () => {
     const r = await api(`${S}/library`);
-    expect(r.body.items).toHaveLength(31);
+    // 31, and (A242) BEAT's closer, off-air card and opener.
+    expect(r.body.items).toHaveLength(34);
     expect(r.body.needsAttention).toEqual({ rightsToConfirm: 1, preparing: 0 });
     expect(r.body.importedFromLinks).toBe(1);
     const needs = r.body.programs.filter((p: { listingStatus: string }) => p.listingStatus === "needs_description").map((p: { title: string }) => p.title).sort();

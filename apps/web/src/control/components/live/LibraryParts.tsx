@@ -1,18 +1,32 @@
 // The library's parts, shared by setup step 2 (master-control A.2), the station's Library and the
 // item page (live-listings 04.1): the folder rail, the drop zone with Import from a link, the
 // summary, the table of items, the generated station ID's read-only row (added 2026-09-29; no
-// frame draws it), and the rights pane (A.3, "Can BEAT air Crate Session 03?").
+// frame draws it), and the rights pane (A.3, "Can BEAT air Crate Session 03?"). A242 (2026-10-02):
+// openers, closers and off-air cards as types (the rail's "Sign-off and sign-on" lists, the drop
+// zone's "Upload as", the type picker) and the sequence they air in (`SignOffSequence`; no frame
+// draws them: rows and words like the library's own).
 
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { libraryApi, type Folder, type GeneratedStationId, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
-import { Button, ChoiceList, CodeSelect, Field, Icon, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
+import { libraryApi, type Folder, type GeneratedStationId, type LibraryCode, type LibraryItem, type LibraryItem as Item } from "@opencast/contracts";
+import { Button, ChoiceList, CodeSelect, Field, Icon, LIBRARY_CODES, LOG_CODE_WORDS, LogCode, Menu, Modal, Sheet, Table, TitleCard, cx, duration, useToast, type Column, type MenuItem, type SelectableCode } from "@opencast/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { call } from "../../../api/client";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { librarySummary, readyLine } from "./logic";
 import { UploadList } from "@opencast/ui/upload";
 import { useUpload } from "./upload";
+import { ROLE_WORDS, roleOf } from "./bumpers";
 import "./LibraryParts.css";
+
+/** An item's type as master control shows it: its identity code (A242), else its log code. */
+export const typeOf = (i: Pick<Item, "code" | "identCode">): SelectableCode | "OPEN" => i.identCode ?? i.code;
+
+/** The rail's lists of openers, closers and off-air cards (A242): their addresses and words. */
+export const IDENT_LISTS = [
+  { key: "openers", code: "OPN", title: "Openers", one: "opener" },
+  { key: "closers", code: "CLS", title: "Closers", one: "closer" },
+  { key: "off-air-cards", code: "OFF", title: "Off-air cards", one: "off-air card" }
+] as const;
 
 export const refreshLibrary = (qc: ReturnType<typeof useQueryClient>) =>
   Promise.all([qc.invalidateQueries({ queryKey: ["GET", libraryApi.getLibrary.path] }), qc.invalidateQueries({ queryKey: ["GET", libraryApi.getItem.path] })]);
@@ -27,10 +41,26 @@ export interface FolderRailProps {
   folders: Folder[];
   importedFromLinks: number;
   needsAttention: { rightsToConfirm: number; preparing: number };
+  /** A242: how many openers, closers and off-air cards. Left out, the group isn't drawn. */
+  identity?: { openers: number; closers: number; offAirCards: number };
+  /** A243: how many bumpers (the Bumpers list). Left out, it isn't drawn. */
+  bumpers?: number;
+  /** A244: the station's programming blocks, a list each with how many items are theirs. */
+  blocks?: Array<{ id: string; name: string; count: number }>;
 }
 
-/** Folders on the left: the station's own, then the two "needs attention" lists (04.1). */
-export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention }: FolderRailProps) {
+/** A243: how many bumpers, for the rail's Bumpers list. */
+export const bumperCount = (items: Item[]) => items.filter((i) => i.code === "BMP" && !i.identCode).length;
+
+/** Counts for the rail's "Sign-off and sign-on" group (A242). */
+export const identityCounts = (items: Item[]) => ({
+  openers: items.filter((i) => i.identCode === "OPN").length,
+  closers: items.filter((i) => i.identCode === "CLS").length,
+  offAirCards: items.filter((i) => i.identCode === "OFF").length
+});
+
+/** Folders on the left: the station's own, the sign-off and sign-on lists (A242), then the two "needs attention" lists (04.1). */
+export function FolderRail({ base, active, total, folders, importedFromLinks, needsAttention, identity, bumpers, blocks }: FolderRailProps) {
   const link = (key: string, label: string, count: number, warn = false) => (
     <a key={key} href={key === "all" ? `${base}/library` : `${base}/library/${key}`} className={cx(active === key && "cc-folders__on", warn && count > 0 && "cc-folders__warn")} aria-current={active === key ? "page" : undefined}>
       {label}
@@ -45,6 +75,27 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
       {link("all", "All items", total)}
       {folders.filter((f) => !f.parentFolderId).map((f) => link(f.id, f.name, f.itemCount))}
       {link("links", "Imported from links", importedFromLinks, true)}
+      {bumpers !== undefined && (
+        <>
+          <div className="cc-folders__g cc-folders__g--gap">Bumpers</div>
+          {link("bumpers", "All bumpers", bumpers)}
+        </>
+      )}
+      {identity && (
+        <>
+          <div className="cc-folders__g cc-folders__g--gap">Sign-off and sign-on</div>
+          {link("closers", "Closers", identity.closers)}
+          {link("off-air-cards", "Off-air cards", identity.offAirCards)}
+          {link("openers", "Openers", identity.openers)}
+        </>
+      )}
+      {/* A244: one list per programming block (its bumpers, ID, intro and outro). */}
+      {blocks && blocks.length > 0 && (
+        <>
+          <div className="cc-folders__g cc-folders__g--gap">Blocks</div>
+          {blocks.map((b) => link(`blocks/${b.id}`, b.name, b.count))}
+        </>
+      )}
       <div className="cc-folders__g cc-folders__g--gap">Needs attention</div>
       {link("rights", "Rights to confirm", needsAttention.rightsToConfirm, true)}
       {link("preparing", "Preparing for air", needsAttention.preparing)}
@@ -60,15 +111,20 @@ export function FolderRail({ base, active, total, folders, importedFromLinks, ne
  * Resume, Retry and Cancel, then "Checking" while the API reads it; once it's in the library below,
  * it leaves the list.
  */
-export function UploadDrop({ stationId, folderId }: { stationId: string; folderId?: string | null }) {
+export function UploadDrop({ stationId, folderId, code: preset, programBlockId }: { stationId: string; folderId?: string | null; code?: LibraryCode; programBlockId?: string | null }) {
   const qc = useQueryClient();
   const toast = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [linking, setLinking] = useState(false);
+  // A242: what the files are, when the station says ("Upload as"); else the type's guessed from the length.
+  const [as, setAs] = useState<LibraryCode | "">(preset ?? "");
+  useEffect(() => setAs(preset ?? ""), [preset]);
+  const card = as === "OFF";
   const up = useUpload({
     id: `library-${stationId}`,
-    purpose: () => ({ kind: "library_item", stationId, fields: folderId ? { folderId } : {} }),
+    // A244: dropped into a block's list, it's the block's (a bumper, ID, intro or outro).
+    purpose: () => ({ kind: "library_item", stationId, fields: { ...(folderId ? { folderId } : {}), ...(as ? { code: as } : {}), ...(programBlockId ? { programBlockId } : {}) } }),
     clearFinishedAfterMs: 4000,
     onFinished: () => void refreshLibrary(qc),
     onBatchDone: ({ finished, failed }) => {
@@ -97,10 +153,21 @@ export function UploadDrop({ stationId, folderId }: { stationId: string; folderI
           <Icon name="upload" />
         </span>
         <div>
-          <b>Drop video or audio files here</b>
-          <small>MP4, MOV, MP3, WAV and most others. They're converted for air automatically.</small>
+          <b>{card ? "Drop an off-air card here" : "Drop video or audio files here"}</b>
+          <small>{card ? "A picture (PNG, JPEG or WebP) or a short clip. It airs for a minute when you sign off." : "MP4, MOV, MP3, WAV and most others. They're converted for air automatically."}</small>
         </div>
         <div className="cc-drop__end">
+          <label className="cc-drop__as">
+            <span>Upload as</span>
+            <select value={as} onChange={(e) => setAs(e.target.value as LibraryCode | "")}>
+              <option value="">Guess from its length</option>
+              {LIBRARY_CODES.map((c) => (
+                <option key={c} value={c}>
+                  {LOG_CODE_WORDS[c]}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button size="sm" onClick={() => input.current?.click()}>Choose files</Button>
           <Button size="sm" icon="link" onClick={() => setLinking(true)}>
             Import from a link
@@ -110,7 +177,7 @@ export function UploadDrop({ stationId, folderId }: { stationId: string; folderI
           ref={input}
           type="file"
           multiple
-          accept="video/*,audio/*"
+          accept={card ? "video/*,audio/*,image/png,image/jpeg,image/webp" : "video/*,audio/*"}
           hidden
           onChange={(e) => {
             if (e.target.files?.length) up.add(e.target.files);
@@ -213,9 +280,11 @@ export interface LibraryTableProps {
   hrefFor?: (i: Item) => string;
   onOpen?: (i: Item) => void;
   empty?: string;
+  /** A244: the station's programming blocks, by id (a block's item shows its dot and name). */
+  blocks?: Map<string, { name: string; colour: string | null }>;
 }
 
-export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, empty }: LibraryTableProps) {
+export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, empty, blocks }: LibraryTableProps) {
   const qc = useQueryClient();
   const toast = useToast();
   const setCode = async (i: Item, code: SelectableCode) => {
@@ -251,11 +320,32 @@ export function LibraryTable({ items, colour, label, onRights, hrefFor, onOpen, 
             <b className="cc-lib-row__title">{i.title}</b>
           )}
           <small>{itemOrigin(i)}</small>
+          {/* A244: a programming block's item: its dot and name. */}
+          {i.programBlockId && blocks?.get(i.programBlockId) && (
+            <small className="cc-lib-row__block">
+              <span className="cc-lib-row__dot" style={{ background: blocks.get(i.programBlockId)!.colour ?? "var(--ink-70)" }} aria-hidden="true" />
+              {blocks.get(i.programBlockId)!.name}
+            </small>
+          )}
         </>
       )
     },
-    { key: "type", header: "Type", width: "128px", cell: (i) => <CodeSelect value={i.code === "OPEN" ? "PGM" : i.code} label={`Type of ${i.title}`} onChange={(c) => void setCode(i, c)} /> },
-    { key: "runs", header: "Runs", width: "64px", cell: (i) => <span className="cc-lib-row__d">{i.durationMs != null ? duration(i.durationMs) : "–"}</span> },
+    {
+      key: "type",
+      header: "Type",
+      width: "128px",
+      cell: (i) => {
+        const t = typeOf(i);
+        // A picture is an off-air card and nothing else (A242). A243: a bumper's role under its type.
+        return (
+          <>
+            <CodeSelect value={t === "OPEN" ? "PGM" : t} codes={i.still ? ["OFF"] : LIBRARY_CODES} label={`Type of ${i.title}`} onChange={(c) => void setCode(i, c)} />
+            {t === "BMP" && <small className="cc-lib-row__role">{ROLE_WORDS[roleOf(i)]}</small>}
+          </>
+        );
+      }
+    },
+    { key: "runs", header: "Runs", width: "64px", cell: (i) => <span className="cc-lib-row__d">{i.durationMs != null ? duration(i.durationMs) : i.still ? "Still" : "–"}</span> },
     { key: "status", header: "Status", width: "190px", cell: (i) => <ItemStatus item={i} onRights={() => onRights(i)} /> },
     {
       key: "menu",
@@ -298,8 +388,55 @@ export function ItemStatus({ item, onRights }: { item: Item; onRights?: () => vo
   return (
     <span className="cc-lib-status">
       Ready for air
-      <small>{readyLine(item)}</small>
+      <small>{item.still ? `A picture${item.picture ? `, ${item.picture.width}×${item.picture.height}` : ""}` : readyLine(item)}</small>
     </span>
+  );
+}
+
+// ---- Sign-off and sign-on (A242) ----
+
+const SEQUENCE_STEPS = ["Closer", "Off-air card", "off air", "Opener", "(Station ID)", "first program"] as const;
+
+/**
+ * "Closer → Off-air card → off air → Opener → (Station ID) → first program": what airs when the
+ * station signs off and back on, with what it airs where it has none of its own. `items`: the
+ * library's (to say which are its own); `ident`: "12.1 BEAT", as the automatic ones say it;
+ * `radio`: the radio band's words.
+ */
+export function SignOffSequence({ items, ident, radio, stationIdAfterOpener }: { items: Item[]; ident: string; radio: boolean; stationIdAfterOpener?: boolean }) {
+  const counts = identityCounts(items.filter((i) => i.status === "ready" && i.rights));
+  const own = (n: number, one: string, many: string, fallback: string) => (n === 0 ? fallback : n === 1 ? `Your ${one}` : `Your ${n} ${many}, a day each in turn`);
+  const rows = [
+    { code: "CLS" as const, title: "Closer", detail: own(counts.closers, "closer", "closers", `Made for you: "${ident} · Signing off · Back at 6:00 am", in your look`) },
+    { code: "OFF" as const, title: "Off-air card", detail: own(counts.offAirCards, "off-air card", "off-air cards", `Made for you: ${ident}, off air, and when you're back`) + ". For a minute, then the channel ends" },
+    { code: "OPN" as const, title: "Opener", detail: own(counts.openers, "opener", "openers", `Made for you: "${ident} · Signing on", in your look`) + ". It ends as the first program starts" },
+    { code: "SID" as const, title: "Station ID", detail: stationIdAfterOpener ? "After the opener" : "Only if you turn it on in Settings, Breaks. The opener replaces it" }
+  ];
+  return (
+    <section className="cc-signoff" aria-label="When you sign off and back on">
+      <p className="cc-signoff__line">
+        {SEQUENCE_STEPS.map((step, n) => (
+          <span key={step}>
+            {n > 0 && <span aria-hidden="true"> → </span>}
+            {step}
+          </span>
+        ))}
+      </p>
+      <ul className="cc-signoff__rows">
+        {rows.map((r) => (
+          <li key={r.code}>
+            <LogCode code={r.code} />
+            <span>
+              <b>{r.title}</b>
+              <small>{r.detail}</small>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="cc-signoff__note">
+        {radio ? "On the radio band, openers and closers are audio, and the off-air card is a short clip or a picture your relays show." : "Openers and closers are short clips. An off-air card is a picture or a short clip."} Off air time too short to go dark keeps the channel on: closer, the card, opener.
+      </p>
+    </section>
   );
 }
 

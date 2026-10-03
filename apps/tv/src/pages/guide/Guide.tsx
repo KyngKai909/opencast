@@ -35,6 +35,7 @@ import {
   typeKey,
   visibleRows,
   whenLine,
+  blockLine,
   type Cell,
   type GuideFocus,
   type GuideModel
@@ -179,6 +180,8 @@ export default function Guide() {
           {cell && row ? (
             <>
               <div className="tvg__when oc-mono">{whenLine(cell, row.station, MARKET_TZ)}</div>
+              {/* A244: a programming block's member says so. */}
+              {blockLine(cell) && <div className="tvg__block">{blockLine(cell)}</div>}
               <h2 className="tvg__title">{cellTitle(cell, row.station)}</h2>
               {description ? (
                 <p className="tvg__desc">

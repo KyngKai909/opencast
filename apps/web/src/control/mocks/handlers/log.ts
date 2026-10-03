@@ -22,6 +22,7 @@ import { fail, needsUser, path, reply } from "../respond";
 import { breakRuleOf, breaksAiring } from "../fixtures/station";
 import { GENERATED_SID_MS, GENERATED_SID_TITLE } from "./library";
 import { logChangeHandlers, mockLogVersion } from "./logChanges";
+import { blockBandAt, spanViews } from "../blocks";
 import { createTemplate, generateWindow, logDays, markEdited, offAirFor, offAirNext, removeTemplate, removeWithBreaks, templateById, templatesOf, templateView, TemplateInputError } from "../schedule";
 
 const HOUR = 3_600_000;
@@ -73,6 +74,10 @@ function isOnAirNow(st: DbStation, t: string) {
   return st.onAir && entry?.kind !== "off_air" && !planned;
 }
 
+/** A242: how long the mock's closer and opener air (BEAT goodnight, BEAT sign-on). */
+const CLOSER_MS = 8_000;
+const OPENER_MS = 6_000;
+
 function status(st: DbStation) {
   const t = now();
   const iso = t.toISOString();
@@ -93,6 +98,7 @@ function status(st: DbStation) {
   const nextEntry = next?.entryId ? stationLog(st.ident.id).find((e) => e.id === next.entryId) : undefined;
   // Planned off air on now, or the next within 24 hours ("Signs off at 2:00 am"); while signed on.
   const off = st.onAir ? offAirNext(st.ident.id, 24 * HOUR) : null;
+  const blocks = blockBandAt(st.ident.id, iso, nextEntry?.id ?? null);
   return {
     onAir,
     now: onAir && cur && cur.kind !== "gap" ? { title: cur.title, code: cur.code, startedAt: cur.at, itemId: cur.entryId ? (stationLog(st.ident.id).find((e) => e.id === cur.entryId)?.itemId ?? null) : null } : null,
@@ -110,10 +116,15 @@ function status(st: DbStation) {
             startsAt: next.at,
             producer,
             colour: card?.colour ?? nextEntry?.carriedFrom?.colour ?? st.ident.colour,
-            pictureUrl: null
+            pictureUrl: null,
+            ...(blocks.next ? { block: blocks.next } : {})
           }
         : null,
+    // A244: the programming block on air now.
+    ...(onAir && blocks.now ? { block: blocks.now } : {}),
     offAir: off ? { ...off, now: Date.parse(off.startsAt) <= t.getTime() } : null,
+    // A242: the closer (its first seconds off air) or the opener (its last), as the API reads the channel.
+    signing: st.onAir && off && Date.parse(off.startsAt) <= t.getTime() ? (t.getTime() - Date.parse(off.startsAt) < CLOSER_MS ? ("off" as const) : Date.parse(off.backAt) - t.getTime() <= OPENER_MS ? ("on" as const) : null) : null,
     // The next 48 hours of the log: how many items are prepared for air, and the first that isn't.
     readiness: readinessOf(st.ident.id, t.getTime())
   };
@@ -301,7 +312,12 @@ export const logHandlers = [
       // G11: which template made each broadcast day in the window, today and past days too.
       days: logDays(id, from, to),
       // Edit mode: what a draft begins from.
-      version: mockLogVersion(id, from, to)
+      version: mockLogVersion(id, from, to),
+      // A244: programming blocks in the window.
+      ...(() => {
+        const blocks = spanViews(id, from, to);
+        return blocks.length ? { blocks } : {};
+      })()
     });
   }),
 
@@ -319,6 +335,7 @@ export const logHandlers = [
     if (b.itemId) {
       const it = libraryItem(b.itemId);
       if (!it || it.stationId !== id) return fail(404, "not_found", "That item isn't in your library.");
+      if (it.identCode) return fail(422, "not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
       if (!it.rights) return fail(409, "rights_unconfirmed", "Confirm its rights before it goes on the log.");
       title = it.title;
       endsAt ??= new Date(Date.parse(b.startsAt) + ceilMinute(it.durationMs ?? MIN)).toISOString();

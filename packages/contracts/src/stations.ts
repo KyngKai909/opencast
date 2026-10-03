@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
 import {
+  AiringBlock,
   Band,
+  BlockBand,
+  BumperRole,
   CallSign,
   ChannelNumber,
   Colour,
@@ -35,7 +38,12 @@ export const Airing = z.object({
    * 6:00 am"). Planned off air (the station's off air hours, or a sign-off on its log) is one
    * airing from sign-off to sign-on, with `logEntryId` the sign-off entry's when there is one.
    */
-  backAt: Timestamp.nullable().optional()
+  backAt: Timestamp.nullable().optional(),
+  /**
+   * A244 (added 2026-10-02): the programming block it's part of ("Late Crate Nights"), or null.
+   * Apps built before it drop it and show the title alone.
+   */
+  block: AiringBlock.nullable().optional()
 });
 export type Airing = z.infer<typeof Airing>;
 
@@ -125,7 +133,16 @@ export const Dial = z.object({
   nearby: z.array(z.object({ market: Market, miles: z.number(), rows: z.array(DialRow) }))
 });
 
-export const GuideRow = z.object({ station: StationIdent, airings: z.array(Airing) });
+export const GuideRow = z.object({
+  station: StationIdent,
+  airings: z.array(Airing),
+  /**
+   * A244 (added 2026-10-02): the station's programming blocks in the window, each from its first
+   * member's start to its last member's end (not clipped to the window: the grid clips). Absent or
+   * empty: none. The guide draws a thin band above the row's programs.
+   */
+  blocks: z.array(BlockBand).optional()
+});
 
 export const StationPage = z.object({
   station: StationIdent,
@@ -149,7 +166,30 @@ export const StationPage = z.object({
    * Follow-up Phase 6 (added 2026-09-30), external stations only: as on the dial, and `down` while
    * it's off the dial because its stream is down (the page stays; `playback` is null then).
    */
-  external: ExternalInfo.extend({ down: z.boolean() }).optional()
+  external: ExternalInfo.extend({ down: z.boolean() }).optional(),
+  /**
+   * A244 (added 2026-10-02): the station's programming blocks on its log in the next 14 days: what
+   * each is, when it airs ("Saturdays, 9:00 pm to 1:00 am" from its day template, else its next
+   * date's times), its next airing and the programs in it. Absent or empty: none (external and
+   * claimable stations have none).
+   */
+  blocks: z
+    .array(
+      z.object({
+        id: Id,
+        name: z.string(),
+        description: z.string().nullable(),
+        logoUrl: z.string().nullable(),
+        colour: Colour.nullable(),
+        /** "Saturdays, 9:00 pm to 1:00 am"; null when it has no regular time. */
+        schedule: z.string().nullable(),
+        /** When it next airs (its first member's start), or null. */
+        next: Timestamp.nullable(),
+        /** The program titles in its next airing, in order. */
+        programs: z.array(z.string())
+      })
+    )
+    .optional()
 });
 
 export const SearchResult = z.object({
@@ -208,6 +248,29 @@ export const BreakCadence = z.object({
 /** The station ID can't be `never`. */
 export const StationIdCadence = BreakCadence.extend({ every: BreakCadenceEvery.exclude(["never"]) });
 
+/**
+ * A243 (added 2026-10-02): one position's bumper sequence: the roles in air order (0 to 4, each
+ * once), and how often it airs (as `BreakCadence`; `n` with `n_programs`, 2 to 12). Between
+ * programs can't be `break` (it's per program boundary): `program` means every boundary.
+ */
+export const PositionRule = z.object({
+  roles: z.array(BumperRole).max(4),
+  every: BreakCadenceEvery,
+  n: z.number().int().min(2).max(12).optional()
+});
+export type PositionRule = z.infer<typeof PositionRule>;
+
+/**
+ * A243 (added 2026-10-02): the bumpers in each break and between programs. `open` airs before the
+ * spots, `close` after the credit (before the station ID), `between` after the station ID just
+ * before the next program starts (outside the break's SCTE-35 span, so partners' ads never
+ * replace it). Defaults (a station that sets nothing): open `into_break`, close `out_of_break`,
+ * both as often as `cadence.bumpers`; between nothing. Up next airs at most once per break and
+ * the boundary after it (the first place it's in).
+ */
+export const BumperSequences = z.object({ open: PositionRule, close: PositionRule, between: PositionRule });
+export type BumperSequences = z.infer<typeof BumperSequences>;
+
 export const BreakRule = z.object({
   mode: z.enum(["after_every_program", "every_n_minutes", "none"]),
   everyMinutes: z.number().int().positive().nullable(),
@@ -251,7 +314,28 @@ export const BreakRule = z.object({
       /** Added 2026-09-29 (later): how often the station's spots air. Left out, every break. */
       spots: BreakCadence.optional()
     })
-    .optional()
+    .optional(),
+  /**
+   * A242 (added 2026-10-02): at sign-on the opener replaces the station ID; with this on, the
+   * opener airs and then the station ID, both ending as the first program starts. Off by default;
+   * left out of `setBreakRule`, it stays as set.
+   */
+  stationIdAfterOpener: z.boolean().optional(),
+  /**
+   * A242 (added 2026-10-02): for a channel that never goes off air, the opener at the start of each
+   * broadcast day (6:00 am in the market's time zone): at the first program boundary at or after
+   * 6:00 am, where the station ID would air, never cutting into a program. Off by default; left out
+   * of `setBreakRule`, it stays as set.
+   */
+  dailyOpener: z.boolean().optional(),
+  /**
+   * A243 (added 2026-10-02): the bumper sequences. Always in `getBreakRule`, the defaults filled in;
+   * left out of `setBreakRule`, they stay as set. `cadence.bumpers` stays and reads as
+   * `open.every`; a body that sets `cadence.bumpers` without this (an app from before) sets both
+   * `open.every` and `close.every`. 400 for a role twice in one position, more than four, or
+   * `n_programs` without `n`.
+   */
+  bumperSequences: BumperSequences.optional()
 });
 
 export const Translator = z.object({

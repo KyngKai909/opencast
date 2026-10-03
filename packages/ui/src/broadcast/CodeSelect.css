@@ -15,3 +15,4 @@
 .oc-code-select--pgm { background: var(--ink); color: var(--ground); border-color: var(--ink); }
 .oc-code-select--spt { color: var(--standby); border-color: var(--standby); }
 .oc-code-select--und { border-style: dashed; }
+.oc-code-select--off { border-style: dashed; }

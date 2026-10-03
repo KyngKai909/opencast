@@ -73,6 +73,43 @@ describe("the cadence, worked out", () => {
     expect(run({ every: "hour" }, { settledBefore: at("03:40"), sid: { last: null, times: [at("03:15")] } })).toEqual(hourly);
   });
 
+  it("A243: the opening and closing bumpers each have their own cadence", () => {
+    const plan = planCadence({
+      cadence: DEFAULT_CADENCE,
+      sequences: { open: { every: "break" }, close: { every: "program" } },
+      breaks,
+      programs,
+      aired: {},
+      settledBefore: 0,
+      hourStart: hourStartIn("UTC")
+    });
+    const opens = breaks.filter((b) => plan.get(b.key)!.bumpersOpen).map((b) => b.key);
+    const closes = breaks.filter((b) => plan.get(b.key)!.bumpersClose).map((b) => b.key);
+    expect(opens).toHaveLength(8);
+    expect(closes).toEqual(["after 03:28", "after 03:58", "after 04:28", "after 04:58"]);
+    // `bumpers` (for readers from before) is either.
+    expect(breaks.every((b) => plan.get(b.key)!.bumpers)).toBe(true);
+  });
+
+  it("A243: as-run rows from before positions (a bumper in a break, no position) count for both sequences", () => {
+    const run = (aired: Parameters<typeof planCadence>[0]["aired"]) => {
+      const plan = planCadence({
+        cadence: DEFAULT_CADENCE,
+        sequences: { open: { every: "hour" }, close: { every: "hour" } },
+        breaks,
+        programs,
+        aired,
+        settledBefore: 0,
+        hourStart: hourStartIn("UTC")
+      });
+      return [breaks.filter((b) => plan.get(b.key)!.bumpersOpen).map((b) => b.key), breaks.filter((b) => plan.get(b.key)!.bumpersClose).map((b) => b.key)];
+    };
+    // A legacy row at 3:05 (this hour): neither airs again until 4:00.
+    expect(run({ bumpers: { last: at("03:05"), times: [] } })).toEqual([["during 04:14"], ["during 04:14"]]);
+    // A row that says it opened a break counts only for the opening sequence.
+    expect(run({ bumpersOpen: { last: at("03:05"), times: [] }, bumpersClose: { last: null, times: [] } })).toEqual([["during 04:14"], ["during 03:14", "during 04:14"]]);
+  });
+
   it("never (bumpers and the credit)", () => {
     const plan = planCadence({ cadence: { ...DEFAULT_CADENCE, bumpers: { every: "never" }, underwriting: { every: "never" } }, breaks, programs, aired: { stationId: none, bumpers: none, underwriting: none }, settledBefore: 0, hourStart: hourStartIn("UTC") });
     expect([...plan.values()].every((p) => p.stationId && !p.bumpers && !p.underwriting)).toBe(true);

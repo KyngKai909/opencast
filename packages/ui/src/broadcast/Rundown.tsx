@@ -14,6 +14,8 @@ export interface RundownItem {
   source?: ReactNode;
   /** Milliseconds. */
   length: number;
+  /** A243: listed but not airing (a bumper that didn't fit the break): drawn quieter. */
+  muted?: boolean;
 }
 
 export interface RundownProps {
@@ -33,7 +35,7 @@ export function Rundown({ items, nowId, variant = "full", timeZone, className }:
       {items.map((it) => {
         const now = it.id === nowId;
         return (
-          <div key={it.id} role="listitem" className={cx("oc-rd", now && "oc-rd--now")} aria-current={now ? "true" : undefined}>
+          <div key={it.id} role="listitem" className={cx("oc-rd", now && "oc-rd--now", it.muted && "oc-rd--muted")} aria-current={now ? "true" : undefined}>
             <span className="oc-rd__t">
               {now && <span className="oc-sr-only">On air: </span>}
               {clock(it.at, { timeZone, seconds: true, suffix: false })}

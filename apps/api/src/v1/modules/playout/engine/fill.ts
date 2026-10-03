@@ -5,7 +5,8 @@
 // producer's rotation (the producer is paid for those). Room is kept for what
 // playout adds when it airs the break, as far as the break rule's cadence has
 // them in it: a bumper into the break and one out of it, the credit and the
-// station ID.
+// station ID. Since A243 (2026-10-02) the bumpers are the break's chosen sequences, and the
+// between sequence after a break that closes a program's slot (sequence.ts `elementsMs`).
 //
 // A break spots don't air in (the cadence, added 2026-09-29) gets none of the
 // station's: nothing is placed or held there, and it isn't marked filled (a
@@ -16,7 +17,8 @@
 import type { ModuleContext } from "../../../context.js";
 import { tzOffsetMinutes } from "../../../lib/time.js";
 import type { BreakSlotView } from "../../log/service.js";
-import { hourStartIn, partsOf } from "./cadence.js";
+import { bumpersIn, hourStartIn, partsOf, type BreakParts } from "./cadence.js";
+import { elementsMs } from "./sequence.js";
 import { catalogCreditBreaks, catalogEntries } from "./catalogCredit.js";
 
 const HOUR = 3_600_000;
@@ -42,6 +44,14 @@ function inDaypart(dayparts: string[], at: Date, tz: string) {
     const [from, to] = DAYPART_HOURS[d] ?? [0, 24];
     return (hour >= from && hour < to) || (hour + 24 >= from && hour + 24 < to);
   });
+}
+
+/** A slot without its bumpers picked: the first two Any bumpers (or the one twice), where the cadence has them. */
+function defaultBumpersMs(bumpers: Array<{ durationMs: number | null; bumperRole?: string | null }>, parts: BreakParts): number {
+  const any = bumpers.filter((b) => !b.bumperRole || b.bumperRole === "any");
+  const [into, outOf] = [any[0], any[1] ?? any[0]];
+  if (!into) return 0;
+  return (bumpersIn(parts, "open") ? into.durationMs! : 0) + (bumpersIn(parts, "close") ? outOf!.durationMs! : 0);
 }
 
 export interface FillResult {
@@ -120,8 +130,9 @@ export function createFiller({ services }: ModuleContext) {
     // it in this break (a credit or bumper that doesn't air here keeps no room).
     if (rule.openTimeTo === "spot_market") {
       const credit = hasCredits && parts.underwriting;
-      const [into, outOf] = [fillers.bumpers[0], fillers.bumpers[1] ?? fillers.bumpers[0]];
-      const bumpersMs = parts.bumpers && into ? into.durationMs! + outOf!.durationMs! : 0;
+      // A243: the break's chosen bumpers (its opening and closing sequences, and the between
+      // sequence after it when it closes a program's slot), picked with the break.
+      const bumpersMs = slot.elements ? elementsMs(slot) : defaultBumpersMs(fillers.bumpers, parts);
       const stationMs = slot.lengthMs - slot.producerShareMs - (parts.stationId ? stationIdMs : 0) - (credit ? CREDIT_MS : 0) - bumpersMs;
       if (stationMs > 0) {
         const used = await tryPlace(await services.spots.rotationFor(stationId, "main"), stationMs);

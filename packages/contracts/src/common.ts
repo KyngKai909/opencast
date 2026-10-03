@@ -28,6 +28,70 @@ export const Colour = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const LogCode = z.enum(["PGM", "SPT", "UND", "BMP", "SID", "OPEN"]);
 export type LogCode = z.infer<typeof LogCode>;
 
+/**
+ * A242 (added 2026-10-02): a station's identity at sign-off and sign-on, as library types. `OPN` an
+ * opener (airs at sign-on, and at the start of each broadcast day if the station chooses), `CLS` a
+ * closer (airs at sign-off), `OFF` the station's own off-air card (an image or a short clip, airing
+ * as the sign-off slate). They are never on the program log (the log refuses them), so every log,
+ * guide, dial and listing response keeps `LogCode`'s six values. The as-run log records `OPN` and
+ * `CLS`; an off-air card airs as the sign-off slate and is recorded as `OPEN`, as the generated
+ * one is.
+ *
+ * Apps check responses against their contracts, and a code they don't know would fail the whole
+ * response. So where an identity item shows up in a response (a library item, an as-run row, an
+ * HLS item tag), `code` keeps an old value (`IDENT_LEGACY_CODE`: SID for an opener or closer, OPEN
+ * for an off-air card) and `identCode` says which it is. Apps built before A242 drop the field they
+ * don't know and read a station ID or a slate; apps built since read `identCode ?? code`.
+ */
+export const IdentCode = z.enum(["OPN", "CLS", "OFF"]);
+export type IdentCode = z.infer<typeof IdentCode>;
+
+/** What an identity code reads as for apps built before A242 (`code` beside `identCode`). */
+export const IDENT_LEGACY_CODE = { OPN: "SID", CLS: "SID", OFF: "OPEN" } as const satisfies Record<IdentCode, LogCode>;
+
+/** A library item's type (A242): a log code, or an identity code. What uploads, item changes and the library's filter take. */
+export const LibraryCode = z.enum([...LogCode.options, ...IdentCode.options]);
+export type LibraryCode = z.infer<typeof LibraryCode>;
+
+/** True for an opener, closer or off-air card (A242). */
+export const isIdentCode = (code: string): code is IdentCode => (IdentCode.options as readonly string[]).includes(code);
+
+/** A stored code as a log code (A242): an identity code reads as its old one. For responses whose `code` is `LogCode`. */
+export const asLogCode = (code: LogCode | IdentCode): LogCode => (isIdentCode(code) ? IDENT_LEGACY_CODE[code] : code);
+
+/**
+ * A243 (added 2026-10-02): a bumper's role. `into_break` opens a break ("We'll be right back"),
+ * `out_of_break` closes it ("Now back to…"), `up_next` names the next program (the player draws the
+ * title over it, from the guide's own data), `any` a brand sting that airs wherever a bumper is
+ * wanted. A bumper without one reads as `any` (every bumper before A243). Bumpers keep `code` BMP.
+ */
+export const BumperRole = z.enum(["into_break", "out_of_break", "up_next", "any"]);
+export type BumperRole = z.infer<typeof BumperRole>;
+
+/**
+ * A244 (added 2026-10-02): the programming block an airing belongs to ("Late Crate Nights"), as the
+ * dial, guide, station page and banner name it. A program or live block is a member of a block when
+ * it starts inside one of the block's spans on the station's log.
+ */
+export const AiringBlock = z.object({ id: Id, name: z.string(), colour: Colour.nullable() });
+export type AiringBlock = z.infer<typeof AiringBlock>;
+
+/**
+ * A244 (added 2026-10-02): a programming block as viewers see it on a station's schedule: from its
+ * first member's start to its last member's end (a member that runs past the span keeps it on air
+ * to its end). Off-air time inside a span splits it in two. `id` is the block's.
+ */
+export const BlockBand = z.object({
+  id: Id,
+  name: z.string(),
+  colour: Colour.nullable(),
+  /** The block's logo (absolute URL), or null. */
+  logoUrl: z.string().nullable(),
+  startsAt: Timestamp,
+  endsAt: Timestamp
+});
+export type BlockBand = z.infer<typeof BlockBand>;
+
 export const StationKind = z.enum(["station", "studio", "claimable", "listed", "catalog"]);
 
 export const StationRole = z.enum(["owner", "operator", "host"]);

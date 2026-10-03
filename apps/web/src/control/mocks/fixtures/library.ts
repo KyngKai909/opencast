@@ -1,6 +1,7 @@
-// BEAT's library (live-listings 04.1; master-control LIB): 31 items. Late Crate (15), Crate
+// BEAT's library (live-listings 04.1; master-control LIB): 34 items. Late Crate (15), Crate
 // Sessions (3, one imported from a link with its rights still to confirm), Crate Talk (6),
-// Spots and IDs (4), Bumpers (2), and one recording not in a folder.
+// Spots and IDs (4), Bumpers (2), one recording not in a folder, and (A242, 2026-10-02) its
+// closer, off-air card (a picture) and opener, not in a folder.
 
 import type { Folder, LibraryItem, Program } from "@opencast/contracts";
 import { BEAT, LAB, uid } from "./stations";
@@ -99,10 +100,18 @@ const spotsIds = [
 
 const bumpers = [
   item({ title: "Beat Tape Live, trailer", code: "BMP", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") }),
-  item({ title: "Back to the reel", code: "BMP", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") })
+  // A243: a bumper out of the break; the trailer has no role (Any).
+  item({ title: "Back to the reel", code: "BMP", bumperRole: "out_of_break", folderId: FOLDERS.bumpers, durationMs: ms(0, 10), createdAt: at("12:00") })
 ];
 
 const loose = [item({ title: "Beat Tape Live, September 19", code: "PGM", programId: PROGRAM_IDS.beatTapeLive, durationMs: ms(57), createdAt: at("-7 22:00") })];
+
+// A242: what airs when BEAT signs off and back on. `code` is the old code apps built before read.
+const identity = [
+  item({ title: "BEAT goodnight", code: "SID", identCode: "CLS", durationMs: ms(0, 8), createdAt: at("-3 12:00"), originalFilename: "beat-goodnight.mp4" }),
+  item({ title: "BEAT test card", code: "OPEN", identCode: "OFF", still: true, durationMs: null, picture: { width: 1920, height: 1080 }, loudnessLufs: null, createdAt: at("-3 12:00"), originalFilename: "beat-test-card.png" }),
+  item({ title: "BEAT sign-on", code: "SID", identCode: "OPN", durationMs: ms(0, 6), createdAt: at("-3 12:00"), originalFilename: "beat-sign-on.mp4" })
+];
 
 // Inland Sound Lab's library: 18 items across its three programs (market 04.1: "Library 18").
 const lab = [
@@ -112,7 +121,7 @@ const lab = [
 ];
 
 export function seedLibrary(): { items: LibraryItem[]; folders: Folder[]; programs: Program[] } {
-  const items = [...lateCrate, ...crateSessions, ...crateTalk, ...spotsIds, ...bumpers, ...loose, ...lab].map((i) => structuredClone(i));
+  const items = [...lateCrate, ...crateSessions, ...crateTalk, ...spotsIds, ...bumpers, ...loose, ...identity, ...lab].map((i) => structuredClone(i));
   const count = (f: string) => items.filter((i) => i.folderId === f).length;
   const folders: Folder[] = [
     { id: FOLDERS.lateCrate, name: "Late Crate", parentFolderId: null, itemCount: count(FOLDERS.lateCrate) },

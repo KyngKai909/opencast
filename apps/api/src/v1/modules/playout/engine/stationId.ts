@@ -20,3 +20,44 @@ export function generatedStationIdKey(look: StationLook, band: Band): string {
 }
 
 export const isGeneratedStationId = (key: string) => key.startsWith("sid-");
+
+// The automatic opener and closer (A242, added 2026-10-02): for a station with no opener (or no
+// closer) of its own that can air. A few seconds, full screen in the station's colour (slates.ts,
+// `identCard`): "12.1 BEAT · Signing on", and "12.1 BEAT · Signing off · Back at 6:00 am", over
+// the same soft bed as the generated station ID (the bed alone on the radio band). Prepared like
+// it, under a key made from what it shows (the closer's includes when the station is back, on the
+// TV band), so a change to the station's look, or another back time, is a new one.
+
+export const GENERATED_IDENT_MS = 5_000;
+/** Bumped when the picture or the bed changes. */
+const IDENT_VERSION = 1;
+
+export type IdentKind = "opener" | "closer";
+
+/** What the automatic opener or closer shows, as its prepared key (`opn-…`, `cls-…`). */
+export function generatedIdentKey(look: StationLook, band: Band, kind: IdentKind, backAt: string | null): string {
+  // The radio band has no picture: one closer whenever the station is back.
+  const back = kind === "closer" && band === "tv" ? backAt : null;
+  const content = { kind, callSign: look.callSign, channel: look.channel, name: look.name, colour: look.colour, back, band, v: IDENT_VERSION };
+  return `${kind === "opener" ? "opn" : "cls"}-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
+}
+
+// A programming block's automatic intro and outro (A244, added 2026-10-02): for a block with no
+// intro (or outro) of its own that can air. Five seconds, full screen in the block's colour (else the
+// station's) with its logo and name (slates.ts, `blockCard`): "Late Crate Nights" over "on 12.1 BEAT",
+// and "That was Late Crate Nights". TV only (the radio band has no automatic cards). Prepared like the
+// generated station ID, under a key made from what it shows, so a new name, logo or colour (the
+// block's or the station's) is a new one.
+
+export const GENERATED_BLOCK_CARD_MS = 5_000;
+/** Bumped when the picture or the bed changes. */
+const BLOCK_CARD_VERSION = 1;
+
+/** What a block's automatic intro or outro shows, as its prepared key (`blk-…`). */
+export function blockCardKey(look: StationLook, band: Band, block: { name: string; logoContentId: string | null; colour: string | null }, kind: "intro" | "outro"): string {
+  const content = { kind, block: block.name, logo: block.logoContentId, colour: block.colour ?? look.colour, callSign: look.callSign, channel: look.channel, band, v: BLOCK_CARD_VERSION };
+  return `blk-${createHash("sha256").update(JSON.stringify(content)).digest("hex").slice(0, 40)}`;
+}
+
+/** Anything Opencast makes over the soft bed: the generated station ID, the automatic opener and closer, and (A244) a block's automatic cards. */
+export const isGeneratedIdent = (key: string) => /^(sid|opn|cls|blk)-/.test(key);

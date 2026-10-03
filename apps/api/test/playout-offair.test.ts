@@ -1,7 +1,8 @@
 // Planned off air in the assembled channel (a radio-band station, so the ladder is AAC 128k and
-// 64k): the sign-off slate, then the playlist ends with #EXT-X-ENDLIST and nothing is written or
-// logged as aired while the station is dark; at the back time a new playlist starts from the
-// station ID. No FFmpeg: items are "prepared" by a fake transcoder, on a frozen clock.
+// 64k): the closer and the sign-off slate, then the playlist ends with #EXT-X-ENDLIST and nothing
+// is written or logged as aired while the station is dark; at the back time a new playlist starts
+// from the opener (A242: the station has none of its own, so the automatic ones, the bed alone on
+// the radio band). No FFmpeg: items are "prepared" by a fake transcoder, on a frozen clock.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { schema } from "@opencast/db";
@@ -59,12 +60,13 @@ describe("off air in the assembled channel", () => {
     expect(parseDateRanges((await playlist())!).some((r) => r.class === HLS_CLASS.bug)).toBe(false);
   }, 30_000);
 
-  it("ends the playlist after the sign-off slate, with when it's back", async () => {
+  it("ends the playlist after the closer and the sign-off slate, with when it's back", async () => {
     await runUntil("2026-10-02T06:02:10.000Z");
     const ended = (await playlist())!;
     expect(ended.trimEnd().endsWith("#EXT-X-ENDLIST")).toBe(true);
     const signOff = parseDateRanges(ended).find((r) => r.class === HLS_CLASS.signOff)!;
-    expect(new Date(signOff.start).toISOString()).toBe("2026-10-02T06:01:00.000Z");
+    // The automatic closer first (five seconds), then the slate.
+    expect(new Date(signOff.start).toISOString()).toBe("2026-10-02T06:01:05.000Z");
     expect(signOff.attributes.backAt).toBe("2026-10-02T06:10:00.000Z");
     expect(ended).toContain("#EXT-X-PROGRAM-DATE-TIME:2026-10-02T06:01:00.000Z");
 
@@ -72,17 +74,18 @@ describe("off air in the assembled channel", () => {
     await runUntil("2026-10-02T06:08:00.000Z", 30_000);
     expect(await playlist()).toBe(ended);
     const all = await rows();
-    expect(all.filter((r) => r.startsAt > new Date("2026-10-02T06:02:00Z") && r.startsAt < new Date("2026-10-02T06:09:56Z"))).toEqual([]);
-    expect(all.find((r) => r.kind === "end")!.startsAt.toISOString()).toBe("2026-10-02T06:02:00.000Z");
+    expect(all.filter((r) => r.startsAt > new Date("2026-10-02T06:02:05Z") && r.startsAt < new Date("2026-10-02T06:09:55Z"))).toEqual([]);
+    expect(all.find((r) => r.kind === "end")!.startsAt.toISOString()).toBe("2026-10-02T06:02:05.000Z");
   }, 30_000);
 
-  it("starts a new playlist from the station ID at the back time", async () => {
+  it("starts a new playlist from the opener at the back time", async () => {
     await runUntil("2026-10-02T06:09:40.000Z", 10_000);
     await runUntil("2026-10-02T06:10:10.000Z");
     const back = (await playlist())!;
     expect(back).not.toContain("#EXT-X-ENDLIST");
     const items = parseDateRanges(back).filter((r) => r.class === HLS_CLASS.item);
-    expect(items.map((r) => `${new Date(r.start).toISOString().slice(11, 19)} ${r.attributes.code}`)).toEqual(["06:09:56 SID", "06:10:00 PGM"]);
+    // The opener replaces the station ID (A242); its tag says SID for players built before, and OPN.
+    expect(items.map((r) => `${new Date(r.start).toISOString().slice(11, 19)} ${r.attributes.identCode ?? r.attributes.code}`)).toEqual(["06:09:55 OPN", "06:10:00 PGM"]);
     // Numbering carries on from the last playlist.
     const all = await rows();
     const end = all.find((r) => r.kind === "end")!;
@@ -90,9 +93,9 @@ describe("off air in the assembled channel", () => {
     expect(sequence).toBe(end.seq);
     expect(Number(/#EXT-X-DISCONTINUITY-SEQUENCE:(\d+)/.exec(back)![1])).toBeGreaterThan(end.disc);
 
-    // What aired: the program, its break, the slate; nothing while dark; then the station ID.
+    // What aired: the program, its break, the closer, the slate; nothing while dark; then the opener.
     const aired = await h.db.select().from(schema.asRun).where(eq(schema.asRun.stationId, stationId)).orderBy(asc(schema.asRun.startedAt));
     const fromSix = aired.filter((r) => r.startedAt >= new Date("2026-10-02T06:00:00Z"));
-    expect(fromSix.map((r) => `${r.startedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual(["06:00:00 PGM planned", "06:00:56 SID planned", "06:01:00 OPEN slate", "06:09:56 SID planned"]);
+    expect(fromSix.map((r) => `${r.startedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual(["06:00:00 PGM planned", "06:00:56 SID planned", "06:01:00 CLS planned", "06:01:05 OPEN slate", "06:09:55 OPN planned"]);
   }, 30_000);
 });

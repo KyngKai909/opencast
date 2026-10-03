@@ -1,7 +1,9 @@
 // The Monitor's rundown, to the second (master-control A.7 RD, P.1): programs split around the
 // breaks inside them ("Saturday Reel, part 1"), each break's rows in the order they air, planned
 // off air (G9: off air hours and sign-offs, with when the station is back), and time with nothing
-// on the log. Shared with the mock, which answers "what's on now" from it.
+// on the log. A243: each bumper's note says where it airs ("Into the break", "Between programs",
+// "Up next: Saturday Reel, 9:00 pm"); one that didn't fit is listed quieter, with no length.
+// Shared with the mock, which answers "what's on now" from it.
 
 import type { BreakRow, BreakSlot, LogCode, LogEntry, OffAirSpan } from "@opencast/contracts";
 import { clock } from "@opencast/ui";
@@ -22,6 +24,8 @@ export interface RundownRow {
   breakId?: string;
   /** The log entry a program row belongs to. */
   entryId?: string;
+  /** A243: a bumper that didn't fit its break: listed ("Didn't fit: Up next (:08)"), not airing. */
+  dropped?: boolean;
 }
 
 /** What each code reads as under a break row, when the row has no note of its own. */
@@ -56,7 +60,7 @@ export function breakRows(b: BreakSlot): RundownRow[] {
   const out: RundownRow[] = [];
   let at = start;
   rows.forEach((r, i) => {
-    out.push({ id: `${id}:r${i}`, at: iso(at), code: r.code, title: r.title, source: r.note ?? CODE_SOURCE[r.code], lengthMs: r.lengthMs, kind: "break", breakId: id });
+    out.push({ id: `${id}:r${i}`, at: iso(at), code: r.code, title: r.title, source: r.note ?? CODE_SOURCE[r.code], lengthMs: r.lengthMs, kind: "break", breakId: id, ...((r.element && !r.element.fits) || (r.block && !r.block.fits) ? { dropped: true } : {}) });
     at += r.lengthMs;
   });
   const rest = start + b.lengthMs - at;
@@ -141,11 +145,11 @@ export function nextRow(rows: RundownRow[], now: number): RundownRow | null {
 
 /** The next break: its first row and how many rows follow it ("Mission Soda, then 6 more"). */
 export function nextBreak(rows: RundownRow[], now: number): { at: string; first: RundownRow; more: number } | null {
-  const first = rows.find((r) => r.kind === "break" && t(r.at) > now && !rows.some((x) => x.breakId === r.breakId && t(x.at) <= now));
+  const first = rows.find((r) => r.kind === "break" && !r.dropped && t(r.at) > now && !rows.some((x) => x.breakId === r.breakId && t(x.at) <= now));
   if (!first) return null;
   const all = rows.filter((r) => r.breakId === first.breakId);
   // Name the break by the first thing in it with a picture; open time only holds on the slate.
-  const lead = all.find((r) => r.code !== "OPEN") ?? first;
+  const lead = all.find((r) => r.code !== "OPEN" && !r.dropped) ?? first;
   return { at: first.at, first: lead, more: Math.max(0, all.length - 1) };
 }
 

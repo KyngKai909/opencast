@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { DateOnly, Id, Micros, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { BumperRole, DateOnly, Id, Micros, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { OrderState, SponsorshipDeclineReason, SponsorshipState, SpotState } from "./states.js";
 import { PreviewStatus } from "./catalog.js";
 import { RelayViewersLine, RelayViewersPart } from "./platforms.js";
@@ -290,7 +290,27 @@ export const BreakContent = z.object({
   shortName: z.string().nullable(),
   /** Which rotation placed it (spots only). */
   rotation: z.enum(["main", "backup"]).nullable(),
-  note: z.string().nullable()
+  note: z.string().nullable(),
+  /**
+   * A243 (added 2026-10-02): a bumper from the station's sequences: where (`open`, `close`,
+   * `between` programs), its role, what up next announces (null when nothing's on next), and
+   * whether it fits the break's time (one that doesn't is listed with no length, and doesn't air).
+   * `kind` stays `bumper`.
+   */
+  element: z
+    .object({
+      position: z.enum(["open", "close", "between", "boundary"]),
+      role: BumperRole,
+      announces: z.object({ title: z.string(), startsAt: Timestamp }).nullable(),
+      fits: z.boolean()
+    })
+    .optional(),
+  /**
+   * A244 (added 2026-10-02): a programming block's own: its intro or outro (between programs, `kind`
+   * `station_id`), its ID (where the station ID would air, `kind` `station_id`) or one of its
+   * bumpers (`kind` `bumper`), and whether it fits.
+   */
+  block: z.object({ id: Id, name: z.string(), part: z.enum(["intro", "outro", "id", "bumper"]), fits: z.boolean() }).optional()
 });
 export type BreakContent = z.infer<typeof BreakContent>;
 

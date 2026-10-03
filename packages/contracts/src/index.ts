@@ -28,6 +28,7 @@ import { billingApi } from "./billing.js";
 import { relayApi } from "./relay.js";
 import { platformsApi } from "./platforms.js";
 import { uploadsApi } from "./uploads.js";
+import { blocksApi } from "./blocks.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -60,6 +61,7 @@ export * from "./billing.js";
 export * from "./relay.js";
 export * from "./platforms.js";
 export * from "./uploads.js";
+export * from "./blocks.js";
 
 export const API_PREFIX = "/v1";
 
@@ -91,7 +93,9 @@ export const api = {
   /** Added 2026-09-30 (follow-up Phase 3): relays, set once for all of a station's translators (modes, breaks, the bug, restarts). */
   relay: relayApi,
   /** Added 2026-09-30 (follow-up Phase 4): direct uploads, straight from the browser to object storage in parts. */
-  uploads: uploadsApi
+  uploads: uploadsApi,
+  /** Added 2026-10-02 (A244): programming blocks, named and branded stretches of a station's log. */
+  blocks: blocksApi
 } as const;
 
 export const HealthResponse = z.object({

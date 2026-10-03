@@ -6,3 +6,6 @@
   .cc-libwrap .cc-folders { border-right: 0; border-bottom: 1px solid var(--hair); }
   .cc-lib-main { padding: 16px; }
 }
+
+/* A243: the Bumpers list's role chips. */
+.cc-lib-roles { margin: 0 0 14px; }

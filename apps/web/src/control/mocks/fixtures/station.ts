@@ -69,6 +69,9 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     adsFromPartners: false,
     // Added 2026-09-29: the station ID, bumpers, credit and spots in every break (as before).
     cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } },
+    // A242 (2026-10-02): the opener replaces the station ID at sign-on; no opener each morning.
+    stationIdAfterOpener: false,
+    dailyOpener: false,
     ...o
   };
 }
@@ -77,7 +80,15 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
 export function breakRuleOf(stationId: string): BreakRule {
   const rule = stationState().breakRules[stationId];
   const cadence = rule?.cadence ? { ...rule.cadence, spots: rule.cadence.spots ?? { every: "break" as const } } : defaultBreakRule().cadence;
-  return rule ? { ...defaultBreakRule(), ...rule, cadence } : defaultBreakRule();
+  const full = rule ? { ...defaultBreakRule(), ...rule, cadence } : defaultBreakRule();
+  // A243: always with the bumper sequences, the defaults (from `cadence.bumpers`) filled in.
+  return { ...full, bumperSequences: full.bumperSequences ?? defaultSequences(full.cadence?.bumpers) };
+}
+
+/** A243: one into the break and one out of it, as often as the bumpers' cadence; nothing between programs. */
+export function defaultSequences(bumpers: NonNullable<BreakRule["cadence"]>["bumpers"] = { every: "break" }): NonNullable<BreakRule["bumperSequences"]> {
+  const every = bumpers.every === "n_programs" ? { every: bumpers.every, n: bumpers.n ?? 2 } : { every: bumpers.every };
+  return { open: { roles: ["into_break"], ...every }, close: { roles: ["out_of_break"], ...every }, between: { roles: [], every: "program" } };
 }
 
 /**

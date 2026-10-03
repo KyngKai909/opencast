@@ -28,7 +28,7 @@
 
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, LogCode, Millis, Ok, Timestamp } from "./common.js";
+import { BumperRole, Id, LibraryCode, Millis, Ok, Timestamp } from "./common.js";
 
 const MiB = 1024 ** 2;
 const GiB = 1024 ** 3;
@@ -81,7 +81,11 @@ export const LOCAL_UPLOAD_PART_PATH = "/uploads/:uploadId/parts/:partNumber/data
 /** What a library upload says about the new item (the old upload's form fields). */
 export const LibraryUploadFields = z.object({
   title: z.string().min(1).max(200).optional(),
-  code: LogCode.optional(),
+  /**
+   * Its type. A242 (2026-10-02): `OPN` (opener), `CLS` (closer) or `OFF` (off-air card) too; an
+   * off-air card can be a picture (PNG, JPEG or WebP) as well as video or audio.
+   */
+  code: LibraryCode.optional(),
   programId: Id.nullable().optional(),
   folderId: Id.nullable().optional(),
   episodeNumber: z.number().int().positive().nullable().optional(),
@@ -90,7 +94,14 @@ export const LibraryUploadFields = z.object({
   /** A caption file's text (WebVTT, or SRT turned into WebVTT; up to 1 MB), read in the browser and sent here. */
   captions: z.string().min(1).max(1_048_576).optional(),
   /** Its language (BCP 47); else the program's captions language, else "en". */
-  captionLanguage: z.string().min(2).max(35).optional()
+  captionLanguage: z.string().min(2).max(35).optional(),
+  /** A244 (added 2026-10-02): a bumper's role (A243), for a bumper uploaded into a block's role. */
+  bumperRole: BumperRole.nullable().optional(),
+  /**
+   * A244 (added 2026-10-02): uploaded straight into a programming block (a bumper, station ID,
+   * opener or closer: the block's bumper, ID, intro or outro). Its block must be the station's.
+   */
+  programBlockId: Id.nullable().optional()
 });
 export type LibraryUploadFields = z.infer<typeof LibraryUploadFields>;
 

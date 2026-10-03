@@ -7,6 +7,7 @@ import { logApi } from "@opencast/contracts";
 import { getDb, saveDb } from "../db";
 import { saveOnAirState } from "../fixtures/onair";
 import { fail, path, reply } from "../respond";
+import { setTemplateBlocks } from "../blocks";
 import { createTemplate, offAirHoursOf, removeTemplate, templateById, templatesOf, templateView, TemplateInputError, updateTemplate } from "../schedule";
 import { roleOn } from "./log";
 
@@ -63,6 +64,11 @@ export const templateHandlers = [
     if (!body.success) return fail(400, "bad_request", "That change isn't complete.");
     // `entries` (a template edited entry by entry) has no screen yet; the mock takes a day's log (`fromDay`).
     if (body.data.entries) return fail(400, "bad_request", "Change the template from a day's log.", { entries: "Not in the mock" });
+    // A244: its programming blocks, replaced (each ends by 6:00 am).
+    if (body.data.blocks) {
+      const problem = setTemplateBlocks(t.id, body.data.blocks);
+      if (problem) return fail(400, "block_crosses_day", problem);
+    }
     try {
       const generated = updateTemplate(t, body.data);
       saveAll();

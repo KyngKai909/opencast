@@ -250,12 +250,86 @@ export const assets = broadcast.table(
     legacyId: text("legacy_id").unique(),
     /** Deleted from the library. Kept, because the as-run log and claims still point at it. */
     archivedAt: at("archived_at"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /**
+     * A243 (migration 0048): a bumper's role (`into_break`, `out_of_break`, `up_next`, `any`). Null
+     * reads as Any (every bumper before it). Only on bumpers (`BMP`).
+     */
+    bumperRole: text("bumper_role", { enum: ["into_break", "out_of_break", "up_next", "any"] }),
+    /**
+     * A243 (migration 0048): when an item may air (bumpers, station IDs, openers, closers): broadcast
+     * dates, inclusive, either end open; and a time of day in the market's time zone (an end before
+     * the start runs past midnight). Outside its window it never airs.
+     */
+    airsFrom: date("airs_from"),
+    airsUntil: date("airs_until"),
+    dailyFrom: time("daily_from"),
+    dailyUntil: time("daily_until"),
+    /**
+     * A244 (migration 0049): the programming block it belongs to: its intro (`OPN`), outro (`CLS`), ID
+     * (`SID`) or one of its bumpers (`BMP`, by role). Null: the station's own. A block's items are
+     * never in the station's pools; they air only during the block.
+     */
+    programBlockId: uuid("program_block_id").references((): AnyPgColumn => programBlocks.id)
   },
   (t) => [
     check("link_has_url", sql`${t.source} <> 'link' or ${t.sourceUrl} is not null`),
     check("creator_work_has_work", sql`${t.source} <> 'creator_work' or ${t.creatorWorkId} is not null`),
+    check("assets_bumper_role", sql`${t.bumperRole} is null or (${t.code} = 'BMP' and ${t.bumperRole} in ('into_break', 'out_of_break', 'up_next', 'any'))`),
+    check("assets_air_dates", sql`${t.airsFrom} is null or ${t.airsUntil} is null or ${t.airsUntil} >= ${t.airsFrom}`),
+    check("assets_daily_window", sql`(${t.dailyFrom} is null) = (${t.dailyUntil} is null) and (${t.dailyFrom} is null or ${t.dailyFrom} <> ${t.dailyUntil})`),
+    // As text: 0047's enum values may not be committed yet when the migrations run in one transaction.
+    check("assets_block_kinds", sql`${t.programBlockId} is null or ${t.code}::text in ('BMP', 'SID', 'OPN', 'CLS')`),
     index("assets_station").on(t.stationId)
+  ]
+);
+
+/**
+ * A244 (migration 0049): a programming block, a named and branded stretch of a station's log ("Late
+ * Crate Nights"): its own look (colour, logo, what the bug shows), an intro and outro, an ID and
+ * bumpers (library items with `program_block_id`), and optionally its own bumper order. Where it
+ * airs is the log's (`program_block_spans`, `day_template_blocks`). Owned by `library`.
+ *
+ * Syndication readiness (the market itself is later): `owner_station_id` makes it and `station_id`
+ * airs it; for every block made now they're the same (`own_block_is_owners`). A carrier's copy will
+ * point at the maker's block (`source_block_id`) and its block agreement (`carriage_agreement_id`,
+ * its foreign key added with the market), and airs as its own row. `reskin` is the maker's say on
+ * whether a carrier may put its own intro, outro and bumpers in (the block ID is always the airing
+ * station's).
+ */
+export const programBlocks = broadcast.table(
+  "program_blocks",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    ownerStationId: uuid("owner_station_id")
+      .notNull()
+      .references(() => stations.id),
+    sourceBlockId: uuid("source_block_id").references((): AnyPgColumn => programBlocks.id),
+    carriageAgreementId: uuid("carriage_agreement_id"),
+    name: text("name").notNull(),
+    description: text("description"),
+    colour: text("colour"),
+    logoContentId: text("logo_content_id").references(() => contents.cid),
+    /** What the bug shows during the block: the block's logo (`logo`; without a logo, the station's), the station's (`station`), or none (`off`). */
+    bug: text("bug", { enum: ["station", "logo", "off"] }).notNull().default("logo"),
+    intro: boolean("intro").notNull().default(true),
+    outro: boolean("outro").notNull().default(true),
+    /** Its own bumper order (null: the station's), as `break_rules.bumper_sequences`. */
+    sequences: jsonb("sequences").$type<BumperSequencesRow>(),
+    reskin: text("reskin", { enum: ["owner_only", "carrier_may_reskin"] }).notNull().default("owner_only"),
+    createdAt: createdAt(),
+    updatedAt: at("updated_at").notNull().defaultNow(),
+    archivedAt: at("archived_at")
+  },
+  (t) => [
+    check("program_block_name_length", sql`char_length(${t.name}) between 1 and 60`),
+    check("program_block_description_length", sql`${t.description} is null or char_length(${t.description}) <= 160`),
+    check("program_block_colour_contrast", sql`${t.colour} is null or public.contrast_on_white(${t.colour}) >= 4.5`),
+    check("own_block_is_owners", sql`${t.sourceBlockId} is not null or ${t.ownerStationId} = ${t.stationId}`),
+    uniqueIndex("program_blocks_name").on(t.stationId, sql`lower(${t.name})`).where(sql`${t.archivedAt} is null`)
   ]
 );
 
@@ -304,7 +378,7 @@ export const contentRefs = broadcast.table(
     cid: text("cid")
       .notNull()
       .references(() => contents.cid),
-    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo", "caption_track", "relay_background"] }).notNull(),
+    owner: text("owner", { enum: ["asset_file", "asset_original", "spot_file", "order_file", "claim_attachment", "business_logo", "caption_track", "relay_background", "block_logo"] }).notNull(),
     ownerId: uuid("owner_id").notNull(),
     createdAt: createdAt()
   },
@@ -459,6 +533,20 @@ export const rightsConfirmations = broadcast.table(
 );
 
 /** How often a part of the break airs (`break_rules.cadence`). */
+/** A243: a bumper's role. */
+export type BumperRoleRow = "into_break" | "out_of_break" | "up_next" | "any";
+/** A243: one position's sequence (roles in air order) and how often it airs. */
+export interface PositionRuleRow {
+  roles: BumperRoleRow[];
+  every: "break" | "program" | "n_programs" | "hour" | "never";
+  n?: number;
+}
+export interface BumperSequencesRow {
+  open: PositionRuleRow;
+  close: PositionRuleRow;
+  between: PositionRuleRow;
+}
+
 export interface BreakCadenceRow {
   every: "break" | "program" | "n_programs" | "hour" | "never";
   n?: number;
@@ -491,6 +579,16 @@ export const breakRules = broadcast.table(
      * of them. `spots` was added later the same day, in the same column (no migration); without it, every break.
      */
     cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow }>(),
+    /** A242 (migration 0047): at sign-on, the opener and then the station ID (off: the opener replaces it). */
+    stationIdAfterOpener: boolean("station_id_after_opener").notNull().default(false),
+    /** A242 (migration 0047): the opener at the start of each broadcast day (6:00 am local), for a channel that never goes off air. */
+    dailyOpener: boolean("daily_opener").notNull().default(false),
+    /**
+     * A243 (migration 0048): the bumper sequences, `{ open, close, between }`, each `{ roles, every, n? }`
+     * (roles in air order). Null: the defaults (one into the break, one out of it, as often as
+     * `cadence.bumpers`; none between programs). Stored only once the station changes them.
+     */
+    bumperSequences: jsonb("bumper_sequences").$type<BumperSequencesRow>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [
@@ -600,6 +698,36 @@ export const repeatGroups = broadcast.table("repeat_groups", {
   createdAt: createdAt()
 });
 
+/**
+ * A244 (migration 0049): a programming block placed on a date's log, like a log entry. Programs and
+ * live blocks starting inside `[starts_at, ends_at)` are its members (the block airs from its first
+ * member's start to its last member's end). Spans never overlap on a station
+ * (`program_block_spans_no_overlap`, an exclusion constraint in the migration). Owned by `log`.
+ */
+export const programBlockSpans = broadcast.table(
+  "program_block_spans",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    blockId: uuid("block_id")
+      .notNull()
+      .references(() => programBlocks.id),
+    startsAt: at("starts_at").notNull(),
+    endsAt: at("ends_at").notNull(),
+    /** Made by a day template (with `template_date`, the broadcast date it was made for). */
+    repeatGroupId: uuid("repeat_group_id").references(() => repeatGroups.id),
+    templateDate: date("template_date"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: createdAt()
+  },
+  (t) => [
+    check("program_block_span_length", sql`${t.endsAt} > ${t.startsAt} and ${t.endsAt} - ${t.startsAt} <= interval '24 hours'`),
+    index("program_block_spans_station_time").on(t.stationId, t.startsAt)
+  ]
+);
+
 /** Day templates (added 2026-09-29): the day a template repeats, as local wall-clock times. */
 export const dayTemplateEntries = broadcast.table(
   "day_template_entries",
@@ -626,6 +754,31 @@ export const dayTemplateEntries = broadcast.table(
     check("template_entry_start_minute", sql`${t.startMinute} >= 0 and ${t.startMinute} < 1440`),
     check("template_entry_length", sql`${t.lengthMs} > 0`),
     index("day_template_entries_template").on(t.templateId)
+  ]
+);
+
+/**
+ * A244 (migration 0049): a programming block in a day template, as `day_template_entries`: a local
+ * wall-clock start (before 6:00 am is after midnight) and a length that ends by 6:00 am, when the
+ * next broadcast day starts (checked by the service). Owned by `log`.
+ */
+export const dayTemplateBlocks = broadcast.table(
+  "day_template_blocks",
+  {
+    id: id(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => repeatGroups.id),
+    blockId: uuid("block_id")
+      .notNull()
+      .references(() => programBlocks.id),
+    startMinute: smallint("start_minute").notNull(),
+    lengthMs: integer("length_ms").notNull()
+  },
+  (t) => [
+    check("template_block_start_minute", sql`${t.startMinute} between 0 and 1439`),
+    check("template_block_length", sql`${t.lengthMs} > 0`),
+    index("day_template_blocks_template").on(t.templateId)
   ]
 );
 
@@ -903,11 +1056,27 @@ export const asRun = broadcast.table(
     /** Proof frame for spots: captured with the station's bug, kept for a year. */
     proofFrameUrl: text("proof_frame_url"),
     proofFrameAt: at("proof_frame_at"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /** A243 (migration 0048): a bumper's role as it aired. */
+    bumperRole: text("bumper_role"),
+    /**
+     * A243 (migration 0048): where it aired: `open` / `close` (a break's opening or closing
+     * sequence), `between` (between programs), `boundary` (a block's intro or outro, later),
+     * `open_time` (open time's fill) or `sign_on` (the opener, A242). Null before 0048.
+     */
+    position: text("position", { enum: ["open", "close", "between", "boundary", "open_time", "sign_on"] }),
+    /** A243 (migration 0048): up next only, what it announced (no foreign key: append-only, and the entry may go). */
+    announcedEntryId: uuid("announced_entry_id"),
+    announcedTitle: text("announced_title"),
+    /** A244 (migration 0049): the programming block it aired in (a member's program and breaks, the block's intro, outro, ID and bumpers). */
+    programBlockId: uuid("program_block_id").references(() => programBlocks.id)
   },
   (t) => [
     check("as_run_ends_after_start", sql`${t.endedAt} >= ${t.startedAt}`),
-    index("as_run_station_time").on(t.stationId, t.startedAt)
+    check("as_run_position", sql`${t.position} is null or ${t.position} in ('open', 'close', 'between', 'boundary', 'open_time', 'sign_on')`),
+    index("as_run_station_time").on(t.stationId, t.startedAt),
+    /** A243: when each item last aired (least recently aired first). */
+    index("as_run_station_asset_time").on(t.stationId, t.assetId, t.startedAt).where(sql`${t.assetId} is not null`)
   ]
 );
 
@@ -1101,7 +1270,14 @@ export const channelItems = broadcast.table(
     open: boolean("open").notNull().default(false),
     /** The as-run entry written once its last segment was published. */
     asRunId: uuid("as_run_id"),
-    createdAt: createdAt()
+    createdAt: createdAt(),
+    /** A243 (migration 0048): carried to the as-run row (`as_run` has the same four). */
+    bumperRole: text("bumper_role"),
+    position: text("position"),
+    announcedEntryId: uuid("announced_entry_id"),
+    announcedTitle: text("announced_title"),
+    /** A244 (migration 0049): carried to the as-run row. */
+    programBlockId: uuid("program_block_id")
   },
   (t) => [index("channel_items_station_seq").on(t.stationId, t.seq), index("channel_items_station_ends").on(t.stationId, t.endsAt)]
 );

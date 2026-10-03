@@ -33,3 +33,6 @@
 /* Ads from partners while it's off: the row reads quieter (its words say "Off"). */
 .cc-lad--off { color: var(--ink-50); }
 .cc-lad__code--off { border-style: dashed; }
+
+/* A242: the sign-off and sign-on sequence, in the log's own type. */
+.cc-breaks__seq { font: 500 13px var(--font-mono); color: var(--ink-70); margin: 0 0 6px; }

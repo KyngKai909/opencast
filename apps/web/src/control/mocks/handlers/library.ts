@@ -2,8 +2,10 @@
 // history (L5) and replacing its file (L6). The Live and programming area owns this file.
 
 import { http } from "msw";
-import { libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
+import { blockById } from "../blocks";
+import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
+import { inWindow } from "../../components/live/bumpers";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
 import { advancePreparing, ensureLiveSeed, entryListingStatus, extraAired, listingWindow, liveState, PROGRAM_CARRIAGE, saveLive } from "../fixtures/live";
 import type { MockPerson } from "../fixtures/people";
@@ -50,7 +52,17 @@ function audioLayout(i: LibraryItem) {
 }
 
 /** L5, L7: the audio layout and caption language, as the API adds them. */
-const withProbe = (i: LibraryItem): LibraryItem => ({ ...i, audioLayout: audioLayout(i), captionLanguage: i.captions === "none" ? null : "en" });
+const withProbe = (i: LibraryItem): LibraryItem => ({
+  ...i,
+  audioLayout: audioLayout(i),
+  captionLanguage: i.captions === "none" ? null : "en",
+  // A243: a bumper's role (none reads as Any), and whether it's inside its window now.
+  bumperRole: i.code === "BMP" ? (i.bumperRole ?? null) : null,
+  airs: i.airs ?? null,
+  airingNow: inWindow(i.airs, now()),
+  // A244: the programming block it belongs to.
+  programBlockId: i.programBlockId ?? null
+});
 
 /** Programs with their listing status computed from what they air this week. */
 function programsOf(stationId: string): Program[] {
@@ -106,6 +118,12 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
   };
 }
 
+/** A242: an item's type as the API stores it, as `code` (what apps built before read) and `identCode`. */
+export function typed(code: string): Pick<LibraryItem, "code" | "identCode"> {
+  if (isIdentCode(code)) return { code: IDENT_LEGACY_CODE[code], identCode: code };
+  return { code: code as LibraryItem["code"], identCode: null };
+}
+
 /** A file as the mocks see it. */
 export type MockFile = Pick<File, "name" | "type" | "size">;
 
@@ -117,13 +135,15 @@ export function mockLibraryUpload(request: Request, stationId: string, file: Moc
   if (denied) return denied;
   if (!dbStation(stationId)) return fail(404, "not_found", "That station wasn't found.");
   if (!file) return fail(400, "no_file", "Choose a video or audio file.");
-  if (!/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
-    return fail(415, "not_media", "That file isn't video or audio.");
+  // A242: an off-air card can be a picture.
+  const still = fields.code === "OFF" && (/^image\/(png|jpeg|webp)$/.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name));
+  if (!still && !/^(video|audio)\//.test(file.type) && !/\.(mp4|mov|m4v|mkv|webm|mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name)) {
+    return fail(415, "not_media", fields.code === "OFF" ? "That file isn't a picture, video or audio." : "That file isn't video or audio.");
   }
   const audio = file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|flac|ogg)$/i.test(file.name);
   // Under a minute is guessed as a bumper. The mock can't read the length: small files are short.
-  const code = (fields.code as LibraryItem["code"] | undefined) ?? (file.size < 8_000_000 ? "BMP" : "PGM");
-  const item = newItem(stationId, { title: fields.title ?? titleFrom(file.name), code, mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: fields.folderId ?? null });
+  const code = fields.code ?? (file.size < 8_000_000 ? "BMP" : "PGM");
+  const item = newItem(stationId, { title: fields.title ?? titleFrom(file.name), ...typed(code), ...(still ? { still: true } : {}), mediaKind: audio ? "audio" : "video", originalFilename: file.name, folderId: fields.folderId ?? null });
   getDb().library.items.push(item);
   liveState().preparing[item.id] = Date.now();
   saveLive();
@@ -161,8 +181,13 @@ export const libraryHandlers = [
     const all = lib.items.filter((i) => i.stationId === id);
     let items = all;
     if (q.get("folderId")) items = items.filter((i) => i.folderId === q.get("folderId"));
-    if (q.get("code")) items = items.filter((i) => i.code === q.get("code"));
+    if (q.get("code")) items = items.filter((i) => (i.identCode ?? i.code) === q.get("code"));
+    // A243: bumpers by role (Any includes bumpers without one).
+    const role = q.get("bumperRole");
+    if (role) items = items.filter((i) => i.code === "BMP" && (i.bumperRole ?? "any") === role);
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
+    // A244: a programming block's items.
+    if (q.get("programBlockId")) items = items.filter((i) => i.programBlockId === q.get("programBlockId"));
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
       items: items.map(withProbe),
@@ -191,7 +216,7 @@ export const libraryHandlers = [
     const job = { id: crypto.randomUUID(), status: "running" as const, requestedUrls: parsed.data.urls, items: [] as { sourceUrl: string; title: string | null; status: string; progressPct: number; assetId: string | null }[], error: null, createdAt: now().toISOString(), stationId: id };
     for (const url of parsed.data.urls) {
       const title = titleFrom(decodeURIComponent(new URL(url).pathname.split("/").filter(Boolean).at(-1) ?? new URL(url).hostname));
-      const item = newItem(id, { title, code: parsed.data.code, source: "link", sourceUrl: url, offerable: false, programId: parsed.data.programId ?? null });
+      const item = newItem(id, { title, ...typed(parsed.data.code), source: "link", sourceUrl: url, offerable: false, programId: parsed.data.programId ?? null });
       getDb().library.items.push(item);
       liveState().preparing[item.id] = Date.now();
       job.items.push({ sourceUrl: url, title, status: "running", progressPct: 0, assetId: item.id });
@@ -271,7 +296,28 @@ export const libraryHandlers = [
     if (denied) return denied;
     const parsed = libraryApi.updateItem.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "invalid", "Check the item's details and try again.");
-    Object.assign(item, parsed.data);
+    const { code, ...rest } = parsed.data;
+    // A243, as the API: a role is a bumper's; a window a bumper's, station ID's, opener's or closer's.
+    const type = code ?? item.identCode ?? item.code;
+    if (rest.bumperRole != null && type !== "BMP") return fail(400, "bad_request", "Only a bumper has a role.");
+    if (rest.airs && (rest.airs.from || rest.airs.until || rest.airs.dailyFrom) && !["BMP", "SID", "OPN", "CLS"].includes(type)) return fail(400, "bad_request", "Only bumpers, station IDs, openers and closers have times they air.");
+    if (rest.airs && Boolean(rest.airs.dailyFrom) !== Boolean(rest.airs.dailyUntil)) return fail(400, "bad_request", "Say both times of day, or neither.");
+    if (rest.airs?.from && rest.airs.until && rest.airs.until < rest.airs.from) return fail(400, "bad_request", "The last day is before the first.");
+    // A244, as the API: bumpers, station IDs, openers and closers can be a block's (the station's own block).
+    if (rest.programBlockId && !["BMP", "SID", "OPN", "CLS"].includes(type)) return fail(400, "bad_request", "Only bumpers, station IDs, openers and closers can be part of a block.");
+    if (rest.programBlockId && blockById(rest.programBlockId)?.stationId !== item.stationId) return fail(404, "not_found", "That block wasn't found.");
+    if (type !== "BMP") rest.bumperRole = null;
+    if (!["BMP", "SID", "OPN", "CLS"].includes(type)) {
+      rest.airs = null;
+      rest.programBlockId = null;
+    }
+    if (code && code !== (item.identCode ?? item.code)) {
+      // A242, as the API: a picture is an off-air card only; openers, closers and cards stay off the log.
+      if (item.still) return fail(422, "still_image", "It's a picture, so it can only be an off-air card. Upload a clip to use it as something else.");
+      if (isIdentCode(code) && usage(item).logEntries) return fail(409, "on_the_log", "It's on the log. Take it off the log first: openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
+      Object.assign(item, typed(code));
+    }
+    Object.assign(item, rest);
     saveDb();
     return reply(libraryApi.getItem.response, withProbe(item));
   }),

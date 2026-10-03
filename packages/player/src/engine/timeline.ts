@@ -1,9 +1,10 @@
 // What the channel's playlist says is on screen at a moment: the DATERANGE tags (read with the
 // contract's parser and checked against its attribute schemas), timed against the media's
-// program date-time. The player draws the bug, lower thirds and codes from this; nothing is
-// burned into the picture (platform prompt, Phase 5: prepare once, then assemble).
+// program date-time. The player draws the bug, lower thirds, codes and (A243) up next's title
+// from this; nothing is burned into the picture (platform prompt, Phase 5: prepare once, then
+// assemble).
 
-import { HLS_CLASS, HlsBreak, HlsBug, HlsCode, HlsItem, HlsLive, HlsLowerThird, HlsSignOff, type HlsDateRange } from "@opencast/contracts";
+import { HLS_CLASS, HlsBreak, HlsBug, HlsCode, HlsItem, HlsLive, HlsLowerThird, HlsSignOff, HlsUpNext, type HlsDateRange } from "@opencast/contracts";
 
 /** A code without an end shows for this long (the contract's default, "the last 10 s"). */
 export const CODE_SECONDS = 10;
@@ -26,9 +27,11 @@ export interface OnScreen {
   lowerThird: Of<typeof HlsLowerThird> | null;
   /** A spot's code and QR, until `until` (ms, program date-time). */
   code: (Of<typeof HlsCode> & { until: number }) | null;
+  /** A243: an up-next bumper's title (the next program, as the guide has it). */
+  upNext?: Of<typeof HlsUpNext> | null;
 }
 
-export const NOTHING_ON_SCREEN: OnScreen = { item: null, inBreak: null, live: null, bug: null, lowerThird: null, code: null };
+export const NOTHING_ON_SCREEN: OnScreen = { item: null, inBreak: null, live: null, bug: null, lowerThird: null, code: null, upNext: null };
 
 /** Folds a playlist's ranges into what's known: a range repeated with the same ID adds to it (SCTE35-IN, END-DATE). */
 export function mergeRanges(known: Map<string, HlsDateRange>, incoming: HlsDateRange[], at: number | null): Map<string, HlsDateRange> {
@@ -79,19 +82,21 @@ export function onScreenAt(ranges: Iterable<HlsDateRange>, at: number | null): O
   const bug = pick(all, HLS_CLASS.bug, HlsBug, at);
   const l3 = pick(all, HLS_CLASS.lowerThird, HlsLowerThird, at);
   const code = pick(all, HLS_CLASS.code, HlsCode, at, codeCovers);
+  const upNext = pick(all, HLS_CLASS.upNext, HlsUpNext, at);
   return {
     item: item && { id: item.range.id, ...item.value },
     inBreak: brk && { id: brk.range.id, ...brk.value, scte35Out: brk.range.scte35Out, scte35In: brk.range.scte35In },
     live: live && { id: live.range.id, ...live.value },
     bug: bug && { id: bug.range.id, ...bug.value },
     lowerThird: l3 && { id: l3.range.id, ...l3.value },
-    code: code && { id: code.range.id, ...code.value, until: code.range.end ?? code.range.start + CODE_SECONDS * 1000 }
+    code: code && { id: code.range.id, ...code.value, until: code.range.end ?? code.range.start + CODE_SECONDS * 1000 },
+    upNext: upNext && { id: upNext.range.id, ...upNext.value }
   };
 }
 
 /** A key that changes when anything drawn or known changes (to patch state only then). */
 export function onScreenKey(s: OnScreen): string {
-  return [s.item?.id, s.inBreak?.id, s.live?.id, s.bug?.id, s.lowerThird?.id, s.code?.id].map((x) => x ?? "").join("|");
+  return [s.item?.id, s.inBreak?.id, s.live?.id, s.bug?.id, s.lowerThird?.id, s.code?.id, s.upNext?.id].map((x) => x ?? "").join("|");
 }
 
 /** The planned sign-off in a playlist: the latest one, with when the station is back (ISO), if said. */

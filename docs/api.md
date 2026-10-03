@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-351 endpoints in 22 modules.
+357 endpoints in 23 modules.
 
 ## accounts (35)
 
@@ -86,11 +86,11 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | | Method | Path | Who | What |
 |---|---|---|---|---|
 | `getLibrary` | GET | `/stations/:stationId/library` | signed in | Every item with its type, rights and status; folders; programs |
-| `upload` | POST | `/stations/:stationId/library/uploads` | signed in | Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. |
+| `upload` | POST | `/stations/:stationId/library/uploads` | signed in | Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. An off-air card (`code` OFF, A242) can also be a picture (PNG, JPEG or WebP). |
 | `importLinks` | POST | `/stations/:stationId/library/imports` | signed in | Import from links. Link imports stay on this station and come off air the same day if the owner asks. |
 | `getImport` | GET | `/stations/:stationId/library/imports/:jobId` | signed in | Progress of a link import |
 | `getItem` | GET | `/library/:itemId` | signed in | One item |
-| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points |
+| `updateItem` | PATCH | `/library/:itemId` | signed in | Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. A243: `bumperRole` on anything but a bumper, or `airs` on anything but a bumper, station ID, opener or closer, 400. |
 | `deleteItem` | DELETE | `/library/:itemId` | signed in | Delete an item. Refused while it's in the log or carried by other stations. |
 | `exportToIpfs` | POST | `/library/:itemId/export-ipfs` | signed in | Export the station's own original to IPFS (owner only). IPFS files are public and can't be taken back. |
 | `confirmRights` | POST | `/library/:itemId/rights` | signed in | Confirm the rights to air it. Needed before it can go on the log. |
@@ -464,3 +464,14 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `completeUpload` | POST | `/uploads/:uploadId/complete` | signed in | Every part is in: the upload becomes `checking` and the API takes it from there (content ID, stored once, the checks, preparation). Answers at once; follow it with `getUpload`. Calling it again answers the same. 409 `parts_missing` (a part the store doesn't have, or an ETag that doesn't match), `not_uploading` (aborted). |
 | `abortUpload` | DELETE | `/uploads/:uploadId` | signed in | Cancel an upload: its parts are deleted. An upload that's already finished is left as it is. Uploads left unfinished for 24 hours are aborted by themselves. |
 | `getUpload` | GET | `/uploads/:uploadId` | signed in | An upload's state, content ID and what it made. The person who started it only (404 otherwise). |
+
+## blocks (6)
+
+| | Method | Path | Who | What |
+|---|---|---|---|---|
+| `listBlocks` | GET | `/stations/:stationId/blocks` | signed in | A244: the station's programming blocks (owner, operator), with their items, schedule and next airing |
+| `getBlock` | GET | `/stations/:stationId/blocks/:blockId` | signed in | A244: one programming block (owner, operator), with where it's on the log (`onLog`) |
+| `createBlock` | POST | `/stations/:stationId/blocks` | signed in | A244: make a programming block (owner, operator). A name the station already has is 409 `block_name_taken`; a colour under 4.5:1 against white is 400. Put it on the log with `applyLogChanges` (`block_add`) or a day template. |
+| `updateBlock` | PATCH | `/stations/:stationId/blocks/:blockId` | signed in | A244: change a programming block's name, description, colour, bug, intro, outro or bumper order (owner, operator). `removeLogo` takes its logo off. |
+| `uploadBlockLogo` | POST | `/stations/:stationId/blocks/:blockId/logo` | signed in | A244: upload the block's logo (owner, operator): a PNG, JPEG or WebP, at least 128 pixels on its short side. Stored at 512 pixels at most. 422 `not_an_image`, `logo_size`. |
+| `archiveBlock` | DELETE | `/stations/:stationId/blocks/:blockId` | signed in | A244: archive a programming block (owner, operator). While it's on the log from now on, 409 `block_on_log` ("Late Crate Nights is on the log 3 more times. Take it off the log first."); with `takeOffLog`, its spans ahead come off every date nobody edited, it leaves its day templates, and dates edited by hand keep theirs (`kept`). Its items go back to being the station's. |

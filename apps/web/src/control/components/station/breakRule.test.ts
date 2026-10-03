@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { cadenceDetail, cadenceFromKey, cadenceKey, cadenceOf, cadenceOptions, cadenceWords, capCells, capMinutes, fillOrder, ladder, ladderWithPartners, moveFill, placeFill, ruleLabel, spotMsPerBreak } from "./breakRule";
+import type { LibraryItem } from "@opencast/contracts";
+import {
+  cadenceDetail,
+  cadenceFromKey,
+  cadenceKey,
+  cadenceOf,
+  cadenceOptions,
+  cadenceWords,
+  capCells,
+  capMinutes,
+  exampleLine,
+  fillOrder,
+  ladder,
+  ladderWithPartners,
+  moveFill,
+  moveRole,
+  placeFill,
+  placeRole,
+  roleSupply,
+  ruleLabel,
+  sequenceOptions,
+  sequencesOf,
+  spotMsPerBreak,
+  upNextTwice
+} from "./breakRule";
 
 describe("what fills every break (station-settings 02.1)", () => {
   it("keeps the bumper and the station ID last, whatever it's given", () => {
@@ -26,11 +50,11 @@ describe("what fills every break (station-settings 02.1)", () => {
   it("puts ads from partners at step 4 of 6, before the bumper out of the break, as the reference now draws it (A151)", () => {
     const rows = ladderWithPartners({ lengthMs: 120_000, fillOrder: ["SPT", "UND", "BMP", "SID"], adsFromPartners: false });
     expect(rows.map((r) => [r.n, r.code, r.title])).toEqual([
-      [1, "BMP", "A bumper into the break"],
+      [1, "BMP", "Opening the break"],
       [2, "SPT", "Spots from your rotation"],
       [3, "UND", "Thank-you credit"],
       [4, "SPT", "Ads from partners"],
-      [5, "BMP", "A bumper out of the break"],
+      [5, "BMP", "Closing the break"],
       [6, "SID", "Station ID"]
     ]);
     expect(rows[3]).toMatchObject({ partner: true, detail: "Off. Only time still open", time: "0:00 – 1:00" });
@@ -50,7 +74,7 @@ describe("what fills every break (station-settings 02.1)", () => {
       [4, "BMP", ":10", null],
       [5, "SID", ":05", null]
     ]);
-    expect(rows.map((r) => r.title)).toEqual(["A bumper into the break", "Thank-you credit", "Spots from your rotation", "A bumper out of the break", "Station ID"]);
+    expect(rows.map((r) => r.title)).toEqual(["Opening the break", "Thank-you credit", "Spots from your rotation", "Closing the break", "Station ID"]);
     expect(rows[4]!.detail).toBe("Always last, can't be removed");
   });
 });
@@ -100,5 +124,45 @@ describe("how often the station ID, bumpers, credit and spots air (added 2026-09
     expect(cadenceDetail("spots", { every: "break" })).toBe("In every break, up to the hourly cap");
     expect(cadenceDetail("spots", { every: "hour" })).toBe("Up to the hourly cap. Other breaks are only as long as the rest needs");
     expect(cadenceDetail("spots", { every: "never" })).toBe("Breaks are only as long as the rest needs. Nothing is sold in them");
+  });
+});
+
+describe("the bumper sequences (A243)", () => {
+  const at = new Date("2026-10-03T03:00:00Z"); // 8:00 pm in the Inland Empire.
+  const bumper = (o: Partial<LibraryItem>) => ({ code: "BMP" as const, status: "ready" as const, rights: { basis: "made_it" as const, confirmedBy: null, confirmedAt: "2026-09-01T00:00:00Z", note: null }, durationMs: 5_000, bumperRole: null, airs: null, ...o });
+
+  it("reads a rule without them as one into the break and one out of it, as often as the bumpers' cadence", () => {
+    expect(sequencesOf({})).toEqual({ open: { roles: ["into_break"], every: "break" }, close: { roles: ["out_of_break"], every: "break" }, between: { roles: [], every: "program" } });
+    expect(sequencesOf({ cadence: { stationId: { every: "break" }, bumpers: { every: "n_programs", n: 3 }, underwriting: { every: "break" } } }).close).toEqual({ roles: ["out_of_break"], every: "n_programs", n: 3 });
+  });
+
+  it("moves a role left or right, and places a dragged one", () => {
+    expect(moveRole(["into_break", "up_next"], "up_next", -1)).toEqual(["up_next", "into_break"]);
+    expect(moveRole(["into_break", "up_next"], "up_next", 1)).toEqual(["into_break", "up_next"]);
+    expect(placeRole(["into_break", "up_next", "any"], "any", 0)).toEqual(["any", "into_break", "up_next"]);
+  });
+
+  it("says how often each position airs, between programs in its own words", () => {
+    expect(sequenceOptions("open").map((o) => o.label)).toEqual(["Every break", "After every program", "After every 2 programs", "After every 3 programs", "After every 4 programs", "Once an hour", "Never"]);
+    expect(sequenceOptions("between").map((o) => o.label)).toEqual(["Between every program", "Every 2 programs", "Every 3 programs", "Every 4 programs", "At the top of the hour", "Never"]);
+  });
+
+  it("says what fills each role: in the library, falling back to Any, nothing for up next, or not airing now", () => {
+    const items = [bumper({ bumperRole: null }), bumper({ bumperRole: "any" }), bumper({ bumperRole: "up_next", airs: { from: "2026-12-01", until: "2026-12-31", dailyFrom: null, dailyUntil: null } })];
+    expect(roleSupply(items, "any", at)).toBe("2 in your library");
+    expect(roleSupply(items, "into_break", at)).toBe("None yet, so an Any bumper airs");
+    expect(roleSupply(items, "up_next", at)).toBe("1, not airing now (from Dec 1)");
+    expect(roleSupply([], "up_next", at)).toBe("None yet, so nothing airs");
+    expect(roleSupply([], "out_of_break", at)).toBe("None yet, so nothing airs");
+  });
+
+  it("notes up next in two places, and gives an example break", () => {
+    const seq = { open: { roles: ["into_break", "up_next"], every: "break" }, close: { roles: ["up_next", "out_of_break"], every: "break" }, between: { roles: [], every: "program" } } as const;
+    expect(upNextTwice(seq as never)).toBe(true);
+    expect(upNextTwice(sequencesOf({}))).toBe(false);
+    const items = [bumper({ bumperRole: "into_break" }), bumper({ bumperRole: "up_next", durationMs: 8_000 }), bumper({ bumperRole: "out_of_break" })];
+    expect(exampleLine({ lengthMs: 120_000, fillOrder: ["SPT", "UND", "BMP", "SID"], bumperSequences: { ...seq, close: { roles: ["out_of_break"], every: "break" } } as never }, items, at)).toBe(
+      "Example, a 2:00 break: Into the break :05, Up next :08, your spots, the credit, Out of the break :05, then your station ID."
+    );
   });
 });

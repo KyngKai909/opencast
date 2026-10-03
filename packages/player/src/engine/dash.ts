@@ -18,6 +18,7 @@
 
 import type { Channel } from "../types";
 import { bestLevel, dataSaverLevel, nativeDriver, type MediaDriver, type MediaHandle, type Quality } from "./driver";
+import { showTextTracks } from "./textTracks";
 
 /** How this device can play DASH: the browser's own, dash.js on Media Source, or not at all. */
 export type DashSupport = "native" | "mse" | "none";
@@ -157,10 +158,6 @@ function bufferSettings(seconds: number) {
   return { streaming: { buffer: { bufferTimeDefault: seconds, bufferTimeAtTopQuality: seconds, bufferTimeAtTopQualityLongForm: seconds, bufferToKeep: 10 } } };
 }
 
-/** Shows or hides the video's caption and subtitle tracks (as the hls.js driver does). */
-function showTextTracks(video: HTMLVideoElement, on: boolean) {
-  for (const t of Array.from(video.textTracks ?? [])) if (t.kind === "subtitles" || t.kind === "captions") t.mode = on ? "showing" : "hidden";
-}
 
 const messageOf = (e: DashEvent) => (typeof e.error === "string" ? e.error : e.error?.message) || `dash.js error${typeof e.error === "object" && e.error?.code !== undefined ? ` ${e.error.code}` : ""}`;
 

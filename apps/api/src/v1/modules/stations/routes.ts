@@ -124,19 +124,25 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     if (to <= from || to.getTime() - from.getTime() > 24 * 3_600_000) throw badRequest("Ask for up to 24 hours.");
     const { profiles } = await onTheDial(await stations.onDial(market.id, query.band));
     const listedIds = profiles.filter((p) => p.kind === "listed").map((p) => p.id);
-    const [window, listed] = await Promise.all([
+    const own = profiles.filter((p) => p.kind !== "listed" && p.kind !== "claimable").map((p) => p.id);
+    const [window, listed, bands] = await Promise.all([
       log.window(profiles.map((p) => p.id), from, to),
-      network.listedAiringsInWindow(listedIds, from, to)
+      network.listedAiringsInWindow(listedIds, from, to),
+      // A244: programming blocks (external and claimable stations have none).
+      log.blockBands(own, from, to)
     ]);
     return {
       market,
       from: from.toISOString(),
       to: to.toISOString(),
-      rows: profiles.map((p) => ({
-        station: p.ident,
-        airings:
-          p.kind === "listed" ? (listed.get(p.id) ?? []).map(externalAiring) : (window.get(p.id) ?? [])
-      }))
+      rows: profiles.map((p) => {
+        const blocks = bands.get(p.id) ?? [];
+        return {
+          station: p.ident,
+          airings: p.kind === "listed" ? (listed.get(p.id) ?? []).map(externalAiring) : (window.get(p.id) ?? []),
+          ...(blocks.length ? { blocks } : {})
+        };
+      })
     };
   });
 
@@ -149,11 +155,13 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     }
     if (!profile || !profile.public) throw notFound("That station");
     const external = profile.kind === "listed" ? (await network.externalDial([profile.id])).get(profile.id) : undefined;
-    const [[row], programs, claimable, upcoming] = await Promise.all([
+    const [[row], programs, claimable, upcoming, blocks] = await Promise.all([
       dialRows([profile], external ? new Map([[profile.id, external]]) : undefined),
       services.library.programsForStation(profile.id),
       profile.kind === "claimable" ? network.claimableInfo(profile.id) : Promise.resolve(null),
-      log.window([profile.id], deps.clock.now(), new Date(deps.clock.now().getTime() + 24 * 3_600_000))
+      log.window([profile.id], deps.clock.now(), new Date(deps.clock.now().getTime() + 24 * 3_600_000)),
+      // A244: its programming blocks in the next 14 days (external and claimable stations have none).
+      profile.kind === "listed" || profile.kind === "claimable" ? Promise.resolve([]) : log.stationPageBlocks(profile.id)
     ]);
     return {
       station: profile.ident,
@@ -177,7 +185,8 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
         : null,
       pledgesTaxDeductible: profile.pledgesTaxDeductible,
       playback: row.playback,
-      ...(external ? { external: { ...external.info, down: external.down } } : {})
+      ...(external ? { external: { ...external.info, down: external.down } } : {}),
+      ...(blocks.length ? { blocks } : {})
     };
   });
 

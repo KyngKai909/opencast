@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dateRangeTag, HLS_CLASS, parseDateRanges } from "@opencast/contracts";
-import { CODE_SECONDS, mergeRanges, onScreenAt, signOffIn } from "./timeline";
+import { dateRangeTag, HLS_CLASS, HlsUpNext, parseDateRanges } from "@opencast/contracts";
+import { CODE_SECONDS, mergeRanges, onScreenAt, onScreenKey, signOffIn } from "./timeline";
 
 // A playlist's tags, written the way the worker writes them (the contract's dateRangeTag) and read
 // the way the player reads them (parseDateRanges).
@@ -93,5 +93,36 @@ describe("the planned sign-off", () => {
     const r = tags(dateRangeTag({ id: "off-1", class: HLS_CLASS.signOff, start: s(0), durationSeconds: 6, attributes: { backAt: "2026-09-27T13:00:00.000Z" } }));
     expect(signOffIn(r)).toEqual({ id: "off-1", backAt: "2026-09-27T13:00:00.000Z" });
     expect(signOffIn(tags(program))).toBeNull();
+  });
+});
+
+describe("up next (A243)", () => {
+  const bumper = dateRangeTag({ id: "item-9", class: HLS_CLASS.item, start: s(0), durationSeconds: 8, attributes: { code: "BMP", contentId: "bafy-next", title: "Up next", bumperRole: "up_next" } });
+  const next = dateRangeTag({
+    id: "item-9-up-next",
+    class: HLS_CLASS.upNext,
+    start: s(1),
+    durationSeconds: 7,
+    attributes: { logEntryId: "le-2", title: "Saturday Reel", episodeTitle: "Reel 14", startsAt: "2026-09-27T03:30:08.000Z", immediate: 1, carriedFrom: "REEL" }
+  });
+
+  it("round-trips through the contract's writer and parser", () => {
+    const [range] = tags(next);
+    expect(range).toMatchObject({ class: "org.useopencast.up-next", start: s(1), end: s(8) });
+    expect(HlsUpNext.parse(range.attributes)).toEqual({ logEntryId: "le-2", title: "Saturday Reel", episodeTitle: "Reel 14", startsAt: "2026-09-27T03:30:08.000Z", immediate: 1, carriedFrom: "REEL", blockName: null });
+  });
+
+  it("is on screen a second into its bumper until the bumper ends, and changes the on-screen key", () => {
+    const all = tags(bumper, next);
+    expect(onScreenAt(all, s(0.5)).upNext).toBeNull();
+    expect(onScreenAt(all, s(2))).toMatchObject({ item: { code: "BMP", bumperRole: "up_next" }, upNext: { id: "item-9-up-next", title: "Saturday Reel", immediate: 1 } });
+    expect(onScreenAt(all, s(8)).upNext).toBeNull();
+    expect(onScreenKey(onScreenAt(all, s(2)))).not.toBe(onScreenKey(onScreenAt(all, s(0.5))));
+  });
+
+  it("a class it doesn't know is ignored, and so is a role it doesn't know (the item still reads)", () => {
+    const later = tags(bumper).map((r) => ({ ...r, attributes: { ...r.attributes, bumperRole: "a role from later" } }));
+    expect(onScreenAt(later, s(2)).item).toMatchObject({ code: "BMP", bumperRole: null });
+    expect(onScreenAt(tags(dateRangeTag({ id: "x", class: "org.useopencast.later" as typeof HLS_CLASS.item, start: s(0), durationSeconds: 5, attributes: { anything: "1" } })), s(1))).toMatchObject({ item: null, upNext: null });
   });
 });

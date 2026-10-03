@@ -8,12 +8,14 @@
 // (they're generated from the break rule); spots already held in a break that goes move to the
 // next break rather than being returned. Every published batch is recorded (`log_changes`).
 
+import { isIdentCode } from "@opencast/contracts";
 import { createHash } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { LOG_EDIT_LEAD_MS, type LogChange, type LogChangeRecord, type LogChangesResult } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { conflict, HttpError } from "../../errors.js";
+import { overlaps, type SpanRow } from "./blocks.js";
 import { clockTime, localDate, roundUpToMinute } from "../../lib/time.js";
 import { snapDate } from "../../lib/segments.js";
 import { STATION_ID_MS } from "../playout/engine/fill.js";
@@ -46,6 +48,8 @@ export interface ChangeHelpers {
   rearmReminders(ex: Executor, entryIds: string[]): Promise<void>;
   /** After the transaction: each viewer is told. */
   tellReminders(news: ReminderNews[]): void;
+  /** A244: programming blocks' spans overlapping a window. */
+  spans(stationId: string, from: Date, to: Date): Promise<SpanRow[]>;
 }
 
 export interface ChangeOps {
@@ -56,6 +60,24 @@ export interface ChangeOps {
 const E = schema.logEntries;
 const B = schema.breaks;
 const LC = schema.logChanges;
+const SP = schema.programBlockSpans;
+/** A244: a block runs 24 hours at most. */
+const MAX_SPAN_MS = 24 * 60 * 60_000;
+
+type EntryChange = Exclude<LogChange, { op: "block_add" | "block_resize" | "block_remove" }>;
+type BlockChange = Extract<LogChange, { op: "block_add" | "block_resize" | "block_remove" }>;
+const isBlockChange = (c: LogChange): c is BlockChange => c.op === "block_add" || c.op === "block_resize" || c.op === "block_remove";
+
+/** A244: a programming block's span as the batch leaves it. */
+interface SpanDraft {
+  index: number;
+  key: string | null;
+  blockId: string;
+  orig: SpanRow | null;
+  next: { startsAt: Date; endsAt: Date } | null;
+  /** The id once published (an addition's). */
+  id: string | null;
+}
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 /** Where entries wait inside the transaction while the batch shuffles them (so a swap never overlaps on the way). */
@@ -65,10 +87,15 @@ export const PARK = Date.UTC(1971, 0, 1);
  * A window's version: a hash of its entries (times, what airs, a live block ended early). The
  * draft keeps the one it began from; the batch is refused if the window has changed since.
  */
-export function logVersion(rows: Row[]): string {
+export function logVersion(rows: Row[], spans: Array<{ id: string; blockId: string; startsAt: Date; endsAt: Date }> = []): string {
   const hash = createHash("sha1");
   for (const r of [...rows].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.id.localeCompare(b.id))) {
     hash.update([r.id, r.startsAt.toISOString(), r.endsAt.toISOString(), r.kind, r.assetId ?? "", r.liveSourceId ?? "", r.carriageAgreementId ?? "", r.endedEarlyAt?.toISOString() ?? ""].join("|"));
+    hash.update("\n");
+  }
+  // A244: programming blocks' spans (a window without any hashes as before).
+  for (const sp of [...spans].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.id.localeCompare(b.id))) {
+    hash.update(["block", sp.id, sp.blockId, sp.startsAt.toISOString(), sp.endsAt.toISOString()].join("|"));
     hash.update("\n");
   }
   return hash.digest("base64url").slice(0, 16);
@@ -117,14 +144,14 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
 
       // Someone changed the log where the draft began: the operator reloads.
       if (body.base) {
-        const rows = await h.load(stationId, new Date(body.base.from), new Date(body.base.to));
-        if (logVersion(rows) !== body.base.version) {
+        const [rows, spans] = await Promise.all([h.load(stationId, new Date(body.base.from), new Date(body.base.to)), h.spans(stationId, new Date(body.base.from), new Date(body.base.to))]);
+        if (logVersion(rows, spans) !== body.base.version) {
           throw conflict("log_changed", "The log changed since you started editing. Reload it to see what changed, then make your changes again.");
         }
       }
 
       const changes = body.changes;
-      const entryIds = [...new Set(changes.flatMap((c) => (c.op === "insert" ? [] : [c.entryId])))];
+      const entryIds = [...new Set(changes.flatMap((c) => (c.op === "insert" || isBlockChange(c) ? [] : [c.entryId])))];
       const current = entryIds.length ? await db.select().from(E).where(and(eq(E.stationId, stationId), inArray(E.id, entryIds))) : [];
       const byId = new Map(current.map((r) => [r.id, r]));
       // What goes on, and what airs now where an item is replaced (whether its breaks move).
@@ -154,6 +181,11 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       const tooSoon = onAir ? `That's too soon: the channel is already set for the next ${LOG_EDIT_LEAD_MS / 1000} seconds.` : "That's in the past.";
 
       for (const [index, c] of changes.entries()) {
+        // A244: programming blocks' spans are checked on their own, below.
+        if (isBlockChange(c)) {
+          about.push({ entryId: null, insert: null });
+          continue;
+        }
         if (c.op === "insert") {
           const input: Input = { ...c.entry };
           const startsAt = snapDate(new Date(input.startsAt));
@@ -195,6 +227,10 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
             continue;
           }
           const item = items.get(c.itemId);
+          if (item && isIdentCode(item.code)) {
+            problems.push({ index, code: "not_for_the_log", message: "Openers, closers and off-air cards air at sign-off and sign-on, not from the log." });
+            continue;
+          }
           // A new item's slot is its length in whole minutes, as `update` makes it.
           const length = roundUpToMinute(item?.durationMs ?? 30 * MIN);
           d.next = { ...d.next, assetId: c.itemId, carriageAgreementId: c.carriageAgreementId ?? null, programId: item?.programId ?? null, code: item?.code ?? d.next.code, endsAt: new Date(d.next.startsAt.getTime() + length) };
@@ -231,6 +267,9 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
           problems.push(problemOf(ins.index, error));
         }
       }
+
+      // A244: programming blocks' spans: added, moved, or taken off.
+      const blocks = await draftSpans();
 
       // Carriage limits across the batch: each change is checked against the log as it is, so two
       // airings of the same carried episode the batch adds are counted against each other here.
@@ -323,6 +362,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
 
       // What each change says.
       const lines = changes.map((c, index) => {
+        if (isBlockChange(c)) return blocks.lineOf(index);
         const a = about[index];
         if (a.insert) return `${titleAfter(a.insert.row)} goes on at ${when(a.insert.row.startsAt, now)}`;
         const d = a.entryId ? drafts.get(a.entryId) : undefined;
@@ -342,6 +382,19 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         summary,
         changes: changes.map((c, index) => {
           const a = about[index];
+          if (isBlockChange(c)) {
+            const sd = blocks.byIndex.get(index);
+            return {
+              index,
+              op: c.op,
+              entryId: null,
+              key: sd?.key ?? null,
+              line: lines[index],
+              spanId: sd?.id ?? sd?.orig?.id ?? null,
+              startsAt: sd?.next ? sd.next.startsAt.toISOString() : null,
+              endsAt: sd?.next ? sd.next.endsAt.toISOString() : null
+            };
+          }
           const d = a.entryId ? drafts.get(a.entryId) : undefined;
           const row = a.insert ? a.insert.row : d && !d.removed ? d.next : null;
           return {
@@ -411,6 +464,14 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         await h.rearmReminders(tx, updated.filter((d) => d.next.startsAt.getTime() !== d.orig.startsAt.getTime()).map((d) => d.orig.id));
         news = await h.settleReminders(tx, removed.map((d) => d.orig));
         if (removed.length) await tx.delete(E).where(inArray(E.id, removed.map((d) => d.orig.id)));
+        // A244: programming blocks' spans (taken off first, so a moved one never meets itself).
+        for (const sd of blocks.list.filter((x) => x.orig && !x.next)) await tx.delete(SP).where(eq(SP.id, sd.orig!.id));
+        for (const [i, sd] of blocks.list.filter((x) => x.orig && x.next).entries()) await tx.update(SP).set({ startsAt: new Date(PARK + i * 2 * MIN), endsAt: new Date(PARK + i * 2 * MIN + MIN) }).where(eq(SP.id, sd.orig!.id));
+        for (const sd of blocks.list.filter((x) => x.orig && x.next)) await tx.update(SP).set({ startsAt: sd.next!.startsAt, endsAt: sd.next!.endsAt, repeatGroupId: null, templateDate: null }).where(eq(SP.id, sd.orig!.id));
+        for (const sd of blocks.list.filter((x) => !x.orig && x.next)) {
+          const [row] = await tx.insert(SP).values({ stationId, blockId: sd.blockId, startsAt: sd.next!.startsAt, endsAt: sd.next!.endsAt, createdBy: userId }).returning({ id: SP.id });
+          sd.id = row.id;
+        }
         const [rec] = await tx.insert(LC).values({ stationId, userId, summary, lines, changes, createdAt: now }).returning();
         return rec;
       });
@@ -421,7 +482,12 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       await h.markEdited(stationId, [
         ...removed.map((d) => d.orig.templateDate ?? d.orig.startsAt),
         ...updated.flatMap((d) => [d.orig.templateDate ?? d.orig.startsAt, d.next.startsAt]),
-        ...inserts.map((i) => i.row.startsAt)
+        ...inserts.map((i) => i.row.startsAt),
+        // A244: a block's span marks its days (both, when it crosses 6:00 am).
+        ...blocks.list.flatMap((sd) => [
+          ...(sd.orig ? [sd.orig.templateDate ?? sd.orig.startsAt, new Date(sd.orig.endsAt.getTime() - 1)] : []),
+          ...(sd.next ? [sd.next.startsAt, new Date(sd.next.endsAt.getTime() - 1)] : [])
+        ])
       ]);
 
       // Held spots from breaks that went move to the next break (after the new layout is stored).
@@ -431,11 +497,11 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
       }
 
       // An on-air station reads its log again, once, when the batch reaches the next half hour.
-      const times = [...touched, ...moved.times];
+      const times = [...touched, ...moved.times, ...blocks.times];
       const soon = times.some((x) => x < t + 30 * MIN);
       if (soon) await services.playout.replan(stationId);
 
-      const version = body.base ? logVersion(await h.load(stationId, new Date(body.base.from), new Date(body.base.to))) : undefined;
+      const version = body.base ? logVersion(await h.load(stationId, new Date(body.base.from), new Date(body.base.to)), await h.spans(stationId, new Date(body.base.from), new Date(body.base.to))) : undefined;
       const names = await services.accounts.displayNames([userId]);
       return result(true, version, soon && onAir, recordOf(recordRow, names), insertedIds);
 
@@ -449,6 +515,100 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
        * carrying it after the batch. One that puts it on past the agreement's airings per episode
        * is a problem (an entry that already carried it only counts).
        */
+      /**
+       * A244: the batch's programming block changes, checked: the block is the station's (and not
+       * archived), a span runs up to 24 hours (it may cross 6:00 am), one on air can only change its
+       * end (and not to sooner than the channel is set), and blocks never overlap.
+       */
+      async function draftSpans() {
+        const list: SpanDraft[] = [];
+        const byIndex = new Map<number, SpanDraft>();
+        const blockChanges = changes.map((c, index) => ({ c, index })).filter((x): x is { c: BlockChange; index: number } => isBlockChange(x.c));
+        const times: number[] = [];
+        if (!blockChanges.length) return { list, byIndex, times, lineOf: () => "" };
+        const spanIds = blockChanges.flatMap(({ c }) => (c.op === "block_add" ? [] : [c.spanId]));
+        const current = spanIds.length ? await db.select().from(SP).where(and(eq(SP.stationId, stationId), inArray(SP.id, spanIds))) : [];
+        const refs = await services.library.blocks.refs([...blockChanges.flatMap(({ c }) => (c.op === "block_add" ? [c.blockId] : [])), ...current.map((sp) => sp.blockId)]);
+        const nameOf = (blockId: string) => refs.get(blockId)?.name ?? "The block";
+        const day = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(d);
+        const lines = new Map<number, string>();
+        const spanDrafts = new Map<string, SpanDraft>();
+        for (const { c, index } of blockChanges) {
+          if (c.op === "block_add") {
+            const ref = refs.get(c.blockId);
+            const sd: SpanDraft = { index, key: c.key ?? null, blockId: c.blockId, orig: null, next: { startsAt: snapDate(new Date(c.startsAt)), endsAt: snapDate(new Date(c.endsAt)) }, id: null };
+            list.push(sd);
+            byIndex.set(index, sd);
+            lines.set(index, `${ref?.name ?? "A block"} added, ${day(sd.next!.startsAt)} ${clock(sd.next!.startsAt)} to ${clock(sd.next!.endsAt)}`);
+            if (!ref || ref.stationId !== stationId) problems.push({ index, code: "not_found", message: "That block isn't this station's." });
+            else if (ref.archived) problems.push({ index, code: "block_archived", message: `${ref.name} is archived.` });
+            else if (sd.next!.startsAt.getTime() < boundary) problems.push({ index, code: "too_soon", message: tooSoon });
+            continue;
+          }
+          const orig = current.find((sp) => sp.id === c.spanId);
+          if (!orig) {
+            lines.set(index, "A block that isn't on the log any more");
+            problems.push({ index, code: "not_found", message: "That block isn't on the log any more." });
+            continue;
+          }
+          const sd = spanDrafts.get(orig.id) ?? { index, key: null, blockId: orig.blockId, orig, next: { startsAt: orig.startsAt, endsAt: orig.endsAt }, id: orig.id };
+          if (!spanDrafts.has(orig.id)) list.push(sd);
+          spanDrafts.set(orig.id, sd);
+          sd.index = index;
+          byIndex.set(index, sd);
+          const name = nameOf(orig.blockId);
+          const onAir = orig.startsAt.getTime() < boundary;
+          if (!sd.next) {
+            lines.set(index, `${name} comes off the log`);
+            problems.push({ index, code: "removed", message: "It's already coming off the log." });
+            continue;
+          }
+          if (c.op === "block_remove") {
+            lines.set(index, `${name} comes off the log`);
+            if (orig.endsAt.getTime() <= t) problems.push({ index, code: "block_locked", message: "It has already aired." });
+            else if (onAir) problems.push({ index, code: "block_locked", message: `${name} is on air. Change it after ${clock(orig.endsAt)}.` });
+            else sd.next = null;
+            continue;
+          }
+          const startsAt = c.startsAt ? snapDate(new Date(c.startsAt)) : sd.next.startsAt;
+          const endsAt = c.endsAt ? snapDate(new Date(c.endsAt)) : sd.next.endsAt;
+          const startMoves = startsAt.getTime() !== sd.next.startsAt.getTime();
+          const endMoves = endsAt.getTime() !== sd.next.endsAt.getTime();
+          lines.set(index, startMoves && endMoves ? `${name} now runs ${clock(startsAt)} to ${clock(endsAt)}` : startMoves ? `${name} now starts at ${clock(startsAt)}` : `${name} now ends at ${clock(endsAt)}`);
+          if (orig.endsAt.getTime() <= t) problems.push({ index, code: "block_locked", message: "It has already aired." });
+          // On air: only its end, and not sooner than the channel is set.
+          else if (onAir && (startMoves || endsAt.getTime() < boundary)) problems.push({ index, code: "block_locked", message: `${name} is on air. Change it after ${clock(orig.endsAt)}.` });
+          else if (!onAir && startsAt.getTime() < boundary) problems.push({ index, code: "too_soon", message: tooSoon });
+          sd.next = { startsAt, endsAt };
+        }
+        // Lengths, then overlaps with every other span after the batch.
+        for (const sd of list) {
+          if (!sd.next || problems.some((p) => p.index === sd.index)) continue;
+          const ms = sd.next.endsAt.getTime() - sd.next.startsAt.getTime();
+          if (ms <= 0) problems.push({ index: sd.index, code: "bad_request", message: "It has to end after it starts." });
+          else if (ms > MAX_SPAN_MS) problems.push({ index: sd.index, code: "bad_request", message: "A block runs 24 hours at most." });
+        }
+        const placed = list.filter((sd) => sd.next);
+        if (placed.length) {
+          const lo = new Date(Math.min(...placed.map((sd) => sd.next!.startsAt.getTime())) - MAX_SPAN_MS);
+          const hi = new Date(Math.max(...placed.map((sd) => sd.next!.endsAt.getTime())) + MAX_SPAN_MS);
+          const others = (await h.spans(stationId, lo, hi)).filter((sp) => !spanDrafts.has(sp.id));
+          const otherRefs = await services.library.blocks.refs(others.map((sp) => sp.blockId));
+          const all = [...others.map((sp) => ({ id: sp.id, blockId: sp.blockId, startsAt: sp.startsAt, endsAt: sp.endsAt, draft: null as SpanDraft | null })), ...placed.map((sd) => ({ id: sd.orig?.id ?? `new:${sd.index}`, blockId: sd.blockId, ...sd.next!, draft: sd }))];
+          const said = new Set<number>();
+          for (const sd of placed) {
+            if (said.has(sd.index) || problems.some((p) => p.index === sd.index)) continue;
+            const other = all.find((x) => x.draft !== sd && overlaps(x, sd.next!));
+            if (other) {
+              said.add(sd.index);
+              problems.push({ index: sd.index, code: "block_overlap", message: `Blocks can't overlap: ${otherRefs.get(other.blockId)?.name ?? refs.get(other.blockId)?.name ?? "another block"} is on until ${clock(other.endsAt)}.` });
+            }
+          }
+        }
+        for (const sd of list) times.push(...[sd.orig?.startsAt, sd.next?.startsAt].filter((d): d is Date => Boolean(d)).map((d) => d.getTime()));
+        return { list, byIndex, times, lineOf: (index: number) => lines.get(index) ?? "" };
+      }
+
       async function batchCarriage() {
         const keyOf = (r: Row) => (r.carriageAgreementId && r.assetId ? `${r.carriageAgreementId}:${r.assetId}` : null);
         const after = [

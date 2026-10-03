@@ -13,24 +13,44 @@ const NITE = station("NITE", "88.4", { band: "radio" });
 const bug: NonNullable<OnScreen["bug"]> = { id: "bug-1", mode: "call_sign_and_channel", callSign: "BEAT", channel: "12.1", logoUrl: null, position: "bottom_right", opacity: 78 };
 const l3: NonNullable<OnScreen["lowerThird"]> = { id: "l3-1", name: "Dana Whitfield", title: "Chair, Planning Commission" };
 const code: NonNullable<OnScreen["code"]> = { id: "code-1", spotId: "s1", code: "ORANGE10", offer: "10% off", qrUrl: "https://useopencast.org/c/ORANGE10", until: 0 };
+const upNext: NonNullable<OnScreen["upNext"]> = { id: "un-1", logEntryId: "le-2", title: "Saturday Reel", episodeTitle: "Reel 14", startsAt: "2026-10-03T04:00:00.000Z", immediate: 1, carriedFrom: null, blockName: null };
 const on = (p: Partial<OnScreen>): OnScreen => ({ ...NOTHING_ON_SCREEN, ...p });
 
 describe("how the graphics share the picture", () => {
   it("the banner covers the bug and the lower third, but a spot's code stays (decided: it's paid, and only 10 s)", () => {
-    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3 }), showing: true, banner: true })).toEqual({ bug: null, lowerThird: null, code: null });
-    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code }), showing: true, banner: true })).toEqual({ bug: null, lowerThird: null, code });
+    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3 }), showing: true, banner: true })).toEqual({ bug: null, lowerThird: null, code: null, upNext: null });
+    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code }), showing: true, banner: true })).toEqual({ bug: null, lowerThird: null, code, upNext: null });
     expect(visibleGraphics({ onScreen: on({ bug }), showing: false, banner: false }).bug).toBeNull();
   });
 
   it("the TV guide's window draws the bug alone", () => {
-    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code }), showing: true, banner: false }, "bug")).toEqual({ bug, lowerThird: null, code: null });
+    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code, upNext }), showing: true, banner: false }, "bug")).toEqual({ bug, lowerThird: null, code: null, upNext: null });
   });
 
   it("the code takes the lower third's corner for its seconds; a bottom-left bug never covers either", () => {
-    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code }), showing: true, banner: false })).toEqual({ bug, lowerThird: null, code });
+    expect(visibleGraphics({ onScreen: on({ bug, lowerThird: l3, code }), showing: true, banner: false })).toEqual({ bug, lowerThird: null, code, upNext: null });
     const left = { ...bug, position: "bottom_left" as const };
     expect(visibleGraphics({ onScreen: on({ bug: left, lowerThird: l3 }), showing: true, banner: false }).bug).toBeNull();
     expect(visibleGraphics({ onScreen: on({ bug: left }), showing: true, banner: false }).bug).toBe(left);
+  });
+});
+
+describe("up next (A243)", () => {
+  it("shares the lower third's place over its bumper; the banner covers it (its Next at line says the same); a bottom-left bug steps aside", () => {
+    expect(visibleGraphics({ onScreen: on({ bug, upNext }), showing: true, banner: false })).toEqual({ bug, lowerThird: null, code: null, upNext });
+    expect(visibleGraphics({ onScreen: on({ bug, upNext }), showing: true, banner: true }).upNext).toBeNull();
+    const left = { ...bug, position: "bottom_left" as const };
+    expect(visibleGraphics({ onScreen: on({ bug: left, upNext }), showing: true, banner: false })).toMatchObject({ bug: null, upNext });
+    expect(visibleGraphics({ onScreen: on({ upNext, lowerThird: l3 }), showing: true, banner: false })).toMatchObject({ lowerThird: null, upNext });
+    expect(visibleGraphics({ onScreen: on({ upNext }), showing: false, banner: false }).upNext).toBeNull();
+  });
+
+  it("draws Up next, the title and the episode; later, Next at its time in the market's time zone", () => {
+    const { container, rerender } = render(<Overlays channel={BEAT} size="web" onScreen={on({ upNext })} showing banner={false} timeZone="America/Los_Angeles" />);
+    expect(container.querySelector(".oc-upnext")?.textContent).toBe("Up nextSaturday ReelReel 14");
+    rerender(<Overlays channel={BEAT} size="tv" onScreen={on({ upNext: { ...upNext, immediate: 0, episodeTitle: null } })} showing banner={false} timeZone="America/Los_Angeles" />);
+    expect(container.querySelector(".oc-ovl--tv .oc-upnext")?.textContent).toBe("Next at 9:00 pmSaturday Reel");
+    expect(container.querySelector(".oc-upnext")?.getAttribute("aria-label")).toBe("Next at 9:00 pm, Saturday Reel");
   });
 });
 

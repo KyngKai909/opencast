@@ -1,18 +1,24 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
+import { asLogCode, isIdentCode } from "@opencast/contracts";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { Airing, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
+import type { Airing, AiringBlock, BlockBand, BlockSpan, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
-import { localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
+import { clockTime, localDate, localDay, localWeekday, roundUpToMinute } from "../../lib/time.js";
 import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
-import { cadenceContext, hourStartIn, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
+import { bumpersIn, cadenceContext, EVERY_PART, hourStartIn, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
+import { BoundaryDecider, blockPositionAirs, bumperHistory, defaultElements, eligible, elementsMs, fitElements, pickElements, rolesFor, SequenceDecider, type Announce, type Boundary, type BumperSequences, type Element } from "../playout/engine/sequence.js";
+import { GENERATED_BLOCK_CARD_MS } from "../playout/engine/stationId.js";
+import { blockAt, loadSpans, memberOf, memberships, type Membership, type SpanRow } from "./blocks.js";
+import type { BlockRef } from "../library/blocks.js";
 import { catalogCreditBreaks, catalogEntries } from "../playout/engine/catalogCredit.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
-import { createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+import { broadcastDate, createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
 import { createChangeOps, logVersion, PARK, type ChangeOps } from "./changes.js";
 
 export type { OffAirSpanView } from "./offair.js";
+export type { Boundary, Element } from "../playout/engine/sequence.js";
 
 /** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
 export const DEAD_AIR_NOTE = "Filled automatically: dead air";
@@ -60,6 +66,20 @@ export interface BreakSlotView {
    * rule's cadence says (added 2026-09-29). Left out: everything (every break).
    */
   parts?: BreakParts;
+  /** A243: its bumpers, picked from their roles' pools: the sequence opening it and the one closing it. */
+  elements?: { open: Element[]; close: Element[] };
+  /** A243: the between sequence after it, when it closes a program's slot just as the next starts (carved from its end). */
+  boundary?: Boundary | null;
+  /** A244: the programming block it's in (its entry is a member), or null. */
+  blockId?: string | null;
+}
+
+/** A244: where programming blocks air on a station, for playout: each piece (members and the open time between them) and the blocks. */
+export interface BlockPlan {
+  pieces: Array<{ blockId: string; spanId: string; s: number; e: number }>;
+  /** Members' entry ids → their block. */
+  byEntry: Map<string, string>;
+  refs: Map<string, BlockRef>;
 }
 
 export interface Gap {
@@ -144,6 +164,27 @@ export interface LogService {
    * `everyPart`, as the rule lays them out with every part in every break (its cadence left aside).
    */
   breaks(stationId: string, from: Date, to: Date, options?: { everyPart?: boolean }): Promise<BreakSlotView[]>;
+  /**
+   * A243: the breaks in a window (as `breaks`) and every program boundary's between sequence in it
+   * (including those carried by a closing break as its `boundary`), for playout.
+   */
+  breakPlan(stationId: string, from: Date, to: Date): Promise<{ breaks: BreakSlotView[]; boundaries: Boundary[]; blocks: BlockPlan }>;
+  /** A243: what up next names after a moment: the guide's next airing, or null when off air (or nothing) comes first. */
+  upNextAfter(stationId: string, at: Date): Promise<Airing | null>;
+  /** A244: programming blocks for playout (as `breakPlan` decides with them). */
+  blockPlan(stationId: string, from: Date, to: Date): Promise<BlockPlan>;
+  /** A244: each station's programming blocks in a window, from first member to last (the guide's bands). */
+  blockBands(stationIds: string[], from: Date, to: Date): Promise<Map<string, BlockBand[]>>;
+  /** A244: the block on air at a moment, and the block the next entry after it enters (the Monitor). */
+  blockStatus(stationId: string, at: Date, nextEntryId: string | null): Promise<{ now: BlockBand | null; next: BlockBand | null }>;
+  /** A244: blocks' schedules ("Every Saturday, 9:00 pm to 1:00 am"), next airing and (`withPlacements`) where they're on the log. */
+  blockSchedules(stationId: string, blockIds: string[], withPlacements: boolean): Promise<Map<string, BlockSchedule>>;
+  /** A244: the station page's Blocks: blocks with a span in the next 14 days. */
+  stationPageBlocks(stationId: string): Promise<StationPageBlock[]>;
+  /** A244: a block's spans starting from now on. */
+  blockSpansAhead(stationId: string, blockId: string): Promise<number>;
+  /** A244: takes a block off the log from now on (dates edited by hand keep theirs) and out of its day templates. */
+  takeBlockOffLog(stationId: string, blockId: string): Promise<{ removed: number; kept: number }>;
   /** Stores the generated breaks for a window (spots are placed into stored breaks). */
   ensureBreaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
   /** Entries within a window, for sign-on checks and playout. */
@@ -184,12 +225,45 @@ export interface LogService {
   checkDeadAir(stationIds: string[]): Promise<void>;
 }
 
+export interface BlockSchedule {
+  label: string | null;
+  /** For viewers: "Saturdays, 9:00 pm to 1:00 am". */
+  viewerLabel: string | null;
+  next: string | null;
+  onLog?: {
+    templates: Array<{ templateId: string; name: string | null; label: string; startTime: string; lengthMs: number }>;
+    dates: Array<{ spanId: string; startsAt: string; endsAt: string; templateId: string | null }>;
+    ahead: number;
+  };
+}
+
+export interface StationPageBlock {
+  id: string;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  colour: string | null;
+  schedule: string | null;
+  next: string | null;
+  programs: string[];
+}
+
+/** A243: a bumper role in the station's words. */
+const roleWords = (role: string) => ({ into_break: "Into the break", out_of_break: "Out of the break", up_next: "Up next", any: "Any" })[role] ?? "Bumper";
+/** ":08", "1:30". */
+const shortLength = (ms: number) => {
+  const total = Math.round(ms / 1000);
+  return `${total >= 60 ? Math.floor(total / 60) : ""}:${String(total % 60).padStart(2, "0")}`;
+};
+
 const E = schema.logEntries;
 const B = schema.breaks;
 const OH = schema.offAirHours;
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
+/** A break over this long ago is history (cadence.ts has the same). */
+const SETTLED_MS = 60_000;
 
 export function createLogService(ctx: ModuleContext): LogService {
   const { deps, services } = ctx;
@@ -329,7 +403,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       logEntryId: row.id,
       title: titleOf(row, ctx),
       episodeTitle: row.episodeTitle ?? (program && item ? item.title : null),
-      code: row.code,
+      code: asLogCode(row.code),
       kind: row.kind,
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
@@ -351,7 +425,7 @@ export function createLogService(ctx: ModuleContext): LogService {
     return {
       id: row.id,
       kind: row.kind,
-      code: row.code,
+      code: asLogCode(row.code),
       startsAt: airing.startsAt,
       endsAt: airing.endsAt,
       title: airing.title,
@@ -394,7 +468,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       return {
         entryId: row.id,
         kind: row.kind,
-        code: row.code,
+        code: asLogCode(row.code),
         startsAt: entry.startsAt,
         endsAt: entry.endsAt,
         title: entry.title,
@@ -455,8 +529,15 @@ export function createLogService(ctx: ModuleContext): LogService {
    * What viewers see (dial, guide, station page): the log's programs and live blocks, and each
    * unbroken stretch of planned off air time as one `off_air` airing with the time it's back.
    */
-  function viewerAirings(rows: Row[], spans: OffAirSpanView[], ctx: Awaited<ReturnType<typeof context>>): Airing[] {
-    const airings = rows.filter((r) => r.kind !== "off_air").map((r) => toAiring(r, ctx));
+  function viewerAirings(rows: Row[], spans: OffAirSpanView[], ctx: Awaited<ReturnType<typeof context>>, blocks?: Map<string, AiringBlock>): Airing[] {
+    // A244: a member of a programming block says which.
+    const airings = rows
+      .filter((r) => r.kind !== "off_air")
+      .map((r) => {
+        const airing = toAiring(r, ctx);
+        const block = blocks?.get(r.id);
+        return block ? { ...airing, block } : airing;
+      });
     for (const stretch of offAirStretches(spans)) {
       airings.push({
         logEntryId: stretch.logEntryId,
@@ -476,6 +557,128 @@ export function createLogService(ctx: ModuleContext): LogService {
     return airings.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }
 
+  // ---- A244: programming blocks ---------------------------------------------------------------
+
+  /**
+   * Each station's spans reaching into `[from, to)` with their members (programs and live blocks
+   * starting inside them), where each airs (`pieces`), and the blocks themselves.
+   */
+  async function blockState(stationIds: string[], from: Date, to: Date) {
+    const spans = await loadSpans(db, stationIds, from, to);
+    const list = new Map<string, Array<Membership<Row>>>();
+    if (!spans.length) return { spans, list, refs: new Map<string, BlockRef>(), rows: [] as Row[] };
+    const lo = new Date(Math.min(...spans.map((x) => x.startsAt.getTime())));
+    const hi = new Date(Math.max(to.getTime(), ...spans.map((x) => x.endsAt.getTime())));
+    const ids = [...new Set(spans.map((x) => x.stationId))];
+    const [rows, offAir, refs] = await Promise.all([load(ids, lo, hi), offAirMap(ids, lo, hi), services.library.blocks.refs(spans.map((x) => x.blockId))]);
+    for (const id of ids) {
+      const offs = (offAir.get(id) ?? []).map((o) => ({ s: Date.parse(o.startsAt), e: Date.parse(o.endsAt) }));
+      list.set(
+        id,
+        memberships(
+          spans.filter((x) => x.stationId === id),
+          rows.filter((r) => r.stationId === id),
+          offs
+        )
+      );
+    }
+    return { spans, list, refs, rows };
+  }
+  type BlockState = Awaited<ReturnType<typeof blockState>>;
+
+  /** Members' blocks, by entry id (what the dial, guide and banner name). */
+  function airingBlocks(state: BlockState): Map<string, AiringBlock> {
+    const out = new Map<string, AiringBlock>();
+    for (const list of state.list.values()) {
+      for (const m of list) {
+        const ref = state.refs.get(m.span.blockId);
+        if (ref) for (const e of m.members) out.set(e.id, { id: ref.id, name: ref.name, colour: ref.colour });
+      }
+    }
+    return out;
+  }
+
+  /** A station's blocks as viewers see them: each piece, first member to last. */
+  function bandsOf(state: BlockState, stationId: string): BlockBand[] {
+    return (state.list.get(stationId) ?? []).flatMap((m) => {
+      const ref = state.refs.get(m.span.blockId);
+      if (!ref) return [];
+      return m.pieces.map((p) => ({ id: ref.id, name: ref.name, colour: ref.colour, logoUrl: ref.logoUrl, startsAt: new Date(p.s).toISOString(), endsAt: new Date(p.e).toISOString() }));
+    });
+  }
+
+  /** "9:00 pm" for a wall-clock minute. */
+  const minuteClock = (minute: number) => {
+    const h = Math.floor(minute / 60) % 24;
+    return `${((h + 11) % 12) + 1}:${String(minute % 60).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+  };
+
+  /** The spans in a window as master control draws them, with what to look at. */
+  async function spanViews(stationId: string, from: Date, to: Date): Promise<BlockSpan[]> {
+    const state = await blockState([stationId], from, to);
+    const list = (state.list.get(stationId) ?? []).filter((m) => m.span.startsAt < to && Math.max(m.span.endsAt.getTime(), m.airsUntil ?? 0) > from.getTime());
+    if (!list.length) return [];
+    const tz = await stationTz(stationId);
+    // What's just before each block too (whether there's room for its intro).
+    const rows = await load([stationId], new Date(Math.min(...list.map((m) => m.span.startsAt.getTime())) - 6 * HOUR), new Date(Math.max(...list.map((m) => m.airsUntil ?? m.span.endsAt.getTime()))));
+    const ctx = await context(rows);
+    const fillers = list.some((m) => state.refs.get(m.span.blockId)?.intro) ? await services.library.fillers(stationId) : null;
+    const offAir = (await offAirMap([stationId], new Date(Math.min(...list.map((m) => m.span.startsAt.getTime())) - DAY), to)).get(stationId) ?? [];
+    const clock = (t: number | Date) => clockTime(new Date(t), tz);
+    return list.map((m) => {
+      const ref = state.refs.get(m.span.blockId);
+      const name = ref?.name ?? "Block";
+      const problems: BlockSpan["problems"] = [];
+      if (!m.members.length) {
+        problems.push({ code: "empty", message: `Nothing in this block yet. Put programs between ${clock(m.span.startsAt)} and ${clock(m.span.endsAt)}.` });
+      }
+      for (const e of m.members) {
+        const over = e.endsAt.getTime() - m.span.endsAt.getTime();
+        if (over > 0) problems.push({ code: "overrun", message: `${titleOf(e, ctx)} runs ${Math.max(1, Math.round(over / MIN))} ${Math.round(over / MIN) === 1 ? "minute" : "minutes"} past the block's end, ${clock(m.span.endsAt)}. It stays in the block.` });
+      }
+      // The intro airs between programs, just before the first member: is there room?
+      const first = m.members[0];
+      if (ref?.intro && first) {
+        const introMs = fillers?.blocks.get(ref.id)?.intros[0]?.durationMs ?? GENERATED_BLOCK_CARD_MS;
+        const at = first.startsAt.getTime();
+        const before = rows.filter((r) => r.kind !== "off_air" && r.endsAt.getTime() <= at && r.id !== first.id).sort((a, b) => b.endsAt.getTime() - a.endsAt.getTime())[0];
+        const signOn = offAir.some((o) => Date.parse(o.endsAt) >= (before?.endsAt.getTime() ?? -Infinity) && Date.parse(o.startsAt) < at);
+        if (before && !signOn) {
+          const gap = at - before.endsAt.getTime();
+          const item = before.assetId ? ctx.items.get(before.assetId) : undefined;
+          const slack = gap === 0 && before.kind === "program" ? Math.max(0, before.endsAt.getTime() - before.startsAt.getTime() - Math.min(item?.durationMs ?? 0, before.endsAt.getTime() - before.startsAt.getTime())) : 0;
+          // A closing break keeps its station ID first: what's left of it is the room.
+          const room = gap > 0 ? gap : slack > 0 ? slack - STATION_ID_MS : 0;
+          if (room < introMs) problems.push({ code: "no_room_intro", message: `No room for the intro before ${clock(at)}. Leave ${shortLength(introMs)} at the end of ${titleOf(before, ctx)}'s slot.` });
+        }
+      }
+      return {
+        id: m.span.id,
+        blockId: m.span.blockId,
+        name,
+        colour: ref?.colour ?? null,
+        startsAt: m.span.startsAt.toISOString(),
+        endsAt: m.span.endsAt.toISOString(),
+        airsFrom: m.airsFrom === null ? null : new Date(m.airsFrom).toISOString(),
+        airsUntil: m.airsUntil === null ? null : new Date(m.airsUntil).toISOString(),
+        pieces: m.pieces.map((p) => ({ startsAt: new Date(p.s).toISOString(), endsAt: new Date(p.e).toISOString() })),
+        templateId: m.span.repeatGroupId,
+        entryIds: m.members.map((e) => e.id),
+        problems
+      };
+    });
+  }
+
+  /** A244: a station's spans overlapping a window (what edit mode's version covers). */
+  async function spansOverlapping(stationId: string, from: Date, to: Date): Promise<SpanRow[]> {
+    const SP = schema.programBlockSpans;
+    return db
+      .select()
+      .from(SP)
+      .where(and(eq(SP.stationId, stationId), lt(SP.startsAt, to), gt(SP.endsAt, from)))
+      .orderBy(asc(SP.startsAt));
+  }
+
   async function offAirView(stationId: string): Promise<OffAirHoursView> {
     const now = deps.clock.now();
     const [rules, tz, upcoming] = await Promise.all([
@@ -493,25 +696,91 @@ export function createLogService(ctx: ModuleContext): LogService {
   type GeneratedBreak = Omit<BreakSlotView, "id" | "filledAt" | "filledMs" | "openMs">;
 
   /**
+   * A243: what up next names after `t`: the first airing viewers see (the guide's own) starting at
+   * or after it, read once for a window (to a day past it). Null when off air comes first or
+   * nothing's on the log.
+   */
+  async function nextAiringFinder(stationId: string, from: Date, to: Date): Promise<(t: number) => Airing | null> {
+    const until = new Date(to.getTime() + DAY);
+    const [rows, offAir, blocks] = await Promise.all([load([stationId], from, until), offAirMap([stationId], from, until, true), blockState([stationId], from, until)]);
+    const ctx = await context(rows);
+    const airings = viewerAirings(rows, offAir.get(stationId) ?? [], ctx, airingBlocks(blocks));
+    return (t) => {
+      const next = airings.find((a) => Date.parse(a.startsAt) >= t);
+      return next && next.kind !== "off_air" ? next : null;
+    };
+  }
+
+  const announceOf = (a: Airing): Announce => ({
+    entryId: a.logEntryId,
+    title: a.title,
+    episodeTitle: a.episodeTitle,
+    startsAt: a.startsAt,
+    carriedFrom: a.carriedFrom ? (a.carriedFrom.callSign ?? a.carriedFrom.name) : null,
+    // A244: "Up next · Late Crate Nights · Saturday Reel".
+    ...(a.block ? { blockName: a.block.name } : {})
+  });
+
+  /**
    * The breaks in a window, from the break rule. With a cadence (added 2026-09-29), each break
    * carries what airs in it, decided in order from an hour before now (or `from`, if earlier) so
    * any window decides the same; a break without spots is only as long as what airs in it needs,
    * and the program goes on sooner (the break that closes a program's slot keeps the slot's time).
    * Breaks cued live are decided in their place too, and come back with the rest.
+   *
+   * A243 (2026-10-02): each break also carries its bumpers (`elements`: the opening and closing
+   * sequences, each bumper picked from its role's pool), and each program boundary its between
+   * sequence (`boundaries`; the closing break before it carries it too, as `boundary`). Picks are
+   * decided in the same walk: a pool of three or more takes turns, least recently aired first,
+   * from the as-run log, so the walk starts an hour back whenever one does. A break or boundary
+   * that's over goes by what the as-run log says aired in it.
+   *
+   * A244 (2026-10-02): programming blocks. A member's breaks are decided in its block: the
+   * block's own bumper order when it has one, its bumpers before the station's, and its ID before
+   * the station's (playout's). Between programs, leaving a block airs its outro, entering one its
+   * intro (`[outro] [the station's between] [intro]`); between two members of the same block, the
+   * block's between sequence. After off-air time (sign-on) there's no intro: the opener is the
+   * station's moment. Before off-air time, a block being left still airs its outro.
    */
-  async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false): Promise<GeneratedBreak[]> {
-    const rule = await services.stations.breakRule(stationId);
-    const every = everyPart || isEveryBreak(rule.cadence);
+  async function generateAll(stationId: string, from: Date, to: Date, everyPart = false): Promise<{ slots: GeneratedBreak[]; boundaries: Boundary[]; blocks: BlockPlan }> {
+    const [rule, tz, fillers] = await Promise.all([services.stations.breakRule(stationId), stationTz(stationId), services.library.fillers(stationId)]);
+    const seq = rule.bumperSequences;
+    const sequenceCadences = { open: seq.open, close: seq.close };
+    const every = everyPart || isEveryBreak(rule.cadence, sequenceCadences);
     const now = deps.clock.now().getTime();
-    const start = every ? from : new Date(Math.min(from.getTime(), now - HOUR));
+    const settledBefore = now - SETTLED_MS;
+
+    // A244: the programming blocks the walk can meet (from as far back as it can start).
+    const bstate = await blockState([stationId], new Date(Math.min(from.getTime(), now - HOUR) - 6 * HOUR), new Date(to.getTime() + 1));
+    const blockList = bstate.list.get(stationId) ?? [];
+    const hasBlocks = blockList.length > 0;
+    const entrySpan = memberOf(blockList);
+    const spanOf = (entryId: string | null | undefined) => (entryId ? (entrySpan.get(entryId) ?? null) : null);
+    const refOf = (span: SpanRow | null) => (span ? (bstate.refs.get(span.blockId) ?? null) : null);
+    const blockBumpers = new Map([...(fillers.blocks ?? new Map())].map(([id, f]) => [id, f.bumpers]));
+    /** A block's bumper order, else the station's (block, then station, then the defaults). */
+    const seqOf = (ref: BlockRef | null): BumperSequences => ref?.sequences ?? seq;
+    const blockRefs = [...bstate.refs.values()];
+
+    const roles = new Set([...seq.open.roles, ...seq.close.roles, ...seq.between.roles, ...blockRefs.flatMap((r) => (r.sequences ? [...r.sequences.open.roles, ...r.sequences.close.roles, ...r.sequences.between.roles] : []))]);
+    const decider = new SequenceDecider(fillers.bumpers, tz, {}, blockBumpers);
+    const rotates = decider.rotates(roles);
+    const between = seq.between.roles.length > 0 && seq.between.every !== "never" && fillers.bumpers.length > 0;
+    const betweenStateful = between && (seq.between.every === "hour" || seq.between.every === "n_programs");
+    const blocksStateful = blockRefs.some((r) => r.sequences && r.sequences.between.roles.length > 0 && (r.sequences.between.every === "hour" || r.sequences.between.every === "n_programs"));
+    // Boundaries are walked for the between sequence, and (A244) for blocks' intros and outros.
+    const walkBoundaries = between || hasBlocks;
+    const walk = !every || rotates || betweenStateful || blocksStateful;
+    const start = walk ? new Date(Math.min(from.getTime(), now - HOUR)) : from;
     const lookback = new Date(start.getTime() - 6 * HOUR);
-    const rows = await load([stationId], lookback, to);
+    // A program starting just as the window ends has its boundary (the between sequence) in it.
+    const rows = await load([stationId], lookback, new Date(to.getTime() + 1));
     const ctx = await context(rows);
     const first = rows[0]?.startsAt && rows[0].startsAt < lookback ? rows[0].startsAt : lookback;
     const [decided, filled] = every
       ? [null, new Set<number>()]
       : await Promise.all([
-          cadenceContext(moduleCtx, stationId, { cadence: rule.cadence, from: first, to, rows, readEntries: (a, b) => load([stationId], a, b) }),
+          cadenceContext(moduleCtx, stationId, { cadence: rule.cadence, sequences: sequenceCadences, from: first, to, rows, readEntries: (a, b) => load([stationId], a, b) }),
           // Breaks filled with spots (the filler marks only those): they keep them.
           db
             .select({ startsAt: B.startsAt })
@@ -520,38 +789,212 @@ export function createLogService(ctx: ModuleContext): LogService {
             .then((r) => new Set(r.map((b) => b.startsAt.getTime())))
         ]);
     const cadence = decided && { ...decided, filled };
-    // Breaks cued from a live block, decided where they fall (with the rule alone, withStored adds them).
-    const cued = cadence
-      ? (await db.select().from(B).where(and(eq(B.stationId, stationId), eq(B.origin, "cued_live"), gte(B.startsAt, lookback), lt(B.startsAt, to))).orderBy(asc(B.startsAt))).map((b) => ({
-          startsAt: b.startsAt.toISOString(),
-          lengthMs: b.lengthMs,
-          context: "Cued live",
-          origin: "cued_live" as const,
-          producerShareMs: 0,
-          logEntryId: b.logEntryId
-        }))
-      : [];
+    // A243: what bumpers aired in breaks and between programs (the as-run log): picks that are over,
+    // and least recently aired first. A244: the blocks' bumpers too.
+    const allBumpers = [...fillers.bumpers, ...[...blockBumpers.values()].flat()];
+    const bumperIds = allBumpers.map((b) => b.id);
+    const { seedRows, airedRows, lastBetween } = await bumperHistory(moduleCtx, stationId, {
+      bumperIds,
+      start,
+      to,
+      seed: rotates,
+      inWindow: start.getTime() < settledBefore,
+      between: betweenStateful || blocksStateful
+    });
+    const seeded = new SequenceDecider(
+      fillers.bumpers,
+      tz,
+      {
+        last: new Map(seedRows.filter((r) => r.id && r.at).map((r) => [r.id!, new Date(r.at).getTime()])),
+        aired: airedRows.filter((r) => r.id).map((r) => ({ id: r.id!, at: r.at.getTime() }))
+      },
+      blockBumpers
+    );
+    const byId = new Map(allBumpers.map((b) => [b.id, b]));
+    // Picks that are over go by the as-run log when they take turns (so any walk agrees); a pool
+    // of one or two picks the same whatever aired.
+    const fromAsRun = rotates && start.getTime() < settledBefore;
+    /** What the as-run log says aired from `a` to `b` (a break or boundary that's over), by position. */
+    const airedIn = (a: number, b: number, position: "open" | "close" | "between", blockId: string | null = null): Element[] => {
+      const inside = airedRows.filter((r) => r.id && r.at.getTime() >= a && r.at.getTime() < b);
+      // Rows from before A243 have no position: the first in a break opened it, the rest closed it.
+      const pick = inside.filter((r, i) => (r.position ? r.position === position : position !== "between" && (position === "open") === (i === 0)));
+      return pick.map((r) => {
+        const item = byId.get(r.id!);
+        return {
+          position,
+          role: item?.bumperRole ?? "any",
+          itemId: r.id!,
+          title: item?.title ?? "Bumper",
+          lengthMs: r.endedAt.getTime() - r.at.getTime(),
+          alternates: [],
+          ...(blockId ? { blockId } : {}),
+          ...(item?.programBlockId ? { ofBlock: true } : {})
+        };
+      });
+    };
+    // What up next names (only read when a sequence has it and there's an up-next bumper).
+    const upNextAnywhere = seeded.has("up_next") || [...blockBumpers.keys()].some((id) => seeded.has("up_next", id));
+    const nextAt = roles.has("up_next") && upNextAnywhere ? await nextAiringFinder(stationId, start, to) : () => null;
+    const announce = (t: number) => () => {
+      const next = nextAt(t);
+      return next ? announceOf(next) : null;
+    };
+    // Program boundaries (between programs), with planned off air time in between ruling one out.
+    const offAir = walkBoundaries ? ((await offAirMap([stationId], lookback, to)).get(stationId) ?? []) : [];
+    const boundaryInput = {
+      last: lastBetween,
+      times: airedRows.filter((r) => r.position === "between").map((r) => r.at.getTime()),
+      settledBefore,
+      hourStart: hourStartIn(tz),
+      starts: rows.filter((r) => r.kind !== "off_air").map((r) => r.startsAt.getTime())
+    };
+    const boundaryDecider = between ? new BoundaryDecider({ rule: seq.between, ...boundaryInput }) : null;
+    /** A244: between two members of a block with its own order, its own between sequence decides. */
+    const blockDeciders = new Map<string, BoundaryDecider | null>();
+    const deciderFor = (ref: BlockRef | null): BoundaryDecider | null => {
+      if (!ref?.sequences) return boundaryDecider;
+      if (!blockDeciders.has(ref.id)) {
+        const b = ref.sequences.between;
+        const any = fillers.bumpers.length > 0 || (blockBumpers.get(ref.id)?.length ?? 0) > 0;
+        blockDeciders.set(ref.id, b.roles.length > 0 && b.every !== "never" && any ? new BoundaryDecider({ rule: b, ...boundaryInput }) : null);
+      }
+      return blockDeciders.get(ref.id)!;
+    };
+    // A244: a block's intro or outro: its own (one a broadcast day, in turn, in library order), else
+    // a five-second card in its look (TV only; playout airs it once it's prepared).
+    const band = hasBlocks ? ((await services.stations.look(stationId))?.band ?? "tv") : "tv";
+    const turnOf = (t: number) => Math.floor(Date.parse(`${broadcastDate(new Date(t), tz)}T00:00:00Z`) / DAY);
+    const blockElement = (ref: BlockRef, kind: "intro" | "outro", at: number): Element | null => {
+      if (!(kind === "intro" ? ref.intro : ref.outro)) return null;
+      const own = (kind === "intro" ? fillers.blocks?.get(ref.id)?.intros : fillers.blocks?.get(ref.id)?.outros) ?? [];
+      const ready = own.filter((i) => eligible(i, at, tz));
+      if (ready.length) {
+        const k = turnOf(at) % ready.length;
+        const ordered = [...ready.slice(k), ...ready.slice(0, k)];
+        return { position: "boundary", role: kind, itemId: ordered[0].id, title: ordered[0].title, lengthMs: ordered[0].durationMs!, alternates: ordered.slice(1).map((i) => i.id), blockId: ref.id, ofBlock: true };
+      }
+      if (band === "radio") return null;
+      return { position: "boundary", role: kind, itemId: "", title: `${ref.name} ${kind}`, lengthMs: GENERATED_BLOCK_CARD_MS, alternates: [], blockId: ref.id, ofBlock: true, generated: true };
+    };
+
+    // Breaks cued from a live block, decided where they fall.
+    const cued = (await db.select().from(B).where(and(eq(B.stationId, stationId), eq(B.origin, "cued_live"), gte(B.startsAt, lookback), lt(B.startsAt, to))).orderBy(asc(B.startsAt))).map((b) => ({
+      startsAt: b.startsAt.toISOString(),
+      lengthMs: b.lengthMs,
+      context: "Cued live",
+      origin: "cued_live" as const,
+      producerShareMs: 0,
+      logEntryId: b.logEntryId
+    }));
     const slots: GeneratedBreak[] = [];
-    /** What airs in a break (every part without a cadence) and how long it runs. */
-    const decide = (b: { startsAt: number; lengthMs: number; afterProgram: boolean; fixed: boolean; programId: string | null; producerShareMs: number }): { parts: BreakParts | undefined; lengthMs: number } => {
-      if (!cadence) return { parts: undefined, lengthMs: b.lengthMs };
-      const parts = cadence.decider.next({ key: String(b.startsAt), startsAt: b.startsAt, endsAt: b.startsAt + b.lengthMs, afterProgram: b.afterProgram }, { spots: cadence.filled.has(b.startsAt) });
+    const boundaries: Boundary[] = [];
+    const entryEnd = (id: string | null) => (id ? rows.find((r) => r.id === id)?.endsAt.getTime() : undefined);
+    /** Boundaries whose closing break already has up next (between leaves it out). */
+    const upNextBefore = new Set<number>();
+    /** The bumpers in a break: as aired (over), or picked (A244: in its block, when its entry is a member). */
+    const elementsFor = (b: { startsAt: number; lengthMs: number; logEntryId: string | null; afterProgram: boolean }, parts: BreakParts | undefined): { open: Element[]; close: Element[] } => {
+      const end = b.startsAt + b.lengthMs;
+      const ref = refOf(spanOf(b.logEntryId));
+      if (end < settledBefore && fromAsRun) return { open: airedIn(b.startsAt, end, "open", ref?.id ?? null), close: airedIn(b.startsAt, end, "close", ref?.id ?? null) };
+      const p = parts ?? EVERY_PART;
+      const own = ref?.sequences ?? null;
+      const airs = own
+        ? { open: blockPositionAirs(own.open, b, bumpersIn(p, "open")), close: blockPositionAirs(own.close, b, bumpersIn(p, "close")), between: false }
+        : { open: bumpersIn(p, "open"), close: bumpersIn(p, "close"), between: false };
+      const r = rolesFor(seqOf(ref), airs);
+      const used = new Set<string>();
+      const after = announce(entryEnd(b.logEntryId) ?? end);
+      return { open: pickElements(seeded, "open", r.open, b.startsAt, used, after, ref?.id ?? null), close: pickElements(seeded, "close", r.close, b.startsAt, used, after, ref?.id ?? null) };
+    };
+    /** What airs in a break (every part without a cadence), its bumpers, and how long it runs. */
+    const decide = (b: {
+      startsAt: number;
+      lengthMs: number;
+      afterProgram: boolean;
+      fixed: boolean;
+      programId: string | null;
+      producerShareMs: number;
+      logEntryId: string | null;
+    }): { parts: BreakParts | undefined; lengthMs: number; elements: { open: Element[]; close: Element[] } } => {
+      const parts = cadence ? cadence.decider.next({ key: String(b.startsAt), startsAt: b.startsAt, endsAt: b.startsAt + b.lengthMs, afterProgram: b.afterProgram }, { spots: cadence.filled.has(b.startsAt) }) : undefined;
+      const elements = elementsFor(b, parts);
+      if (b.afterProgram && [...elements.open, ...elements.close].some((e) => e.role === "up_next")) upNextBefore.add(b.startsAt + b.lengthMs);
       // Without spots: only as long as what airs needs, where the program can move up.
-      if (parts.spots || b.fixed || !cadence.needs) return { parts, lengthMs: b.lengthMs };
-      return { parts, lengthMs: Math.min(b.lengthMs, needMs(cadence.needs, parts, b)) };
+      if (!cadence || !parts || parts.spots || b.fixed || !cadence.needs) return { parts, lengthMs: b.lengthMs, elements };
+      return { parts, lengthMs: Math.min(b.lengthMs, needMs(cadence.needs, parts, { ...b, elementsMs: elementsMs({ elements }) })), elements };
     };
     let c = 0;
     const cuedBefore = (t: number) => {
       while (c < cued.length && Date.parse(cued[c].startsAt) < t) {
         const b = cued[c++];
-        slots.push({ ...b, parts: decide({ startsAt: Date.parse(b.startsAt), lengthMs: b.lengthMs, afterProgram: false, fixed: true, programId: null, producerShareMs: 0 }).parts });
+        const { parts, elements } = decide({ startsAt: Date.parse(b.startsAt), lengthMs: b.lengthMs, afterProgram: false, fixed: true, programId: null, producerShareMs: 0, logEntryId: b.logEntryId });
+        slots.push({ ...b, ...(parts ? { parts } : {}), elements });
       }
+    };
+    /** Puts a boundary on, carved from the end of the closing break before it when that ends just then. */
+    const place = (boundary: Boundary, before: { closing: GeneratedBreak | null }) => {
+      boundaries.push(boundary);
+      const at = Date.parse(boundary.at);
+      if (before.closing && Date.parse(before.closing.startsAt) + before.closing.lengthMs === at) before.closing.boundary = boundary;
+    };
+    const boundaryOf = (at: number, entryId: string, elements: Element[]): Boundary => ({ at: new Date(at).toISOString(), entryId, elements, ms: elements.reduce((sum, e) => sum + e.lengthMs, 0) });
+    /** A244: leaving a block just before off-air time: its outro (the closer follows). */
+    const outroBefore = (before: { row: Row; closing: GeneratedBreak | null }, ref: BlockRef, at: number) => {
+      const outro = blockElement(ref, "outro", at);
+      if (outro) place(boundaryOf(at, before.row.id, [outro]), before);
+    };
+    /**
+     * The boundary into an entry: the between sequence, after the closing break of the one before
+     * (or open time); A244: a block's outro before it when leaving one, its intro after it when
+     * entering one.
+     */
+    let previous: { row: Row; closing: GeneratedBreak | null } | null = null;
+    const boundaryInto = (row: Row) => {
+      const before = previous;
+      if (!walkBoundaries || !before) return;
+      const at = row.startsAt.getTime();
+      const left = spanOf(before.row.id);
+      const entered = spanOf(row.id);
+      const same = Boolean(left && entered && left.id === entered.id);
+      const leftRef = refOf(left);
+      const enteredRef = refOf(entered);
+      // Planned off air time between them: sign-on, not a boundary (the opener airs there, A242; never a block's intro).
+      const off = offAir.find((o) => Date.parse(o.startsAt) < at && Date.parse(o.endsAt) > before.row.endsAt.getTime() - 1);
+      if (off) {
+        if (leftRef) outroBefore(before, leftRef, Math.max(before.row.endsAt.getTime(), Date.parse(off.startsAt)));
+        return;
+      }
+      const context = same ? leftRef : null;
+      const d = deciderFor(context);
+      let elements: Element[] = [];
+      if (d?.next(at)) {
+        if (at < settledBefore && fromAsRun) elements = airedIn(at - 5 * MIN, at, "between", context?.id ?? null);
+        else {
+          const r = rolesFor(seqOf(context), { open: false, close: false, between: true }).between.filter((x) => x !== "up_next" || !upNextBefore.has(at));
+          elements = pickElements(seeded, "between", r, at, new Set(), announce(at), context?.id ?? null);
+        }
+      }
+      const outro = leftRef && !same ? blockElement(leftRef, "outro", at) : null;
+      const intro = enteredRef && !same ? blockElement(enteredRef, "intro", at) : null;
+      const all = [...(outro ? [outro] : []), ...elements, ...(intro ? [intro] : [])];
+      if (!all.length) return;
+      place(boundaryOf(at, row.id, all), before);
     };
     for (const row of rows) {
       cuedBefore(row.startsAt.getTime());
+      if (row.kind === "off_air") {
+        // A244: a block left for a sign-off says goodbye first.
+        const leftRef = previous && walkBoundaries ? refOf(spanOf(previous.row.id)) : null;
+        if (previous && leftRef) outroBefore(previous, leftRef, Math.max(previous.row.endsAt.getTime(), row.startsAt.getTime()));
+        previous = null;
+        continue;
+      }
+      boundaryInto(row);
       if (row.kind !== "program") {
-        // Live programs cue their own; off-air has none.
-        if (row.kind === "live") cuedBefore(row.endsAt.getTime());
+        // Live programs cue their own.
+        cuedBefore(row.endsAt.getTime());
+        previous = { row, closing: null };
         continue;
       }
       const item = row.assetId ? ctx.items.get(row.assetId) : undefined;
@@ -562,6 +1005,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       const itemMs = Math.min(item?.durationMs ?? slotMs, slotMs);
       const barterPerHour = agreement && (agreement.term === "barter" || agreement.term === "cash_plus_barter") ? (agreement.barterMakerMsPerHour ?? 0) : 0;
       const programId = row.programId ?? item?.programId ?? null;
+      let closing: GeneratedBreak | null = null;
 
       // Inside the program, every N minutes (or at the maker's break points).
       if (rule.mode === "every_n_minutes" && rule.everyMinutes) {
@@ -573,7 +1017,7 @@ export function createLogService(ctx: ModuleContext): LogService {
           // At the segment boundary nearest the maker's break point.
           const startsAt = new Date(row.startsAt.getTime() + snapToSegment(point) + shift);
           const perBreakShare = barterPerHour ? Math.min(rule.lengthMs, Math.round(barterPerHour / (60 / rule.everyMinutes))) : 0;
-          const { parts, lengthMs } = decide({ startsAt: startsAt.getTime(), lengthMs: rule.lengthMs, afterProgram: false, fixed: false, programId, producerShareMs: perBreakShare });
+          const { parts, lengthMs, elements } = decide({ startsAt: startsAt.getTime(), lengthMs: rule.lengthMs, afterProgram: false, fixed: false, programId, producerShareMs: perBreakShare, logEntryId: row.id });
           // Nothing airs in it at all: no break.
           if (lengthMs > 0) {
             slots.push({
@@ -583,7 +1027,8 @@ export function createLogService(ctx: ModuleContext): LogService {
               origin: barterPerHour ? "carried_barter" : "rule",
               producerShareMs: perBreakShare,
               logEntryId: row.id,
-              ...(parts ? { parts } : {})
+              ...(parts ? { parts } : {}),
+              elements
             });
           }
           shift += lengthMs;
@@ -591,17 +1036,20 @@ export function createLogService(ctx: ModuleContext): LogService {
         const used = itemMs + shift;
         if (slotMs - used > 0) {
           const startsAt = row.startsAt.getTime() + used;
-          const { parts } = decide({ startsAt, lengthMs: slotMs - used, afterProgram: true, fixed: true, programId, producerShareMs: 0 });
-          slots.push({
+          const { parts, elements } = decide({ startsAt, lengthMs: slotMs - used, afterProgram: true, fixed: true, programId, producerShareMs: 0, logEntryId: row.id });
+          closing = {
             startsAt: new Date(startsAt).toISOString(),
             lengthMs: slotMs - used,
             context: `After ${title}${episode}`,
             origin: "rule",
             producerShareMs: 0,
             logEntryId: row.id,
-            ...(parts ? { parts } : {})
-          });
+            ...(parts ? { parts } : {}),
+            elements
+          };
+          slots.push(closing);
         }
+        previous = { row, closing };
         continue;
       }
       // After every program (and with no rule): the time between the item's end and the slot's end.
@@ -609,20 +1057,42 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (slack > 0) {
         const startsAt = row.startsAt.getTime() + itemMs;
         const producerShareMs = barterPerHour ? Math.min(slack, Math.round((barterPerHour * slotMs) / HOUR)) : 0;
-        const { parts } = decide({ startsAt, lengthMs: slack, afterProgram: true, fixed: true, programId, producerShareMs });
-        slots.push({
+        const { parts, elements } = decide({ startsAt, lengthMs: slack, afterProgram: true, fixed: true, programId, producerShareMs, logEntryId: row.id });
+        closing = {
           startsAt: new Date(startsAt).toISOString(),
           lengthMs: slack,
           context: `After ${title}${episode}`,
           origin: barterPerHour ? "carried_barter" : "rule",
           producerShareMs,
           logEntryId: row.id,
-          ...(parts ? { parts } : {})
-        });
+          ...(parts ? { parts } : {}),
+          elements
+        };
+        slots.push(closing);
       }
+      previous = { row, closing };
     }
     cuedBefore(Infinity);
-    return slots.filter((s) => Date.parse(s.startsAt) >= from.getTime() && Date.parse(s.startsAt) < to.getTime());
+    // A244: each break says the block it's in (its entry is a member).
+    if (hasBlocks) {
+      for (const slot of slots) {
+        const span = spanOf(slot.logEntryId);
+        if (span) slot.blockId = span.blockId;
+      }
+    }
+    return {
+      slots: slots.filter((s) => Date.parse(s.startsAt) >= from.getTime() && Date.parse(s.startsAt) < to.getTime()),
+      boundaries: boundaries.filter((b) => Date.parse(b.at) > from.getTime() && Date.parse(b.at) <= to.getTime()),
+      blocks: {
+        pieces: blockList.flatMap((m) => m.pieces.map((p) => ({ blockId: m.span.blockId, spanId: m.span.id, s: p.s, e: p.e }))),
+        byEntry: new Map([...entrySpan].map(([id, span]) => [id, span.blockId])),
+        refs: bstate.refs
+      }
+    };
+  }
+
+  async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false): Promise<GeneratedBreak[]> {
+    return (await generateAll(stationId, from, to, everyPart)).slots;
   }
 
   async function withStored(stationId: string, generatedIn: GeneratedBreak[], from: Date, to: Date): Promise<BreakSlotView[]> {
@@ -664,6 +1134,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!input.itemId) throw badRequest("Choose what airs.", { itemId: "Required" });
       const item = (await services.library.itemsByIds([input.itemId])).get(input.itemId);
       if (!item || item.archived) throw notFound("That item");
+      // A242: never on the log (so the log, guide and dial keep the codes every app knows).
+      if (isIdentCode(item.code)) throw refused("not_for_the_log", "Openers, closers and off-air cards air at sign-off and sign-on, not from the log.");
       if (!item.rightsConfirmed) throw refused("rights_unconfirmed", "Confirm the rights to air it first.");
       if (item.stationId !== stationId) {
         if (!input.carriageAgreementId) throw refused("needs_agreement", "Another station's program needs a carriage agreement.");
@@ -736,12 +1208,19 @@ export function createLogService(ctx: ModuleContext): LogService {
       // Catalog programs keep one credit an hour: their series' sponsor in this market, or Clear.
       const catalog = await catalogEntries(services, stationId, entries, deps.clock.now());
       const catalogBreaks = catalog.programOf.size ? catalogCreditBreaks(slots, (entryId) => catalog.programOf.has(entryId), hourStartIn(await stationTz(stationId))) : new Set<string>();
-      // The bumper into the break and the one out of it (changed 2026-09-29): the library's first
-      // two, or its one bumper twice.
-      const bumperIn = fillers.bumpers[0];
-      const bumperOut = fillers.bumpers[1] ?? fillers.bumpers[0];
+      // A243: each break's bumpers (its opening and closing sequences, and the between sequence after
+      // a closing break) come picked with it; a slot from elsewhere gets the defaults (the library's
+      // first two Any bumpers, or its one twice).
+      const tz = await stationTz(stationId);
+      const fallback = (slot: BreakSlotView) => {
+        const parts = partsOf(slot);
+        return defaultElements(fillers.bumpers, { open: bumpersIn(parts, "open"), close: bumpersIn(parts, "close") }, Date.parse(slot.startsAt), tz);
+      };
       const main = new Set(rotations.main.spots.map((s) => s.spotId));
       const backup = new Set(rotations.backup.spots.map((s) => s.spotId));
+      // A244: the programming blocks these breaks are in (their ID, bumpers, intro and outro).
+      const blockIds = [...new Set(slots.flatMap((s) => [s.blockId, ...(s.boundary?.elements ?? []).map((e) => e.blockId)]).filter((v): v is string => Boolean(v)))];
+      const blockRefs = await services.library.blocks.refs(blockIds);
       for (const slot of slots) {
         const rows: BreakContent[] = [];
         const airings = slot.id ? (placed.get(slot.id) ?? []) : [];
@@ -762,24 +1241,67 @@ export function createLogService(ctx: ModuleContext): LogService {
           rows.push({ id: a.airingId, kind: "spot", title: a.title, lengthMs: a.lengthSec * 1000, spotId: a.spotId, business: a.business, shortName: a.shortName, rotation, note: rotation === "backup" ? "Backup rotation" : null });
         }
         // What playout adds when it airs the break, each as often as the break rule's cadence says
-        // (every part in every break by default): a bumper into the break, before the spots; the
-        // credit after them; a bumper out of the break; the station ID last. Time nothing takes
-        // holds on the station ID slate before the station ID. A break spots don't air in has no
-        // spot time (it's only as long as the rest needs, unless it closes its program's slot).
+        // (every part in every break by default): the opening bumpers, before the spots; the credit
+        // after them; the closing bumpers; the station ID last; then (A243) the between sequence
+        // when the break closes a program's slot. Time nothing takes holds on the station ID slate
+        // before the station ID. A break spots don't air in has no spot time (it's only as long as
+        // the rest needs, unless it closes its program's slot). Bumpers that don't fit are listed
+        // with no length (A243: by priority, into the break first, then out of it, up next, Any).
         const parts = partsOf(slot);
         let left = Math.max(0, slot.lengthMs - rows.reduce((sum, r) => sum + r.lengthMs, 0));
-        const sidMs = parts.stationId ? Math.min(left, stationIdMs) : 0;
+        // A244: in a block with an ID of its own, that airs where the station ID would.
+        const block = slot.blockId ? blockRefs.get(slot.blockId) : undefined;
+        const blockId = block ? fillers.blocks?.get(block.id)?.stationIds[0] : undefined;
+        const sidMs = parts.stationId ? Math.min(left, blockId?.durationMs ?? stationIdMs) : 0;
         left -= sidMs;
         const catalogCredit = slot.logEntryId && catalogBreaks.has(slot.startsAt) ? catalog.credits.get(catalog.programOf.get(slot.logEntryId)!) : undefined;
         const credit = parts.underwriting && (credits.length > 0 || !!catalogCredit) && left >= CREDIT_MS;
         if (credit) left -= CREDIT_MS;
-        // Each bumper airs whole or not at all: into the break first.
-        const into = parts.bumpers && bumperIn && bumperIn.durationMs! <= left ? bumperIn : null;
-        if (into) left -= into.durationMs!;
-        const outOf = parts.bumpers && bumperOut && bumperOut.durationMs! <= left ? bumperOut : null;
-        if (outOf) left -= outOf.durationMs!;
-        const bumper = (b: NonNullable<typeof into>, where: "in" | "out"): BreakContent => ({ id: `${slot.startsAt}:bmp:${where}`, kind: "bumper", title: b.title, lengthMs: b.durationMs!, spotId: null, business: null, shortName: null, rotation: null, note: where === "in" ? "Into the break" : "Out of the break" });
-        if (into) rows.unshift(bumper(into, "in"));
+        const chosen = slot.elements ?? fallback(slot);
+        const boundary = slot.boundary ?? null;
+        const fitted = fitElements([...chosen.open, ...chosen.close, ...(boundary?.elements ?? [])], left);
+        for (const e of fitted) if (e.fits) left -= e.lengthMs;
+        const bumper = (e: (typeof fitted)[number], i: number): BreakContent => {
+          // A244: a block's intro or outro, between programs.
+          if (e.role === "intro" || e.role === "outro") {
+            const ref = e.blockId ? blockRefs.get(e.blockId) : undefined;
+            const words = e.role === "intro" ? "Intro" : "Outro";
+            return {
+              id: `${slot.startsAt}:${e.role}`,
+              kind: "station_id",
+              title: e.title,
+              lengthMs: e.fits ? e.lengthMs : 0,
+              spotId: null,
+              business: null,
+              shortName: null,
+              rotation: null,
+              note: e.fits ? words : `Didn't fit: ${words} (${shortLength(e.lengthMs)})`,
+              ...(ref ? { block: { id: ref.id, name: ref.name, part: e.role, fits: e.fits } } : {})
+            };
+          }
+          const role = e.role;
+          const announces = e.announces ? { title: e.announces.title, startsAt: e.announces.startsAt } : null;
+          const where = e.position === "open" ? "Into the break" : e.position === "close" ? "Out of the break" : "Between programs";
+          const note = !e.fits ? `Didn't fit: ${roleWords(role)} (${shortLength(e.lengthMs)})` : announces ? `Up next: ${announces.title}, ${clockTime(new Date(announces.startsAt), tz)}` : where;
+          // The first two keep the ids they had before A243 (in and out).
+          const id = e.position === "open" && i === 0 ? `${slot.startsAt}:bmp:in` : e.position === "close" && i === 0 ? `${slot.startsAt}:bmp:out` : `${slot.startsAt}:bmp:${e.position}:${i}`;
+          const ref = e.ofBlock && e.blockId ? blockRefs.get(e.blockId) : undefined;
+          return {
+            id,
+            kind: "bumper",
+            title: e.title,
+            lengthMs: e.fits ? e.lengthMs : 0,
+            spotId: null,
+            business: null,
+            shortName: null,
+            rotation: null,
+            note,
+            element: { position: e.position === "boundary" ? "between" : e.position, role, announces, fits: e.fits },
+            ...(ref ? { block: { id: ref.id, name: ref.name, part: "bumper" as const, fits: e.fits } } : {})
+          };
+        };
+        const at = (position: "open" | "close" | "between") => fitted.filter((e) => e.position === position || (position === "between" && e.position === "boundary")).map(bumper);
+        rows.unshift(...at("open"));
         // Before spots are placed (up to 20 minutes ahead), the spot time is open.
         if (!slot.id && parts.spots && left > 0) {
           rows.push({ id: `${slot.startsAt}:open`, kind: "open", title: "Open", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: "Filled from the rotation about 20 minutes before" });
@@ -797,9 +1319,16 @@ export function createLogService(ctx: ModuleContext): LogService {
             rotation: null,
             note: catalogCredit ? `${catalogCredit.subject} is made possible by` : "Made possible by"
           });
-        if (outOf) rows.push(bumper(outOf, "out"));
+        rows.push(...at("close"));
         if (left > 0) rows.push({ id: `${slot.startsAt}:slate`, kind: "open", title: "Station ID slate", lengthMs: left, spotId: null, business: null, shortName: null, rotation: null, note: null });
-        if (sidMs > 0) rows.push({ id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null });
+        if (sidMs > 0) {
+          rows.push(
+            block && blockId
+              ? { id: `${slot.startsAt}:sid`, kind: "station_id", title: `${block.name} ID`, lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: "Block ID", block: { id: block.id, name: block.name, part: "id", fits: true } }
+              : { id: `${slot.startsAt}:sid`, kind: "station_id", title: "Station ID", lengthMs: sidMs, spotId: null, business: null, shortName: null, rotation: null, note: null }
+          );
+        }
+        rows.push(...at("between"));
         result.set(slot.startsAt, rows);
       }
       return result;
@@ -988,14 +1517,16 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async nowNext(stationIds, at) {
       const until = new Date(at.getTime() + 24 * HOUR);
-      const [rows, offAir] = await Promise.all([load(stationIds, at, until), offAirMap(stationIds, at, until, true)]);
+      const [rows, offAir, blocks] = await Promise.all([load(stationIds, at, until), offAirMap(stationIds, at, until, true), blockState(stationIds, at, until)]);
       const ctx = await context(rows);
+      const marks = airingBlocks(blocks);
       const result = new Map<string, { now: Airing | null; next: Airing | null }>();
       for (const id of stationIds) {
         const airings = viewerAirings(
           rows.filter((r) => r.stationId === id),
           offAir.get(id) ?? [],
-          ctx
+          ctx,
+          marks
         );
         const now = airings.find((a) => Date.parse(a.startsAt) <= at.getTime() && Date.parse(a.endsAt) > at.getTime()) ?? null;
         const next = airings.find((a) => Date.parse(a.startsAt) > at.getTime()) ?? null;
@@ -1005,8 +1536,9 @@ export function createLogService(ctx: ModuleContext): LogService {
     },
 
     async window(stationIds, from, to) {
-      const [rows, offAir] = await Promise.all([load(stationIds, from, to), offAirMap(stationIds, from, to, true)]);
+      const [rows, offAir, blocks] = await Promise.all([load(stationIds, from, to), offAirMap(stationIds, from, to, true), blockState(stationIds, from, to)]);
       const ctx = await context(rows);
+      const marks = airingBlocks(blocks);
       const result = new Map<string, Airing[]>();
       for (const id of stationIds) {
         result.set(
@@ -1014,7 +1546,8 @@ export function createLogService(ctx: ModuleContext): LogService {
           viewerAirings(
             rows.filter((r) => r.stationId === id),
             offAir.get(id) ?? [],
-            ctx
+            ctx,
+            marks
           ).filter((a) => Date.parse(a.endsAt) > from.getTime() && Date.parse(a.startsAt) < to.getTime())
         );
       }
@@ -1050,6 +1583,176 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async breaks(stationId, from, to, options) {
       return withStored(stationId, await generateBreaks(stationId, from, to, options?.everyPart), from, to);
+    },
+
+    async breakPlan(stationId, from, to) {
+      const { slots, boundaries, blocks } = await generateAll(stationId, from, to);
+      return { breaks: await withStored(stationId, slots, from, to), boundaries, blocks };
+    },
+
+    async blockPlan(stationId, from, to) {
+      const state = await blockState([stationId], from, to);
+      const list = state.list.get(stationId) ?? [];
+      return {
+        pieces: list.flatMap((m) => m.pieces.map((p) => ({ blockId: m.span.blockId, spanId: m.span.id, s: p.s, e: p.e }))),
+        byEntry: new Map([...memberOf(list)].map(([id, span]) => [id, span.blockId])),
+        refs: state.refs
+      };
+    },
+
+    async upNextAfter(stationId, at) {
+      return (await nextAiringFinder(stationId, at, at))(at.getTime());
+    },
+
+    async blockBands(stationIds, from, to) {
+      const state = await blockState(stationIds, from, to);
+      return new Map(stationIds.map((id) => [id, bandsOf(state, id).filter((b) => Date.parse(b.endsAt) > from.getTime() && Date.parse(b.startsAt) < to.getTime())]));
+    },
+
+    async blockStatus(stationId, at, nextEntryId) {
+      const state = await blockState([stationId], at, new Date(at.getTime() + DAY));
+      const list = state.list.get(stationId) ?? [];
+      const t = at.getTime();
+      const band = (m: Membership<Row>, p: { s: number; e: number }): BlockBand | null => {
+        const ref = state.refs.get(m.span.blockId);
+        return ref ? { id: ref.id, name: ref.name, colour: ref.colour, logoUrl: ref.logoUrl, startsAt: new Date(p.s).toISOString(), endsAt: new Date(p.e).toISOString() } : null;
+      };
+      let now: BlockBand | null = null;
+      let nowPiece: { s: number; e: number } | null = null;
+      for (const m of list) {
+        const p = m.pieces.find((x) => x.s <= t && t < x.e);
+        if (p) {
+          now = band(m, p);
+          nowPiece = p;
+        }
+      }
+      let next: BlockBand | null = null;
+      const m = nextEntryId ? list.find((x) => x.members.some((e) => e.id === nextEntryId)) : undefined;
+      if (m) {
+        const entry = m.members.find((e) => e.id === nextEntryId)!;
+        const p = m.pieces.find((x) => x.s <= entry.startsAt.getTime() && entry.startsAt.getTime() < x.e);
+        // It enters a block (not the one already on).
+        if (p && p !== nowPiece) next = band(m, p);
+      }
+      return { now, next };
+    },
+
+    async blockSchedules(stationId, blockIds, withPlacements) {
+      const out = new Map<string, BlockSchedule>();
+      if (!blockIds.length) return out;
+      const TB = schema.dayTemplateBlocks;
+      const G = schema.repeatGroups;
+      const SP = schema.programBlockSpans;
+      const now = deps.clock.now();
+      const tz = await stationTz(stationId);
+      const today = broadcastDate(now, tz);
+      const [tbs, ahead] = await Promise.all([
+        db
+          .select({ tb: TB, g: G })
+          .from(TB)
+          .innerJoin(G, eq(G.id, TB.templateId))
+          .where(and(inArray(TB.blockId, blockIds), eq(G.stationId, stationId), eq(G.template, true), isNull(G.removedAt))),
+        db
+          .select()
+          .from(SP)
+          .where(and(eq(SP.stationId, stationId), inArray(SP.blockId, blockIds), gt(SP.endsAt, now)))
+          .orderBy(asc(SP.startsAt))
+      ]);
+      // The next airing: the first span ahead's first member (else the span's own start).
+      const firsts = blockIds.map((id) => ahead.find((sp) => sp.blockId === id)).filter((v): v is SpanRow => Boolean(v));
+      const rows = firsts.length ? await load([stationId], new Date(Math.min(...firsts.map((f) => f.startsAt.getTime()))), new Date(Math.max(...firsts.map((f) => f.endsAt.getTime())))) : [];
+      const firstMembers = memberships(firsts, rows, []);
+      const PLURAL = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"];
+      const day = (d: Date) => new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(d).replace(",", "");
+      for (const id of blockIds) {
+        const mine = tbs.filter((t) => t.tb.blockId === id && (!t.g.endsOn || t.g.endsOn >= today));
+        const range = (t: (typeof mine)[number]) => `${minuteClock(t.tb.startMinute)} to ${minuteClock((t.tb.startMinute + Math.round(t.tb.lengthMs / MIN)) % 1440)}`;
+        const templateLabels = mine.map((t) => `${templateLabel(t.g)}, ${range(t)}`);
+        const viewerLabels = mine.flatMap((t) => {
+          const days = t.g.pattern === "weekly" ? PLURAL[t.g.weekday ?? 0] : t.g.pattern === "daily" ? "Every day" : t.g.pattern === "weekdays" ? "Weekdays" : null;
+          return days ? [`${days}, ${range(t)}`] : [];
+        });
+        const span = firsts.find((f) => f.blockId === id);
+        const m = span ? firstMembers.find((x) => x.span.id === span.id) : undefined;
+        const next = m?.airsFrom ?? span?.startsAt.getTime() ?? null;
+        const oneOff = span ? `${day(span.startsAt)}, ${clockTime(span.startsAt, tz)} to ${clockTime(span.endsAt, tz)}` : null;
+        const mineAhead = ahead.filter((sp) => sp.blockId === id);
+        out.set(id, {
+          label: templateLabels.join("; ") || oneOff,
+          viewerLabel: viewerLabels.join("; ") || null,
+          next: next === null ? null : new Date(next).toISOString(),
+          ...(withPlacements
+            ? {
+                onLog: {
+                  templates: mine.map((t) => ({ templateId: t.g.id, name: t.g.name, label: templateLabel(t.g), startTime: `${String(Math.floor(t.tb.startMinute / 60)).padStart(2, "0")}:${String(t.tb.startMinute % 60).padStart(2, "0")}`, lengthMs: t.tb.lengthMs })),
+                  dates: mineAhead.slice(0, 20).map((sp) => ({ spanId: sp.id, startsAt: sp.startsAt.toISOString(), endsAt: sp.endsAt.toISOString(), templateId: sp.repeatGroupId })),
+                  ahead: mineAhead.filter((sp) => sp.startsAt > now).length
+                }
+              }
+            : {})
+        });
+      }
+      return out;
+    },
+
+    async stationPageBlocks(stationId) {
+      const now = deps.clock.now();
+      const state = await blockState([stationId], now, new Date(now.getTime() + 14 * DAY));
+      const list = (state.list.get(stationId) ?? []).filter((m) => m.members.length && (m.airsUntil ?? 0) > now.getTime() && !state.refs.get(m.span.blockId)?.archived);
+      if (!list.length) return [];
+      const ctx = await context(state.rows);
+      const ids = [...new Set(list.map((m) => m.span.blockId))];
+      const schedules = await service.blockSchedules(stationId, ids, false);
+      const tz = await stationTz(stationId);
+      return ids.map((id) => {
+        const ref = state.refs.get(id)!;
+        const first = list.filter((m) => m.span.blockId === id).sort((a, b) => (a.airsFrom ?? 0) - (b.airsFrom ?? 0))[0];
+        const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric" }).format(new Date(first.airsFrom!)).replace(",", "");
+        return {
+          id,
+          name: ref.name,
+          description: ref.description,
+          logoUrl: ref.logoUrl,
+          colour: ref.colour,
+          schedule: schedules.get(id)?.viewerLabel ?? `${day}, ${clockTime(new Date(first.airsFrom!), tz)} to ${clockTime(new Date(first.airsUntil!), tz)}`,
+          next: new Date(first.airsFrom!).toISOString(),
+          programs: [...new Set(first.members.map((e) => titleOf(e, ctx)))]
+        };
+      });
+    },
+
+    async blockSpansAhead(stationId, blockId) {
+      const SP = schema.programBlockSpans;
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(SP)
+        .where(and(eq(SP.stationId, stationId), eq(SP.blockId, blockId), gt(SP.startsAt, deps.clock.now())));
+      return row?.n ?? 0;
+    },
+
+    async takeBlockOffLog(stationId, blockId) {
+      const SP = schema.programBlockSpans;
+      const TD = schema.dayTemplateDates;
+      const now = deps.clock.now();
+      const tz = await stationTz(stationId);
+      const [ahead, edited] = await Promise.all([
+        db.select().from(SP).where(and(eq(SP.stationId, stationId), eq(SP.blockId, blockId), gt(SP.startsAt, now))),
+        db.select({ date: TD.date }).from(TD).where(and(eq(TD.stationId, stationId), isNotNull(TD.editedAt)))
+      ]);
+      // A date edited by hand keeps its spans, as it keeps its entries.
+      const editedDates = new Set(edited.map((d) => d.date));
+      const kept = ahead.filter((sp) => editedDates.has(broadcastDate(sp.startsAt, tz)));
+      const removing = ahead.filter((sp) => !kept.includes(sp));
+      await db.transaction(async (tx) => {
+        if (removing.length) await tx.delete(SP).where(inArray(SP.id, removing.map((sp) => sp.id)));
+        // Out of its day templates, so they don't make it again.
+        const TB = schema.dayTemplateBlocks;
+        const G = schema.repeatGroups;
+        const mine = await tx.select({ id: TB.id }).from(TB).innerJoin(G, eq(G.id, TB.templateId)).where(and(eq(TB.blockId, blockId), eq(G.stationId, stationId)));
+        if (mine.length) await tx.delete(TB).where(inArray(TB.id, mine.map((r) => r.id)));
+      });
+      if (removing.length) await changedNear(stationId, removing.map((sp) => sp.startsAt));
+      return { removed: removing.length, kept: kept.length };
     },
 
     async ensureBreaks(stationId, from, to) {
@@ -1285,7 +1988,13 @@ export function createLogService(ctx: ModuleContext): LogService {
       const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       const ctx = await context(rows);
       const breaks = await service.breaks(stationId, from, to);
-      const [contents, repeats, days] = await Promise.all([service.breakContents(stationId, breaks), service.repeats(stationId, from), templates.days(stationId, from, to)]);
+      const [contents, repeats, days, blocks, spans] = await Promise.all([
+        service.breakContents(stationId, breaks),
+        service.repeats(stationId, from),
+        templates.days(stationId, from, to),
+        spanViews(stationId, from, to),
+        spansOverlapping(stationId, from, to)
+      ]);
       return {
         from: from.toISOString(),
         to: to.toISOString(),
@@ -1297,8 +2006,10 @@ export function createLogService(ctx: ModuleContext): LogService {
         offAir,
         // G11: each broadcast day in the window and the day template that made it.
         days,
-        // Edit mode: what a draft began from (a batch is refused if the window changed since).
-        version: logVersion(rows)
+        // Edit mode: what a draft began from (a batch is refused if the window changed since; A244: its blocks too).
+        version: logVersion(rows, spans),
+        // A244: programming blocks in the window.
+        ...(blocks.length ? { blocks } : {})
       };
     },
 
@@ -1497,7 +2208,8 @@ export function createLogService(ctx: ModuleContext): LogService {
     remindersOn: (entryIds) => services.accounts.remindersOnEntries(entryIds),
     settleReminders,
     rearmReminders: (ex, entryIds) => services.accounts.rearmReminders(ex, entryIds),
-    tellReminders
+    tellReminders,
+    spans: (stationId, from, to) => spansOverlapping(stationId, from, to)
   });
   return service;
 }
@@ -1508,5 +2220,5 @@ function breakRow(c: BreakContent): BreakRow {
   const code: BreakRow["code"] =
     c.kind === "station_id" ? "SID" : c.kind === "bumper" ? "BMP" : c.kind === "underwriting" || c.kind === "sponsor" ? "UND" : c.kind === "open" ? "OPEN" : "SPT";
   const whose: BreakRow["whose"] = c.kind === "producer" ? "producer" : c.rotation === "backup" ? "backup" : "station";
-  return { code, title: c.business && c.kind === "spot" ? `${c.shortName ?? c.business}: ${c.title}` : c.title, lengthMs: c.lengthMs, whose, note: c.note };
+  return { code, title: c.business && c.kind === "spot" ? `${c.shortName ?? c.business}: ${c.title}` : c.title, lengthMs: c.lengthMs, whose, note: c.note, ...(c.element ? { element: c.element } : {}), ...(c.block ? { block: c.block } : {}) };
 }

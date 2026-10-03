@@ -87,3 +87,26 @@ describe("a shared call sign", () => {
     expect(getByText("Riverside County, Board of Supervisors")).toBeTruthy();
   });
 });
+
+// A244: a programming block's band above a row's programs.
+describe("programming block bands", () => {
+  const withBlock: GuideStation = { ...ROWS[0], blocks: [{ id: "lcn", name: "Late Crate Nights", start: at(19, 30), end: at(22), colour: "#1F5C99" }] };
+
+  it("are placed as the programs are, clipped to the window, with the leading marker when they began earlier", () => {
+    const { container } = render(<GuideGrid rows={[withBlock, ROWS[1]]} from={at(20)} to={at(23)} timeZone={TZ} />);
+    const band = container.querySelector(".oc-guide__band") as HTMLElement;
+    expect(band.style.gridColumn).toBe("2 / 26");
+    expect(band.classList.contains("oc-guide__band--cont")).toBe(true);
+    expect(band.getAttribute("aria-label")).toBe("Late Crate Nights, 7:30 pm to 10:00 pm");
+    expect(band.getAttribute("role")).toBe("note");
+    expect(band.tagName).toBe("DIV");
+    // Only rows with a block get the strip.
+    expect(container.querySelectorAll(".oc-guide__row--blocks")).toHaveLength(1);
+  });
+
+  it("are left out of the compact variant, and of rows whose blocks are outside the window", () => {
+    expect(render(<GuideGrid rows={[withBlock]} from={at(20)} to={at(23)} variant="compact" />).container.querySelector(".oc-guide__band")).toBeNull();
+    cleanup();
+    expect(render(<GuideGrid rows={[{ ...withBlock, blocks: [{ id: "x", name: "Earlier", start: at(17), end: at(19) }] }]} from={at(20)} to={at(23)} />).container.querySelector(".oc-guide__row--blocks")).toBeNull();
+  });
+});

@@ -214,3 +214,87 @@ describe("the assembler's run sheet", () => {
     expect(calls).toBe(2);
   });
 });
+
+describe("bumper sequences left as they are (A243): exactly today's run sheet", () => {
+  const RULE = { mode: "after_every_program", everyMinutes: null, lengthMs: 120_000, spotMsPerHour: 180_000, sameSpotPerHour: 2, fillOrder: ["SPT", "UND", "BMP", "SID"], openTimeTo: "spot_market", blockedCategories: [] };
+  const labelled = (segments: Segment[]) => segments.map((s) => `${s.startsAt.toISOString().slice(11, 19)} ${s.code} ${Math.round((s.endsAt.getTime() - s.startsAt.getTime()) / 1000)}s${s.code === "BMP" ? ` ${s.label}` : ""}`);
+
+  async function station(callSign: string, tenths: number, bumpers: Array<[string, number]>) {
+    const s = await stationFixture(h, { callSign, name: callSign, ownerId: kai.id, tenths, signedOn: true });
+    await kai.put(`/v1/stations/${s.id}/break-rule`, RULE).expect(200);
+    await itemFixture(h, s.id, { title: `${callSign} ident`, code: "SID", durationMs: 5_000 });
+    for (const [i, [title, ms]] of bumpers.entries()) await itemFixture(h, s.id, { title, code: "BMP", durationMs: ms, createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)) });
+    const show = await itemFixture(h, s.id, { title: "Crate", durationMs: 56 * 60_000 });
+    for (const [a, z] of [["10", "11"], ["11", "12"], ["12", "13"]]) await kai.post(`/v1/stations/${s.id}/log`, { kind: "program", startsAt: `2026-10-02T${a}:00:00.000Z`, endsAt: `2026-10-02T${z}:00:00.000Z`, itemId: show.id }).expect(201);
+    return s.id;
+  }
+
+  it("stores nothing new, and reads as one into the break and one out of it", async () => {
+    const id = await station("DFLA", 301, [["A", 10_000]]);
+    const [row] = await h.db.select().from(schema.breakRules).where(eq(schema.breakRules.stationId, id));
+    expect(row.bumperSequences).toBeNull();
+    expect((await kai.get(`/v1/stations/${id}/break-rule`).expect(200)).body.bumperSequences).toEqual({ open: { roles: ["into_break"], every: "break" }, close: { roles: ["out_of_break"], every: "break" }, between: { roles: [], every: "program" } });
+  });
+
+  it("no bumpers: the station ID slate, then the station ID", async () => {
+    const id = await station("DFLB", 311, []);
+    const segments = await planner.plan(id, new Date("2026-10-02T10:55:00Z"), new Date("2026-10-02T11:00:00Z"));
+    expect(labelled(segments)).toEqual(["10:00:00 PGM 3360s", "10:56:00 OPEN 235s", "10:59:55 SID 5s"]);
+  });
+
+  it("one bumper: it opens and closes every break; open time loops it", async () => {
+    const id = await station("DFLC", 321, [["A", 10_000]]);
+    const segments = await planner.plan(id, new Date("2026-10-02T09:59:00Z"), new Date("2026-10-02T13:00:00Z"));
+    expect(labelled(segments.filter((s) => !(s.code === "PGM"))).slice(0, 12)).toEqual([
+      "09:59:00 BMP 10s A",
+      "09:59:10 BMP 10s A",
+      "09:59:20 BMP 10s A",
+      "09:59:30 BMP 10s A",
+      "09:59:40 BMP 10s A",
+      "09:59:50 OPEN 5s",
+      "09:59:55 SID 5s",
+      "10:56:00 BMP 10s A",
+      "10:56:10 BMP 10s A",
+      "10:56:20 OPEN 215s",
+      "10:59:55 SID 5s",
+      "11:56:00 BMP 10s A"
+    ]);
+  });
+
+  it("two bumpers: the first into every break and the second out of it, whatever aired last; open time takes turns", async () => {
+    const id = await station("DFLD", 331, [
+      ["A", 10_000],
+      ["B", 6_000]
+    ]);
+    // B aired last, in open time and in a break before: A still opens the next break, as before A243.
+    const items = await h.db.select().from(schema.assets).where(eq(schema.assets.stationId, id));
+    const a = items.find((i) => i.title === "A")!.id;
+    const b = items.find((i) => i.title === "B")!.id;
+    await h.db.insert(schema.asRun).values([
+      { stationId: id, code: "BMP", startedAt: new Date("2026-10-02T02:00:00Z"), endedAt: new Date("2026-10-02T02:00:10Z"), assetId: a, reason: "station_id_fill" },
+      { stationId: id, code: "BMP", startedAt: new Date("2026-10-02T02:30:00Z"), endedAt: new Date("2026-10-02T02:30:06Z"), assetId: b, reason: "planned", position: "open" }
+    ]);
+    const segments = await planner.plan(id, new Date("2026-10-02T09:59:30Z"), new Date("2026-10-02T13:00:00Z"));
+    expect(labelled(segments.filter((s) => s.code !== "PGM"))).toEqual([
+      "09:59:30 BMP 10s A",
+      "09:59:40 BMP 6s B",
+      "09:59:46 OPEN 9s",
+      "09:59:55 SID 5s",
+      "10:56:00 BMP 10s A",
+      "10:56:10 BMP 6s B",
+      "10:56:16 OPEN 219s",
+      "10:59:55 SID 5s",
+      "11:56:00 BMP 10s A",
+      "11:56:10 BMP 6s B",
+      "11:56:16 OPEN 219s",
+      "11:59:55 SID 5s",
+      "12:56:00 BMP 10s A",
+      "12:56:10 BMP 6s B",
+      "12:56:16 OPEN 219s",
+      "12:59:55 SID 5s"
+    ]);
+    // The rows carry where they aired (what the as-run log records), and nothing else changes.
+    expect(segments.filter((s) => s.code === "BMP" && s.inBreak).map((s) => `${s.position} ${s.bumperRole}`).slice(0, 2)).toEqual(["open into_break", "close out_of_break"]);
+    expect(segments.find((s) => s.code === "BMP" && !s.inBreak)).toMatchObject({ position: "open_time", reason: "station_id_fill" });
+  });
+});

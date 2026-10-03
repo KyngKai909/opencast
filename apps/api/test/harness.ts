@@ -297,7 +297,25 @@ export function testClip(seconds: number, kind: "video" | "audio" = "video"): Pr
 export async function itemFixture(
   h: Harness,
   stationId: string,
-  fields: { title?: string; durationMs?: number; code?: "PGM" | "SPT" | "UND" | "BMP" | "SID"; programId?: string; source?: "upload" | "link"; rights?: boolean; episodeNumber?: number; location?: string } = {}
+  fields: {
+    title?: string;
+    /** Null: a still (an off-air card that's a picture, A242). */
+    durationMs?: number | null;
+    code?: "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPN" | "CLS" | "OFF";
+    programId?: string;
+    source?: "upload" | "link";
+    rights?: boolean;
+    episodeNumber?: number;
+    location?: string;
+    mediaKind?: "video" | "audio";
+    /** A243: a bumper's role, and when it may air. */
+    bumperRole?: "into_break" | "out_of_break" | "up_next" | "any";
+    airs?: { from?: string; until?: string; dailyFrom?: string; dailyUntil?: string };
+    /** Library order (oldest first). */
+    createdAt?: Date;
+    /** A244: a programming block's own (its bumper, ID, intro or outro). */
+    programBlockId?: string;
+  } = {}
 ) {
   const [item] = await h.db
     .insert(schema.assets)
@@ -309,9 +327,16 @@ export async function itemFixture(
       code: fields.code ?? "PGM",
       source: fields.source ?? "upload",
       sourceUrl: fields.source === "link" ? "https://example.com/v" : null,
-      mediaKind: "video",
-      durationMs: fields.durationMs ?? 28.5 * 60_000,
-      status: "ready"
+      mediaKind: fields.mediaKind ?? "video",
+      durationMs: fields.durationMs === undefined ? 28.5 * 60_000 : fields.durationMs,
+      status: "ready",
+      bumperRole: fields.bumperRole ?? null,
+      airsFrom: fields.airs?.from ?? null,
+      airsUntil: fields.airs?.until ?? null,
+      dailyFrom: fields.airs?.dailyFrom ?? null,
+      dailyUntil: fields.airs?.dailyUntil ?? null,
+      programBlockId: fields.programBlockId ?? null,
+      ...(fields.createdAt ? { createdAt: fields.createdAt } : {})
     })
     .returning();
   if (fields.rights !== false) {

@@ -3,7 +3,7 @@
 .oc-tl__col { position: relative; border-left: 1px solid var(--line); }
 .oc-tl__hl { position: absolute; left: 0; right: 0; height: 1px; background: var(--hair); }
 .oc-tl__hrs { position: relative; }
-.oc-tl__hrs span { position: absolute; left: 0; font: 500 12px var(--font-mono); color: var(--ink-50); transform: translateY(-50%); }
+.oc-tl__hrs > div > span { position: absolute; left: 0; font: 500 12px var(--font-mono); color: var(--ink-50); transform: translateY(-50%); }
 .oc-tl__item { position: absolute; left: 8px; right: 0; }
 .oc-blk {
   position: absolute; inset: 0;
@@ -28,3 +28,26 @@ button.oc-blk { cursor: pointer; }
   align-items: center; justify-content: center; font-weight: 600;
 }
 .oc-blk--sel { box-shadow: inset 0 0 0 2px var(--signal); }
+
+/* A244: programming blocks, a rail in the block's colour at the hour labels' inside edge, its name
+   written up it; solid where it airs, dashed where it's placed and nothing of it airs. */
+.oc-tl--bands { grid-template-columns: 74px 1fr; }
+.oc-tl__bands { position: absolute; inset: 0; pointer-events: none; }
+.oc-tl__band { position: absolute; right: 4px; width: 14px; pointer-events: auto; }
+.oc-tl__rail {
+  position: absolute; inset: 0; padding: 0; margin: 0; border: 1.5px dashed var(--oc-band); border-radius: 3px;
+  background: none; color: #fff; font: inherit; overflow: hidden;
+}
+button.oc-tl__rail { cursor: pointer; }
+.oc-tl__rail-on { position: absolute; left: -1.5px; right: -1.5px; background: var(--oc-band); border-radius: 2px; }
+.oc-tl__rail-name {
+  position: absolute; top: 6px; left: 50%; transform: translateX(-50%); writing-mode: vertical-rl;
+  font: 600 9.5px/1 var(--font-text); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff;
+  text-shadow: 0 0 2px var(--oc-band);
+}
+.oc-tl__rail--sel { box-shadow: 0 0 0 2px var(--signal); }
+.oc-tl__rail--warn { outline: 2px solid var(--standby); outline-offset: 1px; }
+.oc-tl__edge { position: absolute; left: -4px; right: -4px; height: 8px; padding: 0; border: 0; background: none; cursor: ns-resize; }
+.oc-tl__edge:focus-visible { outline: 2px solid var(--signal); }
+.oc-tl__edge--start { top: -4px; }
+.oc-tl__edge--end { bottom: -4px; }

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { cx } from "../lib/cx";
-import type { TimeInput } from "../lib/format";
+import { clock, type TimeInput } from "../lib/format";
 import { NowLine } from "./NowLine";
 import { LiveText } from "./LiveText";
 import { Tag } from "../primitives/Tag";
@@ -21,6 +21,19 @@ export interface GuideProgram {
   detail?: ReactNode;
 }
 
+/**
+ * A244: a programming block on a station's row ("Late Crate Nights"), from its first program's start
+ * to its last one's end. Drawn as a thin band above the row's programs, in its colour.
+ */
+export interface GuideBlock {
+  id: string;
+  name: string;
+  start: TimeInput;
+  end: TimeInput;
+  /** Its colour (4.5:1 against white, so its name is white on it); else the ink. */
+  colour?: string | null;
+}
+
 export interface GuideStation {
   id: string;
   channel: string;
@@ -33,6 +46,8 @@ export interface GuideStation {
    * 15.2 SBCO): shown as the column's last line, so each stream is told apart by more than its channel.
    */
   name?: string;
+  /** A244: the station's programming blocks in the window (the compact variant leaves them out). */
+  blocks?: GuideBlock[];
 }
 
 export interface GuideGridProps {
@@ -95,6 +110,20 @@ export function guideCells(programs: GuideProgram[], from: TimeInput, to: TimeIn
   return cells;
 }
 
+/** A244: a row's block bands, placed like its programs (clipped to the window, the leading marker when one began earlier). */
+export function guideBands(blocks: GuideBlock[], from: TimeInput, to: TimeInput): Array<{ block: GuideBlock; colStart: number; colEnd: number; began: boolean }> {
+  return guideCells(
+    blocks.map((b) => ({ id: `${b.id}:${ms(b.start)}`, title: b.name, start: b.start, end: b.end })),
+    from,
+    to
+  ).map((c) => ({ block: blocks.find((b) => `${b.id}:${ms(b.start)}` === c.program.id)!, colStart: c.colStart, colEnd: c.colEnd, began: c.began }));
+}
+
+/** "Late Crate Nights, 9:00 pm to 1:00 am": a block band's name for screen readers. */
+export function guideBandLabel(b: Pick<GuideBlock, "name" | "start" | "end">, timeZone?: string): string {
+  return `${b.name}, ${clock(b.start, { timeZone })} to ${clock(b.end, { timeZone })}`;
+}
+
 /** The head row's half hours. */
 export function guideSlots(from: TimeInput, to: TimeInput): Date[] {
   const out: Date[] = [];
@@ -142,8 +171,11 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
     </div>
   );
 
-  const body = rows.map((r) => (
-    <div key={r.id} className="oc-guide__row" role="group" aria-label={`${r.callSign} ${r.channel}${r.name ? `, ${r.name}` : ""}`}>
+  const body = rows.map((r) => {
+    // A244: a row with a programming block in the window has a band strip above its programs.
+    const bands = compact ? [] : guideBands(r.blocks ?? [], from, to);
+    return (
+    <div key={r.id} className={cx("oc-guide__row", bands.length > 0 && "oc-guide__row--blocks")} role="group" aria-label={`${r.callSign} ${r.channel}${r.name ? `, ${r.name}` : ""}`}>
       <div className="oc-guide__st">
         <span className="oc-cs">{r.callSign}</span>
         <span className="oc-ch">{r.channel}</span>
@@ -158,6 +190,17 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
           </Tag>
         )}
       </div>
+      {bands.map(({ block, colStart, colEnd, began }) => (
+        <div
+          key={`${block.id}:${ms(block.start)}`}
+          className={cx("oc-guide__band", began && "oc-guide__band--cont")}
+          style={{ gridColumn: `${colStart} / ${colEnd}`, ...(block.colour ? { background: block.colour } : {}) }}
+          role="note"
+          aria-label={guideBandLabel(block, timeZone)}
+        >
+          <span aria-hidden="true">{block.name}</span>
+        </div>
+      ))}
       {guideCells(r.programs, from, to, now).map((c) => {
         const p = c.program;
         const classes = cx(
@@ -200,7 +243,8 @@ export function GuideGrid({ rows, from, to, now, timeZone, variant = "web", sele
         );
       })}
     </div>
-  ));
+    );
+  });
 
   const nowLine = now != null ? <NowLine at={now} from={from} to={to} timeZone={timeZone} variant={compact ? "compact" : "web"} /> : null;
 

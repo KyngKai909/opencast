@@ -1,5 +1,6 @@
 // Generated pictures: the station ID, the underwriting credit, off-air and
-// "we'll be right back" slates, the bug, and a spot's code with its QR. Drawn as
+// "we'll be right back" slates, the bug, a spot's code with its QR, and (A242) the
+// automatic opener's and closer's picture and a station's own off-air picture fitted to the frame. Drawn as
 // SVG and rendered with sharp (so no special ffmpeg build is needed), in the
 // style guide's typefaces where installed, inside title safe (the middle 90%).
 // Cached by content: a credit regenerates when its sponsors or members change.
@@ -32,6 +33,8 @@ export interface Sponsor {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const ident = (s: StationLook) => [s.callSign ?? s.name, s.channel].filter(Boolean).join(" ");
 const background = (s: StationLook) => s.colour ?? "#1A1A1A";
+/** "12.1 BEAT": how the automatic opener and closer name the station (A242). */
+export const identLine = (s: StationLook) => [s.channel, s.callSign ?? s.name].filter(Boolean).join(" ");
 
 /** Breaks a line into rows of at most `chars` characters, on word boundaries. */
 function wrap(text: string, chars: number): string[] {
@@ -135,6 +138,80 @@ export class Slates {
       lines.push(`<text x="${SAFE.x + SAFE.w - 40}" y="${SAFE.y + SAFE.h - 40}" font-family="${MONO}" font-size="30" fill="#FFFFFF" text-anchor="end">${esc(ident(station))}</text>`);
       return this.svgToPng(`<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}"><rect width="100%" height="100%" fill="${background(station)}"/>${lines.join("")}</svg>`, file);
     });
+  }
+
+  /**
+   * The automatic opener's or closer's picture (A242, added 2026-10-02), in the station's look:
+   * "12.1 BEAT" large (its channel, then its call sign, or its name before it has one), "Signing on"
+   * or "Signing off" under it, and the closer's "Back at 6:00 am" (when it says), full screen in the
+   * station's colour, inside title safe.
+   */
+  identCard(station: StationLook, kind: "opener" | "closer", backAt: string | null): Promise<string> {
+    const cx = FRAME.width / 2;
+    const big = identLine(station);
+    const size = big.length > 10 ? Math.max(72, Math.round(1100 / (big.length * 0.62))) : 150;
+    const words = kind === "opener" ? "Signing on" : "Signing off";
+    const back = kind === "closer" && backAt ? `Back at ${backAt}` : null;
+    const { callSign, channel, name, colour } = station;
+    return this.cached("ident", { kind, callSign, channel, name, colour, back, v: 1 }, (file) =>
+      this.svgToPng(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
+          <rect width="100%" height="100%" fill="${background(station)}"/>
+          <text x="${cx}" y="${FRAME.height / 2 - 20}" font-family="${DISPLAY}" font-size="${size}" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-4">${esc(big)}</text>
+          <text x="${cx}" y="${FRAME.height / 2 + 70}" font-family="${TEXT}" font-size="56" font-weight="600" fill="#FFFFFF" text-anchor="middle">${esc(words)}</text>
+          ${back ? `<text x="${cx}" y="${SAFE.y + SAFE.h - 40}" font-family="${MONO}" font-size="40" fill="#FFFFFF" fill-opacity="0.9" text-anchor="middle">${esc(back)}</text>` : ""}
+        </svg>`,
+        file
+      )
+    );
+  }
+
+  /**
+   * A programming block's automatic intro or outro (A244, added 2026-10-02): full screen in the
+   * block's colour (else the station's), its logo (when it has one, `logo`: the picture on this
+   * worker's disk) above its name, and under it "on 12.1 BEAT" (intro) or, for the outro, the name
+   * reads "That was Late Crate Nights". Inside title safe.
+   */
+  async blockCard(station: StationLook, block: { name: string; colour: string | null; logoContentId: string | null }, kind: "intro" | "outro", logo: string | null): Promise<string> {
+    const cx = FRAME.width / 2;
+    const title = kind === "intro" ? block.name : `That was ${block.name}`;
+    const size = title.length > 18 ? Math.max(56, Math.round(1100 / (title.length * 0.6))) : 96;
+    const under = kind === "intro" ? `on ${identLine(station)}` : identLine(station);
+    const fill = block.colour ?? background(station);
+    const logoBox = 200;
+    const logoCentre = 230;
+    const titleY = logo ? 430 : 370;
+    const underY = logo ? 500 : 450;
+    return this.cached("blk", { kind, name: block.name, colour: fill, logo: block.logoContentId, line: under, v: 1 }, async (file) => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${FRAME.width}" height="${FRAME.height}">
+          <rect width="100%" height="100%" fill="${fill}"/>
+          <text x="${cx}" y="${titleY}" font-family="${DISPLAY}" font-size="${size}" font-weight="800" fill="#FFFFFF" text-anchor="middle" letter-spacing="-2">${esc(title)}</text>
+          <text x="${cx}" y="${underY}" font-family="${TEXT}" font-size="44" font-weight="600" fill="#FFFFFF" fill-opacity="0.92" text-anchor="middle">${esc(under)}</text>
+        </svg>`;
+      const base = await sharp(Buffer.from(svg), { density: 72 }).resize(FRAME.width, FRAME.height).png().toBuffer();
+      const mark = logo ? await sharp(logo).resize(logoBox, logoBox, { fit: "inside" }).png().toBuffer().catch(() => null) : null;
+      const meta = mark ? await sharp(mark).metadata() : null;
+      await sharp(base)
+        .composite(mark && meta?.width && meta.height ? [{ input: mark, left: Math.round(cx - meta.width / 2), top: Math.round(logoCentre - meta.height / 2) }] : [])
+        .png()
+        .toFile(file);
+    });
+  }
+
+  /**
+   * A station's own off-air card when it's a picture (A242): fitted inside the frame, letterboxed on
+   * black, as a PNG the slate is made from. `source` is the picture on this worker's disk; `id` what
+   * it is (its content ID), so it's drawn once.
+   */
+  ownCard(source: string, id: string): Promise<string> {
+    return this.cached("card", { id, v: 1 }, (file) =>
+      sharp(source)
+        .resize(FRAME.width, FRAME.height, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 1 } })
+        .flatten({ background: "#000000" })
+        .png()
+        .toFile(file)
+        .then(() => undefined)
+    );
   }
 
   /** Off air, and when the station is back. */

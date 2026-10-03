@@ -17,6 +17,7 @@ import { saveOnAirState } from "../fixtures/onair";
 import { fail, path, reply } from "../respond";
 import { markEdited, offAirFor, removeWithBreaks } from "../schedule";
 import { roleOn } from "./log";
+import { checkBlockChanges, isBlockChange, spansOf } from "../blocks";
 
 const MIN = 60_000;
 
@@ -37,6 +38,13 @@ export function mockLogVersion(stationId: string, from: string, to: string): str
   let h2 = 0x01000193;
   for (const e of stationLog(stationId, from, to)) {
     for (const ch of `${e.id}|${e.startsAt}|${e.endsAt}|${e.kind}|${e.itemId ?? ""}|${e.liveSourceId ?? ""}|${e.carriageAgreementId ?? ""}|${e.endedEarlyAt ?? ""}\n`) {
+      h1 = Math.imul(h1 ^ ch.charCodeAt(0), 16777619) >>> 0;
+      h2 = Math.imul(h2 ^ ch.charCodeAt(0), 2246822519) >>> 0;
+    }
+  }
+  // A244: its programming blocks' spans too.
+  for (const sp of spansOf(stationId).filter((x) => x.startsAt < to && x.endsAt > from)) {
+    for (const ch of `block|${sp.id}|${sp.blockId}|${sp.startsAt}|${sp.endsAt}\n`) {
       h1 = Math.imul(h1 ^ ch.charCodeAt(0), 16777619) >>> 0;
       h2 = Math.imul(h2 ^ ch.charCodeAt(0), 2246822519) >>> 0;
     }
@@ -86,12 +94,18 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
   const itemFor = (itemId: string) => {
     const it = items.find((i) => i.id === itemId);
     if (!it || it.stationId !== stationId) return { problem: { code: "not_found", message: "That item wasn't found." } };
+    if (it.identCode) return { problem: { code: "not_for_the_log", message: "Openers, closers and off-air cards air at sign-off and sign-on, not from the log." } };
     if (!it.rights) return { problem: { code: "rights_unconfirmed", message: "Confirm the rights to air it first." } };
     return { item: it };
   };
   const lengthOf = (ms: number | null) => Math.ceil((ms ?? 30 * MIN) / MIN) * MIN;
 
   for (const [index, c] of body.changes.entries()) {
+    // A244: programming blocks' spans, checked below.
+    if (isBlockChange(c)) {
+      about.push({ id: null, insert: null });
+      continue;
+    }
     if (c.op === "insert") {
       const startsAt = snapTime(c.entry.startsAt);
       const row: DbLogEntry = {
@@ -191,6 +205,8 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
       problems.push({ index: mine.get(changed.id)!, code: "overlap", message: `${changed.title} would overlap ${other.title} at ${clockOf(changed.startsAt > other.startsAt ? changed.startsAt : other.startsAt)}.` });
     }
   }
+  const blocks = checkBlockChanges(stationId, body.changes, { t, boundary, tooSoon });
+  problems.push(...blocks.problems);
   problems.sort((a, b) => (a.index ?? -1) - (b.index ?? -1));
 
   // Dead air the batch leaves in the stretch it touches (planned off air and breaks aren't).
@@ -230,6 +246,7 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
   }
 
   const lines = body.changes.map((c, index) => {
+    if (isBlockChange(c)) return blocks.lines.get(index) ?? "";
     const a = about[index];
     if (a.insert) return `${a.insert.row.title} goes on at ${when(a.insert.row.startsAt, now().toISOString())}`;
     const d = a.id ? drafts.get(a.id) : undefined;
@@ -247,6 +264,10 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
     summary,
     changes: body.changes.map((c, index) => {
       const a = about[index];
+      if (isBlockChange(c)) {
+        const r = blocks.results.get(index);
+        return { index, op: c.op, entryId: null, key: r?.key ?? null, spanId: r?.spanId ?? null, line: lines[index], startsAt: r?.startsAt ?? null, endsAt: r?.endsAt ?? null };
+      }
       const d = a.id ? drafts.get(a.id) : undefined;
       const row = a.insert ? a.insert.row : d && !d.removed ? d.next : null;
       return { index, op: c.op, entryId: a.insert ? (ids.get(index) ?? null) : a.id, key: a.insert?.key ?? null, line: lines[index], startsAt: row && c.op !== "remove" ? row.startsAt : null, endsAt: row && c.op !== "remove" ? row.endsAt : null };
@@ -289,6 +310,8 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
     ids.set(ins.index, row.id);
     times.push(row.startsAt);
   }
+  blocks.publish();
+  times.push(...blocks.times);
   markEdited(stationId, times);
   const record: MockLogChange = { stationId, id: crypto.randomUUID(), at: now().toISOString(), by: { userId: by.id, name: by.name }, summary, lines, count: lines.length };
   history().unshift(record);

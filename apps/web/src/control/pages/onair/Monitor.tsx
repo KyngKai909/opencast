@@ -5,7 +5,8 @@
 // filled from the spot market shows here as soon as it's saved. Planned off air (G9) reads "Off
 // air, back at 6:00 am" while it's on, and "Signs off at 2:00 am" when it's coming within 24 hours.
 // "Prepared for air" (PlayoutStatus.readiness) says how many of the next 48 hours' items are ready
-// (each item once, G13), and names the first that isn't, linked to that airing on the log.
+// (each item once, G13), and names the first that isn't, linked to that airing on the log. While the
+// opener or closer airs (A242, PlayoutStatus.signing) it says "Signing on" or "Signing off".
 
 import { useMemo, type ReactNode } from "react";
 import { audienceApi, catalogApi, type Offer, playoutApi, stationsApi } from "@opencast/contracts";
@@ -23,6 +24,7 @@ import { STATION_TZ, useNow } from "../../../lib/clock";
 import { useStation } from "../../station/StationContext";
 import { Quiet } from "../common";
 import "./Monitor.css";
+import { startsWords, untilWords } from "../../components/live/blocks";
 import { controlPath } from "../../../areas";
 import { stationLabel } from "../../station/slug";
 
@@ -37,7 +39,7 @@ function sameDay(a: string | number, b: string | number) {
 }
 
 function toItems(rows: RundownRow[]): RundownItem[] {
-  return rows.map((r) => ({ id: r.id, at: r.at, code: r.code, title: r.title, source: r.source ?? undefined, length: r.lengthMs }));
+  return rows.map((r) => ({ id: r.id, at: r.at, code: r.code, title: r.title, source: r.source ?? undefined, length: r.lengthMs, ...(r.dropped ? { muted: true } : {}) }));
 }
 
 const SERVICE: Record<string, string> = { youtube: "YouTube", twitch: "Twitch" };
@@ -112,8 +114,11 @@ export default function Monitor() {
   const since = status?.onAirSince ?? null;
   const sinceText = since ? (sameDay(since, t) ? clock(since, { timeZone: STATION_TZ }) : monthDay(since)) : null;
   const breakIn = status?.nextBreakAt ? Date.parse(status.nextBreakAt) - t : null;
+  // A242: the opener or closer on air now.
+  const signing = status?.signing === "on" ? "Signing on" : status?.signing === "off" ? "Signing off" : null;
   const description: ReactNode = onAir ? (
     <>
+      {signing ? `${signing}. ` : null}
       {sinceText ? `On air since ${sinceText}.` : "On air."}
       {breakIn !== null && breakIn > 0 && (
         <>
@@ -233,6 +238,14 @@ export default function Monitor() {
       <div className="cc-pm">
         {runBy && <div className="cc-pm__sec">{runBy}</div>}
         <AccountBanner className="cc-pm__banner" />
+        {signing && <div className="cc-pm__sec cc-mon__signing">{signing}</div>}
+        {onAir && status?.block && (
+          <div className="cc-pm__sec">
+            <span className="cc-mon__block" style={{ ["--cc-block" as string]: status.block.colour ?? "var(--ink-70)" }}>
+              {untilWords(status.block)}
+            </span>
+          </div>
+        )}
         {picture}
         {onAir && upNext && (
           <div className="cc-pm__sec cc-pm__next">
@@ -278,6 +291,13 @@ export default function Monitor() {
               <div className="cc-mon__lbl">
                 <Tally state="lit" flicker={false} />
                 Program
+                {signing && <span className="cc-mon__signing">{signing}</span>}
+                {/* A244: the programming block on air. */}
+                {status?.block && (
+                  <span className="cc-mon__block" style={{ ["--cc-block" as string]: status.block.colour ?? "var(--ink-70)" }}>
+                    {untilWords(status.block)}
+                  </span>
+                )}
               </div>
               {picture}
             </>
@@ -292,6 +312,7 @@ export default function Monitor() {
                 <div className="cc-mon__card" style={{ background: next.colour ?? undefined }}>
                   <b>{next.title}</b>
                   {next.detail && <span>{next.detail}</span>}
+                  {next.block && <span className="cc-mon__blockstart">{startsWords(next.block)}</span>}
                 </div>
               </PictureFrame>
             </>

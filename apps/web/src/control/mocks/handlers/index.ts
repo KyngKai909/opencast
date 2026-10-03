@@ -2,6 +2,7 @@
 // handler to match a request answers it.
 
 import { accountHandlers } from "./account";
+import { blockHandlers } from "./blocks";
 import { accountsHandlers } from "./accounts";
 import { earningsHandlers } from "./earnings";
 import { libraryHandlers } from "./library";
@@ -26,6 +27,7 @@ export const handlers = [
   ...logHandlers,
   ...liveHandlers,
   ...libraryHandlers,
+  ...blockHandlers,
   ...marketHandlers,
   ...spotsHandlers,
   ...earningsHandlers,

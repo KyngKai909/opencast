@@ -101,13 +101,29 @@ describe("the break rule (station-settings 02.1)", () => {
     const r = await api("marcus", "GET", `/stations/${BEAT.id}/break-rule`);
     expect(r.json.cadence).toEqual({ stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } });
     const cadence = { stationId: { every: "n_programs", n: 2 }, bumpers: { every: "never" }, underwriting: { every: "hour" }, spots: { every: "program" } };
-    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence })).json.cadence).toEqual(cadence);
-    const { cadence: _left, ...rest } = r.json;
+    // An app from before the bumper sequences (A243) sends the cadence without them.
+    const { bumperSequences: _seq, ...before } = r.json;
+    const set = (await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...before, cadence })).json;
+    expect(set.cadence).toEqual(cadence);
+    expect(set.bumperSequences).toMatchObject({ open: { every: "never" }, close: { every: "never" } });
+    const { cadence: _left, ...rest } = before;
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, lengthMs: 90_000 })).json).toMatchObject({ lengthMs: 90_000, cadence });
     // An app from before spots had a choice leaves them out: they stay.
     const { spots: _spots, ...older } = cadence;
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, cadence: older })).json.cadence).toEqual(cadence);
     expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, cadence: { ...cadence, stationId: { every: "never" } } })).status).toBe(400);
+  });
+
+  it("A243: answers the bumper sequences (the defaults filled in), keeps them when left out, and refuses a role twice", async () => {
+    const r = await api("marcus", "GET", `/stations/${BEAT.id}/break-rule`);
+    expect(r.json.bumperSequences).toEqual({ open: { roles: ["into_break"], every: "break" }, close: { roles: ["out_of_break"], every: "break" }, between: { roles: [], every: "program" } });
+    const chained = { open: { roles: ["into_break", "up_next"], every: "program" }, close: { roles: ["out_of_break"], every: "break" }, between: { roles: ["any"], every: "program" } };
+    const set = (await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, bumperSequences: chained })).json;
+    expect(set.bumperSequences).toEqual(chained);
+    expect(set.cadence.bumpers).toEqual({ every: "program" });
+    const { bumperSequences: _left, ...rest } = set;
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...rest, lengthMs: 90_000 })).json.bumperSequences).toEqual(chained);
+    expect((await api("marcus", "PUT", `/stations/${BEAT.id}/break-rule`, { ...r.json, bumperSequences: { ...chained, between: { roles: ["any", "any"], every: "program" } } })).status).toBe(400);
   });
 });
 

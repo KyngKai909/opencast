@@ -75,23 +75,49 @@ prepare.ts          once per content ID, from the original: FFmpeg to the ladder
                     loudness levelled to -24 LUFS, captions cut to the segments (uploaded, embedded or
                     generated), stored under `prepared/<cid>/<rendition>/` (`prepared_items`,
                     `prepared_renditions`, `prepared_captions`). A carried or catalog program is
-                    prepared once for every station. Slates and generated station IDs the same way
+                    prepared once for every station. Slates, generated station IDs and the automatic
+                    opener and closer (A242) the same way
 readiness.ts        is everything on the next 48 hours of each log prepared in its band's renditions?
                     Queues what isn't, warns an hour ahead, and the usual fill airs anything missing
 plan.ts             the run sheet: programs at their times, split around breaks and resumed where they
-                    stopped; each break = bumper in, spots, credit, bumper out, station ID last (each by
-                    the break rule's cadence, cadence.ts); live blocks; off air; open time = station ID
-                    and bumpers, never nothing
+                    stopped; each break = the opening bumper sequence, spots, credit, the closing
+                    sequence, station ID last (each by the break rule's cadence, cadence.ts; A243: the
+                    bumpers picked with the break by sequence.ts, whole or not at all by priority,
+                    held spots first), then the between-programs sequence carved from the closing
+                    break's end (or open time's) before the next program, outside the break's SCTE-35
+                    span; programs never move; live blocks; off air (A242: the closer, the
+                    off-air card for a minute, dark, then the opener ending as the first program starts,
+                    the station ID after it only if the station says so; the station's own, else
+                    automatic ones in its look; short off air time keeps the channel on: closer, card,
+                    opener, or the card alone); the daily opener at the first program boundary at or
+                    after 6:00 am with fill before it; open time = station ID and bumpers (the Any
+                    ones, in their windows), never nothing. A244: programming blocks: each segment
+                    says the block it airs in (a member, its breaks, the open time between members);
+                    in a block its ID airs first where the station ID would, its bumpers before the
+                    station's; its intro and outro air between programs (its own, else a `blk-…`
+                    card in its look once prepared; never at sign-on)
+sequence.ts         bumper roles and sequences (A243): the defaults (one into the break, one out, as
+                    before), when an item may air (broadcast dates, a time of day), each role's chain
+                    (into and out of a break fall back to Any; up next never), picks decided in order
+                    in the log's break walk (least recently aired first from three in a pool, from the
+                    as-run log; library order below that), up next once a break, fitting by priority,
+                    and whether the between sequence airs at each program boundary. A244: a block's
+                    pools come first in its chain (block role, block Any, then the station's), its
+                    own order where it says plainly, and its intro and outro first by priority
 fill.ts             places spots in stored breaks, holding the money first: rotation, then backup rotation,
                     within the hourly cap, same-spot limit, blocked categories and dayparts; the
                     producer's barter share from the producer's rotation (the producer is paid)
 assemble.ts         per station on air: the run sheet becomes the channel's timeline (`channel_items`):
                     prepared segments in log order, a discontinuity and program date-time per item, and
-                    DATERANGE tags (bug, lower thirds, codes, SCTE-35 break cues). Nothing is encoded.
+                    DATERANGE tags (bug, lower thirds, codes, SCTE-35 break cues, A243's up next: the
+                    next program's title over an up-next bumper, from the guide's own data; A244: a
+                    block's logo as the bug over its members, `blockId` on the bug tag). Nothing
+                    is encoded.
                     As each item's segments are published: an as-run row, a proof frame for spots
                     (proof.ts), and settlement
 playlist.ts         renders a channel's master and media playlists from its timeline (API and worker,
-                    short cache); the player draws the bug, lower thirds and codes from the DATERANGE tags
+                    short cache); the player draws the bug, lower thirds, codes and up next from the
+                    DATERANGE tags (relays draw only the bug: no up-next title there yet, A243)
 live.ts, livecopy.ts, radiolive.ts, rtmp.ts
                     live blocks, always from the worker's own segments in storage
                     (prepared/live-<source>-<session>/<rendition>/, kept with their channel rows,
@@ -110,7 +136,11 @@ sender.ts, fanout.ts, relayBreaks.ts
                     station's Livepeer relay stream (no transcoding), which multistreams to every
                     platform. The relays module (modules/relays) holds the setting, restarts for
                     platform limits and the runner the relay service ticks (docs/relay.md)
-slates.ts           station ID, credit, off-air, stand-by, bug, code + QR: SVG rendered with sharp
+slates.ts           station ID, credit, off-air, stand-by, bug, code + QR, the automatic opener and
+                    closer's picture, a station's own off-air picture fitted to the frame: SVG (or the
+                    picture) rendered with sharp
+stationId.ts        the generated station ID's key, and the automatic opener's and closer's (A242):
+                    keyed by what they show, so a new look (or back time) is prepared again
 ```
 
 The worker keeps no files of its own: it prepares from object storage into scratch space (`WORKER_SCRATCH_DIR`) and writes the results back. Its `/health` reports items prepared, waiting and the time preparation takes, and the last readiness check.
@@ -136,7 +166,7 @@ storageMaintenance.ts the one-off steps (below)
 |---|---|---|
 | Originals: every upload (library items, spots, order deliveries and briefs), claim attachments, logos, caption files | `<cid>` | Infrequent Access (files from before 2026-09-29: Standard) |
 | What's prepared from an original: each rendition's playlist and 4 s segments, and its caption tracks | `prepared/<cid>/<rendition>/`, `prepared/<cid>/cc…/` | Standard |
-| Slates and generated station IDs, prepared the same way | `prepared/slate-…/`, `prepared/sid-…/` | Standard |
+| Slates, generated station IDs and the automatic opener and closer, prepared the same way | `prepared/slate-…/`, `prepared/sid-…/`, `prepared/opn-…/`, `prepared/cls-…/` | Standard |
 | Radio live segments | `prepared/live-…/` | Standard |
 | Proof frames, kept a year | `proof/<station>/<airing>.jpg` | Infrequent Access |
 | Relay backgrounds' loops | `relay-backgrounds/<cid>-<size>/` | Standard |

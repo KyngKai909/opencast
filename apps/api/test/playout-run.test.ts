@@ -115,10 +115,12 @@ describe("an evening, prepared once and assembled", () => {
     expect(reelSpot.startedAt.getTime()).toBeLessThan(Date.parse("2026-10-02T03:02:00Z"));
     // Dead air, filled from the library.
     expect(at("2026-10-02T03:02:00.000Z")).toMatchObject({ code: "PGM", reason: "dead_air_fill" });
-    // Off air: the slate, nothing while dark, the station ID, then the program.
+    // Off air: the automatic closer and the slate, nothing while dark, the automatic opener (in
+    // place of the station ID, A242), then the program.
     expect(evening.filter((r) => r.startedAt >= new Date("2026-10-02T03:03:00Z")).map((r) => `${r.startedAt.toISOString().slice(11, 19)} ${r.code} ${r.reason}`)).toEqual([
-      "03:03:00 OPEN slate",
-      "03:05:56 SID planned",
+      "03:03:00 CLS planned",
+      "03:03:05 OPEN slate",
+      "03:05:55 OPN planned",
       "03:06:00 PGM planned",
       // Its break opens with a bumper (since 2026-09-29), published by 3:06:30.
       "03:06:20 BMP planned"

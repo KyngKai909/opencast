@@ -46,12 +46,13 @@ const ROUTES: Route[] = [
   { path: `${IE}/pipeline/${MARIACHI}/setup`, ready: async (p) => { await h1(/^Set up \w+ 27\.1$/)(p); await expect(p.getByRole("button", { name: "Schedule sign-on" })).toBeEnabled(); } },
   { path: `${IE}/listed`, ready: async (p) => { await h1("External sources")(p); await expect(p.getByRole("heading", { name: "Opencast catalog station" })).toBeVisible(); } },
   { path: `${IE}/listed?add=1`, ready: async (p) => { await expect(p.getByRole("dialog", { name: "List a source" })).toBeVisible(); } },
-  { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByText("This page isn't designed yet.")).toBeVisible(); } },
+  { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByRole("grid", { name: "Catalog series" })).toBeVisible(); } },
   { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
   { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
   { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByRole("grid", { name: "Open claims" })).toBeVisible(); } },
   { path: "/desk/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByRole("grid", { name: "Catalog sponsors" })).toBeVisible(); } },
-  { path: "/desk/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
+  { path: "/desk/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Rules" })).toBeVisible(); } },
+  { path: "/desk/settings/you", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
   { path: "/desk/no-such-page", ready: h1("There's nothing here.") }
 ];
 

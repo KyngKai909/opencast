@@ -22,7 +22,7 @@ const PV = schema.contentPreviews;
 const NEED = schema.contentPreviewNeeds;
 
 /** Who points at a file. `catalog_item` and `catalog_evidence` (added 2026-09-29): the catalog shelf's items and the evidence behind their rights checks. */
-export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background" | "catalog_item" | "catalog_evidence";
+export type ContentOwner = "asset_file" | "asset_original" | "spot_file" | "order_file" | "claim_attachment" | "business_logo" | "caption_track" | "relay_background" | "catalog_item" | "catalog_evidence" | "block_logo";
 
 export interface ContentInfo {
   cid: string;

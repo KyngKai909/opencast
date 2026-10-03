@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AiringX, StationIdentX } from "../../api/ext";
 import {
+  blockLine,
   buildModel,
   cellLine,
   cellTitle,
@@ -376,5 +377,27 @@ describe("an external station's row (follow-up Phase 6)", () => {
     const beat = rowCells(row(station("BEAT", "12.1"), []), FROM, at("22:30"));
     expect(externalLine(beat[0]!, station("BEAT", "12.1"), "Anyone")).toBeNull();
     expect(cellTitle(beat[0]!, station("BEAT", "12.1"))).toBe("Off air");
+  });
+});
+
+// A244: programming blocks on the TV guide.
+describe("programming blocks", () => {
+  const station = { id: "s-beat", kind: "station", callSign: "BEAT", handle: "beat", name: "Inland Beat", colour: null, band: "tv", channel: "12.1", marketSlug: "inland-empire", homeCity: null } as never;
+  const block = { id: "b-lcn", name: "Late Crate Nights", colour: "#1F5C99" };
+  const t = (h: number) => Date.parse("2026-10-04T00:00:00Z") + h * 3600e3;
+  const airing = (h: number, title: string, inBlock: boolean) => ({ logEntryId: `e${h}`, title, episodeTitle: null, code: "PGM", kind: "program", startsAt: new Date(t(h)).toISOString(), endsAt: new Date(t(h + 1)).toISOString(), live: false, carriedFrom: null, programId: null, ...(inBlock ? { block } : {}) });
+
+  it("a row keeps its blocks in the window as bands (focus never lands on them)", () => {
+    const m = buildModel([{ station, airings: [airing(4, "Late Crate", true), airing(5, "Saturday Reel", true)] as never, blocks: [{ ...block, logoUrl: null, startsAt: new Date(t(4)).toISOString(), endsAt: new Date(t(6)).toISOString() }, { ...block, logoUrl: null, startsAt: new Date(t(20)).toISOString(), endsAt: new Date(t(21)).toISOString() }] }], [], t(3), t(7));
+    expect(m.rows[0]!.bands).toEqual([{ id: "b-lcn", name: "Late Crate Nights", colour: "#1F5C99", start: t(4), end: t(6) }]);
+    expect(m.rows[0]!.cells.every((c) => !c.key.startsWith("b-lcn"))).toBe(true);
+  });
+
+  it("the focused cell's details say 'Part of Late Crate Nights'", () => {
+    const m = buildModel([{ station, airings: [airing(4, "Late Crate", true), airing(5, "Night Desk", false)] as never }], [], t(3), t(7));
+    const [, inBlock, outside] = m.rows[0]!.cells;
+    expect(blockLine(inBlock!)).toBe("Part of Late Crate Nights");
+    expect(blockLine(outside!)).toBeNull();
+    expect(m.rows[0]!.bands).toEqual([]);
   });
 });

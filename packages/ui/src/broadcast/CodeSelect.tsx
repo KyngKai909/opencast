@@ -8,7 +8,7 @@ export type SelectableCode = Exclude<LogCodeName, "OPEN">;
 export interface CodeSelectProps {
   value: SelectableCode;
   onChange?: (code: SelectableCode) => void;
-  /** The codes on offer. Defaults to all five. */
+  /** The codes on offer. Defaults to the five log codes (`LIBRARY_CODES` adds the A242 three). */
   codes?: SelectableCode[];
   /** Its accessible name: "Type" (the library's column head). */
   label?: string;
@@ -17,6 +17,9 @@ export interface CodeSelectProps {
 }
 
 const ALL: SelectableCode[] = ["PGM", "SPT", "UND", "BMP", "SID"];
+
+/** A library item's types (A242): the five, then an opener, a closer and an off-air card. */
+export const LIBRARY_CODES: SelectableCode[] = [...ALL, "OPN", "CLS", "OFF"];
 
 /** Picks a library item's log code (master control A2 .typesel), drawn in that code's style. */
 export function CodeSelect({ value, onChange, codes = ALL, label = "Type", disabled, className }: CodeSelectProps) {

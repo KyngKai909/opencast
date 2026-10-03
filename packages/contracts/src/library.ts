@@ -1,6 +1,22 @@
 import { z } from "zod";
 import { endpoint } from "./core.js";
-import { Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+import { BumperRole, DateOnly, IdentCode, Id, LibraryCode, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
+
+/** A243: a time of day, "HH:MM" (24-hour), in the market's time zone. */
+const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
+
+/**
+ * A243 (added 2026-10-02): when an item may air. `from` and `until` are broadcast dates (6:00 am to
+ * 6:00 am), inclusive, either open (null); `dailyFrom` and `dailyUntil` a time of day, both or
+ * neither, not the same (an end before the start runs past midnight). All null: any time.
+ */
+export const AirWindow = z.object({
+  from: DateOnly.nullable(),
+  until: DateOnly.nullable(),
+  dailyFrom: TimeOfDay.nullable(),
+  dailyUntil: TimeOfDay.nullable()
+});
+export type AirWindow = z.infer<typeof AirWindow>;
 
 /** L7 (added 2026-09-29): how a program's airings are captioned, and in what language (BCP 47, "en"). */
 export const Captions = z.object({ mode: z.enum(["none", "generated_live", "generated", "uploaded"]), language: z.string().max(35).nullable() });
@@ -70,6 +86,37 @@ export const LibraryItem = z.object({
   audioLayout: AudioLayout.nullable().optional(),
   /** L7 (added 2026-09-29): its caption track's language, when it has one. */
   captionLanguage: z.string().nullable().optional(),
+  /**
+   * A242 (added 2026-10-02): an opener (`OPN`), closer (`CLS`) or off-air card (`OFF`); null (or
+   * absent) for anything else. `code` then reads `SID` (opener, closer) or `OPEN` (off-air card) for
+   * apps built before it; the item's type is `identCode ?? code`.
+   */
+  identCode: IdentCode.nullable().optional(),
+  /**
+   * A242 (added 2026-10-02): an off-air card that's a picture (PNG, JPEG or WebP), not a clip. It
+   * has no length (`durationMs` null) and nothing to prepare: it airs held for the sign-off
+   * slate's minute.
+   */
+  still: z.boolean().optional(),
+  /**
+   * A243 (added 2026-10-02): a bumper's role. Null (or absent) reads as `any`, as every bumper did
+   * before it; always null for anything that isn't a bumper. `code` stays `BMP`.
+   */
+  bumperRole: BumperRole.nullable().optional(),
+  /**
+   * A243 (added 2026-10-02): when it may air (bumpers, station IDs, openers and closers): broadcast
+   * dates (inclusive, either end open) and a time of day in the market's time zone (`dailyUntil`
+   * before `dailyFrom` runs past midnight). Null (or absent): any time. Outside it, it never airs.
+   */
+  airs: AirWindow.nullable().optional(),
+  /** A243 (added 2026-10-02): inside its window now (true for an item without one). */
+  airingNow: z.boolean().optional(),
+  /**
+   * A244 (added 2026-10-02): the programming block it belongs to (a bumper, station ID, opener or
+   * closer: the block's bumper, ID, intro or outro), or null: the station's own. A block's items air
+   * only during the block.
+   */
+  programBlockId: Id.nullable().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -213,12 +260,29 @@ export type CaptionTrack = z.infer<typeof CaptionTrack>;
 
 const ItemFields = z.object({
   title: z.string().min(1).max(200),
-  code: LogCode,
+  /** A242 (2026-10-02): `OPN`, `CLS` and `OFF` too (an opener, closer or off-air card). Not while it's on the log. */
+  code: LibraryCode,
   programId: Id.nullable(),
   folderId: Id.nullable(),
   episodeNumber: z.number().int().positive().nullable(),
   episodeDescription: z.string().max(160).nullable(),
-  breakPointsMs: z.array(Millis)
+  breakPointsMs: z.array(Millis),
+  /**
+   * A243 (2026-10-02): a bumper's role (null: Any). On anything but a bumper, 400. Changing an item's
+   * type away from `BMP` clears it.
+   */
+  bumperRole: BumperRole.nullable(),
+  /**
+   * A243 (2026-10-02): when it may air (null: any time). Bumpers, station IDs, openers and closers
+   * only (400 otherwise); changing an item's type to another clears it.
+   */
+  airs: AirWindow.nullable(),
+  /**
+   * A244 (2026-10-02): the programming block it belongs to (null: the station's). Bumpers, station
+   * IDs, openers and closers only (400 otherwise); the block must be the station's own and not
+   * archived (404). Changing the type to another clears it.
+   */
+  programBlockId: Id.nullable()
 });
 
 export const libraryApi = {
@@ -228,14 +292,27 @@ export const libraryApi = {
     auth: "user",
     summary: "Every item with its type, rights and status; folders; programs",
     params: StationParams,
-    query: z.object({ folderId: Id.optional(), code: LogCode.optional(), needsAttention: z.coerce.boolean().optional() }),
+    /**
+     * `code` (A242): `OPN`, `CLS` or `OFF` lists the openers, closers or off-air cards. `bumperRole`
+     * (A243): bumpers with that role (`any` includes bumpers without one). `programBlockId` (A244):
+     * that block's items.
+     */
+    query: z.object({
+      folderId: Id.optional(),
+      code: LibraryCode.optional(),
+      needsAttention: z.coerce.boolean().optional(),
+      bumperRole: BumperRole.optional(),
+      /** A244: a programming block's items. */
+      programBlockId: Id.optional()
+    }),
     response: Library
   }),
   upload: endpoint({
     method: "POST",
     path: "/stations/:stationId/library/uploads",
     auth: "user",
-    summary: "Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP.",
+    summary:
+      "Upload a file (MP4, MOV, MP3, WAV…). It's prepared for air in the background. Under a minute is guessed as BMP. An off-air card (`code` OFF, A242) can also be a picture (PNG, JPEG or WebP).",
     params: StationParams,
     multipart: true,
     body: ItemFields.partial().extend({
@@ -261,7 +338,7 @@ export const libraryApi = {
     body: z.object({
       urls: z.array(z.url()).min(1).max(50),
       expandPlaylists: z.boolean().default(false),
-      code: LogCode.default("PGM"),
+      code: LibraryCode.default("PGM"),
       programId: Id.optional()
     }),
     response: ImportJob,
@@ -280,7 +357,8 @@ export const libraryApi = {
     method: "PATCH",
     path: "/library/:itemId",
     auth: "user",
-    summary: "Change title, type, program, folder, episode details or break points",
+    summary:
+      "Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. A243: `bumperRole` on anything but a bumper, or `airs` on anything but a bumper, station ID, opener or closer, 400.",
     params: ItemParams,
     body: ItemFields.partial(),
     response: LibraryItem

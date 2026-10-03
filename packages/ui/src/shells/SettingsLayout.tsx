@@ -20,6 +20,8 @@ export interface SettingsLayoutProps {
   active: string | null;
   /** The sub-rail's heading. */
   title?: string;
+  /** The sub-rail heading's level: h1 where it's the page's title (Network desk, desk-pages 04), else h2. */
+  titleAs?: "h1" | "h2";
   /** The pane's heading. Defaults to the active section's label. */
   heading?: ReactNode;
   /** One line under the heading ("These apply on this account's phones, computers and TVs."). */
@@ -58,6 +60,7 @@ export function SettingsLayout({
   sections,
   active,
   title = "Settings",
+  titleAs: TitleH = "h2",
   heading,
   description,
   variant = "app",
@@ -104,9 +107,9 @@ export function SettingsLayout({
   return (
     <div className={cx("oc-settings", `oc-settings--${variant}`, className)}>
       <nav className="oc-settings__rail" aria-labelledby={titleId}>
-        <h2 className="oc-settings__title" id={titleId}>
+        <TitleH className="oc-settings__title" id={titleId}>
           {title}
-        </h2>
+        </TitleH>
         {sections.map((s) => (
           <SectionLink
             key={s.id}

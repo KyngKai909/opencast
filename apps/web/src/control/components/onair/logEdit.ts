@@ -28,7 +28,15 @@ export type DraftEntry = LogEntry & { change?: "moved" | "resized" | "replaced" 
 /** The draft's own name for an insert (it has no id until it's published). */
 export const insertId = (key: string) => `new:${key}`;
 
-const entryOf = (c: LogChange): string | null => (c.op === "insert" ? (c.key ? insertId(c.key) : null) : c.entryId);
+/** A244: a programming block's change (its span, or a span the draft adds). */
+export type BlockChange = Extract<LogChange, { op: "block_add" | "block_resize" | "block_remove" }>;
+export type EntryChange = Exclude<LogChange, BlockChange>;
+export const isBlockChange = (c: LogChange): c is BlockChange => c.op === "block_add" || c.op === "block_resize" || c.op === "block_remove";
+/** The draft's own name for a span it adds (it has no id until it's published). */
+export const newSpanId = (key: string) => `newblock:${key}`;
+
+const entryOf = (c: LogChange): string | null => (isBlockChange(c) ? null : c.op === "insert" ? (c.key ? insertId(c.key) : null) : c.entryId);
+const spanOf = (c: LogChange): string | null => (!isBlockChange(c) ? null : c.op === "block_add" ? (c.key ? newSpanId(c.key) : null) : c.spanId);
 
 /**
  * Adds a change to the draft, keeping one of each kind per entry: a second move replaces the first,
@@ -36,6 +44,19 @@ const entryOf = (c: LogChange): string | null => (c.op === "insert" ? (c.key ? i
  * itself (it has no id to send yet).
  */
 export function withChange(changes: LogChange[], change: LogChange): LogChange[] {
+  // A244: a block's changes: one of each per span; a span the draft adds takes its own changes in.
+  if (isBlockChange(change)) {
+    const span = spanOf(change);
+    if (change.op !== "block_add" && change.spanId.startsWith("newblock:")) {
+      const key = change.spanId.slice("newblock:".length);
+      if (change.op === "block_remove") return changes.filter((c) => !(c.op === "block_add" && c.key === key));
+      return changes.map((c) => (c.op === "block_add" && c.key === key ? { ...c, ...(change.startsAt ? { startsAt: change.startsAt } : {}), ...(change.endsAt ? { endsAt: change.endsAt } : {}) } : c));
+    }
+    if (change.op === "block_remove") return [...changes.filter((c) => spanOf(c) !== span), change];
+    const same = changes.findIndex((c) => c.op === change.op && spanOf(c) === span);
+    if (same < 0) return [...changes, change];
+    return changes.map((c, i) => (i === same && c.op === "block_resize" && change.op === "block_resize" ? { ...c, ...change } : i === same ? change : c));
+  }
   const target = entryOf(change);
   // An insert's own changes fold into it.
   if (change.op !== "insert" && change.entryId.startsWith("new:")) {
@@ -62,6 +83,7 @@ export function withChange(changes: LogChange[], change: LogChange): LogChange[]
 export function draftEntries(entries: LogEntry[], changes: LogChange[], items: (id: string) => DraftItem | undefined): DraftEntry[] {
   const out = new Map<string, DraftEntry>(entries.map((e) => [e.id, { ...e }]));
   for (const c of changes) {
+    if (isBlockChange(c)) continue;
     if (c.op === "insert") {
       const key = c.key ?? String(Math.random());
       const item = c.entry.itemId ? items(c.entry.itemId) : undefined;
@@ -196,4 +218,57 @@ export function rippleFrom(entries: DraftEntry[], at: string, lengthMs: number, 
 /** Programs are placed in whole minutes. */
 export function wholeMinutes(lengthMs: number): number {
   return Math.ceil(lengthMs / MIN) * MIN;
+}
+
+/** A244: a programming block's span as the draft leaves it (its members as the draft leaves the log). */
+export interface DraftSpan {
+  id: string;
+  blockId: string;
+  name: string;
+  colour: string | null;
+  startsAt: string;
+  endsAt: string;
+  change?: "added" | "resized";
+  key?: string;
+}
+
+/** The log's spans as the draft leaves them, in time order. `names` finds a block's name and colour. */
+export function draftSpans(spans: Array<Pick<DraftSpan, "id" | "blockId" | "name" | "colour" | "startsAt" | "endsAt">>, changes: LogChange[], names: (blockId: string) => { name: string; colour: string | null } | undefined): DraftSpan[] {
+  const out = new Map<string, DraftSpan>(spans.map((s) => [s.id, { ...s }]));
+  for (const c of changes) {
+    if (!isBlockChange(c)) continue;
+    if (c.op === "block_add") {
+      const key = c.key ?? String(Math.random());
+      const b = names(c.blockId);
+      out.set(newSpanId(key), { id: newSpanId(key), key, blockId: c.blockId, name: b?.name ?? "Block", colour: b?.colour ?? null, startsAt: snapTime(c.startsAt), endsAt: snapTime(c.endsAt), change: "added" });
+      continue;
+    }
+    const s = out.get(c.spanId);
+    if (!s) continue;
+    if (c.op === "block_remove") out.delete(c.spanId);
+    else out.set(s.id, { ...s, ...(c.startsAt ? { startsAt: snapTime(c.startsAt) } : {}), ...(c.endsAt ? { endsAt: snapTime(c.endsAt) } : {}), change: s.change ?? "resized" });
+  }
+  return [...out.values()].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+}
+
+/**
+ * A244: a span's members and where it airs, as the API decides (a program or live block starting
+ * inside it; it airs from the first one's start to the last one's end; off-air time between two
+ * splits it).
+ */
+export function spanPieces(span: Pick<DraftSpan, "startsAt" | "endsAt">, entries: Array<Pick<LogEntry, "id" | "kind" | "startsAt" | "endsAt">>): Array<{ startsAt: string; endsAt: string }> {
+  const members = entries.filter((e) => e.kind !== "off_air" && e.startsAt >= span.startsAt && e.startsAt < span.endsAt).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const pieces: Array<{ startsAt: string; endsAt: string }> = [];
+  for (const m of members) {
+    const last = pieces[pieces.length - 1];
+    const paused = last && entries.some((e) => e.kind === "off_air" && e.startsAt < m.startsAt && e.endsAt > last.endsAt);
+    if (last && !paused) last.endsAt = m.endsAt > last.endsAt ? m.endsAt : last.endsAt;
+    else pieces.push({ startsAt: m.startsAt, endsAt: m.endsAt });
+  }
+  return pieces;
+}
+
+/** A244: the span a start falls inside (a program starting there is its member), if any. */
+export function spanAt(spans: DraftSpan[], startsAt: string): DraftSpan | undefined {
+  return spans.find((s) => s.startsAt <= startsAt && startsAt < s.endsAt);
 }

@@ -4,7 +4,7 @@ import { http } from "msw";
 import { accountsApi, libraryApi, stationsApi } from "@opencast/contracts";
 import { ProgramPageX, StationPageFull, type EpisodeX, type WhereToWatch } from "../../api/ext/station";
 import { now } from "../../lib/clock";
-import { type MockAiring } from "../fixtures/schedule";
+import { LATE_CRATE_NIGHTS, type MockAiring } from "../fixtures/schedule";
 import { PROGRAM_EXTRA, STATION_EXTRA, atDay, outsideIdent, programById, programByKey, registerReminded, weekAirings } from "../fixtures/station";
 import { STATIONS, fixtureKey, inMarket, playbackFor, stationById, stationByRef } from "../fixtures/stations";
 import { syncStreamSignOff } from "../fixtures/signoff";
@@ -52,6 +52,13 @@ export function stationPage(ref: string, from?: string | null, to?: string | nul
     onDialSince: x.onDialSince ?? s.onDialSince ?? null,
     hours: s.hours ?? null,
     schedule: mine.filter((a) => a.end > lo && a.start < hi).map(airingX),
+    // A244: its programming blocks (BEAT's Late Crate Nights).
+    ...(() => {
+      const members = mine.filter((a) => a.block?.id === LATE_CRATE_NIGHTS.id && a.end > iso);
+      if (!members.length) return {};
+      const { id, name, colour, description, logoUrl, schedule } = LATE_CRATE_NIGHTS;
+      return { blocks: [{ id, name, colour, description, logoUrl, schedule, next: members[0].start, programs: [...new Set(members.filter((m) => m.start.slice(0, 10) === members[0].start.slice(0, 10)).map((m) => m.title.replace(/, ep\. \d+$/, "")))] }] };
+    })(),
     // A listed city stream carries nothing and makes nothing for others: Opencast only lists it.
     carries: listed
       ? []

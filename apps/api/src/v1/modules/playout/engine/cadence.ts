@@ -35,13 +35,42 @@ export interface BreakCadence {
   /** The station's spots (added later on 2026-09-29). The maker's barter time isn't the station's: it stays. */
   spots: Cadence;
 }
-export type CadencePart = keyof BreakCadence;
-export type BreakParts = Record<CadencePart, boolean>;
+/**
+ * What's decided per break. A243 (2026-10-02): the bumpers are two parts, the sequence opening the
+ * break and the one closing it, each with its own cadence (the break rule's `bumperSequences`;
+ * both `cadence.bumpers` by default, so they air together, as before).
+ */
+export type CadencePart = "stationId" | "bumpersOpen" | "bumpersClose" | "underwriting" | "spots";
+/** `bumpers`: either bumper sequence airs (for readers from before A243). */
+export type BreakParts = Record<CadencePart, boolean> & { bumpers: boolean };
 
-export const CADENCE_PARTS: CadencePart[] = ["stationId", "bumpers", "underwriting", "spots"];
+export const CADENCE_PARTS: CadencePart[] = ["stationId", "bumpersOpen", "bumpersClose", "underwriting", "spots"];
 /** Today's breaks: the station ID, bumpers, the credit and spots in every one. */
 export const DEFAULT_CADENCE: BreakCadence = { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "break" }, spots: { every: "break" } };
-export const EVERY_PART: BreakParts = { stationId: true, bumpers: true, underwriting: true, spots: true };
+export const EVERY_PART: BreakParts = { stationId: true, bumpersOpen: true, bumpersClose: true, bumpers: true, underwriting: true, spots: true };
+
+/** The opening and closing bumper sequences' cadences (A243). Left out: both `cadence.bumpers`. */
+export interface SequenceCadences {
+  open: Cadence;
+  close: Cadence;
+}
+
+/** Each part's cadence: the stored cadence, the bumpers split into the two sequences. */
+export function partCadences(cadence: BreakCadence, sequences?: SequenceCadences): Record<CadencePart, Cadence> {
+  return {
+    stationId: cadence.stationId,
+    bumpersOpen: sequences?.open ?? cadence.bumpers,
+    bumpersClose: sequences?.close ?? cadence.bumpers,
+    underwriting: cadence.underwriting,
+    spots: cadence.spots
+  };
+}
+
+/** Whether the bumpers opening (`open`) or closing (`close`) a break air in it (parts from before A243 carry only `bumpers`). */
+export function bumpersIn(parts: Partial<BreakParts>, where: "open" | "close"): boolean {
+  const own = where === "open" ? parts.bumpersOpen : parts.bumpersClose;
+  return own ?? parts.bumpers ?? true;
+}
 /** "After every N programs" without an N. */
 const DEFAULT_N = 2;
 const HOUR = 3_600_000;
@@ -49,7 +78,7 @@ const HOUR = 3_600_000;
 const SETTLED_MS = 60_000;
 /** How far back "after every N programs" counts programs. */
 const PROGRAMS_BACK_MS = 48 * HOUR;
-const CODE: Record<CadencePart, "SID" | "BMP" | "UND" | "SPT"> = { stationId: "SID", bumpers: "BMP", underwriting: "UND", spots: "SPT" };
+const CODE: Record<CadencePart, "SID" | "BMP" | "UND" | "SPT"> = { stationId: "SID", bumpersOpen: "BMP", bumpersClose: "BMP", underwriting: "UND", spots: "SPT" };
 /** Kept free for the credit in a break it airs in (fill.ts has the same). */
 const CREDIT_MS = 15_000;
 
@@ -59,7 +88,7 @@ export function partsOf(slot: { parts?: BreakParts }): BreakParts {
 }
 
 /** A stored cadence (or none) with the defaults filled in. The station ID is never `never`. */
-export function cadenceOf(stored: Partial<Record<CadencePart, Partial<Cadence> | undefined>> | null | undefined): BreakCadence {
+export function cadenceOf(stored: Partial<Record<keyof BreakCadence, Partial<Cadence> | undefined>> | null | undefined): BreakCadence {
   const one = (c: Partial<Cadence> | undefined): Cadence => {
     const every = c?.every ?? "break";
     return every === "n_programs" ? { every, n: c?.n ?? DEFAULT_N } : { every };
@@ -74,13 +103,15 @@ export function cadenceOf(stored: Partial<Record<CadencePart, Partial<Cadence> |
 }
 
 /** Every part in every break: nothing to work out. */
-export function isEveryBreak(cadence: BreakCadence): boolean {
-  return CADENCE_PARTS.every((p) => cadence[p].every === "break");
+export function isEveryBreak(cadence: BreakCadence, sequences?: SequenceCadences): boolean {
+  const c = partCadences(cadence, sequences);
+  return CADENCE_PARTS.every((p) => c[p].every === "break");
 }
 
 /** Parts whose choice depends on when they last aired (once an hour, after every N programs). */
-export function statefulParts(cadence: BreakCadence): CadencePart[] {
-  return CADENCE_PARTS.filter((p) => cadence[p].every === "hour" || cadence[p].every === "n_programs");
+export function statefulParts(cadence: BreakCadence, sequences?: SequenceCadences): CadencePart[] {
+  const c = partCadences(cadence, sequences);
+  return CADENCE_PARTS.filter((p) => c[p].every === "hour" || c[p].every === "n_programs");
 }
 
 export interface CadenceBreak {
@@ -96,12 +127,17 @@ type Aired = { last: number | null; times: number[] };
 
 export interface CadenceInput {
   cadence: BreakCadence;
+  /** A243: the opening and closing bumper sequences' cadences (left out: both `cadence.bumpers`). */
+  sequences?: SequenceCadences;
   /** In order. */
   breaks: CadenceBreak[];
   /** Programs on the log (their slots), for "after every N programs". */
   programs: Array<{ startsAt: number; endsAt: number }>;
-  /** From the as-run log: when each part aired in a break, and the last time before those. A part left out: nothing. */
-  aired: Partial<Record<CadencePart, Aired>>;
+  /**
+   * From the as-run log: when each part aired in a break, and the last time before those. A part
+   * left out: nothing. `bumpers` (before A243) stands for both bumper sequences.
+   */
+  aired: Partial<Record<CadencePart | "bumpers", Aired>>;
   /** Breaks that ended before this are history. */
   settledBefore: number;
   /**
@@ -120,16 +156,20 @@ export interface CadenceInput {
 export class CadenceDecider {
   private readonly state: Record<CadencePart, { last: number | null; times: number[]; i: number }>;
   private readonly recorded: Set<CadencePart>;
+  private readonly cadences: Record<CadencePart, Cadence>;
 
   constructor(private readonly input: Omit<CadenceInput, "breaks">) {
     const none: Aired = { last: null, times: [] };
+    this.cadences = partCadences(input.cadence, input.sequences);
+    const bumpers = (p: CadencePart) => (p === "bumpersOpen" || p === "bumpersClose" ? input.aired.bumpers : undefined);
     this.state = Object.fromEntries(
       CADENCE_PARTS.map((p) => {
-        const a = input.aired[p] ?? none;
+        const a = input.aired[p] ?? bumpers(p) ?? none;
         return [p, { last: a.last, times: [...a.times].sort((x, y) => x - y), i: 0 }];
       })
     ) as CadenceDecider["state"];
-    this.recorded = new Set(input.recorded ?? CADENCE_PARTS);
+    const recorded = (input.recorded ?? CADENCE_PARTS) as Array<CadencePart | "bumpers">;
+    this.recorded = new Set(recorded.flatMap((p): CadencePart[] => (p === "bumpers" ? ["bumpersOpen", "bumpersClose"] : [p])));
   }
 
   /** `known`: parts known to air in it whatever the rule says (spots already placed and held). */
@@ -146,10 +186,11 @@ export class CadenceDecider {
         at ??= b.startsAt;
       } else if (at !== undefined) airs = true;
       else if (b.endsAt < this.input.settledBefore && this.recorded.has(part)) airs = false;
-      else airs = this.decide(this.input.cadence[part], b, s.last);
+      else airs = this.decide(this.cadences[part], b, s.last);
       if (airs) s.last = Math.max(s.last ?? -Infinity, at ?? b.startsAt);
       out[part] = airs;
     }
+    out.bumpers = out.bumpersOpen || out.bumpersClose;
     return out;
   }
 
@@ -196,15 +237,17 @@ export interface BreakNeeds {
   stationIdMs: number;
   /** Whether a credit would air in a program's breaks (sponsors of it or of the station, or members to thank). */
   credit(programId: string | null): boolean;
-  /** The bumper into the break and the one out of it (the same one twice when there's one). */
-  bumpersMs: number;
+  /** The bumper into the break and the one out of it (the same one twice when there's one). Before A243; `elementsMs` wins. */
+  bumpersMs?: number;
 }
 
-export function needMs(needs: BreakNeeds, parts: BreakParts, context: { programId: string | null; producerShareMs: number }): number {
+/** `elementsMs` (A243): the break's chosen bumper sequences (sequence.ts `elementsMs`), where the cadence has them. */
+export function needMs(needs: BreakNeeds, parts: BreakParts, context: { programId: string | null; producerShareMs: number; elementsMs?: number }): number {
   let ms = context.producerShareMs;
   if (parts.stationId) ms += needs.stationIdMs;
   if (parts.underwriting && needs.credit(context.programId)) ms += CREDIT_MS;
-  if (parts.bumpers) ms += needs.bumpersMs;
+  if (context.elementsMs !== undefined) ms += context.elementsMs;
+  else if (parts.bumpers) ms += needs.bumpersMs ?? 0;
   return ms > 0 ? Math.ceil(ms / SEGMENT_MS) * SEGMENT_MS : 0;
 }
 
@@ -225,45 +268,49 @@ interface EntryLike {
 export async function cadenceContext(
   { deps, services }: ModuleContext,
   stationId: string,
-  input: { cadence: BreakCadence; from: Date; to: Date; rows: EntryLike[]; readEntries(from: Date, to: Date): Promise<EntryLike[]> }
+  input: { cadence: BreakCadence; sequences?: SequenceCadences; from: Date; to: Date; rows: EntryLike[]; readEntries(from: Date, to: Date): Promise<EntryLike[]> }
 ): Promise<{ decider: CadenceDecider; needs: BreakNeeds | null }> {
-  const { cadence, from, to } = input;
+  const { cadence, sequences, from, to } = input;
+  const cadences = partCadences(cadence, sequences);
   const now = deps.clock.now().getTime();
-  const stateful = statefulParts(cadence);
+  const stateful = statefulParts(cadence, sequences);
   const A = schema.asRun;
-  const codes = stateful.map((p) => CODE[p]);
+  const codes = [...new Set(stateful.map((p) => CODE[p]))];
   // The station's own spots count; the maker's barter time isn't the station's.
   const own = or(sql`${A.code} <> 'SPT'`, isNull(A.carriageAgreementId));
   const [before, within, tz] = await Promise.all([
     codes.length
       ? deps.db
-          .select({ code: A.code, at: sql<Date>`max(${A.startedAt})` })
+          .select({ code: A.code, position: A.position, at: sql<Date>`max(${A.startedAt})` })
           .from(A)
           .where(and(eq(A.stationId, stationId), isNotNull(A.breakId), inArray(A.code, codes), own, lt(A.startedAt, from)))
-          .groupBy(A.code)
-      : Promise.resolve([] as Array<{ code: string; at: Date }>),
+          .groupBy(A.code, A.position)
+      : Promise.resolve([] as Array<{ code: string; position: string | null; at: Date }>),
     codes.length
       ? deps.db
-          .select({ code: A.code, at: A.startedAt })
+          .select({ code: A.code, position: A.position, at: A.startedAt })
           .from(A)
           .where(and(eq(A.stationId, stationId), isNotNull(A.breakId), inArray(A.code, codes), own, gte(A.startedAt, from), lt(A.startedAt, to)))
-      : Promise.resolve([] as Array<{ code: string; at: Date }>),
+      : Promise.resolve([] as Array<{ code: string; position: string | null; at: Date }>),
     services.stations.timezoneOf(stationId)
   ]);
+  // A243: a bumper opening the break is `open`, one closing it `close`; rows from before (no position) count for both.
+  const counts = (part: CadencePart, r: { code: string; position: string | null }) =>
+    r.code === CODE[part] && (part === "bumpersOpen" ? r.position === "open" || r.position === null : part === "bumpersClose" ? r.position === "close" || r.position === null : true);
   const aired: CadenceInput["aired"] = {};
   for (const part of stateful) {
-    const b = before.find((r) => r.code === CODE[part]);
-    aired[part] = { last: b?.at ? new Date(b.at).getTime() : null, times: within.filter((r) => r.code === CODE[part]).map((r) => new Date(r.at).getTime()) };
+    const last = before.filter((r) => counts(part, r)).reduce<number | null>((m, r) => (r.at ? Math.max(m ?? -Infinity, new Date(r.at).getTime()) : m), null);
+    aired[part] = { last, times: within.filter((r) => counts(part, r)).map((r) => new Date(r.at).getTime()) };
   }
   // For "after every N programs": the programs since it last aired (at most two days back).
   let entries = input.rows;
-  const counted = CADENCE_PARTS.filter((p) => cadence[p].every === "n_programs");
+  const counted = CADENCE_PARTS.filter((p) => cadences[p].every === "n_programs");
   if (counted.length) {
     const back = Math.min(...counted.map((p) => Math.max(aired[p]?.last ?? from.getTime(), now - PROGRAMS_BACK_MS)));
     if (back < from.getTime()) entries = [...(await input.readEntries(new Date(back), from)), ...entries];
   }
   const programs = entries.filter((e) => e.kind !== "off_air" && e.code === "PGM").map((e) => ({ startsAt: e.startsAt.getTime(), endsAt: e.endsAt.getTime() }));
-  const decider = new CadenceDecider({ cadence, programs, aired, settledBefore: now - SETTLED_MS, recorded: stateful, hourStart: hourStartIn(tz) });
+  const decider = new CadenceDecider({ cadence, sequences, programs, aired, settledBefore: now - SETTLED_MS, recorded: stateful, hourStart: hourStartIn(tz) });
 
   // How long a break without spots runs (only asked when spots don't air in every break).
   let needs: BreakNeeds | null = null;
@@ -275,14 +322,13 @@ export async function cadenceContext(
       services.playout.stationIdMs(stationId),
       services.shelf.catalogSeries()
     ]);
-    const [into, out] = [fillers.bumpers[0], fillers.bumpers[1] ?? fillers.bumpers[0]];
     // A catalog program always has a credit to air (its series' sponsor, or Clear): once an hour, but
-    // a break's length is decided alone, so each of its breaks keeps the room.
+    // a break's length is decided alone, so each of its breaks keeps the room. The bumpers' room is
+    // the break's own chosen sequences (A243: `needMs`'s `elementsMs`).
     const catalogPrograms = new Set(catalog.map((c) => c.programId));
     needs = {
       stationIdMs: fillers.stationIds[0]?.durationMs ?? sidMs,
-      credit: (programId) => members.named.length > 0 || (programId !== null && catalogPrograms.has(programId)) || credits.some((c) => c.programId === null || c.programId === programId),
-      bumpersMs: into ? (into.durationMs ?? 0) + (out!.durationMs ?? 0) : 0
+      credit: (programId) => members.named.length > 0 || (programId !== null && catalogPrograms.has(programId)) || credits.some((c) => c.programId === null || c.programId === programId)
     };
   }
   return { decider, needs };

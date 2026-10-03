@@ -3,7 +3,7 @@
 import { http } from "msw";
 import { stationsApi } from "@opencast/contracts";
 import { GuideX } from "../../api/ext";
-import { inWindow } from "../fixtures/schedule";
+import { blockBandsIn, inWindow } from "../fixtures/schedule";
 import { syncStreamSignOff } from "../fixtures/signoff";
 import { inMarket } from "../fixtures/stations";
 import { fail, path, reply } from "../respond";
@@ -25,7 +25,12 @@ export const guideHandlers = [
     // External stations down 5 minutes are off the guide too (follow-up Phase 6).
     const rows = inMarket(slug, band)
       .filter((s) => !hiddenExternal(s.ident.id))
-      .map((s) => ({ station: identX(s), airings: inWindow(s.ident.id, from, to).map(airingX) }));
+      .map((s) => {
+        const airings = inWindow(s.ident.id, from, to);
+        // A244: its programming blocks, as bands.
+        const blocks = blockBandsIn(airings);
+        return { station: identX(s), airings: airings.map(airingX), ...(blocks.length ? { blocks } : {}) };
+      });
     return reply(GuideX, { market, from, to, rows });
   })
 ];

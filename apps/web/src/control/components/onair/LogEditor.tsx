@@ -11,14 +11,14 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { catalogApi, libraryApi, logApi, type LibraryItem, type LogChange, type LogChangesResult, type LogEntry, type ProgramLog } from "@opencast/contracts";
-import { Button, ChoiceList, Field, LogCode, Modal, Notice, Segmented, SelectField, clock, clockRange, duration, placeBlocks, useToast, type TimelineBlock } from "@opencast/ui";
+import { blocksApi, catalogApi, libraryApi, logApi, type LibraryItem, type LogChange, type LogChangesResult, type LogEntry, type ProgramLog } from "@opencast/contracts";
+import { Button, ChoiceList, Field, LogCode, Modal, Notice, Segmented, SelectField, TimelineBands, clock, clockRange, duration, placeBlocks, useToast, type TimelineBand, type TimelineBlock } from "@opencast/ui";
 import { ApiError, call } from "../../../api/client";
 import { useApi } from "../../../api/hooks";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { LOG_READS } from "./data";
 import { airable } from "./repeat";
-import { draftBreaks, draftEntries, dragTo, insertId, lockOf, rippleFrom, timeValue, typedTime, wholeMinutes, withChange, type DraftEntry, type DraftItem } from "./logEdit";
+import { draftBreaks, draftEntries, draftSpans, dragTo, insertId, isBlockChange, lockOf, newSpanId, rippleFrom, spanAt, spanPieces, timeValue, typedTime, wholeMinutes, withChange, type DraftEntry, type DraftItem, type DraftSpan } from "./logEdit";
 import { dayClock, spanText } from "./time";
 import { stationLabel } from "../../station/slug";
 
@@ -98,6 +98,16 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
   });
 
   const entries = useMemo(() => draftEntries(log?.entries ?? [], changes, (id) => items.get(id)), [log?.entries, changes, items]);
+  // A244: programming blocks' spans as the draft leaves them.
+  const blockList = useApi(blocksApi.listBlocks, { params: { stationId } }, { enabled: active, retry: false });
+  const spans = useMemo(
+    () =>
+      draftSpans((log?.blocks ?? []).map((b) => ({ id: b.id, blockId: b.blockId, name: b.name, colour: b.colour, startsAt: b.startsAt, endsAt: b.endsAt })), changes, (id) => {
+        const b = blockList.data?.blocks.find((x) => x.id === id);
+        return b ? { name: b.name, colour: b.colour } : undefined;
+      }),
+    [log?.blocks, changes, blockList.data]
+  );
   const breaks = useMemo(() => draftBreaks(log?.breaks ?? [], log?.entries ?? [], changes, entries), [log?.breaks, log?.entries, changes, entries]);
   const original = useMemo(() => new Map((log?.entries ?? []).map((e) => [e.id, e])), [log?.entries]);
   const locked = (e: Pick<LogEntry, "id" | "startsAt" | "endsAt">) => lockOf(original.get(e.id) ?? e, now, onAir);
@@ -106,7 +116,7 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
   // Problems and changes by entry, to mark them on the timeline.
   const entryOfChange = (i: number) => {
     const c = changes[i];
-    return c ? (c.op === "insert" ? (c.key ? insertId(c.key) : null) : c.entryId) : null;
+    return c ? (isBlockChange(c) ? (c.op === "block_add" ? (c.key ? newSpanId(c.key) : null) : c.spanId) : c.op === "insert" ? (c.key ? insertId(c.key) : null) : c.entryId) : null;
   };
   const troubled = new Set((result?.problems ?? []).flatMap((p) => (p.index === null ? [] : [entryOfChange(p.index)])).filter((v): v is string => !!v));
 
@@ -123,6 +133,8 @@ export function useLogEdit({ stationId, log, win, active, onAir, now, onDone }: 
     changes,
     entries,
     breaks,
+    spans,
+    blocks: blockList.data?.blocks ?? [],
     items,
     library: library.data,
     result,
@@ -207,6 +219,17 @@ export interface EditTimelineProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onMove: (id: string, startsAt: string) => void;
+  /** A244: programming blocks' spans as the draft leaves them, their rails beside the column. */
+  spans?: DraftSpan[];
+  /** Spans with a problem in the draft. */
+  troubledSpans?: Set<string>;
+  onSelectSpan?: (id: string) => void;
+  onResizeSpan?: (id: string, edge: "start" | "end", at: string) => void;
+}
+
+/** A244: the draft's spans as rails: solid where their programs air (as the draft leaves them), dashed elsewhere. */
+export function draftBands(spans: DraftSpan[], entries: Array<Pick<LogEntry, "id" | "kind" | "startsAt" | "endsAt">>, troubled?: Set<string>): TimelineBand[] {
+  return spans.map((sp) => ({ id: sp.id, label: sp.name, start: sp.startsAt, end: sp.endsAt, pieces: spanPieces(sp, entries).map((p) => ({ start: p.startsAt, end: p.endsAt })), colour: sp.colour, problems: troubled?.has(sp.id) ? 1 : 0 }));
 }
 
 /**
@@ -215,7 +238,7 @@ export interface EditTimelineProps {
  * segment boundary) or moved a minute at a time with the arrow keys (five with Shift); a press
  * picks it for the pane. What's locked stays put.
  */
-export function EditTimeline({ blocks, from, to, pxPerMinute, maxHeight, entries, locked, troubled, selectedId, onSelect, onMove }: EditTimelineProps) {
+export function EditTimeline({ blocks, from, to, pxPerMinute, maxHeight, entries, locked, troubled, selectedId, onSelect, onMove, spans = [], troubledSpans, onSelectSpan, onResizeSpan }: EditTimelineProps) {
   const a0 = Date.parse(from);
   const total = ((Date.parse(to) - a0) / MIN) * pxPerMinute;
   const hours: number[] = [];
@@ -255,13 +278,27 @@ export function EditTimeline({ blocks, from, to, pxPerMinute, maxHeight, entries
   };
 
   return (
-    <div className="oc-tl cc-edit__tl" style={maxHeight ? { maxHeight, overflow: "auto" } : undefined}>
-      <div className="oc-tl__hrs" style={{ height: total }} aria-hidden="true">
-        {hours.map((h, i) => (
-          <span key={h} style={{ top: i * 60 * pxPerMinute }}>
-            {clock(h, { timeZone: STATION_TZ }).replace(":00 ", " ")}
-          </span>
-        ))}
+    <div className={`oc-tl cc-edit__tl${spans.length ? " oc-tl--bands" : ""}`} style={maxHeight ? { maxHeight, overflow: "auto" } : undefined}>
+      <div className="oc-tl__hrs" style={{ height: total }}>
+        <div aria-hidden="true">
+          {hours.map((h, i) => (
+            <span key={h} style={{ top: i * 60 * pxPerMinute }}>
+              {clock(h, { timeZone: STATION_TZ }).replace(":00 ", " ")}
+            </span>
+          ))}
+        </div>
+        {spans.length > 0 && (
+          <TimelineBands
+            bands={draftBands(spans, [...entries.values()], troubledSpans)}
+            from={from}
+            to={to}
+            pxPerMinute={pxPerMinute}
+            timeZone={STATION_TZ}
+            selectedId={selectedId}
+            onSelect={onSelectSpan ? (b) => onSelectSpan(b.id) : undefined}
+            onResize={onResizeSpan ? (b, edge, at) => onResizeSpan(b.id, edge, at) : undefined}
+          />
+        )}
       </div>
       <div className="oc-tl__col" style={{ height: total }} role="list" aria-label="The log, being edited">
         {hours.map((h, i) => (
@@ -322,6 +359,8 @@ export function EditTimeline({ blocks, from, to, pxPerMinute, maxHeight, entries
                 <LogCode code={b.code ?? "PGM"} />
                 <div>
                   <b>{b.title}</b> <small>{b.source}</small>
+                  {/* A244: dropped here, it's the block's. */}
+                  {offset?.id === b.id && spanAt(spans, dragTo(entry.startsAt, offset.dy, pxPerMinute)) && <small className="cc-edit__in">In {spanAt(spans, dragTo(entry.startsAt, offset.dy, pxPerMinute))!.name}</small>}
                   <span className="oc-sr-only">
                     , {span}
                     {state ? `, ${state}` : ""}
@@ -627,5 +666,106 @@ export function LogHistory({ stationId }: { stationId: string }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * A244: a programming block's span picked in edit mode: its start and end (typed, like an entry's;
+ * dragging its rail's edges does the same), and taking it off this day. One on air keeps its start.
+ */
+export function SpanSection({ edit, span, onAir, onClose }: { edit: LogEdit; span: DraftSpan; onAir: boolean; onClose: () => void }) {
+  const [start, setStart] = useState(timeValue(span.startsAt));
+  const [end, setEnd] = useState(timeValue(span.endsAt));
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setStart(timeValue(span.startsAt));
+    setEnd(timeValue(span.endsAt));
+    setError(null);
+  }, [span.id, span.startsAt, span.endsAt]);
+  const started = Date.parse(span.startsAt) <= clockNow().getTime() + (onAir ? 20_000 : 0);
+  const commit = (edge: "start" | "end") => {
+    let at = typedTime(edge === "start" ? start : end, span.startsAt);
+    if (!at) return setError("Type a time like 9:00 pm or 21:00.");
+    // An end at or before the start is the next day's (a block may cross 6:00 am on a date).
+    if (edge === "end" && at <= span.startsAt) at = new Date(Date.parse(at) + 24 * 3_600_000).toISOString();
+    setError(null);
+    if (at !== (edge === "start" ? span.startsAt : span.endsAt)) edit.add({ op: "block_resize", spanId: span.id, ...(edge === "start" ? { startsAt: at } : { endsAt: at }) });
+  };
+  return (
+    <section className="cc-log__sec cc-edit__entry" aria-label={span.name}>
+      <div className="cc-log__hrow">
+        <h2 className="cc-log__h">{span.name}</h2>
+        <Button variant="text" size="sm" onClick={onClose}>
+          Close
+        </Button>
+      </div>
+      <p className="cc-log__quiet">{spanText(span.startsAt, span.endsAt)}</p>
+      <div className="cc-edit__fields">
+        <Field label="Starts" mono size="sm" value={start} disabled={started} onChange={(e) => setStart(e.target.value)} onBlur={() => commit("start")} onKeyDown={(e) => e.key === "Enter" && commit("start")} error={error ?? undefined} />
+        <Field label="Ends" mono size="sm" value={end} onChange={(e) => setEnd(e.target.value)} onBlur={() => commit("end")} onKeyDown={(e) => e.key === "Enter" && commit("end")} help="Programs that start between these times are the block's." />
+        {!started && (
+          <Button variant="text" size="sm" onClick={() => (edit.add({ op: "block_remove", spanId: span.id }), onClose())}>
+            Take the block off this day
+          </Button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** A244: "Add a block": which block, from when to when (snapped like entries). */
+export function AddBlockDialog({ edit, base, near, onClose }: { edit: LogEdit; base: string | null; near: string; onClose: () => void }) {
+  const [blockId, setBlockId] = useState(edit.blocks[0]?.id ?? "");
+  const [start, setStart] = useState("21:00");
+  const [end, setEnd] = useState("23:00");
+  const [error, setError] = useState<string | null>(null);
+  const add = () => {
+    const startsAt = typedTime(start, near);
+    let endsAt = typedTime(end, near);
+    if (!blockId) return setError("Choose a block.");
+    if (!startsAt || !endsAt) return setError("Type times like 9:00 pm or 21:00.");
+    if (endsAt <= startsAt) endsAt = new Date(Date.parse(endsAt) + 24 * 3_600_000).toISOString();
+    edit.add({ op: "block_add", key: edit.nextKey(), blockId, startsAt, endsAt });
+    onClose();
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      width={420}
+      title="Add a block"
+      subtitle="Programs that start between these times are the block's."
+      footer={
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={add} disabled={!edit.blocks.length}>
+            Add it
+          </Button>
+        </>
+      }
+    >
+      {edit.blocks.length ? (
+        <SelectField label="Block" size="sm" value={blockId} onChange={(e) => setBlockId(e.target.value)}>
+          {edit.blocks.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <p className="cc-log__quiet">You don't have a block yet.</p>
+      )}
+      {base && (
+        <p className="cc-log__note">
+          <a className="cc-log__link" href={`${base}/blocks/new`}>
+            New block…
+          </a>
+        </p>
+      )}
+      <div className="cc-edit__fields">
+        <Field label="Starts" mono size="sm" value={start} onChange={(e) => setStart(e.target.value)} />
+        <Field label="Ends" mono size="sm" value={end} onChange={(e) => setEnd(e.target.value)} error={error ?? undefined} />
+      </div>
+    </Modal>
   );
 }

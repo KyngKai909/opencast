@@ -24,6 +24,20 @@
 .oc-guide__lv { font-size: 12px; }
 .oc-guide__p--cont b::before { content: "‹ " / ""; color: var(--ink-50); }
 
+/* A244: a programming block's band above the row's programs: its colour, its name in white. Not a
+   button; the programs under it keep their look. */
+.oc-guide__row--blocks { grid-template-rows: 14px auto; }
+.oc-guide__row--blocks .oc-guide__st { grid-row: 1 / span 2; }
+.oc-guide__row--blocks .oc-guide__p { grid-row: 2; }
+.oc-guide__band {
+  grid-row: 1; min-width: 0; height: 14px; padding: 0 6px; background: var(--ink-70, #4a4a4a); color: #fff;
+  font: 600 10.5px/14px var(--font-text); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-left: 1px solid var(--ground);
+}
+.oc-guide__band--cont span::before { content: "‹ " / ""; }
+.oc-guide--phone .oc-guide__row--blocks { grid-template-rows: 12px auto; }
+.oc-guide--phone .oc-guide__band { height: 12px; font-size: 9.5px; line-height: 12px; padding: 0 4px; }
+
 /* The phone: a narrow station column, scrolling both ways. */
 .oc-guide--phone { --oc-guide-stc: 74px; min-width: 760px; }
 .oc-guide--phone .oc-guide__st .oc-cs { font-size: 12.5px; }

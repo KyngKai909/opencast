@@ -10,3 +10,5 @@
 .oc-rundown--compact { border-top: 0; }
 .oc-rundown--compact .oc-rd { grid-template-columns: 66px 44px minmax(0, 1fr) 44px; font-size: 13px; }
 .oc-rundown--compact .oc-rd__t, .oc-rundown--compact .oc-rd__d { font-size: 12px; }
+/* A243: a bumper that didn't fit its break, listed quieter. */
+.oc-rd--muted { color: var(--ink-50); }
