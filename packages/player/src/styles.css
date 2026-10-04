@@ -113,7 +113,9 @@
      column instead of running into the program's name. */
   display: grid; grid-template-columns: minmax(calc(380 * var(--u)), max-content) minmax(0, 1fr) minmax(calc(260 * var(--u)), max-content); gap: calc(44 * var(--u));
 }
-.oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; }
+/* The number, call sign and name centred down the banner's height, whatever the program column beside
+   them holds (the user's call, 2026-10-04). */
+.oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; align-self: stretch; }
 .oc-banner__ch {
   /* Centred down the call sign and name beside it, the divider running their full height. */
   grid-row: span 2; display: flex; align-items: center;
@@ -123,13 +125,16 @@
 .oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
 /* The call sign with an external station's "External" beside it. */
 .oc-banner__csrow { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); }
+/* "External" at the call sign's size, so it never makes that line taller. */
+.oc-banner .oc-banner__csrow .oc-tag { height: max(calc(40 * var(--u)), 18px); padding: 0 max(calc(12 * var(--u)), 6px); font-size: max(calc(22 * var(--u)), 11px); line-height: 1; }
 .oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__src { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__now h3 {
-  margin: calc(2 * var(--u)) 0 calc(10 * var(--u));
+  /* Room between the title, the progress bar and Next (2026-10-04: too tight, on the web most of all). */
+  margin: calc(2 * var(--u)) 0 max(calc(18 * var(--u)), 9px);
   font: 800 max(calc(58 * var(--u)), 18px)/1.02 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.03em;
 }
-.oc-banner__nx { margin-top: calc(14 * var(--u)); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
+.oc-banner__nx { margin-top: max(calc(22 * var(--u)), 9px); font-size: max(calc(26 * var(--u)), 12.5px); color: var(--pic-ink-70); display: flex; gap: calc(14 * var(--u)); align-items: center; }
 .oc-banner__nx b { color: var(--pic-ink); font-weight: 600; }
 /* A244: a programming block's name before the title, lighter; after the next title, quieter. */
 .oc-banner__blk { font-weight: 500; color: var(--pic-ink-70); }
@@ -158,15 +163,16 @@
 
 /* A narrow picture (a phone's full player): the ident over what's on, the clock and tally beside. */
 @container (max-width: 560px) {
-  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
+  .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
   .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
   .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
   .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
-  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 6px; }
+  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; }
   .oc-banner--web .oc-banner__ch { font-size: 20px; }
   .oc-banner--web .oc-banner__cs { font-size: 15px; }
+  .oc-banner--web .oc-banner__csrow .oc-tag { height: 16px; padding: 0 5px; font-size: 10.5px; }
   .oc-banner--web .oc-banner__clock { font-size: 13px; }
-  .oc-banner--web .oc-banner__nx { font-size: 12px; }
+  .oc-banner--web .oc-banner__nx { font-size: 12px; margin-top: 9px; }
   .oc-banner--web .oc-banner__hints { display: none; }
 }
 
