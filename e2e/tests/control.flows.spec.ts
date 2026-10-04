@@ -263,6 +263,35 @@ test("BEAT opens a break on the Schedule: what's in it, whose time it is, and wh
   await expect(page).toHaveURL(/\/control\/beat\/schedule\/rules$/);
 });
 
+// A246 phase 3: change how often a part airs, see the next hour rebuilt before saving, then save.
+test("BEAT previews a break rule, then saves it", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule/rules");
+  const preview = page.getByRole("region", { name: "Preview: 9:00 to 10:00 pm" });
+  await expect(preview.getByText("Rebuilt with the rules as saved")).toBeVisible();
+  const hour = preview.getByRole("list", { name: "The hour, rebuilt" });
+  // 9:29 pm, cued during Beat Tape Live: the credit in it, as the rule says (every break).
+  await expect(hour.getByRole("img", { name: "Bumper :10, Credit :15, Bumper :10, Open 1:20, ID :05" })).toBeVisible();
+  const credit = page.getByRole("radiogroup", { name: "How often: Thank-you credit" });
+  await credit.getByRole("radio", { name: "Never" }).click();
+  // Rebuilt before saving: the credit is gone from the break, and nothing is saved yet.
+  await expect(preview.getByText("Rebuilt with the rules as set. Nothing is saved yet")).toBeVisible();
+  await expect(hour.getByRole("img", { name: "Bumper :10, Bumper :10, Open 1:35, ID :05" })).toBeVisible();
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  // The station ID can't be never: its chip is crossed out and can't be chosen.
+  await expect(page.getByRole("radiogroup", { name: "How often: Station ID" }).getByRole("radio", { name: "Never" })).toBeDisabled();
+  await page.getByRole("button", { name: "Save break rules" }).click();
+  await expect(page.getByText("Break rules saved.")).toBeVisible();
+  await expect(preview.getByText("Rebuilt with the rules as saved")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save break rules" })).toBeDisabled();
+  // Saved: it's still so after a reload, and the Log's break is built the same way.
+  await page.reload();
+  await expect(page.getByRole("radiogroup", { name: "How often: Thank-you credit" }).getByRole("radio", { name: "Never" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("tab", { name: "Log" }).click();
+  await page.getByRole("list", { name: "The rundown" }).getByRole("button", { name: /Spots placed at 9:09 pm/ }).click();
+  await expect(page.getByRole("region", { name: "Break, 9:29:00 pm" }).getByRole("img", { name: "Bumper :10, Bumper :10, Open 1:35, ID :05" })).toBeVisible();
+});
+
 test("BEAT fills dead air from the Add drawer", async ({ page }) => {
   await signInAs(page, "kai");
   await page.goto("/control/beat/schedule");

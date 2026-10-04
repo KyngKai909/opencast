@@ -3,6 +3,7 @@ import { endpoint } from "./core.js";
 import { BlockBand, BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { Captions, Program } from "./library.js";
 import { BlockSpan, DayTemplateBlock } from "./blocks.js";
+import { BreakRule } from "./stations.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -286,6 +287,23 @@ export const ProgramLog = z.object({
    */
   blocks: z.array(BlockSpan).optional()
 });
+
+/**
+ * A246 (added 2026-10-03): `previewBreakRule`'s answer: the rule as it would be saved (after the
+ * same checks and merging as `setBreakRule`), and the window's entries and breaks rebuilt with it,
+ * each break with its rows (G1), as `getLog` would answer after saving. `keeps`: the break keeps
+ * what it has whatever the rule says (spots already placed in it, about 20 minutes before air, or
+ * it has started), so a new rule doesn't change what's sold in it. `blocks` as `getLog`'s.
+ */
+export const BreakRulePreview = z.object({
+  rule: BreakRule,
+  from: Timestamp,
+  to: Timestamp,
+  entries: z.array(LogEntry),
+  breaks: z.array(BreakSlot.extend({ keeps: z.boolean() })),
+  blocks: z.array(BlockSpan).optional()
+});
+export type BreakRulePreview = z.infer<typeof BreakRulePreview>;
 
 export const DeadAirStatus = z.object({
   /** Over the next 24 hours. */
@@ -714,6 +732,16 @@ export const logApi = {
     params: StationParams,
     query: z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) }),
     response: z.object({ changes: z.array(LogChangeRecord) })
+  }),
+  previewBreakRule: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/break-rule/preview",
+    auth: "user",
+    summary:
+      "A246 (added 2026-10-03): the breaks in a window rebuilt with a break rule that isn't saved (owner, operator): the rule as `setBreakRule` would save it (the same checks and 400s, the same merging of what's left out), and the window's entries and breaks with their rows, exactly as `getLog` would answer after saving it. Nothing is saved, placed, stored or sent. `to` is at most three hours after `from`. A break that keeps what it has (`keeps`: spots already placed in it, or it has started) reads as it will air",
+    params: StationParams,
+    body: z.object({ rule: BreakRule, from: Timestamp, to: Timestamp }),
+    response: BreakRulePreview
   })
 };
 

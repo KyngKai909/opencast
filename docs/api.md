@@ -2,7 +2,7 @@
 
 Generated from `packages/contracts` by `npm run docs:api`. Every path is under `/v1`. Request and response shapes are the Zod schemas in the contracts.
 
-357 endpoints in 23 modules.
+358 endpoints in 23 modules.
 
 ## accounts (35)
 
@@ -107,7 +107,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `putCaptionTrack` | PUT | `/library/:itemId/captions` | signed in | L7: upload or edit the caption track (owner, operator): WebVTT, or SRT (turned into WebVTT), up to 1 MB. The item's captions become `uploaded`. 422 `not_captions` when it isn't either. |
 | `removeCaptionTrack` | DELETE | `/library/:itemId/captions` | signed in | L7: remove the caption track (owner, operator); the item's captions go back to none |
 
-## log (21)
+## log (22)
 
 | | Method | Path | Who | What |
 |---|---|---|---|---|
@@ -132,6 +132,7 @@ Generated from `packages/contracts` by `npm run docs:api`. Every path is under `
 | `updateListing` | PATCH | `/stations/:stationId/listings/:entryId` | signed in | G5: an airing's episode title and description, or a carried program's local note (owner, operator). A carried program's title and description are the maker's: 409 `from_the_maker`. |
 | `applyLogChanges` | POST | `/stations/:stationId/log/changes` | signed in | Edit mode (owner, operator): check a batch of changes together (`dryRun`) or publish them all at once, in one transaction: moves, replacing an item, a new end, removals and inserts, with the same rules as `addEntry`, `updateEntry` and `removeEntry`. A problem refuses the whole batch (422 `log_changes_refused`, nothing applied); a dry run answers them instead. `base` is the window and version the draft began from: 409 `log_changed` if the log changed there since. On air, the entry airing now and anything starting within `LOG_EDIT_LEAD_MS` is locked. Publishing tells an on-air station to read its log again (once), marks template dates edited, moves spots held in a break that goes to the next break, and records the batch in the log's history. |
 | `listLogChanges` | GET | `/stations/:stationId/log/changes` | signed in | Edit mode: the log's published batches of changes, newest first, with who and when (owner, operator) |
+| `previewBreakRule` | POST | `/stations/:stationId/break-rule/preview` | signed in | A246 (added 2026-10-03): the breaks in a window rebuilt with a break rule that isn't saved (owner, operator): the rule as `setBreakRule` would save it (the same checks and 400s, the same merging of what's left out), and the window's entries and breaks with their rows, exactly as `getLog` would answer after saving it. Nothing is saved, placed, stored or sent. `to` is at most three hours after `from`. A break that keeps what it has (`keeps`: spots already placed in it, or it has started) reads as it will air |
 
 ## playout (6)
 

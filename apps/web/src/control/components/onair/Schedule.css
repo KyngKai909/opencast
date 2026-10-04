@@ -12,7 +12,7 @@
 @media (max-width: 767px) {
   /* The phone's main isn't padded: each page pads itself (as the log does). */
   .cc-sch, .cc-blks { padding: 14px 16px 24px; }
-  .cc-sch .cc-breaks { padding: 0; }
+  .cc-sch .cc-rules { padding: 0; }
   .cc-sch__top { gap: 10px; margin-bottom: 14px; }
   .cc-sch__h { font-size: 22px; }
   /* The four pills scroll sideways rather than push the page wider. */

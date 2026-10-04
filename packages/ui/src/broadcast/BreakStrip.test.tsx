@@ -31,4 +31,16 @@ describe("BreakStrip", () => {
     expect(container.textContent).toBe("");
     expect(breakKindClass("upnext")).toBe("oc-brk--upnext");
   });
+
+  it("big (A246): each part's words over its length; mini: words, no lengths", () => {
+    const big = [
+      { kind: "bumper" as const, length: 5_000, label: "Bumper", detail: "0:05" },
+      { kind: "spots" as const, length: 90_000, label: "Spots", detail: "up to 1:30" }
+    ];
+    const { container, rerender } = render(<BreakStrip parts={big} variant="big" />);
+    expect(screen.getByRole("img", { name: "Bumper :05, Spots 1:30" }).className).toContain("oc-brkstrip--big");
+    expect([...container.querySelectorAll(".oc-brkstrip > span small")].map((s) => s.textContent)).toEqual(["0:05", "up to 1:30"]);
+    rerender(<BreakStrip parts={big} variant="mini" />);
+    expect(container.querySelector(".oc-brkstrip--mini")!.textContent).toBe("BumperSpots");
+  });
 });

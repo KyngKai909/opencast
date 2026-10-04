@@ -9,7 +9,8 @@ import { useStation } from "../../station/StationContext";
 import { SCHEDULE_TABS, scheduleHref, type ScheduleTab } from "./scheduleRoutes";
 import "./Schedule.css";
 
-export function ScheduleHead({ tab, end }: { tab: ScheduleTab; end?: ReactNode }) {
+/** `onNavigate`: a tab's own way to another tab (Break rules asks first while its draft is unsaved). */
+export function ScheduleHead({ tab, end, onNavigate }: { tab: ScheduleTab; end?: ReactNode; onNavigate?: (to: string) => void }) {
   const s = useStation();
   const navigate = useNavigate();
   useShellOptions({ context: "Schedule" });
@@ -20,7 +21,7 @@ export function ScheduleHead({ tab, end }: { tab: ScheduleTab; end?: ReactNode }
         variant="pill"
         label="Schedule"
         value={tab}
-        onChange={(v) => navigate(scheduleHref(s.base, v))}
+        onChange={(v) => (onNavigate ?? navigate)(scheduleHref(s.base, v))}
         items={SCHEDULE_TABS.map((t) => ({ value: t.value, label: t.label }))}
         className="cc-sch__tabs"
       />

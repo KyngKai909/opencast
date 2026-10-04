@@ -315,3 +315,155 @@ export function exampleLine(rule: Pick<BreakRule, "lengthMs" | "fillOrder"> & Pa
   const parts = [...said(seq.open.every === "never" ? [] : seq.open.roles), ...middle, ...said(seq.close.every === "never" ? [] : seq.close.roles)];
   return `Example, a ${duration(rule.lengthMs)} break: ${parts.join(", ")}, then your station ID${between.length ? `; between programs, ${between.join(", ")}` : ""}.`;
 }
+
+// ---- Break rules with a preview (A246, Schedule phase 3) ----
+
+/** The cadence choices as chips: every break, after each program, every N programs, once an hour, never. */
+export type CadenceChoice = "break" | "program" | "n" | "hour" | "never";
+
+/** A chip's value for a cadence. */
+export function choiceOf(c: Pick<BreakCadence, "every">): CadenceChoice {
+  return c.every === "n_programs" ? "n" : c.every;
+}
+
+/** The chips' words ("Every 3 programs" once N is 3). */
+export function choiceOptions(part: ChipPart, n: number): Array<{ value: CadenceChoice; label: string; disabled?: boolean }> {
+  return [
+    { value: "break", label: "Every break" },
+    { value: "program", label: "After each program" },
+    { value: "n", label: `Every ${n} programs` },
+    { value: "hour", label: "Once an hour" },
+    // The station ID can't be never: crossed out.
+    { value: "never", label: "Never", ...(part === "stationId" ? { disabled: true } : {}) }
+  ];
+}
+
+/** A chip back to a cadence (N kept from before, else 2). */
+export function cadenceFromChoice(choice: CadenceChoice, n: number): BreakCadence {
+  return choice === "n" ? { every: "n_programs", n } : { every: choice };
+}
+
+/** The N choices for "every N programs" (the contract takes 2 to 12). */
+export const N_PROGRAMS = [2, 3, 4, 5, 6];
+
+/** The parts with chips, in the reference's order, each with its swatch's kind and its line. */
+export const CHIP_PARTS = [
+  { part: "spots", kind: "spots", title: "Spots", detail: "Your rotation, then backups, then the spot market" },
+  { part: "underwriting", kind: "credit", title: "Thank-you credit", detail: "Members and sponsors" },
+  { part: "bumpers", kind: "bumper", title: "Bumpers", detail: "Into and out of the break" },
+  { part: "stationId", kind: "id", title: "Station ID", detail: "Always last. Can't be never" },
+  { part: "upNext", kind: "upnext", title: "Up next", detail: "Between programs" }
+] as const;
+export type ChipPart = (typeof CHIP_PARTS)[number]["part"];
+
+/** S20: where Up next airs by its own cadence: the first sequence with its role, else between programs. */
+export function upNextHome(seq: BumperSequences): SequencePosition {
+  return (["open", "close", "between"] as const).find((p) => seq[p].roles.includes("up_next")) ?? "between";
+}
+
+/**
+ * How often Up next airs (S20). Its own cadence when set; left out, as often as the position
+ * holding its role (as before); with its role nowhere, never.
+ */
+export function upNextCadence(rule: Pick<BreakRule, "cadence" | "bumperSequences">): BreakCadence {
+  if (rule.cadence?.upNext) return rule.cadence.upNext;
+  const seq = sequencesOf(rule);
+  const at = (["open", "close", "between"] as const).find((p) => seq[p].roles.includes("up_next"));
+  if (!at) return { every: "never" };
+  const p = seq[at];
+  // Between programs, "every break" is every boundary.
+  return p.every === "n_programs" ? { every: "n_programs", n: p.n ?? 2 } : at === "between" && p.every === "break" ? { every: "program" } : { every: p.every };
+}
+
+/** The Bumpers chips: the opening and closing sequences' cadence when they agree, else null (set below). */
+export function bumpersCadence(rule: Pick<BreakRule, "cadence" | "bumperSequences">): BreakCadence | null {
+  const { open, close } = sequencesOf(rule);
+  if (open.every !== close.every || (open.every === "n_programs" && (open.n ?? 2) !== (close.n ?? 2))) return null;
+  return open.every === "n_programs" ? { every: "n_programs", n: open.n ?? 2 } : { every: open.every };
+}
+
+/** One part's cadence as the chips show it. */
+export function chipCadence(rule: BreakRule, part: ChipPart): BreakCadence | null {
+  if (part === "upNext") return upNextCadence(rule);
+  if (part === "bumpers") return bumpersCadence(rule);
+  return cadenceOf(rule)[part];
+}
+
+/** The rule with one part's cadence changed by its chips. Bumpers set the opening and closing sequences together; Up next only its own (S20). */
+export function withChipCadence(rule: BreakRule, part: ChipPart, c: BreakCadence): BreakRule {
+  const cadence = cadenceOf(rule);
+  const every = c.every === "n_programs" ? { every: c.every, n: c.n ?? 2 } : { every: c.every };
+  if (part === "bumpers") {
+    const seq = sequencesOf(rule);
+    const strip = ({ n: _n, ...p }: PositionRule) => p;
+    return { ...rule, cadence: { ...cadence, bumpers: every }, bumperSequences: { ...seq, open: { ...strip(seq.open), ...every }, close: { ...strip(seq.close), ...every } } };
+  }
+  if (part === "upNext") return { ...rule, cadence: { ...cadence, upNext: every } };
+  return { ...rule, cadence: { ...cadence, [part]: every } as BreakCadences };
+}
+
+/** Two rules the same (as the form sees them: blocked categories in any order). */
+export function sameRule(a: BreakRule, b: BreakRule): boolean {
+  const norm = (r: BreakRule) => JSON.stringify({ ...r, blockedCategories: [...r.blockedCategories].sort(), fillOrder: fillOrder(r.fillOrder), cadence: cadenceOf(r), bumperSequences: sequencesOf(r) }, (_k, v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y))) : v));
+  return norm(a) === norm(b);
+}
+
+/** One part of the recipe strip: its kind, length, words and length line. */
+export interface RecipePart {
+  kind: "bumper" | "spots" | "credit" | "id" | "upnext";
+  length: number;
+  label: string;
+  detail: string;
+}
+
+const lengthWords = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/**
+ * "Every break, in air order", drawn to scale for a break of the rule's length: the opening
+ * bumpers, the spots and the credit in the station's order, the closing bumpers, the station ID;
+ * then between programs (outside the break). Parts that never air are left out; a bumper role
+ * with nothing to air is left out too. Up next goes where its cadence puts it (S20).
+ */
+export function recipeOf(rule: BreakRule, items: Bumper[], at: Date): { inBreak: RecipePart[]; between: RecipePart[] } {
+  const seq = sequencesOf(rule);
+  const cadence = cadenceOf(rule);
+  const upNextOwn = !!rule.cadence?.upNext;
+  const upNextOn = upNextCadence(rule).every !== "never";
+  const home = upNextHome(seq);
+  const roles = (p: SequencePosition): BumperRole[] => {
+    const base = seq[p].every === "never" ? [] : seq[p].roles;
+    if (!upNextOwn) return base;
+    // S20: its own cadence. The position's `every` governs only the other roles.
+    const rest = base.filter((r) => r !== "up_next");
+    if (p !== home || !upNextOn) return rest;
+    const order = seq[p].roles;
+    const i = order.indexOf("up_next");
+    const j = i < 0 ? -1 : rest.findIndex((r) => order.slice(i + 1).includes(r));
+    return j < 0 ? [...rest, "up_next"] : [...rest.slice(0, j), "up_next", ...rest.slice(j)];
+  };
+  const bumpers = (p: SequencePosition) => {
+    let upNext = false;
+    return roles(p).flatMap((r): RecipePart[] => {
+      if (r === "up_next" && upNext) return [];
+      const ms = roleLength(items, r, at);
+      if (!ms) return [];
+      if (r === "up_next") upNext = true;
+      return [{ kind: r === "up_next" ? "upnext" : "bumper", length: ms, label: r === "up_next" ? "Up next" : "Bumper", detail: lengthWords(ms) }];
+    });
+  };
+  const open = bumpers("open");
+  const close = bumpers("close");
+  const credit: RecipePart[] = cadence.underwriting.every === "never" ? [] : [{ kind: "credit", length: FIXED_MS.UND, label: "Credit", detail: lengthWords(FIXED_MS.UND) }];
+  const sid: RecipePart = { kind: "id", length: FIXED_MS.SID, label: "ID", detail: lengthWords(FIXED_MS.SID) };
+  const fixed = [...open, ...credit, ...close, sid].reduce((s, p) => s + p.length, 0);
+  const spotMs = Math.max(0, rule.lengthMs - fixed);
+  const spots: RecipePart[] = cadence.spots.every === "never" || !spotMs ? [] : [{ kind: "spots", length: spotMs, label: "Spots", detail: `up to ${lengthWords(spotMs)}` }];
+  const middle = fillOrder(rule.fillOrder).flatMap((c) => (c === "SPT" ? spots : c === "UND" ? credit : []));
+  // Up next once: a break position before between programs.
+  const inBreak = [...open, ...middle, ...close, sid];
+  const between = bumpers("between").filter((p) => p.kind !== "upnext" || !inBreak.some((x) => x.kind === "upnext"));
+  return { inBreak, between };
+}

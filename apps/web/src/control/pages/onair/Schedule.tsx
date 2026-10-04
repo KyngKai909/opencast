@@ -4,7 +4,8 @@
 // `entry`, `block`, `break` and `add`; Phase 2), Templates (`/schedule/templates`, and one at
 // `/:templateId`), Blocks (`/schedule/blocks`: pages/live/Blocks.tsx) and Break rules
 // (`/schedule/rules`). Templates is the list with the off air hours above it (the "Every day"
-// rule); Break rules is the break rule from station settings, as it was, until Phase 3.
+// rule); Break rules is the break rule as one draft with a preview of the next hour (Phase 3,
+// BreaksSection), its tabs asking before leaving unsaved changes.
 
 import { useParams } from "react-router";
 import { LogPage } from "../../components/onair/LogPage";
@@ -13,7 +14,7 @@ import { TemplateList } from "../../components/onair/RepeatDay";
 import { ScheduleHead } from "../../components/onair/ScheduleHead";
 import { scheduleHref } from "../../components/onair/scheduleRoutes";
 import { useTemplates } from "../../components/onair/data";
-import { BreaksSection, breaksLede } from "../../components/station/settings/BreaksSection";
+import { BreaksSection } from "../../components/station/settings/BreaksSection";
 import { useIsPhone } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 
@@ -46,9 +47,7 @@ function BreakRules() {
   const s = useStation();
   return (
     <div className="cc-sch">
-      <ScheduleHead tab="rules" />
-      <p className="cc-sch__lede">{breaksLede(s.label)}</p>
-      <BreaksSection s={s} />
+      <BreaksSection s={s} head={(go) => <ScheduleHead tab="rules" onNavigate={go} />} />
     </div>
   );
 }

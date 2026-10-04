@@ -139,6 +139,19 @@ for (const size of ["web", "phone"] as const) {
         await checkA11y(page, `sign-in code, ${size}, ${ground}`, { exclude: EXCLUDE });
       });
 
+      // A246: Break rules with unsaved changes (the preview rebuilt), and the question on leaving.
+      test("/schedule/rules with unsaved changes, and leaving them", async ({ page }) => {
+        await open(page, kai("/schedule/rules"), ground, size);
+        await page.getByRole("radiogroup", { name: "How often: Thank-you credit" }).getByRole("radio", { name: "Once an hour" }).click();
+        await expect(page.getByText("Rebuilt with the rules as set. Nothing is saved yet")).toBeVisible();
+        await settle(page);
+        await checkA11y(page, `/schedule/rules unsaved, ${size}, ${ground}`, { exclude: EXCLUDE });
+        await page.getByRole("tab", { name: "Log" }).click();
+        await expect(page.getByRole("dialog", { name: "Leave without saving?" })).toBeVisible();
+        await settle(page);
+        await checkA11y(page, `/schedule/rules leaving, ${size}, ${ground}`, { exclude: EXCLUDE });
+      });
+
       // Setting up a station: someone new starts one on /control/new, then each setup step.
       for (const step of ["station", "library", "log", "translators", "sign-on"]) {
         test(`/setup/:id/${step} as new`, async ({ page }) => {

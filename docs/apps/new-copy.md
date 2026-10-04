@@ -1291,3 +1291,26 @@ For review. The reference (`docs/reference/control/opencast-schedule.html`, sect
 | Setup step 3 and the Log without the Schedule's head | "What airs, in order. Build one day and make a template of it, then adjust." (was "…and repeat it, then adjust.") |
 | Templates, with no templates | "No templates yet. On the Log, "Make a template from this day" starts one." (was "…Repeat this day makes one from a day.") |
 | The API's lines (G18) | "{Saturday Reel} keeps its time", "{Saturday Reel} no longer keeps its time"; the problem `kept`: "{Saturday Reel} is kept at its time. Turn off Keep at this time to move it." |
+
+## The Schedule workspace, Phase 3: Break rules, with a preview (A246, 2026-10-03)
+
+For review. The reference (`docs/reference/control/opencast-schedule.html`, section 05) draws the tab and its words are final: "Every break, in air order", "Drawn to scale for a 2:00 break", "Then between programs", "Outside the break, so partner ads never replace it", the parts' names and lines ("Your rotation, then backups, then the spot market", "Members and sponsors", "Into and out of the break", "Always last. Can't be never", "Between programs"), the chips ("Every break", "After each program", "Every 2 programs", "Once an hour", "Never"), "What can air in your breaks", "Never on {BEAT}", "Backup rotation", "When a spot pauses", "Ads from partners", "Only time still open. Paid later", the tiles ("Breaks come", "Length", "Spot time per hour", "Same spot per hour"), "Preview: {7:00 to 8:00 pm}", "Rebuilt with the rules as set. Nothing is saved yet", "Everything on this page saves together. Applies to breaks not yet filled. Breaks in the next 20 minutes keep what they have. {Late Crate Nights} uses its own bumper order during the block.", "Reset", "Save break rules". These are the words beyond it. `{}` marks what's filled in.
+
+| Where | Words |
+|---|---|
+| The recipe's line, after every program (the length doesn't shape these breaks) | "Drawn to scale for a {2:00} break. After every program, a break is the time its program leaves, so most run shorter or longer"; with no rule (breaks cued from the booth): "Drawn to scale for a {2:00} break, cued from the booth" |
+| The recipe on the phone (its parts listed under the strip) | "Bumper {0:10} · Spots up to {1:20} · Credit {0:15} · Bumper {0:10} · ID {0:05}" |
+| The recipe, between programs | each part "{Up next} {0:05}" or "Bumper {0:03}" |
+| The chips | "Every {3} programs" once N is chosen; beside it the select "How many programs: {Spots}" with "{2} programs" to "{6} programs"; accessible names "How often: {Spots}" (and "How often each part airs" for the group) |
+| Up next's line, by where its role sits | "Between programs" (the reference's), "In the break, as it opens", "In the break, as it closes" |
+| Bumpers, opening and closing differ | "Opening and closing differ. Set each in the bumper order below" |
+| What can air | "Spots in these categories don't reach your market" (the reference's line); the backup rotation's link "Open the rotation" and "No backups yet"; the row "Fill order", "Your spots and the credit, inside each break", chips "Spots, then the credit" and "The credit, then spots"; Ads from partners' chips "On", "Off" |
+| The length tile, by mode | after every program: "Breaks cued live, and between repeats. The rest are the time a program leaves"; every N minutes: "Every break. Live programs cue their own"; no rule: "Breaks cued from the booth" |
+| The timing tiles (accessible names) | "Timing and limits" (the group); the selects "Breaks come", "Break length", "Spot time per hour", "The same spot, at most" |
+| The bumper order (the sequences, below) | the heading "The bumper order"; "Which bumpers air, in order, and how often each place airs them"; with Up next's own cadence: "Which bumpers air, in order. Up next goes by its own choice above; here it only sets its place" |
+| The preview | saved and unchanged: "Rebuilt with the rules as saved"; "Building the preview…"; "Nothing on the log this hour."; "The preview can't be built. {The API's words}"; a program's "live" or "carried"; a kept break "Keeps what it has"; the arrows "An hour earlier", "An hour later"; the list's name "The hour, rebuilt"; the column's "Preview and save" |
+| Two or more blocks with their own order | "{Late Crate Nights} and {Sunday Matinee} use their own bumper order during their blocks." |
+| Saving | "Unsaved changes" beside Save; "Saving…"; the toast "Break rules saved." |
+| Leaving with unsaved changes (a link, a Schedule tab) | "Leave without saving?"; "Your changes to the break rules haven't been saved. Leaving drops them."; "Keep editing", "Leave without saving" (closing or reloading the tab gets the browser's own prompt) |
+| The Log's why line, with Up next's own cadence (S20) | "up next airs {once an hour}"; "up next is off" |
+| The API's refusals (`previewBreakRule`) | "The preview ends after it starts."; "Preview three hours at most." (the rest are `setBreakRule`'s own) |

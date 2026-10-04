@@ -52,6 +52,8 @@ export function whyLine(slot: BreakSlot, rule: BreakRule | undefined, opts: { ow
       c.spots.every !== "break" ? `spots air ${often(c.spots)}` : null,
       c.underwriting.every === "never" ? null : `the credit airs ${often(c.underwriting)}`,
       c.stationId.every !== "break" ? `the station ID airs ${often(c.stationId)}` : null,
+      // S20: Up next with its own cadence.
+      rule.cadence?.upNext ? (rule.cadence.upNext.every === "never" ? "up next is off" : `up next airs ${often(rule.cadence.upNext)}`) : null,
       opts.block ? `during ${opts.block.name}, its bumper and ID replace the station's` : null
     ].filter((w): w is string => !!w);
     if (how.length) parts.push(`${how.join("; ").replace(/^./, (x) => x.toUpperCase())}.`);

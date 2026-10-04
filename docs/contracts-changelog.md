@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-03: The break rule's preview, and Up next with its own cadence (A246, S20)
+
+Additive: one new endpoint (request and response both new), one new shape, and one optional field. No published response changes shape. No migration: `cadence.upNext` lives in `broadcast.break_rules.cadence` (jsonb), as `spots` does; `drizzle-kit generate` reports no changes.
+
+- `log.ts`: `previewBreakRule` (`POST /stations/:stationId/break-rule/preview`, owners and operators, as `setBreakRule`): body `{ rule: BreakRule, from, to }` (`to` after `from`, three hours at most: 400 otherwise); answers `BreakRulePreview` (new): `{ rule, from, to, entries: LogEntry[], breaks: (BreakSlot & { keeps })[], blocks? }`. `rule` is the rule as `setBreakRule` would save it (the same checks and 400s, the same merging of what's left out); `entries` and `breaks` are what `getLog` answers for the window after saving it, each break with its rows. `keeps`: the break keeps what it has (spots placed in it, or it has started). Nothing is saved, stored, placed or sent, and template dates aren't made (a window `getLog` hasn't generated yet can differ by those). The contract's own checks name the body's field under `rule` (`rule.cadence.stationId.every`); `setBreakRule`'s name it without.
+- `stations.ts` (S20): `BreakRule.cadence` gains optional `upNext` (`BreakCadence`, `never` allowed; nullable on the way in). Left out, as before: Up next airs as often as the bumper position holding the `up_next` role. Set, Up next airs at that cadence in the first position with its role (`open`, `close`, then `between`), or between programs, last, with its role in no position; that position's `every` governs only its other roles; `never` takes it off. During a programming block with its own bumper order, the block's sequences decide, as before. `getBreakRule` answers it only once set. Left out of `setBreakRule` with the rest of `cadence` sent, it stays as set; `null` clears it.
+- Behaviour: the log's walk (`generateAll`, which playout's `breakPlan` and `getLog` share) decides Up next by its own cadence when set, from the as-run log for once an hour and every N programs, as the between sequence does; a break and the boundary right after it are one chance. `setBreakRule`'s checks and merging moved into one function shared with the preview (`resolveBreakRule`); what it saves is unchanged.
+- How older builds tolerate it: apps drop `cadence.upNext` (zod strips it) and send `cadence` without it, which keeps it. A station that never sets it airs exactly as before. Older apps never call the preview.
+
 ## 2026-10-03: Keep at this time (G18, A246)
 
 Additive: optional fields and one new `LogChange` op (request side). No log code, enum value or field a response already carries changes shape. Migration **0050** (after 0049, written by hand: the journal's gap at 0038 makes drizzle-kit number wrong): `broadcast.log_entries.keep_time` and `broadcast.day_template_entries.keep_time` (boolean, not null, default false).
