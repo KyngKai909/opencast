@@ -62,8 +62,8 @@ test("swiping: presets first, then the detent into the dial; every swipe lands w
   await page.mouse.click(150, 400);
   await expect(player).toHaveAttribute("data-status", "playing");
 
-  // The next preset is kept ready: the swipe shows its picture while dragging, and lands with a short
-  // burst of static all the same (2026-10-04, the user's decision: static on every swipe).
+  // Static first, then the picture (2026-10-04, the user's decision): the next station slides in as
+  // static, never its live picture, and its picture follows the snap.
   await page.waitForTimeout(2500);
   await watchForStatic(page);
   await drag(page, -320);

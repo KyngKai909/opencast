@@ -160,7 +160,7 @@ describe("next and previous", () => {
     expect(screen.getByRole("button", { name: "Previous channel: SAZN 18.1" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Next channel: CIVC 7.1" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
-    expect(engine.peek).toHaveBeenCalledWith(rows[0]!.station.id);
+    expect(engine.peek).not.toHaveBeenCalledWith(rows[0]!.station.id);
     expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
     vi.useRealTimers();
   });
@@ -238,7 +238,7 @@ describe("the drag", () => {
     return ms;
   };
 
-  it("past the threshold snaps to the next station, which shows beside this one as it moves (here past the detent: a longer pull)", async () => {
+  it("past the threshold snaps to the next station, which slides in as static, never its live picture (here past the detent: a longer pull)", async () => {
     vi.useFakeTimers();
     const { w, engine } = watch();
     const { container } = show(w);
@@ -248,7 +248,9 @@ describe("the drag", () => {
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
     expect(engine.tune).not.toHaveBeenCalled();
     drag(touch, 0, -700);
-    expect(engine.peek).toHaveBeenCalledWith(rows[0]!.station.id);
+    // 2026-10-04: static first, then the picture.
+    expect(engine.peek).not.toHaveBeenCalledWith(rows[0]!.station.id);
+    expect(container.querySelector(".vw-sw__peek .vw-sw__static")).not.toBeNull();
     await act(async () => void (await vi.advanceTimersByTimeAsync(300)));
     expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
     vi.useRealTimers();
