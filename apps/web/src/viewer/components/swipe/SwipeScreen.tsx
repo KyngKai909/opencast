@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useNavigate } from "react-router";
-import { Button, Icon, IconButton, Slate, clock, cx } from "@opencast/ui";
+import { Button, Icon, IconButton, clock, cx } from "@opencast/ui";
 import { PlayerSurface, TuningStatic, boundaryFrom, orderIds, orderPlace, prefersReducedMotion, stepId, type Boundary } from "@opencast/player";
 import { MARKET_TZ, now as clockNow, useNow } from "../../../lib/clock";
 import type { DialRowX } from "../../api/ext";
@@ -159,7 +159,12 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     el.style.top = `${d.dir === "next" ? seam - 46 : seam + 10}px`;
   };
 
-  /** The station the drag is heading for, the detent if it crosses one, and its picture beside this one. */
+  /**
+   * The station the drag is heading for and the detent if it crosses one. 2026-10-04, the user's
+   * decision: static first, then the picture, like a TV. The incoming station shows the tuning static
+   * as it slides in (the radio band its card), never its live picture, though the neighbours are
+   * still kept ready so the picture follows quickly.
+   */
   const prepare = (d: Drag, dir: SwipeDir) => {
     d.dir = dir;
     d.crossed = false;
@@ -167,7 +172,8 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     const target = id ? (w.channels.find((c) => c.station.id === id) ?? null) : null;
     d.target = target;
     d.boundary = target ? boundaryFrom(ids, fromId, dir) : null;
-    const picture = target ? engine.peek(target.station.id) : (engine.peek(null), false);
+    engine.peek(null);
+    const picture = false;
     d.picture = picture;
     // The warm picture sits a screen below (or above) the one on screen, and moves with it.
     cur.current?.style.setProperty("--oc-peek-y", `${dir === "next" ? height() : -height()}px`);
@@ -183,9 +189,10 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
   };
 
   /**
-   * The snap has landed: the player changes channel with its static, number and tuning sound. 2026-10-04,
-   * the user's decision: a short burst of static on every swipe, the picture showing while the finger
-   * drags or not (the reference's swipe without static, `engine.swipeTo`, is no longer used here).
+   * The snap has landed: the player changes channel with its tuning sound and its 300 ms of static at
+   * least. 2026-10-04, the user's decision: static on every swipe (the reference's swipe without static,
+   * `engine.swipeTo`, is no longer used here). The swipe's own static and number stay over the player's
+   * until the picture arrives, so the static that slid in is the one that clears.
    */
   const land = (target: DialRowX, picture: boolean) => {
     setLanding({ id: target.station.id, picture });
@@ -532,7 +539,6 @@ function PeekBack({ peek, tablet }: { peek: Peek; tablet: boolean }) {
   const r = peek.row;
   const st = r.station;
   const glow = { "--vw-sw-glow": st.colour ?? "#33507A" } as CSSProperties;
-  const offAir = st.kind !== "listed" && (!r.onAir || !r.playback || r.now?.kind === "off_air");
   if (st.band === "radio")
     return (
       <div className="vw-sw__radio" style={glow}>
@@ -541,21 +547,7 @@ function PeekBack({ peek, tablet }: { peek: Peek; tablet: boolean }) {
         <span className="vw-sw__radio-t">{r.onAir && r.now ? r.now.title : "Off air"}</span>
       </div>
     );
-  if (offAir) {
-    const back = r.now?.kind === "off_air" ? (r.now.backAt ?? r.now.endsAt) : (r.backAt ?? r.next?.startsAt ?? null);
-    return (
-      <div className="vw-sw__off" style={glow}>
-        <Slate kind="off-air" callSign={st.callSign ?? undefined} name={st.name}>
-          {back ? (
-            <>
-              {`${[st.callSign, st.channel].filter(Boolean).join(" ")} signs on again at `}
-              <span className="oc-mono">{clock(back, { timeZone: MARKET_TZ })}</span>.
-            </>
-          ) : null}
-        </Slate>
-      </div>
-    );
-  }
+  // An off-air station gets the static too, then the player clears it to its off-air screen.
   if (peek.picture) return <div className={cx("vw-sw__ready", tablet && "vw-sw__ready--glow")} style={glow} />;
   return (
     <div className="vw-sw__static">

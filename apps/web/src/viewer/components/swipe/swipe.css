@@ -24,8 +24,6 @@
 /* The incoming station behind the moving picture. */
 .vw-sw__ready { position: absolute; inset: 0; background: var(--screen); }
 .vw-sw__static { position: absolute; inset: 0; background: rgb(46 48 56); }
-.vw-sw__off { position: absolute; inset: 0; display: grid; }
-.vw-sw__off .oc-slate { width: 100%; height: 100%; border-radius: 0; }
 .vw-sw__radio {
   position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 9%;
   background: radial-gradient(120% 80% at 30% 30%, color-mix(in srgb, var(--vw-sw-glow) 80%, #fff 20%), var(--vw-sw-glow) 50%, color-mix(in srgb, var(--vw-sw-glow) 55%, #000 45%));
