@@ -1,9 +1,12 @@
-import { stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
+import { logApi, stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest, HttpError, notFound } from "../../errors.js";
 import { clientIp, isPrivateAddress } from "../../geo.js";
 import type { StationProfile } from "./service.js";
+
+/** A246: a break rule's preview covers three hours at most (the tab asks for one). */
+const PREVIEW_MAX_MS = 3 * 3_600_000;
 
 /** A thin dial shows nearby markets' stations after its own. */
 const THIN_DIAL = 6;
@@ -251,6 +254,18 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   r.handle(api.setBreakRule, async ({ user, params, body }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return stations.setBreakRule(params.stationId, body);
+  });
+  // A246: the breaks in a window rebuilt with a rule that isn't saved: the same checks and merging
+  // as setBreakRule (resolveBreakRule), then the log's own walk with that rule. Nothing is written.
+  r.handle(logApi.previewBreakRule, async ({ user, params, body }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    const from = new Date(body.from);
+    const to = new Date(body.to);
+    if (to.getTime() <= from.getTime()) throw badRequest("The preview ends after it starts.", { to: "After from" });
+    if (to.getTime() - from.getTime() > PREVIEW_MAX_MS) throw badRequest("Preview three hours at most.", { to: "Three hours at most" });
+    const rule = await stations.resolveBreakRule(params.stationId, body.rule);
+    const preview = await log.previewBreaks(params.stationId, from, to, rule);
+    return { rule, from: from.toISOString(), to: to.toISOString(), ...preview };
   });
 
   r.handle(api.listTranslators, async ({ user, params }) => {

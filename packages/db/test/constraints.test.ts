@@ -1,5 +1,5 @@
 // One block per constraint in docs/prompts/1-platform.md, Phase 3.
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type pg from "pg";
 import {
   account,
@@ -325,6 +325,33 @@ describe("program log", () => {
          VALUES ($1, '2026-10-01 20:00Z', '2026-10-01 20:30Z', 'program', 'PGM', $2)`,
         [carrier.id, a.id]
       )
+    );
+  });
+
+  // G18 (migration 0050): "Keep at this time" on a log entry and a template entry, false unless set.
+  test("an entry keeps its time only when marked, in the log and in a day template", async (tx) => {
+    const s = await station(tx);
+    const a = await asset(tx, s.id);
+    await tx.run(`INSERT INTO broadcast.rights_confirmations (asset_id, basis) VALUES ($1, 'made_it')`, [a.id]);
+    const entry = (start: string, end: string, keep?: boolean) =>
+      tx.one<{ keep_time: boolean }>(
+        `INSERT INTO broadcast.log_entries (station_id, starts_at, ends_at, kind, code, asset_id${keep === undefined ? "" : ", keep_time"})
+         VALUES ($1, $2, $3, 'program', 'PGM', $4${keep === undefined ? "" : ", $5"}) RETURNING keep_time`,
+        [s.id, start, end, a.id, ...(keep === undefined ? [] : [keep])]
+      );
+    expect((await entry("2026-10-01 20:00Z", "2026-10-01 20:30Z")).keep_time).toBe(false);
+    expect((await entry("2026-10-01 20:30Z", "2026-10-01 21:00Z", true)).keep_time).toBe(true);
+    const template = await tx.one<{ id: string }>(
+      `INSERT INTO broadcast.repeat_groups (station_id, pattern, start_time, starts_on, template) VALUES ($1, 'daily', '20:00', '2026-10-01', true) RETURNING id`,
+      [s.id]
+    );
+    const templateEntry = await tx.one<{ keep_time: boolean }>(
+      `INSERT INTO broadcast.day_template_entries (template_id, start_minute, length_ms, kind, code, asset_id) VALUES ($1, 1200, 1800000, 'program', 'PGM', $2) RETURNING keep_time`,
+      [template.id, a.id]
+    );
+    expect(templateEntry.keep_time).toBe(false);
+    await tx.rejects(/keep_time/, () =>
+      tx.run(`UPDATE broadcast.day_template_entries SET keep_time = null WHERE template_id = $1`, [template.id])
     );
   });
 });

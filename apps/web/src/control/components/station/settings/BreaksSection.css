@@ -1,38 +1,93 @@
-/* Settings, Breaks (station-settings 02.1: .ladder, .lad, .cap-meter, .blocked). */
-.cc-breaks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 30px; align-items: start; }
-.cc-breaks__col { min-width: 0; }
-.cc-breaks__rule b { max-width: 5em; }
-.cc-breaks__never { align-items: flex-start; }
-.cc-breaks__never .cc-sec-top__h { flex: none; max-width: 5em; }
-.cc-breaks__never .cc-sec-top__sub { flex: 1; font-size: 13px; color: var(--ink-70); margin-left: 24px; }
-.cc-breaks__chips { padding: 14px 0; border-bottom: 1px solid var(--hair); }
+/* The Schedule's Break rules tab (A246; opencast-schedule .rules, .recipe, .cad, .segs, .timing, .prev, .applies). */
+.cc-rules__grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 26px; align-items: start; }
+.cc-rules__main { min-width: 0; border-top: 1px solid var(--line); }
+.cc-rules__side { min-width: 0; position: sticky; top: 16px; }
 
-.cc-ladder { list-style: none; margin: 0; padding: 0; }
-.cc-lad { display: grid; grid-template-columns: 34px 60px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 14px; }
-.cc-lad[draggable="true"] { cursor: grab; }
-.cc-lad--dragging { opacity: .5; }
-.cc-lad:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.cc-lad__n { font: 500 12px var(--font-mono); color: var(--ink-50); }
-.cc-lad small { display: block; color: var(--ink-70); font-size: 12.5px; line-height: 1.6; }
-.cc-lad__t { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-70); text-align: right; white-space: nowrap; }
+/* Every break, in air order. */
+.cc-recipe { padding: 14px 0 6px; }
+.cc-recipe__h { margin: 0; font: 700 16px var(--font-display); }
+.cc-recipe__sub { margin: 2px 0 10px; font-size: 12.5px; color: var(--ink-70); }
+.cc-recipe__after { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 0; font-size: 12.5px; color: var(--ink-70); }
+.cc-recipe__legend { display: none; margin: 6px 0 0; font-size: 12px; color: var(--ink-70); }
+.cc-recipe__chip { display: inline-flex; height: 26px; align-items: center; padding: 0 10px; border-radius: 6px; font: 600 11.5px var(--font-text); }
 
-.cc-cap { display: flex; gap: 4px; margin-top: 8px; }
-.cc-cap i { flex: 1; height: 10px; border-radius: 2px; background: var(--hair); }
-.cc-cap i.cc-cap__f { background: var(--ink); }
-.cc-cap__legend { display: flex; justify-content: space-between; margin-top: 4px; font-size: 12.5px; color: var(--ink-70); }
-.cc-breaks__cap { align-items: start; }
-.cc-breaks__cap .cc-valsel { margin-top: 26px; }
+/* How often each part airs, and what can air: rows of a swatch, words and chips. */
+.cc-cad { border-top: 1px solid var(--line); margin-top: 14px; }
+.cc-cad__r { display: grid; grid-template-columns: 22px 180px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.cc-cad--two .cc-cad__r { grid-template-columns: 180px minmax(0, 1fr); }
+.cc-cad__r b { display: block; font-weight: 600; }
+.cc-cad__r small { display: block; font-size: 11.5px; color: var(--ink-70); line-height: 1.4; }
+.cc-cad__sw { width: 14px; height: 14px; border-radius: 3px; }
+.cc-cad__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+/* The station ID can't be never: that choice (its last) is crossed out, whoever's looking. */
+.cc-cad__r[data-part="stationId"] .cc-cad__set .oc-chip:last-child { text-decoration: line-through; }
+.cc-cad__note { flex-basis: 100%; }
+.cc-cad__val { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 13px; }
+.cc-cad__link { font-size: 12.5px; }
 
-@media (max-width: 1100px) {
-  .cc-breaks { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 767px) {
-  .cc-breaks { padding: 16px 16px 24px; }
-}
+/* Sections below. */
+.cc-rules__sec { margin-top: 22px; }
+.cc-rules__h { margin: 0 0 8px; font: 700 15px var(--font-display); }
+.cc-rules__sec > .cc-sec-top { align-items: baseline; padding-bottom: 0; border-bottom: 0; }
+.cc-rules__sub { margin: -4px 0 8px; font-size: 12.5px; color: var(--ink-70); }
+.cc-rules__seq { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.cc-rules__seq:first-of-type { border-top: 1px solid var(--line); }
+.cc-rules__seq b { display: block; font-weight: 600; }
+.cc-rules__seq small { display: block; font-size: 11.5px; color: var(--ink-70); line-height: 1.4; }
 
-/* Ads from partners while it's off: the row reads quieter (its words say "Off"). */
-.cc-lad--off { color: var(--ink-50); }
-.cc-lad__code--off { border-style: dashed; }
+/* Timing and limits: four tiles. */
+.cc-timing { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.cc-timing__t { padding: 10px 12px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
+.cc-timing__t > small { display: block; font-size: 11.5px; color: var(--ink-70); }
+.cc-timing__t .cc-valsel { display: flex; width: 100%; }
+/* The tile's value, left-aligned across the tile (the settings rows' selects sit right and shrink). */
+.cc-timing__t .cc-valsel select { width: 100%; min-width: 0; margin: 0; padding: 0 22px 0 0; text-align: left; font: 500 17px var(--font-mono); }
+.cc-timing__t .cc-valsel .oc-i { right: 0; }
+/* "After every program": words, in the text face (the reference's tile). */
+.cc-timing__t--words .cc-valsel select { font: 700 14px var(--font-text); }
+.cc-timing__note { display: block; margin-top: 4px; font-size: 11.5px; color: var(--ink-70); line-height: 1.4; }
+
+/* The preview. */
+.cc-prev__head { display: flex; align-items: center; gap: 8px; }
+.cc-prev__h { margin: 0; font: 700 16px var(--font-display); }
+.cc-prev__arrows { margin-left: auto; display: inline-flex; gap: 4px; }
+.cc-prev__arw { border-radius: 50%; }
+.cc-prev__arw--l svg { transform: rotate(180deg); }
+.cc-prev__sub { font-size: 12.5px; color: var(--ink-70); margin: 2px 0 10px; }
+.cc-prev__empty { font-size: 13px; color: var(--ink-70); margin: 0; padding: 6px 0; }
+.cc-prev__rows { list-style: none; margin: 0; padding: 0; transition: opacity .15s; }
+.cc-prev__rows--busy { opacity: .6; }
+.cc-prev__row { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 4px 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
+.cc-prev__t { font: 500 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-70); }
+.cc-prev__pgm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-prev__q { color: var(--ink-70); }
+.cc-prev__brk { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cc-prev__strip { flex: 1; min-width: 0; }
+.cc-prev__between { flex: none; display: inline-flex; height: 22px; align-items: center; padding: 0 6px; border-radius: 5px; font: 600 9.5px var(--font-text); white-space: nowrap; }
+.cc-prev__keeps { grid-column: 2; font-size: 11.5px; color: var(--ink-70); }
+.cc-applies { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 12px; color: var(--ink-70); box-shadow: inset 0 0 0 1px var(--line); line-height: 1.45; }
+.cc-applies b { color: var(--ink); }
+.cc-rules__save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.cc-rules__state { font-size: 12.5px; font-weight: 600; color: var(--standby); }
+
+.cc-breaks__note { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-70); }
 
 /* A242: the sign-off and sign-on sequence, in the log's own type. */
 .cc-breaks__seq { font: 500 13px var(--font-mono); color: var(--ink-70); margin: 0 0 6px; }
+
+@media (max-width: 1100px) {
+  .cc-rules__grid { grid-template-columns: minmax(0, 1fr); }
+  .cc-rules__side { position: static; }
+  .cc-timing { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 767px) {
+  .cc-recipe__strip > span { font-size: 0; }
+  .cc-recipe__strip > span > small { display: none; }
+  .cc-recipe__legend { display: block; }
+  .cc-cad__r { grid-template-columns: 22px minmax(0, 1fr); }
+  .cc-cad__r > .cc-cad__chips, .cc-cad__r > .oc-chips { grid-column: 1 / -1; }
+  .cc-cad--two .cc-cad__r { grid-template-columns: minmax(0, 1fr); }
+  .cc-cad--two .cc-cad__r > * { grid-column: auto; }
+  .cc-rules__seq { grid-template-columns: minmax(0, 1fr); }
+  .cc-timing { grid-template-columns: minmax(0, 1fr); }
+}

@@ -1,6 +1,6 @@
 // Settings, Breaks: the bumper sequences (A243), alone and on the mocks. Adding, removing and
 // reordering roles by keys (announced), what fills each role under its chip, the empty row, at most
-// four, how often each position airs, and BreaksSection saving `bumperSequences` with the rule.
+// four, how often each position airs, and Break rules saving `bumperSequences` with the rest of the rule (A246: one Save).
 
 import { useState } from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,17 +105,20 @@ describe("Settings, Breaks: the sequences on the mocks", () => {
     // BEAT has "Back to the reel" (out of a break) and the trailer (no role: Any).
     expect(await screen.findAllByText("1 in your library")).toHaveLength(1);
     expect(screen.getByText("None yet, so an Any bumper airs")).toBeTruthy();
-    expect(screen.getByText("Example, a 2:00 break: Into the break :10, your spots, the credit, Out of the break :10, then your station ID.")).toBeTruthy();
-    const between = screen.getByText("Between programs", { selector: "h4" }).parentElement!.nextElementSibling as HTMLElement;
+    // A246: the recipe draws them to scale: a 0:10 bumper each side of the spots and the credit.
+    expect(screen.getByRole("img", { name: "Bumper :10, Spots 1:20, Credit :15, Bumper :10, ID :05" })).toBeTruthy();
+    const between = screen.getByText("Between programs", { selector: "b" }).closest(".cc-rules__seq") as HTMLElement;
     expect(within(between).getByText("Nothing airs here.")).toBeTruthy();
     fireEvent.click(within(between).getByRole("button", { name: "Add to Between programs" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Up next" }));
-    await waitFor(() => expect(breakRuleOf(BEAT.id).bumperSequences?.between).toEqual({ roles: ["up_next"], every: "program" }));
     expect(await screen.findByText("Up next names the next program on your log, as the guide shows it.")).toBeTruthy();
     // Up next in the opening sequence too: it airs once.
     fireEvent.click(screen.getByRole("button", { name: "Add to Opening the break" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Up next" }));
-    await waitFor(() => expect(breakRuleOf(BEAT.id).bumperSequences?.open.roles).toEqual(["into_break", "up_next"]));
     expect(await screen.findByText("Up next airs once a break. Here it only airs if it isn't earlier in the break.")).toBeTruthy();
+    // A246: saved together.
+    fireEvent.click(screen.getByRole("button", { name: "Save break rules" }));
+    await waitFor(() => expect(breakRuleOf(BEAT.id).bumperSequences?.between).toEqual({ roles: ["up_next"], every: "program" }));
+    expect(breakRuleOf(BEAT.id).bumperSequences?.open.roles).toEqual(["into_break", "up_next"]);
   });
 });

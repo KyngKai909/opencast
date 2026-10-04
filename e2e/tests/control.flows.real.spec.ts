@@ -33,8 +33,10 @@ test("BEAT carries Saturday Reel from the syndication market", async ({ page }) 
 
 test("BEAT fills its breaks from the spot market", async ({ page }) => {
   await signIn(page, "kai");
+  // A246: Breaks is the Schedule now.
   await page.goto("/control/beat/breaks");
-  await expect(page.getByRole("heading", { name: "Breaks tonight" })).toBeVisible();
+  await expect(page).toHaveURL(/\/control\/beat\/schedule$/);
+  await expect(page.getByRole("heading", { name: "Schedule", level: 1 })).toBeVisible();
   await page.goto("/control/beat/spot-market");
   await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
   const add = page.getByRole("button", { name: "Add Orange Street Coffee to your rotation" }).first();
@@ -48,8 +50,9 @@ test("BEAT fills its breaks from the spot market", async ({ page }) => {
       return r.main.spots.some((s) => s.spotId === seed.spots.fallMenu || s.spotId === seed.spots.nightOwl);
     })
     .toBe(true);
-  await page.goto("/control/beat/breaks");
-  await expect(page.getByText(/Rotation: 1 spot\./)).toBeVisible();
+  // The rotation tab says it was added (C.3's toast, A246).
+  await page.goto("/control/beat/spot-market/rotation");
+  await expect(page.getByText(/^Orange Street Coffee added\./)).toBeVisible();
 });
 
 test("BEAT approves a sponsorship of Beat Tape Live", async ({ page }) => {

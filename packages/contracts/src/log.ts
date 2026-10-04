@@ -3,6 +3,7 @@ import { endpoint } from "./core.js";
 import { BlockBand, BumperRole, DateOnly, Id, LogCode, Millis, Ok, StationIdent, Timestamp } from "./common.js";
 import { Captions, Program } from "./library.js";
 import { BlockSpan, DayTemplateBlock } from "./blocks.js";
+import { BreakRule } from "./stations.js";
 
 export const LogEntry = z.object({
   id: Id,
@@ -23,7 +24,13 @@ export const LogEntry = z.object({
   /** G5 (added 2026-09-29): this airing's own description, else its item's (up to 160 characters). */
   episodeDescription: z.string().nullable().optional(),
   /** G3 (added 2026-09-29): a live block ended early at this moment (`endsAt` is then the same). */
-  endedEarlyAt: Timestamp.nullable().optional()
+  endedEarlyAt: Timestamp.nullable().optional(),
+  /**
+   * G18 (added 2026-10-03): "Keep at this time": the station marked it as a fixed point. Moving the
+   * rows around it in master control stops here, and a live block ending early doesn't move it up.
+   * Left out: false.
+   */
+  keepTime: z.boolean().optional()
 });
 export type LogEntry = z.infer<typeof LogEntry>;
 
@@ -143,7 +150,9 @@ export const DayTemplateEntry = z.object({
   carriageAgreementId: Id.nullable(),
   episodeTitle: z.string().nullable(),
   episodeDescription: z.string().nullable(),
-  localNote: z.string().nullable()
+  localNote: z.string().nullable(),
+  /** G18 (added 2026-10-03): "Keep at this time", copied to each date it makes. Left out: false. */
+  keepTime: z.boolean().optional()
 });
 export type DayTemplateEntry = z.infer<typeof DayTemplateEntry>;
 
@@ -158,8 +167,11 @@ export const DayTemplateEntryInput = z.object({
   carriageAgreementId: Id.optional(),
   episodeTitle: z.string().max(200).optional(),
   episodeDescription: z.string().max(160).optional(),
-  localNote: z.string().max(160).optional()
+  localNote: z.string().max(160).optional(),
+  /** G18 (added 2026-10-03): "Keep at this time". Left out: false. */
+  keepTime: z.boolean().optional()
 });
+export type DayTemplateEntryInput = z.infer<typeof DayTemplateEntryInput>;
 
 /**
  * Day templates (added 2026-09-29): a day built once and repeated. Its days (`fromDay`, `onDate`,
@@ -277,6 +289,23 @@ export const ProgramLog = z.object({
   blocks: z.array(BlockSpan).optional()
 });
 
+/**
+ * A246 (added 2026-10-03): `previewBreakRule`'s answer: the rule as it would be saved (after the
+ * same checks and merging as `setBreakRule`), and the window's entries and breaks rebuilt with it,
+ * each break with its rows (G1), as `getLog` would answer after saving. `keeps`: the break keeps
+ * what it has whatever the rule says (spots already placed in it, about 20 minutes before air, or
+ * it has started), so a new rule doesn't change what's sold in it. `blocks` as `getLog`'s.
+ */
+export const BreakRulePreview = z.object({
+  rule: BreakRule,
+  from: Timestamp,
+  to: Timestamp,
+  entries: z.array(LogEntry),
+  breaks: z.array(BreakSlot.extend({ keeps: z.boolean() })),
+  blocks: z.array(BlockSpan).optional()
+});
+export type BreakRulePreview = z.infer<typeof BreakRulePreview>;
+
 export const DeadAirStatus = z.object({
   /** Over the next 24 hours. */
   gaps: z.array(Gap),
@@ -331,7 +360,9 @@ const EntryInput = z.object({
   carriageAgreementId: Id.optional(),
   episodeTitle: z.string().max(200).optional(),
   episodeDescription: z.string().max(160).optional(),
-  localNote: z.string().max(160).optional()
+  localNote: z.string().max(160).optional(),
+  /** G18 (added 2026-10-03): "Keep at this time". Left out: false (on `updateEntry`: as it is). */
+  keepTime: z.boolean().optional()
 });
 
 /**
@@ -358,6 +389,9 @@ export const LOG_EDIT_LEAD_MS = 20_000;
  *   to sooner than `LOG_EDIT_LEAD_MS` from now (`block_locked`).
  * - `block_remove` (A244): the span comes off (its programs stay). Not while it's on air.
  * Blocks never overlap (`block_overlap`).
+ * - `keep` (G18, 2026-10-03): marks an entry "Keep at this time" (`keep: true`), or clears the mark.
+ *   A kept entry is a fixed point: a `move` of it in the same batch is refused (`kept`) unless the
+ *   batch clears the mark first. Its line: "Saturday Reel keeps its time".
  */
 export const LogChange = z.discriminatedUnion("op", [
   z.object({ op: z.literal("move"), entryId: Id, startsAt: Timestamp }),
@@ -368,7 +402,9 @@ export const LogChange = z.discriminatedUnion("op", [
   // A244 (added 2026-10-02): programming blocks on this date's log.
   z.object({ op: z.literal("block_add"), key: z.string().max(64).optional(), blockId: Id, startsAt: Timestamp, endsAt: Timestamp }),
   z.object({ op: z.literal("block_resize"), spanId: Id, startsAt: Timestamp.optional(), endsAt: Timestamp.optional() }),
-  z.object({ op: z.literal("block_remove"), spanId: Id })
+  z.object({ op: z.literal("block_remove"), spanId: Id }),
+  // G18 (added 2026-10-03): "Keep at this time".
+  z.object({ op: z.literal("keep"), entryId: Id, keep: z.boolean() })
 ]);
 export type LogChange = z.infer<typeof LogChange>;
 
@@ -401,8 +437,8 @@ export const LogChangesResult = z.object({
   changes: z.array(
     z.object({
       index: z.number().int(),
-      /** A244 (2026-10-02): `block_add`, `block_resize`, `block_remove` too (only for batches that send them). */
-      op: z.enum(["move", "replace", "resize", "remove", "insert", "block_add", "block_resize", "block_remove"]),
+      /** A244 (2026-10-02): `block_add`, `block_resize`, `block_remove` too; G18 (2026-10-03): `keep` (only for batches that send them). */
+      op: z.enum(["move", "replace", "resize", "remove", "insert", "block_add", "block_resize", "block_remove", "keep"]),
       /** The entry (an insert's once published; null before, and for block changes). */
       entryId: Id.nullable(),
       /** A244 (added 2026-10-02): a block change's span (a `block_add`'s once published). */
@@ -419,7 +455,7 @@ export const LogChangesResult = z.object({
     z.object({
       /** The change it's about (null: the batch as a whole). */
       index: z.number().int().nullable(),
-      /** `locked`, `overlap`, `not_found`, `too_soon`, or the rule's own code (`rights_unconfirmed`, a carriage limit…). A244: `block_overlap`, `block_locked`, `block_archived`. */
+      /** `locked`, `overlap`, `not_found`, `too_soon`, or the rule's own code (`rights_unconfirmed`, a carriage limit…). A244: `block_overlap`, `block_locked`, `block_archived`. G18: `kept` (a move of an entry kept at its time). */
       code: z.string(),
       message: z.string()
     })
@@ -596,6 +632,25 @@ export const logApi = {
     params: z.object({ stationId: Id, templateId: Id }),
     response: z.object({ removed: z.number().int() })
   }),
+  /**
+   * A246 (added 2026-10-03): "Reset to template". One date a template made, and that was edited
+   * by hand since (an exception), made again from the template: what's on that broadcast day from
+   * now on that the template didn't make comes off (an entry with spots held in its break stays, as
+   * when a template changes), the template's entries and blocks go back on, and the date stops
+   * being an exception. A date that wasn't edited is left as it is (`generated` all zeros). Dates
+   * from tomorrow on only: 409 `date_started` for today or before. 404 when the date isn't one
+   * this template made.
+   */
+  resetTemplateDate: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/templates/:templateId/dates/:date/reset",
+    auth: "user",
+    summary:
+      "Reset one edited date to its day template (owner, operator): what the template didn't make comes off that broadcast day, the template's entries and blocks go back on, and the date is no longer an exception. Dates from tomorrow on (409 `date_started`); a date the template didn't make is 404.",
+    params: z.object({ stationId: Id, templateId: Id, date: DateOnly }),
+    response: z.object({ template: DayTemplate, generated: TemplateGeneration }),
+    status: 200
+  }),
   getOffAirHours: endpoint({
     method: "GET",
     path: "/stations/:stationId/off-air-hours",
@@ -697,6 +752,16 @@ export const logApi = {
     params: StationParams,
     query: z.object({ limit: z.coerce.number().int().min(1).max(50).default(10) }),
     response: z.object({ changes: z.array(LogChangeRecord) })
+  }),
+  previewBreakRule: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/break-rule/preview",
+    auth: "user",
+    summary:
+      "A246 (added 2026-10-03): the breaks in a window rebuilt with a break rule that isn't saved (owner, operator): the rule as `setBreakRule` would save it (the same checks and 400s, the same merging of what's left out), and the window's entries and breaks with their rows, exactly as `getLog` would answer after saving it. Nothing is saved, placed, stored or sent. `to` is at most three hours after `from`. A break that keeps what it has (`keeps`: spots already placed in it, or it has started) reads as it will air",
+    params: StationParams,
+    body: z.object({ rule: BreakRule, from: Timestamp, to: Timestamp }),
+    response: BreakRulePreview
   })
 };
 

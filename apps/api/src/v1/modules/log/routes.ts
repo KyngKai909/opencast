@@ -72,6 +72,11 @@ export function logRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) 
     await log.templates.get(params.stationId, params.templateId);
     return { removed: await log.templates.remove(params.stationId, params.templateId) };
   });
+  // A246: "Reset to template" for one edited date.
+  r.handle(api.resetTemplateDate, async ({ user, params }) => {
+    await accounts.requireStation(user, params.stationId, [...staff]);
+    return log.templates.resetDate(params.stationId, params.templateId, params.date);
+  });
   r.handle(api.getOffAirHours, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);
     return log.offAirHours(params.stationId);

@@ -1,6 +1,6 @@
 // The Spots pages' reads and writes, each through the contract.
 // A write refreshes everything that shows its result: the rotations, the market, tonight's breaks
-// (the Breaks page, the Program log, the Monitor's rundown, the rail's badge).
+// (the Schedule's log, the Monitor's rundown).
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type EndpointDef, logApi, playoutApi, spotsApi } from "@opencast/contracts";

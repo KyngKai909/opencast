@@ -118,11 +118,11 @@ export default function LibraryItem() {
             </Button>
             {item.identCode ? (
               // A242: openers, closers and off-air cards air at sign-off and sign-on, not from the log.
-              <Button size="sm" href={`${s.base}/settings/breaks`}>
+              <Button size="sm" href={`${s.base}/schedule/rules`}>
                 Sign-off and sign-on
               </Button>
             ) : item.rights && item.status === "ready" ? (
-              <Button size="sm" href={`${s.base}/log?place=${item.id}`}>Schedule</Button>
+              <Button size="sm" href={`${s.base}/schedule?edit=1&add=${item.id}`}>Schedule</Button>
             ) : (
               <Button size="sm" disabled title="Confirm its rights, and let it be prepared for air, to schedule it.">
                 Schedule

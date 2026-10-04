@@ -1,0 +1,19 @@
+/* A246: the Schedule workspace (opencast-schedule .sch-top, .sch-tabs). */
+.cc-sch__top { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
+.cc-sch__h { margin: 0; font: 800 26px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
+.cc-sch__tabs { margin-left: 18px; }
+.cc-sch__end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cc-sch__lede { margin: -6px 0 18px; font-size: 14.5px; color: var(--ink-70); max-width: 62ch; }
+.cc-sch__empty { margin: 0; font-size: 13.5px; color: var(--ink-50); }
+.cc-sch__moved { display: grid; gap: 12px; justify-items: start; }
+
+@media (max-width: 767px) {
+  /* The phone's main isn't padded: each page pads itself (as the log does). */
+  .cc-sch, .cc-blks { padding: 14px 16px 24px; }
+  .cc-sch .cc-rules { padding: 0; }
+  .cc-sch__top { gap: 10px; margin-bottom: 14px; }
+  .cc-sch__h { font-size: 22px; }
+  /* The four pills scroll sideways rather than push the page wider. */
+  .cc-sch__tabs { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+  .cc-sch__end { margin-left: 0; }
+}

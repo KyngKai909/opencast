@@ -312,7 +312,19 @@ export const BreakRule = z.object({
       bumpers: BreakCadence,
       underwriting: BreakCadence,
       /** Added 2026-09-29 (later): how often the station's spots air. Left out, every break. */
-      spots: BreakCadence.optional()
+      spots: BreakCadence.optional(),
+      /**
+       * S20 (added 2026-10-03, A246): how often Up next airs, on its own, so it can change without
+       * the bumpers beside it. Left out (as before, and what `getBreakRule` answers for a station
+       * that never set it), Up next airs as often as the bumper position holding the `up_next`
+       * role says. Set, it airs at this cadence wherever its role sits (the first of `open`,
+       * `close`, `between` that has it), that position's `every` governing only its other roles;
+       * with the role in no position, between programs, last. `never` takes it off. `break` and
+       * `program` are the same between programs (every boundary). During a programming block with
+       * its own bumper order, the block's sequences decide, as before. Left out of `setBreakRule`
+       * with the rest of `cadence` sent, it stays as set; `null` clears it (back to the position's).
+       */
+      upNext: BreakCadence.nullable().optional()
     })
     .optional(),
   /**

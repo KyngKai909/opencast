@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { LibraryItem } from "@opencast/contracts";
+import type { BreakRule, LibraryItem } from "@opencast/contracts";
+import { bumpersCadence, choiceOptions, recipeOf, sameRule, upNextCadence, withChipCadence } from "./breakRule";
 import {
   cadenceDetail,
   cadenceFromKey,
@@ -164,5 +165,67 @@ describe("the bumper sequences (A243)", () => {
     expect(exampleLine({ lengthMs: 120_000, fillOrder: ["SPT", "UND", "BMP", "SID"], bumperSequences: { ...seq, close: { roles: ["out_of_break"], every: "break" } } as never }, items, at)).toBe(
       "Example, a 2:00 break: Into the break :05, Up next :08, your spots, the credit, Out of the break :05, then your station ID."
     );
+  });
+});
+
+// ---- A246, Break rules with a preview ----
+
+
+describe("Break rules' chips and recipe (A246)", () => {
+  const base: BreakRule = {
+    mode: "after_every_program",
+    everyMinutes: null,
+    lengthMs: 120_000,
+    spotMsPerHour: 180_000,
+    sameSpotPerHour: 2,
+    fillOrder: ["SPT", "UND", "BMP", "SID"],
+    openTimeTo: "spot_market",
+    blockedCategories: ["Alcohol", "Gambling"],
+    adsFromPartners: false,
+    cadence: { stationId: { every: "break" }, bumpers: { every: "break" }, underwriting: { every: "hour" }, spots: { every: "break" } },
+    bumperSequences: { open: { roles: ["into_break"], every: "break" }, close: { roles: ["out_of_break"], every: "break" }, between: { roles: ["up_next", "any"], every: "program" } }
+  };
+  const bmp = (title: string, bumperRole: LibraryItem["bumperRole"], durationMs: number) => ({ code: "BMP", bumperRole, airs: null, status: "ready", rights: { kind: "own" }, durationMs, title }) as never;
+  const lib = [bmp("Right back", "into_break", 5_000), bmp("Up next", "up_next", 5_000), bmp("Back to it", "out_of_break", 5_000), bmp("Sting", "any", 3_000)];
+  const now = new Date("2026-10-03T03:00:00Z");
+
+  it("the station ID's never is there, crossed out (disabled)", () => {
+    expect(choiceOptions("stationId", 2).find((o) => o.value === "never")).toEqual({ value: "never", label: "Never", disabled: true });
+    expect(choiceOptions("spots", 3).map((o) => o.label)).toEqual(["Every break", "After each program", "Every 3 programs", "Once an hour", "Never"]);
+  });
+
+  it("S20: Up next's cadence is its own when set; left out, its position's; nowhere, never", () => {
+    expect(upNextCadence(base)).toEqual({ every: "program" });
+    expect(upNextCadence({ ...base, cadence: { ...base.cadence!, upNext: { every: "hour" } } })).toEqual({ every: "hour" });
+    expect(upNextCadence({ ...base, bumperSequences: { ...base.bumperSequences!, between: { roles: ["any"], every: "program" } } })).toEqual({ every: "never" });
+    // Up next's chips never touch the between sequence.
+    const next = withChipCadence(base, "upNext", { every: "n_programs", n: 3 });
+    expect(next.cadence?.upNext).toEqual({ every: "n_programs", n: 3 });
+    expect(next.bumperSequences).toEqual(base.bumperSequences);
+  });
+
+  it("the Bumpers chips set opening and closing together; differing, no chip is theirs", () => {
+    const next = withChipCadence(base, "bumpers", { every: "n_programs", n: 2 });
+    expect(next.bumperSequences?.open).toEqual({ roles: ["into_break"], every: "n_programs", n: 2 });
+    expect(next.bumperSequences?.close).toEqual({ roles: ["out_of_break"], every: "n_programs", n: 2 });
+    expect(bumpersCadence(next)).toEqual({ every: "n_programs", n: 2 });
+    expect(bumpersCadence({ ...base, bumperSequences: { ...base.bumperSequences!, close: { roles: [], every: "hour" } } })).toBeNull();
+  });
+
+  it("draws every break to scale, then between programs; Up next where its own cadence puts it", () => {
+    const r = recipeOf(base, lib, now);
+    expect(r.inBreak.map((p) => `${p.label} ${p.detail}`)).toEqual(["Bumper 0:05", "Spots up to 1:30", "Credit 0:15", "Bumper 0:05", "ID 0:05"]);
+    expect(r.between.map((p) => `${p.label} ${p.detail}`)).toEqual(["Up next 0:05", "Bumper 0:03"]);
+    // Never: off the picture. With its own cadence and between programs never, Up next still airs there.
+    const own = recipeOf({ ...base, cadence: { ...base.cadence!, upNext: { every: "program" }, underwriting: { every: "never" } }, bumperSequences: { ...base.bumperSequences!, between: { roles: ["up_next", "any"], every: "never" } } }, lib, now);
+    expect(own.inBreak.map((p) => p.label)).toEqual(["Bumper", "Spots", "Bumper", "ID"]);
+    expect(own.between.map((p) => p.label)).toEqual(["Up next"]);
+    // The credit first.
+    expect(recipeOf({ ...base, fillOrder: ["UND", "SPT", "BMP", "SID"] }, lib, now).inBreak.map((p) => p.label)).toEqual(["Bumper", "Credit", "Spots", "Bumper", "ID"]);
+  });
+
+  it("two rules are the same whatever order their blocked categories are in", () => {
+    expect(sameRule(base, { ...base, blockedCategories: ["Gambling", "Alcohol"] })).toBe(true);
+    expect(sameRule(base, { ...base, lengthMs: 90_000 })).toBe(false);
   });
 });

@@ -225,12 +225,14 @@ describe("the invite's page", () => {
 describe("notices' emails", () => {
   it("link into the app the notice belongs to, one email per notice", async () => {
     h.deps.bus.emit("business.low_balance", { businessId, daysLeft: 1, since: "start" });
-    h.deps.bus.emit("station.dead_air_warning", { stationId, gapStartsAt: new Date(h.clock.now().getTime() + 30 * MIN).toISOString(), minutesBefore: 30 });
+    const gap = new Date(h.clock.now().getTime() + 30 * MIN).toISOString();
+    h.deps.bus.emit("station.dead_air_warning", { stationId, gapStartsAt: gap, minutesBefore: 30 });
     await h.deps.bus.settle();
     const low = emailsTo("jess@orangestreet.example").find((s) => s.title === "Your spots pause tomorrow");
     expect(low).toMatchObject({ link: `${BIZ}/${businessId}/balance` });
     expect(low!.key).toMatch(/^notice:/);
     const dead = emailsTo("kai@example.com").find((s) => s.title === "Dead air in 30 minutes");
-    expect(dead).toMatchObject({ link: `${APP}/control/beat/log` });
+    // A246: straight to the gap on the Schedule (its broadcast day, and its start).
+    expect(dead!.link).toMatch(new RegExp(`^${APP}/control/beat/schedule\\?day=\\d{4}-\\d{2}-\\d{2}&fill=${gap.replace(/\./g, "\\.")}$`));
   });
 });

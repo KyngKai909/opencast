@@ -27,6 +27,11 @@ export interface DbFill {
   business?: string | null;
   /** "REEL's break time, barter" */
   note?: string | null;
+  /**
+   * A246 (the break rule's preview): a bumper placed by its sequence: where it airs, its role and,
+   * for up next, what it names. Fills without it read as before (the first bumper opens the break).
+   */
+  element?: { position: "open" | "close" | "between"; role: "into_break" | "out_of_break" | "up_next" | "any"; announces: { title: string; startsAt: string } | null };
 }
 
 export interface DbBreak {

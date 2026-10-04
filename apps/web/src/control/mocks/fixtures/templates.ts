@@ -111,7 +111,9 @@ export function toTemplateEntry(e: DbLogEntry, id: string): DbTemplateEntry {
     episodeTitle: e.episodeTitle,
     episodeDescription: e.episodeDescription ?? null,
     localNote: e.localNote,
-    carriedFrom: e.carriedFrom
+    carriedFrom: e.carriedFrom,
+    // G18: a fixed point stays one on every date the template makes.
+    ...(e.keepTime ? { keepTime: true } : {})
   };
 }
 
@@ -140,6 +142,7 @@ export function entryOn(te: DbTemplateEntry, date: string, stationId: string, te
     carriageAgreementId: te.carriageAgreementId,
     repeatGroupId: templateId,
     localNote: te.localNote,
+    ...(te.keepTime ? { keepTime: true } : {}),
     ...placeOn(te, date)
   };
 }

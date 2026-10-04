@@ -35,5 +35,5 @@
 
 /* On the phone the shell's main has no gutter: each page keeps 16px at the sides. */
 @media (max-width: 767px) {
-  .cc-brk, .cc-spm, .cc-spn, .cc-ord { padding: 14px 16px 24px; }
+  .cc-spm, .cc-spn, .cc-ord { padding: 14px 16px 24px; }
 }

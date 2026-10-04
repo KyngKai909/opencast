@@ -188,13 +188,28 @@ describe("placing a block on a date's log (edit mode)", () => {
     const overlap = (await changes(id, { dryRun: true, changes: [{ op: "block_add", blockId: other, startsAt: pt(SAT, "23:00"), endsAt: pt("2026-10-04", "02:00") }] }).expect(200)).body;
     expect(overlap.problems).toEqual([{ index: 0, code: "block_overlap", message: "Blocks can't overlap: Late Crate Nights is on until 1:00 am." }]);
     const later = (await changes(id, { changes: [{ op: "block_resize", spanId, endsAt: pt("2026-10-04", "01:30") }] }).expect(200)).body;
-    expect(later.changes[0]).toMatchObject({ op: "block_resize", spanId, line: "Late Crate Nights now ends at 1:30 am", endsAt: pt("2026-10-04", "01:30") });
+    expect(later.changes[0]).toMatchObject({ op: "block_resize", spanId, line: "Late Crate Nights now ends at 1:30 am, was 1:00 am", endsAt: pt("2026-10-04", "01:30") });
     const off = (await changes(id, { changes: [{ op: "block_remove", spanId }] }).expect(200)).body;
     expect(off.changes[0].line).toBe("Late Crate Nights comes off the log");
     expect(await h.db.select().from(schema.programBlockSpans).where(eq(schema.programBlockSpans.id, spanId))).toEqual([]);
     // The database refuses an overlap too.
     await place(id, blockId, pt(SAT, "21:00"), pt(SAT, "22:00"));
     await expect(h.db.insert(schema.programBlockSpans).values({ stationId: id, blockId: other, startsAt: new Date(pt(SAT, "21:30")), endsAt: new Date(pt(SAT, "23:30")) })).rejects.toThrow();
+  });
+
+  it("says in a change's line who joins the block or leaves it, with the batch's own moves (A246)", async () => {
+    const m = await station("BJON", 337);
+    const b = await makeBlock(m, { name: "Late Crate Nights" });
+    const crate = await program(m, "Late Crate", 29 * MIN);
+    const session = await program(m, "Crate Session", 58 * MIN);
+    const late = (await onLog(m, crate.id, pt("2026-10-10", "21:00"), pt("2026-10-10", "21:30"))).body;
+    await onLog(m, session.id, pt("2026-10-10", "22:00"), pt("2026-10-10", "23:00"));
+    const spanId = await place(m, b.id, pt("2026-10-10", "21:30"), pt("2026-10-10", "23:00"));
+    const line = async (batch: object[]) => (await changes(m, { dryRun: true, changes: batch }).expect(200)).body.changes.map((c: { line: string }) => c.line);
+    expect(await line([{ op: "block_resize", spanId, startsAt: pt("2026-10-10", "21:00") }])).toEqual(["Late Crate Nights now starts at 9:00 pm, was 9:30 pm. Late Crate joins it"]);
+    expect(await line([{ op: "block_resize", spanId, endsAt: pt("2026-10-10", "22:00") }])).toEqual(["Late Crate Nights now ends at 10:00 pm, was 11:00 pm. Crate Session is no longer part of it"]);
+    // Late Crate moved into it by the same batch joins it; a block added says only when it is.
+    expect(await line([{ op: "move", entryId: late.id, startsAt: pt("2026-10-10", "21:30") }, { op: "block_resize", spanId, endsAt: pt("2026-10-10", "22:30") }])).toEqual(["Late Crate moves to 9:30 pm", "Late Crate Nights now ends at 10:30 pm, was 11:00 pm. Late Crate joins it"]);
   });
 
   it("keeps a span on air to its end (only the end can change, and not too soon)", async () => {

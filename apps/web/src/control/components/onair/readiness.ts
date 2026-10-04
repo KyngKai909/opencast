@@ -8,7 +8,7 @@
 
 import type { ItemHistory, PlayoutStatus, SignOnCheck } from "@opencast/contracts";
 import { STATION_TZ } from "../../../lib/clock";
-import { broadcastDay, isoDate, timeOn, viewWindow } from "./time";
+import { broadcastDay, isoDate, timeOn } from "./time";
 
 type Readiness = NonNullable<PlayoutStatus["readiness"]>;
 type NotReady = NonNullable<Readiness["firstNotReady"]>;
@@ -54,15 +54,12 @@ export function readinessLine(r: PlayoutStatus["readiness"], now: number, tz = S
 }
 
 /**
- * Where the program log shows an airing (G13): its broadcast day, the whole day when it's outside
- * the evening's 6 pm to 2 am, and the entry picked out (`?entry=`).
+ * Where the log shows an airing (G13): the Schedule's Log (A246) on its broadcast day, which shows
+ * the whole day, with the entry picked out (`?entry=`).
  */
 export function logEntryHref(base: string, entryId: string, airsAt: string, tz = STATION_TZ): string {
-  const day = broadcastDay(airsAt, tz);
-  const evening = viewWindow("evening", day, tz);
-  const inEvening = Date.parse(airsAt) >= Date.parse(evening.from) && Date.parse(airsAt) < Date.parse(evening.to);
-  const q = new URLSearchParams({ day: isoDate(day), ...(inEvening ? {} : { view: "day" }), entry: entryId });
-  return `${base}/log?${q}`;
+  const q = new URLSearchParams({ day: isoDate(broadcastDay(airsAt, tz)), entry: entryId });
+  return `${base}/schedule?${q}`;
 }
 
 /**

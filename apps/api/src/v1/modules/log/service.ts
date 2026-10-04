@@ -8,7 +8,7 @@ import { clockTime, localDate, localDay, localWeekday, roundUpToMinute } from ".
 import { endEarlyAt, nextSegment, SEGMENT_MS, snapDate, snapToSegment } from "../../lib/segments.js";
 import { CREDIT_MS, STATION_ID_MS } from "../playout/engine/fill.js";
 import { bumpersIn, cadenceContext, EVERY_PART, hourStartIn, isEveryBreak, needMs, partsOf, type BreakParts } from "../playout/engine/cadence.js";
-import { BoundaryDecider, blockPositionAirs, bumperHistory, defaultElements, eligible, elementsMs, fitElements, pickElements, rolesFor, SequenceDecider, type Announce, type Boundary, type BumperSequences, type Element } from "../playout/engine/sequence.js";
+import { BoundaryDecider, blockPositionAirs, bumperHistory, defaultElements, eligible, elementsMs, fitElements, pickElements, rolesFor, SequenceDecider, UpNextDecider, upNextAired, upNextHome, withoutUpNext, withUpNext, type Announce, type Boundary, type BumperRole, type BumperSequences, type Element } from "../playout/engine/sequence.js";
 import { GENERATED_BLOCK_CARD_MS } from "../playout/engine/stationId.js";
 import { blockAt, loadSpans, memberOf, memberships, type Membership, type SpanRow } from "./blocks.js";
 import type { BlockRef } from "../library/blocks.js";
@@ -23,6 +23,7 @@ export type { Boundary, Element } from "../playout/engine/sequence.js";
 /** Log entries made by the dead-air fill carry this note (playout records them as dead-air fills). */
 export const DEAD_AIR_NOTE = "Filled automatically: dead air";
 import type { ItemRef } from "../library/service.js";
+import type { BreakRuleView } from "../stations/service.js";
 
 type Row = typeof schema.logEntries.$inferSelect;
 
@@ -98,6 +99,8 @@ export interface EntryInput {
   episodeTitle?: string;
   episodeDescription?: string;
   localNote?: string;
+  /** G18: "Keep at this time" (left out: false; on `update`, as it is). */
+  keepTime?: boolean;
 }
 
 /** G7: a "Repeat this day" still on the log (a day template, or a G7 copy made before them). */
@@ -164,6 +167,13 @@ export interface LogService {
    * `everyPart`, as the rule lays them out with every part in every break (its cadence left aside).
    */
   breaks(stationId: string, from: Date, to: Date, options?: { everyPart?: boolean }): Promise<BreakSlotView[]>;
+  /**
+   * A246: a window's entries and breaks (with their rows) rebuilt with a break rule that isn't
+   * saved, as `log` would answer after saving it (`previewBreakRule`). Reads only: nothing is
+   * stored, placed or sent, and template dates aren't made. `keeps`: the break keeps what it has
+   * (spots placed in it, or it has started).
+   */
+  previewBreaks(stationId: string, from: Date, to: Date, rule: BreakRuleView): Promise<{ entries: LogEntry[]; breaks: Array<BreakSlotView & { rows: BreakRow[]; keeps: boolean }>; blocks?: BlockSpan[] }>;
   /**
    * A243: the breaks in a window (as `breaks`) and every program boundary's between sequence in it
    * (including those carried by a closing break as its `boundary`), for playout.
@@ -438,7 +448,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       repeatGroupId: row.repeatGroupId,
       localNote: row.localNote,
       episodeDescription: airing.episodeDescription ?? null,
-      endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null
+      endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null,
+      keepTime: row.keepTime
     };
   }
 
@@ -741,10 +752,24 @@ export function createLogService(ctx: ModuleContext): LogService {
    * intro (`[outro] [the station's between] [intro]`); between two members of the same block, the
    * block's between sequence. After off-air time (sign-on) there's no intro: the opener is the
    * station's moment. Before off-air time, a block being left still airs its outro.
+   *
+   * S20 (2026-10-03, A246): Up next with its own cadence (`rule.cadence.upNext`, when set) airs
+   * by it, in the first position with its role (else between programs), the position's own `every`
+   * governing only its other roles (precedence: sequence.ts, "Up next with its own cadence").
+   * Unset, nothing here changes: Up next is a role in its position, as before.
+   *
+   * A246 (2026-10-03): `override` is a break rule that isn't saved (`previewBreakRule`): the walk
+   * uses it in place of the station's and reads nothing else differently. Nothing here writes.
    */
-  async function generateAll(stationId: string, from: Date, to: Date, everyPart = false): Promise<{ slots: GeneratedBreak[]; boundaries: Boundary[]; blocks: BlockPlan }> {
-    const [rule, tz, fillers] = await Promise.all([services.stations.breakRule(stationId), stationTz(stationId), services.library.fillers(stationId)]);
-    const seq = rule.bumperSequences;
+  async function generateAll(stationId: string, from: Date, to: Date, everyPart = false, override?: BreakRuleView): Promise<{ slots: GeneratedBreak[]; boundaries: Boundary[]; blocks: BlockPlan }> {
+    const [rule, tz, fillers] = await Promise.all([override ?? services.stations.breakRule(stationId), stationTz(stationId), services.library.fillers(stationId)]);
+    const ruleSeq = rule.bumperSequences;
+    // S20: Up next's own cadence, if set. Its role then leaves the station's sequences (each
+    // position airs its other roles as its own `every` says) and goes where `upNextHome` puts it.
+    const upNextCadence = rule.cadence.upNext ?? null;
+    const upNextAt = upNextCadence ? upNextHome(ruleSeq) : null;
+    const seq: BumperSequences = upNextCadence ? { open: withoutUpNext(ruleSeq.open), close: withoutUpNext(ruleSeq.close), between: withoutUpNext(ruleSeq.between) } : ruleSeq;
+    const upNextOn = !!upNextCadence && upNextCadence.every !== "never" && fillers.bumpers.length > 0;
     const sequenceCadences = { open: seq.open, close: seq.close };
     const every = everyPart || isEveryBreak(rule.cadence, sequenceCadences);
     const now = deps.clock.now().getTime();
@@ -762,15 +787,18 @@ export function createLogService(ctx: ModuleContext): LogService {
     const seqOf = (ref: BlockRef | null): BumperSequences => ref?.sequences ?? seq;
     const blockRefs = [...bstate.refs.values()];
 
-    const roles = new Set([...seq.open.roles, ...seq.close.roles, ...seq.between.roles, ...blockRefs.flatMap((r) => (r.sequences ? [...r.sequences.open.roles, ...r.sequences.close.roles, ...r.sequences.between.roles] : []))]);
+    const roles = new Set<BumperRole>([...seq.open.roles, ...seq.close.roles, ...seq.between.roles, ...(upNextOn ? (["up_next"] as const) : []), ...blockRefs.flatMap((r) => (r.sequences ? [...r.sequences.open.roles, ...r.sequences.close.roles, ...r.sequences.between.roles] : []))]);
     const decider = new SequenceDecider(fillers.bumpers, tz, {}, blockBumpers);
     const rotates = decider.rotates(roles);
     const between = seq.between.roles.length > 0 && seq.between.every !== "never" && fillers.bumpers.length > 0;
     const betweenStateful = between && (seq.between.every === "hour" || seq.between.every === "n_programs");
     const blocksStateful = blockRefs.some((r) => r.sequences && r.sequences.between.roles.length > 0 && (r.sequences.between.every === "hour" || r.sequences.between.every === "n_programs"));
+    // S20: Up next by its own cadence, between programs (its home) or in breaks.
+    const upNextBetween = upNextOn && upNextAt === "between";
+    const upNextStateful = upNextOn && (upNextCadence!.every === "hour" || upNextCadence!.every === "n_programs");
     // Boundaries are walked for the between sequence, and (A244) for blocks' intros and outros.
-    const walkBoundaries = between || hasBlocks;
-    const walk = !every || rotates || betweenStateful || blocksStateful;
+    const walkBoundaries = between || hasBlocks || upNextBetween;
+    const walk = !every || rotates || betweenStateful || blocksStateful || upNextStateful;
     const start = walk ? new Date(Math.min(from.getTime(), now - HOUR)) : from;
     const lookback = new Date(start.getTime() - 6 * HOUR);
     // A program starting just as the window ends has its boundary (the between sequence) in it.
@@ -850,6 +878,10 @@ export function createLogService(ctx: ModuleContext): LogService {
       starts: rows.filter((r) => r.kind !== "off_air").map((r) => r.startsAt.getTime())
     };
     const boundaryDecider = between ? new BoundaryDecider({ rule: seq.between, ...boundaryInput }) : null;
+    // S20: Up next's own decider, from when an up-next bumper last aired (the as-run log) when its
+    // cadence needs it (once an hour, every N programs).
+    const upNextHistory = upNextStateful ? await upNextAired(moduleCtx, stationId, start, to) : { last: null, times: [] };
+    const upNext = upNextOn ? new UpNextDecider({ cadence: upNextCadence!, ...upNextHistory, settledBefore, hourStart: hourStartIn(tz), starts: boundaryInput.starts }) : null;
     /** A244: between two members of a block with its own order, its own between sequence decides. */
     const blockDeciders = new Map<string, BoundaryDecider | null>();
     const deciderFor = (ref: BlockRef | null): BoundaryDecider | null => {
@@ -903,6 +935,8 @@ export function createLogService(ctx: ModuleContext): LogService {
         ? { open: blockPositionAirs(own.open, b, bumpersIn(p, "open")), close: blockPositionAirs(own.close, b, bumpersIn(p, "close")), between: false }
         : { open: bumpersIn(p, "open"), close: bumpersIn(p, "close"), between: false };
       const r = rolesFor(seqOf(ref), airs);
+      // S20: Up next by its own cadence, in its break position (the station's order only).
+      if (upNext && upNextAt && upNextAt !== "between" && !ref?.sequences && upNext.next({ at: end, from: b.startsAt, afterProgram: b.afterProgram })) r[upNextAt] = withUpNext(ruleSeq, upNextAt, r[upNextAt]);
       const used = new Set<string>();
       const after = announce(entryEnd(b.logEntryId) ?? end);
       return { open: pickElements(seeded, "open", r.open, b.startsAt, used, after, ref?.id ?? null), close: pickElements(seeded, "close", r.close, b.startsAt, used, after, ref?.id ?? null) };
@@ -968,10 +1002,14 @@ export function createLogService(ctx: ModuleContext): LogService {
       const context = same ? leftRef : null;
       const d = deciderFor(context);
       let elements: Element[] = [];
-      if (d?.next(at)) {
+      const sequenceAirs = d?.next(at) ?? false;
+      // S20: Up next by its own cadence, between programs (the station's order only; not twice).
+      const upNextHere = upNextBetween && !context?.sequences && !upNextBefore.has(at) && upNext!.next({ at, afterProgram: true });
+      if (sequenceAirs || upNextHere) {
         if (at < settledBefore && fromAsRun) elements = airedIn(at - 5 * MIN, at, "between", context?.id ?? null);
         else {
-          const r = rolesFor(seqOf(context), { open: false, close: false, between: true }).between.filter((x) => x !== "up_next" || !upNextBefore.has(at));
+          let r = sequenceAirs ? rolesFor(seqOf(context), { open: false, close: false, between: true }).between.filter((x) => x !== "up_next" || !upNextBefore.has(at)) : [];
+          if (upNextHere) r = withUpNext(ruleSeq, "between", r);
           elements = pickElements(seeded, "between", r, at, new Set(), announce(at), context?.id ?? null);
         }
       }
@@ -1091,8 +1129,8 @@ export function createLogService(ctx: ModuleContext): LogService {
     };
   }
 
-  async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false): Promise<GeneratedBreak[]> {
-    return (await generateAll(stationId, from, to, everyPart)).slots;
+  async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false, override?: BreakRuleView): Promise<GeneratedBreak[]> {
+    return (await generateAll(stationId, from, to, everyPart, override)).slots;
   }
 
   async function withStored(stationId: string, generatedIn: GeneratedBreak[], from: Date, to: Date): Promise<BreakSlotView[]> {
@@ -1381,7 +1419,8 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!(row.startsAt <= at && at < row.endsAt)) throw new HttpError(409, "not_on_air", "It can end early only while it's on air.");
       const shift = row.endsAt.getTime() - at.getTime();
       // The programs right after it move up, in order, until a gap, a live block, a carried
-      // program (its times are the carriage agreement's) or a break with spots already held.
+      // program (its times are the carriage agreement's), a break with spots already held, or a
+      // program kept at its time (G18: the station fixed it there; it stays, and so does what follows).
       const after = await db
         .select()
         .from(E)
@@ -1399,7 +1438,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       let cursor = row.endsAt.getTime();
       for (const e of after) {
         if (e.startsAt.getTime() !== cursor) break;
-        if (e.kind !== "program" || e.carriageAgreementId || held.has(e.id)) break;
+        if (e.kind !== "program" || e.carriageAgreementId || held.has(e.id) || e.keepTime) break;
         moving.push(e);
         cursor = e.endsAt.getTime();
       }
@@ -1583,6 +1622,20 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async breaks(stationId, from, to, options) {
       return withStored(stationId, await generateBreaks(stationId, from, to, options?.everyPart), from, to);
+    },
+
+    async previewBreaks(stationId, from, to, rule) {
+      // The breaks part of `log()`, with the rule given: the same walk, stored breaks, contents and rows.
+      const [rows, generated, blocks] = await Promise.all([load([stationId], from, to), generateBreaks(stationId, from, to, false, rule), spanViews(stationId, from, to)]);
+      const ctx = await context(rows);
+      const breaks = await withStored(stationId, generated, from, to);
+      const contents = await service.breakContents(stationId, breaks);
+      const now = deps.clock.now().getTime();
+      return {
+        entries: rows.map((r) => toEntry(r, ctx)),
+        breaks: breaks.map((b) => ({ ...b, rows: (contents.get(b.startsAt) ?? []).map(breakRow), keeps: Boolean(b.filledAt) || b.filledMs > 0 || Date.parse(b.startsAt) <= now })),
+        ...(blocks.length ? { blocks } : {})
+      };
     },
 
     async breakPlan(stationId, from, to) {
@@ -2030,6 +2083,7 @@ export function createLogService(ctx: ModuleContext): LogService {
           episodeTitle: input.episodeTitle ?? null,
           episodeDescription: input.episodeDescription ?? null,
           localNote: input.localNote ?? null,
+          keepTime: input.keepTime ?? false,
           createdBy: userId
         })
         .returning();
@@ -2068,7 +2122,8 @@ export function createLogService(ctx: ModuleContext): LogService {
           carriageAgreementId: merged.carriageAgreementId ?? null,
           ...(input.episodeTitle !== undefined ? { episodeTitle: input.episodeTitle } : {}),
           ...(input.episodeDescription !== undefined ? { episodeDescription: input.episodeDescription } : {}),
-          ...(input.localNote !== undefined ? { localNote: input.localNote } : {})
+          ...(input.localNote !== undefined ? { localNote: input.localNote } : {}),
+          ...(input.keepTime !== undefined ? { keepTime: input.keepTime } : {})
         })
         .where(eq(E.id, entryId))
         .returning();

@@ -7,6 +7,7 @@ import type { ModuleContext } from "../../context.js";
 import type { EmailNotice } from "../../email.js";
 import type { Events } from "../../events.js";
 import { clockTime, localDate } from "../../lib/time.js";
+import { broadcastDate } from "../log/templates.js";
 
 type Kind =
   | "reminder"
@@ -179,8 +180,11 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
 
   const appOrigin = deps.config.appOrigin.replace(/\/+$/, "");
   const businessOrigin = (deps.config.businessOrigin ?? deps.config.appOrigin).replace(/\/+$/, "");
-  /** Master control's pages a station notice can open; anything else opens the monitor. */
-  const CONTROL_PAGES: Record<string, string> = { log: "log", "as-run": "log", live: "live", sponsors: "sponsors", rights: "rights", "spot-market": "spot-market", carriage: "market", breaks: "breaks", earnings: "earnings", library: "library", settings: "settings" };
+  /**
+   * Master control's pages a station notice can open; anything else opens the monitor. A246: the
+   * log, the as-run log and the breaks are the Schedule (the old pages still redirect there).
+   */
+  const CONTROL_PAGES: Record<string, string> = { schedule: "schedule", log: "schedule", "as-run": "schedule", live: "live", sponsors: "sponsors", rights: "rights", "spot-market": "spot-market", carriage: "market", breaks: "schedule", earnings: "earnings", library: "library", settings: "settings" };
 
   /**
    * A notice's link as a full address in the right app, for its email. Notices keep app-neutral
@@ -373,11 +377,14 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
   });
 
   deps.bus.on("station.dead_air_warning", async (e) => {
+    const tz = await services.stations.timezoneOf(e.stationId);
     await service.notify(await stationTeam(e.stationId), {
       kind: "dead_air_warning",
       title: `Dead air in ${e.minutesBefore} minutes`,
-      body: `Nothing is on the log from ${clockTime(new Date(e.gapStartsAt), await services.stations.timezoneOf(e.stationId))}. If nobody fills it, master control repeats from the library.`,
-      link: `/stations/${e.stationId}/log`,
+      body: `Nothing is on the log from ${clockTime(new Date(e.gapStartsAt), tz)}. If nobody fills it, master control repeats from the library.`,
+      // A246 (decision 9): straight to the gap on the Schedule, with Fill ready: its broadcast day
+      // and its start (the Log tab's `day` and `fill`).
+      link: `/stations/${e.stationId}/schedule?day=${broadcastDate(new Date(e.gapStartsAt), tz)}&fill=${e.gapStartsAt}`,
       scope: { kind: "station", id: e.stationId },
       dedupeKey: `dead-air:${e.stationId}:${e.gapStartsAt}:${e.minutesBefore}`
     });

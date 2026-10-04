@@ -577,8 +577,10 @@ export const breakRules = broadcast.table(
      * Added 2026-09-29 (migration 0024): how often the station ID, bumpers and credit air in breaks,
      * `{ stationId, bumpers, underwriting, spots? }`, each `{ every, n? }`. Null: every break for all
      * of them. `spots` was added later the same day, in the same column (no migration); without it, every break.
+     * S20 (2026-10-03, A246): `upNext`, Up next's own cadence, in the same column (no migration);
+     * without it, Up next airs as often as the bumper position holding its role.
      */
-    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow }>(),
+    cadence: jsonb("cadence").$type<{ stationId: BreakCadenceRow; bumpers: BreakCadenceRow; underwriting: BreakCadenceRow; spots?: BreakCadenceRow; upNext?: BreakCadenceRow }>(),
     /** A242 (migration 0047): at sign-on, the opener and then the station ID (off: the opener replaces it). */
     stationIdAfterOpener: boolean("station_id_after_opener").notNull().default(false),
     /** A242 (migration 0047): the opener at the start of each broadcast day (6:00 am local), for a channel that never goes off air. */
@@ -656,6 +658,11 @@ export const logEntries = broadcast.table(
      * entry for, with `repeat_group_id` the template. Null for entries made by hand and for G7 copies.
      */
     templateDate: date("template_date"),
+    /**
+     * G18 (migration 0050): "Keep at this time", a fixed point the station marked. Moving rows in
+     * master control stops here, and a live block ending early doesn't move it up.
+     */
+    keepTime: boolean("keep_time").notNull().default(false),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -748,6 +755,8 @@ export const dayTemplateEntries = broadcast.table(
     localNote: text("local_note"),
     episodeTitle: text("episode_title"),
     episodeDescription: text("episode_description"),
+    /** G18 (migration 0050): "Keep at this time", copied onto each date the template makes. */
+    keepTime: boolean("keep_time").notNull().default(false),
     createdAt: createdAt()
   },
   (t) => [

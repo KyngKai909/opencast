@@ -65,6 +65,8 @@ export interface TemplateEntryInput {
   episodeTitle?: string;
   episodeDescription?: string;
   localNote?: string;
+  /** G18: "Keep at this time" (left out: false). */
+  keepTime?: boolean;
 }
 
 /** A244: a programming block in a day template, as sent. */
@@ -91,6 +93,11 @@ export interface TemplateOps {
   ): Promise<{ template: DayTemplate; generated: TemplateGeneration }>;
   /** Takes a repeat (template or G7 copy) off the log from now on. */
   remove(stationId: string, groupId: string): Promise<number>;
+  /**
+   * A246: "Reset to template": an edited date made again from its template (what the template
+   * didn't make comes off it from now on), no longer an exception. Dates from tomorrow on.
+   */
+  resetDate(stationId: string, templateId: string, date: string): Promise<{ template: DayTemplate; generated: TemplateGeneration }>;
   /** Generates the dates a station's templates cover, through the horizon (or `through`). Idempotent. */
   generate(stationId: string, options?: { through?: string; force?: string }): Promise<TemplateGeneration>;
   /** Every station with templates, for the job. */
@@ -195,7 +202,9 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       liveSourceId: r.liveSourceId,
       localNote: r.localNote,
       episodeTitle: r.episodeTitle,
-      episodeDescription: r.episodeDescription
+      episodeDescription: r.episodeDescription,
+      // G18: the day's fixed points stay fixed on each date the template makes.
+      keepTime: r.keepTime
     }));
   }
 
@@ -272,7 +281,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         liveSourceId: x.liveSourceId ?? null,
         localNote: x.localNote ?? null,
         episodeTitle: x.episodeTitle ?? null,
-        episodeDescription: x.episodeDescription ?? null
+        episodeDescription: x.episodeDescription ?? null,
+        keepTime: x.keepTime ?? false
       });
     }
     // In the broadcast day's order: "23:00" comes before "01:00".
@@ -356,7 +366,8 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             carriageAgreementId: e.carriageAgreementId,
             episodeTitle: e.episodeTitle,
             episodeDescription: e.episodeDescription,
-            localNote: e.localNote
+            localNote: e.localNote,
+            keepTime: e.keepTime
           })
         ),
       dates: dates.filter((d) => d.templateId === g.id).map((d) => ({ date: d.date, edited: Boolean(d.editedAt), entries: d.entries, skipped: d.skipped })),
@@ -497,6 +508,44 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
       return removed;
     },
 
+    async resetDate(stationId, templateId, date) {
+      const row = await group(stationId, templateId);
+      if (!row.template || row.removedAt) throw notFound("That template");
+      const tz = await services.stations.timezoneOf(stationId);
+      const now = deps.clock.now();
+      if (date <= broadcastDate(now, tz)) {
+        const words = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+        throw new HttpError(409, "date_started", `${words} has started. Only dates from tomorrow on can be reset to their template.`);
+      }
+      const [rec] = await db.select().from(TD).where(and(eq(TD.stationId, stationId), eq(TD.date, date)));
+      if (!rec || rec.templateId !== templateId) throw notFound("That date of the template");
+      let removed = 0;
+      if (rec.editedAt) {
+        const { from, to } = broadcastDay(date, tz);
+        // The template's own rows stay for `generate` to match (kept, moved back or remade); what
+        // it didn't make comes off: entries put on by hand, and blocks placed on the date.
+        const ours = (x: { repeatGroupId: string | null; templateDate: string | null }) => x.repeatGroupId === templateId && x.templateDate === date;
+        await db.transaction(async (tx) => {
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`day-templates:${stationId}`}))`);
+          const rows = await tx
+            .select()
+            .from(E)
+            .where(and(eq(E.stationId, stationId), gte(E.startsAt, from), lt(E.startsAt, to), gt(E.startsAt, now)));
+          removed = await removeRows(tx, rows.filter((r) => !ours(r)));
+          const spans = await tx
+            .select({ id: SP.id, repeatGroupId: SP.repeatGroupId, templateDate: SP.templateDate })
+            .from(SP)
+            .where(and(eq(SP.stationId, stationId), gte(SP.startsAt, from), lt(SP.startsAt, to), gt(SP.startsAt, now)));
+          const going = spans.filter((sp) => !ours(sp));
+          if (going.length) await tx.delete(SP).where(inArray(SP.id, going.map((sp) => sp.id)));
+          // No longer an exception, and older than the template: `generate` makes it again.
+          await tx.update(TD).set({ editedAt: null, generatedAt: new Date(0) }).where(and(eq(TD.stationId, stationId), eq(TD.date, date)));
+        });
+      }
+      const generated = rec.editedAt ? await ops.generate(stationId, { through: date }) : { dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 };
+      return { template: (await views(stationId, [row]))[0], generated: { ...generated, removed: generated.removed + removed } };
+    },
+
     async generate(stationId, options = {}) {
       const totals: TemplateGeneration = { dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 };
       const tz = await services.stations.timezoneOf(stationId);
@@ -593,6 +642,7 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             localNote: e.localNote,
             episodeTitle: e.episodeTitle,
             episodeDescription: e.episodeDescription,
+            keepTime: e.keepTime,
             repeatGroupId: t.id,
             templateDate: date
           });
@@ -625,10 +675,10 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
             const want = wanted.get(key);
             if (want && !kept.has(key)) {
               kept.add(key);
-              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId) {
+              if (row.repeatGroupId !== want.repeatGroupId || row.localNote !== want.localNote || row.episodeTitle !== want.episodeTitle || row.episodeDescription !== want.episodeDescription || row.programId !== want.programId || row.keepTime !== want.keepTime) {
                 await tx
                   .update(E)
-                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId })
+                  .set({ repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime })
                   .where(eq(E.id, row.id));
               }
             } else if (row.startsAt > now) {

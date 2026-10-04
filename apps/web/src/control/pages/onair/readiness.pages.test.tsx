@@ -50,7 +50,7 @@ describe("the Monitor's Prepared for air", () => {
       </ShellOptionsProvider>
     );
     const link = await screen.findByRole("link", { name: "Late Crate, ep. 15" });
-    expect(link.getAttribute("href")).toBe(`/control/beat/log?day=2026-09-26&entry=${lateCrate15().id}`);
+    expect(link.getAttribute("href")).toBe(`/control/beat/schedule?day=2026-09-26&entry=${lateCrate15().id}`);
     // The line reads as before, counting the item once though it airs twice (10:00 pm and 3:30 am).
     expect(link.closest("dd")!.textContent).toMatch(/^\d+ of \d+ items ready for the next 48 hours; Late Crate, ep\. 15 at 10:00 pm is being prepared$/);
   });
@@ -58,11 +58,13 @@ describe("the Monitor's Prepared for air", () => {
   it("the log picks out the airing it links to", async () => {
     const id = lateCrate15().id;
     renderWithApi(<LogPage stationId={BEAT.id} station={BEAT} base="/control/beat" />, { path: `/?day=2026-09-26&entry=${id}` });
-    const title = await screen.findAllByText("Late Crate, ep. 15");
-    const picked = title.map((t) => t.closest(".oc-blk")).filter((b) => b?.classList.contains("oc-blk--sel"));
-    // The 10:00 pm airing (the evening's window has only that one), not the dead air's pane.
+    const title = await screen.findAllByText("Late Crate, ep. 15", { selector: "b" });
+    const picked = title.map((t) => t.closest("li")).filter((li) => li?.classList.contains("cc-rr--sel"));
+    // The 10:00 pm airing, not the overnight repeat; its pane is open.
     expect(picked).toHaveLength(1);
-    expect(document.querySelectorAll(".oc-blk--sel")).toHaveLength(1);
+    expect(picked[0]!.textContent).toContain("10:00 pm");
+    expect(document.querySelectorAll(".cc-rr--sel")).toHaveLength(1);
+    expect(await screen.findByRole("region", { name: "Late Crate, ep. 15" })).toBeTruthy();
   });
 });
 

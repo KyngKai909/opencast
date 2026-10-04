@@ -19,6 +19,7 @@
 @import "./LogTimeline.css";
 @import "./Rundown.css";
 @import "./BreakBar.css";
+@import "./BreakStrip.css";
 @import "./BreakLegend.css";
 @import "./ScheduleList.css";
 @import "./ProgressBar.css";

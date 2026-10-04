@@ -36,6 +36,43 @@ export interface BreakRuleView {
   bumperSequences: BumperSequences;
 }
 
+/** A break rule as `setBreakRule` takes it: what an older app leaves out stays as set. */
+export type BreakRuleInput = Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener" | "bumperSequences"> & {
+  adsFromPartners?: boolean;
+  /** S20: `upNext` left out stays as set; null clears it (Up next follows its position again). */
+  cadence?: Omit<BreakCadence, "spots" | "upNext"> & { spots?: BreakCadence["spots"]; upNext?: BreakCadence["upNext"] | null };
+  stationIdAfterOpener?: boolean;
+  dailyOpener?: boolean;
+  /** A243: left out (an app from before), they stay as set; `cadence.bumpers` alone sets `open.every` and `close.every`. */
+  bumperSequences?: BumperSequences;
+};
+
+type BreakRuleRow = typeof schema.breakRules.$inferSelect;
+
+/** A stored break rule (or none: the defaults) as `getBreakRule` reads it, with its blocked categories. */
+function breakRuleView(rule: Partial<BreakRuleRow> | undefined, blockedCategories: string[]): BreakRuleView {
+  return {
+    mode: rule?.mode ?? "after_every_program",
+    everyMinutes: rule?.everyMinutes ?? null,
+    lengthMs: rule?.lengthMs ?? 120_000,
+    spotMsPerHour: rule?.spotMsPerHour ?? 180_000,
+    sameSpotPerHour: rule?.sameSpotPerHour ?? 2,
+    fillOrder: (rule?.fillOrder as LogCode[] | undefined) ?? ["SPT", "UND", "BMP", "SID"],
+    openTimeTo: rule?.openTimeTo ?? "spot_market",
+    blockedCategories: [...blockedCategories].sort(),
+    adsFromPartners: rule?.adsFromPartners ?? false,
+    // A243: `cadence.bumpers` reads as the opening sequence's cadence.
+    ...(() => {
+      const cadence = cadenceOf(rule?.cadence);
+      const bumperSequences = sequencesOf(rule?.bumperSequences, cadence.bumpers);
+      const open = bumperSequences.open;
+      return { cadence: { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } }, bumperSequences };
+    })(),
+    stationIdAfterOpener: rule?.stationIdAfterOpener ?? false,
+    dailyOpener: rule?.dailyOpener ?? false
+  };
+}
+
 /** What an ad request for ads from partners would carry about a station (nothing sends one yet). */
 export interface StationAdProfile {
   /** IAB Content Taxonomy 3.0 ids. */
@@ -238,17 +275,12 @@ export interface StationsService {
   /** `user` (A230): the owner, for a subchannel beside their own X.1; `shareCallSign` shares its call sign. */
   chooseChannel(stationId: string, input: { marketId: string; band: Band; channel: string; shareCallSign?: boolean }, user?: CurrentUser): Promise<StationSetupView>;
   /** `adsFromPartners` left out keeps the station's current switch (older apps don't send it). */
-  setBreakRule(
-    stationId: string,
-    rule: Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener" | "bumperSequences"> & {
-      adsFromPartners?: boolean;
-      cadence?: Omit<BreakCadence, "spots"> & { spots?: BreakCadence["spots"] };
-      stationIdAfterOpener?: boolean;
-      dailyOpener?: boolean;
-      /** A243: left out (an app from before), they stay as set; `cadence.bumpers` alone sets `open.every` and `close.every`. */
-      bumperSequences?: BumperSequences;
-    }
-  ): Promise<BreakRuleView>;
+  setBreakRule(stationId: string, rule: BreakRuleInput): Promise<BreakRuleView>;
+  /**
+   * A246: the rule `setBreakRule` would save, as `breakRule` would read it after: the same checks
+   * (and 400s) and the same merging with what's stored. Nothing is written (`previewBreakRule`).
+   */
+  resolveBreakRule(stationId: string, rule: BreakRuleInput): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
@@ -354,6 +386,64 @@ const WORKER_INGEST_SERVER = (process.env.WORKER_INGEST_SERVER ?? `rtmp://localh
 const WHIP_BASE = (process.env.LIVEPEER_WHIP_BASE ?? "https://livepeer.studio/webrtc").replace(/\/+$/, "");
 /** S14: a source's own playback on Livepeer, the team's private preview of what it's sending. */
 const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepeercdn.studio/hls").replace(/\/+$/, "");
+
+/**
+ * What `setBreakRule` writes for a body (A246: split out so `previewBreakRule` checks and merges
+ * the same way without writing): the 400s, the station ID last in the fill order, the cadence (left
+ * out, what's stored stays; spots and S20's Up next too when only they're left out), and the bumper
+ * sequences (sent, stored as sent, the bumpers' cadence following the opening one's; left out,
+ * they stay, except that a body from before them that changes how often bumpers air changes both
+ * the opening and closing sequence's). `undefined` in `set`: left as stored. Stored only once
+ * they're not the defaults (null: the defaults, from `cadence.bumpers`).
+ */
+function resolveBreakRuleWrite(rule: BreakRuleInput, stored: BreakRuleRow | undefined) {
+  if (rule.mode === "every_n_minutes" && !rule.everyMinutes) throw badRequest("Say how often.", { everyMinutes: "Required" });
+  const fillOrder = [...rule.fillOrder.filter((c) => c !== "SID"), "SID" as const];
+  const was = cadenceOf(stored?.cadence);
+  let cadence: BreakCadence | undefined;
+  if (rule.cadence) {
+    if ((rule.cadence.stationId.every as string) === "never") throw badRequest("The station ID can't be turned off. Choose how often it airs.", { "cadence.stationId": "Required" });
+    for (const [part, c] of Object.entries(rule.cadence)) {
+      if (c && c.every === "n_programs" && !c.n) throw badRequest("Say after how many programs.", { [`cadence.${part}.n`]: "Required" });
+    }
+    // S20: Up next's own cadence left out stays as set; null clears it.
+    const upNext = rule.cadence.upNext === undefined ? was.upNext : (rule.cadence.upNext ?? undefined);
+    cadence = cadenceOf({ ...rule.cadence, spots: rule.cadence.spots ?? was.spots, upNext });
+  }
+  let bumperSequences: BumperSequences | null | undefined;
+  if (rule.bumperSequences) {
+    const problems = sequenceProblems(rule.bumperSequences);
+    if (problems) throw badRequest("Each bumper role can be in a position once, four at most. Say after how many programs.", problems);
+    bumperSequences = sequencesOf(rule.bumperSequences);
+    if (cadence) {
+      cadence = { ...cadence, bumpers: { every: bumperSequences.open.every, ...(bumperSequences.open.n ? { n: bumperSequences.open.n } : {}) } };
+      if (JSON.stringify(bumperSequences) === JSON.stringify(defaultSequences(cadence.bumpers))) bumperSequences = null;
+    }
+  } else if (cadence) {
+    if (stored?.bumperSequences) {
+      const before = sequencesOf(stored.bumperSequences);
+      const every = { every: cadence.bumpers.every, ...(cadence.bumpers.every === "n_programs" ? { n: cadence.bumpers.n } : {}) };
+      if (before.open.every !== every.every || before.open.n !== every.n) bumperSequences = { ...before, open: { ...before.open, ...every }, close: { ...before.close, ...every } };
+    }
+  }
+  const set = {
+    mode: rule.mode,
+    everyMinutes: rule.mode === "every_n_minutes" ? rule.everyMinutes : null,
+    lengthMs: rule.lengthMs,
+    spotMsPerHour: rule.spotMsPerHour,
+    sameSpotPerHour: rule.sameSpotPerHour,
+    fillOrder,
+    openTimeTo: rule.openTimeTo,
+    adsFromPartners: rule.adsFromPartners,
+    cadence,
+    // A242: left out (an app from before), each stays as set.
+    stationIdAfterOpener: rule.stationIdAfterOpener,
+    dailyOpener: rule.dailyOpener,
+    bumperSequences
+  };
+  const categories = [...new Set(rule.blockedCategories.map((c) => c.trim()).filter(Boolean))];
+  return { set, categories };
+}
 
 export function createStationsService({ deps, services }: ModuleContext): StationsService {
   const { db } = deps;
@@ -789,26 +879,7 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async breakRule(stationId) {
       const [rule] = await db.select().from(schema.breakRules).where(eq(schema.breakRules.stationId, stationId));
       const blocked = await db.select().from(schema.blockedCategories).where(eq(schema.blockedCategories.stationId, stationId));
-      return {
-        mode: rule?.mode ?? "after_every_program",
-        everyMinutes: rule?.everyMinutes ?? null,
-        lengthMs: rule?.lengthMs ?? 120_000,
-        spotMsPerHour: rule?.spotMsPerHour ?? 180_000,
-        sameSpotPerHour: rule?.sameSpotPerHour ?? 2,
-        fillOrder: (rule?.fillOrder as LogCode[] | undefined) ?? ["SPT", "UND", "BMP", "SID"],
-        openTimeTo: rule?.openTimeTo ?? "spot_market",
-        blockedCategories: blocked.map((b) => b.category).sort(),
-        adsFromPartners: rule?.adsFromPartners ?? false,
-        // A243: `cadence.bumpers` reads as the opening sequence's cadence.
-        ...(() => {
-          const cadence = cadenceOf(rule?.cadence);
-          const bumperSequences = sequencesOf(rule?.bumperSequences, cadence.bumpers);
-          const open = bumperSequences.open;
-          return { cadence: { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } }, bumperSequences };
-        })(),
-        stationIdAfterOpener: rule?.stationIdAfterOpener ?? false,
-        dailyOpener: rule?.dailyOpener ?? false
-      };
+      return breakRuleView(rule, blocked.map((b) => b.category));
     },
 
     async adProfile(stationId) {
@@ -1269,80 +1340,36 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
       return service.setup(stationId);
     },
 
+    async resolveBreakRule(stationId, rule) {
+      const [stored] = await db.select().from(schema.breakRules).where(eq(schema.breakRules.stationId, stationId));
+      const { set, categories } = resolveBreakRuleWrite(rule, stored);
+      // What `breakRule()` reads after the write: the stored row with what's sent over it.
+      const written = Object.fromEntries(Object.entries(set).filter(([, v]) => v !== undefined)) as Partial<BreakRuleRow>;
+      return breakRuleView({ ...(stored ?? {}), ...written }, categories);
+    },
+
     async setBreakRule(stationId, rule) {
-      if (rule.mode === "every_n_minutes" && !rule.everyMinutes) throw badRequest("Say how often.", { everyMinutes: "Required" });
-      const fillOrder = [...rule.fillOrder.filter((c) => c !== "SID"), "SID" as const];
-      // How often each part airs (added 2026-09-29): left out, what's set stays; so does how
-      // often spots air when only they are left out (an app from before they had a choice).
-      let cadence: BreakCadence | undefined;
-      if (rule.cadence) {
-        if ((rule.cadence.stationId.every as string) === "never") throw badRequest("The station ID can't be turned off. Choose how often it airs.", { "cadence.stationId": "Required" });
-        for (const [part, c] of Object.entries(rule.cadence)) {
-          if (c && c.every === "n_programs" && !c.n) throw badRequest("Say after how many programs.", { [`cadence.${part}.n`]: "Required" });
-        }
-        cadence = cadenceOf({ ...rule.cadence, spots: rule.cadence.spots ?? (await service.breakRule(stationId)).cadence.spots });
-      }
-      // A243: the bumper sequences. Sent, they're stored as sent (and the bumpers' cadence follows the
-      // opening one); left out, they stay, except that a body from before them that changes how often
-      // bumpers air changes both the opening and closing sequence's.
-      // Stored only once they're not the defaults (null: the defaults, from `cadence.bumpers`).
-      let bumperSequences: BumperSequences | null | undefined;
-      if (rule.bumperSequences) {
-        const problems = sequenceProblems(rule.bumperSequences);
-        if (problems) throw badRequest("Each bumper role can be in a position once, four at most. Say after how many programs.", problems);
-        bumperSequences = sequencesOf(rule.bumperSequences);
-        if (cadence) {
-          cadence = { ...cadence, bumpers: { every: bumperSequences.open.every, ...(bumperSequences.open.n ? { n: bumperSequences.open.n } : {}) } };
-          if (JSON.stringify(bumperSequences) === JSON.stringify(defaultSequences(cadence.bumpers))) bumperSequences = null;
-        }
-      } else if (cadence) {
-        const [stored] = await db.select({ bumperSequences: schema.breakRules.bumperSequences }).from(schema.breakRules).where(eq(schema.breakRules.stationId, stationId));
-        if (stored?.bumperSequences) {
-          const was = sequencesOf(stored.bumperSequences);
-          const every = { every: cadence.bumpers.every, ...(cadence.bumpers.every === "n_programs" ? { n: cadence.bumpers.n } : {}) };
-          if (was.open.every !== every.every || was.open.n !== every.n) bumperSequences = { ...was, open: { ...was.open, ...every }, close: { ...was.close, ...every } };
-        }
-      }
+      const [stored] = await db.select().from(schema.breakRules).where(eq(schema.breakRules.stationId, stationId));
+      const { set, categories } = resolveBreakRuleWrite(rule, stored);
       await db.transaction(async (tx) => {
         await tx
           .insert(schema.breakRules)
           .values({
             stationId,
-            mode: rule.mode,
-            everyMinutes: rule.mode === "every_n_minutes" ? rule.everyMinutes : null,
-            lengthMs: rule.lengthMs,
-            spotMsPerHour: rule.spotMsPerHour,
-            sameSpotPerHour: rule.sameSpotPerHour,
-            fillOrder,
-            openTimeTo: rule.openTimeTo,
-            adsFromPartners: rule.adsFromPartners ?? false,
-            cadence: cadence ?? null,
-            stationIdAfterOpener: rule.stationIdAfterOpener ?? false,
-            dailyOpener: rule.dailyOpener ?? false,
-            bumperSequences: bumperSequences ?? null,
+            ...set,
+            adsFromPartners: set.adsFromPartners ?? false,
+            cadence: set.cadence ?? null,
+            stationIdAfterOpener: set.stationIdAfterOpener ?? false,
+            dailyOpener: set.dailyOpener ?? false,
+            bumperSequences: set.bumperSequences ?? null,
             updatedAt: deps.clock.now()
           })
           .onConflictDoUpdate({
             target: schema.breakRules.stationId,
-            set: {
-              mode: rule.mode,
-              everyMinutes: rule.mode === "every_n_minutes" ? rule.everyMinutes : null,
-              lengthMs: rule.lengthMs,
-              spotMsPerHour: rule.spotMsPerHour,
-              sameSpotPerHour: rule.sameSpotPerHour,
-              fillOrder,
-              openTimeTo: rule.openTimeTo,
-              ...(rule.adsFromPartners !== undefined ? { adsFromPartners: rule.adsFromPartners } : {}),
-              ...(cadence ? { cadence } : {}),
-              // A242: left out (an app from before), each stays as set.
-              ...(rule.stationIdAfterOpener !== undefined ? { stationIdAfterOpener: rule.stationIdAfterOpener } : {}),
-              ...(rule.dailyOpener !== undefined ? { dailyOpener: rule.dailyOpener } : {}),
-              ...(bumperSequences !== undefined ? { bumperSequences } : {}),
-              updatedAt: deps.clock.now()
-            }
+            // Left out (an app from before), each optional field stays as set.
+            set: { ...Object.fromEntries(Object.entries(set).filter(([, v]) => v !== undefined)), updatedAt: deps.clock.now() }
           });
         await tx.delete(schema.blockedCategories).where(eq(schema.blockedCategories.stationId, stationId));
-        const categories = [...new Set(rule.blockedCategories.map((c) => c.trim()).filter(Boolean))];
         if (categories.length) await tx.insert(schema.blockedCategories).values(categories.map((category) => ({ stationId, category })));
       });
       return service.breakRule(stationId);

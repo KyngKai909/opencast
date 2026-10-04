@@ -1,4 +1,4 @@
-// B.3 Place it in the log (/log/place/:offerId?term=cash, the rail's Program log): the week, with
+// B.3 Place it in the log (/schedule/place/:offerId?term=cash since A246, the rail's Schedule; the old /log/place/:offerId redirects): the week, with
 // the new slot outlined and what it replaces struck through; the six facts; a second airing the
 // terms allow (never a fourth); Carry, confirmed with a toast and Undo instead of a modal.
 
@@ -64,7 +64,7 @@ export default function PlaceInLog() {
   const from = atLocal(first, "00:00").toISOString();
   const to = atLocal(addDays(first, 7), "06:00").toISOString();
   const log = useApi(logApi.getLog, { params: { stationId: s.id }, query: { from, to } }, { enabled: !s.studio, retry: false });
-  useShellOptions({ context: "Program log" });
+  useShellOptions({ context: "Schedule" });
 
   const o = offer.data;
   const carrying = agreements.data?.carrying.find((a) => a.offerId === offerId && !a.endsAt) ?? null;

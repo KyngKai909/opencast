@@ -7,7 +7,9 @@ import SetupLibrary from "../live/SetupLibrary";
 import SetupTranslators from "../station/SetupTranslators";
 import Monitor from "./Monitor";
 import NewStation from "./NewStation";
-import ProgramLog from "./ProgramLog";
+import Blocks from "../live/Blocks";
+import OldRoute from "./OldRoute";
+import Schedule from "./Schedule";
 import SetupLog from "./SetupLog";
 import SetupSignOn from "./SetupSignOn";
 import SetupStation from "./SetupStation";
@@ -29,6 +31,18 @@ export const onAirOutsideRoutes = (
 export const onAirStationRoutes = (
   <>
     <Route path="monitor" element={<Monitor />} />
-    <Route path="log" element={<ProgramLog />} />
+    {/* A246: the Schedule workspace, its tabs as routes. */}
+    <Route path="schedule" element={<Schedule tab="log" />} />
+    <Route path="schedule/templates" element={<Schedule tab="templates" />} />
+    <Route path="schedule/templates/:templateId" element={<Schedule tab="templates" />} />
+    <Route path="schedule/blocks" element={<Blocks />} />
+    <Route path="schedule/blocks/:blockId" element={<Blocks />} />
+    <Route path="schedule/rules" element={<Schedule tab="rules" />} />
+    {/* The pages it replaced, redirected to its tabs with their query (OldRoute.tsx). */}
+    <Route path="log" element={<OldRoute />} />
+    <Route path="log/place/:offerId" element={<OldRoute />} />
+    <Route path="breaks" element={<OldRoute />} />
+    <Route path="blocks" element={<OldRoute />} />
+    <Route path="blocks/:blockId" element={<OldRoute />} />
   </>
 );

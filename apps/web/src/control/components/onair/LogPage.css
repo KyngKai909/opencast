@@ -1,93 +1,305 @@
-/* The program log (master-control A.4: .days, .split, .pane, .warnbar, .tl). */
-.cc-log__days { margin-bottom: 14px; }
-.cc-log__split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; }
-.cc-log__split--week { grid-template-columns: minmax(0, 1fr); }
+/* The program log, as the Schedule's Log tab (A246, opencast-schedule .daynav, .hchips, .schg,
+   .rr, .pane2, .tray, .drawer, .wk) and setup step 3. */
+.cc-log { position: relative; }
+.cc-log__split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
 .cc-log__main { min-width: 0; }
-.cc-log__main > .oc-notice { margin-bottom: 14px; }
-.cc-log__pane { border-left: 1px solid var(--hair); padding-left: 28px; }
-.cc-log__sec + .cc-log__sec { margin-top: 22px; }
-.cc-log__h { margin: 0 0 10px; font: 700 15px var(--font-display); }
-.cc-log__seg { margin-bottom: 10px; }
-.cc-log__go { margin-top: 12px; }
+.cc-log__pane { border-left: 1px solid var(--hair); padding-left: 20px; position: sticky; top: 12px; }
 .cc-log__err { margin: 8px 0 0; font-size: 13px; color: var(--standby); }
 .cc-log__quiet { margin: 0; font-size: 13.5px; color: var(--ink-50); }
 .cc-log__standby { color: var(--standby); }
 .cc-log--setup .oc-control-foot { margin-top: 18px; }
-.cc-log__main > .cc-log__origin { margin-bottom: 14px; }
 .cc-log__hrow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .cc-log__note { margin: 8px 0 0; font-size: 13px; color: var(--ink-70); }
 .cc-log__link { color: var(--signal); font-weight: 600; text-decoration: none; }
 .cc-log__link:hover { text-decoration: underline; }
-.cc-log__templates { margin-top: 12px; }
+.cc-log__end { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cc-log__record { margin: 0 0 12px; }
+.cc-log__lines { margin: 4px 0 0; padding: 0 0 0 18px; font-size: 13.5px; color: var(--ink-70); }
+.cc-log__swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 1px; }
 
-/* Planned off air (G9): a calm band, not dead air. No hatching, no standby amber, no warning sign:
-   the quiet ground with "Off air" and when the station is back. */
-.oc-blk:has(.cc-log__off) {
-  background: color-mix(in srgb, var(--hair) 55%, var(--ground)); box-shadow: inset 3px 0 0 var(--line);
-  color: var(--ink-70); align-items: center;
+/* The small buttons the reference draws (.btn-xs). */
+.cc-btn-xs {
+  height: 28px; padding: 0 11px; border: 0; border-radius: 8px; cursor: pointer;
+  font: 600 12px var(--font-text); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); background: none;
 }
-.oc-blk:has(.cc-log__off) .oc-code { display: none; }
-.oc-blk:has(.cc-log__off) b { font-weight: 600; color: var(--ink-70); }
+.cc-btn-xs:disabled { opacity: .5; cursor: default; }
+.cc-btn-xs--pri { background: var(--ink); color: var(--ground); box-shadow: none; }
+.cc-btn-xs--warn { background: var(--standby-fill); color: var(--on-standby); box-shadow: none; }
 
-/* Repeat this day and Off air hours, in their dialogs. */
+/* The day nav: arrows, the day, Today, the template chip, Day and Week. */
+.cc-daynav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--hair); }
+.cc-daynav__arw { border-radius: 50%; }
+.cc-daynav__arw--l svg { transform: rotate(180deg); }
+.cc-daynav__day { font: 700 17px var(--font-display); }
+.cc-daynav__end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.cc-tplchip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ink-70); box-shadow: inset 0 0 0 1px var(--line); }
+.cc-tplchip i { width: 6px; height: 6px; border-radius: 50%; background: var(--standby); }
+
+/* Health chips: each scrolls to its row. Red is only for on air now; amber for what to look at. */
+.cc-hchips { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+.cc-hchip {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 11px; border: 0; border-radius: 999px;
+  font: 600 12.5px var(--font-text); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-70); background: none;
+}
+button.cc-hchip { cursor: pointer; }
+button.cc-hchip:hover { color: var(--ink); }
+.cc-hchip i { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-50); }
+.cc-hchip--live i { background: var(--live); }
+.cc-hchip--warn { color: var(--standby); box-shadow: inset 0 0 0 1px var(--standby); }
+.cc-hchip--warn i { background: var(--standby-fill); }
+.cc-hchip--off i { background: repeating-linear-gradient(135deg, var(--ink-50) 0 2px, transparent 2px 4px); box-shadow: inset 0 0 0 1px var(--ink-50); }
+.cc-hchip--signal { color: var(--signal); box-shadow: inset 0 0 0 1px var(--signal); }
+.cc-hchip--signal i { display: none; }
+
+/* The rundown (.rr): edge, start, code, title and source, length. */
+.cc-rd { list-style: none; margin: 0; padding: 0; position: relative; }
+.cc-rr {
+  --cc-edge: transparent;
+  display: grid; grid-template-columns: 18px 92px 50px minmax(0, 1fr) 84px; gap: 10px; align-items: center;
+  padding: 9px 8px 9px 0; border-bottom: 1px solid var(--hair); font-size: 14px; position: relative;
+}
+.cc-rr__edge { align-self: stretch; width: 6px; border-radius: 3px; margin-left: 4px; background: var(--cc-edge); }
+.cc-rr__t { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-70); }
+.cc-rr__locked { display: block; font: 400 11px var(--font-text) !important; color: var(--ink-50) !important; margin: 0 !important; }
+.cc-rr__main { min-width: 0; }
+.cc-rr b { display: block; font-weight: 600; }
+.cc-rr small { display: block; font-size: 12px; color: var(--ink-70); margin-top: 1px; }
+.cc-rr__len { font: 500 13px var(--font-mono); text-align: right; color: var(--ink-70); }
+.cc-rr__act { justify-self: end; }
+/* A row picks out its pane: its title is the button, reaching over the row. */
+.cc-rr__pick { all: unset; display: block; cursor: pointer; text-align: left; max-width: 100%; }
+.cc-rr__pick:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 2px; }
+.cc-rr__pick:disabled { cursor: default; }
+/* Past rows dim by colour (their words still hold 4.5:1); the pictures in them fade. */
+.cc-rr--past, .cc-rr--past b, .cc-rr--past small, .cc-rr--past .cc-rr__t, .cc-rr--past .cc-rr__len, .cc-rr--past .cc-code2 { color: var(--ink-50); font-weight: 500; }
+.cc-rr--past .cc-rr__barwrap, .cc-rr--past .cc-rr__edge { opacity: .5; }
+.cc-rr--now { background: color-mix(in srgb, var(--live) 7%, transparent); box-shadow: inset 3px 0 0 var(--live); }
+.cc-rr--now .cc-rr__t { color: var(--ink); }
+.cc-rr--sel { background: var(--raised); box-shadow: inset 3px 0 0 var(--signal); }
+.cc-rr--warn small { color: var(--standby); }
+.cc-rr__tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; font: 700 10px var(--font-text); color: var(--live); vertical-align: 2px; }
+.cc-rr__tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
+.cc-rr__fixed { margin-left: 6px; display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border-radius: 4px; font: 600 9.5px var(--font-mono); color: var(--ink-70); box-shadow: inset 0 0 0 1px var(--line); vertical-align: 2px; }
+
+/* The rundown's codes (.code2): drawn by the app, with their words for screen readers. */
+.cc-code2 { display: inline-flex; align-items: center; justify-content: center; height: 20px; padding: 0 6px; border-radius: 4px; font: 600 10.5px var(--font-mono); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-70); justify-self: start; }
+.cc-code2--pgm { color: var(--ink); }
+/* Live is a marker, not red: red is kept for the row on air now (the user's decision 7). */
+.cc-code2--live { gap: 4px; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-70); }
+.cc-code2--live::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.cc-code2--gap { color: var(--standby); box-shadow: inset 0 0 0 1px var(--standby); }
+.cc-code2--off { box-shadow: none; outline: 1px dashed var(--line); outline-offset: -1px; }
+
+/* A break: one thin row with a bar of what fills it. */
+.cc-rr--break { padding: 5px 8px 5px 0; font-size: 12.5px; color: var(--ink-70); }
+.cc-rr--break .cc-rr__t { font-size: 12px; }
+.cc-rr__bline { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cc-rr__bar { width: 220px; flex: none; }
+.cc-rr__barwrap { display: block; flex: none; }
+.cc-rr__bline > span:not(.cc-rr__tag):not(.cc-rr__barwrap) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dead air, striped amber; planned off air, striped grey. */
+.cc-rr--gap { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby) 14%, transparent) 0 6px, transparent 6px 12px); color: var(--standby); }
+.cc-rr--gap b, .cc-rr--gap small { color: var(--standby); }
+.cc-rr--off { background: repeating-linear-gradient(135deg, var(--hair) 0 6px, transparent 6px 12px); color: var(--ink-70); }
+/* A block's label, where it starts. */
+.cc-rr--band { display: block; padding: 7px 8px 7px 30px; border-bottom: 0; }
+.cc-rr--band .cc-rr__pick { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+.cc-rr__sw { width: 10px; height: 10px; border-radius: 3px; background: var(--cc-edge); align-self: center; }
+.cc-rr__band { text-transform: uppercase; }
+.cc-rr--band small { display: inline; font-weight: 500; letter-spacing: 0; color: var(--ink-50); margin: 0; }
+
+/* Edit mode: handles, moved rows in blue, a new row outlined, a removed one struck through. */
+.cc-rr__drag { all: unset; width: 18px; height: 22px; display: grid; place-items: center; color: var(--ink-50); cursor: grab; touch-action: none; border-radius: 4px; box-shadow: inset 3px 0 0 var(--cc-edge); }
+.cc-rr__drag:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+.cc-rr--dragging { z-index: 3; background: var(--raised); box-shadow: 0 8px 24px rgb(0 0 0 / .25); }
+.cc-rr--moved { box-shadow: inset 3px 0 0 var(--signal); background: color-mix(in srgb, var(--signal) 8%, transparent); }
+.cc-rr--ins { box-shadow: inset 0 0 0 1.5px var(--signal); border-radius: 8px; }
+.cc-rr--rem b { text-decoration: line-through; color: var(--ink-50); }
+.cc-rr--rem { background: color-mix(in srgb, var(--live) 5%, transparent); }
+.cc-rr--problem { box-shadow: inset 0 0 0 2px var(--standby); border-radius: 8px; }
+.cc-rr__in { color: var(--signal) !important; font-weight: 600; }
+.cc-rr__tools { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+.cc-rr__icon { all: unset; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--ink-50); cursor: pointer; }
+.cc-rr__icon:hover { color: var(--ink); background: var(--raised); }
+.cc-rr__icon:focus-visible { outline: 2px solid var(--signal); }
+.cc-rr__icon[aria-pressed="true"] { color: var(--signal); }
+.cc-rr__resize { all: unset; cursor: ns-resize; font: 500 13px var(--font-mono); color: var(--ink); padding: 2px 6px; border-radius: 4px; box-shadow: inset 0 -2px 0 var(--signal); touch-action: none; white-space: nowrap; }
+.cc-rr__resize:focus-visible { outline: 2px solid var(--signal); }
+.cc-rd--edit .cc-rr:not(.cc-rr--band) { grid-template-columns: 18px 92px 50px minmax(0, 1fr) 132px; }
+/* "Add here" between rows: quiet until it's pointed at or focused. */
+.cc-rr__add { height: 10px; position: relative; }
+.cc-rr__add button {
+  all: unset; position: absolute; left: 152px; right: 0; top: -6px; height: 22px; z-index: 2; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; font: 600 12px var(--font-text); color: var(--signal); opacity: 0;
+}
+.cc-rr__add button::after { content: ""; height: 1px; flex: 1; background: color-mix(in srgb, var(--signal) 40%, transparent); }
+.cc-rr__add button:hover, .cc-rr__add button:focus-visible { opacity: 1; }
+.cc-rr__drop { height: 0; position: relative; }
+.cc-rr__drop span { position: absolute; left: 30px; right: 0; top: -1px; border-top: 2px solid var(--signal); font: 600 11.5px var(--font-text); color: var(--signal); padding-top: 2px; z-index: 4; }
+
+/* Phase 4: a block's start and end as handles (f-blockplace's .spanrow, .spanhandle). */
+.cc-rr--handle { display: block; padding: 8px 0 0; border-bottom: 0; }
+.cc-span {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--cc-edge) 22%, transparent); box-shadow: inset 0 0 0 1.5px var(--cc-edge);
+}
+.cc-rr--handle-moved .cc-span, .cc-rr--handle-dragging .cc-span { background: color-mix(in srgb, var(--signal) 14%, transparent); box-shadow: inset 0 0 0 1.5px var(--signal); }
+.cc-span__grip { all: unset; flex: none; width: 30px; height: 18px; display: grid; place-items: center; cursor: ns-resize; touch-action: none; border-radius: 4px; }
+.cc-span__grip span { width: 30px; height: 6px; border-radius: 3px; background: var(--cc-edge); }
+.cc-rr--handle-moved .cc-span__grip span { background: var(--signal); }
+.cc-span__grip:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-span__grip--off { width: 30px; height: 6px; border-radius: 3px; background: var(--cc-edge); opacity: .45; }
+.cc-span__pick { all: unset; flex: 1; min-width: 0; cursor: pointer; }
+.cc-span__pick:disabled { cursor: default; }
+.cc-span__pick:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
+.cc-span__pick b { font-weight: 700; }
+.cc-span__pick small { font-weight: 500; color: var(--ink-70); }
+
+/* The pane (.pane2). */
+.cc-pane__h { margin: 0 0 4px; font: 700 17px var(--font-display); display: flex; align-items: center; }
+.cc-pane__sub { margin: 0; font-size: 12.5px; color: var(--ink-70); }
+.cc-kv2 { border-top: 1px solid var(--line); margin: 12px 0 0; }
+.cc-kv2 > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.cc-kv2 dt { color: var(--ink-70); }
+.cc-kv2 dd { margin: 0; font-weight: 600; text-align: right; }
+.cc-glance__sec { margin-top: 14px; }
+.cc-glance__h3 { margin: 0; font: 700 14px var(--font-display); }
+.cc-glance__sec .cc-kv2 { margin-top: 6px; }
+.cc-glance__next { margin-top: 18px; }
+.cc-glance__next .cc-pane__h { font-size: 15px; }
+.cc-bpane__strip { margin: 14px 0 6px; }
+.cc-blst { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.cc-blst > li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.cc-blst__sw { width: 10px; height: 10px; border-radius: 2px; }
+.cc-blst b { font-weight: 600; display: block; }
+.cc-blst small { display: block; font-size: 11.5px; color: var(--ink-70); }
+.cc-blst__m { font: 500 12.5px var(--font-mono); color: var(--ink-70); }
+.cc-blst__missed { color: var(--ink-50); }
+.cc-blst__missed b { font-weight: 500; }
+.cc-why { margin: 12px 0 0; font-size: 12px; color: var(--ink-70); line-height: 1.45; }
+
+/* Edit mode's pane: the picked row. */
+.cc-edit__summary { margin: 0 0 8px; font-weight: 600; font-size: 14px; }
+.cc-edit__warnings { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+.cc-edit__warnings li { color: var(--ink-70); padding-left: 10px; box-shadow: inset 2px 0 0 var(--standby); }
+.cc-edit__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cc-edit__fields { display: grid; gap: 12px; margin-top: 10px; }
+.cc-edit__lock { margin: 8px 0 10px; font-size: 13.5px; color: var(--standby); font-weight: 600; }
+.cc-edit__keep { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 600; }
+.cc-edit__keep small { display: block; font-size: 12px; font-weight: 400; color: var(--ink-70); }
+.cc-epane .cc-log__note { margin-top: 0; }
+
+/* The tray at the foot (.tray): the draft's changes, checked. */
+.cc-tray {
+  /* Sticks to the foot of the view while the day scrolls under it. */
+  position: sticky; bottom: 20px; z-index: 8; margin-top: 16px;
+  border-radius: 16px; background: var(--raised); padding: 14px 18px;
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px rgb(0 0 0 / .35);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  max-height: 46vh; overflow: auto;
+}
+.cc-tray b { font: 700 15px var(--font-display); }
+.cc-tray__lines { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; color: var(--ink-70); }
+.cc-tray__lines li { padding: 2px 0; display: flex; gap: 10px; align-items: baseline; }
+.cc-tray__warn { color: var(--standby); }
+.cc-tray__problem { color: var(--standby); font-weight: 600; }
+.cc-tray__problem::before { content: "Problem: "; }
+.cc-tray__undo { all: unset; cursor: pointer; color: var(--signal); font-weight: 600; font-size: 12px; }
+.cc-tray__undo:focus-visible { outline: 2px solid var(--signal); }
+.cc-tray__p { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-70); }
+.cc-tray__btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.cc-tray--conflict { box-shadow: 0 0 0 1px var(--standby), 0 18px 40px rgb(0 0 0 / .35); }
+
+/* The Add drawer (.drawer): tabs, search, choices with fit badges, quick fill. */
+.cc-add__tabs { margin: 14px 0 0; }
+.cc-add__search { margin: 12px 0 8px; }
+.cc-picks { list-style: none; margin: 0; padding: 0; }
+.cc-pick > button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13.5px; }
+.cc-pick > button:hover { background: var(--raised); }
+.cc-pick > button:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.cc-pick--hl > button { box-shadow: inset 3px 0 0 var(--signal); background: var(--raised); }
+.cc-pick__th { height: 36px; border-radius: 6px; background: linear-gradient(135deg, var(--cc-pc), color-mix(in srgb, var(--cc-pc) 55%, #000 45%)); }
+.cc-pick__w { min-width: 0; }
+.cc-pick b { display: block; font-weight: 600; }
+.cc-pick small { display: block; font-size: 12px; color: var(--ink-70); margin-top: 1px; }
+.cc-fitb { font: 600 11.5px var(--font-text); padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.cc-fitb--fits { color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.cc-fitb--over { color: var(--standby); box-shadow: inset 0 0 0 1px var(--standby); }
+.cc-fitb--next { color: var(--signal); box-shadow: inset 0 0 0 1px var(--signal); }
+.cc-add__more { all: unset; cursor: pointer; margin-top: 10px; font: 600 13px var(--font-text); color: var(--signal); }
+.cc-add__more:focus-visible { outline: 2px solid var(--signal); }
+.cc-quick { display: grid; gap: 8px; margin-top: 14px; }
+.cc-quick__card { padding: 12px 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.cc-quick__card b { display: block; font-weight: 600; }
+.cc-quick__card small { color: var(--ink-70); font-size: 12px; }
+
+/* The week (.wk): seven days as columns. */
+.cc-wk { border-top: 1px solid var(--line); margin-top: 4px; }
+.cc-wk__grid { display: grid; grid-template-columns: 52px repeat(7, minmax(0, 1fr)); position: relative; }
+.cc-wk__head { border-bottom: 1px solid var(--line); }
+.cc-wk__hd { all: unset; box-sizing: border-box; cursor: pointer; padding: 8px 6px; font: 700 13px var(--font-display); min-width: 0; }
+.cc-wk__hd:hover { background: var(--raised); }
+.cc-wk__hd:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.cc-wk__hd small { display: block; font: 500 11px var(--font-text); color: var(--ink-50); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-wk__hd--today { box-shadow: inset 0 -3px 0 var(--signal); }
+.cc-wk__edited { color: var(--standby); }
+.cc-wk__scroll { max-height: 600px; overflow-y: auto; }
+.cc-wk__scroll:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.cc-wk__tcol { position: relative; }
+.cc-wk__tcol span { position: absolute; right: 6px; font: 500 10.5px var(--font-mono); color: var(--ink-50); transform: translateY(-2px); }
+.cc-wk__col { position: relative; border-left: 1px solid var(--hair); min-width: 0; }
+.cc-wk__ev {
+  all: unset; box-sizing: border-box; position: absolute; left: 7px; right: 3px; cursor: pointer;
+  border-radius: 5px; padding: 3px 6px; font-size: 11px; font-weight: 600; overflow: hidden; line-height: 1.2;
+  background: var(--ink-70); color: #FFFFFF;
+}
+.cc-wk__ev:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; z-index: 2; }
+.cc-wk__t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-wk__ev small { display: block; font-weight: 500; font-size: 10px; }
+.cc-wk__ev--live { box-shadow: inset 0 0 0 2px var(--on-screen); }
+.cc-wk__ev--gap { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby) 30%, transparent) 0 5px, transparent 5px 10px); color: var(--standby); box-shadow: inset 0 0 0 1px var(--standby); }
+.cc-wk__ev--off { background: repeating-linear-gradient(135deg, var(--hair) 0 5px, transparent 5px 10px); color: var(--ink-50); }
+.cc-wk__band { position: absolute; left: 1px; width: 4px; border-radius: 2px; }
+.cc-wk__now { position: absolute; left: 0; right: 0; height: 2px; background: var(--live); z-index: 2; pointer-events: none; }
+
+/* Templates and off air hours, in their dialogs. */
 .cc-rep { display: grid; gap: 14px; }
 .cc-rep__seg { justify-self: start; }
 .cc-offair { display: grid; gap: 14px; }
 .cc-offair__rule { margin: 0; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--hair); display: grid; gap: 10px; justify-items: start; }
 .cc-offair__times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
 
-/* Edit mode (2026-09-29; no frame draws it): the log's own blocks, a changed one marked with a
-   signal edge, a locked one quieter, one with a problem outlined in standby amber. */
-.cc-log__end { display: flex; align-items: center; gap: 10px; }
-.cc-log__main > .cc-edit__bar { margin-bottom: 14px; }
-.cc-edit__blk { touch-action: none; user-select: none; }
-/* On a touch screen the page scrolls under a finger; a start is typed there instead. */
-@media (pointer: coarse) { .cc-edit__blk { touch-action: auto; } }
-button.cc-edit__blk { cursor: grab; }
-.cc-edit__blk--dragging { cursor: grabbing; opacity: .9; z-index: 2; }
-.cc-edit__blk--changed { box-shadow: inset 3px 0 0 var(--signal), inset 0 0 0 1px var(--hair); }
-.cc-edit__blk--locked { cursor: default; opacity: .7; }
-button.cc-edit__blk--locked { cursor: not-allowed; }
-.cc-edit__blk--problem { box-shadow: inset 0 0 0 2px var(--standby); }
-.cc-edit__blk.oc-blk--sel { box-shadow: inset 0 0 0 2px var(--signal); }
-.cc-edit__summary { margin: 0 0 8px; font-weight: 600; font-size: 14px; }
-.cc-edit__lines, .cc-edit__problems, .cc-edit__warnings, .cc-edit__past { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
-.cc-edit__lines li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.cc-edit__problems li { color: var(--standby); }
-.cc-edit__problems li::before { content: "Problem: "; font-weight: 600; }
-.cc-edit__warnings li { color: var(--ink-70); padding-left: 10px; box-shadow: inset 2px 0 0 var(--standby); }
-.cc-edit__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.cc-edit__fields { display: grid; gap: 12px; margin-top: 10px; }
-.cc-edit__lock { margin: 8px 0 10px; font-size: 13.5px; color: var(--standby); font-weight: 600; }
-.cc-edit__from { margin-bottom: 12px; }
-.cc-edit__choices { max-height: 320px; overflow: auto; }
-.cc-edit__last { margin: 0 0 8px; }
-.cc-edit__past li { display: grid; gap: 1px; }
-.cc-edit__past small { color: var(--ink-50); font-size: 12px; }
-
-/* The week: seven days side by side, the hours once at the left. */
-.cc-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.cc-week__h { margin: 0 0 4px; font: 600 13px var(--font-text); color: var(--ink-70); }
-.cc-week__day .oc-tl { grid-template-columns: 0 1fr; }
-.cc-week__day .oc-tl__hrs { visibility: hidden; }
-.cc-week__day:first-child .oc-tl { grid-template-columns: 44px 1fr; }
-.cc-week__day:first-child .oc-tl__hrs { visibility: visible; }
-
 @media (max-width: 1100px) {
-  .cc-log__split { grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; }
-  .cc-log__pane { padding-left: 20px; }
+  .cc-log__split { grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
+  .cc-rr__bar { width: 140px; }
 }
+/* The phone (Phase 4, opencast-schedule 08): the rundown is the whole screen, the day and its
+   chips on top (staying there while the rows scroll), a break or a row picked as a bottom sheet. */
 @media (max-width: 767px) {
   .cc-log { padding: 14px 16px; }
+  .cc-log__bar { position: sticky; top: 0; z-index: 6; background: var(--ground); margin: 0 -16px; padding: 0 16px; }
+  .cc-log--phone .cc-daynav { padding: 8px 0; gap: 8px; }
+  .cc-log--phone .cc-daynav__day { font-size: 15px; }
+  .cc-log--phone .cc-hchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 0; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+  .cc-log--phone .cc-hchips::-webkit-scrollbar { display: none; }
+  .cc-log--phone .cc-hchip { flex: none; white-space: nowrap; }
+  .cc-log--phone .cc-log__record { margin-top: 8px; }
+  .cc-log__sheet .cc-bpane, .cc-log__sheet .cc-epane, .cc-log__sheet .cc-edit__entry { padding-bottom: 8px; }
   .cc-offair__times { grid-template-columns: minmax(0, 1fr); }
   .cc-log .oc-control-title { flex-wrap: wrap; }
-  .cc-log__days { overflow-x: auto; }
   .cc-log__split { grid-template-columns: minmax(0, 1fr); }
-  .cc-log__pane { border-left: 0; padding-left: 0; border-top: 1px solid var(--hair); padding-top: 18px; }
-  .cc-week { grid-template-columns: repeat(7, 120px); overflow-x: auto; }
+  .cc-log__pane { border-left: 0; padding-left: 0; border-top: 1px solid var(--hair); padding-top: 18px; position: static; }
+  .cc-rr { grid-template-columns: 6px 66px minmax(0, 1fr) 54px; gap: 8px; font-size: 13px; }
+  .cc-rr .cc-code2 { display: none; }
+  .cc-rr__edge { margin-left: 0; width: 4px; }
+  .cc-rr__bar { width: 80px; }
+  .cc-rr--band { padding-left: 14px; }
+  .cc-rd--edit .cc-rr:not(.cc-rr--band) { grid-template-columns: 18px 66px minmax(0, 1fr) auto; }
+  .cc-rr__add button { left: 80px; }
+  .cc-tray { bottom: 12px; grid-template-columns: minmax(0, 1fr); }
+  .cc-tray__btns { justify-content: flex-start; }
+  .cc-wk__scroll, .cc-wk__head { overflow-x: auto; }
+  .cc-wk__grid { grid-template-columns: 44px repeat(7, 96px); }
+  .cc-wk { overflow-x: auto; }
 }
-
-/* A244: a programming block's pane, and the dragged program's "In Late Crate Nights". */
-.cc-log__swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: 1px; }
-.cc-edit__in { display: block; margin-top: 2px; font-weight: 600; color: var(--signal); }
-.cc-log__tblocks { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-70); }

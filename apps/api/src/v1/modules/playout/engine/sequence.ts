@@ -446,6 +446,94 @@ export class BoundaryDecider {
   }
 }
 
+// ---- Up next with its own cadence (S20, 2026-10-03, A246) ------------------------------------
+//
+// Precedence. Left out (`cadence.upNext` unset: every station before S20, and any that never sets
+// it), Up next is just a role: it airs as often as the position holding it (`open.every`,
+// `close.every` or `between.every`), exactly as before. Set, Up next goes by its own cadence and
+// the position's `every` governs only its other roles: it airs in the first position that has
+// its role (open, then close, then between), or between programs, last, when no position has it;
+// `never` takes it off everywhere. A programming block with its own bumper order keeps deciding
+// Up next with its own sequences, as before (A244): `cadence.upNext` is the station's. Up next
+// still airs at most once per break and the boundary after it, and only with an up-next bumper
+// in the library and something on next.
+
+/** Where Up next airs when it has its own cadence: the first position with its role, else between programs. */
+export function upNextHome(seq: BumperSequences): Position {
+  return (["open", "close", "between"] as const).find((p) => seq[p].roles.includes("up_next")) ?? "between";
+}
+
+/** The roles a position airs with Up next taken out (it goes by its own cadence). */
+export function withoutUpNext(rule: PositionRule): PositionRule {
+  return { ...rule, roles: rule.roles.filter((r) => r !== "up_next") };
+}
+
+/** Up next put back in a position's roles where the sequence has it (else last). */
+export function withUpNext(seq: BumperSequences, position: Position, roles: BumperRole[]): BumperRole[] {
+  if (roles.includes("up_next")) return roles;
+  const order = seq[position].roles;
+  const at = order.indexOf("up_next");
+  if (at < 0) return [...roles, "up_next"];
+  // Before the first role that comes after it in the sequence.
+  const after = order.slice(at + 1);
+  const i = roles.findIndex((r) => after.includes(r));
+  return i < 0 ? [...roles, "up_next"] : [...roles.slice(0, i), "up_next", ...roles.slice(i)];
+}
+
+/**
+ * Whether Up next airs at each chance, in order (S20): a break (at its end) where its home is a
+ * break position, a program boundary where it's between programs. A break and the boundary right
+ * after it are one chance (decided once). Chances that are over go by the as-run log when the
+ * cadence needs history (once an hour, every N programs), as `BoundaryDecider` does.
+ */
+export class UpNextDecider {
+  private last: number | null;
+  private readonly times: number[];
+  private readonly decided = new Map<number, boolean>();
+  private i = 0;
+
+  constructor(
+    private readonly input: {
+      cadence: Cadence;
+      /** When an up-next bumper last aired before the walk, and the times inside it (as-run). */
+      last: number | null;
+      times: number[];
+      settledBefore: number;
+      hourStart(t: number): number;
+      /** Program and live starts on the log, for "every N programs". */
+      starts: number[];
+    }
+  ) {
+    this.last = input.last;
+    this.times = [...input.times].sort((a, b) => a - b);
+  }
+
+  /** `at`: the break's end (the next program's start, for a closing break) or the boundary. `from`: the break's start. */
+  next(chance: { at: number; from?: number; afterProgram: boolean }): boolean {
+    const { at, afterProgram } = chance;
+    const known = this.decided.get(at);
+    if (known !== undefined) return known;
+    const from = chance.from ?? at - BOUNDARY_SPAN_MS;
+    while (this.i < this.times.length && this.times[this.i] < from) this.last = Math.max(this.last ?? -Infinity, this.times[this.i++]);
+    const c = this.input.cadence;
+    const aired = this.times.some((t) => t >= from && t <= at);
+    let airs: boolean;
+    if (c.every === "never") airs = false;
+    else if (aired) airs = true;
+    else if (at < this.input.settledBefore && (c.every === "hour" || c.every === "n_programs")) airs = false;
+    else if (c.every === "break") airs = true;
+    else if (c.every === "program") airs = afterProgram;
+    else if (c.every === "hour") airs = this.last === null || this.last < this.input.hourStart(chance.from ?? at);
+    else {
+      const last = this.last;
+      airs = afterProgram && (last === null || this.input.starts.filter((s) => s > last && s <= at).length >= (c.n ?? DEFAULT_N));
+    }
+    if (airs) this.last = Math.max(this.last ?? -Infinity, at);
+    this.decided.set(at, airs);
+    return airs;
+  }
+}
+
 /**
  * A break's bumpers when they weren't picked with it (a slot from elsewhere): the defaults, the
  * library's first Any bumper into the break and its second (or the first again) out of it, where
@@ -500,4 +588,18 @@ export async function bumperHistory(
       : Promise.resolve(null)
   ]);
   return { seedRows, airedRows, lastBetween };
+}
+
+/**
+ * S20: when an up-next bumper last aired before `start`, and when it aired from `start` to `to`
+ * (the as-run log is playout's; the log's walk reads it here, as `bumperHistory`).
+ */
+export async function upNextAired({ deps }: Pick<ModuleContext, "deps">, stationId: string, start: Date, to: Date): Promise<{ last: number | null; times: number[] }> {
+  const AR = schema.asRun;
+  const upNext = and(eq(AR.stationId, stationId), eq(AR.code, "BMP"), eq(AR.bumperRole, "up_next"));
+  const [before, within] = await Promise.all([
+    deps.db.select({ at: sql<Date>`max(${AR.startedAt})` }).from(AR).where(and(upNext, lt(AR.startedAt, start))),
+    deps.db.select({ at: AR.startedAt }).from(AR).where(and(upNext, gte(AR.startedAt, start), lt(AR.startedAt, to)))
+  ]);
+  return { last: before[0]?.at ? new Date(before[0].at).getTime() : null, times: within.map((r) => r.at.getTime()) };
 }

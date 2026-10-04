@@ -1,0 +1,13 @@
+/* A246: a drawer (the schedule reference's .drawer): the modal's parts along the right edge. */
+.oc-backdrop--drawer { place-items: stretch end; }
+.oc-drawer {
+  /* The drawer's lift: black, whatever the ground, as the modal's. */
+  --oc-drawer-lift: -20px 0 40px rgb(0 0 0 / .3);
+  width: 470px; max-width: 100%; height: 100%;
+  background: var(--ground); color: var(--ink);
+  box-shadow: -1px 0 0 var(--line), var(--oc-drawer-lift);
+  display: flex; flex-direction: column; overflow: hidden;
+  outline: none;
+}
+.oc-drawer .oc-modal__head { padding: 22px 24px 0; border-bottom: 0; }
+.oc-drawer .oc-modal__main { padding: 0 24px 22px; }

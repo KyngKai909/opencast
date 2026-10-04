@@ -151,10 +151,15 @@ export interface OffAirHoursSectionProps {
   stationId: string;
   callSign: string;
   phone: boolean;
+  /**
+   * A246: the Schedule's Templates tab shows the hours first, as the "Every day" rule that applies
+   * to every template and date (opencast-schedule 06), in a dashed card above the templates.
+   */
+  everyDay?: boolean;
 }
 
 /** The pane's "Off air hours", as the frame draws it, with Change. */
-export function OffAirHoursSection({ stationId, callSign, phone }: OffAirHoursSectionProps) {
+export function OffAirHoursSection({ stationId, callSign, phone, everyDay = false }: OffAirHoursSectionProps) {
   const hours = useOffAirHours(stationId);
   const t = useNow(60_000).getTime();
   const [editing, setEditing] = useState(false);
@@ -171,6 +176,26 @@ export function OffAirHoursSection({ stationId, callSign, phone }: OffAirHoursSe
     ];
   });
   if (next) items.push({ label: "Next", value: next });
+
+  // A246 (Phase 4): the Templates tab's dashed "Every day" card, as 06 draws it: one line and Change.
+  if (everyDay) {
+    const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+    const line = hours.isError ? hours.error.message : rules.length ? `Off air ${rules.map((r) => lower(r.label)).join("; ")}. Applies to every template and date` : hours.data ? `No off air hours: ${callSign} stays on around the clock. Hours set here apply to every template and date` : null;
+    return (
+      <section className="cc-tcard cc-tcard--every" aria-labelledby="cc-log-offair">
+        <h2 className="cc-tcard__h" id="cc-log-offair">
+          Every day
+        </h2>
+        {line && <small className="cc-tcard__line">{line}</small>}
+        {hours.data && (
+          <button type="button" className="cc-btn-xs cc-tcard__btn" onClick={() => setEditing(true)}>
+            Change<span className="oc-sr-only"> the off air hours</span>
+          </button>
+        )}
+        {editing && <OffAirHoursForm stationId={stationId} callSign={callSign} hours={hours.data} phone={phone} onClose={() => setEditing(false)} />}
+      </section>
+    );
+  }
 
   return (
     <section className="cc-log__sec" aria-labelledby="cc-log-offair">

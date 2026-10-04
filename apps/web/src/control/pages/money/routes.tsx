@@ -1,8 +1,8 @@
-// The Money area's routes, under `/control/:callSign` (a studio's `/control/:handle` too).
+// The Money area's routes, under `/control/:callSign` (a studio's `/control/:handle` too). A246:
+// Breaks went to the Schedule (its old route redirects: pages/onair/OldRoute.tsx).
 
 import { Route } from "react-router";
 import Audience from "./Audience";
-import Breaks from "./Breaks";
 import Earnings from "./Earnings";
 import Orders from "./Orders";
 import Sponsors from "./Sponsors";
@@ -13,7 +13,6 @@ import StudioSpotRotation from "./StudioSpotRotation";
 
 export const moneyStationRoutes = (
   <>
-    <Route path="breaks" element={<Breaks />} />
     <Route path="spot-market" element={<SpotMarket />} />
     <Route path="spot-market/rotation" element={<SpotMarket tab="rotation" />} />
     <Route path="spot-market/orders" element={<Orders />} />
