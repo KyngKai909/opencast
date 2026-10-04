@@ -6,13 +6,13 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 
-const BARS: Array<{ label: string; colour: string; style: CSSProperties }> = [
-  { label: "%", colour: "#E5484D", style: { top: 0, height: "100%" } },
-  { label: "vh", colour: "#F5A524", style: { top: 0, height: "100vh" } },
-  { label: "dvh", colour: "#30A46C", style: { top: 0, height: "100dvh" } },
-  { label: "lvh", colour: "#3E63DD", style: { top: 0, height: "100lvh" } },
-  { label: "svh", colour: "#8E4EC6", style: { top: 0, height: "100svh" } },
-  { label: "b0", colour: "#FFFFFF", style: { bottom: 0, height: 40 } }
+const BARS: Array<{ label: string; fill: string; style: CSSProperties }> = [
+  { label: "%", fill: "#E5484D", style: { top: 0, height: "100%" } },
+  { label: "vh", fill: "#F5A524", style: { top: 0, height: "100vh" } },
+  { label: "dvh", fill: "#30A46C", style: { top: 0, height: "100dvh" } },
+  { label: "lvh", fill: "#3E63DD", style: { top: 0, height: "100lvh" } },
+  { label: "svh", fill: "#8E4EC6", style: { top: 0, height: "100svh" } },
+  { label: "b0", fill: "#FFFFFF", style: { bottom: 0, height: 40 } }
 ];
 
 function installed(): boolean {
@@ -56,7 +56,7 @@ export function ViewportProbe() {
   return (
     <div aria-hidden="true" style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none" }}>
       {BARS.map((b, i) => (
-        <div key={b.label} data-probe={b.label} style={{ position: "fixed", right: 2 + i * 7, width: 5, background: b.colour, ...b.style }} />
+        <div key={b.label} data-probe={b.label} style={{ position: "fixed", right: 2 + i * 7, width: 5, background: b.fill, ...b.style }} />
       ))}
       <div style={{ position: "fixed", left: 8, top: "38%", padding: "6px 8px", borderRadius: 8, background: "rgb(0 0 0 / .78)", color: "#fff", font: "600 11px/1.45 ui-monospace, monospace" }}>
         {lines.map((l) => (
