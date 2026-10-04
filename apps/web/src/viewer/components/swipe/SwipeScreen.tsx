@@ -251,12 +251,15 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     [ids, fromId, w.channels]
   );
 
-  // The player has taken over (its picture, its static, its needle or its off-air screen): the
-  // swipe's own layer goes.
+  // The player has taken over (its picture, its needle or its off-air screen): the swipe's own layer
+  // goes. 2026-10-04: a station that wasn't ready keeps the swipe's static and corner number until its
+  // picture arrives (swipe home 08, "Incoming station"); handing over to the player's own static the
+  // moment it started tuning drew a second, bigger number and restarted the static, which flashed.
   useEffect(() => {
     if (!landing) return;
     const id = landing.id;
-    const done = (s.currentId === id && !s.pendingId) || s.tuning?.stationId === id || s.status === "standby";
+    const settled = s.status !== "tuning" && s.status !== "idle" && !s.tuning;
+    const done = (s.currentId === id && !s.pendingId && (landing.picture || settled)) || s.status === "standby";
     if (done) {
       engine.peek(null);
       setPeek(null);
@@ -421,7 +424,7 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
   return (
     <div
       ref={root}
-      className={cx("vw-sw", `vw-sw--${form.device}`, landscape ? "vw-sw--land" : "vw-sw--port", paused && "vw-sw--paused", hiddenChrome && "vw-sw--quiet", livePlace && "vw-sw--behind")}
+      className={cx("vw-sw", `vw-sw--${form.device}`, landscape ? "vw-sw--land" : "vw-sw--port", paused && "vw-sw--paused", hiddenChrome && "vw-sw--quiet", livePlace && "vw-sw--behind", landing && !landing.picture && "vw-sw--landing")}
       style={{ "--vw-sw-glow": glow } as CSSProperties}
     >
       <div className="vw-sw__touch" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}>
