@@ -42,8 +42,17 @@
 .vw-sw__osd.is-on { opacity: 1; }
 .vw-sw__n { display: block; font: 500 34px var(--font-mono); letter-spacing: -.04em; }
 .vw-sw__c { display: block; font-size: 15px; margin-top: 3px; }
-/* The player's own corner number sits in the same place. */
+/* The player's own corner number sits in the same place, at the same size, so a channel change by
+   number or button draws it exactly as a swipe does (2026-10-04: it was up to 64 px, scaled by a
+   picture cropped wider than the screen, and looked like the number jumping). */
 .vw-sw--port .oc-tune__osd { top: calc(var(--vw-sw-safe) + 96px); right: 76px; }
+.vw-sw .oc-tune__n { font-size: 34px; }
+.vw-sw .oc-tune__c { font-size: 15px; margin-top: 3px; }
+/* A swipe onto a station that wasn't ready: the swipe's static and number stay until its picture
+   arrives, so the player's own (a second number, the static restarting) stays out of sight. */
+.vw-sw--landing .oc-tune { visibility: hidden; }
+.vw-sw--landing .vw-sw__cur { z-index: 0; }
+.vw-sw--landing .vw-sw__peek:not(.vw-sw__peek--front) { z-index: 1; }
 .vw-sw--port .oc-tune__hold { bottom: calc(var(--vw-sw-bar) + 190px); }
 
 /* Paused: the picture dimmed, a play mark with "Paused at" and the time. */

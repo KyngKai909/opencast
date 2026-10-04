@@ -49,7 +49,7 @@ async function watchForStatic(page: Page) {
 }
 const sawStatic = (page: Page) => page.evaluate(() => (window as unknown as { __static: boolean }).__static);
 
-test("swiping: presets first, then the detent into the dial; a ready picture arrives with no static", async ({ page }) => {
+test("swiping: presets first, then the detent into the dial; every swipe lands with a short burst of static", async ({ page }) => {
   await seed(page);
   await page.goto("/");
   // The app opens straight onto preset 1, and the URL follows the channel.
@@ -62,14 +62,15 @@ test("swiping: presets first, then the detent into the dial; a ready picture arr
   await page.mouse.click(150, 400);
   await expect(player).toHaveAttribute("data-status", "playing");
 
-  // The next preset is kept ready: the swipe shows its picture and lands without static.
+  // The next preset is kept ready: the swipe shows its picture while dragging, and lands with a short
+  // burst of static all the same (2026-10-04, the user's decision: static on every swipe).
   await page.waitForTimeout(2500);
   await watchForStatic(page);
   await drag(page, -320);
   await expect(page).toHaveURL(/\/watch\/sazn$/);
   await expect(page.getByText("Preset 2 of 2", { exact: true })).toBeAttached();
   await expect(player).toHaveAttribute("data-status", "playing");
-  expect(await sawStatic(page)).toBe(false);
+  expect(await sawStatic(page)).toBe(true);
 
   // From the last preset into the dial: the detent says so, and a short pull springs back.
   await page.waitForTimeout(1200);
