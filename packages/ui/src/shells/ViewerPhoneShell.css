@@ -22,9 +22,10 @@
 
 /* ---------- The floating bar (A245; swipe home 08, "Floating bar") ----------
    The four tabs in a pill on the left, the round Tune button on its own at the right, floating
-   14 px from the screen's edges and 22 px above the home indicator. On the picture it's dark glass;
+   14 px from the screen's edges and just clear of the home indicator (the user's call, 2026-10-03: a
+   little lower than the reference's 22 px above it). On the picture it's dark glass;
    on the app's ground (Guide, Search, You) the raised colour. The page runs underneath. */
-.oc-viewer-phone--floating { --oc-float-gap: 14px; --oc-float-bottom: max(22px, env(safe-area-inset-bottom, 0px)); --oc-float-h: 58px; padding-bottom: 0; }
+.oc-viewer-phone--floating { --oc-float-gap: 14px; --oc-float-bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) - 12px)); --oc-float-h: 58px; padding-bottom: 0; }
 .oc-viewer-phone--floating .oc-viewer-phone__main { position: relative; }
 /* The page clears the bar (and the mini player above it) at the end of its scroll. */
 .oc-viewer-phone--barred:not(.oc-viewer-phone--picture) .oc-viewer-phone__main { padding-bottom: calc(var(--oc-float-bottom) + var(--oc-float-h) + 16px); }
