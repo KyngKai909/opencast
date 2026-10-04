@@ -369,6 +369,18 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       // come often enough but the cadence leaves more than an hour, it's a warning, not a block.
       // Planned off air time doesn't count against it: the station signs off and back on with its ID.
       const sidEntries = entries.filter((e) => e.code === "SID").map((e) => e.startsAt.getTime());
+      // A247, after every N programs: between the others, the time a program leaves of its slot airs
+      // as open time, with the station ID (where there's room for it, and no break there).
+      if (rule.everyPrograms) {
+        const items = await services.library.itemsByIds(entries.filter((e) => e.kind === "program" && e.assetId).map((e) => e.assetId!));
+        const breakAt = new Set(breaks.map((b) => Date.parse(b.startsAt)));
+        for (const e of entries) {
+          const ms = e.kind === "program" && e.assetId ? items.get(e.assetId)?.durationMs : undefined;
+          if (!ms) continue;
+          const end = e.startsAt.getTime() + ms;
+          if (e.endsAt.getTime() - end >= STATION_ID_MS && !breakAt.has(end)) sidEntries.push(end);
+        }
+      }
       const offAirMarks = offAir.flatMap((o) => [Math.max(now.getTime(), Date.parse(o.startsAt)), Math.min(day.getTime(), Date.parse(o.endsAt))]);
       const inOffAir = (a: number, b: number) => offAir.some((o) => Date.parse(o.startsAt) <= a && Date.parse(o.endsAt) >= b);
       const longestWithout = (breakTimes: number[]) => {

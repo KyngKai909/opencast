@@ -293,6 +293,35 @@ test("BEAT previews a break rule, then saves it", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Break, 9:29:00 pm" }).getByRole("img", { name: "Bumper :10, Bumper :10, Open 1:35, ID :05" })).toBeVisible();
 });
 
+// A247: breaks at set times each hour. Clock breaks at :15 and :45, seen in the hour rebuilt before saving, then saved.
+test("BEAT sets clock breaks at :15 and :45, sees the preview change, and saves", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule/rules");
+  await page.getByRole("button", { name: "An hour later" }).click();
+  const preview = page.getByRole("region", { name: "Preview: 10:00 to 11:00 pm" });
+  const hour = preview.getByRole("list", { name: "The hour, rebuilt" });
+  await expect(preview.getByText("Rebuilt with the rules as saved")).toBeVisible();
+  // Every 30 minutes: Slow Hours' first break is at 11:00 pm, past this hour.
+  await expect(hour.getByText("Slow Hours")).toBeVisible();
+  await expect(hour.getByText("10:45:00")).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Breaks come" }).selectOption("clock");
+  const minutes = page.getByRole("group", { name: "Minutes past the hour" });
+  for (const m of [":15", ":45", ":00", ":30"]) await minutes.getByRole("button", { name: m }).click();
+  await expect(minutes.getByRole("button", { name: ":15" })).toHaveAttribute("aria-pressed", "true");
+  await expect(minutes.getByRole("button", { name: ":30" })).toHaveAttribute("aria-pressed", "false");
+  // Rebuilt before saving: Slow Hours pauses at 10:45 (Late Crate fills its slot, so it isn't cut at 10:15).
+  await expect(preview.getByText("Rebuilt with the rules as set. Nothing is saved yet")).toBeVisible();
+  await expect(hour.getByText("10:45:00")).toBeVisible();
+  await expect(page.getByText("Unsaved changes")).toBeVisible();
+  await page.getByRole("button", { name: "Save break rules" }).click();
+  await expect(page.getByText("Break rules saved.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save break rules" })).toBeDisabled();
+  // Saved: still so after a reload.
+  await page.reload();
+  await expect(page.getByRole("combobox", { name: "Breaks come" })).toHaveValue("clock");
+  await expect(page.getByRole("group", { name: "Minutes past the hour" }).getByRole("button", { name: ":45" })).toHaveAttribute("aria-pressed", "true");
+});
+
 test("BEAT fills dead air from the Add drawer", async ({ page }) => {
   await signInAs(page, "kai");
   await page.goto("/control/beat/schedule");

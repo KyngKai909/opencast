@@ -404,7 +404,8 @@ export function withChipCadence(rule: BreakRule, part: ChipPart, c: BreakCadence
 
 /** Two rules the same (as the form sees them: blocked categories in any order). */
 export function sameRule(a: BreakRule, b: BreakRule): boolean {
-  const norm = (r: BreakRule) => JSON.stringify({ ...r, blockedCategories: [...r.blockedCategories].sort(), fillOrder: fillOrder(r.fillOrder), cadence: cadenceOf(r), bumperSequences: sequencesOf(r) }, (_k, v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y))) : v));
+  // A247's fields left out read as not set.
+  const norm = (r: BreakRule) => JSON.stringify({ ...r, blockedCategories: [...r.blockedCategories].sort(), fillOrder: fillOrder(r.fillOrder), cadence: cadenceOf(r), bumperSequences: sequencesOf(r), everyPrograms: r.everyPrograms ?? null, clockMinutes: r.clockMinutes ?? null, longPrograms: r.longPrograms ?? null }, (_k, v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y))) : v));
   return norm(a) === norm(b);
 }
 
@@ -466,4 +467,122 @@ export function recipeOf(rule: BreakRule, items: Bumper[], at: Date): { inBreak:
   const inBreak = [...open, ...middle, ...close, sid];
   const between = bumpers("between").filter((p) => p.kind !== "upnext" || !inBreak.some((x) => x.kind === "upnext"));
   return { inBreak, between };
+}
+
+// ---- When breaks come (A247, 2026-10-04) ----
+
+/**
+ * "Breaks come", as one choice: after every program, after every N programs (`everyPrograms`),
+ * every N minutes, at set times each hour (`clockMinutes`, which the API keeps under
+ * `every_n_minutes`), never. Inside long programs (`longPrograms`) is a switch beside it.
+ */
+export type Timing = "program" | "programs" | "minutes" | "clock" | "none";
+
+/** The N choices for after every N programs (the API takes 2 to 12). */
+export const EVERY_PROGRAMS = [2, 3, 4, 5, 6];
+/** Every N minutes: 5 to 60, by 5. */
+export const EVERY_MINUTES = Array.from({ length: 12 }, (_, i) => (i + 1) * 5);
+/** The clock's chips: :00 to :55, by 5. */
+export const CLOCK_MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
+/** At most this many clock times an hour (the API's limit). */
+export const MAX_CLOCK_TIMES = 6;
+/** Inside long programs: longer than, and every. */
+export const LONG_OVER_MINUTES = [30, 45, 60, 90];
+export const LONG_EVERY_MINUTES = [10, 15, 20, 25, 30, 40, 45, 50, 60];
+/** The clock's times when they're first chosen: the top and bottom of the hour. */
+export const DEFAULT_CLOCK = [0, 30];
+/** Inside long programs when it's switched on: over 45 minutes, every 30. */
+export const DEFAULT_LONG = { overMs: 45 * 60_000, everyMs: 30 * 60_000 };
+/** Less program than this between two breaks and the later one is skipped (the API's `MIN_RUN_MS`). */
+export const MIN_RUN_MINUTES = 5;
+
+/** The rule's choice for "Breaks come". */
+export function timingOf(rule: Pick<BreakRule, "mode" | "everyPrograms" | "clockMinutes">): Timing {
+  if (rule.mode === "after_every_program") return rule.everyPrograms ? "programs" : "program";
+  if (rule.mode === "every_n_minutes") return rule.clockMinutes?.length ? "clock" : "minutes";
+  return "none";
+}
+
+/** Inside long programs applies (every N minutes already breaks inside every program). */
+export function longApplies(rule: Pick<BreakRule, "mode" | "everyPrograms" | "clockMinutes">): boolean {
+  return timingOf(rule) !== "minutes";
+}
+
+/** The rule with "Breaks come" changed: N, minutes and clock times kept from before where they were set. */
+export function withTiming(rule: BreakRule, timing: Timing): BreakRule {
+  const minutes = rule.mode === "every_n_minutes" && !rule.clockMinutes?.length ? (rule.everyMinutes ?? 30) : 30;
+  const clock = rule.clockMinutes?.length ? rule.clockMinutes : DEFAULT_CLOCK;
+  const base = { ...rule, everyPrograms: null, clockMinutes: null };
+  switch (timing) {
+    case "program":
+      return { ...base, mode: "after_every_program", everyMinutes: null };
+    case "programs":
+      return { ...base, mode: "after_every_program", everyMinutes: null, everyPrograms: rule.everyPrograms ?? 2 };
+    case "minutes":
+      // Every N minutes breaks inside every program: inside long programs doesn't apply.
+      return { ...base, mode: "every_n_minutes", everyMinutes: minutes, longPrograms: null };
+    case "clock":
+      return withClock({ ...base, mode: "every_n_minutes" }, clock);
+    case "none":
+      return { ...base, mode: "none", everyMinutes: null };
+  }
+}
+
+/** The rule with its clock times (sorted); the minutes apps from before show follow (60 over how many). None chosen: as it was. */
+export function withClock(rule: BreakRule, minutes: readonly number[]): BreakRule {
+  const list = [...new Set(minutes)].sort((a, b) => a - b);
+  if (!list.length) return rule;
+  return { ...rule, mode: "every_n_minutes", clockMinutes: list, everyMinutes: Math.round(60 / list.length) };
+}
+
+/** How far apart clock times must be, in minutes: 10, or the break's length and five minutes of program. */
+export function clockGapMinutes(lengthMs: number): number {
+  return Math.max(10, Math.ceil(lengthMs / 60_000 + MIN_RUN_MINUTES));
+}
+
+/** What's wrong with the clock times (the API's own words), or null. */
+export function clockProblem(rule: Pick<BreakRule, "lengthMs" | "clockMinutes">): string | null {
+  const list = rule.clockMinutes ?? [];
+  if (list.length > MAX_CLOCK_TIMES) return `Choose ${MAX_CLOCK_TIMES} times an hour at most.`;
+  const need = clockGapMinutes(rule.lengthMs);
+  const close = list.length > 1 && list.some((m, i) => ((list[(i + 1) % list.length]! - m + 60) % 60 || 60) < need);
+  return close ? `Leave at least ${need} minutes between break times.` : null;
+}
+
+/** ":15", ":05". */
+export const clockMinute = (m: number) => `:${String(m).padStart(2, "0")}`;
+
+/** ":15 and :45", ":00, :20 and :40". */
+export function clockWords(minutes: readonly number[]): string {
+  const said = minutes.map(clockMinute);
+  return said.length < 2 ? (said[0] ?? "") : `${said.slice(0, -1).join(", ")} and ${said[said.length - 1]}`;
+}
+
+/** "2nd", "3rd", "4th". */
+export function ordinal(n: number): string {
+  const tail = n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${tail}`;
+}
+
+/** "Breaks come" in the Log's words: "after every 2 programs", "at :15 and :45 each hour". */
+export function timingWords(rule: Pick<BreakRule, "mode" | "everyMinutes" | "everyPrograms" | "clockMinutes">): string {
+  switch (timingOf(rule)) {
+    case "program":
+      return "after every program";
+    case "programs":
+      return `after every ${rule.everyPrograms} programs`;
+    case "minutes":
+      return `every ${rule.everyMinutes ?? 30} minutes`;
+    case "clock":
+      return `at ${clockWords(rule.clockMinutes ?? [])} each hour`;
+    case "none":
+      return "when they're cued from the booth";
+  }
+}
+
+/** Inside long programs, in a sentence: "Programs over 45 minutes also break every 30 minutes inside." */
+export function longWords(rule: Pick<BreakRule, "mode" | "everyPrograms" | "clockMinutes" | "longPrograms">): string | null {
+  const long = rule.longPrograms;
+  if (!long || !longApplies(rule)) return null;
+  return `Programs over ${Math.round(long.overMs / 60_000)} minutes also break every ${Math.round(long.everyMs / 60_000)} minutes inside.`;
 }

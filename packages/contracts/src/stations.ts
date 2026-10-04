@@ -271,9 +271,51 @@ export type PositionRule = z.infer<typeof PositionRule>;
 export const BumperSequences = z.object({ open: PositionRule, close: PositionRule, between: PositionRule });
 export type BumperSequences = z.infer<typeof BumperSequences>;
 
+/**
+ * A247 (added 2026-10-04): breaks inside programs longer than `overMs`, every `everyMs` of program
+ * (counted from the last break in it, or its start). Whole minutes; `everyMs` 10 to 60 minutes,
+ * `overMs` longer than it (to 24 hours).
+ */
+export const LongProgramBreaks = z.object({ overMs: Millis, everyMs: Millis });
+export type LongProgramBreaks = z.infer<typeof LongProgramBreaks>;
+
 export const BreakRule = z.object({
   mode: z.enum(["after_every_program", "every_n_minutes", "none"]),
   everyMinutes: z.number().int().positive().nullable(),
+  /**
+   * A247 (added 2026-10-04): with `after_every_program`, the break comes after every this many
+   * programs (2 to 12), counted again from the start of the broadcast day (6:00 am), after off air
+   * time and at a programming block's edge. Between the others, the time a program leaves of its
+   * slot airs as open time (the station ID and bumpers). Live programs cue their own and aren't
+   * counted. Null (or left out of
+   * `getBreakRule` by an older API): after every program. 400 with another mode. Left out of
+   * `setBreakRule` (an app from before), it stays as set while the mode stays `after_every_program`.
+   */
+  everyPrograms: z.number().int().min(2).max(12).nullable().optional(),
+  /**
+   * A247 (added 2026-10-04): clock breaks: minutes past the hour (the station's time), 1 to 6 of
+   * them, each 0 to 59, at least 10 minutes and the break's length plus 5 minutes apart (around
+   * the hour too). Sent sorted or not, saved sorted without repeats. Set, `mode` is
+   * `every_n_minutes` (400 otherwise) and `everyMinutes` reads 60 over how many there are (what an
+   * app from before shows, "Every 30 minutes" for two). A program pauses at each time it's airing
+   * (a long one gets several); a time that falls on a program boundary or in the break after a
+   * program is that break. Live programs cue their own. Left out of `setBreakRule` (an app from
+   * before), it stays as set while the body keeps the `mode` and `everyMinutes` it read; null clears it.
+   */
+  clockMinutes: z.array(z.number().int().min(0).max(59)).min(1).max(6).nullable().optional(),
+  /**
+   * A247 (added 2026-10-04): breaks inside long programs too, with after every program (or every N
+   * programs), clock breaks or none; not with every N minutes, which already breaks inside every
+   * program (400; cleared when an app from before switches to it). Null: off. Left out of
+   * `setBreakRule`, it stays as set.
+   *
+   * With any of A247's timing, a break inside a program comes out of the time the program leaves
+   * in its slot (one that doesn't fit isn't placed, so a program is never cut for one), and one
+   * with less than 5 minutes of program since the break before it, or before its program ends, is
+   * skipped. A program with its maker's break points breaks at those, as every N minutes does; a
+   * carried program carried live only gets none inside it (it airs as the maker airs it).
+   */
+  longPrograms: LongProgramBreaks.nullable().optional(),
   lengthMs: Millis,
   /** Spot time per hour; default 3:00. */
   spotMsPerHour: Millis,

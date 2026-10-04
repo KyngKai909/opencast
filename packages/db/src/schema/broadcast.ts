@@ -591,10 +591,18 @@ export const breakRules = broadcast.table(
      * `cadence.bumpers`; none between programs). Stored only once the station changes them.
      */
     bumperSequences: jsonb("bumper_sequences").$type<BumperSequencesRow>(),
+    /** A247 (migration 0051): with `after_every_program`, a break after every this many programs (2 to 12). Null: every program. */
+    everyPrograms: smallint("every_programs"),
+    /** A247 (migration 0051): clock breaks, minutes past the hour (sorted, 1 to 6), with `every_n_minutes` (`every_minutes` is 60 over how many). Null: none. */
+    clockMinutes: jsonb("clock_minutes").$type<number[]>(),
+    /** A247 (migration 0051): breaks inside programs longer than `overMs`, every `everyMs`. Null: off. */
+    longPrograms: jsonb("long_programs").$type<{ overMs: number; everyMs: number }>(),
     updatedAt: at("updated_at").notNull().defaultNow()
   },
   (t) => [
     check("every_minutes_set", sql`${t.mode} <> 'every_n_minutes' or ${t.everyMinutes} > 0`),
+    check("every_programs_range", sql`${t.everyPrograms} is null or (${t.mode} = 'after_every_program' and ${t.everyPrograms} between 2 and 12)`),
+    check("clock_minutes_mode", sql`${t.clockMinutes} is null or (${t.mode} = 'every_n_minutes' and jsonb_typeof(${t.clockMinutes}) = 'array')`),
     check("sid_last", sql`${t.fillOrder}->>(jsonb_array_length(${t.fillOrder}) - 1) = 'SID'`)
   ]
 );

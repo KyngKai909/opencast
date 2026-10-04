@@ -72,6 +72,10 @@ export function defaultBreakRule(o: Partial<BreakRule> = {}): BreakRule {
     // A242 (2026-10-02): the opener replaces the station ID at sign-on; no opener each morning.
     stationIdAfterOpener: false,
     dailyOpener: false,
+    // A247 (2026-10-04): every program, no clock times, nothing more inside long programs.
+    everyPrograms: null,
+    clockMinutes: null,
+    longPrograms: null,
     ...o
   };
 }

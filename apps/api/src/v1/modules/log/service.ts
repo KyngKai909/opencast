@@ -14,7 +14,8 @@ import { blockAt, loadSpans, memberOf, memberships, type Membership, type SpanRo
 import type { BlockRef } from "../library/blocks.js";
 import { catalogCreditBreaks, catalogEntries } from "../playout/engine/catalogCredit.js";
 import { hhmm, offAirSpans, offAirStretches, ruleLabel, type OffAirSpanView } from "./offair.js";
-import { broadcastDate, createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+import { broadcastDate, broadcastDay, createTemplateOps, templateLabel, type TemplateOps } from "./templates.js";
+import { MIN_RUN_MS, nextClockTime, programRuns } from "./timing.js";
 import { createChangeOps, logVersion, PARK, type ChangeOps } from "./changes.js";
 
 export type { OffAirSpanView } from "./offair.js";
@@ -805,6 +806,15 @@ export function createLogService(ctx: ModuleContext): LogService {
     const rows = await load([stationId], lookback, new Date(to.getTime() + 1));
     const ctx = await context(rows);
     const first = rows[0]?.startsAt && rows[0].startsAt < lookback ? rows[0].startsAt : lookback;
+    // A247 (log/timing.ts): clock times, inside long programs (not with every N minutes), and after
+    // every N programs, decided from the broadcast day's start so any window decides the same.
+    // None of them set: the walk below is exactly as before.
+    const clockAt = rule.clockMinutes?.length ? rule.clockMinutes : null;
+    const minutesMode = rule.mode === "every_n_minutes" && !!rule.everyMinutes && !clockAt;
+    const longAt = rule.longPrograms && !minutesMode ? rule.longPrograms : null;
+    const breaksAfter = rule.mode === "after_every_program" && rule.everyPrograms ? await nthPrograms(stationId, tz, first, to, rule.everyPrograms) : null;
+    const timed = Boolean(clockAt || longAt || breaksAfter);
+    const hourOf = hourStartIn(tz);
     const [decided, filled] = every
       ? [null, new Set<number>()]
       : await Promise.all([
@@ -1019,6 +1029,87 @@ export function createLogService(ctx: ModuleContext): LogService {
       if (!all.length) return;
       place(boundaryOf(at, row.id, all), before);
     };
+    /** Where the last break laid out so far ends (A247's "too close"). */
+    const lastEnd = () => {
+      const last = slots[slots.length - 1];
+      return last ? Date.parse(last.startsAt) + last.lengthMs : -Infinity;
+    };
+    /**
+     * A247: a program's breaks with clock times, inside long programs or after every N programs:
+     * inside it (clock times, every `everyMs` once it's long, or its maker's break points) while
+     * they fit in the time it leaves and aren't too close, then the break after it (every Nth
+     * program only, with every N programs). Returns the break after it, if any.
+     */
+    const timedBreaks = (row: Row, p: { item: ItemRef | undefined; title: string; slotMs: number; itemMs: number; barterPerHour: number; programId: string | null; liveOnly: boolean }): GeneratedBreak | null => {
+      const start = row.startsAt.getTime();
+      const room = p.slotMs - p.itemMs;
+      const long = longAt && p.itemMs > longAt.overMs ? longAt : null;
+      let shift = 0;
+      let shares = 0;
+      if ((clockAt || long) && !p.liveOnly) {
+        const marks = p.item?.breakPointsMs?.length ? [...p.item.breakPointsMs].sort((a, b) => a - b) : null;
+        // `at`: the last time considered (program time); `placed`: the last break inside it, or its start.
+        let at = 0;
+        let placed = 0;
+        for (;;) {
+          let next: number;
+          if (marks) next = marks.find((m) => m > at) ?? Infinity;
+          else {
+            const wall = start + at + shift;
+            next = Math.min(clockAt ? at + nextClockTime(wall, clockAt, hourOf) - wall : Infinity, long ? placed + long.everyMs : Infinity);
+          }
+          if (!(next > at) || next >= p.itemMs) break;
+          at = next;
+          // At the segment boundary nearest it.
+          const point = snapToSegment(next);
+          // Too close to the program's end (and so to whatever comes after it): none from here on.
+          if (p.itemMs - point < MIN_RUN_MS) break;
+          const startsAt = start + point + shift;
+          // Too close to its start, or to the break before it.
+          if (point < MIN_RUN_MS || point <= placed || startsAt - lastEnd() < MIN_RUN_MS) continue;
+          // Out of the time the program leaves: a program is never cut for a break.
+          if (shift + rule.lengthMs > room) break;
+          const producerShareMs = p.barterPerHour ? Math.min(rule.lengthMs, Math.round((p.barterPerHour * (point - placed)) / HOUR)) : 0;
+          const { parts, lengthMs, elements } = decide({ startsAt, lengthMs: rule.lengthMs, afterProgram: false, fixed: false, programId: p.programId, producerShareMs, logEntryId: row.id });
+          // Nothing airs in it at all: no break.
+          if (lengthMs > 0) {
+            slots.push({
+              startsAt: new Date(startsAt).toISOString(),
+              lengthMs,
+              context: `During ${p.title}`,
+              origin: p.barterPerHour ? "carried_barter" : "rule",
+              producerShareMs,
+              logEntryId: row.id,
+              ...(parts ? { parts } : {}),
+              elements
+            });
+            shares += producerShareMs;
+          }
+          shift += lengthMs;
+          placed = point;
+        }
+      }
+      const used = p.itemMs + shift;
+      const slack = p.slotMs - used;
+      // After every N programs: only after every Nth.
+      if (slack <= 0 || (breaksAfter && !breaksAfter.has(row.id))) return null;
+      const startsAt = start + used;
+      // The maker's time for the slot, less what the breaks inside it carried.
+      const producerShareMs = p.barterPerHour ? Math.max(0, Math.min(slack, Math.round((p.barterPerHour * p.slotMs) / HOUR) - shares)) : 0;
+      const { parts, elements } = decide({ startsAt, lengthMs: slack, afterProgram: true, fixed: true, programId: p.programId, producerShareMs, logEntryId: row.id });
+      const closing: GeneratedBreak = {
+        startsAt: new Date(startsAt).toISOString(),
+        lengthMs: slack,
+        context: `After ${p.title}`,
+        origin: p.barterPerHour ? "carried_barter" : "rule",
+        producerShareMs,
+        logEntryId: row.id,
+        ...(parts ? { parts } : {}),
+        elements
+      };
+      slots.push(closing);
+      return closing;
+    };
     for (const row of rows) {
       cuedBefore(row.startsAt.getTime());
       if (row.kind === "off_air") {
@@ -1046,7 +1137,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       let closing: GeneratedBreak | null = null;
 
       // Inside the program, every N minutes (or at the maker's break points).
-      if (rule.mode === "every_n_minutes" && rule.everyMinutes) {
+      if (minutesMode && rule.everyMinutes) {
         const points = item?.breakPointsMs?.length
           ? item.breakPointsMs
           : Array.from({ length: Math.floor(itemMs / (rule.everyMinutes * MIN)) }, (_, i) => (i + 1) * rule.everyMinutes! * MIN).filter((p) => p < itemMs);
@@ -1090,6 +1181,11 @@ export function createLogService(ctx: ModuleContext): LogService {
         previous = { row, closing };
         continue;
       }
+      if (timed) {
+        closing = timedBreaks(row, { item, title: `${title}${episode}`, slotMs, itemMs, barterPerHour, programId, liveOnly: Boolean(agreement?.liveOnly) });
+        previous = { row, closing };
+        continue;
+      }
       // After every program (and with no rule): the time between the item's end and the slot's end.
       const slack = slotMs - itemMs;
       if (slack > 0) {
@@ -1127,6 +1223,21 @@ export function createLogService(ctx: ModuleContext): LogService {
         refs: bstate.refs
       }
     };
+  }
+
+  /**
+   * A247, after every N programs: the programs whose break comes, counted from the broadcast day
+   * `first` is in (log/timing.ts `programRuns`), so any window decides the same.
+   */
+  async function nthPrograms(stationId: string, tz: string, first: Date, to: Date, n: number): Promise<Set<string>> {
+    const dayFrom = broadcastDay(broadcastDate(first, tz), tz).from;
+    const [list, state, off] = await Promise.all([load([stationId], dayFrom, to), blockState([stationId], dayFrom, to), offAirMap([stationId], dayFrom, to)]);
+    const spans = memberOf(state.list.get(stationId) ?? []);
+    const offAir = off.get(stationId) ?? [];
+    const entries = list
+      .filter((r) => r.startsAt >= dayFrom)
+      .map((r) => ({ id: r.id, kind: r.kind, startsAt: r.startsAt.getTime(), endsAt: r.endsAt.getTime(), day: broadcastDate(r.startsAt, tz), span: spans.get(r.id)?.id ?? null }));
+    return programRuns(entries, n, (a, b) => offAir.some((o) => Date.parse(o.startsAt) < b && Date.parse(o.endsAt) > a - 1));
   }
 
   async function generateBreaks(stationId: string, from: Date, to: Date, everyPart = false, override?: BreakRuleView): Promise<GeneratedBreak[]> {
