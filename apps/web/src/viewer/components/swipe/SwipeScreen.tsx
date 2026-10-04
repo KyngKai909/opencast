@@ -31,7 +31,7 @@ import { NotForMe } from "../watch/NotForMe";
 import { SharedAiring } from "../watch/parts";
 import { WatchOnSheet } from "../remote/WatchOnSheet";
 import type { WatchData } from "../watch/useWatch";
-import { AXIS_PX, CHROME_HIDE_MS, DETENT_SHARE, FADE_MS, OSD_MS, SNAP_EASE, SNAP_MS, SPRING_EASE, SPRING_MS, TAP_SLOP_PX, axisOf, directionOf, dragOffset, releaseAction, seamAt, velocityOf, type Sample, type SwipeDir } from "./gesture";
+import { AXIS_PX, CHROME_HIDE_MS, DETENT_SHARE, FADE_MS, SNAP_EASE, SNAP_MS, SPRING_EASE, SPRING_MS, TAP_SLOP_PX, axisOf, directionOf, dragOffset, releaseAction, seamAt, velocityOf, type Sample, type SwipeDir } from "./gesture";
 import { backToLivePlace, behindMs, behindText, boundaryText, placeText } from "./rules";
 import { useSwipeOrders } from "./useSwipeOrder";
 import { SwipeRail } from "./SwipeRail";
@@ -107,7 +107,6 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
   const busy = useRef(false);
   const [peek, setPeek] = useState<Peek | null>(null);
   const [landing, setLanding] = useState<{ id: string; picture: boolean } | null>(null);
-  const [osd, setOsd] = useState<DialRowX | null>(null);
   const [chrome, setChrome] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
@@ -183,12 +182,15 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     detent.current?.classList.remove("is-on");
   };
 
-  /** The snap has landed: the player changes channel (no static when the picture was showing). */
+  /**
+   * The snap has landed: the player changes channel with its static, number and tuning sound. 2026-10-04,
+   * the user's decision: a short burst of static on every swipe, the picture showing while the finger
+   * drags or not (the reference's swipe without static, `engine.swipeTo`, is no longer used here).
+   */
   const land = (target: DialRowX, picture: boolean) => {
     setLanding({ id: target.station.id, picture });
-    if (picture) setOsd(target);
     setDevice({ lastStationId: target.station.id });
-    void engine.swipeTo(target.station.id, { input: "touch" });
+    void engine.tune(target.station.id, { input: "touch" });
     busy.current = false;
   };
 
@@ -259,7 +261,9 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     if (!landing) return;
     const id = landing.id;
     const settled = s.status !== "tuning" && s.status !== "idle" && !s.tuning;
-    const done = (s.currentId === id && !s.pendingId && (landing.picture || settled)) || s.status === "standby";
+    // A station whose picture showed hands over as soon as the player's static starts (one number:
+    // the player's); one that wasn't ready keeps the swipe's until its picture.
+    const done = (landing.picture && s.tuning?.stationId === id) || (s.currentId === id && !s.pendingId && (landing.picture || settled)) || s.status === "standby";
     if (done) {
       engine.peek(null);
       setPeek(null);
@@ -275,13 +279,6 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
     }, LAND_GIVE_UP_MS);
     return () => clearTimeout(t);
   }, [landing, s.currentId, s.pendingId, s.tuning?.stationId, s.status]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The corner number after a snap that showed the picture (the player draws its own on a full change).
-  useEffect(() => {
-    if (!osd) return;
-    const t = setTimeout(() => setOsd(null), OSD_MS);
-    return () => clearTimeout(t);
-  }, [osd]);
 
   // swipe home 08, "Preloading": while the swipe home is up, the next and previous stations (and the
   // dial's first while in the presets) keep a picture ready, so the drag shows them live. Elsewhere
@@ -446,12 +443,6 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
             </div>
           )}
         </div>
-        {osd && !peek && (
-          <div className="vw-sw__osd vw-sw__osd--landed is-on" aria-hidden="true">
-            <span className="vw-sw__n oc-mono">{osd.station.channel}</span>
-            <span className="vw-sw__c oc-cs">{osd.station.callSign}</span>
-          </div>
-        )}
         {paused && (
           <div className="vw-sw__pause" aria-hidden="true">
             <span className="vw-sw__pause-g">
