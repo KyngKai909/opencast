@@ -120,7 +120,9 @@
   font: 500 max(calc(76 * var(--u)), 22px)/1 var(--font-mono); letter-spacing: -.05em;
   padding-right: calc(22 * var(--u)); border-right: 2px solid var(--line);
 }
-.oc-banner__cs { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
+.oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
+/* The call sign with an external station's "External" beside it. */
+.oc-banner__csrow { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); }
 .oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__src { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__now h3 {

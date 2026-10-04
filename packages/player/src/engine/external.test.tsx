@@ -122,7 +122,8 @@ describe("the banner on an external station", () => {
   it("with nothing scheduled: the station's name, External beside its call sign, and no progress bar", () => {
     const { container } = render(<Banner channel={COLT} size="tv" now={now} timeZone="America/Los_Angeles" onAirHere />);
     expect(container.querySelector("h3")?.textContent).toBe("City of Colton channel");
-    expect(container.querySelector(".oc-banner__cs .oc-tag--listed")?.textContent).toBe("External");
+    expect(container.querySelector(".oc-banner__csrow .oc-tag--listed")?.textContent).toBe("External");
+    expect(container.querySelector(".oc-banner__cs")?.textContent).toBe("COLT");
     // 2026-10-04: no "Live from {source}" line; it only said the name again.
     expect(container.querySelector(".oc-banner__src")).toBeNull();
     expect(container.querySelector("[role=progressbar]")).toBeNull();

@@ -58,8 +58,8 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
     <div className={cx("oc-banner", `oc-banner--${size}`)} data-theme="dark" role="status" aria-live="polite" aria-label={`${ident(c)}, ${c.station.name}${air ? `: ${air.title}` : ""}`}>
       <div className="oc-banner__id">
         <span className="oc-banner__ch oc-mono">{c.station.channel}</span>
-        <span className="oc-banner__cs">
-          <span className="oc-cs">{c.station.callSign ?? c.station.handle}</span>
+        <span className="oc-banner__csrow">
+          <span className="oc-banner__cs oc-cs">{c.station.callSign ?? c.station.handle}</span>
           {listed && (
             <Tag variant="listed" onPicture>
               External
