@@ -66,7 +66,7 @@ function watch(o: { status?: string; behindLive?: boolean; banner?: boolean } = 
     backToLive: vi.fn(),
     peek: vi.fn(() => true),
     swipeReady: vi.fn(() => true),
-    swipeTo: vi.fn(() => Promise.resolve()),
+    tune: vi.fn(() => Promise.resolve()),
     getState: vi.fn(() => ({ mutedByBrowser: false })),
     canPlayDash: () => true,
     showAirPlayPicker: vi.fn(),
@@ -161,7 +161,7 @@ describe("next and previous", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next channel: CIVC 7.1" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
     expect(engine.peek).toHaveBeenCalledWith(rows[0]!.station.id);
-    expect(engine.swipeTo).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
     vi.useRealTimers();
   });
 
@@ -171,7 +171,7 @@ describe("next and previous", () => {
     show(w);
     fireEvent.keyDown(window, { key: "ArrowUp" });
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
-    expect(engine.swipeTo).toHaveBeenCalledWith(rows[2]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[2]!.station.id, { input: "touch" });
     vi.useRealTimers();
   });
 
@@ -181,7 +181,7 @@ describe("next and previous", () => {
     show(w);
     fireEvent.click(screen.getByRole("button", { name: "Next channel: CIVC 7.1" }));
     await act(async () => void (await new Promise((r) => setTimeout(r, 10))));
-    expect(engine.swipeTo).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
   });
 });
 
@@ -246,11 +246,11 @@ describe("the drag", () => {
     // BEAT is the last preset, so the dial's first is past the detent: half the drag, and 35%.
     drag(touch, 0, -200);
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
-    expect(engine.swipeTo).not.toHaveBeenCalled();
+    expect(engine.tune).not.toHaveBeenCalled();
     drag(touch, 0, -700);
     expect(engine.peek).toHaveBeenCalledWith(rows[0]!.station.id);
     await act(async () => void (await vi.advanceTimersByTimeAsync(300)));
-    expect(engine.swipeTo).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
     vi.useRealTimers();
   });
 
@@ -267,7 +267,7 @@ describe("the drag", () => {
     await act(async () => void (await vi.advanceTimersByTimeAsync(200)));
     fireEvent.pointerUp(touch, { pointerId: 3, clientX: 200, clientY: 360 });
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
-    expect(engine.swipeTo).not.toHaveBeenCalled();
+    expect(engine.tune).not.toHaveBeenCalled();
     expect(engine.peek).toHaveBeenLastCalledWith(null);
     vi.useRealTimers();
   });
@@ -279,7 +279,7 @@ describe("the drag", () => {
     drag(container.querySelector(".vw-sw__touch")!, -300, 20);
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
     expect(engine.peek).not.toHaveBeenCalled();
-    expect(engine.swipeTo).not.toHaveBeenCalled();
+    expect(engine.tune).not.toHaveBeenCalled();
     expect(engine.togglePlay).not.toHaveBeenCalled();
     vi.useRealTimers();
   });

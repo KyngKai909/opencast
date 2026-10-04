@@ -4,9 +4,11 @@ import "@opencast/ui/styles.css";
 import "@opencast/player/styles.css";
 import "./app.css";
 import { isNative } from "./viewer/native/platform";
+import { watchAppHeight } from "./lib/appHeight";
 import { App } from "./App";
 
 async function boot() {
+  watchAppHeight();
   // The env itself, not config: Vite replaces it at build time, so a production build drops the
   // mocks' chunk entirely.
   if (import.meta.env.VITE_MOCK === "true") {

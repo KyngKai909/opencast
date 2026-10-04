@@ -5,9 +5,8 @@ html, body, #root { height: 100%; }
 body { font-size: 15px; line-height: 1.45; overscroll-behavior-y: none; }
 #root { display: flex; flex-direction: column; }
 #root > * { flex: 1; min-height: 0; }
-/* Installed to an iPhone's home screen (black-translucent status bar), 100% is the screen less the
-   status bar, which left a band of ground under the app (2026-10-03). Pinned to the screen's edges
-   instead, the app reaches the bottom. */
-@media (display-mode: standalone) {
-  #root { position: fixed; inset: 0; height: auto; }
-}
+/* Installed to an iPhone's home screen (black-translucent status bar), 100%, and anything pinned to
+   the edges, is the screen less the status bar, which left a band of ground under the app. Its
+   height is the screen's, measured (lib/appHeight.ts marks the page .oc-installed and sets
+   --oc-app-h). 2026-10-04: pinning to the edges alone (2026-10-03) fell short the same way. */
+.oc-installed #root { position: fixed; top: 0; left: 0; right: 0; height: var(--oc-app-h, 100%); }
