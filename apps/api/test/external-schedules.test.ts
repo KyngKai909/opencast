@@ -80,11 +80,16 @@ describe("a JSON schedule", () => {
         ["Next Comedy", "2026-10-03T08:45:00.000Z", "2026-10-03T09:30:00.000Z"]
       ]);
       expect(read(FEED, { name: "Brand Atlas" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+      // A trailing "Channel", "TV" and the like that the key leaves off (2026-10-04).
+      expect(read(FEED, { name: "Brand Cinema Channel" })).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
+      expect(read(FEED, { name: "Atlas TV" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
     });
 
-    it("else the stream address's last folder, the same way", () => {
+    it("else the stream address's folders, the same way, nearest the file first", () => {
       expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-cinema/index.m3u8" })).toEqual([["Feature Film", "2026-10-03T06:49:31.000Z", "2026-10-03T08:28:16.000Z"]]);
       expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-atlas/index.m3u8" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
+      // The player's own folder under the channel's (`…/brand-atlas/tracks-v1a1/mono.m3u8`).
+      expect(read(FEED, { name: "Something Else", streamUrl: "https://cdn.brand.example.tv/brand-atlas/tracks-v1a1/mono.m3u8" })).toEqual([["Kitchen Rescue", "2026-10-03T07:40:00.000Z", "2026-10-03T08:35:00.000Z"]]);
     });
 
     it("finds nothing when nothing matches, and never mixes in another channel", () => {

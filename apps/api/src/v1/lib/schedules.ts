@@ -125,25 +125,33 @@ export interface ChannelHints {
 /** Lowercase letters and digits only: "Whiplash II" and "whiplashii" are the same. */
 const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** The stream address's last folder: `…/whiplash-atlas/index.m3u8` → "whiplash-atlas". */
-function streamFolder(url: string | null | undefined): string | null {
-  if (!url) return null;
+/**
+ * The stream address's folders, nearest the file first: `…/whiplash-biwi/tracks-v1a1/mono.m3u8` →
+ * "tracks-v1a1", "whiplash-biwi" (a player's own folders can sit under the channel's).
+ */
+function streamFolders(url: string | null | undefined): string[] {
+  if (!url) return [];
   try {
-    const parts = new URL(url).pathname.split("/");
-    return parts.length > 2 ? decodeURIComponent(parts[parts.length - 2]) : null;
+    return new URL(url).pathname.split("/").slice(1, -1).reverse().map((p) => decodeURIComponent(p));
   } catch {
-    return null;
+    return [];
   }
 }
 
+/** Words a station's name adds that a feed's key leaves off: "Biwi Channel" → "Biwi" (2026-10-04). */
+const NAME_EXTRAS = /(\s+(channel|tv|television|network|live|hd))+$/i;
+
 /**
  * 2026-10-03: the station's channel in a feed keyed by channel. The fragment names it
- * (`#channel=atlas`); else the listing's name or its stream's folder, made plain, is a key
- * ("Window TV" → windowtv) or, failing that, ends with the longest key ("Whiplash Atlas" → atlas).
+ * (`#channel=atlas`); else the listing's name (as given, then without a trailing "Channel", "TV"
+ * and the like) or one of its stream's folders, made plain, is a key ("Window TV" → windowtv,
+ * "Biwi Channel" → biwi) or, failing that, ends with the longest key ("Whiplash Atlas" → atlas,
+ * the folder "whiplash-biwi" → biwi).
  */
 function pickChannel(keys: string[], fragment: string | null, hints: ChannelHints): string | null {
   if (fragment !== null) return keys.find((k) => k === fragment) ?? keys.find((k) => plain(k) === plain(fragment)) ?? null;
-  const names = [hints.name, streamFolder(hints.streamUrl)].map((n) => plain(n ?? "")).filter(Boolean);
+  const name = hints.name ?? "";
+  const names = [...new Set([name, name.replace(NAME_EXTRAS, ""), ...streamFolders(hints.streamUrl)].map(plain).filter(Boolean))];
   for (const n of names) {
     const exact = keys.find((k) => plain(k) === n);
     if (exact) return exact;
