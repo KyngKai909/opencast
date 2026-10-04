@@ -115,11 +115,14 @@
 }
 .oc-banner__id { display: grid; grid-template-columns: auto 1fr; gap: calc(4 * var(--u)) calc(22 * var(--u)); align-content: center; }
 .oc-banner__ch {
-  grid-row: span 2;
+  /* Centred down the call sign and name beside it, the divider running their full height. */
+  grid-row: span 2; display: flex; align-items: center;
   font: 500 max(calc(76 * var(--u)), 22px)/1 var(--font-mono); letter-spacing: -.05em;
   padding-right: calc(22 * var(--u)); border-right: 2px solid var(--line);
 }
 .oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
+/* The call sign with an external station's "External" beside it. */
+.oc-banner__csrow { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); }
 .oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__src { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
 .oc-banner__now h3 {
@@ -143,7 +146,7 @@
 /* Casting and mirroring (tv 06.1 .castchip): where the controls are, with where to change channel at the end. */
 .oc-banner__chip { color: var(--pic-ink-70); }
 .oc-banner__chip .oc-i { width: calc(30 * var(--u)); height: calc(24 * var(--u)); min-width: 16px; min-height: 13px; }
-/* "Live from Redlands City Hall": Live in the live colour (tv 06.1). */
+/* "Live from Redlands City Hall" (a station's own live block, from its note): Live in the live colour (tv 06.1). */
 .oc-banner__live { color: var(--live); font-weight: 600; }
 /* On TV the tags are the ten-foot size (.tv .tag). */
 .oc-banner--tv .oc-tag { height: 36px; padding: 0 14px; font-size: 22px; border-width: 1.5px; }
