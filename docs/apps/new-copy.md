@@ -1351,3 +1351,21 @@ For review. The reference (`docs/reference/control/opencast-schedule.html`, sect
 | The syndication line, a carried copy (later) | "Made by {REEL}, carried here in its look. The syndication market's screens come later." / "…in your look where it allows." |
 | The phone, the desk-only tabs | "Open {Templates} on a computer" ("Blocks", "Break rules"); "Templates, blocks and break rules are desk work. On the phone, check tonight, fill dead air, sign off and move a program on the Log."; "Back to the Log" |
 
+
+## Break timing (A247, 2026-10-04)
+
+For review. Words for the Break rules tab's new choices of when breaks come, and the Log's why line. The reference (`docs/reference/control/opencast-schedule.html`, section 05) draws only "After every program" in the tile; these follow its voice.
+
+| Where | Words |
+|---|---|
+| "Breaks come" (the select) | "After every program", "After every {2} programs", "Every {30} minutes", "At set times each hour", "Never" |
+| Under it, the second select | after every N programs: "Every {2nd} program" to "Every {6th} program" (accessible name "After how many programs"); every N minutes: "{5} minutes" to "{60} minutes" ("How many minutes") |
+| Under it, the line | after every N programs: "Between the others, a program's spare time airs your station ID and bumpers"; every N minutes: "Inside every program, or at its maker's break points"; set times: "Programs pause at the times below"; after every program and never: nothing (as the reference) |
+| The recipe's line | after every N programs: "Drawn to scale for a {2:00} break. After every {2nd} program, a break is the time its program leaves, so most run shorter or longer"; never with inside long programs: "Drawn to scale for a {2:00} break, cued from the booth and inside long programs" |
+| The length tile | after every program (or N) with inside long programs: "Breaks inside long programs, cued live, and between repeats. The rest are the time a program leaves"; set times: "Breaks at your times, and cued live. After a program, a break is the time it leaves"; never with inside long programs: "Breaks cued from the booth, and inside long programs" |
+| The clock's row | "Breaks at"; "Minutes past the hour, in your station's time. A long program gets several"; chips ":00" to ":55" (the group "Minutes past the hour"); too close: "Leave at least {10} minutes between break times." (Save waits) |
+| Inside long programs | "Inside long programs too" (the switch's name); on: "Counted from the last break inside it, or its start", "Longer than {45 min} every {30 min}" (accessible names "Programs longer than", "A break every"); off: "Off: long programs break only as above"; with every N minutes (the switch off and disabled): "Every N minutes already breaks inside every program" |
+| The rules line (under the rows) | with set times or inside long programs: "A break inside a program comes out of the time it leaves in its slot, so a program is never cut for one. A break less than 5 minutes from another, or from the end of its program, is skipped. Programs carried live only never pause."; with every N programs: "The count starts again each day at 6:00 am, after off air time and where a block starts or ends. Live programs cue their own and aren't counted." |
+| The group (accessible name) | "When breaks come" |
+| The Log's why line | "Breaks come after every {2} programs.", "Breaks come every {45} minutes.", "Breaks come at {:15 and :45} each hour."; with inside long programs: "Programs over {45} minutes also break every {30} minutes inside." |
+| The API's refusals (and the mock's) | "Breaks after every N programs go with breaks after every program."; "Breaks at set times each hour go with mode every_n_minutes."; "Choose the minutes past the hour: 0 to 59."; "Choose 6 times an hour at most."; "Leave at least {10} minutes between break times."; "Every N minutes already breaks inside every program."; "Breaks inside long programs come every 10 to 60 minutes."; "A long program is longer than how often it breaks, and 24 hours at most."; "Say after how many programs: 2 to 12." |

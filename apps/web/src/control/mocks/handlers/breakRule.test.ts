@@ -77,3 +77,47 @@ describe("the mock's break rule preview", () => {
     expect((await api("PUT", "/break-rule", { ...rule, cadence: { ...rule.cadence, upNext: null } })).json.cadence).not.toHaveProperty("upNext");
   });
 });
+
+describe("A247: when breaks come, in the mock", () => {
+  // 10:00 to 11:00 pm: Late Crate, ep. 15 (10:00 to 10:28:28) and Slow Hours, carried (10:30:28 to 11:40).
+  const HOUR_FROM = "2026-09-27T05:00:00.000Z";
+  const HOUR_TO = "2026-09-27T06:00:00.000Z";
+  const times = (breaks: Slot[]) => breaks.map((b) => b.startsAt.slice(11, 19));
+
+  it("clock breaks at :15 and :45 show in the preview, and in getLog once saved", async () => {
+    const rule = { ...breakRuleOf(BEAT.id), mode: "every_n_minutes", everyMinutes: 30, clockMinutes: [45, 15] };
+    const seen = await api("POST", "/break-rule/preview", { rule, from: HOUR_FROM, to: HOUR_TO });
+    expect(seen.status).toBe(200);
+    expect(seen.json.rule).toMatchObject({ clockMinutes: [15, 45], everyMinutes: 30 });
+    // Late Crate fills its slot, so 10:15 doesn't fit (it isn't cut for a break); Slow Hours pauses at 10:45.
+    expect(times(seen.json.breaks)).toEqual(["05:28:28", "05:45:00"]);
+    expect((await api("PUT", "/break-rule", rule)).status).toBe(200);
+    const log = await api("GET", `/log?from=${HOUR_FROM}&to=${HOUR_TO}`);
+    expect(times(log.json.breaks)).toEqual(times(seen.json.breaks));
+  });
+
+  it("after every N programs, and inside long programs", async () => {
+    const base = breakRuleOf(BEAT.id);
+    const every = await api("POST", "/break-rule/preview", { rule: { ...base, mode: "after_every_program", everyMinutes: null }, from: HOUR_FROM, to: HOUR_TO });
+    expect(times(every.json.breaks)).toEqual(["05:28:28"]);
+    // Late Crate, ep. 15 is the evening's 4th program (Beat Tape Live, live, isn't counted).
+    const two = await api("POST", "/break-rule/preview", { rule: { ...base, mode: "after_every_program", everyMinutes: null, everyPrograms: 2 }, from: HOUR_FROM, to: HOUR_TO });
+    expect(times(two.json.breaks)).toEqual(["05:28:28"]);
+    const three = await api("POST", "/break-rule/preview", { rule: { ...base, mode: "after_every_program", everyMinutes: null, everyPrograms: 3 }, from: HOUR_FROM, to: HOUR_TO });
+    expect(times(three.json.breaks)).toEqual([]);
+    const long = await api("POST", "/break-rule/preview", { rule: { ...base, mode: "after_every_program", everyMinutes: null, longPrograms: { overMs: 45 * 60_000, everyMs: 20 * 60_000 } }, from: HOUR_FROM, to: HOUR_TO });
+    // Slow Hours runs 69 minutes: every 20 inside it.
+    expect(times(long.json.breaks)).toEqual(["05:28:28", "05:50:28"]);
+  });
+
+  it("refuses what the API refuses, and an older body keeps the clock until it changes the minutes", async () => {
+    const base = breakRuleOf(BEAT.id);
+    expect((await api("PUT", "/break-rule", { ...base, clockMinutes: [15, 20] })).json.error.message).toBe("Leave at least 10 minutes between break times.");
+    expect((await api("PUT", "/break-rule", { ...base, mode: "none", everyPrograms: 2 })).json.error.message).toBe("Breaks after every N programs go with breaks after every program.");
+    expect((await api("PUT", "/break-rule", { ...base, longPrograms: { overMs: 45 * 60_000, everyMs: 30 * 60_000 } })).json.error.message).toBe("Every N minutes already breaks inside every program.");
+    await api("PUT", "/break-rule", { ...base, clockMinutes: [15, 45] });
+    const { clockMinutes: _c, everyPrograms: _p, longPrograms: _l, ...old } = breakRuleOf(BEAT.id);
+    expect((await api("PUT", "/break-rule", { ...old, lengthMs: 90_000 })).json).toMatchObject({ clockMinutes: [15, 45], lengthMs: 90_000 });
+    expect((await api("PUT", "/break-rule", { ...old, everyMinutes: 20 })).json).toMatchObject({ clockMinutes: null, everyMinutes: 20 });
+  });
+});

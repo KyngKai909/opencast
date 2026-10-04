@@ -12,6 +12,11 @@
 // The Bumpers chips set the opening and closing sequences' cadence together; Up next's chips set
 // `cadence.upNext` alone and never the between-programs sequence (decision 5). The length tile
 // says what's true for the mode: after every program, a break is the time its program leaves.
+//
+// A247 (2026-10-04): "Breaks come" is one of five (after every program, after every N programs,
+// every N minutes, at set times each hour, never), N and the minutes chosen in the same tile; below
+// the tiles, the clock's minutes as chips, and "Inside long programs too" as a switch with how long
+// and how often (not with every N minutes, which already breaks inside every program).
 
 import { useState, type ReactNode } from "react";
 import { blocksApi, libraryApi, logApi, SPOT_CATEGORIES, spotsApi, stationsApi, type BreakCadence, type BreakRule, type BumperRole, type PositionRule } from "@opencast/contracts";
@@ -28,12 +33,25 @@ import {
   chipCadence,
   choiceOf,
   choiceOptions,
+  clockMinute,
+  clockProblem,
+  CLOCK_MINUTES,
+  DEFAULT_LONG,
+  EVERY_MINUTES,
+  EVERY_PROGRAMS,
+  LONG_EVERY_MINUTES,
+  LONG_OVER_MINUTES,
+  longApplies,
+  MIN_RUN_MINUTES,
+  ordinal,
+  timingOf,
+  withClock,
+  withTiming,
   fillOrder,
   N_PROGRAMS,
   POSITION_WORDS,
   recipeOf,
   roleSupply,
-  ruleLabel,
   sameRule,
   sequencesOf,
   upNextHome,
@@ -41,7 +59,8 @@ import {
   withChipCadence,
   type CadenceChoice,
   type ChipPart,
-  type SequencePosition
+  type SequencePosition,
+  type Timing
 } from "../breakRule";
 import { now as clockNow } from "../../../../lib/clock";
 import { SequenceBuilder } from "./SequenceBuilder";
@@ -52,8 +71,6 @@ import { ValueSelect } from "../ValueSelect";
 import "./common.css";
 import "./BreaksSection.css";
 
-type Mode = BreakRule["mode"];
-
 const LENGTHS = [60, 90, 120, 150, 180, 240].map((s) => ({ value: s * 1000, label: duration(s * 1000) }));
 const CAPS = Array.from({ length: 16 }, (_, i) => (i + 1) * 30_000).map((v) => ({ value: v, label: duration(v) }));
 const SAME_SPOT = [1, 2, 3, 4].map((n) => ({ value: n, label: perHour(n) }));
@@ -63,20 +80,56 @@ export function breaksLede(cs: string): string {
   return `Applied to every break ${cs} airs, including breaks inside carried programs where ${cs} sells the time.`;
 }
 
-/** The recipe's line under its heading: true for the mode chosen (after every program, a break is the time its program leaves). */
-export function recipeLine(rule: Pick<BreakRule, "mode" | "lengthMs">): string {
+type TimingRule = Pick<BreakRule, "mode" | "lengthMs"> & Partial<Pick<BreakRule, "everyPrograms" | "clockMinutes" | "longPrograms">>;
+/** A247: inside long programs is on, and applies to the choice. */
+const longOn = (rule: Omit<TimingRule, "lengthMs">) => !!rule.longPrograms && longApplies(rule);
+
+/** The recipe's line under its heading: true for the choice (after every program, a break is the time its program leaves). */
+export function recipeLine(rule: TimingRule): string {
   const scale = `Drawn to scale for a ${duration(rule.lengthMs).replace(/^:/, "0:")} break`;
-  if (rule.mode === "after_every_program") return `${scale}. After every program, a break is the time its program leaves, so most run shorter or longer`;
-  if (rule.mode === "none") return `${scale}, cued from the booth`;
+  const timing = timingOf(rule);
+  if (timing === "program") return `${scale}. After every program, a break is the time its program leaves, so most run shorter or longer`;
+  if (timing === "programs") return `${scale}. After every ${ordinal(rule.everyPrograms ?? 2)} program, a break is the time its program leaves, so most run shorter or longer`;
+  if (timing === "none") return longOn(rule) ? `${scale}, cued from the booth and inside long programs` : `${scale}, cued from the booth`;
   return scale;
 }
 
-/** What the length tile says it's for, in the mode chosen. */
-export function lengthLine(mode: Mode): string {
-  if (mode === "after_every_program") return "Breaks cued live, and between repeats. The rest are the time a program leaves";
-  if (mode === "none") return "Breaks cued from the booth";
+/** What the length tile says it's for, in the choice made. */
+export function lengthLine(rule: Omit<TimingRule, "lengthMs">): string {
+  const timing = timingOf(rule);
+  const long = longOn(rule);
+  if (timing === "program" || timing === "programs") return long ? "Breaks inside long programs, cued live, and between repeats. The rest are the time a program leaves" : "Breaks cued live, and between repeats. The rest are the time a program leaves";
+  if (timing === "clock") return "Breaks at your times, and cued live. After a program, a break is the time it leaves";
+  if (timing === "none") return long ? "Breaks cued from the booth, and inside long programs" : "Breaks cued from the booth";
   return "Every break. Live programs cue their own";
 }
+
+/** A247: the line under "Breaks come", true for the choice (none for after every program and never, as the reference draws them). */
+export function timingLine(rule: Omit<TimingRule, "lengthMs">): string | null {
+  switch (timingOf(rule)) {
+    case "programs":
+      return "Between the others, a program's spare time airs your station ID and bumpers";
+    case "minutes":
+      return "Inside every program, or at its maker's break points";
+    case "clock":
+      return "Programs pause at the times below";
+    default:
+      return null;
+  }
+}
+
+/** A247: the rules that hold for breaks inside programs, and for counting programs. */
+export function timingRules(rule: Omit<TimingRule, "lengthMs">): string | null {
+  const timing = timingOf(rule);
+  const inside = timing === "clock" || longOn(rule);
+  const lines = [
+    inside ? `A break inside a program comes out of the time it leaves in its slot, so a program is never cut for one. A break less than ${MIN_RUN_MINUTES} minutes from another, or from the end of its program, is skipped. Programs carried live only never pause.` : null,
+    timing === "programs" ? "The count starts again each day at 6:00 am, after off air time and where a block starts or ends. Live programs cue their own and aren't counted." : null
+  ].filter((l): l is string => !!l);
+  return lines.length ? lines.join(" ") : null;
+}
+
+const minutesLabel = (m: number) => `${m} min`;
 
 /** "Late Crate Nights uses its own bumper order during the block." */
 export function ownOrderLine(names: string[]): string | null {
@@ -136,12 +189,22 @@ export function BreaksSection({ s, head }: { s: StationState; head?: (go: (to: s
   const never = [...blockable, ...r.blockedCategories.filter((c) => !blockable.includes(c))];
   const backups = rotations.data?.backup.spots ?? [];
   const backupNames = [...new Set(backups.map((b) => b.business))].join(", ");
-  const every = r.everyMinutes ?? 30;
-  const modes: { value: Mode; label: string }[] = [
-    { value: "after_every_program", label: ruleLabel("after_every_program", null) },
-    { value: "every_n_minutes", label: ruleLabel("every_n_minutes", every) },
-    { value: "none", label: ruleLabel("none", null) }
+  // A247: "Breaks come", and what goes with each choice.
+  const timing = timingOf(r);
+  const nPrograms = r.everyPrograms ?? 2;
+  const nMinutes = timing === "minutes" ? (r.everyMinutes ?? 30) : 30;
+  const timings: { value: Timing; label: string }[] = [
+    { value: "program", label: "After every program" },
+    { value: "programs", label: `After every ${nPrograms} programs` },
+    { value: "minutes", label: `Every ${nMinutes} minutes` },
+    { value: "clock", label: "At set times each hour" },
+    { value: "none", label: "Never" }
   ];
+  const clockIssue = timing === "clock" ? clockProblem(r) : null;
+  const long = r.longPrograms ?? null;
+  const longOk = longApplies(r);
+  const rules = timingRules(r);
+  const note = timingLine(r);
   const setSequence = (position: SequencePosition, next: PositionRule) =>
     change((x) => {
       const bumperSequences = { ...sequencesOf(x), [position]: next };
@@ -272,12 +335,23 @@ export function BreaksSection({ s, head }: { s: StationState; head?: (go: (to: s
           <div className="cc-timing" role="group" aria-label="Timing and limits">
             <div className="cc-timing__t cc-timing__t--words">
               <small>Breaks come</small>
-              <ValueSelect label="Breaks come" value={r.mode} options={modes} disabled={!canEdit} onChange={(mode) => patch({ mode, everyMinutes: mode === "every_n_minutes" ? every : null })} />
+              <ValueSelect label="Breaks come" value={timing} options={timings} disabled={!canEdit} onChange={(t) => change((x) => withTiming(x, t))} />
+              {timing === "programs" && (
+                <span className="cc-timing__more">
+                  <ValueSelect label="After how many programs" value={nPrograms} options={EVERY_PROGRAMS.map((n) => ({ value: n, label: `Every ${ordinal(n)} program` }))} disabled={!canEdit} onChange={(everyPrograms) => patch({ everyPrograms })} />
+                </span>
+              )}
+              {timing === "minutes" && (
+                <span className="cc-timing__more">
+                  <ValueSelect label="How many minutes" value={nMinutes} options={EVERY_MINUTES.map((m) => ({ value: m, label: `${m} minutes` }))} disabled={!canEdit} onChange={(everyMinutes) => patch({ everyMinutes })} />
+                </span>
+              )}
+              {note && <span className="cc-timing__note">{note}</span>}
             </div>
             <div className="cc-timing__t">
               <small>Length</small>
               <ValueSelect label="Break length" value={r.lengthMs} options={LENGTHS} disabled={!canEdit} onChange={(lengthMs) => patch({ lengthMs })} />
-              <span className="cc-timing__note">{lengthLine(r.mode)}</span>
+              <span className="cc-timing__note">{lengthLine(r)}</span>
             </div>
             <div className="cc-timing__t">
               <small>Spot time per hour</small>
@@ -287,6 +361,52 @@ export function BreaksSection({ s, head }: { s: StationState; head?: (go: (to: s
               <small>Same spot per hour</small>
               <ValueSelect label="The same spot, at most" value={r.sameSpotPerHour} options={SAME_SPOT} disabled={!canEdit} onChange={(sameSpotPerHour) => patch({ sameSpotPerHour })} />
             </div>
+          </div>
+
+          <div className="cc-cad cc-cad--two cc-when" role="group" aria-label="When breaks come">
+            {timing === "clock" && (
+              <div className="cc-cad__r">
+                <div>
+                  <b>Breaks at</b>
+                  <small>Minutes past the hour, in your station's time. A long program gets several</small>
+                </div>
+                <div className="cc-cad__chips">
+                  <ChipRow<string>
+                    multiple
+                    layout="wrap"
+                    size="sm"
+                    label="Minutes past the hour"
+                    value={(r.clockMinutes ?? []).map(String)}
+                    options={CLOCK_MINUTES.map((m) => ({ value: String(m), label: clockMinute(m), disabled: !canEdit }))}
+                    onChange={(v) => change((x) => withClock(x, v.map(Number)))}
+                    className="cc-when__clock"
+                  />
+                  {clockIssue && (
+                    <small className="cc-cad__note cc-when__problem" role="alert">
+                      {clockIssue}
+                    </small>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="cc-cad__r">
+              <div>
+                <b id="cc-long-h">Inside long programs too</b>
+                <small>{!longOk ? "Every N minutes already breaks inside every program" : long ? "Counted from the last break inside it, or its start" : "Off: long programs break only as above"}</small>
+              </div>
+              <div className="cc-cad__chips">
+                <Toggle checked={!!long && longOk} aria-labelledby="cc-long-h" disabled={!canEdit || !longOk} onChange={(on) => patch({ longPrograms: on ? DEFAULT_LONG : null })} />
+                {long && longOk && (
+                  <span className="cc-when__long">
+                    Longer than
+                    <ValueSelect label="Programs longer than" value={long.overMs / 60_000} options={LONG_OVER_MINUTES.map((m) => ({ value: m, label: minutesLabel(m) }))} disabled={!canEdit} onChange={(m) => patch({ longPrograms: { ...long, overMs: m * 60_000, everyMs: Math.min(long.everyMs, (m - 5) * 60_000) } })} />
+                    every
+                    <ValueSelect label="A break every" value={long.everyMs / 60_000} options={LONG_EVERY_MINUTES.filter((m) => m * 60_000 < long.overMs).map((m) => ({ value: m, label: minutesLabel(m) }))} disabled={!canEdit} onChange={(m) => patch({ longPrograms: { ...long, everyMs: m * 60_000 } })} />
+                  </span>
+                )}
+              </div>
+            </div>
+            {rules && <p className="cc-breaks__note cc-when__rules">{rules}</p>}
           </div>
 
           <section className="cc-rules__sec" aria-labelledby="cc-order-h">
@@ -356,7 +476,7 @@ export function BreaksSection({ s, head }: { s: StationState; head?: (go: (to: s
               <Button size="sm" disabled={!dirty || save.isPending} onClick={() => (setEdits(null), setError(null))}>
                 Reset
               </Button>
-              <Button size="sm" variant="primary" disabled={!dirty || save.isPending} onClick={() => save.mutate(r)}>
+              <Button size="sm" variant="primary" disabled={!dirty || save.isPending || !!clockIssue} onClick={() => save.mutate(r)}>
                 {save.isPending ? "Saving…" : "Save break rules"}
               </Button>
               <span className="cc-rules__state" aria-live="polite">

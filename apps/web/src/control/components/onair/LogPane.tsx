@@ -11,7 +11,7 @@ import type { BlockSpan, BreakRow, BreakRule, BreakSlot, LogEntry } from "@openc
 import { BreakStrip, Button, breakKindClass, clock, clockRange, minutesText, type BreakKind } from "@opencast/ui";
 import { STATION_TZ } from "../../../lib/clock";
 import { spanSummary } from "../live/blocks";
-import { cadenceOf, sequencesOf } from "../station/breakRule";
+import { cadenceOf, longWords, sequencesOf, timingWords } from "../station/breakRule";
 import { breakKindOf, breakOwner, breakParts, rowLength, spotsPending, spotsPlacedAt, type Glance, type RowBlock } from "./dayRows";
 import { entrySource } from "./rundown";
 import { spanText } from "./time";
@@ -44,7 +44,10 @@ export function whyLine(slot: BreakSlot, rule: BreakRule | undefined, opts: { ow
   if (barter && opts.owner) parts.push(`${opts.owner}'s ${rowLength(barter)} is the maker's time under barter.`);
   if (slot.origin === "cued_live") parts.push(`Cued from the booth${opts.cuedIn ? ` during ${opts.cuedIn}` : ""}.`);
   if (rule) {
-    if (slot.origin === "rule") parts.push(rule.mode === "every_n_minutes" ? `Breaks come every ${rule.everyMinutes ?? 30} minutes.` : rule.mode === "none" ? "Breaks are cued from the booth." : "Breaks come after every program.");
+    // A247: every N programs, any minutes, clock times; inside long programs too.
+    if (slot.origin === "rule") parts.push(rule.mode === "none" ? "Breaks are cued from the booth." : `Breaks come ${timingWords(rule)}.`);
+    const long = slot.origin !== "cued_live" ? longWords(rule) : null;
+    if (long) parts.push(long);
     const c = cadenceOf(rule);
     const seq = sequencesOf(rule);
     const how = [

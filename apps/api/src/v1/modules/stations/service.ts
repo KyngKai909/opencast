@@ -11,6 +11,7 @@ import { createRelayBackgrounds, type RelayBackgroundView } from "./relayBackgro
 import { cadenceOf, type BreakCadence } from "../playout/engine/cadence.js";
 import { defaultSequences, sequenceProblems, sequencesOf, type BumperSequences } from "../playout/engine/sequence.js";
 import { kindOfTranslator } from "../relays/platforms.js";
+import { resolveTiming } from "../log/timing.js";
 
 export type StationKind = "station" | "studio" | "claimable" | "listed" | "catalog";
 type LogCode = "PGM" | "SPT" | "UND" | "BMP" | "SID" | "OPEN";
@@ -34,10 +35,16 @@ export interface BreakRuleView {
   dailyOpener: boolean;
   /** A243: the bumper sequences (open, close, between), the defaults filled in. `cadence.bumpers` reads as `open.every`. */
   bumperSequences: BumperSequences;
+  /** A247: with `after_every_program`, a break after every this many programs; null: every program. */
+  everyPrograms: number | null;
+  /** A247: clock breaks, minutes past the hour (sorted), with `every_n_minutes`; null: none. */
+  clockMinutes: number[] | null;
+  /** A247: breaks inside programs longer than `overMs`, every `everyMs`; null: off. */
+  longPrograms: { overMs: number; everyMs: number } | null;
 }
 
 /** A break rule as `setBreakRule` takes it: what an older app leaves out stays as set. */
-export type BreakRuleInput = Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener" | "bumperSequences"> & {
+export type BreakRuleInput = Omit<BreakRuleView, "adsFromPartners" | "cadence" | "stationIdAfterOpener" | "dailyOpener" | "bumperSequences" | "everyPrograms" | "clockMinutes" | "longPrograms"> & {
   adsFromPartners?: boolean;
   /** S20: `upNext` left out stays as set; null clears it (Up next follows its position again). */
   cadence?: Omit<BreakCadence, "spots" | "upNext"> & { spots?: BreakCadence["spots"]; upNext?: BreakCadence["upNext"] | null };
@@ -45,6 +52,10 @@ export type BreakRuleInput = Omit<BreakRuleView, "adsFromPartners" | "cadence" |
   dailyOpener?: boolean;
   /** A243: left out (an app from before), they stay as set; `cadence.bumpers` alone sets `open.every` and `close.every`. */
   bumperSequences?: BumperSequences;
+  /** A247: left out (an app from before), each stays as set while the mode it goes with does; null clears it. */
+  everyPrograms?: number | null;
+  clockMinutes?: number[] | null;
+  longPrograms?: { overMs: number; everyMs: number } | null;
 };
 
 type BreakRuleRow = typeof schema.breakRules.$inferSelect;
@@ -69,7 +80,11 @@ function breakRuleView(rule: Partial<BreakRuleRow> | undefined, blockedCategorie
       return { cadence: { ...cadence, bumpers: open.every === "n_programs" ? { every: open.every, n: open.n } : { every: open.every } }, bumperSequences };
     })(),
     stationIdAfterOpener: rule?.stationIdAfterOpener ?? false,
-    dailyOpener: rule?.dailyOpener ?? false
+    dailyOpener: rule?.dailyOpener ?? false,
+    // A247: always answered; null where not set (each only with the mode it goes with).
+    everyPrograms: rule?.mode === "after_every_program" ? (rule.everyPrograms ?? null) : null,
+    clockMinutes: rule?.mode === "every_n_minutes" && rule.clockMinutes?.length ? [...rule.clockMinutes] : null,
+    longPrograms: rule?.longPrograms ?? null
   };
 }
 
@@ -394,10 +409,13 @@ const LIVEPEER_PLAYBACK = (process.env.LIVEPEER_PLAYBACK_BASE ?? "https://livepe
  * sequences (sent, stored as sent, the bumpers' cadence following the opening one's; left out,
  * they stay, except that a body from before them that changes how often bumpers air changes both
  * the opening and closing sequence's). `undefined` in `set`: left as stored. Stored only once
- * they're not the defaults (null: the defaults, from `cadence.bumpers`).
+ * they're not the defaults (null: the defaults, from `cadence.bumpers`). A247's timing (every N
+ * programs, clock times, inside long programs) is always written, as `resolveTiming` works it out.
  */
 function resolveBreakRuleWrite(rule: BreakRuleInput, stored: BreakRuleRow | undefined) {
-  if (rule.mode === "every_n_minutes" && !rule.everyMinutes) throw badRequest("Say how often.", { everyMinutes: "Required" });
+  if (rule.mode === "every_n_minutes" && !rule.everyMinutes && !rule.clockMinutes?.length) throw badRequest("Say how often.", { everyMinutes: "Required" });
+  // A247: after every N programs, clock times, inside long programs (log/timing.ts).
+  const timing = resolveTiming(rule, stored && { mode: stored.mode, everyMinutes: stored.everyMinutes, everyPrograms: stored.everyPrograms, clockMinutes: stored.clockMinutes, longPrograms: stored.longPrograms });
   const fillOrder = [...rule.fillOrder.filter((c) => c !== "SID"), "SID" as const];
   const was = cadenceOf(stored?.cadence);
   let cadence: BreakCadence | undefined;
@@ -428,7 +446,7 @@ function resolveBreakRuleWrite(rule: BreakRuleInput, stored: BreakRuleRow | unde
   }
   const set = {
     mode: rule.mode,
-    everyMinutes: rule.mode === "every_n_minutes" ? rule.everyMinutes : null,
+    everyMinutes: timing.everyMinutes,
     lengthMs: rule.lengthMs,
     spotMsPerHour: rule.spotMsPerHour,
     sameSpotPerHour: rule.sameSpotPerHour,
@@ -439,7 +457,11 @@ function resolveBreakRuleWrite(rule: BreakRuleInput, stored: BreakRuleRow | unde
     // A242: left out (an app from before), each stays as set.
     stationIdAfterOpener: rule.stationIdAfterOpener,
     dailyOpener: rule.dailyOpener,
-    bumperSequences
+    bumperSequences,
+    // A247: always written (what a body from before leaves out is worked out in `resolveTiming`).
+    everyPrograms: timing.everyPrograms,
+    clockMinutes: timing.clockMinutes,
+    longPrograms: timing.longPrograms
   };
   const categories = [...new Set(rule.blockedCategories.map((c) => c.trim()).filter(Boolean))];
   return { set, categories };

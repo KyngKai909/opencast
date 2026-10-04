@@ -180,8 +180,8 @@ describe("Break rules: the words", () => {
   it("say what's true for the mode: after every program, the length doesn't shape breaks", () => {
     expect(recipeLine({ mode: "after_every_program", lengthMs: 120_000 })).toBe("Drawn to scale for a 2:00 break. After every program, a break is the time its program leaves, so most run shorter or longer");
     expect(recipeLine({ mode: "every_n_minutes", lengthMs: 90_000 })).toBe("Drawn to scale for a 1:30 break");
-    expect(lengthLine("after_every_program")).toBe("Breaks cued live, and between repeats. The rest are the time a program leaves");
-    expect(lengthLine("every_n_minutes")).toBe("Every break. Live programs cue their own");
+    expect(lengthLine({ mode: "after_every_program" })).toBe("Breaks cued live, and between repeats. The rest are the time a program leaves");
+    expect(lengthLine({ mode: "every_n_minutes" })).toBe("Every break. Live programs cue their own");
   });
 
   it("name the blocks with their own bumper order", () => {
