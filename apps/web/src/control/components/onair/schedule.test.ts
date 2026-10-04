@@ -1,12 +1,14 @@
 // The words for off air hours and day templates (G8, G9), the Monitor's line, the rundown's off
-// air, and the sign-on line leaving informational checks out.
+// air, and the sign-on line leaving informational checks out. A246 (Phase 4): the Templates tab's
+// cards (dates ahead, which template wins a date, the precedence note), what saving does (dates
+// rebuilt, edited dates kept), and "Reset to template".
 
 import { describe, expect, it } from "vitest";
 import type { DayTemplate } from "@opencast/contracts";
 import { monitorOffAirText, nextOffAirText, offAirSource, ruleIndexOf, ruleLines, wallClock } from "./offAir";
 import { buildRundown } from "./rundown";
 import { signOnSummary } from "./signOn";
-import { copyDetail, copyName, datesText, dayOriginOf, generationLines, oldCopies, originOf, repeatOptions, templateDetail, templateName } from "./templates";
+import { cardLine, copyName, coversDate, datesText, generationLines, precedenceNote, referenceDate, repeatOptions, resetLine, saveCounts, savedLine, templateName, winnerOn } from "./templates";
 
 const TZ = "America/Los_Angeles";
 const T = (hhmm: string) => `2026-09-27T${hhmm}:00.000Z`;
@@ -74,46 +76,61 @@ describe("day template words", () => {
     expect(repeatOptions(0)[0]).toEqual({ value: "weekly", label: "Every Sunday" });
   });
 
-  it("names a template, and says where it's from and what's ahead", () => {
+  it("names a template, and says how it repeats and what's ahead (06's cards)", () => {
     const t = template({ dates: [{ date: "2026-10-03", edited: false, entries: 8, skipped: 2 }, { date: "2026-10-10", edited: true, entries: 10, skipped: 0 }] });
     expect(templateName(t)).toBe("Every Saturday");
-    expect(templateDetail(t)).toBe("Built from Sat Sep 26. 2 dates ahead, 1 edited.");
+    expect(cardLine(t, null)).toBe("From Sep 26. 2 dates ahead, 1 edited");
     const named = template({ name: "After work", label: "Weekdays", pattern: "weekdays", weekday: null, fromDay: "2026-09-21", until: "2026-11-20", dates: [] });
     expect(templateName(named)).toBe("After work");
-    expect(templateDetail(named)).toBe("Weekdays. Built from Mon Sep 21, until Fri Nov 20. No dates ahead.");
+    expect(cardLine(named, null)).toBe("Monday to Friday from Sep 21, until Nov 20. No dates ahead");
+    expect(cardLine(template({ name: "Saturdays" }), null)).toBe("Every Saturday from Sep 26. No dates ahead");
     expect(datesText(template({ dates: [{ date: "2026-10-03", edited: false, entries: 1, skipped: 0 }] }))).toBe("1 date ahead");
+    const once = template({ id: "hw", name: "Halloween", pattern: "once", weekday: null, label: "Once, Sat Oct 31", onDate: "2026-10-31" });
+    expect(cardLine(once, "Overrides Every Saturday that day")).toBe("Once, Sat Oct 31. Overrides Every Saturday that day");
   });
 
-  it("says which template made a date, and whether it was edited", () => {
-    const t = template({ dates: [{ date: "2026-10-03", edited: false, entries: 8, skipped: 2 }, { date: "2026-10-10", edited: true, entries: 10, skipped: 0 }] });
-    expect(originOf([t], "2026-10-03")).toEqual({ template: t, edited: false });
-    expect(originOf([t], "2026-10-10")).toEqual({ template: t, edited: true });
-    expect(originOf([t], "2026-09-26")).toBeNull();
+  it("knows which template makes a date: once, then a weekday, then weekdays, then every day", () => {
+    const sat = template({ id: "sat", createdAt: T("01:00") });
+    const weekdays = template({ id: "wd", pattern: "weekdays", weekday: null, label: "Weekdays", fromDay: "2026-09-21" });
+    const daily = template({ id: "all", pattern: "daily", weekday: null, label: "Every day", fromDay: "2026-09-20" });
+    const once = template({ id: "hw", name: "Halloween", pattern: "once", weekday: null, label: "Once, Sat Oct 31", onDate: "2026-10-31" });
+    const all = [sat, weekdays, daily, once];
+    expect(coversDate(sat, "2026-09-26")).toBe(false);
+    expect(winnerOn(all, "2026-10-03")?.id).toBe("sat");
+    expect(winnerOn(all, "2026-10-05")?.id).toBe("wd");
+    expect(winnerOn(all, "2026-10-04")?.id).toBe("all");
+    expect(winnerOn(all, "2026-10-31")?.id).toBe("hw");
+    // The note is the winner's, on dates both cover in the next three weeks.
+    expect(precedenceNote(once, all, "2026-10-12")).toBe("Overrides Every Saturday and Every day that day");
+    expect(precedenceNote(sat, all, "2026-09-27")).toBe("Overrides Every day on Saturdays");
+    expect(precedenceNote(weekdays, all, "2026-09-27")).toBe("Overrides Every day on weekdays");
+    expect(precedenceNote(daily, all, "2026-09-27")).toBeNull();
+    // Halloween is beyond three weeks: nothing to say yet.
+    expect(precedenceNote(once, all, "2026-09-27")).toBeNull();
   });
 
-  it("reads which template made a day from the log's days first, today and past days too (G11)", () => {
-    const t = template({ id: "sat", dates: [{ date: "2026-10-03", edited: false, entries: 8, skipped: 2 }] });
-    const days = [
-      { date: "2026-09-19", templateId: "old", templateName: "After work", label: "Weekdays", edited: true },
-      { date: "2026-09-26", templateId: null, templateName: null, label: null, edited: false }
-    ];
-    expect(dayOriginOf(days, [t], "2026-09-19")).toEqual({ templateId: "old", name: "After work", edited: true });
-    expect(dayOriginOf(days, [t], "2026-09-26")).toBeNull();
-    // A day the log didn't list: the templates' dates.
-    expect(dayOriginOf(days, [t], "2026-10-03")).toEqual({ templateId: "sat", name: "Every Saturday", edited: false });
-    expect(dayOriginOf(undefined, [t], "2026-10-03")).toEqual({ templateId: "sat", name: "Every Saturday", edited: false });
+  it("says what saving does: how many dates are rebuilt and which edited ones are kept (decision 7)", () => {
+    const dates = (edited: string[]) => ["2026-10-03", "2026-10-10", "2026-10-17", "2026-10-24"].map((date) => ({ date, edited: edited.includes(date), entries: 8, skipped: 0 }));
+    expect(saveCounts(template({ dates: dates(["2026-10-03"]) }))).toEqual({ rebuilt: 3, kept: 1, line: "Saving changes here rebuilds 3 upcoming Saturdays. Oct 3, edited by hand, is kept as an exception." });
+    expect(saveCounts(template({ dates: dates([]) })).line).toBe("Saving changes here rebuilds 4 upcoming Saturdays.");
+    expect(saveCounts(template({ dates: dates(["2026-10-03", "2026-10-17"]) })).line).toBe("Saving changes here rebuilds 2 upcoming Saturdays. Oct 3 and Oct 17, edited by hand, are kept as exceptions.");
+    expect(saveCounts(template({ pattern: "weekdays", weekday: null, dates: dates([]).slice(0, 1) })).line).toBe("Saving changes here rebuilds 1 upcoming weekday.");
+    expect(saveCounts(template({ pattern: "once", weekday: null, onDate: "2026-10-31", dates: [{ date: "2026-10-31", edited: false, entries: 3, skipped: 0 }] })).line).toBe("Saving changes here rebuilds Sat Oct 31.");
+    expect(savedLine(3, 1)).toBe("Template saved. 3 dates rebuilt; 1 edited date kept as an exception.");
+    expect(savedLine(1, 0)).toBe("Template saved. 1 date rebuilt.");
+    expect(resetLine("2026-09-30", "After work", { created: 2, removed: 1 })).toBe("Sep 30 is back to After work: 2 programs back on, 1 taken off.");
+    expect(resetLine("2026-09-30", "After work", { created: 0, removed: 0 })).toBe("Sep 30 is back to After work.");
   });
 
-  it("keeps G7's one-time copies apart from templates", () => {
-    const t = template({ id: "tmpl" });
-    const repeats = [
-      { id: "tmpl", day: "2026-09-26", pattern: "weekly" as const, until: null, entries: 30, template: true, weekday: 6, label: "Every Saturday" },
-      { id: "copy", day: "2026-09-19", pattern: "weekly" as const, until: "2026-10-31", entries: 1, template: false }
-    ];
-    const copies = oldCopies(repeats, [t]);
-    expect(copies.map((r) => r.id)).toEqual(["copy"]);
-    expect(copyName(copies[0])).toBe("Every Saturday");
-    expect(copyDetail(copies[0])).toBe("Copied from Sat Sep 19, until Sat Oct 31. 1 entry to come.");
+  it("opens a template on the next date it makes", () => {
+    expect(referenceDate(template({ dates: [{ date: "2026-10-03", edited: false, entries: 1, skipped: 0 }] }), "2026-09-26")).toBe("2026-10-03");
+    expect(referenceDate(template({}), "2026-09-26")).toBe("2026-10-03");
+    expect(referenceDate(template({ pattern: "once", weekday: null, onDate: "2027-01-01" }), "2026-09-26")).toBe("2026-09-26");
+  });
+
+  it("names G7's one-time copies by how they repeated", () => {
+    expect(copyName({ id: "copy", day: "2026-09-19", pattern: "weekly", until: "2026-10-31", entries: 1, template: false })).toBe("Every Saturday");
+    expect(copyName({ id: "copy", day: "2026-09-19", pattern: "daily", until: null, entries: 1 })).toBe("Every day");
   });
 
   it("lists what a write made, with removals and exceptions only when there are some", () => {

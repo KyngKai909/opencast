@@ -3,17 +3,18 @@
 // here (so gaps leave it out and nothing warns about it) and call `generate` for the dates a log
 // window covers; the template handlers (handlers/templates.ts) write through it.
 
-import { templateBlocksOf } from "./blocks";
-import type { DayTemplate, LogDay, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
+import { spansForDate, templateBlocksOf } from "./blocks";
+import type { DayTemplate, DayTemplateEntryInput, LogDay, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
 import { now, STATION_TZ } from "../../lib/clock";
 import { addDays, broadcastDay, isoDate, localTime, weekdayOf } from "../components/onair/time";
 import { getDb, stationLog } from "./db";
 import type { DbLogEntry } from "./fixtures/evening";
 import { offAirSpans, ruleLabel } from "./fixtures/offair";
 import { onAirState } from "./fixtures/onair";
-import { entryOn, HORIZON_DAYS, MAX_AHEAD_DAYS, templateLabel, toTemplateEntry, winner, ymd, type DbTemplate, type DbTemplateDate } from "./fixtures/templates";
+import { entryOn, HORIZON_DAYS, MAX_AHEAD_DAYS, templateLabel, toTemplateEntry, winner, ymd, type DbTemplate, type DbTemplateDate, type DbTemplateEntry } from "./fixtures/templates";
 
 const DAY = 86_400_000;
+const MIN = 60_000;
 const uuid = () => crypto.randomUUID();
 const iso = (t: number) => new Date(t).toISOString();
 
@@ -213,6 +214,8 @@ export function generate(stationId: string, opts: { dates?: string[]; through?: 
     totals.skippedForConflicts += r.skipped;
     if (had) had.t.dates = had.t.dates.filter((d) => d !== had.rec);
     if (win) win.dates.push({ date, edited: false, entries: kept.size + r.placed, skipped: r.skipped, made: true });
+    // A244: its programming blocks, from the template that makes it now.
+    spansForDate(stationId, date, had?.t.id ?? null, win?.id ?? null);
     totals.dates++;
   }
   return totals;
@@ -311,6 +314,53 @@ export interface TemplatePatch {
   onto?: string;
   until?: string | null;
   fromDay?: string;
+  /** A246: the template's own rundown, edited (replaces its entries). */
+  entries?: DayTemplateEntryInput[];
+}
+
+/** "21:00" as its place in the broadcast day (6:00 am is 0). */
+const dayOrder = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h * 60 + m - 360 + 1440) % 1440;
+};
+
+/**
+ * A246: `updateTemplate.entries` as the API keeps them: each with its title and code (an entry
+ * the template already had keeps its own, a carried one its maker), in the broadcast day's order,
+ * none overlapping (400 otherwise, as the API's).
+ */
+export function entriesFromInput(t: DbTemplate, list: DayTemplateEntryInput[]): DbTemplateEntry[] {
+  const db = getDb();
+  const out = list.map((x): DbTemplateEntry => {
+    const was = t.entries.find((e) => e.kind === x.kind && e.itemId === (x.itemId ?? null) && e.liveSourceId === (x.liveSourceId ?? null) && e.carriageAgreementId === (x.carriageAgreementId ?? null));
+    const it = x.itemId ? db.library.items.find((i) => i.id === x.itemId) : undefined;
+    const carried = x.carriageAgreementId ? stationLog(t.stationId).find((e) => e.carriageAgreementId === x.carriageAgreementId) : undefined;
+    const program = x.programId ? db.library.programs.find((p) => p.id === x.programId) : undefined;
+    if (x.kind === "program" && !was && !it && !carried) throw new TemplateInputError("That item isn't in your library.", { entries: "Not in your library" });
+    const title = x.kind === "off_air" ? "Off air" : (was?.title ?? (x.kind === "live" ? (program?.title ?? "Live") : (carried?.title ?? it?.title ?? "Program")));
+    return {
+      id: uuid(),
+      startTime: x.startTime,
+      lengthMs: x.lengthMs ?? Math.ceil((it?.durationMs ?? 30 * MIN) / MIN) * MIN,
+      kind: x.kind,
+      code: was?.code ?? (x.kind === "off_air" ? "OPEN" : "PGM"),
+      title,
+      itemId: x.itemId ?? null,
+      programId: x.programId ?? was?.programId ?? it?.programId ?? carried?.programId ?? null,
+      liveSourceId: x.liveSourceId ?? null,
+      carriageAgreementId: x.carriageAgreementId ?? null,
+      episodeTitle: x.episodeTitle ?? was?.episodeTitle ?? (it?.episodeNumber ? `ep. ${it.episodeNumber}` : null),
+      episodeDescription: x.episodeDescription ?? was?.episodeDescription ?? null,
+      localNote: x.localNote ?? was?.localNote ?? null,
+      carriedFrom: was?.carriedFrom ?? carried?.carriedFrom ?? null,
+      ...(x.keepTime ? { keepTime: true } : {})
+    };
+  });
+  out.sort((a, b) => dayOrder(a.startTime) - dayOrder(b.startTime));
+  for (let i = 1; i < out.length; i++) {
+    if (dayOrder(out[i - 1].startTime) * MIN + out[i - 1].lengthMs > dayOrder(out[i].startTime) * MIN) throw new TemplateInputError("Two entries overlap.", { entries: "Overlap" });
+  }
+  return out;
 }
 
 export function updateTemplate(t: DbTemplate, input: TemplatePatch): TemplateGeneration {
@@ -318,7 +368,8 @@ export function updateTemplate(t: DbTemplate, input: TemplatePatch): TemplateGen
   const onto = pattern === "once" ? (input.onto ?? (t.pattern === "once" ? t.onDate : null)) : null;
   const until = pattern === "once" ? onto : input.until !== undefined ? input.until : t.pattern === "once" ? null : t.until;
   if (input.pattern || input.onto || input.until !== undefined) checkPattern({ pattern, onto, until, fromDay: t.fromDay });
-  if (input.fromDay) t.entries = snapshot(t.stationId, input.fromDay);
+  if (input.entries) t.entries = entriesFromInput(t, input.entries);
+  else if (input.fromDay) t.entries = snapshot(t.stationId, input.fromDay);
   Object.assign(t, {
     pattern,
     weekday: pattern === "weekly" ? (input.weekday ?? t.weekday ?? weekdayOf(ymd(t.fromDay))) : null,
@@ -347,4 +398,41 @@ export function removeTemplate(t: DbTemplate): number {
   t.dates = t.dates.filter((d) => d.date < tomorrow || d.edited);
   generate(t.stationId);
   return gone.length;
+}
+
+/** Why a date can't be reset: it has started (409), or the template didn't make it (404). */
+export class ResetRefused extends Error {
+  constructor(
+    readonly status: 404 | 409,
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * A246: "Reset to template", as the API's: an edited date made again from its template. What
+ * the template didn't make comes off it from now on (an entry made by hand, a block placed on the
+ * date), the template's entries go back on, and it's no longer an exception. A date that wasn't
+ * edited is left as it is.
+ */
+export function resetTemplateDate(t: DbTemplate, date: string): TemplateGeneration {
+  const tomorrow = isoDate(addDays(today(), 1));
+  if (date < tomorrow) {
+    const words = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+    throw new ResetRefused(409, "date_started", `${words} has started. Only dates from tomorrow on can be reset to their template.`);
+  }
+  const rec = t.dates.find((d) => d.date === date);
+  if (!rec) throw new ResetRefused(404, "not_found", "That date of the template wasn't found.");
+  if (!rec.edited) return { dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 };
+  // A seeded edited date not on the log yet is made first, as it was edited.
+  if (!rec.made) makeSeeded(t.stationId, new Set([date]));
+  const t0 = now().toISOString();
+  const going = getDb().log.filter((e) => e.stationId === t.stationId && dayOf(e.startsAt) === date && e.startsAt > t0 && e.repeatGroupId !== t.id);
+  for (const e of going) removeWithBreaks(e.id);
+  spansForDate(t.stationId, date, null, null, { handPlaced: true });
+  rec.edited = false;
+  const g = generate(t.stationId, { dates: [date], force: t.id });
+  return { ...g, removed: g.removed + going.length };
 }

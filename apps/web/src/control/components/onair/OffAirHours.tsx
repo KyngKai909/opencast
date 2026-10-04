@@ -177,11 +177,31 @@ export function OffAirHoursSection({ stationId, callSign, phone, everyDay = fals
   });
   if (next) items.push({ label: "Next", value: next });
 
+  // A246 (Phase 4): the Templates tab's dashed "Every day" card, as 06 draws it: one line and Change.
+  if (everyDay) {
+    const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+    const line = hours.isError ? hours.error.message : rules.length ? `Off air ${rules.map((r) => lower(r.label)).join("; ")}. Applies to every template and date` : hours.data ? `No off air hours: ${callSign} stays on around the clock. Hours set here apply to every template and date` : null;
+    return (
+      <section className="cc-tcard cc-tcard--every" aria-labelledby="cc-log-offair">
+        <h2 className="cc-tcard__h" id="cc-log-offair">
+          Every day
+        </h2>
+        {line && <small className="cc-tcard__line">{line}</small>}
+        {hours.data && (
+          <button type="button" className="cc-btn-xs cc-tcard__btn" onClick={() => setEditing(true)}>
+            Change<span className="oc-sr-only"> the off air hours</span>
+          </button>
+        )}
+        {editing && <OffAirHoursForm stationId={stationId} callSign={callSign} hours={hours.data} phone={phone} onClose={() => setEditing(false)} />}
+      </section>
+    );
+  }
+
   return (
-    <section className={everyDay ? "cc-log__sec cc-sch__everyday" : "cc-log__sec"} aria-labelledby="cc-log-offair">
+    <section className="cc-log__sec" aria-labelledby="cc-log-offair">
       <div className="cc-log__hrow">
         <h2 className="cc-log__h" id="cc-log-offair">
-          {everyDay ? "Every day" : "Off air hours"}
+          Off air hours
         </h2>
         {hours.data && (
           <Button variant="text" size="sm" onClick={() => setEditing(true)}>
@@ -196,7 +216,6 @@ export function OffAirHoursSection({ stationId, callSign, phone, everyDay = fals
       ) : hours.data ? (
         <p className="cc-log__quiet">No off air hours. {callSign} stays on around the clock.</p>
       ) : null}
-      {everyDay && <p className="cc-log__note">Off air hours apply to every template and date.</p>}
       <p className="cc-log__note">{OFF_AIR_NOTE}</p>
       {editing && <OffAirHoursForm stationId={stationId} callSign={callSign} hours={hours.data} phone={phone} onClose={() => setEditing(false)} />}
     </section>

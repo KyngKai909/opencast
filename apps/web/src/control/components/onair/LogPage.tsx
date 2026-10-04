@@ -13,7 +13,10 @@
 // mode across a visit to the market; `?add=<itemId>` (the library's "Schedule") opens the drawer on
 // that item; `?fill=<gapStart>` opens the gap with Fill ready (on the phone, Fill's sheet, P.2).
 // `?day=` is a date ("2026-10-03") or a weekday of this week ("sat"). Setup step 3 shows the Day
-// view without the Schedule's tabs or the Week.
+// view without the Schedule's tabs or the Week. Phase 4: in edit mode a block's start and end are
+// handles on the rundown (`?addBlock=<blockId>`, a block's "Place on the log", opens Add a block set
+// to it); on the phone the rundown is the whole screen, the day and its chips on top, and what's
+// picked (a break, a program, the row being changed) opens as a bottom sheet.
 // Times are on 4-second segment boundaries (prepare once, then assemble), as the API answers them.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -36,7 +39,7 @@ import { lockOf, type DraftItem } from "./logEdit";
 import { BlockPane, BreakPane, EntryPane, GlancePane } from "./LogPane";
 import { edgesOf, fixedReason, type Reflow } from "./reorder";
 import { RepeatDialog } from "./RepeatDay";
-import { templateName } from "./templates";
+import { shortDate, templateName } from "./templates";
 import { DAY_KEYS, addDays, broadcastDay, isoDate, viewWindow, weekOf, weekdayOf, type Ymd } from "./time";
 import { WeekView } from "./WeekView";
 import "./LogPage.css";
@@ -207,6 +210,12 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
   useEffect(() => {
     if (addParam && editing && log.data && !adding) setAdding(firstSpace());
   }, [addParam, editing, !!log.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Phase 4, `?addBlock=<blockId>` (a block's "Place on the log", on a date): edit mode with Add a
+  // block set to it.
+  const addBlockParam = params.get("addBlock");
+  useEffect(() => {
+    if (addBlockParam && editing && log.data) setAddingBlock(true);
+  }, [addBlockParam, editing, !!log.data]);
   const fill = useFill({ stationId, base, gap: phone ? fillGap : null, phone });
 
   if (log.isLoading) return <Quiet />;
@@ -272,7 +281,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
   const dayNav = (
     <div className="cc-daynav">
       <IconButton icon="chev" label={view === "week" ? "The week before" : "The day before"} size="sm" className="cc-daynav__arw cc-daynav__arw--l" onClick={() => set({ day: isoDate(addDays(day, view === "week" ? -7 : -1)), break: null, entry: null, block: null })} />
-      <b className="cc-daynav__day">{view === "week" ? weekLabel(week) : dayLabel(day)}</b>
+      <b className="cc-daynav__day">{view === "week" ? weekLabel(week) : phone && isToday ? `Today, ${shortDate(isoDate(day))}` : dayLabel(day)}</b>
       <IconButton icon="chev" label={view === "week" ? "The week after" : "The day after"} size="sm" className="cc-daynav__arw" onClick={() => set({ day: isoDate(addDays(day, view === "week" ? 7 : 1)), break: null, entry: null, block: null })} />
       {(view === "week" ? !thisWeek.some((d) => isoDate(d) === isoDate(day)) : !isToday) && (
         <button type="button" className="cc-btn-xs" onClick={() => set({ day: null, break: null, entry: null, block: null })}>
@@ -285,7 +294,7 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
           {origin.text}
         </span>
       )}
-      {view === "day" && canEdit && !editing && (
+      {view === "day" && canEdit && !editing && !phone && (
         <button type="button" className="cc-btn-xs" onClick={() => setRepeating(true)}>
           Make a template from this day
         </button>
@@ -294,7 +303,8 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
         {editing ? (
           <span className="cc-hchip cc-hchip--signal">{origin && !origin.edited ? `Editing. This date becomes an exception to "${originName}"` : "Editing"}</span>
         ) : (
-          !setup && (
+          // The phone keeps to the day (opencast-schedule 08).
+          !setup && !phone && (
             <Segmented
               label="View"
               size="sm"
@@ -413,18 +423,35 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
   );
 
   const sheetGap = phone && fillGap && !editing;
+  // Phase 4, the phone (opencast-schedule 08): the rundown is the whole screen; what's picked opens
+  // as a bottom sheet (a break, a program, a block; in edit mode the row being changed).
+  const closePicked = () => (editing ? (setPicked(null), setPickedSpan(null)) : set({ break: null, entry: null, block: null }));
+  const phoneSheet = !phone
+    ? null
+    : editing
+      ? pickedEntry
+        ? { label: pickedEntry.title, body: pane }
+        : editSpan
+          ? { label: editSpan.name, body: pane }
+          : null
+      : pickedBreak?.slot || pickedProgram?.entry || pickedBlock
+        ? { label: pickedBreak ? `Break, ${clock(pickedBreak.at, { timeZone: STATION_TZ, seconds: true })}` : (pickedProgram?.title ?? pickedBlock?.name ?? ""), body: pane }
+        : null;
 
   return (
-    <div className={["cc-log", setup && "cc-log--setup", editing && "cc-log--editing"].filter(Boolean).join(" ")}>
+    <div className={["cc-log", setup && "cc-log--setup", editing && "cc-log--editing", phone && "cc-log--phone"].filter(Boolean).join(" ")}>
       {head ? head(headEnd) : <ControlTitle title="Program log" description="What airs, in order. Build one day and make a template of it, then adjust." end={headEnd} />}
-      {dayNav}
-      {chips.length > 0 && (
-        <div className="cc-hchips" aria-label="At a glance">
-          {chips.map((c) => (
-            <Chip key={c.key} chip={c} onGo={c.rowId ? goChip(c) : undefined} />
-          ))}
-        </div>
-      )}
+      {/* On the phone the day and its chips stay on top while the rows scroll under them. */}
+      <div className="cc-log__bar">
+        {dayNav}
+        {chips.length > 0 && (
+          <div className="cc-hchips" aria-label="At a glance">
+            {chips.map((c) => (
+              <Chip key={c.key} chip={c} onGo={c.rowId ? goChip(c) : undefined} />
+            ))}
+          </div>
+        )}
+      </div>
       {edit.published && !editing && (
         <Notice
           tone="plain"
@@ -470,7 +497,15 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
                         if (i >= 0) edit.drop(i);
                       },
                       onAddAt: (at) => setAdding(spaceAt(at)),
-                      earliest: tNow + (onAir ? 20_000 : 0)
+                      earliest: tNow + (onAir ? 20_000 : 0),
+                      // Phase 4: a block's start and end as handles.
+                      handles: {
+                        original: new Map((data.blocks ?? []).map((b) => [b.id, { startsAt: b.startsAt, endsAt: b.endsAt }])),
+                        limits: { earliest: tNow + (onAir ? 20_000 : 0), dayEnd: win.to },
+                        intro: (id) => !!edit.blocks.find((b) => b.id === id)?.intro,
+                        outro: (id) => !!edit.blocks.find((b) => b.id === id)?.outro,
+                        onPick: (spanId) => (setPicked(null), setPickedSpan(spanId))
+                      }
                     }
                   : undefined
               }
@@ -479,9 +514,11 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
             <p className="cc-log__quiet">Nothing on the log this day.</p>
           )}
         </div>
-        <aside className="cc-log__pane" aria-label={editing ? "The row picked" : "The day"}>
-          {pane}
-        </aside>
+        {!phone && (
+          <aside className="cc-log__pane" aria-label={editing ? "The row picked" : "The day"}>
+            {pane}
+          </aside>
+        )}
       </div>
       {editing && <EditTray edit={edit} exception={exception} />}
       {setup && (
@@ -507,7 +544,18 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
           onClose={closeDrawer}
         />
       )}
-      {editing && addingBlock && <AddBlockDialog edit={edit} base={base} near={win.from} onClose={() => setAddingBlock(false)} />}
+      {editing && addingBlock && (
+        <AddBlockDialog
+          edit={edit}
+          base={base}
+          near={win.from}
+          blockId={addBlockParam}
+          onClose={() => {
+            setAddingBlock(false);
+            if (addBlockParam) set({ addBlock: null });
+          }}
+        />
+      )}
       {repeating && <RepeatDialog stationId={stationId} day={day} pattern="weekly" phone={phone} onClose={() => setRepeating(false)} />}
       {leaving && (
         <Modal
@@ -525,6 +573,11 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
             </>
           }
         />
+      )}
+      {phoneSheet && (
+        <Sheet open onClose={closePicked} label={phoneSheet.label} className="cc-log__sheet">
+          {phoneSheet.body}
+        </Sheet>
       )}
       {sheetGap && (
         <Sheet

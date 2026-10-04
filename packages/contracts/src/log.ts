@@ -171,6 +171,7 @@ export const DayTemplateEntryInput = z.object({
   /** G18 (added 2026-10-03): "Keep at this time". Left out: false. */
   keepTime: z.boolean().optional()
 });
+export type DayTemplateEntryInput = z.infer<typeof DayTemplateEntryInput>;
 
 /**
  * Day templates (added 2026-09-29): a day built once and repeated. Its days (`fromDay`, `onDate`,
@@ -630,6 +631,25 @@ export const logApi = {
       "Stop repeating a day template (owner, operator): the same as `removeRepeat`. Its entries come off the dates ahead that weren't edited, which another template may take; edited dates stay as they are.",
     params: z.object({ stationId: Id, templateId: Id }),
     response: z.object({ removed: z.number().int() })
+  }),
+  /**
+   * A246 (added 2026-10-03): "Reset to template". One date a template made, and that was edited
+   * by hand since (an exception), made again from the template: what's on that broadcast day from
+   * now on that the template didn't make comes off (an entry with spots held in its break stays, as
+   * when a template changes), the template's entries and blocks go back on, and the date stops
+   * being an exception. A date that wasn't edited is left as it is (`generated` all zeros). Dates
+   * from tomorrow on only: 409 `date_started` for today or before. 404 when the date isn't one
+   * this template made.
+   */
+  resetTemplateDate: endpoint({
+    method: "POST",
+    path: "/stations/:stationId/log/templates/:templateId/dates/:date/reset",
+    auth: "user",
+    summary:
+      "Reset one edited date to its day template (owner, operator): what the template didn't make comes off that broadcast day, the template's entries and blocks go back on, and the date is no longer an exception. Dates from tomorrow on (409 `date_started`); a date the template didn't make is 404.",
+    params: z.object({ stationId: Id, templateId: Id, date: DateOnly }),
+    response: z.object({ template: DayTemplate, generated: TemplateGeneration }),
+    status: 200
   }),
   getOffAirHours: endpoint({
     method: "GET",

@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-03: Reset a date to its template; block changes' lines say who joins or leaves (A246, Phase 4)
+
+Additive: one new endpoint (request and response both new) and one type export. No published response changes shape. No migration: an edited date is `day_template_dates.edited_at`, already there; `drizzle-kit generate` reports no changes.
+
+- `log.ts`: `resetTemplateDate` (`POST /stations/:stationId/log/templates/:templateId/dates/:date/reset`, owners and operators, no body): one date a template made, and that was edited by hand since, made again from the template. What's on that broadcast day from now on that the template didn't make comes off (entries and blocks put there by hand; an entry with spots held in its break stays, as when a template changes); the template's entries and blocks go back on (kept where they're already as it makes them); the date is no longer an exception. Answers `{ template: DayTemplate, generated: TemplateGeneration }` (`generated.removed` counts what came off). A date that wasn't edited is left as it is (`generated` all zeros). 409 `date_started` for today or before ("Oct 26 has started. Only dates from tomorrow on can be reset to their template."); 404 when the date isn't one the template made. `DayTemplateEntryInput` is exported as a type too (it was a schema only).
+- Behaviour, no shape change: `applyLogChanges`' line for a block change says who it takes in or lets go, by the log's start-time rule with the batch's own moves and inserts, and what it was: "Late Crate Nights now ends at 12:30 am, was 1:00 am. Crate Session 01 is no longer part of it"; "… now starts at 9:00 pm, was 9:30 pm. Late Crate joins it" (a block added says only when it is). It's the same `line` string, so the change history records it too. G17 (the same as fields) stays open.
+- Behaviour, no shape change: the dead-air warning (30 and 12 minutes before) links to `/stations/:id/schedule?day=<broadcast day>&fill=<gap start>` (was `/stations/:id/log`), and a notice's email link maps `log`, `as-run`, `breaks` and `schedule` to master control's Schedule (`/control/<slug>/schedule`, with the query). The old `/log` and `/breaks` pages still redirect there.
+- How older builds tolerate it: apps built before never call the new endpoint; master control built before reads the longer lines as any line; an old link in a notice already sent still lands (the old pages redirect).
+
 ## 2026-10-03: The break rule's preview, and Up next with its own cadence (A246, S20)
 
 Additive: one new endpoint (request and response both new), one new shape, and one optional field. No published response changes shape. No migration: `cadence.upNext` lives in `broadcast.break_rules.cadence` (jsonb), as `spots` does; `drizzle-kit generate` reports no changes.

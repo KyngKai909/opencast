@@ -1,11 +1,9 @@
-/* A246: the Schedule workspace (opencast-schedule .sch-top, .sch-tabs; 06's dashed "Every day" card). */
+/* A246: the Schedule workspace (opencast-schedule .sch-top, .sch-tabs). */
 .cc-sch__top { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .cc-sch__h { margin: 0; font: 800 26px/1 var(--font-display); font-stretch: var(--semi-wide); letter-spacing: -.02em; }
 .cc-sch__tabs { margin-left: 18px; }
 .cc-sch__end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .cc-sch__lede { margin: -6px 0 18px; font-size: 14.5px; color: var(--ink-70); max-width: 62ch; }
-.cc-sch__templates { max-width: 720px; }
-.cc-sch__everyday { padding: 12px 14px; border: 1.5px dashed var(--line); border-radius: 12px; margin-bottom: 22px; }
 .cc-sch__empty { margin: 0; font-size: 13.5px; color: var(--ink-50); }
 .cc-sch__moved { display: grid; gap: 12px; justify-items: start; }
 

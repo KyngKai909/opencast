@@ -1,37 +1,95 @@
-/* A244: programming blocks: the list of cards, and the block editor's sections (built like Settings'). */
-.cc-blks { max-width: 880px; }
-.cc-blks__list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-.cc-blks__card { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; padding: 12px; border-radius: var(--r-card, 10px); background: var(--raised); box-shadow: inset 0 0 0 1px var(--hair); color: inherit; text-decoration: none; }
-.cc-blks__card:hover { box-shadow: inset 0 0 0 1px var(--line); }
-.cc-blks__card:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
-.cc-blks__swatch { width: 48px; height: 48px; border-radius: 8px; display: grid; place-items: center; color: #fff; font: 700 20px/1 var(--font-display); overflow: hidden; }
-.cc-blks__swatch img { width: 100%; height: 100%; object-fit: contain; }
-.cc-blks__text { display: grid; gap: 2px; min-width: 0; }
-.cc-blks__text b { font-size: 15px; }
-.cc-blks__text small { font-size: 12.5px; color: var(--ink-70); }
+/* A244, A246 (Phase 4): the Schedule's Blocks tab (opencast-schedule 07: .blks, .bcard, .bdet-h,
+   .bgrid, .bsec, .irow, .order, .bprev, .gband, .ctrl, .where, .fallback). */
+.cc-blks { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; border-top: 1px solid var(--line); padding-top: 14px; }
+.cc-bcards { display: grid; gap: 10px; align-content: start; }
+.cc-bcards__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cc-bcards__new { justify-self: start; margin-top: 6px; }
+.cc-bcard { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 12px; padding: 12px 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); text-decoration: none; }
+.cc-bcard:hover { background: var(--raised); }
+.cc-bcard:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-bcard--on { box-shadow: inset 0 0 0 1.5px var(--signal); background: var(--raised); }
+.cc-bcard__sw { border-radius: 4px; }
+.cc-bcard__text { min-width: 0; }
+.cc-bcard__text b { display: block; font: 700 15px var(--font-display); }
+.cc-bcard__text small { display: block; font-size: 12px; color: var(--ink-70); margin-top: 2px; line-height: 1.35; }
+.cc-bcard__text small.cc-bcard__nx { color: var(--ink); margin-top: 6px; font-weight: 600; }
+.cc-bcard__text small.cc-bcard__nx--place { color: var(--signal); }
 
-.cc-blk { display: grid; gap: 0; margin-top: 8px; }
-.cc-blk__sec { padding: 18px 0; border-top: 1px solid var(--line); }
-.cc-blk__sec:first-of-type { border-top: 0; }
-.cc-blk__h { margin: 0 0 10px; font: 700 16px/1.25 var(--font-display); }
-.cc-blk__look { display: grid; grid-template-columns: 72px 1fr; gap: 16px; align-items: start; }
-.cc-blk__mark { width: 72px; height: 72px; border-radius: 10px; display: grid; place-items: center; color: #fff; font: 700 28px/1 var(--font-display); overflow: hidden; }
-.cc-blk__mark img { width: 100%; height: 100%; object-fit: contain; }
-.cc-blk__fields { display: grid; gap: 12px; max-width: 520px; }
-.cc-blk__row { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 8px 0; }
-.cc-blk__row > div:first-child { display: grid; gap: 2px; }
-.cc-blk__row b { font-size: 14px; }
-.cc-blk__row small { font-size: 12.5px; color: var(--ink-70); }
-.cc-blk__row--col { flex-direction: column; align-items: stretch; }
-.cc-blk__uses { color: var(--ink) !important; }
-.cc-blk__acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.cc-blk__roles { list-style: none; margin: 0; padding: 0; }
+/* The block open: its head. */
+.cc-bpage { min-width: 0; }
+.cc-bpage__head { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.cc-bpage__mark { flex: none; width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; overflow: hidden; color: #FFFFFF; font: 800 13px var(--font-display); letter-spacing: -.02em; }
+.cc-bpage__mark img { width: 100%; height: 100%; object-fit: contain; }
+.cc-bpage__who { min-width: 0; flex: 1; }
+.cc-bpage__h { margin: 0; font: 800 22px var(--font-display); font-stretch: var(--semi-wide); }
+.cc-bpage__who small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 2px; }
+.cc-bpage__edit { all: unset; cursor: pointer; font: 500 12px var(--font-text); color: var(--ink-70); margin-left: 4px; vertical-align: 3px; }
+.cc-bpage__edit:hover { color: var(--ink); text-decoration: underline; }
+.cc-bpage__edit:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-bpage__naming { display: grid; gap: 10px; max-width: 460px; justify-items: start; }
+.cc-bpage__naming > * { width: 100%; }
+.cc-bpage__naming > button { width: auto; }
+.cc-bpage__end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.cc-bpage__place::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); margin-left: 2px; }
+.cc-bpage__unsaved { margin: 10px 0 0; font-size: 12.5px; color: var(--signal); font-weight: 600; }
+.cc-bpage__grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; margin-top: 14px; }
+.cc-bpage__for { margin-bottom: 12px; flex-wrap: wrap; }
+.cc-bpage__archive { margin-top: 10px; }
+
+/* Sections. */
+.cc-bsec { margin-bottom: 16px; }
+.cc-bsec__h { margin: 0 0 8px; font: 700 14.5px var(--font-display); display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.cc-bsec__h small { font: 500 12px var(--font-text); color: var(--ink-70); }
+.cc-bsec__acts { display: flex; gap: 8px; margin-top: 10px; }
+a.cc-btn-xs { text-decoration: none; }
+
+/* What it airs, a row a part, with where it falls back. */
+.cc-irows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hair); }
+.cc-irow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.cc-irow b { font-weight: 600; display: block; }
+.cc-irow small { display: block; font-size: 11.5px; color: var(--ink-70); }
+.cc-irow__n { font: 500 12.5px var(--font-mono); color: var(--ink-70); }
+.cc-irow__fb { font-size: 11.5px; color: var(--ink-70); text-align: right; }
+.cc-irow__end { display: flex; align-items: center; gap: 10px; }
+
+/* The station's bumper order, read-only. */
+.cc-orders { list-style: none; margin: 10px 0 0; padding: 0; }
+.cc-orders li { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--hair); font-size: 12.5px; }
+.cc-orders__roles { display: flex; gap: 5px; flex-wrap: wrap; }
+.cc-orders__roles span { height: 24px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); font-weight: 600; font-size: 11px; }
+.cc-orders__roles em { color: var(--ink-70); font-style: normal; }
+
+/* The look: the preview (the player's own parts), then its controls. */
+.cc-blkprev { margin: 0 0 10px; }
+.cc-blkprev__sample { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--ink-70); }
+.cc-blkprev__pic { border-radius: 10px; background: radial-gradient(120% 90% at 30% 30%, color-mix(in srgb, var(--cc-blk) 60%, #FFFFFF 40%), var(--cc-blk) 55%, color-mix(in srgb, var(--cc-blk) 45%, #000000 55%)); }
+.cc-blkprev__ttl { position: absolute; left: 6%; top: 30%; right: 30%; color: #FFFFFF; font: 800 22px/1 var(--font-display); font-stretch: var(--semi-wide); }
+/* The banner in its own strip, as it shows on a channel change (in the player it covers the bug). */
+.cc-blkprev__banner { aspect-ratio: auto; margin-top: 6px; background: none; overflow: visible; }
+.cc-blkprev__banner .oc-banner { position: relative; left: auto; right: auto; bottom: auto; }
+/* One guide row: the block's band over its programs. */
+.cc-blkprev__guide { margin-top: 8px; border-top: 1px solid var(--line); }
+.cc-blkprev__guide .oc-guide { min-width: 0; --oc-guide-stc: 56px; }
+.cc-blkprev__guide .oc-guide__head { display: none; }
+
+.cc-ctrl { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.cc-ctrl > span:first-child { color: var(--ink-70); }
+.cc-ctrl--colour { display: block; }
+.cc-ctrl__acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cc-ctrl__acts small { color: var(--ink-70); font-size: 11.5px; }
+
+/* Where it airs. */
+.cc-where { list-style: none; margin: 0; padding: 0; }
+.cc-where li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.cc-where b { font-weight: 600; display: block; }
+.cc-where small { font-size: 11.5px; color: var(--ink-70); }
+.cc-fallback { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); font-size: 12px; color: var(--ink-70); line-height: 1.45; }
+
 .cc-blk__seq { display: grid; gap: 14px; margin-top: 14px; }
-.cc-blk__placed { margin: 0; padding-left: 18px; font-size: 14px; display: grid; gap: 4px; }
 .cc-blk__quiet { color: var(--ink-70); font-size: 14px; margin: 0; }
 .cc-blk__err { color: var(--standby); font-size: 13px; }
-.cc-blk__sec--end { display: flex; }
-@media (max-width: 767px) {
-  .cc-blk__look { grid-template-columns: 1fr; }
-  .cc-blk__row { flex-direction: column; }
+
+@media (max-width: 1200px) {
+  .cc-blks { grid-template-columns: 240px minmax(0, 1fr); gap: 18px; }
+  .cc-bpage__grid { grid-template-columns: minmax(0, 1fr); }
 }

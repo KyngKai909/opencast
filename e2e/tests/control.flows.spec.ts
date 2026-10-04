@@ -1,7 +1,8 @@
 // Master control's flows (apps prompt, Phase 9), on the mock at its Saturday evening, 8:42 pm:
 // sign on for the first time, carry a program, fill a break from the spot market, approve a
 // sponsorship, open a break, edit the log and publish the changes, fill dead air from the Add
-// drawer. What each screen says is the reference frames' copy (docs/reference/control, the Schedule
+// drawer; A246 Phase 4: move where a block ends on the log, reset a date to its template, and on
+// the phone open a break as a sheet and fill dead air (from the dead-air warning's link). What each screen says is the reference frames' copy (docs/reference/control, the Schedule
 // in opencast-schedule.html); copy beyond them is in docs/apps/new-copy.md.
 
 import { expect, test } from "@playwright/test";
@@ -311,6 +312,93 @@ test("BEAT fills dead air from the Add drawer", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^Dead air at 1:39 am, 21 min$/ })).toBeVisible();
 });
 
+// A246 phase 4: a block's end is a handle on the rundown in edit mode. Dragged below Beat Tape
+// Live, it takes the start of the row under it; the rows say who joins, and the dry run's line too.
+test("BEAT moves where Late Crate Nights ends on the log, and publishes it", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const log = page.getByRole("list", { name: "The rundown, being edited" });
+  // On air since 8:00 pm: its start stays; only its end moves.
+  await expect(log.getByText("Late Crate Nights started 8:00 pm")).toBeVisible();
+  await expect(log.getByRole("button", { name: /Move the start of Late Crate Nights/ })).toHaveCount(0);
+  const end = log.getByRole("button", { name: "Move the end of Late Crate Nights, now 9:00 pm" });
+  await end.scrollIntoViewIfNeeded();
+  const grip = (await end.boundingBox())!;
+  const below = (await log.locator("[data-row]").filter({ hasText: "Late Crate, ep. 15" }).first().boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + grip.width / 2, below.y + 2, { steps: 12 });
+  // While dragging: where it would land, and who that brings in.
+  await expect(log.getByText("Ends 10:00 pm. Beat Tape Live joins it")).toBeVisible();
+  await expect(log.getByText("Joins Late Crate Nights")).toBeVisible();
+  await page.mouse.up();
+  await expect(log.getByText("Ends 10:00 pm, was 9:00 pm")).toBeVisible();
+  await expect(log.getByText("Live, so it keeps its start. Member")).toBeVisible();
+  const tray = page.getByRole("region", { name: "Your changes" });
+  await expect(tray.getByText("1 change, checked: nothing blocks publishing")).toBeVisible();
+  await expect(tray.getByText("Late Crate Nights now ends at 10:00 pm, was 9:00 pm. Beat Tape Live joins it")).toBeVisible();
+  await tray.getByRole("button", { name: "Publish 1 change" }).click();
+  await expect(page.getByText("1 change published.")).toBeVisible();
+  await expect(page.getByRole("list", { name: "The rundown" }).getByRole("button", { name: /^Late Crate Nights Block, 8:00 to 10:00 pm/ })).toBeVisible();
+});
+
+// A246 phase 4 (decision 6): an edited date back to its template, with what comes off said first.
+test("BEAT resets an edited Wednesday to its template", async ({ page }) => {
+  await signInAs(page, "kai");
+  await page.goto("/control/beat/schedule/templates");
+  await expect(page.getByRole("heading", { level: 2, name: "After work" })).toBeVisible();
+  await expect(page.getByText("Sep 30 edited")).toBeVisible();
+  await expect(page.getByText("Saving changes here rebuilds 14 upcoming weekdays. Sep 30, edited by hand, is kept as an exception.")).toBeVisible();
+  await page.getByRole("button", { name: "Reset Sep 30 to template" }).click();
+  const dialog = page.getByRole("dialog", { name: "Reset Sep 30 to After work?" });
+  await expect(dialog.getByText("Crate Talk, 7:00 pm")).toBeVisible();
+  await dialog.getByRole("button", { name: "Reset to template" }).click();
+  await expect(page.getByText("Sep 30 is back to After work: 1 taken off.")).toBeVisible();
+  await expect(page.getByText("Sep 30 edited")).toHaveCount(0);
+  await expect(page.getByText("Saving changes here rebuilds 15 upcoming weekdays.")).toBeVisible();
+  // The Log's Wednesday: from the template, no longer edited, and Crate Talk gone.
+  await page.goto("/control/beat/schedule?day=2026-09-30");
+  await expect(page.getByText('From "After work"', { exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "The rundown" }).getByText("Crate Talk")).toHaveCount(0);
+});
+
+// A246 phase 4: the phone. The rundown with its chips, a break as a bottom sheet, and the dead-air
+// warning's link (decision 9) opening straight to the gap with Fill ready.
+test.describe("on the phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("BEAT opens a break as a sheet, and fills dead air from the warning's link", async ({ page }) => {
+    await signInAs(page, "kai");
+    await page.goto("/control/beat/schedule");
+    await expect(page.getByText("Today, Sat Sep 26")).toBeVisible();
+    await expect(page.getByRole("button", { name: "On air: Saturday Reel, 17 min left" })).toBeVisible();
+    await page.getByRole("list", { name: "The rundown" }).getByRole("button", { name: /Spots placed at 9:09 pm/ }).click();
+    const sheet = page.getByRole("dialog", { name: "Break, 9:29:00 pm" });
+    await expect(sheet.getByText("Spots, placed at 9:09 pm")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+
+    // The warning's link: the gap's day, and its start.
+    await page.goto("/control/beat/schedule?day=2026-09-26&fill=2026-09-27T06:40:00.000Z");
+    const fill = page.getByRole("dialog", { name: /^Dead air in/ });
+    await expect(fill.getByText("Nothing is scheduled after 11:40 pm.")).toBeVisible();
+    await fill.getByRole("button", { name: "Fill the gap" }).click();
+    await expect(fill).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Dead air at 11:40 pm/ })).toHaveCount(0);
+  });
+
+  test("the Templates, Blocks and Break rules tabs say they're desk work, with the way back", async ({ page }) => {
+    await signInAs(page, "kai");
+    for (const [path, what] of [["templates", "Templates"], ["blocks", "Blocks"], ["rules", "Break rules"]] as const) {
+      await page.goto(`/control/beat/schedule/${path}`);
+      await expect(page.getByRole("heading", { name: `Open ${what} on a computer` })).toBeVisible();
+    }
+    await page.getByRole("link", { name: "Back to the Log" }).click();
+    await expect(page).toHaveURL(/\/control\/beat\/schedule$/);
+  });
+});
+
 // A246: every page the Schedule replaced still opens, on the right tab, with its query kept.
 test("the old log, breaks and blocks addresses land on the Schedule's tabs with their query", async ({ page }) => {
   await signInAs(page, "kai");
@@ -331,7 +419,7 @@ test("the old log, breaks and blocks addresses land on the Schedule's tabs with 
     { from: "/breaks?rotation=backup", to: "/spot-market/rotation", query: { show: "backup" } },
     { from: "/blocks", to: "/schedule/blocks", tab: "Blocks" },
     { from: "/blocks/new", to: "/schedule/blocks/new", tab: "Blocks", shows: "Make the block" },
-    { from: `/blocks/${LCN}`, to: `/schedule/blocks/${LCN}`, tab: "Blocks", shows: "All blocks" }
+    { from: `/blocks/${LCN}`, to: `/schedule/blocks/${LCN}`, tab: "Blocks", shows: "What it airs" }
   ];
   for (const c of cases) {
     await page.goto(`/control/beat${c.from}`);

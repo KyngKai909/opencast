@@ -15,7 +15,7 @@ import { schema } from "@opencast/db";
 import { LOG_EDIT_LEAD_MS, type LogChange, type LogChangeRecord, type LogChangesResult } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { conflict, HttpError } from "../../errors.js";
-import { overlaps, type SpanRow } from "./blocks.js";
+import { isMember, overlaps, type SpanRow } from "./blocks.js";
 import { clockTime, localDate, roundUpToMinute } from "../../lib/time.js";
 import { snapDate } from "../../lib/segments.js";
 import { STATION_ID_MS } from "../playout/engine/fill.js";
@@ -376,9 +376,10 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         if (n) warnings.push({ index: d.index, code: "reminders", message: `${plural(n, "viewer")} set ${n === 1 ? "a reminder" : "reminders"} for this; they'll be told.` });
       }
 
-      // What each change says.
+      // What each change says. A246: a block's change also says who joins it or leaves it.
+      const joining = await blockMembers();
       const lines = changes.map((c, index) => {
-        if (isBlockChange(c)) return blocks.lineOf(index);
+        if (isBlockChange(c)) return blocks.lineOf(index) + (joining.get(index) ?? "");
         const a = about[index];
         if (a.insert) return `${titleAfter(a.insert.row)} goes on at ${when(a.insert.row.startsAt, now)}`;
         const d = a.entryId ? drafts.get(a.entryId) : undefined;
@@ -596,7 +597,7 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
           const endsAt = c.endsAt ? snapDate(new Date(c.endsAt)) : sd.next.endsAt;
           const startMoves = startsAt.getTime() !== sd.next.startsAt.getTime();
           const endMoves = endsAt.getTime() !== sd.next.endsAt.getTime();
-          lines.set(index, startMoves && endMoves ? `${name} now runs ${clock(startsAt)} to ${clock(endsAt)}` : startMoves ? `${name} now starts at ${clock(startsAt)}` : `${name} now ends at ${clock(endsAt)}`);
+          lines.set(index, startMoves && endMoves ? `${name} now runs ${clock(startsAt)} to ${clock(endsAt)}` : startMoves ? `${name} now starts at ${clock(startsAt)}, was ${clock(sd.next.startsAt)}` : `${name} now ends at ${clock(endsAt)}, was ${clock(sd.next.endsAt)}`);
           if (orig.endsAt.getTime() <= t) problems.push({ index, code: "block_locked", message: "It has already aired." });
           // On air: only its end, and not sooner than the channel is set.
           else if (onAir && (startMoves || endsAt.getTime() < boundary)) problems.push({ index, code: "block_locked", message: `${name} is on air. Change it after ${clock(orig.endsAt)}.` });
@@ -629,6 +630,40 @@ export function createChangeOps(ctx: ModuleContext, h: ChangeHelpers): ChangeOps
         }
         for (const sd of list) times.push(...[sd.orig?.startsAt, sd.next?.startsAt].filter((d): d is Date => Boolean(d)).map((d) => d.getTime()));
         return { list, byIndex, times, lineOf: (index: number) => lines.get(index) ?? "" };
+      }
+
+      /**
+       * A246: the programs a block added or moved by the batch takes in or lets go, by the same
+       * start-time rule as the log (`isMember`), with the batch's own moves and inserts: words after
+       * the change's line ("Late Crate Nights now ends at 12:30 am, was 1:00 am. Crate Session 01 is
+       * no longer part of it"). G17 asks for them as fields; until then the tray reads them here.
+       */
+      async function blockMembers(): Promise<Map<number, string>> {
+        const out = new Map<number, string>();
+        const moving = blocks.list.filter((sd) => sd.next && !problems.some((p) => p.index === sd.index));
+        if (!moving.length) return out;
+        const edges = moving.flatMap((sd) => [sd.orig?.startsAt, sd.orig?.endsAt, sd.next!.startsAt, sd.next!.endsAt]).filter((d): d is Date => Boolean(d)).map((d) => d.getTime());
+        const rowsNow = await h.load(stationId, new Date(Math.min(...edges)), new Date(Math.max(...edges)));
+        const changed = new Set([...drafts.values()].map((d) => d.orig.id));
+        const rowsAfter = [...rowsNow.filter((r) => !changed.has(r.id)), ...[...drafts.values()].filter((d) => !d.removed).map((d) => d.next), ...inserts.map((i) => i.row)];
+        const titles = await h.titles([...rowsNow, ...rowsAfter]);
+        const names = (rows: Row[]) => {
+          const list = rows.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime()).map((r) => titles.get(r.id) ?? "Untitled");
+          return list.length > 1 ? `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}` : list[0];
+        };
+        for (const sd of moving) {
+          const before = sd.orig ? rowsNow.filter((r) => isMember(sd.orig!, r)) : [];
+          const after = rowsAfter.filter((r) => isMember(sd.next!, r));
+          const joins = after.filter((r) => !before.some((b) => b.id === r.id));
+          const leaves = before.filter((r) => !after.some((a) => a.id === r.id));
+          const words = [
+            // A new block's members are what's in it: its line says when.
+            sd.orig && joins.length ? `${names(joins)} ${joins.length === 1 ? "joins" : "join"} it` : null,
+            leaves.length ? `${names(leaves)} ${leaves.length === 1 ? "is" : "are"} no longer part of it` : null
+          ].filter(Boolean);
+          if (words.length) out.set(sd.index, `. ${words.join(". ")}`);
+        }
+        return out;
       }
 
       async function batchCarriage() {

@@ -263,7 +263,7 @@ export function draftGaps(entries: DraftEntry[], offAir: NonNullable<ProgramLog[
  * The picked entry in edit mode: its start, its end (a live block, a sign-off), what airs, keeping
  * it at its time (G18), putting something on before or after it (the Add drawer), and taking it off.
  */
-export function EntrySection({ edit, entry, base, onAdd, onClose }: { edit: LogEdit; entry: DraftEntry; base: string | null; onAdd: (at: string) => void; onClose: () => void }) {
+export function EntrySection({ edit, entry, base, place = "log", onAdd, onClose }: { edit: Pick<LogEdit, "locked" | "library" | "add" | "keep">; entry: DraftEntry; base: string | null; place?: "log" | "template"; onAdd: (at: string) => void; onClose: () => void }) {
   const lock = edit.locked(entry);
   const fixed = fixedReason(entry, !!lock);
   const [start, setStart] = useState(timeValue(entry.startsAt));
@@ -364,7 +364,7 @@ export function EntrySection({ edit, entry, base, onAdd, onClose }: { edit: LogE
             </Button>
           </div>
           <Button variant="text" size="sm" onClick={() => edit.add({ op: "remove", entryId: entry.id })}>
-            Take off the log
+            {place === "template" ? "Take off the template" : "Take off the log"}
           </Button>
         </div>
       )}
@@ -411,7 +411,7 @@ export function DayChanges({ stationId, origin }: { stationId: string; origin: s
  * A244: a programming block's span picked in edit mode: its start and end (typed, like an entry's;
  * typed, as an entry's), and taking it off this day. One on air keeps its start.
  */
-export function SpanSection({ edit, span, onAir, onClose }: { edit: LogEdit; span: DraftSpan; onAir: boolean; onClose: () => void }) {
+export function SpanSection({ edit, span, onAir, place = "log", onClose }: { edit: Pick<LogEdit, "add">; span: DraftSpan; onAir: boolean; place?: "log" | "template"; onClose: () => void }) {
   const [start, setStart] = useState(timeValue(span.startsAt));
   const [end, setEnd] = useState(timeValue(span.endsAt));
   const [error, setError] = useState<string | null>(null);
@@ -440,10 +440,10 @@ export function SpanSection({ edit, span, onAir, onClose }: { edit: LogEdit; spa
       <p className="cc-log__quiet">{spanText(span.startsAt, span.endsAt)}</p>
       <div className="cc-edit__fields">
         <Field label="Starts" mono size="sm" value={start} disabled={started} onChange={(e) => setStart(e.target.value)} onBlur={() => commit("start")} onKeyDown={(e) => e.key === "Enter" && commit("start")} error={error ?? undefined} />
-        <Field label="Ends" mono size="sm" value={end} onChange={(e) => setEnd(e.target.value)} onBlur={() => commit("end")} onKeyDown={(e) => e.key === "Enter" && commit("end")} help="Programs that start between these times are the block's." />
+        <Field label="Ends" mono size="sm" value={end} onChange={(e) => setEnd(e.target.value)} onBlur={() => commit("end")} onKeyDown={(e) => e.key === "Enter" && commit("end")} help={place === "template" ? "Programs that start between these times are the block's. In a template it ends by 6:00 am." : "Programs that start between these times are the block's."} />
         {!started && (
           <Button variant="text" size="sm" onClick={() => (edit.add({ op: "block_remove", spanId: span.id }), onClose())}>
-            Take the block off this day
+            {place === "template" ? "Take the block off the template" : "Take the block off this day"}
           </Button>
         )}
       </div>
@@ -451,9 +451,13 @@ export function SpanSection({ edit, span, onAir, onClose }: { edit: LogEdit; spa
   );
 }
 
-/** A244: "Add a block": which block, from when to when (snapped like entries). */
-export function AddBlockDialog({ edit, base, near, onClose }: { edit: LogEdit; base: string | null; near: string; onClose: () => void }) {
-  const [blockId, setBlockId] = useState(edit.blocks[0]?.id ?? "");
+/** A244: "Add a block": which block, from when to when (snapped like entries). `blockId`: the one chosen first (a block's "Place on the log"). */
+export function AddBlockDialog({ edit, base, near, blockId: first, onClose }: { edit: Pick<LogEdit, "blocks" | "add" | "nextKey">; base: string | null; near: string; blockId?: string | null; onClose: () => void }) {
+  const [blockId, setBlockId] = useState(first ?? edit.blocks[0]?.id ?? "");
+  // The list comes after the dialog opens: the block asked for, else the first.
+  useEffect(() => {
+    if (!blockId && edit.blocks.length) setBlockId(first && edit.blocks.some((b) => b.id === first) ? first : edit.blocks[0].id);
+  }, [edit.blocks, blockId, first]);
   const [start, setStart] = useState("21:00");
   const [end, setEnd] = useState("23:00");
   const [error, setError] = useState<string | null>(null);

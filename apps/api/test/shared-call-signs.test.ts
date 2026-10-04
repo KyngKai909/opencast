@@ -271,9 +271,11 @@ describe("an owner's own stations sharing a call sign (A230)", () => {
 
   it("links master control's emails to the family member's own address", async () => {
     await h.db.update(schema.users).set({ email: "kai@example.com" }).where(eq(schema.users.id, kai.id));
-    h.deps.bus.emit("station.dead_air_warning", { stationId: tapes, gapStartsAt: new Date(h.clock.now().getTime() + 30 * 60_000).toISOString(), minutesBefore: 30 });
+    const gap = new Date(h.clock.now().getTime() + 30 * 60_000).toISOString();
+    h.deps.bus.emit("station.dead_air_warning", { stationId: tapes, gapStartsAt: gap, minutesBefore: 30 });
     await h.deps.bus.settle();
     const dead = h.sent.filter((s) => s.channel === "email" && s.to === "kai@example.com" && s.title === "Dead air in 30 minutes");
-    expect(dead.map((d) => d.link)).toEqual(["https://app.opencast.test/control/beat-12-2/log"]);
+    // A246: straight to the gap on the Schedule (Saturday night's broadcast day).
+    expect(dead.map((d) => d.link)).toEqual([`https://app.opencast.test/control/beat-12-2/schedule?day=2026-09-26&fill=${gap}`]);
   });
 });

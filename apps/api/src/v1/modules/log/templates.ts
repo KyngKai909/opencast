@@ -93,6 +93,11 @@ export interface TemplateOps {
   ): Promise<{ template: DayTemplate; generated: TemplateGeneration }>;
   /** Takes a repeat (template or G7 copy) off the log from now on. */
   remove(stationId: string, groupId: string): Promise<number>;
+  /**
+   * A246: "Reset to template": an edited date made again from its template (what the template
+   * didn't make comes off it from now on), no longer an exception. Dates from tomorrow on.
+   */
+  resetDate(stationId: string, templateId: string, date: string): Promise<{ template: DayTemplate; generated: TemplateGeneration }>;
   /** Generates the dates a station's templates cover, through the horizon (or `through`). Idempotent. */
   generate(stationId: string, options?: { through?: string; force?: string }): Promise<TemplateGeneration>;
   /** Every station with templates, for the job. */
@@ -501,6 +506,44 @@ export function createTemplateOps({ deps, services }: ModuleContext): TemplateOp
         await ops.generate(stationId);
       }
       return removed;
+    },
+
+    async resetDate(stationId, templateId, date) {
+      const row = await group(stationId, templateId);
+      if (!row.template || row.removedAt) throw notFound("That template");
+      const tz = await services.stations.timezoneOf(stationId);
+      const now = deps.clock.now();
+      if (date <= broadcastDate(now, tz)) {
+        const words = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+        throw new HttpError(409, "date_started", `${words} has started. Only dates from tomorrow on can be reset to their template.`);
+      }
+      const [rec] = await db.select().from(TD).where(and(eq(TD.stationId, stationId), eq(TD.date, date)));
+      if (!rec || rec.templateId !== templateId) throw notFound("That date of the template");
+      let removed = 0;
+      if (rec.editedAt) {
+        const { from, to } = broadcastDay(date, tz);
+        // The template's own rows stay for `generate` to match (kept, moved back or remade); what
+        // it didn't make comes off: entries put on by hand, and blocks placed on the date.
+        const ours = (x: { repeatGroupId: string | null; templateDate: string | null }) => x.repeatGroupId === templateId && x.templateDate === date;
+        await db.transaction(async (tx) => {
+          await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`day-templates:${stationId}`}))`);
+          const rows = await tx
+            .select()
+            .from(E)
+            .where(and(eq(E.stationId, stationId), gte(E.startsAt, from), lt(E.startsAt, to), gt(E.startsAt, now)));
+          removed = await removeRows(tx, rows.filter((r) => !ours(r)));
+          const spans = await tx
+            .select({ id: SP.id, repeatGroupId: SP.repeatGroupId, templateDate: SP.templateDate })
+            .from(SP)
+            .where(and(eq(SP.stationId, stationId), gte(SP.startsAt, from), lt(SP.startsAt, to), gt(SP.startsAt, now)));
+          const going = spans.filter((sp) => !ours(sp));
+          if (going.length) await tx.delete(SP).where(inArray(SP.id, going.map((sp) => sp.id)));
+          // No longer an exception, and older than the template: `generate` makes it again.
+          await tx.update(TD).set({ editedAt: null, generatedAt: new Date(0) }).where(and(eq(TD.stationId, stationId), eq(TD.date, date)));
+        });
+      }
+      const generated = rec.editedAt ? await ops.generate(stationId, { through: date }) : { dates: 0, created: 0, removed: 0, skippedForConflicts: 0, exceptions: 0 };
+      return { template: (await views(stationId, [row]))[0], generated: { ...generated, removed: generated.removed + removed } };
     },
 
     async generate(stationId, options = {}) {

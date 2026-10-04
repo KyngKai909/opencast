@@ -4,47 +4,37 @@
 // `entry`, `block`, `break` and `add`; Phase 2), Templates (`/schedule/templates`, and one at
 // `/:templateId`), Blocks (`/schedule/blocks`: pages/live/Blocks.tsx) and Break rules
 // (`/schedule/rules`). Templates is the list with the off air hours above it (the "Every day"
-// rule); Break rules is the break rule as one draft with a preview of the next hour (Phase 3,
-// BreaksSection), its tabs asking before leaving unsaved changes.
+// rule) and the template open, its rundown edited as the day's (Phase 4, TemplatesTab.tsx); Break
+// rules is the break rule as one draft with a preview of the next hour (Phase 3, BreaksSection),
+// its tabs asking before leaving unsaved changes. On the phone, Templates, Blocks and Break rules
+// say they're desk work (Phase 4).
 
-import { useParams } from "react-router";
 import { LogPage } from "../../components/onair/LogPage";
-import { OffAirHoursSection } from "../../components/onair/OffAirHours";
-import { TemplateList } from "../../components/onair/RepeatDay";
+import { DeskOnly } from "../../components/onair/DeskOnly";
 import { ScheduleHead } from "../../components/onair/ScheduleHead";
-import { scheduleHref } from "../../components/onair/scheduleRoutes";
-import { useTemplates } from "../../components/onair/data";
+import { TemplatesTab } from "../../components/onair/TemplatesTab";
 import { BreaksSection } from "../../components/station/settings/BreaksSection";
 import { useIsPhone } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 
 export default function Schedule({ tab }: { tab: "log" | "templates" | "rules" }) {
   const s = useStation();
-  if (tab === "templates") return <Templates />;
+  if (tab === "templates") return <TemplatesTab />;
   if (tab === "rules") return <BreakRules />;
   return <LogPage stationId={s.id} station={s.station} base={s.base} canEdit={s.can("programming")} head={(end) => <ScheduleHead tab="log" end={end} />} />;
 }
 
-function Templates() {
-  const s = useStation();
-  const phone = useIsPhone();
-  const { templateId } = useParams();
-  const templates = useTemplates(s.id);
-  const none = templates.data && !templates.data.templates.length;
-  return (
-    <div className="cc-sch cc-log">
-      <ScheduleHead tab="templates" />
-      <div className="cc-sch__templates">
-        <OffAirHoursSection stationId={s.id} callSign={s.label} phone={phone} everyDay />
-        <TemplateList stationId={s.id} phone={phone} picked={templateId} dateHref={(date) => `${scheduleHref(s.base)}?day=${date}`} className="" />
-        {none && <p className="cc-sch__empty">No templates yet. On the Log, "Make a template from this day" starts one.</p>}
-      </div>
-    </div>
-  );
-}
-
 function BreakRules() {
   const s = useStation();
+  const phone = useIsPhone();
+  // Building break rules is desk work (opencast-schedule 08).
+  if (phone)
+    return (
+      <div className="cc-sch">
+        <ScheduleHead tab="rules" />
+        <DeskOnly what="Break rules" base={s.base} />
+      </div>
+    );
   return (
     <div className="cc-sch">
       <BreaksSection s={s} head={(go) => <ScheduleHead tab="rules" onNavigate={go} />} />

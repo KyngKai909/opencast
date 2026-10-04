@@ -138,6 +138,24 @@ button.cc-hchip:hover { color: var(--ink); }
 .cc-rr__drop { height: 0; position: relative; }
 .cc-rr__drop span { position: absolute; left: 30px; right: 0; top: -1px; border-top: 2px solid var(--signal); font: 600 11.5px var(--font-text); color: var(--signal); padding-top: 2px; z-index: 4; }
 
+/* Phase 4: a block's start and end as handles (f-blockplace's .spanrow, .spanhandle). */
+.cc-rr--handle { display: block; padding: 8px 0 0; border-bottom: 0; }
+.cc-span {
+  display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--cc-edge) 22%, transparent); box-shadow: inset 0 0 0 1.5px var(--cc-edge);
+}
+.cc-rr--handle-moved .cc-span, .cc-rr--handle-dragging .cc-span { background: color-mix(in srgb, var(--signal) 14%, transparent); box-shadow: inset 0 0 0 1.5px var(--signal); }
+.cc-span__grip { all: unset; flex: none; width: 30px; height: 18px; display: grid; place-items: center; cursor: ns-resize; touch-action: none; border-radius: 4px; }
+.cc-span__grip span { width: 30px; height: 6px; border-radius: 3px; background: var(--cc-edge); }
+.cc-rr--handle-moved .cc-span__grip span { background: var(--signal); }
+.cc-span__grip:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.cc-span__grip--off { width: 30px; height: 6px; border-radius: 3px; background: var(--cc-edge); opacity: .45; }
+.cc-span__pick { all: unset; flex: 1; min-width: 0; cursor: pointer; }
+.cc-span__pick:disabled { cursor: default; }
+.cc-span__pick:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 2px; }
+.cc-span__pick b { font-weight: 700; }
+.cc-span__pick small { font-weight: 500; color: var(--ink-70); }
+
 /* The pane (.pane2). */
 .cc-pane__h { margin: 0 0 4px; font: 700 17px var(--font-display); display: flex; align-items: center; }
 .cc-pane__sub { margin: 0; font-size: 12.5px; color: var(--ink-70); }
@@ -251,16 +269,23 @@ button.cc-hchip:hover { color: var(--ink); }
 .cc-offair { display: grid; gap: 14px; }
 .cc-offair__rule { margin: 0; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--hair); display: grid; gap: 10px; justify-items: start; }
 .cc-offair__times { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; }
-.cc-log__tblocks { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-70); }
-.cc-log__templates { margin-top: 12px; }
 
 @media (max-width: 1100px) {
   .cc-log__split { grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; }
   .cc-rr__bar { width: 140px; }
 }
-/* The phone's layout comes later (Phase 4); until then nothing runs wider than the screen. */
+/* The phone (Phase 4, opencast-schedule 08): the rundown is the whole screen, the day and its
+   chips on top (staying there while the rows scroll), a break or a row picked as a bottom sheet. */
 @media (max-width: 767px) {
   .cc-log { padding: 14px 16px; }
+  .cc-log__bar { position: sticky; top: 0; z-index: 6; background: var(--ground); margin: 0 -16px; padding: 0 16px; }
+  .cc-log--phone .cc-daynav { padding: 8px 0; gap: 8px; }
+  .cc-log--phone .cc-daynav__day { font-size: 15px; }
+  .cc-log--phone .cc-hchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 8px 0; margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+  .cc-log--phone .cc-hchips::-webkit-scrollbar { display: none; }
+  .cc-log--phone .cc-hchip { flex: none; white-space: nowrap; }
+  .cc-log--phone .cc-log__record { margin-top: 8px; }
+  .cc-log__sheet .cc-bpane, .cc-log__sheet .cc-epane, .cc-log__sheet .cc-edit__entry { padding-bottom: 8px; }
   .cc-offair__times { grid-template-columns: minmax(0, 1fr); }
   .cc-log .oc-control-title { flex-wrap: wrap; }
   .cc-log__split { grid-template-columns: minmax(0, 1fr); }

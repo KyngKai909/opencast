@@ -259,8 +259,10 @@ export function applyChanges(stationId: string, onAir: boolean, body: { dryRun: 
     }
   }
 
+  // A246: a block's line says who joins it or leaves it, with the batch's own moves.
+  const joining = blocks.memberWords(log, after);
   const lines = body.changes.map((c, index) => {
-    if (isBlockChange(c)) return blocks.lines.get(index) ?? "";
+    if (isBlockChange(c)) return (blocks.lines.get(index) ?? "") + (joining.get(index) ?? "");
     const a = about[index];
     if (a.insert) return `${a.insert.row.title} goes on at ${when(a.insert.row.startsAt, now().toISOString())}`;
     const d = a.id ? drafts.get(a.id) : undefined;

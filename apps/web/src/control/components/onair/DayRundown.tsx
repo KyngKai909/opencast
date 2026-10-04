@@ -7,14 +7,18 @@
 // In edit mode the rows are the draft: moved rows in blue, a new row outlined, a removed one struck
 // through, fixed points marked, locked rows saying why. Rows move by their handle (drag, or the
 // arrow keys a place at a time), "Add here" sits between rows, a live block or sign-off has its
-// end to drag, and each row has "Keep at this time" and Remove. Moving follows reorder.ts.
+// end to drag, and each row has "Keep at this time" and Remove. Moving follows reorder.ts. A
+// programming block's start and end are handle rows (Phase 4, blockHandles.ts): they drop between
+// rows and take the start of the row below, the rows saying who joins or leaves while dragging, and
+// each row says whether it's a member. A template's rundown (TemplateEditor.tsx) is drawn the same.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from "react";
 import { Link } from "react-router";
 import type { LogChange, LogEntry } from "@opencast/contracts";
 import { BreakStrip, Icon, clock, snapTime } from "@opencast/ui";
 import { STATION_TZ } from "../../../lib/clock";
 import { ROW_CODE_WORDS, rowLength, rowTime, type DayRow } from "./dayRows";
+import { handleRange, handleSpots, handleWords, memberNote, membershipChange, membershipWords, nudgeHandle, spotsIn, type HandleEdge, type HandleLimits } from "./blockHandles";
 import type { DraftEntry, DraftSpan } from "./logEdit";
 import { FIXED_WORDS, dropAfter, dropStart, endWithBreak, fixedReason, membershipNote, nudge, resizeTo, type Reflow } from "./reorder";
 
@@ -38,6 +42,20 @@ export interface RundownEdit {
   onAddAt: (at: string) => void;
   /** Nothing can go on sooner than this. */
   earliest: number;
+  /** Phase 4: the draft's blocks as start and end handles. Left out, a block's label stays a label. */
+  handles?: RundownHandles;
+}
+
+/** A246 (Phase 4): what the rundown needs to draw a block's start and end as handles. */
+export interface RundownHandles {
+  /** Each span's times before the draft ("Ends 12:30 am, was 1:00 am"). */
+  original: Map<string, Pick<DraftSpan, "startsAt" | "endsAt">>;
+  limits: HandleLimits;
+  /** Whether a block airs its intro or outro (for its rows' words). */
+  intro: (blockId: string) => boolean;
+  outro: (blockId: string) => boolean;
+  /** A handle's words picked: the span's typed times in the pane. */
+  onPick?: (spanId: string) => void;
 }
 
 export interface DayRundownProps {
@@ -65,19 +83,22 @@ function RowCodeTag({ row }: { row: DayRow }) {
   );
 }
 
-/** What a draft row says under its title in edit mode. */
+/** What a draft row says under its title in edit mode (with, near a block, whether it's a member). */
 function editLine(row: DayRow, edit: RundownEdit): string | null {
   const e = row.entry!;
   if (row.removed) return "Coming off the log";
   const lock = edit.locked(e);
   if (lock) return lock;
   const was = edit.original.get(e.id);
-  if (e.change === "inserted") return `New. ${row.source ?? ""}`.trim();
-  if (e.change === "replaced") return was ? `Replaces ${was.title}` : row.source;
+  const member = edit.handles ? memberNote(e, edit.spans, edit.reflow.entries, { intro: edit.handles.intro }) : null;
+  if (e.change === "inserted") return [`New. ${row.source ?? ""}`.trim(), member].filter(Boolean).join(". ");
+  if (e.change === "replaced") return [was ? `Replaces ${was.title}` : row.source, member].filter(Boolean).join(". ");
   const moved = was && was.startsAt !== e.startsAt ? `Moved from ${clock(was.startsAt, { timeZone: STATION_TZ })}` : null;
   const ends = was && was.endsAt !== e.endsAt ? `Now ends ${clock(e.endsAt, { timeZone: STATION_TZ })}, was ${clock(was.endsAt, { timeZone: STATION_TZ })}` : null;
   const fixed = fixedReason(e, false);
   const words = [fixed && fixed !== "locked" ? FIXED_WORDS[fixed] : null, moved, ends].filter(Boolean);
+  // As f-blockplace: a member's line is what it is to the block.
+  if (member) return [...words, member].join(". ");
   return words.length ? words.join(". ") : row.source;
 }
 
@@ -191,6 +212,140 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
     if (!edit) setDrag(null);
   }, [edit]);
 
+  // ---- A block's start and end (Phase 4) ----
+  const handles = edit?.handles;
+  // A handle being dragged: which edge of which span, how far, and the start it would take.
+  const [handleDrag, setHandleDrag] = useState<{ spanId: string; edge: HandleEdge; dy: number; at: string | null } | null>(null);
+  const handleStart = useRef<{ spanId: string; edge: HandleEdge; y: number } | null>(null);
+  const spots = useMemo(() => (handles ? handleSpots(rows, handles.limits.dayEnd) : []), [rows, handles]);
+  const spanOf = (id: string) => edit?.spans.find((x) => x.id === id);
+  const edgeAt = (span: DraftSpan, edge: HandleEdge) => (edge === "start" ? span.startsAt : span.endsAt);
+  const rangeOf = (span: DraftSpan, edge: HandleEdge) => (handles && edit ? handleRange(span, edit.spans, edge, handles.limits) : null);
+  /** The row a spot sits above (the first that starts there), or null for the day's end. */
+  const rowAtSpot = (at: string) => rows.find((r) => r.at === at && ((r.kind === "entry" && !r.removed) || r.kind === "gap" || r.kind === "off_air")) ?? null;
+  /** The spot nearest the pointer, inside what the edge can reach. */
+  const spotAt = (span: DraftSpan, edge: HandleEdge, y: number): string | null => {
+    const range = rangeOf(span, edge);
+    if (!range || !list.current) return null;
+    let best: { at: string; d: number } | null = null;
+    for (const at of spotsIn(spots, range)) {
+      const row = rowAtSpot(at);
+      const el = row ? list.current.querySelector<HTMLElement>(`[data-row="${row.id}"]`) : null;
+      const top = el ? el.getBoundingClientRect().top : list.current.getBoundingClientRect().bottom;
+      const d = Math.abs(top - y);
+      if (!best || d < best.d) best = { at, d };
+    }
+    return best?.at ?? null;
+  };
+  const moveEdge = (span: DraftSpan, edge: HandleEdge, at: string | null) => {
+    if (!edit || !at || at === edgeAt(span, edge)) return;
+    edit.onChanges([{ op: "block_resize", spanId: span.id, ...(edge === "start" ? { startsAt: at } : { endsAt: at }) }]);
+  };
+  const handleDown = (spanId: string, edge: HandleEdge) => (e: PointerEvent<HTMLButtonElement>) => {
+    handleStart.current = { spanId, edge, y: e.clientY };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const handleMove = (e: PointerEvent<HTMLButtonElement>) => {
+    const s = handleStart.current;
+    const span = s && spanOf(s.spanId);
+    if (!s || !span) return;
+    const dy = e.clientY - s.y;
+    if (!handleDrag && Math.abs(dy) < 4) return;
+    setHandleDrag({ spanId: s.spanId, edge: s.edge, dy, at: spotAt(span, s.edge, e.clientY) });
+  };
+  const handleUp = () => {
+    const d = handleDrag;
+    handleStart.current = null;
+    setHandleDrag(null);
+    const span = d && spanOf(d.spanId);
+    if (d && span) moveEdge(span, d.edge, d.at);
+  };
+  const handleKey = (span: DraftSpan, edge: HandleEdge) => (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const range = rangeOf(span, edge);
+    if (range) moveEdge(span, edge, nudgeHandle(spots, edgeAt(span, edge), e.key === "ArrowUp" ? -1 : 1, range));
+  };
+  // While an edge is dragged: who joins the block and who leaves it, by the start-time rule.
+  const dragSpan = handleDrag ? spanOf(handleDrag.spanId) : undefined;
+  const dragNext = dragSpan && handleDrag?.at ? { startsAt: handleDrag.edge === "start" ? handleDrag.at : dragSpan.startsAt, endsAt: handleDrag.edge === "end" ? handleDrag.at : dragSpan.endsAt } : null;
+  const dragChange = dragSpan && dragNext && edit ? membershipChange(dragSpan, dragNext, edit.reflow.entries) : null;
+  const joining = new Set(dragChange?.joins.map((x) => x.id) ?? []);
+  const leaving = new Set(dragChange?.leaves.map((x) => x.id) ?? []);
+
+  /** A block's start or end: a handle row (f-blockplace's .spanhandle). */
+  const handleRow = (span: DraftSpan, edge: HandleEdge) => {
+    if (!handles || !edit) return null;
+    const range = rangeOf(span, edge);
+    const locked = !range;
+    const was = handles.original.get(span.id);
+    const moved = !!was && edgeAt(was as DraftSpan, edge) !== edgeAt(span, edge);
+    const words = handleWords(span, edge, { was, entries: edit.reflow.entries, outro: handles.outro(span.blockId), locked: edge === "start" && locked });
+    const dragging = handleDrag?.spanId === span.id && handleDrag.edge === edge;
+    // While dragged it stays put: the line where it would land moves, with who that brings in or lets go.
+    const style = { "--cc-edge": span.colour ?? "var(--ink-70)" } as CSSProperties;
+    const now = edgeAt(span, edge);
+    return (
+      <li key={`handle:${span.id}:${edge}`} data-handle={`${span.id}:${edge}`} className={["cc-rr", "cc-rr--handle", moved && "cc-rr--handle-moved", dragging && "cc-rr--handle-dragging"].filter(Boolean).join(" ")} style={style}>
+        <div className="cc-span">
+          {locked ? (
+            <span className="cc-span__grip cc-span__grip--off" aria-hidden="true" />
+          ) : (
+            <button
+              type="button"
+              className="cc-span__grip"
+              aria-label={`Move the ${edge} of ${span.name}, now ${clock(now, { timeZone: STATION_TZ })}`}
+              aria-roledescription="draggable"
+              onPointerDown={handleDown(span.id, edge)}
+              onPointerMove={handleMove}
+              onPointerUp={handleUp}
+              onPointerCancel={() => {
+                handleStart.current = null;
+                setHandleDrag(null);
+              }}
+              onKeyDown={handleKey(span, edge)}
+            >
+              <span aria-hidden="true" />
+            </button>
+          )}
+          <button type="button" className="cc-span__pick" onClick={() => handles.onPick?.(span.id)} disabled={!handles.onPick}>
+            <b>{words.title}</b> <small>{words.detail}</small>
+          </button>
+          {edge === "start" && !locked && (
+            <button type="button" className="cc-rr__icon" aria-label={`Take ${span.name} off this day`} title="Take it off" onClick={() => edit.onChanges([{ op: "block_remove", spanId: span.id }])}>
+              <Icon name="x" size={14} />
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  };
+  // Where each end handle goes: above the first row that starts at or after the block's end.
+  const endsBefore = new Map<string, DraftSpan[]>();
+  const endsLast: DraftSpan[] = [];
+  if (handles && edit) {
+    for (const span of edit.spans) {
+      if (span.endsAt <= (rows[0]?.at ?? span.endsAt) || span.endsAt > handles.limits.dayEnd) continue;
+      const below = rows.find((r) => r.kind !== "break" && r.at >= span.endsAt && r.span?.id !== span.id);
+      if (below) endsBefore.set(below.id, [...(endsBefore.get(below.id) ?? []), span]);
+      else endsLast.push(span);
+    }
+  }
+  /** The line where a dragged edge would land. */
+  const handleDropLine = (beforeRowId: string | null) => {
+    if (!handleDrag?.at || !dragSpan) return null;
+    const target = rowAtSpot(handleDrag.at);
+    if ((target?.id ?? null) !== beforeRowId) return null;
+    const what = handleDrag.edge === "start" ? `${dragSpan.name} starts ${clock(handleDrag.at, { timeZone: STATION_TZ })}` : `Ends ${clock(handleDrag.at, { timeZone: STATION_TZ })}`;
+    return (
+      <li key={`hdrop:${beforeRowId ?? "end"}`} className="cc-rr__drop" aria-hidden="true">
+        <span>
+          {what}. {dragChange ? membershipWords(dragChange) : ""}
+        </span>
+      </li>
+    );
+  };
+
   // "Add here" before an entry or dead air: right after the entry above (and its break).
   const addAt = (row: DayRow, i: number): string | null => {
     if (!edit || row.removed || (row.kind !== "entry" && row.kind !== "gap")) return null;
@@ -228,6 +383,14 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
           </li>
         ) : null;
         const after = drag && drag.after === row.id ? dropLine(row.id) : null;
+        // Phase 4: a block's end handle above the row it ends at, and a dragged edge's landing line.
+        const ends = (endsBefore.get(row.id) ?? []).map((sp) => handleRow(sp, "end"));
+        const edgeDrop = handleDropLine(row.id);
+
+        if (row.kind === "band" && handles && row.span) {
+          const span = spanOf(row.span.id);
+          return span ? [...ends, edgeDrop, handleRow(span, "start")] : ends;
+        }
 
         if (row.kind === "band") {
           return (
@@ -247,6 +410,7 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
 
         if (row.kind === "break") {
           return [
+            ...ends,
             addLine,
             <li key={row.id} data-row={row.id} className={base.filter(Boolean).join(" ")} style={edge as never}>
               <span className="cc-rr__edge" aria-hidden="true" />
@@ -268,6 +432,8 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
 
         if (row.kind === "gap") {
           return [
+            ...ends,
+            edgeDrop,
             addLine,
             <li key={row.id} data-row={row.id} className={base.filter(Boolean).join(" ")} style={edge as never}>
               <span className="cc-rr__edge" aria-hidden="true" />
@@ -289,6 +455,8 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
 
         if (row.kind === "off_air") {
           return [
+            ...ends,
+            edgeDrop,
             <li key={row.id} data-row={row.id} className={base.filter(Boolean).join(" ")}>
               <span className="cc-rr__edge" aria-hidden="true" />
               {time}
@@ -336,6 +504,8 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
         const named = `${row.title}, ${clock(row.at, { timeZone: STATION_TZ })}`;
         const state = edit ? [e.change === "inserted" ? "new" : e.change, row.removed ? "coming off" : null, lock ? "locked" : null, e.keepTime ? "kept at this time" : null, edit.troubled.has(row.id) ? "has a problem" : null].filter(Boolean).join(", ") : "";
         return [
+          ...ends,
+          edgeDrop,
           addLine,
           <li key={row.id} data-row={row.id} className={classes.filter(Boolean).join(" ")} style={{ ...(edge as object), ...(isDragged ? { transform: `translateY(${drag!.dy}px)` } : {}) }}>
             {movable ? (
@@ -377,6 +547,7 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
               {isDragged && drag?.after !== undefined && edit && (
                 <small className="cc-rr__in">{membershipNote(edit.spans, e.startsAt, dropStart(edit.reflow, row.id, drag.after) ?? e.startsAt)}</small>
               )}
+              {dragSpan && (joining.has(e.id) || leaving.has(e.id)) && <small className="cc-rr__in">{joining.has(e.id) ? `Joins ${dragSpan.name}` : `Leaves ${dragSpan.name}`}</small>}
             </div>
             {edit && !row.removed && !lock ? (
               <span className="cc-rr__tools">
@@ -421,6 +592,8 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
           after
         ];
       })}
+      {endsLast.map((sp) => handleRow(sp, "end"))}
+      {handleDropLine(null)}
     </ol>
   );
 }

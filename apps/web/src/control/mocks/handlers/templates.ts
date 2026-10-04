@@ -1,6 +1,7 @@
 // Day templates and off air hours (G8, G9): "Repeat this day" as a template (list, one, make,
-// change, stop) and the station's off air hours, owners and operators only. The log reads both
-// (handlers/log.ts); the rules and generation are in ../schedule.ts. The On air area owns this file.
+// change, stop; A246: its own rundown edited, and an edited date reset to it) and the station's
+// off air hours, owners and operators only. The log reads both (handlers/log.ts); the rules and
+// generation are in ../schedule.ts. The On air area owns this file.
 
 import { http } from "msw";
 import { logApi } from "@opencast/contracts";
@@ -8,7 +9,7 @@ import { getDb, saveDb } from "../db";
 import { saveOnAirState } from "../fixtures/onair";
 import { fail, path, reply } from "../respond";
 import { setTemplateBlocks } from "../blocks";
-import { createTemplate, offAirHoursOf, removeTemplate, templateById, templatesOf, templateView, TemplateInputError, updateTemplate } from "../schedule";
+import { createTemplate, offAirHoursOf, removeTemplate, resetTemplateDate, ResetRefused, templateById, templatesOf, templateView, TemplateInputError, updateTemplate } from "../schedule";
 import { roleOn } from "./log";
 
 const uuid = () => crypto.randomUUID();
@@ -62,8 +63,6 @@ export const templateHandlers = [
     if (!t) return fail(404, "not_found", "That template wasn't found.");
     const body = logApi.updateTemplate.body!.safeParse(await request.json().catch(() => null));
     if (!body.success) return fail(400, "bad_request", "That change isn't complete.");
-    // `entries` (a template edited entry by entry) has no screen yet; the mock takes a day's log (`fromDay`).
-    if (body.data.entries) return fail(400, "bad_request", "Change the template from a day's log.", { entries: "Not in the mock" });
     // A244: its programming blocks, replaced (each ends by 6:00 am).
     if (body.data.blocks) {
       const problem = setTemplateBlocks(t.id, body.data.blocks);
@@ -75,6 +74,22 @@ export const templateHandlers = [
       return reply(logApi.updateTemplate.response, { template: templateView(t), generated });
     } catch (e) {
       return inputError(e);
+    }
+  }),
+
+  // A246: "Reset to template" for one edited date.
+  http.post(path(logApi.resetTemplateDate), ({ request, params }) => {
+    const r = roleOn(request, String(params.stationId), ["owner", "operator"]);
+    if (r instanceof Response) return r;
+    const t = templateById(r.station.ident.id, String(params.templateId));
+    if (!t) return fail(404, "not_found", "That template wasn't found.");
+    try {
+      const generated = resetTemplateDate(t, String(params.date));
+      saveAll();
+      return reply(logApi.resetTemplateDate.response, { template: templateView(t), generated });
+    } catch (e) {
+      if (e instanceof ResetRefused) return fail(e.status, e.code, e.message);
+      throw e;
     }
   }),
 

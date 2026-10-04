@@ -37,6 +37,13 @@ const ROUTES: Route[] = [
   kai("/schedule/blocks"),
   kai("/schedule/blocks/new"),
   kai("/schedule/blocks/00000000-0000-4000-8000-0000000b1001"),
+  // A246 phase 4: a block not on the log (its sample preview), a template, a template and the day
+  // being edited (block handles, the template's rundown), the dead-air warning's link.
+  kai("/schedule/blocks/00000000-0000-4000-8000-0000000b1002"),
+  kai(`/schedule/templates/${uid(447002)}`),
+  kai(`/schedule/templates/${uid(447001)}?edit=1`),
+  kai("/schedule?edit=1"),
+  kai("/schedule?day=2026-09-26&fill=2026-09-27T06:40:00.000Z"),
   kai("/schedule/rules"),
   { path: "/control/hall/monitor", as: "kai" },
   // Live and programming.
@@ -140,7 +147,9 @@ for (const size of ["web", "phone"] as const) {
       });
 
       // A246: Break rules with unsaved changes (the preview rebuilt), and the question on leaving.
+      // On the phone the tab says it's desk work (phase 4), so this is the web's.
       test("/schedule/rules with unsaved changes, and leaving them", async ({ page }) => {
+        test.skip(size === "phone", "Break rules are desk work on the phone");
         await open(page, kai("/schedule/rules"), ground, size);
         await page.getByRole("radiogroup", { name: "How often: Thank-you credit" }).getByRole("radio", { name: "Once an hour" }).click();
         await expect(page.getByText("Rebuilt with the rules as set. Nothing is saved yet")).toBeVisible();
@@ -150,6 +159,24 @@ for (const size of ["web", "phone"] as const) {
         await expect(page.getByRole("dialog", { name: "Leave without saving?" })).toBeVisible();
         await settle(page);
         await checkA11y(page, `/schedule/rules leaving, ${size}, ${ground}`, { exclude: EXCLUDE });
+      });
+
+      // A246 phase 4: the block page with a change unsaved and its "Place on the log" menu open (the
+      // web), and a break opened as a bottom sheet (the phone).
+      test("a block with unsaved changes and its Place on the log menu, or a break as a sheet", async ({ page }) => {
+        if (size === "web") {
+          await open(page, kai("/schedule/blocks/00000000-0000-4000-8000-0000000b1001", "What it airs"), ground, size);
+          await page.getByRole("switch", { name: "Outro" }).click();
+          await expect(page.getByText("Unsaved changes. Save keeps them; leaving drops them.")).toBeVisible();
+          await page.getByRole("button", { name: "Place Late Crate Nights on the log" }).click();
+          await expect(page.getByRole("menu")).toBeVisible();
+        } else {
+          await open(page, kai("/schedule"), ground, size);
+          await page.getByRole("list", { name: "The rundown" }).getByRole("button", { name: /Spots placed at 9:09 pm/ }).click();
+          await expect(page.getByRole("dialog", { name: "Break, 9:29:00 pm" })).toBeVisible();
+        }
+        await settle(page);
+        await checkA11y(page, `block page or break sheet, ${size}, ${ground}`, { exclude: EXCLUDE });
       });
 
       // Setting up a station: someone new starts one on /control/new, then each setup step.
