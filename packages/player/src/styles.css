@@ -125,6 +125,10 @@
 .oc-banner__cs { font-size: max(calc(56 * var(--u)), 17px); line-height: 1; }
 /* The call sign with an external station's "External" beside it. */
 .oc-banner__csrow { display: flex; align-items: center; gap: max(calc(14 * var(--u)), 6px); }
+/* An external station's "External": above the title on TV and the desktop, beside the call sign on
+   the phone's narrow banner (the user's call, 2026-10-04); one shows, the other is hidden. */
+.oc-banner__ext--id { display: none; }
+.oc-banner__ext--now { display: block; margin-bottom: max(calc(10 * var(--u)), 6px); }
 /* "External" at the call sign's size, so it never makes that line taller. */
 .oc-banner .oc-banner__csrow .oc-tag { height: max(calc(40 * var(--u)), 18px); padding: 0 max(calc(12 * var(--u)), 6px); font-size: max(calc(22 * var(--u)), 11px); line-height: 1; }
 .oc-banner__id small { font-size: max(calc(24 * var(--u)), 12px); color: var(--pic-ink-70); }
@@ -166,11 +170,13 @@
   .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
   .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
   .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
-  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
+  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; gap: 12px; }
   .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; }
   .oc-banner--web .oc-banner__ch { font-size: 20px; }
   .oc-banner--web .oc-banner__cs { font-size: 15px; }
   .oc-banner--web .oc-banner__csrow .oc-tag { height: 16px; padding: 0 5px; font-size: 10.5px; }
+  .oc-banner--web .oc-banner__ext--id { display: inline-flex; }
+  .oc-banner--web .oc-banner__ext--now { display: none; }
   .oc-banner--web .oc-banner__clock { font-size: 13px; }
   .oc-banner--web .oc-banner__nx { font-size: 12px; margin-top: 9px; }
   .oc-banner--web .oc-banner__hints { display: none; }

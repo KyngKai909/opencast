@@ -60,8 +60,9 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
         <span className="oc-banner__ch oc-mono">{c.station.channel}</span>
         <span className="oc-banner__csrow">
           <span className="oc-banner__cs oc-cs">{c.station.callSign ?? c.station.handle}</span>
+          {/* On the phone's narrow banner, beside the call sign; on TV and the desktop, above the title. */}
           {listed && (
-            <Tag variant="listed" onPicture>
+            <Tag variant="listed" onPicture className="oc-banner__ext oc-banner__ext--id">
               External
             </Tag>
           )}
@@ -70,6 +71,13 @@ export function Banner({ channel: c, size, now, timeZone, hints = [], backTo, on
       </div>
       <div className="oc-banner__now">
         {source && <span className="oc-banner__src">{source}</span>}
+        {listed && (
+          <span className="oc-banner__src oc-banner__ext oc-banner__ext--now">
+            <Tag variant="listed" onPicture>
+              External
+            </Tag>
+          </span>
+        )}
         <h3 aria-label={block ? `${block.name} · ${title}` : undefined}>
           {block && (
             <span className="oc-banner__blk">
