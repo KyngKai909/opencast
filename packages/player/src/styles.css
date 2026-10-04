@@ -170,7 +170,7 @@
   .oc-banner--web { grid-template-columns: minmax(0, 1fr) auto; gap: 12px 12px; padding: 10px 12px; left: 2%; right: 2%; bottom: 3%; }
   .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
   .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
-  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; }
+  .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; gap: 12px; }
   .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; }
   .oc-banner--web .oc-banner__ch { font-size: 20px; }
   .oc-banner--web .oc-banner__cs { font-size: 15px; }
