@@ -81,7 +81,8 @@
    fades down from that same colour, so the status bar runs into the picture rather than sitting on it
    as a band (2026-10-04). */
 @media (display-mode: standalone) and (orientation: portrait) {
-  .vw-sw--phone .vw-sw__top { background: linear-gradient(to bottom, rgb(15 24 48) 0%, rgb(15 24 48 / .6) 35%, rgb(15 24 48 / 0) 100%); }
+  /* Solid only where it meets the status bar, then thin quickly, so a bright picture isn't dimmed under it. */
+  .vw-sw--phone .vw-sw__top { background: linear-gradient(to bottom, rgb(15 24 48) 0%, rgb(15 24 48 / .5) 14%, rgb(15 24 48 / .18) 45%, rgb(15 24 48 / 0) 100%); }
 }
 .vw-sw__mkt { justify-self: start; display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0; border: 0; background: none; color: #fff; font: 600 12.5px var(--font-text); opacity: .92; cursor: pointer; text-shadow: 0 1px 6px rgb(0 0 0 / .5); }
 .vw-sw__band { display: flex; gap: 4px; }
