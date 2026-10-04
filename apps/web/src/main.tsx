@@ -5,7 +5,6 @@ import "@opencast/player/styles.css";
 import "./app.css";
 import { isNative } from "./viewer/native/platform";
 import { App } from "./App";
-import { ViewportProbe } from "./viewer/debug/ViewportProbe";
 
 async function boot() {
   // The env itself, not config: Vite replaces it at build time, so a production build drops the
@@ -20,7 +19,6 @@ async function boot() {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <App />
-      <ViewportProbe />
     </StrictMode>
   );
 }

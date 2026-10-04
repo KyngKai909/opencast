@@ -5,6 +5,8 @@ html, body, #root { height: 100%; }
 body { font-size: 15px; line-height: 1.45; overscroll-behavior-y: none; }
 #root { display: flex; flex-direction: column; }
 #root > * { flex: 1; min-height: 0; }
-/* Installed to an iPhone's home screen the status bar is see-through, the picture running behind
-   it. 2026-10-04: iOS gave that app a frame short of the bottom; viewer/debug/ViewportProbe.tsx
-   (temporary) measures what it really gets, for the fix. */
+/* Installed to an iPhone's home screen the status bar is the plain black one (index.html), not the
+   see-through one. Measured on the user's iPhone (2026-10-04): with black-translucent iOS gave the app
+   894 of the screen's 956 points, starting at the top, so the bottom 62 (the status bar's height)
+   showed a band no page can draw in; every CSS height stopped there. Worth trying again on a later
+   iOS: the switch is that one meta tag. */
