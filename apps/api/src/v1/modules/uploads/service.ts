@@ -219,7 +219,10 @@ export function createUploadsService({ deps, services }: ModuleContext): Uploads
   /** What the file is for, done with it: the old endpoints' own service calls, given the staged file. */
   async function finish(row: Row, file: UploadedFile): Promise<{ state: "preparing" | "done"; result: NonNullable<UploadView["result"]> }> {
     const purpose = row.target as UploadPurpose;
-    const user = { id: row.userId, privyDid: null, isAdmin: false } satisfies CurrentUser;
+    // As they are now, admin included: an admin working on a station Opencast runs has no membership
+    // there, so without it the check below said "That station wasn't found" (2026-10-04).
+    const isAdmin = (await services.accounts.peopleByIds([row.userId])).get(row.userId)?.isAdmin ?? false;
+    const user = { id: row.userId, privyDid: null, isAdmin } satisfies CurrentUser;
     // The role again: it may have changed while the file was on its way.
     await authorize(user, purpose);
     switch (purpose.kind) {
