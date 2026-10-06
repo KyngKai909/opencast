@@ -291,7 +291,7 @@ function scheduleOf(sc: ListedScheduleInput, was?: DbListed): Pick<DbListed, "ca
 
 /** A248: an uploaded spreadsheet refused as the API refuses it: its size, its type, one with no times. */
 function fileProblem(file: File): Response | null {
-  if (file.size > SHEET_FILE_MAX_BYTES) return fail(422, "too_big", "Use a file of 2 MB or less.");
+  if (file.size > SHEET_FILE_MAX_BYTES) return fail(413, "too_big", "Use a file of 2 MB or less.");
   const kind = kindOfFile(file.name);
   if (!kind) return fail(422, "not_a_spreadsheet", "That isn't a spreadsheet Opencast can read: use .xlsx, .ods, .csv or .tsv.");
   if (kind === "xls") return fail(422, "old_excel", "Older Excel files (.xls) aren't read. Save it as .xlsx or .csv and upload that.");

@@ -395,9 +395,11 @@ export async function readScheduleAt(url: string, declared: ScheduleFormat | nul
   return { format: "sheet", table, sheet: readSheetSchedule(table.rows, table.continues, now), gid: google?.gid ?? null };
 }
 
+export const SHEET_FILE_TOO_BIG = "Use a file of 2 MB or less.";
+
 /** An uploaded spreadsheet's bytes, checked: its size, and a spreadsheet's name or type. */
 async function sheetFileBytes(file: UploadedFile): Promise<{ bytes: Uint8Array; kind: ReturnType<typeof kindFromName> }> {
-  if (file.size > SHEET_FILE_MAX_BYTES) throw refused("too_big", "Use a file of 2 MB or less.");
+  if (file.size > SHEET_FILE_MAX_BYTES) throw refused("too_big", SHEET_FILE_TOO_BIG);
   const kind = kindFromName(file.originalName) ?? kindFromType(file.mimeType);
   if (!kind) throw refused("not_a_spreadsheet", NOT_A_SHEET);
   if (kind === "xls") throw refused("old_excel", "Older Excel files (.xls) aren't read. Save it as .xlsx or .csv and upload that.");

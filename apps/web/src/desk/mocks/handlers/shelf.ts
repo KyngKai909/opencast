@@ -150,7 +150,7 @@ export const shelfHandlers: HttpHandler[] = [
     const file = form?.get("file");
     if (!file || typeof file === "string") return fail(400, "bad_request", "Choose a file to attach.", { file: "Required" });
     if (!/\.(pdf|png|jpe?g|gif|webp|heic|txt)$/i.test(file.name)) return fail(422, "wrong_file_type", "Attach a PDF, a picture or a text file.");
-    if (file.size > 20 * 1024 * 1024) return fail(422, "too_big", "Attach a file of 20 MB or less.");
+    if (file.size > 20 * 1024 * 1024) return fail(413, "too_big", "Attach a file of 20 MB or less.");
     const id = nextId();
     i.evidence.push({ id, line: String(params.line) as ChecklistLineName, fileName: file.name, contentType: file.type || "application/octet-stream", bytes: file.size, contentId: `bafkreievidence${id.slice(-12)}`, uploadedBy: p.id, at: now().toISOString() });
     saveSettings();

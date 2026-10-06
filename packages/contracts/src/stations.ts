@@ -760,7 +760,7 @@ export const stationsApi = {
     path: "/stations/:stationId/relay-background",
     auth: "user",
     summary:
-      "Upload or replace a radio station's relay background (owner, operator): a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video up to 30 seconds (its sound is dropped), up to 100 MB. Prepared once into a loop at the relay's size (`status` `preparing`, then `ready`); relays that are on pick it up once it's ready. 409 `not_radio` (a TV station relays its own picture); 422 `wrong_file_type`, `too_big`, `too_long`, `unreadable_file`.",
+      "Upload or replace a radio station's relay background (owner, operator): a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video up to 30 seconds (its sound is dropped), up to 100 MB (413 `too_big` past it, before it's all sent). Prepared once into a loop at the relay's size (`status` `preparing`, then `ready`); relays that are on pick it up once it's ready. 409 `not_radio` (a TV station relays its own picture); 422 `wrong_file_type`, `too_long`, `unreadable_file`.",
     params: StationParams,
     multipart: true,
     body: z.object({}),
