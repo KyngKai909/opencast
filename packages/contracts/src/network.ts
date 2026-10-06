@@ -379,6 +379,70 @@ export type SheetFile = z.infer<typeof SheetFile>;
 export const SHEET_FILE_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
+ * A249 (2026-10-06): an XMLTV guide's limits. A guide is read as it downloads (gzipped or not) and
+ * only the station's channel is kept, so a large one never sits in memory; past any limit the read
+ * stops, and what was stored stays (`calendarSync` `too_big`).
+ */
+export const GUIDE_LIMITS = {
+  /** The file as it comes (gzipped, when it is). */
+  compressedBytes: 40_000_000,
+  /** The guide as read (unzipped). */
+  bytes: 300_000_000,
+  /** Airings kept for one channel, from now on. */
+  programmes: 5_000,
+  /** One read, from asking to the last byte. */
+  seconds: 90
+} as const;
+
+/**
+ * A249: what was read from an XMLTV guide at its last read (a schedule address in the format
+ * `xmltv`): the channel kept for the station, how many the guide has, its size, and when it was
+ * last downloaded or answered "not changed".
+ */
+export const GuideRead = z.object({
+  /** The guide's channel read for this station (its id there), and its name there; null when none was. */
+  channel: z.string().nullable(),
+  channelName: z.string().nullable(),
+  /** Channels the guide lists. */
+  channels: z.number().int(),
+  /** Airings kept for the channel (those not over yet). */
+  programmes: z.number().int(),
+  /** Its size as it came (`compressedBytes`, gzipped or not) and as read (`bytes`), as far as it was read. */
+  compressedBytes: z.number().int(),
+  bytes: z.number().int(),
+  gzip: z.boolean(),
+  /** A large guide (gzipped, or over 5 MB as read): read hourly, and at most every 30 minutes while its airings run out. */
+  large: z.boolean(),
+  /** When it was last downloaded and read. */
+  readAt: Timestamp,
+  /** When it last answered "not changed since" (nothing downloaded, what's stored kept); null since a full read. */
+  unchangedAt: Timestamp.nullable(),
+  /** The limit a read stopped at (`calendarSync` `too_big`); null when it didn't. */
+  limit: z.enum(["compressed", "bytes", "programmes", "time"]).nullable()
+});
+export type GuideRead = z.infer<typeof GuideRead>;
+
+/**
+ * A249: a guide file found for a channel ("Find this channel's guide"), from iptv-org's public
+ * lists, that can be fetched as it is (no site's pages read).
+ */
+export const GuideOption = z.object({
+  /** Whose guide it is: "Pluto TV (US)". */
+  label: z.string(),
+  /** Who publishes the file: "i.mjh.nz". */
+  via: z.string(),
+  /** The address to use, with its channel: `https://i.mjh.nz/PlutoTV/us.xml.gz#channel=6793eaa4bc03978b9bc63db1`. */
+  url: z.string(),
+  /** The channel's name in that guide ("ANIME x HIDIVE"). */
+  siteName: z.string(),
+  /** iptv-org's id for the channel ("AnimexHIDIVE.us"), when its list says. */
+  channelId: z.string().nullable(),
+  /** The channel is in the file now (true), isn't (false: the list is out of date), or the file couldn't be read (null). */
+  inGuide: z.boolean().nullable()
+});
+export type GuideOption = z.infer<typeof GuideOption>;
+
+/**
  * Where a listing's "what's on" comes from, as the desk sees it: `ExternalSchedule`'s three, and
  * (added 2026-10-01, A241) `manual`, a weekly schedule entered by hand, checked against the
  * source's published schedule. The dial, guide and station page (`ExternalInfo.schedule`) keep
@@ -524,11 +588,16 @@ export const ListedSource = z.object({
    * computer can read (no schema.org event with a title and a start). Not an error: its airings
    * are left as they were, and its stream's health doesn't change.
    */
-  calendarSync: z.enum(["synced", "calendar_not_found", "not_set", "no_event_data", "not_public"]),
+  calendarSync: z.enum(["synced", "calendar_not_found", "not_set", "no_event_data", "not_public", "pick_channel", "not_in_guide", "too_big"]),
   // Added 2026-10-06 (A248): `not_public`, a Google Sheet that answers with a sign-in page or
   // "not found" (it isn't published to the web, nor shared with anyone with the link). Like
   // `calendar_not_found`, its airings stay as they were. A spreadsheet with no times it can read
   // is `no_event_data`.
+  // Added 2026-10-06 (A249, large guides): `pick_channel`, an XMLTV guide with several channels and
+  // none named (`#channel=`) nor matching the listing's name or stream; `not_in_guide`, the channel
+  // named isn't in the guide (now); `too_big`, a guide past a limit (`GUIDE_LIMITS`: its size as it
+  // came, its size as read, airings for one channel, or time). Like `calendar_not_found`, its
+  // airings stay as they were; `schedule.guide` says more.
   listingState: z.enum(["not_listed", "checking", "listed"]),
   lastSyncedAt: Timestamp.nullable(),
   upcoming: z.number().int(),
@@ -571,7 +640,10 @@ export const ListedSource = z.object({
       /** What was read from its spreadsheet (a link's last read, or the uploaded file); null for anything else. */
       sheet: SheetRead.nullable().optional(),
       /** `source` `file`: the uploaded spreadsheet. */
-      file: SheetFile.nullable().optional()
+      file: SheetFile.nullable().optional(),
+      // ---- Added 2026-10-06 (A249): large and compressed XMLTV guides ----
+      /** What was read from its XMLTV guide at the last read; null for anything else. */
+      guide: GuideRead.nullable().optional()
     })
     .optional(),
   /** On the dial now: evidence in place, in its market, and not hidden for being down. */
@@ -756,7 +828,9 @@ export const SchedulePreview = z.object({
   /** The first 8 of them. */
   airings: z.array(z.object({ title: z.string(), startsAt: Timestamp, endsAt: Timestamp.nullable() })).max(8),
   /** The zone the sheet's (or a webpage's) times were read in, to show the times in. */
-  timeZone: z.string()
+  timeZone: z.string(),
+  /** Added 2026-10-06 (A249): what was read from an XMLTV guide; null (or absent) for anything else. */
+  guide: GuideRead.nullable().optional()
 });
 export type SchedulePreview = z.infer<typeof SchedulePreview>;
 
@@ -1127,6 +1201,23 @@ export const networkApi = {
       sourceId: Id.optional()
     }),
     response: SchedulePreview
+  }),
+  // ---- Added 2026-10-06: A249, large guides ----
+
+  findListedGuides: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/find-guide",
+    auth: "admin",
+    summary:
+      "A249: \"Find this channel's guide\": the channel's name (and, for a listing or a lead from an IPTV list, its iptv-org id) looked up in iptv-org's public lists (channels and guides, read at most once a day), and the guide files for it that can be fetched as they are: i.mjh.nz's (Pluto TV, Plex, Roku, Samsung TV Plus and the rest) and nzxmltv.com's, each with the address to use (its channel in `#channel=`) and whether the channel is in the file now (each file's channel list is read, not its airings). Guides only a site's pages give are counted in `skipped`, not offered. Nothing is saved. Matching: the name or one of the channel's other names, the same ignoring case, spaces and punctuation and a trailing \"TV\" or \"Channel\"; or the guide's own name for it. 502 `lists_unavailable` when the lists can't be read.",
+    body: z.object({ name: z.string().trim().min(1).max(160), sourceId: Id.optional(), creatorId: Id.optional() }),
+    response: z.object({
+      /** iptv-org's channels it matched. */
+      channels: z.array(z.object({ id: z.string(), name: z.string() })),
+      guides: z.array(GuideOption),
+      /** Guides for them that only a site's pages give (not offered). */
+      skipped: z.number().int()
+    })
   }),
   uploadListedSchedule: endpoint({
     method: "POST",
