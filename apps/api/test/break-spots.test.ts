@@ -5,7 +5,7 @@
 // promising only those breaks; and a bumper opening and closing each break (the same one twice, or
 // none), with the station ID last.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { createPlanner, type Segment } from "../src/v1/modules/playout/engine/plan.js";
 import { createFiller } from "../src/v1/modules/playout/engine/fill.js";
@@ -252,15 +252,13 @@ describe("holds and caps", () => {
     const id = await station("CAPS");
     // Spots after every third program: 3:25 and 4:55 (an hour and a half apart), each break five minutes.
     await kai.put(`/v1/stations/${id}/break-rule`, rule({ mode: "after_every_program", everyMinutes: null, spotMsPerHour: 60_000, cadence: cadence({ every: "n_programs", n: 3 }) })).expect(200);
-    // A day before the database's own clock: holds are dated by it, and a daily cap counts today's.
-    h.clock.set("2026-09-01T02:59:00.000Z");
-    await programs(id, "2026-09-01T03:00:00.000Z", 4, 30, 25);
+    h.clock.set("2026-10-02T02:59:00.000Z");
+    await programs(id, "2026-10-02T03:00:00.000Z", 4, 30, 25);
     const once = await listedSpot("Once a day", 30, $(4));
     const second = await listedSpot("Second", 30);
     const third = await listedSpot("Third", 30);
     await kai.put(`/v1/stations/${id}/rotations/main`, { spotIds: [once, second, third] }).expect(200);
     const results = await filler.fillAhead(id, h.clock.now(), 150 * MIN);
-    h.clock.set("2026-10-02T02:59:00.000Z");
     const byBreak = await Promise.all(
       results.map(async (r) => {
         const [b] = await h.db.select().from(schema.breaks).where(eq(schema.breaks.id, r.breakId));
@@ -275,6 +273,10 @@ describe("holds and caps", () => {
     expect(byBreak[1].placed).toEqual([second, third]);
     expect(byBreak[1].skipped).toEqual([{ spotId: once, reason: "daily_cap" }]);
     expect(await held(id)).toHaveLength(4);
+    // The holds are dated by the injected clock, not the database's: the daily cap counts them from
+    // the fake midnight whatever the real date is.
+    const holds = await h.db.select().from(schema.holds).where(inArray(schema.holds.id, (await held(id)).map((a) => a.holdId)));
+    expect(holds.map((x) => x.createdAt.toISOString())).toEqual(Array(4).fill("2026-10-02T02:59:00.000Z"));
     const filled = await h.db.select().from(schema.breaks).where(and(eq(schema.breaks.stationId, id), isNotNull(schema.breaks.filledAt)));
     expect(filled).toHaveLength(2);
   });
