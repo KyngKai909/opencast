@@ -191,6 +191,11 @@ describe.runIf(foundryAvailable())("a sample week of money", () => {
 
     const aired: number[] = [];
     for (let d = 0; d < 7; d++) {
+      if (d > 0) {
+        // Midnight in Los Angeles: the jobs bring back spots that stopped at yesterday's daily cap.
+        h.clock.set(evening(d, 0).toISOString());
+        await h.services.spots.resumeDailyCaps();
+      }
       if (d === 3) {
         // Thursday: the order is delivered and approved; BEAT is paid.
         h.clock.set(evening(3, 12).toISOString());

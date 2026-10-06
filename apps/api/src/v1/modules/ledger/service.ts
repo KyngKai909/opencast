@@ -412,7 +412,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       );
       const [payout] = await tx
         .insert(schema.payouts)
-        .values({ accountId: account, amountMicros: micros, destination: toWallet ? where.destination.label : "bank", scheduledFor, status: "scheduled", entryId })
+        .values({ accountId: account, amountMicros: micros, destination: toWallet ? where.destination.label : "bank", scheduledFor, status: "scheduled", entryId, createdAt: deps.clock.now() })
         .returning();
       return { payoutId: payout.id, entryId: entryId! };
     });
@@ -566,7 +566,9 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           sponsorshipId: input.sponsorshipId ?? null,
           productionOrderId: input.productionOrderId ?? null,
           amountMicros: input.amountMicros,
-          isEstimate: input.isEstimate ?? false
+          isEstimate: input.isEstimate ?? false,
+          // The injected clock, not the database's: a spot's daily cap counts the holds made since its midnight.
+          createdAt: deps.clock.now()
         })
         .returning({ id: H.id });
       // Checked now, not at commit, so a caller can try the next spot instead.
@@ -905,7 +907,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       // The deposit exists first, so the provider can report back against it.
       const [deposit] = await db
         .insert(schema.deposits)
-        .values({ advertiserId: businessId, fundingSourceId: source.id, amountMicros: input.amountMicros, feeMicros, status: "pending" })
+        .values({ advertiserId: businessId, fundingSourceId: source.id, amountMicros: input.amountMicros, feeMicros, status: "pending", createdAt: deps.clock.now() })
         .returning();
       let started;
       try {
@@ -957,7 +959,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         .where(and(eq(schema.fundingSources.advertiserId, businessId), eq(schema.fundingSources.clearLinkId, link.id), sql`${schema.fundingSources.removedAt} is null`));
       const [deposit] = await db
         .insert(D)
-        .values({ advertiserId: businessId, fundingSourceId: source?.id ?? null, amountMicros: input.amountMicros, feeMicros: 0, status: "pending", txHash, fromAddress: link.address, providerRef: `tx:${txHash}` })
+        .values({ advertiserId: businessId, fundingSourceId: source?.id ?? null, amountMicros: input.amountMicros, feeMicros: 0, status: "pending", txHash, fromAddress: link.address, providerRef: `tx:${txHash}`, createdAt: deps.clock.now() })
         .onConflictDoNothing()
         .returning();
       if (!deposit) {
@@ -1065,7 +1067,7 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
         );
         const [payout] = await tx
           .insert(schema.payouts)
-          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "scheduled", entryId })
+          .values({ accountId: available, amountMicros: input.amountMicros, destination: source.label, scheduledFor: deps.clock.now().toISOString().slice(0, 10), status: "scheduled", entryId, createdAt: deps.clock.now() })
           .returning();
         return { payoutId: payout.id, entryId: entryId! };
       });
