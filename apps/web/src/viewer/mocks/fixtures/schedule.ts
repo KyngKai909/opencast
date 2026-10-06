@@ -129,6 +129,16 @@ export const AIRINGS: MockAiring[] = [
   a("REEL", "20:00", "21:00", "Cartoons from 1928 to 1934", "cartoons", { note: "Public domain, restored" }),
   a("REEL", "21:00", "22:00", "Newsreel hour", "newsreel"),
   a("REEL", "22:00", "23:00", "Cartoons from 1935", "cartoons"),
+  // ATIC 36.1 (external, A248): a volunteer channel's week grid in a published Google Sheet, its
+  // Eastern times here in Pacific (the desk mock's canned sheet, mocks/sheets.ts).
+  a("ATIC", "17:00", "17:40", "Classic Wrestling", null, { listed: true }),
+  a("ATIC", "17:40", "19:15", "Night at the Drive-In (1987)", null, { listed: true }),
+  a("ATIC", "19:15", "19:40", "Cartoon Vault", null, { listed: true }),
+  a("ATIC", "19:40", "20:05", "Office Dogs", null, { listed: true }),
+  a("ATIC", "20:05", "20:45", "Puppet Kitchen", null, { listed: true }),
+  a("ATIC", "20:45", "21:10", "Late Laughs", null, { listed: true }),
+  a("ATIC", "21:10", "22:00", "Static Hour", null, { listed: true }),
+  a("ATIC", "22:00", "26:30", "Night Owls", null, { listed: true }),
   // PREP 31.1
   a("PREP", "19:30", "22:00", "Football: Redlands East Valley at Citrus Valley", "football"),
   a("PREP", "22:00", "22:30", "Friday scoreboard", "scoreboard"),

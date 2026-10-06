@@ -270,6 +270,59 @@ test("External sources: a schedule entered by hand (A241)", async ({ page }) => 
   await expect(details.getByRole("list", { name: "Changes" })).toContainText("Its schedule read again");
 });
 
+// A248: Attic Channel's schedule from a published Google Sheet: what was read in its details; then
+// in Change, a spreadsheet uploaded instead (checked first: what's read, the first airings), saved,
+// and in its history. A shared link that isn't shared with anyone with the link says so.
+test("External sources: a schedule from a spreadsheet (A248)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await page.goto(`${IE}/listed`);
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Attic Channel/ })).toContainText("Their spreadsheet");
+  await page.getByText("Attic Channel").first().click();
+  const details = page.getByRole("dialog", { name: "Attic Channel" });
+  await expect(details).toContainText("Read 152 shows from a week grid, Monday 9/21 to Sunday 9/27, times in Eastern.");
+  await expect(details).toContainText("Eastern: the sheet says so");
+  await expect(details.getByRole("list", { name: "Skipped" })).toContainText("out of order in its day");
+  await details.getByRole("button", { name: "Change" }).click();
+  const form = page.getByRole("dialog", { name: "Change the listing" });
+  await expect(form.getByRole("radio", { name: "A spreadsheet", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(form.getByLabel("Spreadsheet link")).toHaveValue(/2PACX-1vMockAtticChannelWeek/);
+  // A link for editing that isn't shared: said before anything is saved.
+  await form.getByLabel("Spreadsheet link").fill("https://docs.google.com/spreadsheets/d/1PrivateMadeUpSheet/edit#gid=0");
+  await form.getByRole("button", { name: "Check it" }).click();
+  await expect(form).toContainText("This sheet isn't public");
+  await settled(page);
+  await checkA11y(page, "desk Change, a sheet that isn't public");
+  // A file instead: checked, then saved.
+  await form.getByRole("radio", { name: "Upload a spreadsheet" }).click();
+  await form.locator('input[type="file"]').setInputFiles({ name: "attic-week.csv", mimeType: "text/csv", buffer: Buffer.from("Mon,Tue\nNews 6pm,News 6pm\n") });
+  await form.getByRole("button", { name: "Check it" }).click();
+  await expect(form.getByRole("region", { name: "What was read" })).toContainText("Read 14 shows from a week grid, Mon to Sun, every week, times in Pacific.");
+  await expect(form.getByRole("list", { name: "The first airings" }).getByRole("listitem")).toHaveCount(8);
+  await settled(page);
+  await checkA11y(page, "desk Change, a spreadsheet checked");
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Attic Channel is saved. It's on the dial at 36.1.")).toBeVisible();
+  await expect(details).toContainText("attic-week.csv, CSV file");
+  await expect(details.getByRole("list", { name: "Changes" })).toContainText("Spreadsheet from nothing to attic-week.csv, 14 shows");
+  await details.getByRole("button", { name: "Close" }).last().click();
+
+  // Listing a new source with a Google Sheet's link: it's read as it's saved.
+  await page.getByRole("button", { name: "List a source" }).click();
+  const add = page.getByRole("dialog", { name: "List a source" });
+  await add.getByLabel("Whose stream").fill("Couch Club");
+  await add.getByLabel("Channel").fill("39.1");
+  await add.getByLabel("Call sign").fill("CUCH");
+  await add.getByRole("radio", { name: "Stream link" }).click();
+  await add.getByLabel("Stream address").fill("https://couch.example.org/live/index.m3u8");
+  await add.getByRole("radio", { name: "Clearly public" }).click();
+  await add.getByLabel("The basis").fill("Non-profit channel, stream published for the public");
+  await add.getByRole("radio", { name: "A spreadsheet", exact: true }).click();
+  await add.getByLabel("Spreadsheet link").fill("https://docs.google.com/spreadsheets/d/e/2PACX-1vMadeUpCouchClub/pubhtml");
+  await add.getByRole("button", { name: "List it" }).click();
+  await expect(page.getByText("Couch Club is on the dial at 39.1.")).toBeVisible();
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Couch Club/ })).toContainText("Their spreadsheet");
+});
+
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
 // the catalog station's library, its checklist answered with evidence and sent by Dee, and the
 // second check done by Rae, a rights reviewer: never the first checker.

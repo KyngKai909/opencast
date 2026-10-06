@@ -1,0 +1,26 @@
+/* A248: "A spreadsheet": its link or file, the zone, Check it, then what was read and the first
+   airings. The manual editor's spacing (14px) and hairline rules; times in mono, as the log's. */
+.nd-sheet { display: grid; gap: 14px; }
+.nd-sheet__pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nd-sheet__name { font-size: 13px; color: var(--ink-70); overflow-wrap: anywhere; }
+.nd-sheet__file .nd-form__note { margin-top: 6px; }
+.nd-sheet__check { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nd-sheet__checknote { margin: 0; }
+.nd-sheet__result { display: grid; gap: 10px; padding: 12px 14px 14px; border: 1px solid var(--hair); border-radius: var(--r-control); }
+.nd-sheet__read { display: grid; gap: 6px; }
+.nd-sheet__summary { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.nd-sheet__facts { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 13px; color: var(--ink-70); }
+.nd-sheet__skipped { font-size: 13px; color: var(--ink-70); }
+.nd-sheet__skipped summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+.nd-sheet__skipped ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+.nd-sheet__next { margin: 4px 0 0; font-size: 13px; color: var(--ink-70); }
+.nd-sheet__airings { margin: 0; padding: 0; list-style: none; display: grid; }
+.nd-sheet__airings li { display: grid; grid-template-columns: minmax(150px, auto) minmax(0, 1fr); gap: 12px; padding: 6px 0; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink); }
+.nd-sheet__when { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-70); white-space: nowrap; }
+@media (max-width: 480px) {
+  .nd-sheet__airings li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+.nd-sheet__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 480px) {
+  .nd-sheet__pair { grid-template-columns: minmax(0, 1fr); }
+}

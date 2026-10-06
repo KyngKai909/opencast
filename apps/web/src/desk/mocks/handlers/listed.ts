@@ -13,6 +13,10 @@
 //
 // IPTV lists: a pasted list is read here (../iptv.ts); an iptv-org address answers a canned list,
 // never fetched. Channels become pipeline leads with their stream noted, never listings.
+//
+// A248: spreadsheets (../sheets.ts). A Google Sheet's link, or a .csv, .tsv, .xlsx or .ods link,
+// answers a canned week grid (a shared link with "private" in its id isn't public); an uploaded
+// file answers a canned weekday sheet. Never fetched, never opened.
 
 import { http, type HttpHandler } from "msw";
 import {
@@ -20,6 +24,7 @@ import {
   manualScheduleProblems,
   MANUAL_HORIZON_DAYS,
   networkApi,
+  SHEET_FILE_MAX_BYTES,
   slotText,
   sortedSlots,
   WEEKDAYS,
@@ -37,6 +42,7 @@ import type { DbStation } from "../fixtures/stations";
 import { advanceHealth, publishExternalOff } from "../external";
 import { isAdminNow } from "../settingsDb";
 import { isIptvOrgAddress, parseIptvList, SAMPLE_LIST } from "../iptv";
+import { atticAirings, atticRead, isSheetLink, kindOfFile, NO_SHOWS, NOT_PUBLIC, notPublicLink, weeklyAirings, weeklyFileRead } from "../sheets";
 import { bodyOf, fail, needsAdmin, needsDesk, path, reply } from "../respond";
 import { valueAt } from "../settingsDb";
 import { channelOnBand } from "./creators";
@@ -114,7 +120,11 @@ export function listedView(l: DbListed): ListedSource | null {
       url: l.calendarUrl,
       checkedAgainst: l.schedule.checkedAgainst,
       checkedOn: l.schedule.checkedOn,
-      ...(l.schedule.source === "manual" ? { slots: l.schedule.slots ?? [], skipDates: l.schedule.skipDates ?? [] } : {})
+      ...(l.schedule.source === "manual" ? { slots: l.schedule.slots ?? [], skipDates: l.schedule.skipDates ?? [] } : {}),
+      // A248: its own time zone, what was read from its spreadsheet, the file uploaded.
+      timeZone: l.schedule.timeZone ?? null,
+      sheet: l.schedule.format === "sheet" || l.schedule.source === "file" ? (l.schedule.sheet ?? null) : null,
+      file: l.schedule.source === "file" ? (l.schedule.file ?? null) : null
     },
     onDial: !l.removed && waiting === null,
     waiting,
@@ -167,6 +177,8 @@ function formatOf(url: string, guide: boolean): DbListed["schedule"]["format"] {
   if (/\.json($|\?)/i.test(url)) return "json";
   if (/\.xml($|\?)/i.test(url)) return guide ? "xmltv" : "rss";
   if (/\.html?($|\?)|\/(events?|schedule)(\/|$|\?)/i.test(url)) return "webpage";
+  // A248: a Google Sheet, or a spreadsheet file.
+  if (isSheetLink(url)) return "sheet";
   return null;
 }
 
@@ -204,8 +216,28 @@ export function manualUpcoming(l: DbListed, tz: string, at = now()): number {
 
 function sync(l: DbListed) {
   if (l.removed) return;
+  const tz = marketById(stationById(l.stationId)?.marketId ?? "")?.timezone || "America/Los_Angeles";
+  // A248: an uploaded spreadsheet is made into airings again (weekly: the next 14 days); a sheet's
+  // link answers the canned week, or isn't public.
+  if (l.schedule.source === "file" && l.schedule.sheet) {
+    l.schedule.sheet = { ...l.schedule.sheet, timeZone: l.schedule.timeZone ?? (l.schedule.sheet.timeZoneFrom === "sheet" ? l.schedule.sheet.timeZone : tz), timeZoneFrom: l.schedule.timeZone ? "listing" : l.schedule.sheet.timeZoneFrom === "sheet" ? "sheet" : "market" };
+    l.calendarSync = "synced";
+    l.lastSyncedAt = now().toISOString();
+    l.upcoming = l.schedule.sheet.weekly ? 28 : l.upcoming;
+    return;
+  }
+  if (l.schedule.format === "sheet" && l.calendarUrl) {
+    if (notPublicLink(l.calendarUrl)) {
+      l.calendarSync = "not_public";
+      return;
+    }
+    l.schedule.sheet = atticRead(l.calendarUrl, l.schedule.timeZone ?? null, now());
+    l.calendarSync = "synced";
+    l.lastSyncedAt = now().toISOString();
+    l.upcoming = 31;
+    return;
+  }
   if (l.schedule.source === "manual") {
-    const tz = marketById(stationById(l.stationId)?.marketId ?? "")?.timezone || "America/Los_Angeles";
     l.calendarSync = "synced";
     l.lastSyncedAt = now().toISOString();
     l.upcoming = manualUpcoming(l, tz);
@@ -228,9 +260,10 @@ function sync(l: DbListed) {
   } else l.calendarSync = "calendar_not_found";
 }
 
-/** A241: what's on as the desk sends it (`schedule`), as the mock keeps it. */
-function scheduleOf(sc: ListedScheduleInput): Pick<DbListed, "calendarUrl" | "schedule"> {
+/** A241: what's on as the desk sends it (`schedule`), as the mock keeps it. A248: `file` keeps the listing's file (`was`). */
+function scheduleOf(sc: ListedScheduleInput, was?: DbListed): Pick<DbListed, "calendarUrl" | "schedule"> {
   if (sc.source === "none") return { calendarUrl: null, schedule: { source: "none", format: null, checkedAgainst: null, checkedOn: null } };
+  if (sc.source === "file") return { calendarUrl: null, schedule: { ...(was?.schedule ?? { checkedAgainst: null, checkedOn: null }), source: "file", format: "sheet", timeZone: sc.timeZone ?? null } };
   if (sc.source === "manual") {
     return {
       calendarUrl: null,
@@ -250,9 +283,20 @@ function scheduleOf(sc: ListedScheduleInput): Pick<DbListed, "calendarUrl" | "sc
       source: sc.source,
       format: sc.calendarFormat ?? formatOf(sc.calendarUrl, sc.source === "guide_data"),
       checkedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
-      checkedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null
+      checkedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null,
+      timeZone: sc.timeZone ?? null
     }
   };
+}
+
+/** A248: an uploaded spreadsheet refused as the API refuses it: its size, its type, one with no times. */
+function fileProblem(file: File): Response | null {
+  if (file.size > SHEET_FILE_MAX_BYTES) return fail(422, "too_big", "Use a file of 2 MB or less.");
+  const kind = kindOfFile(file.name);
+  if (!kind) return fail(422, "not_a_spreadsheet", "That isn't a spreadsheet Opencast can read: use .xlsx, .ods, .csv or .tsv.");
+  if (kind === "xls") return fail(422, "old_excel", "Older Excel files (.xls) aren't read. Save it as .xlsx or .csv and upload that.");
+  if (/empty/i.test(file.name)) return fail(422, "no_event_data", NO_SHOWS);
+  return null;
 }
 
 /** A241: a schedule entered by hand, refused as the API refuses it (the contracts' rules). */
@@ -267,6 +311,8 @@ function manualProblem(sc: ListedScheduleInput | undefined): Response | null {
 const manualText = (sc: DbListed["schedule"]) =>
   sc.source === "manual" && sc.slots?.length ? sortedSlots(sc.slots).map((x) => `${slotText(x)}${x.description ? `, “${x.description}”` : ""}`).join("; ") : null;
 const skipText = (sc: DbListed["schedule"]) => (sc.source === "manual" && sc.skipDates?.length ? sc.skipDates.join(", ") : null);
+/** A248: an uploaded spreadsheet in the history's words: "week.xlsx, 14 shows". */
+const fileText = (sc: DbListed["schedule"]) => (sc.file ? `${sc.file.name}, ${sc.sheet?.shows ?? 0} ${sc.sheet?.shows === 1 ? "show" : "shows"}` : null);
 
 /** The same channel rules as a full station, with room for more external stations in one major. */
 function channelProblem(marketId: string, band: "tv" | "radio", channel: string, exceptStationId?: string): Response | null {
@@ -434,6 +480,8 @@ export const listedHandlers: HttpHandler[] = [
     if (b.guideData && !b.calendarUrl) return fail(400, "invalid", "Guide data needs its address as well as the schedule it was checked against.", { calendarUrl: "Required with guide data" });
     const badSchedule = manualProblem(b.schedule);
     if (badSchedule) return badSchedule;
+    // A248: a spreadsheet file is uploaded to a listing once it's listed.
+    if (b.schedule?.source === "file") return fail(400, "bad_request", "Upload the spreadsheet once it's listed.", { schedule: "A file is uploaded to a listing" });
     const d = getDb();
     const creator = b.creatorId ? creatorById(b.creatorId) : null;
     if (b.creatorId && !creator) return fail(404, "not_found", "That lead wasn't found.");
@@ -566,6 +614,8 @@ export const listedHandlers: HttpHandler[] = [
     if (plays === "embed" && playsChanged && !b.embedTerms) return fail(400, "invalid", "Say whether their terms allow embedding.", { embedTerms: "Required for an embed" });
     const badSchedule = manualProblem(b.schedule);
     if (badSchedule) return badSchedule;
+    // A248: an uploaded spreadsheet kept as it is needs one uploaded.
+    if (b.schedule?.source === "file" && (l.schedule.source !== "file" || !l.schedule.file)) return fail(409, "no_file", "Upload a spreadsheet first.");
     const channel = b.channel && b.channel !== station.ident.channel ? b.channel : null;
     // A229: X.1 with a family stays put; a family's call sign is X.1's to change.
     const family = familyStations(station);
@@ -631,8 +681,9 @@ export const listedHandlers: HttpHandler[] = [
     let scheduleChanged = false;
     const sc = b.schedule;
     if (sc) {
-      const next = scheduleOf(sc);
+      const next = scheduleOf(sc, l);
       scheduleChanged =
+        (next.schedule.timeZone ?? null) !== (l.schedule.timeZone ?? null) ||
         next.calendarUrl !== l.calendarUrl ||
         next.schedule.source !== l.schedule.source ||
         next.schedule.checkedAgainst !== l.schedule.checkedAgainst ||
@@ -643,7 +694,8 @@ export const listedHandlers: HttpHandler[] = [
         skipText(next.schedule) !== skipText(l.schedule);
       if (scheduleChanged) {
         l.calendarUrl = next.calendarUrl;
-        l.schedule = next.schedule;
+        // A248: what was read from a spreadsheet stays only with its file; a link is read afresh.
+        l.schedule = next.schedule.source === "file" ? next.schedule : { ...next.schedule, sheet: null, file: null };
         l.calendarSync = "not_set";
         l.upcoming = 0;
         l.lastSyncedAt = null;
@@ -691,6 +743,9 @@ export const listedHandlers: HttpHandler[] = [
       // A241: the weekly schedule entered by hand, as one line, and the dates it skips.
       note("manualSchedule", manualText(was.schedule), manualText(l.schedule));
       note("skipDates", skipText(was.schedule), skipText(l.schedule));
+      // A248: an uploaded spreadsheet given up, and the listing's time zone.
+      if (l.schedule.source !== "file") note("scheduleFile", was.schedule.source === "file" ? fileText(was.schedule) : null, null);
+      note("scheduleTimeZone", was.schedule.timeZone ?? null, l.schedule.timeZone ?? null);
     }
     if (channel) note("channel", oldIdent.channel, channel);
     if (callSign) note("callSign", oldIdent.callSign, callSign);
@@ -698,7 +753,7 @@ export const listedHandlers: HttpHandler[] = [
       const effects: ListedChange["effects"] = [];
       if (before && !basisOf(l)) effects.push("waits_for_evidence");
       if (restart) effects.push("checks_restart");
-      if (scheduleChanged && (l.calendarUrl || l.schedule.source === "manual")) effects.push("schedule_reread");
+      if (scheduleChanged && (l.calendarUrl || l.schedule.source === "manual" || l.schedule.source === "file")) effects.push("schedule_reread");
       recordChange(l, whoOf(p), "changed", fields, effects);
       // Its lead leaves On air while the listing waits for evidence.
       const lead = l.creatorId ? creatorById(l.creatorId) : undefined;
@@ -777,6 +832,86 @@ export const listedHandlers: HttpHandler[] = [
     }
     saved();
     return reply(networkApi.restoreListedSource.response, listedView(l)!);
+  }),
+
+  // ---- A248 (2026-10-06): schedules from spreadsheets ----
+
+  http.post(path(networkApi.previewListedSchedule), async ({ request }) => {
+    const p = needsAdmin(request);
+    if (p instanceof Response) return p;
+    const form = await request.formData().catch(() => null);
+    const field = (k: string) => {
+      const v = form?.get(k);
+      return typeof v === "string" && v ? v : undefined;
+    };
+    const file = form?.get("file");
+    const url = field("calendarUrl");
+    const upload = file && typeof file !== "string" ? file : null;
+    if (!!url === !!upload) return fail(400, "bad_request", "Give their schedule's address, or upload a spreadsheet.", { calendarUrl: "An address or a file" });
+    const listing = field("sourceId") ? getDb().listed.find((x) => x.id === field("sourceId")) : undefined;
+    const marketId = listing ? stationById(listing.stationId)?.marketId : field("marketId");
+    const market = marketById(marketId ?? "")?.timezone || "America/Los_Angeles";
+    const timeZone = field("timeZone") ?? null;
+    if (upload) {
+      const bad = fileProblem(upload);
+      if (bad) return bad;
+      const read = weeklyFileRead(kindOfFile(upload.name) as Exclude<ReturnType<typeof kindOfFile>, "xls" | null>, timeZone, market, now(), field("sheet"));
+      const airings = weeklyAirings(now(), read.timeZone);
+      return reply(networkApi.previewListedSchedule.response, { format: "sheet", sheet: read, upcoming: 28, airings, timeZone: read.timeZone });
+    }
+    if (!isSheetLink(url!)) {
+      // Any other address: as a feed is, canned (the mock never fetches).
+      return reply(networkApi.previewListedSchedule.response, { format: formatOf(url!, false) ?? "ical", sheet: null, upcoming: 0, airings: [], timeZone: timeZone ?? market });
+    }
+    if (notPublicLink(url!)) return fail(422, "not_public", NOT_PUBLIC);
+    // The canned week's airings, as Eastern times (a zone chosen only changes what's said).
+    const read = atticRead(url!, timeZone, now());
+    return reply(networkApi.previewListedSchedule.response, { format: "sheet", sheet: read, upcoming: 31, airings: atticAirings(now()), timeZone: read.timeZone });
+  }),
+
+  http.post(path(networkApi.uploadListedSchedule), async ({ request, params }) => {
+    const p = needsAdmin(request);
+    if (p instanceof Response) return p;
+    const l = getDb().listed.find((x) => x.id === String(params.sourceId));
+    if (!l) return fail(404, "not_found", "That external station wasn't found.");
+    if (l.removed) return fail(409, "removed", `${l.name} was taken off the dial. Put it back on the list first.`);
+    const form = await request.formData().catch(() => null);
+    const file = form?.get("file");
+    if (!file || typeof file === "string") return fail(400, "bad_request", "Choose a spreadsheet file.", { file: "Required" });
+    const bad = fileProblem(file);
+    if (bad) return bad;
+    const field = (k: string) => {
+      const v = form?.get(k);
+      return typeof v === "string" && v ? v : null;
+    };
+    const timeZone = field("timeZone");
+    const market = marketById(stationById(l.stationId)?.marketId ?? "")?.timezone || "America/Los_Angeles";
+    const was = { ...l.schedule };
+    const wasUrl = l.calendarUrl;
+    const read = weeklyFileRead(kindOfFile(file.name) as Exclude<ReturnType<typeof kindOfFile>, "xls" | null>, timeZone, market, now(), field("sheet") ?? undefined);
+    l.calendarUrl = null;
+    l.schedule = {
+      source: "file",
+      format: "sheet",
+      checkedAgainst: null,
+      checkedOn: null,
+      timeZone,
+      sheet: read,
+      file: { name: file.name, kind: read.kind, bytes: file.size, uploadedAt: now().toISOString(), uploadedBy: whoOf(p) }
+    };
+    sync(l);
+    const fields: ListedChange["fields"] = [];
+    const note = (field: ListedChange["fields"][number]["field"], from: string | null, to: string | null) => {
+      if (from !== to) fields.push({ field, from, to });
+    };
+    note("schedule", was.source, "file");
+    note("calendarUrl", wasUrl, null);
+    note("manualSchedule", manualText(was), null);
+    fields.push({ field: "scheduleFile", from: was.source === "file" ? fileText(was) : null, to: fileText(l.schedule) });
+    note("scheduleTimeZone", was.timeZone ?? null, timeZone);
+    recordChange(l, whoOf(p), "changed", fields, ["schedule_reread"]);
+    saved();
+    return reply(networkApi.uploadListedSchedule.response, listedView(l)!);
   }),
 
   http.post(path(networkApi.previewIptvList), async ({ request }) => {

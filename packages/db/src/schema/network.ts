@@ -283,8 +283,11 @@ export const listedSources = network.table("listed_sources", {
   streamUrl: text("stream_url").notNull(),
   embedTerms: text("embed_terms", { enum: ["allowed", "unclear"] }).notNull(),
   calendarUrl: text("calendar_url"),
-  /** A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. */
-  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data"] })
+  /**
+   * A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. A248
+   * (2026-10-06): `not_public`, a Google Sheet that isn't published or shared with anyone with the link.
+   */
+  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data", "not_public"] })
     .notNull()
     .default("not_set"),
   listingState: text("listing_state", { enum: ["not_listed", "checking", "listed"] })
@@ -315,9 +318,9 @@ export const listedSources = network.table("listed_sources", {
    * schedule, (A241, migration 0046) a weekly schedule entered by hand (`manual_schedule`, checked
    * against `guide_checked_against` on `guide_checked_on`), or neither.
    */
-  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "manual", "none"] }).notNull().default("none"),
-  /** A241: `webpage`, a page read for its schema.org JSON-LD event data. */
-  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv", "webpage"] }),
+  scheduleSource: text("schedule_source", { enum: ["feed", "guide_data", "manual", "file", "none"] }).notNull().default("none"),
+  /** A241: `webpage`, a page read for its schema.org JSON-LD event data. A248: `sheet`, a spreadsheet. */
+  scheduleFormat: text("schedule_format", { enum: ["ical", "rss", "json", "xmltv", "webpage", "sheet"] }),
   guideCheckedAgainst: text("guide_checked_against"),
   guideCheckedOn: date("guide_checked_on"),
   /** The stream, checked every minute: unchecked, up, down (still on the dial), hidden (down 5 minutes: off the dial). */
@@ -377,8 +380,74 @@ export const listedSources = network.table("listed_sources", {
    * optionally `description`, `from` and `until`) and `skipDates` (the dates it doesn't air). Null
    * for every other source (the change history keeps what it was).
    */
-  manualSchedule: jsonb("manual_schedule").$type<{ slots: ManualSlotRow[]; skipDates: string[] }>()
+  manualSchedule: jsonb("manual_schedule").$type<{ slots: ManualSlotRow[]; skipDates: string[] }>(),
+  // ---- A248 (added 2026-10-06, migration 0052): schedules from spreadsheets ----
+  /**
+   * The listing's own time zone (IANA) for the times its source gives without one: a spreadsheet's,
+   * a webpage's event data without an offset. Null: worked out (a zone the sheet names, else the market's).
+   */
+  scheduleTimeZone: text("schedule_time_zone"),
+  /**
+   * What was read from its spreadsheet at the last read (a link, `schedule_format` `sheet`) or when it
+   * was uploaded (`schedule_source` `file`): layout, tab, days, the zone it names and used, cells
+   * skipped. Null for every other schedule.
+   */
+  sheetRead: jsonb("sheet_read").$type<SheetReadRow>(),
+  /**
+   * `schedule_source` `file`: the uploaded spreadsheet, kept as what was read from it (the file itself
+   * isn't kept): its name, kind, size, who uploaded it and when, and its shows (`entries`), made into
+   * airings at once and hourly. Null for every other source.
+   */
+  sheetFile: jsonb("sheet_file").$type<SheetFileRow>()
 });
+
+/**
+ * One show read from a spreadsheet (A248): on `date` (a dated sheet) or every `day` (a weekly one),
+ * from `start` to `end`, minutes after that day's midnight in the schedule's time zone (past 1440
+ * after midnight: a show listed under Monday at 12:15 am is Tuesday's 0:15 by the clock). `end` null:
+ * not known (nothing listed after it, or a gap).
+ */
+export interface SheetEntryRow {
+  date: string | null;
+  day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  start: number;
+  end: number | null;
+  title: string;
+}
+
+/** What was read from a spreadsheet (A248), as `ListedSource.schedule.sheet` shows it, plus the zone it names. */
+export interface SheetReadRow {
+  kind: "google_sheet" | "csv" | "tsv" | "xlsx" | "ods";
+  tab: string | null;
+  gid: string | null;
+  tabs: string[];
+  layout: "week_grid" | "time_grid" | "list" | null;
+  shows: number;
+  weekly: boolean;
+  firstDay: string | null;
+  lastDay: string | null;
+  firstDate: string | null;
+  lastDate: string | null;
+  /** The zone the sheet names (IANA), when it names one; null otherwise. */
+  zone: string | null;
+  zonesNamed: string[];
+  timeZone: string;
+  timeZoneFrom: "listing" | "sheet" | "market";
+  skipped: Array<{ text: string; where: string; why: "no_time" | "no_title" | "out_of_order" | "no_am_pm" | "no_day" }>;
+  skippedCount: number;
+  readAt: string;
+}
+
+/** An uploaded spreadsheet (A248), kept as what was read from it. */
+export interface SheetFileRow {
+  name: string;
+  kind: SheetReadRow["kind"];
+  bytes: number;
+  uploadedAt: string;
+  /** Who uploaded it (a user id), or null. */
+  uploadedBy: string | null;
+  entries: SheetEntryRow[];
+}
 
 /** One weekly slot of a schedule entered by hand (A241). */
 export interface ManualSlotRow {

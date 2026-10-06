@@ -71,6 +71,9 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   });
   r.handle(api.addListedSource, ({ user, body }) => network.addListedSource(user, body));
   r.handle(api.syncListedSource, ({ params }) => network.syncListedSource(params.sourceId));
+  // A248 (added 2026-10-06): a schedule read before it's saved, and a spreadsheet uploaded as one.
+  r.handle(api.previewListedSchedule, ({ body, file }) => network.previewListedSchedule(body, file));
+  r.handle(api.uploadListedSchedule, ({ user, params, body, file }) => network.uploadListedSchedule(user, params.sourceId, body, file));
 
   // External stations (added 2026-09-30, follow-up Phase 6).
   r.handle(api.recordListedEvidence, ({ user, params, body }) => network.recordListedEvidence(user, params.sourceId, body));

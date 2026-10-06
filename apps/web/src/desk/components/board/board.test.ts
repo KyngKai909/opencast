@@ -24,11 +24,11 @@ describe("coverage", () => {
   // Phase 6 added NASA on 61.1: four external stations on the board.
   it("is the frame's: 71%, 2 claimable on air, 4 yeses not set up, HALL 90.8", () => {
     const c = coverage(...boards());
-    // A229 added Riverside County's two streams sharing RIVC on 15; A234 Beat Tapes on 12.2.
-    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 9, listed: 7, catalog: 1, claimable: 3 });
+    // A229 added Riverside County's two streams sharing RIVC on 15; A234 Beat Tapes on 12.2; A248 Attic Channel on 36.1.
+    expect(c).toMatchObject({ localSharePercent: 71, claimableOnAir: 2, saidYesNotSetUp: 4, waitlistHere: 26, stations: 9, listed: 8, catalog: 1, claimable: 3 });
     expect(c.deadAirComing.map(callAndChannel)).toEqual(["HALL 90.8"]);
     expect(statCaptions(c).deadAir).toBe("Station with dead air coming, HALL 90.8");
-    expect(marketLine(c)).toBe("9 stations, 2 claimable stations on air, 7 external city streams and the catalog station. 26 people on the waitlist here.");
+    expect(marketLine(c)).toBe("9 stations, 2 claimable stations on air, 8 external city streams and the catalog station. 26 people on the waitlist here.");
   });
 
   it("adds the bands' counts when the API sends no market-wide stats, and takes the TV band's share", () => {

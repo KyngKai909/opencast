@@ -20,6 +20,11 @@
 // the published schedule as a tick under it. "Enter it by hand": the weekly slots, where it was
 // checked and the dates it doesn't air (ManualScheduleFields). "None". A page with no event data
 // says so, and offers entering it by hand.
+//
+// A248 (2026-10-06): and "A spreadsheet" (SheetScheduleFields): a Google Sheet's link (or a .csv,
+// .tsv, .xlsx or .ods file's), saved as a feed in the format `sheet`, or a file uploaded once the
+// listing is saved (a new listing is listed first, then its file uploaded); its zone, worked out or
+// chosen; "Check it" first, to see what's read.
 import { useState, type FormEvent } from "react";
 import { networkApi, ScheduleFormat, type ListedScheduleInput, type ListedSource, type Market } from "@opencast/contracts";
 import { Button, Checkbox, Field, Modal, Notice, Segmented, SelectField, TextAreaField, useToast } from "@opencast/ui";
@@ -31,10 +36,13 @@ import { complete, EmbedEvidenceFields, emptyEvidence, evidenceInput, evidencePr
 import { changeWarning, familyCallSignChange, familyHeadFor, FORMAT_LABELS, NO_EVENT_DATA, onceWords, playsOf, sameBrandLabel, type Plays } from "./external";
 import { manualChanged, manualDraftOf, manualInput, manualProblems, type ManualDraft } from "./manual";
 import { ManualScheduleFields } from "./ManualScheduleFields";
+import { sheetDraftOf, sheetProblems, SheetScheduleFields, type SheetDraft } from "./SheetScheduleFields";
+import { localDate } from "../../lib/dates";
+import { useNow } from "../../../lib/clock";
 import { channelText } from "./SourceStatus";
 import "../pipeline/forms.css";
 
-type Schedule = "feed" | "guide" | "manual" | "none";
+type Schedule = "feed" | "guide" | "sheet" | "manual" | "none";
 type Format = ScheduleFormat | "";
 
 export interface ListSourcePrefill {
@@ -51,6 +59,8 @@ const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 /** The form's fields for a listing as it is (A215's Change). */
 function draftOf(s: ListedSource) {
   const source = s.schedule?.source ?? (s.calendarUrl ? "feed" : "none");
+  // A248: a spreadsheet's link (a feed in the format `sheet`) or an uploaded file.
+  const sheet = source === "file" || (source === "feed" && s.schedule?.format === "sheet");
   return {
     name: s.name,
     description: s.description ?? "",
@@ -59,10 +69,10 @@ function draftOf(s: ListedSource) {
     callSign: s.station.callSign ?? "",
     plays: playsOf(s),
     streamUrl: s.streamUrl,
-    schedule: (source === "guide_data" ? "guide" : source) as Schedule,
-    calendarUrl: s.calendarUrl ?? "",
+    schedule: (sheet ? "sheet" : source === "guide_data" ? "guide" : source) as Schedule,
+    calendarUrl: sheet ? "" : (s.calendarUrl ?? ""),
     // A241: the feed's format as it was read ("" works it out from the answer).
-    format: (source === "feed" || source === "guide_data" ? (s.schedule?.format ?? "") : "") as Format,
+    format: (!sheet && (source === "feed" || source === "guide_data") ? (s.schedule?.format ?? "") : "") as Format,
     checkedAgainst: source === "guide_data" ? (s.schedule?.checkedAgainst ?? "") : "",
     checkedOn: source === "guide_data" ? (s.schedule?.checkedOn ?? "") : "",
     outsideMarket: false,
@@ -99,6 +109,9 @@ export function ListSource({
   const invalidates = [networkApi.listListedSources, networkApi.getBoard, networkApi.listCreators, networkApi.listListedChanges, networkApi.listExternalOutages];
   const add = useApiMutation(networkApi.addListedSource, { invalidates });
   const update = useApiMutation(networkApi.updateListedSource, { invalidates });
+  // A248: a spreadsheet file, uploaded to the listing once it's saved.
+  const uploadSheet = useApiMutation(networkApi.uploadListedSchedule, { invalidates });
+  const today = localDate(useNow(60_000), market.timezone || "America/Los_Angeles");
   const [f, setF] = useState(() =>
     editing
       ? { ...draftOf(editing), ...(startByHand ? { schedule: "manual" as Schedule } : {}) }
@@ -121,6 +134,7 @@ export function ListSource({
   );
   // A241: the schedule entered by hand; from a page with no event data, where it was checked is that page.
   const [m, setM] = useState<ManualDraft>(() => manualDraftOf(editing, startByHand ? (editing?.calendarUrl ?? "") : ""));
+  const [sh, setSh] = useState<SheetDraft>(() => sheetDraftOf(editing));
   // A lead's stream has no permission yet: "Not yet" until someone records it.
   const [d, setD] = useState<EvidenceDraft>(() => emptyEvidence(editing?.embedTerms ?? "allowed", prefill.creatorId ? "not_yet" : "permission"));
   const [nothing, setNothing] = useState(false);
@@ -140,11 +154,16 @@ export function ListSource({
   const saveChange = async (s: ListedSource) => {
     const was = draftOf(s);
     const feedish = f.schedule === "feed" || f.schedule === "guide";
+    // A248: a new file is uploaded after the rest is saved, with its zone (the change leaves the schedule to it).
+    const wasSheet = sheetDraftOf(s);
+    const newFile = f.schedule === "sheet" && sh.from === "file" ? sh.file : null;
+    const sheetChanged = f.schedule === "sheet" && (was.schedule !== "sheet" || sh.from !== wasSheet.from || (sh.from === "link" && sh.url.trim() !== wasSheet.url) || sh.timeZone !== wasSheet.timeZone);
     const scheduleChanged =
-      f.schedule !== was.schedule ||
+      (f.schedule !== was.schedule && !newFile) ||
       (feedish && (f.calendarUrl.trim() !== was.calendarUrl || f.format !== was.format)) ||
       (f.schedule === "guide" && (f.checkedAgainst.trim() !== was.checkedAgainst || f.checkedOn.trim() !== was.checkedOn)) ||
-      (f.schedule === "manual" && manualChanged(m, s));
+      (f.schedule === "manual" && manualChanged(m, s)) ||
+      (sheetChanged && !newFile);
     const body = {
       ...(f.name.trim() !== was.name ? { name: f.name.trim() } : {}),
       ...(f.description.trim() !== was.description ? { description: f.description.trim() || null } : {}),
@@ -157,10 +176,11 @@ export function ListSource({
       // A229: sharing X.1's call sign, or leaving it with a call sign of its own.
       ...(sharing ? (was.sameBrand && f.channel.trim() === was.channel ? {} : { shareCallSign: true }) : f.callSign !== was.callSign ? { callSign: f.callSign, ...(was.sameBrand ? { shareCallSign: false } : {}) } : {})
     };
-    setNothing(!Object.keys(body).length);
-    if (!Object.keys(body).length) return;
+    setNothing(!Object.keys(body).length && !newFile);
+    if (!Object.keys(body).length && !newFile) return;
     try {
-      const saved = await update.mutateAsync({ params: { sourceId: s.id }, body });
+      let saved = Object.keys(body).length ? await update.mutateAsync({ params: { sourceId: s.id }, body }) : s;
+      if (newFile) saved = await uploadFile(s.id, newFile);
       const ch = channelText(saved);
       toast.show({ message: saved.onDial ? `${saved.name} is saved${ch ? `. It's on the dial at ${saved.station.channel}` : ""}.` : `Saved. ${saved.name} goes on the dial once ${onceWords(saved)}.` });
       onSaved?.(saved);
@@ -170,11 +190,23 @@ export function ListSource({
     }
   };
 
+  /** A248: the spreadsheet file uploaded to a listing, with its zone and tab; a refusal goes under the file. */
+  const uploadFile = async (sourceId: string, file: File) => {
+    try {
+      return await uploadSheet.mutateAsync({ params: { sourceId }, body: { file, ...(sh.timeZone ? { timeZone: sh.timeZone } : {}), ...(sh.tab ? { sheet: sh.tab } : {}) } });
+    } catch (err) {
+      setErrors((e) => ({ ...e, sheetFile: errorText(err) }));
+      throw err;
+    }
+  };
+
   /** A241: what's on, as the API takes it (`calendarFormat` null works it out; undefined leaves it unsaid). */
   const scheduleInput = (calendarFormat: ScheduleFormat | null | undefined): ListedScheduleInput => {
     const format = calendarFormat === undefined ? {} : { calendarFormat };
     if (f.schedule === "none") return { source: "none" };
     if (f.schedule === "manual") return manualInput(m);
+    // A248: a spreadsheet's link is a feed in the format `sheet`; an uploaded one keeps its file.
+    if (f.schedule === "sheet") return sh.from === "link" ? { source: "feed", calendarUrl: sh.url.trim(), calendarFormat: "sheet", timeZone: sh.timeZone || null } : { source: "file", timeZone: sh.timeZone || null };
     if (f.schedule === "feed") return { source: "feed", calendarUrl: f.calendarUrl.trim(), ...format };
     return { source: "guide_data", calendarUrl: f.calendarUrl.trim(), ...format, guideData: { checkedAgainst: f.checkedAgainst.trim(), checkedOn: f.checkedOn.trim() } };
   };
@@ -191,6 +223,7 @@ export function ListSource({
     if (!isLink(f.streamUrl)) errs.streamUrl = f.plays === "embed" ? "Paste the address of their player." : "Paste the stream's address.";
     if ((f.schedule === "feed" || f.schedule === "guide") && !isLink(f.calendarUrl)) errs.calendarUrl = f.schedule === "feed" ? "Paste the link to their calendar, feed or schedule page." : "Paste the guide data's address.";
     if (f.schedule === "manual") Object.assign(errs, manualProblems(m));
+    if (f.schedule === "sheet") Object.assign(errs, sheetProblems(sh, editing));
     if (f.schedule === "guide") {
       if (!isLink(f.checkedAgainst)) errs.checkedAgainst = "Paste the link to their published schedule.";
       if (!isDate(f.checkedOn)) errs.checkedOn = "The day you checked it.";
@@ -212,13 +245,24 @@ export function ListSource({
           streamUrl: f.streamUrl.trim(),
           plays: f.plays,
           embedTerms: f.plays === "embed" ? d.embedTerms : undefined,
-          // A241: what's on in one shape (a feed, guide data, by hand); none says nothing.
-          schedule: f.schedule === "none" ? undefined : scheduleInput(f.format || undefined),
+          // A241: what's on in one shape (a feed, guide data, by hand); none says nothing. A248: a
+          // spreadsheet file is uploaded once it's listed.
+          schedule: f.schedule === "none" || (f.schedule === "sheet" && sh.from === "file") ? undefined : scheduleInput(f.format || undefined),
           evidence: evidenceInput(f.plays, d),
           creatorId: prefill.creatorId,
           outsideMarket: f.outsideMarket || undefined
         }
       });
+      // A248: then its spreadsheet file; listed either way, and a file it can't read says why.
+      if (f.schedule === "sheet" && sh.from === "file" && sh.file) {
+        try {
+          await uploadFile(saved.id, sh.file);
+        } catch (err) {
+          toast.show({ message: `${name} is listed, but its spreadsheet wasn't read: ${errorText(err)} Upload it again from its details.` });
+          onClose();
+          return;
+        }
+      }
       toast.show({ message: saved.onDial ? `${name} is on the dial at ${f.channel.trim()}.` : `${name} is saved. It goes on the dial once ${onceWords(saved)}.` });
       onClose();
     } catch (err) {
@@ -226,7 +270,7 @@ export function ListSource({
     }
   };
 
-  const pending = add.isPending || update.isPending;
+  const pending = add.isPending || update.isPending || uploadSheet.isPending;
   const failed = editing ? update.error : add.error;
   return (
     <Modal
@@ -343,6 +387,7 @@ export function ListSource({
             onChange={(v) => set("schedule")(v)}
             options={[
               { value: "feed", label: "Its feed" },
+              { value: "sheet", label: "A spreadsheet" },
               { value: "manual", label: "Enter it by hand" },
               { value: "none", label: "None" }
             ]}
@@ -390,6 +435,21 @@ export function ListSource({
               </div>
             )}
           </>
+        )}
+        {f.schedule === "sheet" && (
+          <SheetScheduleFields
+            value={sh}
+            onChange={(next) => {
+              setSh(next);
+              setNothing(false);
+              setErrors(({ sheetUrl: _u, sheetFile: _f, ...rest }) => rest);
+            }}
+            // The API's refusal of the link's address shows under it.
+            errors={{ ...errors, sheetUrl: errors.sheetUrl ?? errors["schedule.calendarUrl"] ?? errors.calendarUrl ?? "" }}
+            market={market}
+            editing={editing}
+            today={today}
+          />
         )}
         {f.schedule === "manual" && (
           <ManualScheduleFields

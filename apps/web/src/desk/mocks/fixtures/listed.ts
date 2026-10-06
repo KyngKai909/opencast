@@ -5,10 +5,12 @@
 // stream link with checked guide data), the school district whose terms are unclear, and Inland
 // Community TV, a channel from an IPTV list waiting for its permission. A241 (2026-10-01): Loma
 // Linda's schedule entered by hand (checked against its published program grid), and the county
-// library's read from its events page's own event data.
+// library's read from its events page's own event data. A248 (2026-10-06): Attic Channel on 36.1, a
+// volunteer channel whose schedule is a published Google Sheet (mocks/sheets.ts).
 // Times are the mock clock's: Saturday, September 26, 8:42:12 pm in the Inland Empire.
 
-import type { CreatorStage, ExternalOutage, ListedChange, ManualSlot, ScheduleFormat, StreamPermission } from "@opencast/contracts";
+import type { CreatorStage, ExternalOutage, ListedChange, ManualSlot, ScheduleFormat, SheetFile, SheetRead, StreamPermission } from "@opencast/contracts";
+import { ATTIC_SHEET, atticRead } from "../sheets";
 import { CREATOR_IDS, ICTV_STREAM } from "./creators";
 import { U } from "./ids";
 import { STATION_IDS } from "./stations";
@@ -21,7 +23,7 @@ export interface DbListed {
   streamUrl: string;
   embedTerms: "allowed" | "unclear";
   calendarUrl: string | null;
-  calendarSync: "synced" | "calendar_not_found" | "not_set" | "no_event_data";
+  calendarSync: "synced" | "calendar_not_found" | "not_set" | "no_event_data" | "not_public";
   lastSyncedAt: string | null;
   upcoming: number;
   plays: "embed" | "stream_link";
@@ -33,12 +35,16 @@ export interface DbListed {
   note: string | null;
   /** A241: `manual`, a weekly schedule entered by hand (`slots`, `skipDates`); `webpage`, a page's event data. */
   schedule: {
-    source: "feed" | "guide_data" | "manual" | "none";
+    source: "feed" | "guide_data" | "manual" | "file" | "none";
     format: ScheduleFormat | null;
     checkedAgainst: string | null;
     checkedOn: string | null;
     slots?: ManualSlot[];
     skipDates?: string[];
+    /** A248: the listing's own time zone for it; what was read from its spreadsheet; an uploaded file. */
+    timeZone?: string | null;
+    sheet?: SheetRead | null;
+    file?: SheetFile | null;
   };
   /** The source is outside its market (waits unless Settings allows other markets' streams). */
   outsideMarket: boolean;
@@ -65,7 +71,7 @@ export interface DbListed {
 }
 
 /** The ids of the seed's listings, by call sign. */
-export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706), LOMA: U(797), RIVC: U(751), RIVC_LIB: U(753) };
+export const LISTED_IDS = { RDLS: U(701), COLT: U(702), SBCO: U(703), RUSD: U(704), NASA: U(705), ICTV: U(706), LOMA: U(797), RIVC: U(751), RIVC_LIB: U(753), ATIC: U(736) };
 
 /** The last minute's check, just before the mock clock's 8:42:12 pm. */
 const CHECKED = "2026-09-27T03:42:00.000Z";
@@ -170,6 +176,14 @@ export function seedListed(): DbListed[] {
       calendarUrl: "https://riverside.example.gov/library/events", calendarSync: "synced", lastSyncedAt: "2026-09-27T03:00:00.000Z", upcoming: 4,
       schedule: { source: "feed", format: "webpage", checkedAgainst: null, checkedOn: null },
       health: { state: "up", since: "2026-09-20T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
+    }),
+    // A248: a volunteer channel's schedule, a week grid in a published Google Sheet (times in Eastern).
+    listing({
+      id: LISTED_IDS.ATIC, stationId: STATION_IDS.ATIC, name: "Attic Channel", description: "Cartoons, sketch comedy and late films, run by volunteers", plays: "stream_link",
+      streamUrl: "https://attic.example.org/live/index.m3u8", embedTerms: "unclear", publicBasis: "Non-profit channel, stream published for the public",
+      calendarUrl: ATTIC_SHEET, calendarSync: "synced", lastSyncedAt: "2026-09-27T03:00:00.000Z", upcoming: 31,
+      schedule: { source: "feed", format: "sheet", checkedAgainst: null, checkedOn: null, timeZone: null, sheet: atticRead(ATTIC_SHEET, null, new Date("2026-09-27T03:00:00.000Z")) },
+      health: { state: "up", since: "2026-09-25T17:00:00.000Z", lastCheckedAt: CHECKED, detail: null }
     })
   ];
 }

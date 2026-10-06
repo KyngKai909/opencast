@@ -125,8 +125,8 @@ test("next and previous are there for screen readers, named for where they go", 
   await seed(page);
   await page.goto("/watch/beat");
   await expect(page.locator(".oc-player").first()).toHaveAttribute("data-status", "playing");
-  // From preset 1 the previous wraps to the dial's last.
-  await expect(page.getByRole("button", { name: "Previous channel: PREP 31.1" })).toHaveCount(1);
+  // From preset 1 the previous wraps to the dial's last (A248's Attic Channel on 36.1).
+  await expect(page.getByRole("button", { name: "Previous channel: ATIC 36.1" })).toHaveCount(1);
   const next = page.getByRole("button", { name: "Next channel: SAZN 18.1" });
   await next.focus();
   await expect(next).toBeVisible();
@@ -146,7 +146,7 @@ test("the Tune pad: 18 is SAZN 18.1 with what's on, 45 has no station and names 
   await pad.getByRole("button", { name: "4", exact: true }).click();
   await pad.getByRole("button", { name: "5", exact: true }).click();
   await expect(pad).toContainText("No station on 45.1");
-  await expect(pad).toContainText("Nearest is PREP 31.1.");
+  await expect(pad).toContainText("Nearest is ATIC 36.1.");
   await expect(pad.getByRole("button", { name: "Tune", exact: true })).toBeDisabled();
   await pad.getByRole("button", { name: "Delete" }).click();
   await pad.getByRole("button", { name: "Delete" }).click();
