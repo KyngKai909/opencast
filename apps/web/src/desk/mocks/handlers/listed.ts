@@ -17,6 +17,10 @@
 // A248: spreadsheets (../sheets.ts). A Google Sheet's link, or a .csv, .tsv, .xlsx or .ods link,
 // answers a canned week grid (a shared link with "private" in its id isn't public); an uploaded
 // file answers a canned weekday sheet. Never fetched, never opened.
+//
+// A249: an XMLTV guide's address (an .xml.gz file, or i.mjh.nz's) answers a canned read of one
+// channel of a 427-channel guide (../guides.ts); without #channel= it has none picked. "Find this
+// channel's guide" answers a canned extract of iptv-org's lists.
 
 import { http, type HttpHandler } from "msw";
 import {
@@ -42,6 +46,7 @@ import type { DbStation } from "../fixtures/stations";
 import { advanceHealth, publishExternalOff } from "../external";
 import { isAdminNow } from "../settingsDb";
 import { isIptvOrgAddress, parseIptvList, SAMPLE_LIST } from "../iptv";
+import { foundGuides, goneFromGuide, guideAirings, guideChannel, guideRead, isGuideAddress, notInGuide, PICK_CHANNEL } from "../guides";
 import { atticAirings, atticRead, isSheetLink, kindOfFile, NO_SHOWS, NOT_PUBLIC, notPublicLink, weeklyAirings, weeklyFileRead } from "../sheets";
 import { bodyOf, fail, needsAdmin, needsDesk, path, reply } from "../respond";
 import { valueAt } from "../settingsDb";
@@ -124,7 +129,9 @@ export function listedView(l: DbListed): ListedSource | null {
       // A248: its own time zone, what was read from its spreadsheet, the file uploaded.
       timeZone: l.schedule.timeZone ?? null,
       sheet: l.schedule.format === "sheet" || l.schedule.source === "file" ? (l.schedule.sheet ?? null) : null,
-      file: l.schedule.source === "file" ? (l.schedule.file ?? null) : null
+      file: l.schedule.source === "file" ? (l.schedule.file ?? null) : null,
+      // A249: what was read from its XMLTV guide.
+      guide: l.schedule.format === "xmltv" ? (l.schedule.guide ?? null) : null
     },
     onDial: !l.removed && waiting === null,
     waiting,
@@ -244,6 +251,24 @@ function sync(l: DbListed) {
     return;
   }
   if (!l.calendarUrl) return;
+  // A249: a guide: its channel's canned read, or none picked, or a channel the file no longer has.
+  if (isGuideAddress(l.calendarUrl)) {
+    l.schedule.format = "xmltv";
+    if (!guideChannel(l.calendarUrl)) {
+      l.calendarSync = "pick_channel";
+      l.schedule.guide = { ...guideRead(l.calendarUrl, now()), programmes: 0 };
+      return;
+    }
+    if (goneFromGuide(l.calendarUrl)) {
+      l.calendarSync = "not_in_guide";
+      return;
+    }
+    l.schedule.guide = guideRead(l.calendarUrl, now());
+    l.calendarSync = "synced";
+    l.lastSyncedAt = now().toISOString();
+    l.upcoming = guideAirings(now()).length;
+    return;
+  }
   if (l.schedule.format === "webpage") {
     // A241: a page whose address says "event" has event data; any other has none (not an error).
     l.lastSyncedAt = now().toISOString();
@@ -859,6 +884,13 @@ export const listedHandlers: HttpHandler[] = [
       const airings = weeklyAirings(now(), read.timeZone);
       return reply(networkApi.previewListedSchedule.response, { format: "sheet", sheet: read, upcoming: 28, airings, timeZone: read.timeZone });
     }
+    // A249: a guide: its channel's canned read; none picked, or one the file no longer has, refused.
+    if (isGuideAddress(url!)) {
+      if (!guideChannel(url!)) return fail(422, "pick_channel", PICK_CHANNEL);
+      if (goneFromGuide(url!)) return fail(422, "not_in_guide", notInGuide(guideChannel(url!)!));
+      const airings = guideAirings(now());
+      return reply(networkApi.previewListedSchedule.response, { format: "xmltv", sheet: null, upcoming: airings.length, airings: airings.slice(0, 8), timeZone: timeZone ?? market, guide: guideRead(url!, now()) });
+    }
     if (!isSheetLink(url!)) {
       // Any other address: as a feed is, canned (the mock never fetches).
       return reply(networkApi.previewListedSchedule.response, { format: formatOf(url!, false) ?? "ical", sheet: null, upcoming: 0, airings: [], timeZone: timeZone ?? market });
@@ -867,6 +899,17 @@ export const listedHandlers: HttpHandler[] = [
     // The canned week's airings, as Eastern times (a zone chosen only changes what's said).
     const read = atticRead(url!, timeZone, now());
     return reply(networkApi.previewListedSchedule.response, { format: "sheet", sheet: read, upcoming: 31, airings: atticAirings(now()), timeZone: read.timeZone });
+  }),
+
+  // ---- A249 (2026-10-06): "Find this channel's guide" ----
+
+  http.post(path(networkApi.findListedGuides), async ({ request }) => {
+    const p = needsAdmin(request);
+    if (p instanceof Response) return p;
+    const parsed = networkApi.findListedGuides.body.safeParse(await bodyOf(request));
+    if (!parsed.success) return fail(400, "invalid", "Give the channel's name.", { name: "Required" });
+    // The mock never fetches: a canned extract of iptv-org's lists, by name.
+    return reply(networkApi.findListedGuides.response, foundGuides(parsed.data.name));
   }),
 
   http.post(path(networkApi.uploadListedSchedule), async ({ request, params }) => {

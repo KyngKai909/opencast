@@ -323,6 +323,65 @@ test("External sources: a schedule from a spreadsheet (A248)", async ({ page }) 
   await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Couch Club/ })).toContainText("Their spreadsheet");
 });
 
+// A249: Anime x HIDIVE, a free channel whose lineup is in a platform's public guide. "Find this
+// channel's guide" looks its name up in iptv-org's lists (canned on the mocks): the guide files
+// Opencast can read, one checked (its channel, of how many, the first airings), then used as guide
+// data, checked against their published schedule, and listed with what was read.
+test("External sources: find a channel's guide (A249)", async ({ page }) => {
+  await signedInAsAdmin(page);
+  await page.goto(`${IE}/listed`);
+  await page.getByRole("button", { name: "List a source" }).click();
+  const add = page.getByRole("dialog", { name: "List a source" });
+  // Without a name, there's nothing to look up.
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  await expect(add.getByRole("alert")).toContainText("Fill in whose stream first");
+  await add.getByLabel("Whose stream").fill("Anime x HIDIVE");
+  await add.getByLabel("Channel").fill("43.1");
+  await add.getByLabel("Call sign").fill("HIDV");
+  await add.getByRole("radio", { name: "Stream link" }).click();
+  await add.getByLabel("Stream address").fill("https://fast.example.org/hidive/index.m3u8");
+  await add.getByRole("radio", { name: "Clearly public" }).click();
+  await add.getByLabel("The basis").fill("Free channel, stream published for the public");
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  const found = add.getByRole("region", { name: "Guides found" });
+  const files = found.getByRole("list", { name: "Guide files" });
+  await expect(files.getByRole("listitem", { name: /via i\.mjh\.nz$/ })).toHaveCount(3);
+  await expect(files.getByRole("listitem").first()).toContainText("Pluto TV (US), via i.mjh.nz");
+  await expect(found).toContainText("3 more guides need a site's pages read, so they aren't offered.");
+  await settled(page);
+  await checkA11y(page, "desk List a source, guides found");
+  await found.getByRole("button", { name: "Check Pluto TV (US), via i.mjh.nz" }).click();
+  const read = found.getByRole("region", { name: "What was read" });
+  await expect(read).toContainText("Read 32 airings to come for ANIME x HIDIVE, one of 427 channels in the guide.");
+  await expect(read).toContainText("965 KB as it downloads (gzipped), 7.4 MB unzipped");
+  await expect(read.getByRole("list", { name: "The first airings" }).getByRole("listitem")).toHaveCount(8);
+  await expect(read.getByRole("list", { name: "The first airings" }).getByRole("listitem").first()).toContainText("Golden Time");
+  await settled(page);
+  await checkA11y(page, "desk List a source, a guide checked");
+  await found.getByRole("button", { name: "Use Pluto TV (US), via i.mjh.nz" }).click();
+  await expect(add.getByLabel("Guide data address")).toHaveValue("https://i.mjh.nz/PlutoTV/us.xml.gz#channel=6793eaa4bc03978b9bc63db1");
+  await expect(add.getByLabel("Format")).toHaveValue("xmltv");
+  await expect(add.getByRole("checkbox", { name: "It's guide data, checked against their published schedule" })).toBeChecked();
+  await expect(found.getByRole("button", { name: "Pluto TV (US), via i.mjh.nz is in use" })).toBeDisabled();
+  await add.getByRole("textbox", { name: "Checked against" }).fill("https://pluto.tv/us/live-tv/6793eaa4bc03978b9bc63db1");
+  await add.getByLabel("Date checked").fill("2026-09-26");
+  await add.getByRole("button", { name: "List it" }).click();
+  await expect(page.getByText("Anime x HIDIVE is on the dial at 43.1.")).toBeVisible();
+  await expect(page.getByRole("grid", { name: "External sources" }).getByRole("row", { name: /^Anime x HIDIVE/ })).toContainText("Guide data");
+  await page.getByText("Anime x HIDIVE").first().click();
+  const details = page.getByRole("dialog", { name: "Anime x HIDIVE" });
+  await expect(details).toContainText("ANIME x HIDIVE (6793eaa4bc03978b9bc63db1), one of 427 channels");
+  await expect(details).toContainText("Read every hour (every 30 minutes at most while it runs out), asking first whether it changed.");
+  await details.getByRole("button", { name: "Close" }).last().click();
+
+  // A channel the list names but the file no longer has: said, and not offered as one to use.
+  await page.getByRole("button", { name: "List a source" }).click();
+  await add.getByLabel("Whose stream").fill("WeatherNation");
+  await add.getByRole("button", { name: "Find this channel's guide" }).click();
+  await expect(found).toContainText("Not in the guide right now");
+  await expect(found.getByRole("button", { name: "Use Samsung TV Plus (US), via i.mjh.nz" })).toBeDisabled();
+});
+
 // desk-catalog 01 and 03 (follow-up Phase 0, item 10): the shelf as drawn, then an item added from
 // the catalog station's library, its checklist answered with evidence and sent by Dee, and the
 // second check done by Rae, a rights reviewer: never the first checker.

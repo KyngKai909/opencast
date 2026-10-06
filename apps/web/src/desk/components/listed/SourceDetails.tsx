@@ -16,6 +16,7 @@ import { deskPath } from "../../../areas";
 import { useNow } from "../../../lib/clock";
 import { dateAtTime, dayMonth, localDate } from "../../lib/dates";
 import { ErrorLine } from "../../pages/common";
+import { channelWords, guideCadence, guideProblem, guideSize, guideSummary } from "./guides";
 import { browserNote, changeWords, familyLine, FORMAT_LABELS, nativeOnlyNote, NO_EVENT_DATA, needsEvidence, nowWords, outageWords, PLAYS_LABELS, playsDetail, playsOf, removedWords, scheduleWords, shortDate, sourceDetail, transportLine } from "./external";
 import { weekLines } from "./manual";
 import { datesPassed, fileWords, NOT_PUBLIC_HELP, sheetSummary, skippedWords, tabWords, ZONE_FROM_WORDS, zoneShort, zonesNamedWords } from "./sheets";
@@ -133,6 +134,13 @@ function scheduleRows(s: ListedSource, tz: string, now: Date): KeyValueRow[] {
     rows.push({ title: sc?.source === "guide_data" ? "Guide data address" : sc?.format === "webpage" ? "Schedule page" : sc?.format === "sheet" ? "Spreadsheet link" : "Feed address", detail: <Link href={s.calendarUrl} /> });
     if (sc?.format && sc.format !== "sheet") rows.push({ title: "Format", detail: FORMAT_LABELS[sc.format] });
   }
+  // A249: what was read from its XMLTV guide: the channel, of how many, its size, how often.
+  const g = sc?.guide;
+  if (g && s.calendarUrl) {
+    if (g.channel) rows.push({ title: "Channel in the guide", detail: `${channelWords(g)}${g.channels > 1 ? `, one of ${g.channels.toLocaleString("en-US")} channels` : ""}` });
+    rows.push({ title: "What was read", detail: `${g.channel ? `${guideSummary(g)}. ` : ""}${guideSize(g)}. Last read ${dateAtTime(g.readAt, tz)}${g.unchangedAt ? `; not changed since, at ${dateAtTime(g.unchangedAt, tz)}` : ""}` });
+    rows.push({ title: "How often", detail: guideCadence(g) });
+  }
   return rows;
 }
 
@@ -242,6 +250,7 @@ export function SourceDetails({
             This Google Sheet isn't public, so it can't be read: what it listed before stays. {NOT_PUBLIC_HELP.replace("check it again", "it's read again within the hour")}
           </p>
         )}
+        {guideProblem(s) && !gone && <p className="nd-src__note">{guideProblem(s)}</p>}
         {s.calendarSync === "no_event_data" && s.schedule?.source !== "manual" && !gone && (
           <p className="nd-src__note">
             {NO_EVENT_DATA}{" "}

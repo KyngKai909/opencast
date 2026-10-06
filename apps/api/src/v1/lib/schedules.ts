@@ -14,6 +14,7 @@
 import { parseIcs, type CalendarEvent } from "./ics.js";
 import { parseJsonLdEvents } from "./jsonLd.js";
 import { isSheetAddress, kindFromType } from "./sheetFiles.js";
+import { readXmltvText } from "./guideStream.js";
 
 export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv" | "webpage" | "sheet";
 
@@ -50,7 +51,7 @@ export function detectScheduleFormat(url: string, contentType: string | null, te
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 
 /** Text inside an element, with CDATA unwrapped and entities decoded. */
-function textOf(xml: string): string {
+export function textOf(xml: string): string {
   const cdata = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(xml);
   const raw = cdata ? cdata[1] : xml.replace(/<[^>]+>/g, "");
   return raw
@@ -65,7 +66,7 @@ function textOf(xml: string): string {
     .trim();
 }
 
-function element(block: string, names: string[]): string | null {
+export function element(block: string, names: string[]): string | null {
   for (const name of names) {
     const found = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i").exec(block);
     if (found) return textOf(found[1]);
@@ -137,13 +138,13 @@ export interface ChannelHints {
 }
 
 /** Lowercase letters and digits only: "Whiplash II" and "whiplashii" are the same. */
-const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+export const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /**
  * The stream address's folders, nearest the file first: `…/whiplash-biwi/tracks-v1a1/mono.m3u8` →
  * "tracks-v1a1", "whiplash-biwi" (a player's own folders can sit under the channel's).
  */
-function streamFolders(url: string | null | undefined): string[] {
+export function streamFolders(url: string | null | undefined): string[] {
   if (!url) return [];
   try {
     return new URL(url).pathname.split("/").slice(1, -1).reverse().map((p) => decodeURIComponent(p));
@@ -153,7 +154,7 @@ function streamFolders(url: string | null | undefined): string[] {
 }
 
 /** Words a station's name adds that a feed's key leaves off: "Biwi Channel" → "Biwi" (2026-10-04). */
-const NAME_EXTRAS = /(\s+(channel|tv|television|network|live|hd))+$/i;
+export const NAME_EXTRAS = /(\s+(channel|tv|television|network|live|hd))+$/i;
 
 /**
  * 2026-10-03: the station's channel in a feed keyed by channel. The fragment names it
@@ -223,7 +224,7 @@ function parseJson(text: string, fragment: string | null, hints: ChannelHints): 
 }
 
 /** XMLTV's time: `20260926190000 -0700` (the offset optional: UTC). */
-function xmltvDate(value: string | null): Date | null {
+export function xmltvDate(value: string | null): Date | null {
   const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4})?/.exec(value?.trim() ?? "");
   if (!m) return null;
   const [, y, mo, d, h, mi, s = "00", off] = m;
@@ -234,23 +235,25 @@ function xmltvDate(value: string | null): Date | null {
   return new Date(utc - minutes * 60_000);
 }
 
-function parseXmltv(text: string, channel: string | null): CalendarEvent[] {
-  const events: CalendarEvent[] = [];
-  for (const [, attrs, block] of text.matchAll(/<programme\s([^>]*)>([\s\S]*?)<\/programme>/gi)) {
-    const attr = (name: string) => new RegExp(`\\b${name}="([^"]*)"`, "i").exec(attrs)?.[1] ?? null;
-    if (channel && attr("channel") !== channel) continue;
-    const summary = element(block, ["title"]);
-    const start = xmltvDate(attr("start"));
-    if (!summary || !start) continue;
-    const end = xmltvDate(attr("stop"));
-    events.push({ uid: `${attr("channel") ?? ""}@${attr("start")}`, summary, start, end: end && end > start ? end : null });
-  }
-  return events;
+/** An attribute's value in a start tag's attributes (either quote), as written. */
+export function xmlAttr(attrs: string, name: string): string | null {
+  const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, "i").exec(attrs);
+  return m ? (m[1] ?? m[2] ?? null) : null;
+}
+
+/** One XMLTV programme (its start tag's attributes, and what's inside it) as an event: its title, start and stop. */
+export function xmltvProgramme(attrs: string, block: string): CalendarEvent | null {
+  const summary = element(block, ["title"]);
+  const start = xmltvDate(xmlAttr(attrs, "start"));
+  if (!summary || !start) return null;
+  const end = xmltvDate(xmlAttr(attrs, "stop"));
+  return { uid: `${xmlAttr(attrs, "channel") ?? ""}@${xmlAttr(attrs, "start")}`, summary, start, end: end && end > start ? end : null };
 }
 
 /**
  * The feed's events. An XMLTV file with several channels is read for the one the address's
- * fragment names (`…/guide.xml#channel=NASA.us`); without one, every programme in it. A241: a
+ * fragment names (`…/guide.xml#channel=NASA.us`); without one (A249), the one the listing's name or
+ * stream names exactly, or none (`readXmltvText`: a guide of one channel is read whole). A241: a
  * webpage's event data, a start without an offset read in `timeZone` (the market's). 2026-10-03:
  * a JSON feed keyed by channel is read for the fragment's channel too, else the one `hints` (the
  * listing's name and stream address) point to.
@@ -261,6 +264,7 @@ export function parseSchedule(text: string, format: Exclude<ScheduleFormat, "she
   if (format === "ical") return parseIcs(text);
   if (format === "webpage") return parseJsonLdEvents(text, timeZone);
   if (format === "json") return parseJson(text, fragment, hints);
-  if (format === "xmltv") return parseXmltv(text, fragment);
+  // A249: XMLTV is read by lib/guideStream.ts, as it downloads; here, a guide already in hand.
+  if (format === "xmltv") return readXmltvText(text, fragment, hints);
   return parseRss(text);
 }

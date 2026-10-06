@@ -139,6 +139,10 @@ export function scheduleWords(s: ListedSource): { text: string; detail?: string;
   if (source === "file") return { text: "Their spreadsheet", detail: "Uploaded", tone: "ok" };
   if (s.calendarSync === "not_public") return { text: "Sheet isn't public", detail: "Publish it, or share it with anyone with the link", tone: "warn" };
   if (s.calendarSync === "no_event_data" && s.schedule?.format === "sheet") return { text: "No times found in the sheet", detail: "Banner shows name and Live until it has some", tone: "warn" };
+  // A249: an XMLTV guide with no channel picked, without the one named, or past a limit.
+  if (s.calendarSync === "pick_channel") return { text: "Guide needs a channel", detail: "Pick one: Find this channel's guide", tone: "warn" };
+  if (s.calendarSync === "not_in_guide") return { text: "Channel not in the guide", detail: "What it listed before stays", tone: "warn" };
+  if (s.calendarSync === "too_big") return { text: "Guide too big to read", detail: "What it listed before stays", tone: "warn" };
   if (s.calendarSync === "calendar_not_found") return { text: source === "guide_data" ? "Guide data not found" : "Calendar not found", detail: "Banner shows name and Live", tone: "warn" };
   // A241: the page answered, with nothing a computer can read; not an error.
   if (s.calendarSync === "no_event_data") return { text: "No schedule data on the page", detail: "Enter it by hand instead", tone: "warn" };

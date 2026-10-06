@@ -286,8 +286,10 @@ export const listedSources = network.table("listed_sources", {
   /**
    * A241 (2026-10-01): `no_event_data`, a webpage with no schedule data a computer can read. A248
    * (2026-10-06): `not_public`, a Google Sheet that isn't published or shared with anyone with the link.
+   * A249 (2026-10-06): `pick_channel` (an XMLTV guide of several channels, none named or matched),
+   * `not_in_guide` (the channel named isn't in it), `too_big` (a guide past a limit).
    */
-  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data", "not_public"] })
+  calendarSync: text("calendar_sync", { enum: ["synced", "calendar_not_found", "not_set", "no_event_data", "not_public", "pick_channel", "not_in_guide", "too_big"] })
     .notNull()
     .default("not_set"),
   listingState: text("listing_state", { enum: ["not_listed", "checking", "listed"] })
@@ -398,8 +400,38 @@ export const listedSources = network.table("listed_sources", {
    * isn't kept): its name, kind, size, who uploaded it and when, and its shows (`entries`), made into
    * airings at once and hourly. Null for every other source.
    */
-  sheetFile: jsonb("sheet_file").$type<SheetFileRow>()
+  sheetFile: jsonb("sheet_file").$type<SheetFileRow>(),
+  // ---- A249 (added 2026-10-06, migration 0053): large and compressed XMLTV guides ----
+  /**
+   * What was read from its XMLTV guide at the last read (the channel kept, the guide's channels and
+   * size), with the guide's `ETag` and `Last-Modified` from the last read that worked, sent back on
+   * the next so an unchanged guide isn't downloaded again. Null for every other schedule, and
+   * cleared when its schedule changes.
+   */
+  guideRead: jsonb("guide_read").$type<GuideReadRow>()
 });
+
+/**
+ * What was read from an XMLTV guide (A249), as `ListedSource.schedule.guide` shows it, plus the
+ * address it was read from (without its fragment) and the validators for asking again.
+ */
+export interface GuideReadRow {
+  /** The address read, without its `#channel=`: the validators are for it only. */
+  url: string;
+  etag: string | null;
+  lastModified: string | null;
+  channel: string | null;
+  channelName: string | null;
+  channels: number;
+  programmes: number;
+  compressedBytes: number;
+  bytes: number;
+  gzip: boolean;
+  large: boolean;
+  readAt: string;
+  unchangedAt: string | null;
+  limit: "compressed" | "bytes" | "programmes" | "time" | null;
+}
 
 /**
  * One show read from a spreadsheet (A248): on `date` (a dated sheet) or every `day` (a weekly one),

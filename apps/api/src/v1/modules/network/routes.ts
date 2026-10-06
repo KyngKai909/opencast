@@ -77,6 +77,8 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const sheetFile = { maxBytes: SHEET_FILE_MAX_BYTES, tooBig: SHEET_FILE_TOO_BIG };
   r.handle(api.previewListedSchedule, ({ body, file }) => network.previewListedSchedule(body, file), sheetFile);
   r.handle(api.uploadListedSchedule, ({ user, params, body, file }) => network.uploadListedSchedule(user, params.sourceId, body, file), sheetFile);
+  // A249 (added 2026-10-06): "Find this channel's guide", from iptv-org's public lists.
+  r.handle(api.findListedGuides, ({ body }) => network.findListedGuides(body));
 
   // External stations (added 2026-09-30, follow-up Phase 6).
   r.handle(api.recordListedEvidence, ({ user, params, body }) => network.recordListedEvidence(user, params.sourceId, body));

@@ -47,7 +47,7 @@ export function sheetProblems(d: SheetDraft, editing?: ListedSource): Record<str
 }
 
 /** "Fri Oct 9, 6:00 to 6:25 am" in the zone the sheet was read in. */
-function airingText(a: SchedulePreview["airings"][number], tz: string): string {
+export function airingText(a: SchedulePreview["airings"][number], tz: string): string {
   const day = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(new Date(a.startsAt));
   const when = a.endsAt ? clockRange(a.startsAt, a.endsAt, { timeZone: tz }) : clock(a.startsAt, { timeZone: tz });
   return `${day} ${dayMonth(a.startsAt, tz, { short: true })}, ${when}`;

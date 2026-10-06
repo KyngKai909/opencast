@@ -233,21 +233,22 @@ describe("what's on: a webpage, or by hand", () => {
   });
 });
 
+/** A multipart call, as the desk's client sends an upload (written out: jsdom's File doesn't go into a Request). */
+const form = async (path: string, fields: Record<string, string | { name: string; text: string }>, as = "dee") => {
+  const edge = "----oc-mock-form";
+  const parts = Object.entries(fields).map(([k, v]) =>
+    typeof v === "string" ? `--${edge}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n` : `--${edge}\r\nContent-Disposition: form-data; name="${k}"; filename="${v.name}"\r\nContent-Type: application/octet-stream\r\n\r\n${v.text}\r\n`
+  );
+  const req = new Request(`http://localhost/v1${path}`, {
+    method: "POST",
+    headers: { authorization: `Bearer mock-access-token:${WHO[as] ?? as}`, "content-type": `multipart/form-data; boundary=${edge}` },
+    body: `${parts.join("")}--${edge}--\r\n`
+  });
+  const res = await getResponse(handlers, req);
+  return { status: res!.status, json: await res!.json() };
+};
+
 describe("spreadsheets (A248)", () => {
-  /** A multipart call, as the desk's client sends an upload (written out: jsdom's File doesn't go into a Request). */
-  const form = async (path: string, fields: Record<string, string | { name: string; text: string }>, as = "dee") => {
-    const edge = "----oc-mock-form";
-    const parts = Object.entries(fields).map(([k, v]) =>
-      typeof v === "string" ? `--${edge}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n` : `--${edge}\r\nContent-Disposition: form-data; name="${k}"; filename="${v.name}"\r\nContent-Type: application/octet-stream\r\n\r\n${v.text}\r\n`
-    );
-    const req = new Request(`http://localhost/v1${path}`, {
-      method: "POST",
-      headers: { authorization: `Bearer mock-access-token:${WHO[as] ?? as}`, "content-type": `multipart/form-data; boundary=${edge}` },
-      body: `${parts.join("")}--${edge}--\r\n`
-    });
-    const res = await getResponse(handlers, req);
-    return { status: res!.status, json: await res!.json() };
-  };
   const SHEET = "https://docs.google.com/spreadsheets/d/e/2PACX-1vMadeUpWeek/pubhtml?gid=7";
   const csv = (name: string) => ({ name, text: "Mon,Tue\nNews 6pm,News 6pm\n" });
 
@@ -289,5 +290,45 @@ describe("spreadsheets (A248)", () => {
     const none = await api("PATCH", `/admin/listed-sources/${loma.id}`, { body: { schedule: { source: "none" } } });
     expect(none.json.schedule).toMatchObject({ source: "none", file: null, sheet: null });
     expect((await api("PATCH", `/admin/listed-sources/${loma.id}`, { body: { schedule: { source: "file" } } })).status).toBe(409);
+  });
+});
+
+describe("large guides (A249)", () => {
+  const PLUTO = "https://i.mjh.nz/PlutoTV/us.xml.gz#channel=6793eaa4bc03978b9bc63db1";
+
+  it("finds a channel's guide files (canned), the out-of-date one marked; admins only", async () => {
+    const found = await api("POST", "/admin/listed-sources/find-guide", { body: { name: "Anime x HIDIVE" } });
+    expect(found.status).toBe(200);
+    const body = networkApi.findListedGuides.response.parse(found.json);
+    expect(body.guides.map((g) => [g.label, g.via, g.url, g.inGuide])).toEqual([
+      ["Pluto TV (US)", "i.mjh.nz", PLUTO, true],
+      ["Plex (US)", "i.mjh.nz", "https://i.mjh.nz/Plex/us.xml.gz#channel=63dea56a2a2abb171ff6dadf", true],
+      ["Samsung TV Plus (US)", "i.mjh.nz", "https://i.mjh.nz/SamsungTVPlus/us.xml.gz#channel=US15000032I", true]
+    ]);
+    expect(body.skipped).toBe(3);
+    expect((await api("POST", "/admin/listed-sources/find-guide", { body: { name: "WeatherNation TV" } })).json.guides).toEqual([expect.objectContaining({ inGuide: false })]);
+    expect((await api("POST", "/admin/listed-sources/find-guide", { body: { name: "Nobody Here" } })).json).toEqual({ channels: [], guides: [], skipped: 0 });
+    expect((await api("POST", "/admin/listed-sources/find-guide", { body: { name: "Anime x HIDIVE" }, as: "other" })).status).toBe(403);
+  });
+
+  it("checks a guide (canned): its channel, of how many, and the first airings; none picked, or one gone, refused", async () => {
+    const ok = await form("/admin/listed-sources/schedule-preview", { calendarUrl: PLUTO, calendarFormat: "xmltv", marketId: IE });
+    expect(ok.status).toBe(200);
+    const preview = networkApi.previewListedSchedule.response.parse(ok.json);
+    expect(preview).toMatchObject({ format: "xmltv", upcoming: 32, guide: { channel: "6793eaa4bc03978b9bc63db1", channelName: "ANIME x HIDIVE", channels: 427, gzip: true } });
+    expect(preview.airings[0]).toEqual({ title: "Golden Time", startsAt: "2026-09-27T03:30:00.000Z", endsAt: "2026-09-27T04:00:00.000Z" });
+    expect((await form("/admin/listed-sources/schedule-preview", { calendarUrl: "https://i.mjh.nz/PlutoTV/us.xml.gz", marketId: IE })).json.error.code).toBe("pick_channel");
+    expect((await form("/admin/listed-sources/schedule-preview", { calendarUrl: "https://i.mjh.nz/SamsungTVPlus/us.xml.gz#channel=USBC1500009LD", marketId: IE })).json.error.code).toBe("not_in_guide");
+  });
+
+  it("reads a listing's guide as guide data, with what was read", async () => {
+    const nasa = await byName("NASA");
+    const res = await api("PATCH", `/admin/listed-sources/${nasa.id}`, {
+      body: { schedule: { source: "guide_data", calendarUrl: PLUTO, calendarFormat: "xmltv", guideData: { checkedAgainst: "https://pluto.tv/us/live-tv/6793eaa4bc03978b9bc63db1", checkedOn: "2026-09-26" } } }
+    });
+    expect(res.status).toBe(200);
+    expect(networkApi.updateListedSource.response.parse(res.json)).toMatchObject({ calendarSync: "synced", upcoming: 32, schedule: { source: "guide_data", format: "xmltv", guide: { channelName: "ANIME x HIDIVE", channels: 427 } } });
+    const none = await api("PATCH", `/admin/listed-sources/${nasa.id}`, { body: { schedule: { source: "feed", calendarUrl: "https://i.mjh.nz/PlutoTV/us.xml.gz" } } });
+    expect(none.json).toMatchObject({ calendarSync: "pick_channel", schedule: { guide: { channel: null } } });
   });
 });

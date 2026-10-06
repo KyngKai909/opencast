@@ -1,0 +1,15 @@
+/* A249: "Find this channel's guide": the button, then each guide file found with Check it and Use
+   this, and what a check read (the spreadsheet preview's look, SheetScheduleFields.css). */
+.nd-guide { display: grid; gap: 10px; }
+.nd-guide__find { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.nd-guide__note { margin: 0; }
+.nd-guide__found { display: grid; gap: 8px; }
+.nd-guide__head { margin: 0; font-size: 13px; color: var(--ink-70); }
+.nd-guide__list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.nd-guide__item { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--hair); border-radius: var(--r-control); }
+.nd-guide__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.nd-guide__what { display: grid; gap: 2px; min-width: 0; }
+.nd-guide__label { font-size: 14px; font-weight: 600; color: var(--ink); }
+.nd-guide__sub { font-size: 13px; color: var(--ink-70); overflow-wrap: anywhere; }
+.nd-guide__gone { color: var(--ink); font-weight: 600; }
+.nd-guide__acts { display: flex; gap: 8px; flex-wrap: wrap; }

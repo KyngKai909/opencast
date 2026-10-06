@@ -9,7 +9,7 @@
 // volunteer channel whose schedule is a published Google Sheet (mocks/sheets.ts).
 // Times are the mock clock's: Saturday, September 26, 8:42:12 pm in the Inland Empire.
 
-import type { CreatorStage, ExternalOutage, ListedChange, ManualSlot, ScheduleFormat, SheetFile, SheetRead, StreamPermission } from "@opencast/contracts";
+import type { CreatorStage, ExternalOutage, GuideRead, ListedChange, ManualSlot, ScheduleFormat, SheetFile, SheetRead, StreamPermission } from "@opencast/contracts";
 import { ATTIC_SHEET, atticRead } from "../sheets";
 import { CREATOR_IDS, ICTV_STREAM } from "./creators";
 import { U } from "./ids";
@@ -23,7 +23,7 @@ export interface DbListed {
   streamUrl: string;
   embedTerms: "allowed" | "unclear";
   calendarUrl: string | null;
-  calendarSync: "synced" | "calendar_not_found" | "not_set" | "no_event_data" | "not_public";
+  calendarSync: "synced" | "calendar_not_found" | "not_set" | "no_event_data" | "not_public" | "pick_channel" | "not_in_guide" | "too_big";
   lastSyncedAt: string | null;
   upcoming: number;
   plays: "embed" | "stream_link";
@@ -45,6 +45,8 @@ export interface DbListed {
     timeZone?: string | null;
     sheet?: SheetRead | null;
     file?: SheetFile | null;
+    /** A249: what was read from its XMLTV guide. */
+    guide?: GuideRead | null;
   };
   /** The source is outside its market (waits unless Settings allows other markets' streams). */
   outsideMarket: boolean;

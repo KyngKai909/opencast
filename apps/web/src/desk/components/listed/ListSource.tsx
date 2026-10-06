@@ -25,6 +25,10 @@
 // .tsv, .xlsx or .ods file's), saved as a feed in the format `sheet`, or a file uploaded once the
 // listing is saved (a new listing is listed first, then its file uploaded); its zone, worked out or
 // chosen; "Check it" first, to see what's read.
+//
+// A249 (2026-10-06): under Its feed, "Find this channel's guide" (FindGuide): the guide files
+// iptv-org's lists give for its name, each checked; "Use this" puts one's address in as guide data
+// in the format XMLTV, still checked against their published schedule (where and when).
 import { useState, type FormEvent } from "react";
 import { networkApi, ScheduleFormat, type ListedScheduleInput, type ListedSource, type Market } from "@opencast/contracts";
 import { Button, Checkbox, Field, Modal, Notice, Segmented, SelectField, TextAreaField, useToast } from "@opencast/ui";
@@ -37,6 +41,7 @@ import { changeWarning, familyCallSignChange, familyHeadFor, FORMAT_LABELS, NO_E
 import { manualChanged, manualDraftOf, manualInput, manualProblems, type ManualDraft } from "./manual";
 import { ManualScheduleFields } from "./ManualScheduleFields";
 import { sheetDraftOf, sheetProblems, SheetScheduleFields, type SheetDraft } from "./SheetScheduleFields";
+import { FindGuide } from "./FindGuide";
 import { localDate } from "../../lib/dates";
 import { useNow } from "../../../lib/clock";
 import { channelText } from "./SourceStatus";
@@ -404,6 +409,18 @@ export function ListSource({
               value={f.calendarUrl}
               onChange={(e) => set("calendarUrl")(e.target.value)}
               error={errors.calendarUrl}
+            />
+            <FindGuide
+              name={f.name}
+              sourceId={editing?.id}
+              creatorId={prefill.creatorId}
+              market={market}
+              used={f.calendarUrl}
+              // A249: someone else's listings for the channel: guide data, in the format XMLTV.
+              onUse={(o) => {
+                setF((x) => ({ ...x, calendarUrl: o.url, format: "xmltv", schedule: "guide" }));
+                setErrors(({ calendarUrl: _u, ...rest }) => rest);
+              }}
             />
             {editing?.calendarSync === "no_event_data" && f.calendarUrl.trim() === (editing.calendarUrl ?? "") && (
               <Notice tone="standby" icon="warn">
