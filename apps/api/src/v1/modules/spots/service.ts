@@ -854,7 +854,7 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       const businessId = await db.transaction(async (tx) => {
         const [row] = await tx
           .insert(AD)
-          .values({ name: input.name, category: input.category, about: input.about ?? null, website: input.website ?? null, customersWhere: input.customersWhere })
+          .values({ name: input.name, category: input.category, about: input.about ?? null, website: input.website ?? null, customersWhere: input.customersWhere, createdAt: deps.clock.now() })
           .returning();
         await services.accounts.addBusinessMember(tx, row.id, user.id, "owner");
         for (const location of input.locations) {
