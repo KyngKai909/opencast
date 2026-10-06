@@ -292,7 +292,7 @@ export const trustApi = {
     path: "/claims/:claimId/attachments",
     auth: "user",
     summary:
-      "B6: upload the permission or licence that backs an answer (owner, operator; a PDF, image or text file up to 20 MB). Returns the `attachmentUrl` `answerClaim` takes. 409 `not_open` once the claim is answered or closed; 422 `wrong_file_type`, `too_big`.",
+      "B6: upload the permission or licence that backs an answer (owner, operator; a PDF, image or text file up to 20 MB). Returns the `attachmentUrl` `answerClaim` takes. 409 `not_open` once the claim is answered or closed; 422 `wrong_file_type`; 413 `too_big` (over 20 MB, cut off as it's sent).",
     params: z.object({ claimId: Id }),
     multipart: true,
     body: z.object({}),

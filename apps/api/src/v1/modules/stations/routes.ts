@@ -3,6 +3,7 @@ import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest, HttpError, notFound } from "../../errors.js";
 import { clientIp, isPrivateAddress } from "../../geo.js";
+import { RELAY_BACKGROUND_MAX_BYTES, RELAY_BACKGROUND_TOO_BIG } from "./relayBackground.js";
 import type { StationProfile } from "./service.js";
 
 /** A246: a break rule's preview covers three hours at most (the tab asks for one). */
@@ -291,9 +292,10 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     await accounts.requireStation(user, params.stationId, [...staff]);
     return { background: await stations.getRelayBackground(params.stationId) };
   });
-  r.handle(api.setRelayBackground, async ({ user, params, file }) => {
-    await accounts.requireStation(user, params.stationId, [...staff]);
-    return stations.setRelayBackground(params.stationId, file);
+  r.handle(api.setRelayBackground, ({ params, file }) => stations.setRelayBackground(params.stationId, file), {
+    maxBytes: RELAY_BACKGROUND_MAX_BYTES,
+    tooBig: RELAY_BACKGROUND_TOO_BIG,
+    authorize: ({ user, params }) => accounts.requireStation(user, params.stationId, [...staff])
   });
   r.handle(api.removeRelayBackground, async ({ user, params }) => {
     await accounts.requireStation(user, params.stationId, [...staff]);

@@ -21,7 +21,8 @@ import { prepareBaseLoop, probeBackground, type BackgroundKind } from "../playou
 import { LADDER, scaledLadder } from "../playout/engine/ladder.js";
 
 const RB = schema.relayBackgrounds;
-const MAX_BYTES = 100 * 1024 ** 2;
+export const RELAY_BACKGROUND_MAX_BYTES = 100 * 1024 ** 2;
+export const RELAY_BACKGROUND_TOO_BIG = "Use a file of 100 MB or less.";
 const TYPES = /^(image\/(png|jpeg|webp|gif)|video\/(mp4|quicktime|webm|x-m4v))$/;
 const EXTENSIONS = /\.(png|jpe?g|webp|gif|mp4|m4v|mov|webm)$/i;
 
@@ -135,7 +136,7 @@ export function createRelayBackgrounds({ deps, services }: ModuleContext) {
       if (!file) throw badRequest("Choose an image, a GIF or a short video.", { file: "Required" });
       if ((await bandOf(stationId)) !== "radio") throw conflict("not_radio", "Backgrounds are for radio stations' relays. A TV station relays its own picture.");
       if (!TYPES.test(file.mimeType) && !EXTENSIONS.test(file.originalName)) throw refused("wrong_file_type", "Use a PNG, JPEG or WebP image, a GIF, or an MP4, MOV or WebM video.");
-      if (file.size > MAX_BYTES) throw refused("too_big", "Use a file of 100 MB or less.");
+      if (file.size > RELAY_BACKGROUND_MAX_BYTES) throw refused("too_big", RELAY_BACKGROUND_TOO_BIG);
       const probed = await probeBackground(file.path);
       if ("error" in probed) {
         if (probed.error === "too_long") throw refused("too_long", "Use a video of 30 seconds or less. It loops.");

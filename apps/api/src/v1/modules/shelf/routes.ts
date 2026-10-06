@@ -1,6 +1,7 @@
 import { catalogShelfApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
+import { EVIDENCE_MAX_BYTES, EVIDENCE_TOO_BIG } from "./service.js";
 
 export function shelfRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const { shelf } = services;
@@ -12,7 +13,12 @@ export function shelfRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.addItem, ({ user, params, body }) => shelf.addItem(user, params.seriesId, body));
   r.handle(api.getItem, ({ user, params }) => shelf.item(user, params.itemId));
   r.handle(api.setCheck, ({ user, params, body }) => shelf.setCheck(user, params.itemId, params.line, body));
-  r.handle(api.addEvidence, ({ user, params, file }) => shelf.addEvidence(user, params.itemId, params.line, file));
+  r.handle(api.addEvidence, ({ user, params, file }) => shelf.addEvidence(user, params.itemId, params.line, file), {
+    maxBytes: EVIDENCE_MAX_BYTES,
+    tooBig: EVIDENCE_TOO_BIG,
+    // Rights reviewers and admins (addEvidence checks it again).
+    authorize: ({ user }) => services.settings.requireDesk(user, "rights")
+  });
   r.handle(api.sendForSecondCheck, ({ user, params }) => shelf.send(user, params.itemId));
   r.handle(api.secondCheck, ({ user, params, body }) => shelf.secondCheck(user, params.itemId, body));
   r.handle(api.failItem, ({ user, params, body }) => shelf.fail(user, params.itemId, body.reason));
