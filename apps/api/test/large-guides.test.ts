@@ -109,6 +109,35 @@ describe("a guide read as it downloads (lib/guideStream.ts)", () => {
     expect(answer.format === "xmltv" && answer.guide).toMatchObject({ gzip: false, large: false });
   });
 
+  it("finds a channel given just before its own programmes, as Plex's, Samsung TV Plus's and Roku's guides lay them out (2026-10-06)", async () => {
+    const INTER = "https://guides.example.org/Interleaved/us.xml.gz";
+    const ch = (id: string, name: string) => `  <channel id="${id}"><display-name>${name}</display-name></channel>`;
+    const text = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      "<tv>",
+      ch("USBA370000104", "News 24/7"),
+      prog("USBA370000104", "2026-10-06T17:00:00Z", "2026-10-06T18:00:00Z", "Headlines"),
+      ch("USBC44000226R", "Cooking Now"),
+      prog("USBC44000226R", "2026-10-06T17:00:00Z", "2026-10-06T18:00:00Z", "Back to Back Chef"),
+      prog("USBC44000226R", "2026-10-06T18:00:00Z", "2026-10-06T19:00:00Z", "Pasta Night"),
+      ch("USBC1500009LD", "Weather Now"),
+      prog("USBC1500009LD", "2026-10-06T17:00:00Z", "2026-10-06T18:00:00Z", "Forecast"),
+      "</tv>"
+    ].join("\n");
+    const inter = network({ [INTER]: { body: () => gz(text) } });
+    const answer = await readScheduleAt(`${INTER}#channel=USBC44000226R`, null, inter.fn, {}, "UTC", NOW);
+    expect(answer.format === "xmltv" && titles(answer.events)).toEqual([
+      ["Back to Back Chef", "2026-10-06T17:00:00.000Z", "2026-10-06T18:00:00.000Z"],
+      ["Pasta Night", "2026-10-06T18:00:00.000Z", "2026-10-06T19:00:00.000Z"]
+    ]);
+    // The last channel too, and none of the others' programmes.
+    const last = await readScheduleAt(`${INTER}#channel=USBC1500009LD`, null, inter.fn, {}, "UTC", NOW);
+    expect(last.format === "xmltv" && titles(last.events)).toEqual([["Forecast", "2026-10-06T17:00:00.000Z", "2026-10-06T18:00:00.000Z"]]);
+    // A name, with no channel given.
+    const named = await readScheduleAt(INTER, null, inter.fn, { name: "Cooking Now" }, "UTC", NOW);
+    expect(named.format === "xmltv" && named.events.map((e) => e.summary)).toEqual(["Back to Back Chef", "Pasta Night"]);
+  });
+
   it("takes Plex's channel by the second half of its id (the files' first half changes), an exact id first", () => {
     const PLEX = "5ef11486d33ab9004048a1cd";
     const text = guide(

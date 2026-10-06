@@ -210,8 +210,9 @@ export class XmltvScanner {
   private readonly channels: GuideChannel[] = [];
   private readonly ids = new Set<string>();
   /**
-   * `listed`: the guide lists its channels (before its programmes, as XMLTV has them), so each
-   * want's channel is known at the first programme and only theirs are kept. `loose`: it doesn't,
+   * `listed`: the guide lists its channels, all before its programmes (Pluto's) or each just before
+   * its own (Plex's, Samsung TV Plus's, Roku's), so each want's channel is known by its first
+   * programme and only theirs are kept; the wants are matched again as each channel arrives. `loose`: it doesn't,
    * so programmes are kept by the channel they name (50 channels at most) and the wants are matched
    * at the end. Undefined until the first programme.
    */
@@ -311,6 +312,9 @@ export class XmltvScanner {
       const names = [...inner.matchAll(/<display-name(?:\s[^>]*)?>([\s\S]*?)<\/display-name>/gi)].map((m) => textOf(m[1]!)).filter(Boolean);
       this.channels.push({ id, names });
       this.ids.add(id);
+      // Plex's, Samsung TV Plus's and Roku's guides give each channel just before its own programmes
+      // (2026-10-06): a channel that comes after the first programme can still be the one wanted.
+      if (this.mode === "listed") this.resolve();
       return;
     }
     if (this.options.channelsOnly) {
