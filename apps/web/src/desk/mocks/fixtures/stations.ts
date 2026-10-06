@@ -50,7 +50,9 @@ export const STATION_IDS = {
   // A229: Riverside County's streams sharing one call sign on 15 (15.2 is listed in the demo).
   RIVC: U(151), RIVC_LIB: U(153),
   // A234: Beat Tapes shares 12.1 BEAT's call sign; its owner since Friday isn't BEAT's.
-  BEAT_TAPES: U(122)
+  BEAT_TAPES: U(122),
+  // A248: a volunteer channel whose schedule is a Google Sheet.
+  ATIC: U(136)
 };
 
 /** A234: Friday, September 25, 4:10 pm in the Inland Empire: Kai M. handed Beat Tapes to Jen Park. */
@@ -90,7 +92,9 @@ export function seedStations(): DbStation[] {
     st(197, IE.id, "listed", "tv", "9.7", "LOMA", "Loma Linda Community Access", null, {}, "Loma Linda"),
     // A229: one county, one call sign, a stream per subchannel (the channel tells them apart).
     st(151, IE.id, "listed", "tv", "15.1", "RIVC", "Riverside County, Board of Supervisors", null, {}, "Riverside"),
-    st(153, IE.id, "listed", "tv", "15.3", "RIVC", "Riverside County Library Live", null, { sharesCallSignWith: U(151) }, "Riverside")
+    st(153, IE.id, "listed", "tv", "15.3", "RIVC", "Riverside County Library Live", null, { sharesCallSignWith: U(151) }, "Riverside"),
+    // A248: its schedule from a published Google Sheet.
+    st(136, IE.id, "listed", "tv", "36.1", "ATIC", "Attic Channel", null, {}, "Riverside")
   ];
 }
 

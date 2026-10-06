@@ -28,6 +28,12 @@
 //   from a feed too (one that lists only what's on now showed nothing), and a feed is read again
 //   every 2 minutes, not hourly, while its listing has nothing stored past the next 5 minutes.
 //   A read changes airings in place, so viewers' reminders on them stay (or follow the show).
+// - A248 (2026-10-06): or a spreadsheet. A link (a Google Sheet, read as its CSV export, or a .csv,
+//   .tsv, .xlsx or .ods file) is read like a feed, hourly; a Google Sheet that isn't public says so
+//   (`not_public`). An uploaded file (`schedule_source` `file`) is kept as what was read from it, and
+//   made into airings at once and hourly, as a schedule entered by hand is (a sheet without dates
+//   repeats weekly; one with dates airs on them). Its times are in the listing's own time zone
+//   when it has one, else the zone the sheet names, else the market's (lib/sheetSchedule.ts).
 // - Each listing's stream (or embed) is checked every minute by the worker, lightly: one small
 //   request with a timeout, never a segment. Down 5 minutes, it leaves the dial, the guide and the
 //   swipe order until it's back; the Network desk hears both times (`external.station`).
@@ -45,15 +51,19 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { CHANNEL_HOLD_AFTER_SIGN_OFF_MS, familyHeadTenths, formatChannelNumber, isSubchannel, parseChannelNumber, type Band, type ChannelNumber } from "@opencast/domain";
-import { manualScheduleProblems, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type StreamPermission } from "@opencast/contracts";
+import { manualScheduleProblems, SHEET_FILE_MAX_BYTES, slotText, sortedSlots, WEEKDAYS, type Creator, type CreatorStage, type ExternalInfo, type ExternalOutage, type IptvChannel, type ListedChange, type ListedField, type ListedScheduleInput, type ListedSource, type SchedulePreview, type StreamPermission } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { StationProfile } from "../stations/service.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, conflict, HttpError, notFound, refused } from "../../errors.js";
 import { isIptvOrgAddress, parseIptvList } from "../../lib/iptv.js";
+import { promises as fs } from "node:fs";
 import { detectScheduleFormat, parseSchedule, type ScheduleFormat } from "../../lib/schedules.js";
 import type { CalendarEvent } from "../../lib/ics.js";
 import { manualAirings, manualWindow } from "../../lib/manualSchedule.js";
+import { googleSheet, googleSheetCsvUrl, kindFromName, kindFromType, readSheet, SheetError, sheetFragment, type SheetTable } from "../../lib/sheetFiles.js";
+import { readSheetSchedule, sheetAirings, type SheetSchedule } from "../../lib/sheetSchedule.js";
+import type { UploadedFile } from "../../http.js";
 import { clockTime } from "../../lib/time.js";
 import { publicFetch } from "../../lib/publicFetch.js";
 import { httpsVariant, isPlainHttp, relayUrl } from "../../lib/streamRelay.js";
@@ -138,6 +148,16 @@ export interface ExternalDial {
   playback: { kind: "hls" | "embed"; url: string; format?: "dash"; sourceUrl?: string } | null;
 }
 
+/** A248: what `previewListedSchedule` reads. */
+export interface PreviewScheduleInput {
+  calendarUrl?: string;
+  calendarFormat?: ScheduleFormat;
+  timeZone?: string;
+  sheet?: string;
+  marketId?: string;
+  sourceId?: string;
+}
+
 export interface ExternalCheckResult {
   checked: number;
   up: number;
@@ -188,6 +208,10 @@ export interface ExternalPart {
    */
   syncExternalSchedules(options?: { fetch?: Fetch }): Promise<{ synced: number; failed: number; released?: number; releasedStations?: number }>;
   previewIptvList(input: { m3u?: string; url?: string }, fetchFn?: Fetch): Promise<{ listUrl: string | null; channels: Array<IptvChannel & { already: "lead" | "external" | null }>; skipped: number }>;
+  /** A248: read a schedule address (or an uploaded spreadsheet) now, and say what it would give. Nothing is saved. */
+  previewListedSchedule(input: PreviewScheduleInput, file: UploadedFile | null, fetchFn?: Fetch): Promise<SchedulePreview>;
+  /** A248: a listing's schedule from an uploaded spreadsheet, kept as what was read from it. */
+  uploadListedSchedule(user: CurrentUser | null, sourceId: string, input: { timeZone?: string; sheet?: string }, file: UploadedFile | null): Promise<ListedSource>;
   importIptvLeads(input: { marketId: string; listUrl?: string; channels: IptvChannel[] }): Promise<{ imported: Creator[]; skipped: number }>;
 }
 
@@ -218,6 +242,8 @@ const hostOf = (url: string) => {
 };
 
 type ManualSchedule = NonNullable<Row["manualSchedule"]>;
+type SheetReadRow = NonNullable<Row["sheetRead"]>;
+type SheetFileRow = NonNullable<Row["sheetFile"]>;
 
 /**
  * A241: a schedule entered by hand as it's kept: each slot's days once and in week order, the
@@ -249,21 +275,157 @@ export function manualHistoryText(m: ManualSchedule | null): string | null {
 /** A241: the schedule's skipped dates for the history ("2026-11-26, 2026-12-24"), or null. */
 const skipText = (m: ManualSchedule | null) => (m?.skipDates.length ? m.skipDates.join(", ") : null);
 
-/** A241: the columns that hold what's on, for a schedule as `addListedSource` and `updateListedSource` take it. */
+/**
+ * A241: the columns that hold what's on, for a schedule as `addListedSource` and `updateListedSource`
+ * take it. A248: and the listing's own time zone for it; `file` keeps the uploaded spreadsheet as it is.
+ */
 function scheduleColumns(sc: ListedScheduleInput) {
-  if (sc.source === "none") return { scheduleSource: "none" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null };
-  if (sc.source === "manual") {
-    return { scheduleSource: "manual" as const, calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: sc.checkedAgainst, guideCheckedOn: sc.checkedOn, manualSchedule: normalManual(sc) };
-  }
+  const none = { calendarUrl: null, scheduleFormat: null, guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null, scheduleTimeZone: null };
+  if (sc.source === "none") return { ...none, scheduleSource: "none" as const };
+  if (sc.source === "manual") return { ...none, scheduleSource: "manual" as const, guideCheckedAgainst: sc.checkedAgainst, guideCheckedOn: sc.checkedOn, manualSchedule: normalManual(sc) };
+  if (sc.source === "file") return { ...none, scheduleSource: "file" as const, scheduleFormat: "sheet" as const, scheduleTimeZone: sc.timeZone ?? null };
   return {
     scheduleSource: sc.source,
     calendarUrl: sc.calendarUrl,
     scheduleFormat: sc.calendarFormat ?? null,
     guideCheckedAgainst: sc.source === "guide_data" ? sc.guideData.checkedAgainst : null,
     guideCheckedOn: sc.source === "guide_data" ? sc.guideData.checkedOn : null,
-    manualSchedule: null
+    manualSchedule: null,
+    scheduleTimeZone: sc.timeZone ?? null
   };
 }
+
+// ---- A248 (2026-10-06): schedules from spreadsheets ----
+
+/** Why a schedule address (or a spreadsheet) couldn't be read, with the desk's words. */
+export class ScheduleReadError extends Error {
+  constructor(
+    readonly code: "calendar_not_found" | "not_public" | "not_a_spreadsheet" | "old_excel" | "no_tab",
+    message: string
+  ) {
+    super(message);
+    this.name = "ScheduleReadError";
+  }
+}
+
+export const NOT_PUBLIC = "This Google Sheet isn't public. Publish it to the web (File, Share, Publish to web), or share it with anyone with the link, then try again.";
+const NOT_ANSWERED = "That address didn't answer with a schedule. Check the link and try again.";
+export const NO_SHOWS = "No shows with times were found in it. Each needs a title and a time (“Trigun 6:00 AM”) under a row of days, or columns like Date, Start and Title.";
+const NOT_A_SHEET = "That isn't a spreadsheet Opencast can read: use .xlsx, .ods, .csv or .tsv.";
+
+/** What a schedule address gave: a feed's events, or a spreadsheet's schedule. */
+type ScheduleAnswer =
+  | { format: Exclude<ScheduleFormat, "sheet">; events: CalendarEvent[] }
+  | { format: "sheet"; table: SheetTable; sheet: SheetSchedule; gid: string | null };
+
+/** The zone a sheet's times are read in: the listing's own setting, else the one the sheet names, else the market's. */
+export function sheetZone(listing: string | null | undefined, named: string | null | undefined, market: string): { tz: string; from: SheetReadRow["timeZoneFrom"] } {
+  if (listing) return { tz: listing, from: "listing" };
+  if (named) return { tz: named, from: "sheet" };
+  return { tz: market, from: "market" };
+}
+
+/** What was read, as it's kept (and shown on the desk). */
+function sheetReadRow(table: Pick<SheetTable, "kind" | "tab" | "tabs">, sheet: SheetSchedule, gid: string | null, zone: ReturnType<typeof sheetZone>, now: Date): SheetReadRow {
+  return {
+    kind: table.kind,
+    tab: table.tab,
+    gid,
+    tabs: table.tabs,
+    layout: sheet.layout,
+    shows: sheet.entries.length,
+    weekly: sheet.weekly,
+    firstDay: sheet.firstDay,
+    lastDay: sheet.lastDay,
+    firstDate: sheet.firstDate,
+    lastDate: sheet.lastDate,
+    zone: sheet.zone,
+    zonesNamed: sheet.zonesNamed.length > 1 ? sheet.zonesNamed : [],
+    timeZone: zone.tz,
+    timeZoneFrom: zone.from,
+    skipped: sheet.skipped,
+    skippedCount: sheet.skippedCount,
+    readAt: now.toISOString()
+  };
+}
+
+/** A sheet that couldn't be read, in the desk's words: a Google Sheet answering with a web page isn't public. */
+function sheetProblem(e: SheetError, google: boolean): ScheduleReadError {
+  if (e.code === "web_page") return google ? new ScheduleReadError("not_public", NOT_PUBLIC) : new ScheduleReadError("not_a_spreadsheet", "That address answered with a web page, not a spreadsheet.");
+  return new ScheduleReadError(e.code, e.message);
+}
+
+/**
+ * A schedule address read now: a feed's events, or (A248) a spreadsheet's schedule. A Google Sheet is
+ * fetched as its CSV export (its tab kept); one that answers "not found" or with a sign-in page isn't
+ * public. `timeZone`: for a webpage's times without an offset.
+ */
+export async function readScheduleAt(url: string, declared: ScheduleFormat | null, fetchFn: Fetch, hints: { name?: string; streamUrl?: string }, timeZone: string, now: Date): Promise<ScheduleAnswer> {
+  const google = declared === null || declared === "sheet" ? googleSheet(url) : null;
+  let response: Response;
+  try {
+    response = await fetchFn(google ? googleSheetCsvUrl(url)! : url, { signal: AbortSignal.timeout(15_000) });
+  } catch {
+    throw new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+  }
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    if (google && [401, 403, 404].includes(response.status)) throw new ScheduleReadError("not_public", NOT_PUBLIC);
+    throw new ScheduleReadError("calendar_not_found", NOT_ANSWERED);
+  }
+  const bytes = await readBytes(response, LIST_BYTES);
+  const type = response.headers.get("content-type");
+  const text = () => new TextDecoder().decode(bytes);
+  const format = google ? "sheet" : (declared ?? detectScheduleFormat(url, type, text()));
+  if (format !== "sheet") return { format, events: parseSchedule(text(), format, url, timeZone, hints) };
+  let table: SheetTable;
+  try {
+    const path = (() => {
+      try {
+        return new URL(url).pathname;
+      } catch {
+        return url;
+      }
+    })();
+    table = readSheet(bytes, { kind: google ? "google_sheet" : (kindFromName(path) ?? kindFromType(type)), tab: sheetFragment(url) });
+  } catch (e) {
+    if (e instanceof SheetError) throw sheetProblem(e, !!google);
+    throw e;
+  }
+  return { format: "sheet", table, sheet: readSheetSchedule(table.rows, table.continues, now), gid: google?.gid ?? null };
+}
+
+/** An uploaded spreadsheet's bytes, checked: its size, and a spreadsheet's name or type. */
+async function sheetFileBytes(file: UploadedFile): Promise<{ bytes: Uint8Array; kind: ReturnType<typeof kindFromName> }> {
+  if (file.size > SHEET_FILE_MAX_BYTES) throw refused("too_big", "Use a file of 2 MB or less.");
+  const kind = kindFromName(file.originalName) ?? kindFromType(file.mimeType);
+  if (!kind) throw refused("not_a_spreadsheet", NOT_A_SHEET);
+  if (kind === "xls") throw refused("old_excel", "Older Excel files (.xls) aren't read. Save it as .xlsx or .csv and upload that.");
+  return { bytes: new Uint8Array(await fs.readFile(file.path)), kind };
+}
+
+/** A sheet read from a file, or the API's refusal: what it couldn't read, or that it found no shows. */
+function readSheetFile(bytes: Uint8Array, kind: ReturnType<typeof kindFromName>, tab: string | null, now: Date): { table: SheetTable; sheet: SheetSchedule } {
+  let table: SheetTable;
+  try {
+    table = readSheet(bytes, { kind, tab });
+  } catch (e) {
+    if (e instanceof SheetError) {
+      const p = sheetProblem(e, false);
+      throw refused(p.code, p.message);
+    }
+    throw e;
+  }
+  const sheet = readSheetSchedule(table.rows, table.continues, now);
+  if (!sheet.entries.length) throw refused("no_event_data", NO_SHOWS);
+  return { table, sheet };
+}
+
+/** One airing in a preview. */
+const previewAiring = (e: CalendarEvent) => ({ title: e.summary, startsAt: e.start.toISOString(), endsAt: e.end?.toISOString() ?? null });
+
+/** An uploaded spreadsheet in the change history's words: "week.xlsx, 152 shows". */
+const fileText = (f: SheetFileRow | null | undefined) => (f ? `${f.name}, ${f.entries.length} ${f.entries.length === 1 ? "show" : "shows"}` : null);
 
 /**
  * A241: a schedule entered by hand, checked before it's saved: where it was checked (the published
@@ -277,6 +439,9 @@ export function checkManual(sc: ListedScheduleInput | undefined) {
   const problems = manualScheduleProblems(sc.slots);
   if (problems.length) throw badRequest(problems[0]!.message, Object.fromEntries(problems.map((p) => [p.slot === null ? "slots" : `slots.${p.slot}.${p.field}`, p.message])));
 }
+
+/** A241, A248: a schedule kept here (entered by hand, or an uploaded spreadsheet), made into airings without a fetch. */
+const ownSchedule = (r: Pick<Row, "scheduleSource">) => r.scheduleSource === "manual" || r.scheduleSource === "file";
 
 /** The fields whose values are addresses (shown in full to admins only). */
 const ADDRESS_FIELDS: ReadonlySet<ListedField> = new Set(["streamUrl", "calendarUrl", "guideCheckedAgainst"]);
@@ -358,22 +523,28 @@ function corsBlocked(row: { plays: Row["plays"]; streamUrl?: string; httpsUrl?: 
  * channel, for a brand's channels) read it once, and each gets the same answer.
  */
 function oncePerAddress(fetchFn: Fetch): Fetch {
-  const answers = new Map<string, Promise<{ status: number; type: string | null; text: string }>>();
+  const answers = new Map<string, Promise<{ status: number; type: string | null; bytes: Uint8Array }>>();
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     let answer = answers.get(url);
     if (!answer) {
-      answer = fetchFn(input, init).then(async (res) => ({ status: res.status, type: res.headers.get("content-type"), text: res.ok ? await readSome(res, LIST_BYTES) : "" }));
+      answer = fetchFn(input, init).then(async (res) => ({ status: res.status, type: res.headers.get("content-type"), bytes: res.ok ? await readBytes(res, LIST_BYTES) : new Uint8Array() }));
       answers.set(url, answer);
     }
-    const { status, type, text } = await answer;
-    return new Response([204, 205, 304].includes(status) ? null : text, { status, headers: type ? { "content-type": type } : {} });
+    // A248: the bytes as they came (a spreadsheet can be a workbook, not text).
+    const { status, type, bytes } = await answer;
+    return new Response([204, 205, 304].includes(status) ? null : bytes.slice(), { status, headers: type ? { "content-type": type } : {} });
   }) as Fetch;
 }
 
 /** Up to `limit` bytes of an answer's body as text, then the rest is let go unread. */
 async function readSome(res: Response, limit: number): Promise<string> {
-  if (!res.body) return "";
+  return new TextDecoder().decode(await readBytes(res, limit));
+}
+
+/** Up to `limit` bytes of an answer's body, then the rest is let go unread. */
+async function readBytes(res: Response, limit: number): Promise<Uint8Array> {
+  if (!res.body) return new Uint8Array();
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -395,7 +566,7 @@ async function readSome(res: Response, limit: number): Promise<string> {
     at += part.byteLength;
     if (at >= all.byteLength) break;
   }
-  return new TextDecoder().decode(all);
+  return all;
 }
 
 export interface StreamCheck {
@@ -559,7 +730,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // A229: the call-sign family each is in, if any.
       Promise.all(rows.map((r) => services.stations.callSignFamily(r.stationId)))
     ]);
-    const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy)].filter((v): v is string => !!v));
+    const names = await services.accounts.displayNames([...permissions.map((p) => p.recordedBy), ...rows.map((r) => r.removedBy), ...rows.map((r) => r.sheetFile?.uploadedBy)].filter((v): v is string => !!v));
     const permissionView = (p: (typeof permissions)[number]): StreamPermission => ({
       id: p.id,
       grantedBy: p.grantedBy,
@@ -613,7 +784,14 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           checkedAgainst: r.guideCheckedAgainst,
           checkedOn: r.guideCheckedOn,
           // A241: the weekly schedule entered by hand, and the dates it doesn't air.
-          ...(r.scheduleSource === "manual" ? { slots: r.manualSchedule?.slots ?? [], skipDates: r.manualSchedule?.skipDates ?? [] } : {})
+          ...(r.scheduleSource === "manual" ? { slots: r.manualSchedule?.slots ?? [], skipDates: r.manualSchedule?.skipDates ?? [] } : {}),
+          // A248: the listing's own time zone for it, what was read from its spreadsheet, and the file uploaded.
+          timeZone: r.scheduleTimeZone,
+          sheet: r.sheetRead && (r.scheduleFormat === "sheet" || r.scheduleSource === "file") ? r.sheetRead : null,
+          file:
+            r.scheduleSource === "file" && r.sheetFile
+              ? { name: r.sheetFile.name, kind: r.sheetFile.kind, bytes: r.sheetFile.bytes, uploadedAt: r.sheetFile.uploadedAt, uploadedBy: r.sheetFile.uploadedBy ? (names.get(r.sheetFile.uploadedBy) ?? null) : null }
+              : null
         },
         onDial: !removed && waiting === null,
         waiting,
@@ -919,39 +1097,78 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
   async function sync(row: Row, fetchFn: Fetch): Promise<boolean> {
     lastTried.set(row.id, deps.clock.now().getTime());
     if (row.scheduleSource === "manual") return syncManual(row);
+    if (row.scheduleSource === "file") return syncFile(row);
     if (!row.calendarUrl) return false;
-    let events;
-    let format: ScheduleFormat;
+    const market = await services.stations.timezoneOf(row.stationId);
+    let answer: ScheduleAnswer;
     try {
-      const response = await fetchFn(row.calendarUrl, { signal: AbortSignal.timeout(15_000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const text = await readSome(response, LIST_BYTES);
-      format = row.scheduleFormat ?? detectScheduleFormat(row.calendarUrl, response.headers.get("content-type"), text);
-      // A241: a webpage's event data without an offset is in the market's time zone.
-      const tz = format === "webpage" ? await services.stations.timezoneOf(row.stationId) : "UTC";
-      // 2026-10-03: a feed keyed by channel is read for this listing's, found by its name or stream.
-      events = parseSchedule(text, format, row.calendarUrl, tz, { name: row.name, streamUrl: row.streamUrl });
-    } catch {
-      await db.update(LS).set({ calendarSync: "calendar_not_found" }).where(eq(LS.id, row.id));
+      // A241: a webpage's event data without an offset is in the market's time zone (A248: or the
+      // listing's own). 2026-10-03: a feed keyed by channel is read for this listing's, found by its
+      // name or stream. A248: a spreadsheet's rows are read for its schedule.
+      answer = await readScheduleAt(row.calendarUrl, row.scheduleFormat, fetchFn, { name: row.name, streamUrl: row.streamUrl }, row.scheduleTimeZone ?? market, deps.clock.now());
+    } catch (e) {
+      // A248: a Google Sheet that isn't public says so; anything else that can't be read isn't found.
+      await db
+        .update(LS)
+        .set({ calendarSync: e instanceof ScheduleReadError && e.code === "not_public" ? "not_public" : "calendar_not_found" })
+        .where(eq(LS.id, row.id));
       return false;
     }
     const now = deps.clock.now();
-    // A241: a page with no event data a computer can read says so, and isn't an error: what it
-    // listed before stays (a redesign that drops it for a day doesn't empty the guide).
-    if (format === "webpage" && !events.length) {
-      await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
+    if (answer.format === "sheet") {
+      // A248: the zone its times are in, and what was read, kept for the desk.
+      const zone = sheetZone(row.scheduleTimeZone, answer.sheet.zone, market);
+      const sheetRead = sheetReadRow(answer.table, answer.sheet, answer.gid, zone, now);
+      // A sheet with no shows it can read says so, as a webpage without event data does: what it
+      // listed before stays.
+      if (!answer.sheet.entries.length) {
+        await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: "sheet", sheetRead }).where(eq(LS.id, row.id));
+        return true;
+      }
+      const { from, to } = manualWindow(now);
+      await storeRead(row, sheetAirings(answer.sheet.entries, zone.tz, from, to), now, { scheduleFormat: "sheet", sheetRead });
       return true;
     }
+    // A241: a page with no event data a computer can read says so, and isn't an error: what it
+    // listed before stays (a redesign that drops it for a day doesn't empty the guide).
+    if (answer.format === "webpage" && !answer.events.length) {
+      await db.update(LS).set({ calendarSync: "no_event_data", lastSyncedAt: now, scheduleFormat: answer.format, sheetRead: null }).where(eq(LS.id, row.id));
+      return true;
+    }
+    await storeRead(row, answer.events, now, { scheduleFormat: answer.format, sheetRead: null });
+    return true;
+  }
+
+  /**
+   * A read's events stored as the listing's airings. 2026-10-03: what's still on is kept with what's
+   * to come (a feed that lists only what's on now had nothing stored). When the read lists what's
+   * on now, it replaces what was stored for now, so nothing is doubled; when it doesn't (a feed of
+   * what's next only), what's stored for now stays, as before. Ids are kept, and reminders with them
+   * (replaceAirings).
+   */
+  async function storeRead(row: Row, events: CalendarEvent[], now: Date, set: Partial<typeof LS.$inferInsert> = {}) {
     await db.transaction(async (tx) => {
-      // 2026-10-03: what's still on is kept with what's to come (a feed that lists only what's on
-      // now had nothing stored). When the read lists what's on now, it replaces what was stored for
-      // now, so nothing is doubled; when it doesn't (a feed of what's next only), what's stored
-      // for now stays, as before. Ids are kept, and reminders with them (replaceAirings).
       const still = events.filter((e) => (e.end ? e.end > now : e.start >= now));
       const listsNow = still.some((e) => e.start < now);
       await replaceAirings(tx, row.id, listsNow ? or(gte(LA.startsAt, now), gt(LA.endsAt, now)) : gte(LA.startsAt, now), still);
-      await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now, scheduleFormat: format }).where(eq(LS.id, row.id));
+      await tx.update(LS).set({ calendarSync: "synced", lastSyncedAt: now, ...set }).where(eq(LS.id, row.id));
     });
+  }
+
+  /**
+   * A248: an uploaded spreadsheet, made into airings as it was read: on its dates, or (a sheet whose
+   * days have no dates) every week from now to 14 days ahead, so it rolls forward hourly. Its zone is
+   * worked out afresh each time (the listing's own, the sheet's, the market's).
+   */
+  async function syncFile(row: Row): Promise<boolean> {
+    const file = row.sheetFile;
+    if (!file) return false;
+    const market = await services.stations.timezoneOf(row.stationId);
+    const zone = sheetZone(row.scheduleTimeZone, row.sheetRead?.zone, market);
+    const now = deps.clock.now();
+    const { from, to } = manualWindow(now);
+    const sheetRead = row.sheetRead ? { ...row.sheetRead, timeZone: zone.tz, timeZoneFrom: zone.from } : null;
+    await storeRead(row, sheetAirings(file.entries, zone.tz, from, to), now, { sheetRead });
     return true;
   }
 
@@ -1011,6 +1228,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         throw badRequest("Give what's on as its schedule, or as its calendar address and guide data, not both.", { schedule: "Not with calendarUrl or guideData" });
       }
       checkManual(input.schedule);
+      // A248: a spreadsheet file is uploaded to the listing once it's listed (uploadListedSchedule).
+      if (input.schedule?.source === "file") throw badRequest("Upload the spreadsheet once it's listed.", { schedule: "A file is uploaded to a listing" });
       const what = input.schedule
         ? scheduleColumns(input.schedule)
         : {
@@ -1019,7 +1238,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             scheduleFormat: input.calendarFormat ?? null,
             guideCheckedAgainst: input.guideData?.checkedAgainst ?? null,
             guideCheckedOn: input.guideData?.checkedOn ?? null,
-            manualSchedule: null
+            manualSchedule: null,
+            scheduleTimeZone: null
           };
       const creator = input.creatorId ? (await db.select().from(CR).where(eq(CR.id, input.creatorId)))[0] : null;
       if (input.creatorId && !creator) throw notFound("That lead");
@@ -1110,7 +1330,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
       if (!row) throw notFound("That listed source");
       if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
-      if (!row.calendarUrl && row.scheduleSource !== "manual") throw refused("no_calendar", "Add the source's agenda calendar first.");
+      if (!row.calendarUrl && !ownSchedule(row)) throw refused("no_calendar", "Add the source's agenda calendar first.");
       await sync(row, fetchFn);
       return one(sourceId);
     },
@@ -1160,6 +1380,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // What's on (A241: a schedule entered by hand is checked first).
       const sc = input.schedule;
       checkManual(sc);
+      // A248: an uploaded spreadsheet kept as it is (its time zone changed) needs one uploaded.
+      if (sc?.source === "file" && (row.scheduleSource !== "file" || !row.sheetFile)) throw conflict("no_file", "Upload a spreadsheet first.");
       const format = sc && (sc.source === "feed" || sc.source === "guide_data") ? sc.calendarFormat : undefined;
       const schedule = sc ? scheduleColumns(sc) : null;
       const wasManual = row.scheduleSource === "manual" ? row.manualSchedule : null;
@@ -1171,6 +1393,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
           (format !== undefined && schedule.scheduleFormat !== row.scheduleFormat) ||
           schedule.guideCheckedAgainst !== row.guideCheckedAgainst ||
           schedule.guideCheckedOn !== row.guideCheckedOn ||
+          schedule.scheduleTimeZone !== row.scheduleTimeZone ||
           manualChanged);
 
       // Channel and call sign: the rules for listing.
@@ -1226,6 +1449,9 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         // A241: the weekly schedule entered by hand, as one line, and the dates it skips.
         note("manualSchedule", manualHistoryText(wasManual), manualHistoryText(schedule.manualSchedule));
         note("skipDates", skipText(wasManual), skipText(schedule.manualSchedule));
+        // A248: an uploaded spreadsheet given up for another schedule, and the listing's time zone.
+        if (schedule.scheduleSource !== "file") note("scheduleFile", row.scheduleSource === "file" ? fileText(row.sheetFile) : null, null);
+        note("scheduleTimeZone", row.scheduleTimeZone, schedule.scheduleTimeZone);
       }
       if (channel) note("channel", ident.channel, channel);
       if (callSign) note("callSign", ident.callSign, callSign);
@@ -1235,7 +1461,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const effects: ListedChange["effects"] = [];
       if (basisFor(row) && !basis) effects.push("waits_for_evidence");
       if (restart) effects.push("checks_restart");
-      if (scheduleChanged && (schedule?.calendarUrl || schedule?.scheduleSource === "manual")) effects.push("schedule_reread");
+      if (scheduleChanged && schedule && (schedule.calendarUrl || ownSchedule(schedule))) effects.push("schedule_reread");
 
       await db.transaction(async (tx) => {
         await tx
@@ -1251,7 +1477,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             // A237: a new address (or way to play) is tried over https afresh, below; A238: and for
             // CORS, and matched against the platform feeds.
             ...(restart ? { httpsUrl: null, httpsCheckedAt: null, cors: null, corsDetail: null, corsCheckedAt: null, platformFeed: platformFeedOf(streamUrl) } : {}),
-            ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const } : {})
+            // A248: a spreadsheet read afresh (an uploaded one's file kept, for a new time zone).
+            ...(schedule && scheduleChanged ? { ...schedule, calendarSync: "not_set" as const, ...(schedule.scheduleSource === "file" ? {} : { sheetFile: null, sheetRead: null }) } : {})
           })
           .where(eq(LS.id, sourceId));
         // A new address starts its health afresh: the old one's outage ends (kept in the history).
@@ -1357,10 +1584,10 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
         }
       }
       const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
-      if (after?.calendarUrl || after?.scheduleSource === "manual") await sync(after, fetchFn);
+      if (after && (after.calendarUrl || ownSchedule(after))) await sync(after, fetchFn);
       for (const member of family) {
         const [m] = await db.select().from(LS).where(eq(LS.id, member.id));
-        if (m && !m.removedAt && (m.calendarUrl || m.scheduleSource === "manual")) await sync(m, fetchFn);
+        if (m && !m.removedAt && (m.calendarUrl || ownSchedule(m))) await sync(m, fetchFn);
       }
       return one(sourceId);
     },
@@ -1411,7 +1638,8 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
             removed: !!r.removedAt,
             // A241: a schedule entered by hand is guide data checked against the published schedule,
             // and reads so on the dial (ExternalSchedule keeps its three values for apps built before it).
-            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource === "manual" ? "guide_data" : r.scheduleSource },
+            // A248: an uploaded spreadsheet is the source's own schedule, as a file: a feed.
+            info: { source: r.name, plays: r.plays, schedule: r.scheduleSource === "manual" ? "guide_data" : r.scheduleSource === "file" ? "feed" : r.scheduleSource },
             // Straight from the source: its embed, or its stream link in Opencast's player.
             // A201: a DASH stream link says so (`format: "dash"`); apps before it try it as HLS and stand by.
             // A237: an http:// stream link plays its https address, or the relay's (streamAddress).
@@ -1453,11 +1681,11 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
 
     async syncExternalSchedules(options = {}) {
       // A215: a listing taken off the dial isn't read any more. A241: a schedule entered by hand is
-      // made into airings again, so its two weeks roll forward.
+      // made into airings again, so its two weeks roll forward (A248: an uploaded spreadsheet's too).
       const rows = await db
         .select()
         .from(LS)
-        .where(and(or(isNotNull(LS.calendarUrl), eq(LS.scheduleSource, "manual")), isNull(LS.removedAt)));
+        .where(and(or(isNotNull(LS.calendarUrl), inArray(LS.scheduleSource, ["manual", "file"])), isNull(LS.removedAt)));
       // 2026-10-03: the worker runs this pass every minute, but only the listings that are due are
       // read: each hourly, and a feed whose last read worked every 2 minutes while nothing stored
       // for it ends more than 5 minutes from now. Cheap: one small query over those few listings,
@@ -1465,7 +1693,7 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       const now = deps.clock.now().getTime();
       const since = (row: Row) => now - Math.max(lastTried.get(row.id) ?? 0, row.lastSyncedAt?.getTime() ?? 0);
       const hourly = rows.filter((row) => since(row) >= SCHEDULE_REREAD_MS);
-      const sooner = rows.filter((row) => !hourly.includes(row) && row.scheduleSource !== "manual" && row.calendarSync === "synced" && since(row) >= RUNNING_DRY_REREAD_MS);
+      const sooner = rows.filter((row) => !hourly.includes(row) && !ownSchedule(row) && row.calendarSync === "synced" && since(row) >= RUNNING_DRY_REREAD_MS);
       const soon = new Date(now + RUNNING_DRY_MS);
       const stocked = new Set(
         sooner.length
@@ -1507,6 +1735,79 @@ export function createExternal({ deps, services }: ModuleContext, helpers: { cre
       // A223: a full station that signed off for good 90 days ago lets its channel go too.
       const releasedStations = await services.stations.releaseSignedOffChannels();
       return { synced, failed, released: held.length, releasedStations };
+    },
+
+    async previewListedSchedule(input, file, fetchFn = externalFetch()) {
+      if (!!input.calendarUrl === !!file) throw badRequest("Give their schedule's address, or upload a spreadsheet.", { calendarUrl: "An address or a file" });
+      const now = deps.clock.now();
+      // The market's zone: the listing's, or the one it's being listed in.
+      const [row] = input.sourceId ? await db.select().from(LS).where(eq(LS.id, input.sourceId)) : [];
+      if (input.sourceId && !row) throw notFound("That external station");
+      const market = row
+        ? await services.stations.timezoneOf(row.stationId)
+        : input.marketId
+          ? ((await services.network.marketsByIds([input.marketId])).get(input.marketId)?.timezone ?? "America/Los_Angeles")
+          : "America/Los_Angeles";
+      let answer: ScheduleAnswer;
+      if (file) {
+        const { bytes, kind } = await sheetFileBytes(file);
+        answer = { format: "sheet", gid: null, ...readSheetFile(bytes, kind, input.sheet ?? null, now) };
+      } else {
+        try {
+          answer = await readScheduleAt(input.calendarUrl!, input.calendarFormat ?? null, fetchFn, { name: row?.name, streamUrl: row?.streamUrl }, input.timeZone ?? market, now);
+        } catch (e) {
+          if (e instanceof ScheduleReadError) throw refused(e.code, e.message);
+          throw refused("calendar_not_found", NOT_ANSWERED);
+        }
+      }
+      const { from, to } = manualWindow(now);
+      if (answer.format === "sheet") {
+        if (!answer.sheet.entries.length) throw refused("no_event_data", NO_SHOWS);
+        const zone = sheetZone(input.timeZone, answer.sheet.zone, market);
+        const airings = sheetAirings(answer.sheet.entries, zone.tz, from, to).filter((e) => (e.end ? e.end > now : e.start >= now));
+        return { format: "sheet", sheet: sheetReadRow(answer.table, answer.sheet, answer.gid, zone, now), upcoming: airings.length, airings: airings.slice(0, 8).map(previewAiring), timeZone: zone.tz };
+      }
+      if (answer.format === "webpage" && !answer.events.length) throw refused("no_event_data", "This page has no schedule data a computer can read.");
+      const airings = answer.events.filter((e) => (e.end ? e.end > now : e.start >= now)).sort((a, b) => a.start.getTime() - b.start.getTime());
+      return { format: answer.format, sheet: null, upcoming: airings.length, airings: airings.slice(0, 8).map(previewAiring), timeZone: input.timeZone ?? market };
+    },
+
+    async uploadListedSchedule(user, sourceId, input, file) {
+      const [row] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (!row) throw notFound("That external station");
+      if (row.removedAt) throw conflict("removed", `${row.name} was taken off the dial. Put it back on the list first.`);
+      if (!file) throw badRequest("Choose a spreadsheet file.", { file: "Required" });
+      const now = deps.clock.now();
+      const { bytes, kind } = await sheetFileBytes(file);
+      const { table, sheet } = readSheetFile(bytes, kind, input.sheet ?? null, now);
+      const market = await services.stations.timezoneOf(row.stationId);
+      const timeZone = input.timeZone ?? null;
+      const sheetFile: SheetFileRow = { name: file.originalName.slice(0, 200), kind: table.kind, bytes: file.size, uploadedAt: now.toISOString(), uploadedBy: user?.id ?? null, entries: sheet.entries };
+      const sheetRead = sheetReadRow(table, sheet, null, sheetZone(timeZone, sheet.zone, market), now);
+      // The history: what's on before, and the file (always: a new upload is a change, even of the same name).
+      const fields: ListedChange["fields"] = [];
+      const note = (field: ListedField, from: string | null, to: string | null) => {
+        if (from !== to) fields.push({ field, from, to });
+      };
+      note("schedule", row.scheduleSource, "file");
+      note("calendarUrl", row.calendarUrl, null);
+      note("guideCheckedAgainst", row.guideCheckedAgainst, null);
+      note("guideCheckedOn", row.guideCheckedOn, null);
+      note("manualSchedule", row.scheduleSource === "manual" ? manualHistoryText(row.manualSchedule) : null, null);
+      note("skipDates", row.scheduleSource === "manual" ? skipText(row.manualSchedule) : null, null);
+      fields.push({ field: "scheduleFile", from: row.scheduleSource === "file" ? fileText(row.sheetFile) : null, to: fileText(sheetFile) });
+      note("scheduleTimeZone", row.scheduleTimeZone, timeZone);
+      await db.transaction(async (tx) => {
+        await tx
+          .update(LS)
+          .set({ scheduleSource: "file", calendarUrl: null, scheduleFormat: "sheet", guideCheckedAgainst: null, guideCheckedOn: null, manualSchedule: null, scheduleTimeZone: timeZone, sheetFile, sheetRead, calendarSync: "not_set" })
+          .where(eq(LS.id, sourceId));
+        await recordChange(tx, user, sourceId, "changed", fields, ["schedule_reread"]);
+      });
+      // Made into airings at once: the airings from now on are the file's (ids kept where the same show stays).
+      const [after] = await db.select().from(LS).where(eq(LS.id, sourceId));
+      if (after) await sync(after, publicFetch);
+      return one(sourceId);
     },
 
     async previewIptvList(input, fetchFn = publicFetch) {

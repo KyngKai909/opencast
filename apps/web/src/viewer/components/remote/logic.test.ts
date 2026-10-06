@@ -12,7 +12,8 @@ const id = (cs: string) => DIAL.find((r) => r.station.callSign === cs)!.station.
 describe("the rocker's neighbours", () => {
   it("names the stations up and down the dial from what the TV shows (06.3, 02.2)", () => {
     const civc = rockerNeighbours(DIAL, id("CIVC"));
-    expect([identText(civc.up), identText(civc.down)]).toEqual(["9.1 RDLS", "31.1 PREP"]);
+    // Down from the bottom wraps to the top of the band (A248's Attic Channel on 36.1).
+    expect([identText(civc.up), identText(civc.down)]).toEqual(["9.1 RDLS", "36.1 ATIC"]);
     const beat = rockerNeighbours(DIAL, id("BEAT"));
     // A229: BEAT 12.2 (Beat Tapes, sharing BEAT's call sign) is next up the dial.
     expect([identText(beat.up), identText(beat.down)]).toEqual(["12.2 BEAT", "9.7 LOMA"]);

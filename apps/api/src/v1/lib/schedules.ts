@@ -7,11 +7,15 @@
 // 2026-10-03: a JSON feed keyed by channel (`{ "whiplash": {…}, "atlas": {…} }`, one feed for a
 // brand's channels) is read for the station's own channel only: the address's `#channel=`, else
 // the listing's name, else its stream's folder. No match, no events: never another channel's.
+// A248 (2026-10-06): or a spreadsheet (`sheet`): a Google Sheet, a .csv, .tsv, .xlsx or .ods file, or
+// an answer that's a spreadsheet's type or a workbook's bytes. Its rows are read by lib/sheetFiles.ts
+// and its schedule by lib/sheetSchedule.ts, from the answer's bytes (network/external.ts).
 
 import { parseIcs, type CalendarEvent } from "./ics.js";
 import { parseJsonLdEvents } from "./jsonLd.js";
+import { isSheetAddress, kindFromType } from "./sheetFiles.js";
 
-export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv" | "webpage";
+export type ScheduleFormat = "ical" | "rss" | "json" | "xmltv" | "webpage" | "sheet";
 
 /** A241: an answer that's a web page: an HTML type, or text that starts like one. */
 function isWebpage(contentType: string | null, head: string): boolean {
@@ -21,15 +25,25 @@ function isWebpage(contentType: string | null, head: string): boolean {
   return !/^(<\?xml|<rss[\s>]|<feed[\s>]|<tv[\s>]|<!doctype\s+tv|[{[]|BEGIN:VCALENDAR)/i.test(head);
 }
 
+/** A248: text that reads as comma- or tab-separated rows: a few lines, each with a separator, none of it markup. */
+function looksDelimited(text: string): boolean {
+  if (/^[<{[]/.test(text.trimStart())) return false;
+  const lines = text.slice(0, 4000).split(/\r\n|\n|\r/).filter((l) => l.trim()).slice(0, 6);
+  return lines.length >= 2 && lines.every((l) => /[,\t]/.test(l));
+}
+
 /** The format from the address, then the answer's type, then the text itself. */
 export function detectScheduleFormat(url: string, contentType: string | null, text: string): ScheduleFormat {
   const path = url.split(/[?#]/)[0].toLowerCase();
   if (path.endsWith(".ics") || /text\/calendar/i.test(contentType ?? "")) return "ical";
+  // A248: a spreadsheet's address or type, or a workbook's bytes (a zip).
+  if (isSheetAddress(url) || kindFromType(contentType) || text.startsWith("PK\u0003\u0004")) return "sheet";
   const head = text.trimStart().slice(0, 400);
   if (head.startsWith("BEGIN:VCALENDAR")) return "ical";
   if (isWebpage(contentType, head)) return "webpage";
   if (head.startsWith("{") || head.startsWith("[") || /json/i.test(contentType ?? "")) return "json";
   if (/<tv[\s>]/i.test(text.slice(0, 2000)) || path.endsWith(".xmltv")) return "xmltv";
+  if (!/<(rss|feed|item|entry)[\s>]/i.test(text.slice(0, 4000)) && looksDelimited(text)) return "sheet";
   return "rss";
 }
 
@@ -241,7 +255,7 @@ function parseXmltv(text: string, channel: string | null): CalendarEvent[] {
  * a JSON feed keyed by channel is read for the fragment's channel too, else the one `hints` (the
  * listing's name and stream address) point to.
  */
-export function parseSchedule(text: string, format: ScheduleFormat, url = "", timeZone = "UTC", hints: ChannelHints = {}): CalendarEvent[] {
+export function parseSchedule(text: string, format: Exclude<ScheduleFormat, "sheet">, url = "", timeZone = "UTC", hints: ChannelHints = {}): CalendarEvent[] {
   const named = /#channel=([^&]+)/.exec(url)?.[1];
   const fragment = named ? decodeURIComponent(named) : null;
   if (format === "ical") return parseIcs(text);

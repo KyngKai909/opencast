@@ -120,8 +120,8 @@ export function playsDetail(s: ListedSource, timeZone: string): string {
 
 export type Tone = "ok" | "warn" | "quiet";
 
-/** A241: a feed's format in the desk's words (the List a source form's choices). */
-export const FORMAT_LABELS = { ical: "iCal", rss: "RSS", json: "JSON", xmltv: "XMLTV", webpage: "Webpage (its event data)" } as const;
+/** A241: a feed's format in the desk's words (the List a source form's choices). A248: a spreadsheet. */
+export const FORMAT_LABELS = { ical: "iCal", rss: "RSS", json: "JSON", xmltv: "XMLTV", webpage: "Webpage (its event data)", sheet: "Spreadsheet" } as const;
 
 /** A241: what the desk says when a webpage has no schedule data a computer can read. */
 export const NO_EVENT_DATA = "This page has no schedule data a computer can read.";
@@ -135,12 +135,17 @@ export function scheduleWords(s: ListedSource): { text: string; detail?: string;
   const source = s.schedule?.source ?? (s.calendarUrl ? "feed" : "none");
   if (source === "none") return { text: "No schedule found", detail: "Banner shows name and Live", tone: "warn" };
   if (source === "manual") return { text: "Entered by hand", detail: "Checked against their published schedule", tone: "ok" };
+  // A248: an uploaded spreadsheet, and a Google Sheet that isn't public.
+  if (source === "file") return { text: "Their spreadsheet", detail: "Uploaded", tone: "ok" };
+  if (s.calendarSync === "not_public") return { text: "Sheet isn't public", detail: "Publish it, or share it with anyone with the link", tone: "warn" };
+  if (s.calendarSync === "no_event_data" && s.schedule?.format === "sheet") return { text: "No times found in the sheet", detail: "Banner shows name and Live until it has some", tone: "warn" };
   if (s.calendarSync === "calendar_not_found") return { text: source === "guide_data" ? "Guide data not found" : "Calendar not found", detail: "Banner shows name and Live", tone: "warn" };
   // A241: the page answered, with nothing a computer can read; not an error.
   if (s.calendarSync === "no_event_data") return { text: "No schedule data on the page", detail: "Enter it by hand instead", tone: "warn" };
   if (source === "guide_data") return { text: "Guide data", detail: "Checked, from their published schedule", tone: "ok" };
   const format = s.schedule?.format ?? null;
   if (format === "webpage") return { text: "Their webpage's event data", tone: "ok" };
+  if (format === "sheet") return { text: "Their spreadsheet", detail: "Read every hour", tone: "ok" };
   return { text: format === null || format === "ical" ? "Their agenda calendar" : "Their schedule feed", tone: "ok" };
 }
 
@@ -324,7 +329,9 @@ const FIELD_LABELS: Record<ListedChange["fields"][number]["field"], string> = {
   channel: "Channel",
   callSign: "Call sign",
   manualSchedule: "Weekly schedule",
-  skipDates: "Doesn't air on"
+  skipDates: "Doesn't air on",
+  scheduleFile: "Spreadsheet",
+  scheduleTimeZone: "Its time zone"
 };
 
 const VALUE_WORDS: Record<string, string> = {
@@ -335,6 +342,7 @@ const VALUE_WORDS: Record<string, string> = {
   feed: "Their calendar or schedule feed",
   guide_data: "Guide data",
   manual: "Entered by hand",
+  file: "An uploaded spreadsheet",
   none: "None"
 };
 

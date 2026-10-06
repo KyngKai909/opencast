@@ -296,8 +296,87 @@ export type ExternalBasis = z.infer<typeof ExternalBasis>;
  * A calendar or schedule feed's format. Added 2026-10-01 (A241): `webpage`, a web page read for its
  * embedded event data (schema.org JSON-LD in its `<script type="application/ld+json">` blocks).
  */
-export const ScheduleFormat = z.enum(["ical", "rss", "json", "xmltv", "webpage"]);
+export const ScheduleFormat = z.enum(["ical", "rss", "json", "xmltv", "webpage", "sheet"]);
 export type ScheduleFormat = z.infer<typeof ScheduleFormat>;
+// Added 2026-10-06 (A248): `sheet`, a spreadsheet: a Google Sheet (published, or shared with anyone
+// with the link; read as its CSV export, the tab its `gid` names or the first), or a link to a
+// .csv, .tsv, .xlsx or .ods file (the first sheet, or the one a `#sheet=<name>` fragment names).
+
+/** A248: whether `name` is a time zone the platform knows ("America/New_York", "UTC"). */
+export function isTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: name });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A248: a time zone by its IANA name. */
+export const TimeZoneName = z.string().min(1).max(64).refine(isTimeZone, "A time zone like America/New_York");
+
+/**
+ * A248: how a spreadsheet lays its schedule out. `week_grid`: a header row of days, each cell a
+ * title and its time ("Trigun 6:00 AM"). `time_grid`: a column of times down the side, a header row
+ * of days, each cell a title. `list`: one row per airing, under headers like Date, Start, Title.
+ */
+export const SheetLayout = z.enum(["week_grid", "time_grid", "list"]);
+export type SheetLayout = z.infer<typeof SheetLayout>;
+
+/** A248: what kind of spreadsheet it was. */
+export const SheetKind = z.enum(["google_sheet", "csv", "tsv", "xlsx", "ods"]);
+export type SheetKind = z.infer<typeof SheetKind>;
+
+/**
+ * A248: what was read from a spreadsheet, at its last read (a link) or when it was uploaded (a
+ * file). Titles and times are the sheet's own; a cell without a time it can read is skipped
+ * (`skipped`, the first 20 with why), never guessed.
+ */
+export const SheetRead = z.object({
+  kind: SheetKind,
+  /** The tab read, by name (a file's), or null for a Google Sheet's (`gid` names it). */
+  tab: z.string().nullable(),
+  /** A Google Sheet's tab, from its link (`#gid=…`); null: the first tab. */
+  gid: z.string().nullable(),
+  /** A file's tabs, in order (one to pick from). Empty for a CSV and a Google Sheet. */
+  tabs: z.array(z.string()),
+  /** Null when no layout was recognised (no header of days, nor of columns like Date, Start, Title). */
+  layout: SheetLayout.nullable(),
+  /** Shows read: one per cell (a grid) or row (a list) with a title and a time. */
+  shows: z.number().int(),
+  /** A sheet whose days have no dates repeats every week (airings are made for the next 14 days). */
+  weekly: z.boolean(),
+  /** The first and last day read, in the sheet's own words ("Monday 10/05", "Sunday 10/11"). */
+  firstDay: z.string().nullable(),
+  lastDay: z.string().nullable(),
+  /** The first and last date read ("2026-10-05"); null for a weekly sheet. */
+  firstDate: DateOnly.nullable(),
+  lastDate: DateOnly.nullable(),
+  /** The time zone its times were read in, and why: the listing's own setting, the sheet's words, or the market's. */
+  timeZone: z.string(),
+  timeZoneFrom: z.enum(["listing", "sheet", "market"]),
+  /** The zones the sheet names when it names more than one (then none of them is used). */
+  zonesNamed: z.array(z.string()),
+  /** Cells (or rows) left out, and why: no time, a time but no title, out of order in its day, or a time without am or pm in a sheet that uses them. */
+  skipped: z.array(z.object({ text: z.string(), where: z.string(), why: z.enum(["no_time", "no_title", "out_of_order", "no_am_pm", "no_day"]) })),
+  skippedCount: z.number().int(),
+  readAt: Timestamp
+});
+export type SheetRead = z.infer<typeof SheetRead>;
+
+/** A248: an uploaded spreadsheet file, kept as what was read from it (the file itself isn't kept). */
+export const SheetFile = z.object({
+  name: z.string(),
+  kind: SheetKind,
+  bytes: z.number().int(),
+  uploadedAt: Timestamp,
+  /** Who uploaded it (their display name), or null. */
+  uploadedBy: z.string().nullable()
+});
+export type SheetFile = z.infer<typeof SheetFile>;
+
+/** A248: an uploaded spreadsheet's size limit. */
+export const SHEET_FILE_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * Where a listing's "what's on" comes from, as the desk sees it: `ExternalSchedule`'s three, and
@@ -307,7 +386,10 @@ export type ScheduleFormat = z.infer<typeof ScheduleFormat>;
  * is what it is (guide data checked against the published schedule), so apps built before it keep
  * reading the dial.
  */
-export const ListedScheduleSource = z.enum(["feed", "guide_data", "manual", "none"]);
+export const ListedScheduleSource = z.enum(["feed", "guide_data", "manual", "file", "none"]);
+// Added 2026-10-06 (A248): `file`, an uploaded spreadsheet, kept as what was read from it
+// (`ListedSource.schedule.file`, `.sheet`). `ExternalInfo.schedule` says `feed` for it: it's the
+// source's own schedule, as a file.
 export type ListedScheduleSource = z.infer<typeof ListedScheduleSource>;
 
 /**
@@ -316,11 +398,23 @@ export type ListedScheduleSource = z.infer<typeof ListedScheduleSource>;
  * `guideData`), a schedule entered by hand (`ManualScheduleInput`), or none.
  */
 export const ListedScheduleInput = z.discriminatedUnion("source", [
-  z.object({ source: z.literal("feed"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional() }),
-  z.object({ source: z.literal("guide_data"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional(), guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }) }),
+  z.object({ source: z.literal("feed"), calendarUrl: z.url(), calendarFormat: ScheduleFormat.nullable().optional(), timeZone: TimeZoneName.nullable().optional() }),
+  z.object({
+    source: z.literal("guide_data"),
+    calendarUrl: z.url(),
+    calendarFormat: ScheduleFormat.nullable().optional(),
+    guideData: z.object({ checkedAgainst: z.url(), checkedOn: DateOnly }),
+    timeZone: TimeZoneName.nullable().optional()
+  }),
   ManualScheduleInput,
+  // A248: the uploaded spreadsheet kept as it is, with its time zone changed (null: worked out).
+  // A file itself comes only through `uploadListedSchedule`; 409 `no_file` without one.
+  z.object({ source: z.literal("file"), timeZone: TimeZoneName.nullable().optional() }),
   z.object({ source: z.literal("none") })
 ]);
+// Added 2026-10-06 (A248): `timeZone` on a feed and guide data, the listing's own setting for the
+// times a source gives without one (a spreadsheet's, a webpage's event data without an offset);
+// null or left out works it out (a zone the sheet names, else the market's). And `file`, above.
 export type ListedScheduleInput = z.infer<typeof ListedScheduleInput>;
 
 /**
@@ -388,7 +482,10 @@ export const ListedField = z.enum([
   "callSign",
   // ---- Added 2026-10-01 (A241): a schedule entered by hand, as its weekly line, and the dates it skips ----
   "manualSchedule",
-  "skipDates"
+  "skipDates",
+  // ---- Added 2026-10-06 (A248): an uploaded spreadsheet ("week.xlsx, 152 shows"), and the listing's time zone for its schedule ----
+  "scheduleFile",
+  "scheduleTimeZone"
 ]);
 export type ListedField = z.infer<typeof ListedField>;
 
@@ -427,7 +524,11 @@ export const ListedSource = z.object({
    * computer can read (no schema.org event with a title and a start). Not an error: its airings
    * are left as they were, and its stream's health doesn't change.
    */
-  calendarSync: z.enum(["synced", "calendar_not_found", "not_set", "no_event_data"]),
+  calendarSync: z.enum(["synced", "calendar_not_found", "not_set", "no_event_data", "not_public"]),
+  // Added 2026-10-06 (A248): `not_public`, a Google Sheet that answers with a sign-in page or
+  // "not found" (it isn't published to the web, nor shared with anyone with the link). Like
+  // `calendar_not_found`, its airings stay as they were. A spreadsheet with no times it can read
+  // is `no_event_data`.
   listingState: z.enum(["not_listed", "checking", "listed"]),
   lastSyncedAt: Timestamp.nullable(),
   upcoming: z.number().int(),
@@ -463,7 +564,14 @@ export const ListedSource = z.object({
       checkedAgainst: z.string().nullable(),
       checkedOn: DateOnly.nullable(),
       slots: z.array(ManualSlot).optional(),
-      skipDates: z.array(DateOnly).optional()
+      skipDates: z.array(DateOnly).optional(),
+      // ---- Added 2026-10-06 (A248): spreadsheets ----
+      /** The listing's own time zone for times given without one; null: worked out (`sheet.timeZoneFrom`). */
+      timeZone: z.string().nullable().optional(),
+      /** What was read from its spreadsheet (a link's last read, or the uploaded file); null for anything else. */
+      sheet: SheetRead.nullable().optional(),
+      /** `source` `file`: the uploaded spreadsheet. */
+      file: SheetFile.nullable().optional()
     })
     .optional(),
   /** On the dial now: evidence in place, in its market, and not hidden for being down. */
@@ -634,6 +742,23 @@ export const ClaimPage = z.object({
     .nullable()
 });
 export type ClaimPage = z.infer<typeof ClaimPage>;
+
+/**
+ * A248 (2026-10-06): what a schedule address (or an uploaded spreadsheet) would give, read now and
+ * not saved: its format, what was read from a spreadsheet, how many airings are to come, and the
+ * first few, in the time zone they were read in.
+ */
+export const SchedulePreview = z.object({
+  format: ScheduleFormat,
+  sheet: SheetRead.nullable(),
+  /** Airings from now on (a weekly sheet's for the next 14 days, as saving makes them). */
+  upcoming: z.number().int(),
+  /** The first 8 of them. */
+  airings: z.array(z.object({ title: z.string(), startsAt: Timestamp, endsAt: Timestamp.nullable() })).max(8),
+  /** The zone the sheet's (or a webpage's) times were read in, to show the times in. */
+  timeZone: z.string()
+});
+export type SchedulePreview = z.infer<typeof SchedulePreview>;
 
 export const networkApi = {
   getBoard: endpoint({
@@ -981,6 +1106,37 @@ export const networkApi = {
     auth: "admin",
     summary: "Sync listings from the agenda calendar now. Added 2026-10-01 (A241): a webpage is read for its event data (`calendarSync` `no_event_data` when it has none); a schedule entered by hand is made into airings for the next 14 days again",
     params: z.object({ sourceId: Id }),
+    response: ListedSource
+  }),
+
+  // ---- Added 2026-10-06: A248, schedules from spreadsheets ----
+
+  previewListedSchedule: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/schedule-preview",
+    auth: "admin",
+    summary:
+      "A248: read a schedule address now, or an uploaded spreadsheet (`file`: .xlsx, .ods, .csv or .tsv, 2 MB at most), and say what it would give, without saving anything: the format, what was read from a spreadsheet (its layout, tab, days, time zone and the cells skipped), how many airings are to come and the first 8. `marketId` (a new listing) or `sourceId` (a listing) gives the market's time zone; `timeZone` overrides it, as the listing's own setting would. `sheet` picks a file's tab by name. 400 without an address or a file (or with both); 422 `not_public` (a Google Sheet that isn't published or shared with anyone with the link), `calendar_not_found` (the address didn't answer), `no_event_data` (nothing with a title and a time in it), `not_a_spreadsheet`, `old_excel` (.xls), `too_big`, `no_tab`.",
+    multipart: true,
+    body: z.object({
+      calendarUrl: z.url().optional(),
+      calendarFormat: ScheduleFormat.optional(),
+      timeZone: TimeZoneName.optional(),
+      sheet: z.string().max(100).optional(),
+      marketId: Id.optional(),
+      sourceId: Id.optional()
+    }),
+    response: SchedulePreview
+  }),
+  uploadListedSchedule: endpoint({
+    method: "POST",
+    path: "/admin/listed-sources/:sourceId/schedule-file",
+    auth: "admin",
+    summary:
+      "A248: a listing's schedule from an uploaded spreadsheet (`file`: .xlsx, .ods, .csv or .tsv, 2 MB at most; formulas and macros are never run, only the values the file holds are read). What's read is kept as the listing's schedule (`schedule.source` `file`; the file itself isn't kept) and made into airings at once and hourly: on its dates, or, for a sheet whose days have no dates, every week for the next 14 days. `timeZone` is the listing's own setting for its times (left out: a zone the sheet names, else the market's); `sheet` picks a tab by name (else the first). Kept in the listing's history (`scheduleFile`). 400 without a file; 422 `too_big`, `not_a_spreadsheet`, `old_excel` (.xls: save it as .xlsx), `no_tab`, `no_event_data` (nothing with a title and a time in it); 409 `removed`.",
+    params: z.object({ sourceId: Id }),
+    multipart: true,
+    body: z.object({ timeZone: TimeZoneName.optional(), sheet: z.string().max(100).optional() }),
     response: ListedSource
   }),
 
