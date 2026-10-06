@@ -1,7 +1,8 @@
-import { networkApi as api } from "@opencast/contracts";
+import { networkApi as api, SHEET_FILE_MAX_BYTES } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser, RouteRegistrar } from "../../http.js";
 import { notFound } from "../../errors.js";
+import { SHEET_FILE_TOO_BIG } from "./external.js";
 
 export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   const { network, settings } = services;
@@ -72,8 +73,10 @@ export function networkRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.addListedSource, ({ user, body }) => network.addListedSource(user, body));
   r.handle(api.syncListedSource, ({ params }) => network.syncListedSource(params.sourceId));
   // A248 (added 2026-10-06): a schedule read before it's saved, and a spreadsheet uploaded as one.
-  r.handle(api.previewListedSchedule, ({ body, file }) => network.previewListedSchedule(body, file));
-  r.handle(api.uploadListedSchedule, ({ user, params, body, file }) => network.uploadListedSchedule(user, params.sourceId, body, file));
+  // Admins only (the endpoints' `auth`), checked before the file is read.
+  const sheetFile = { maxBytes: SHEET_FILE_MAX_BYTES, tooBig: SHEET_FILE_TOO_BIG };
+  r.handle(api.previewListedSchedule, ({ body, file }) => network.previewListedSchedule(body, file), sheetFile);
+  r.handle(api.uploadListedSchedule, ({ user, params, body, file }) => network.uploadListedSchedule(user, params.sourceId, body, file), sheetFile);
   // A249 (added 2026-10-06): "Find this channel's guide", from iptv-org's public lists.
   r.handle(api.findListedGuides, ({ body }) => network.findListedGuides(body));
 

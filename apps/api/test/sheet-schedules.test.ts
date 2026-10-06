@@ -576,7 +576,8 @@ describe("a spreadsheet as a listing's schedule", () => {
       ids.WEEK = await listIt("47.1", "LOOP", "Loop Channel");
       await anon(h).post(`/v1/admin/listed-sources/${ids.WEEK}/schedule-file`).attach("file", Buffer.from(WEEKLY), "week.csv").expect(401);
       await upload(viewer, strToU8(WEEKLY), "week.csv").expect(403);
-      const big = await upload(dee, Buffer.alloc(2 * 1024 * 1024 + 1, 0x41), "week.csv").expect(422);
+      // Cut off as it arrives (2026-10-06): 413, in the endpoint's own words.
+      const big = await upload(dee, Buffer.alloc(2 * 1024 * 1024 + 1, 0x41), "week.csv").expect(413);
       expect(big.body.error).toMatchObject({ code: "too_big", message: "Use a file of 2 MB or less." });
       expect((await upload(dee, strToU8("%PDF-1.4"), "week.pdf").expect(422)).body.error.code).toBe("not_a_spreadsheet");
       expect((await upload(dee, new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0, 0, 0, 0]), "week.xls").expect(422)).body.error.code).toBe("old_excel");

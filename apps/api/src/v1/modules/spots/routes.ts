@@ -3,6 +3,7 @@ import { checkCreditText } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { notFound } from "../../errors.js";
+import { FORM_FILE_MAX_BYTES, FORM_FILE_TOO_BIG, LOGO_MAX_BYTES, LOGO_TOO_BIG } from "../../formUploads.js";
 
 export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext) {
   const { spots, accounts } = services;
@@ -55,9 +56,10 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await spotBusiness(user, params.spotId, doers);
     return spots.updateSpot(params.spotId, body);
   });
-  r.handle(api.uploadSpotFile, async ({ user, params, body, file }) => {
-    await spotBusiness(user, params.spotId, doers);
-    return spots.uploadSpotFile(params.spotId, file!, body.scaleToFit);
+  r.handle(api.uploadSpotFile, ({ params, body, file }) => spots.uploadSpotFile(params.spotId, file!, body.scaleToFit), {
+    maxBytes: FORM_FILE_MAX_BYTES,
+    tooBig: FORM_FILE_TOO_BIG,
+    authorize: ({ user, params }) => spotBusiness(user, params.spotId, doers)
   });
   r.handle(api.matchStations, async ({ user, params, body }) => {
     await spotBusiness(user, params.spotId, doers);
@@ -200,9 +202,10 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await orderSide(user, params.orderId);
     return spots.order(params.orderId);
   });
-  r.handle(api.attachBriefFile, async ({ user, params, file }) => {
-    await orderSide(user, params.orderId, "business");
-    return spots.attachBriefFile(params.orderId, file!);
+  r.handle(api.attachBriefFile, ({ params, file }) => spots.attachBriefFile(params.orderId, file!), {
+    maxBytes: FORM_FILE_MAX_BYTES,
+    tooBig: FORM_FILE_TOO_BIG,
+    authorize: ({ user, params }) => orderSide(user, params.orderId, "business")
   });
   r.handle(api.quoteOrder, async ({ user, params, body }) => {
     await orderSide(user, params.orderId, "maker");
@@ -212,9 +215,10 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await orderSide(user, params.orderId, "business");
     return spots.acceptQuote(params.orderId);
   });
-  r.handle(api.deliverOrder, async ({ user, params, file }) => {
-    await orderSide(user, params.orderId, "maker");
-    return spots.deliver(params.orderId, file!);
+  r.handle(api.deliverOrder, ({ params, file }) => spots.deliver(params.orderId, file!), {
+    maxBytes: FORM_FILE_MAX_BYTES,
+    tooBig: FORM_FILE_TOO_BIG,
+    authorize: ({ user, params }) => orderSide(user, params.orderId, "maker")
   });
   r.handle(api.addOrderNote, async ({ user, params, body }) => {
     await orderSide(user, params.orderId);
@@ -253,9 +257,10 @@ export function spotsRoutes(r: RouteRegistrar, { deps, services }: ModuleContext
     await accounts.requireBusiness(user, params.businessId, [...doers]);
     return spots.updateLocation(params.businessId, params.locationId, body);
   });
-  r.handle(api.uploadLogo, async ({ user, params, file }) => {
-    await accounts.requireBusiness(user, params.businessId, [...doers]);
-    return spots.uploadLogo(params.businessId, file);
+  r.handle(api.uploadLogo, ({ params, file }) => spots.uploadLogo(params.businessId, file), {
+    maxBytes: LOGO_MAX_BYTES,
+    tooBig: LOGO_TOO_BIG,
+    authorize: ({ user, params }) => accounts.requireBusiness(user, params.businessId, [...doers])
   });
   r.handle(api.closeBusiness, async ({ user, params, body }) => {
     await accounts.requireBusiness(user, params.businessId, ["owner"]);

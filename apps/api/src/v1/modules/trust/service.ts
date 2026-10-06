@@ -50,7 +50,8 @@ export interface TrustService {
 /** B6: what an answer can be backed by. */
 const ATTACHMENT_TYPES = /^(application\/pdf|image\/(png|jpeg|gif|webp|heic)|text\/plain)$/;
 const ATTACHMENT_EXTENSIONS = /\.(pdf|png|jpe?g|gif|webp|heic|txt)$/i;
-const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+export const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+export const ATTACHMENT_TOO_BIG = "Attach a file of 20 MB or less.";
 
 const DAY = 86_400_000;
 
@@ -305,7 +306,7 @@ export function createTrustService({ deps, services }: ModuleContext): TrustServ
       if (!ATTACHMENT_TYPES.test(file.mimeType) && !ATTACHMENT_EXTENSIONS.test(file.originalName)) {
         throw refused("wrong_file_type", "Attach a PDF, a picture or a text file.");
       }
-      if (file.size > ATTACHMENT_MAX_BYTES) throw refused("too_big", "Attach a file of 20 MB or less.");
+      if (file.size > ATTACHMENT_MAX_BYTES) throw refused("too_big", ATTACHMENT_TOO_BIG);
       const content = services.library.content;
       // Read once or twice: Infrequent Access.
       const stored = await content.store(file.path, { storageClass: "infrequent", contentType: file.mimeType || undefined });
