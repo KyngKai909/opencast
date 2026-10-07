@@ -18,8 +18,8 @@ The user's request (2026-10-06): an Analytics page in the Network desk for the w
 | 1 | **The data**, shipped first so history builds up: a session per station (and the fix that comes with it), the visit, the device hash, how it was tuned, press-to-picture, searches. Migration 0054. | Done (PR #28) |
 | 2 | **Totals and the API**: hourly station totals (every station, external included, from session minutes), nightly totals (sessions and their length, bots by reason, devices, how people tuned in, station flows), `analyticsApi` (overview and stations), the rail's "Analytics" first under Network, the **Overview** and **Stations** tabs with CSV. Migration 0055. | Done (PR #29) |
 | 3 | **One station** (03): the night by the minute with breaks, airings, surfaces, markets, came from and went to, airtime fill, earned. Cost to run comes with Money (Phase 6); the station's own Programs, Money and Health views come with those tabs. | Done (PR #30) |
-| 4 | **Audience** (04): the hour-by-day grid, session lengths (median and average), stations per visit, presets, surfaces and relays by day, moving around the dial, devices, how people tuned in; a station picker narrows it all. Migration 0056. | Done |
-| 5 | **Programs and breaks** (05): programs across stations with still-watching curves; `break_stats` and break hold. | |
+| 4 | **Audience** (04): the hour-by-day grid, session lengths (median and average), stations per visit, presets, surfaces and relays by day, moving around the dial, devices, how people tuned in; a station picker narrows it all. Migration 0056. | Done (PR #31) |
+| 5 | **Programs and breaks** (05): programs across stations (sortable), a program's still-watching curve with its breaks, tune-aways and biggest drop; `break_stats` and break hold by length, position and first element. Migration 0057. | Done |
 | 6 | **Money** (06): earnings by kind, held for claimable stations, the spot market, per 1,000 hours, Opencast's week, carriage; the `costs` rule group in Settings. | |
 | 7 | **Health** (07) and **Growth**: airtime fill, incidents, relays, bots, press to picture and Stand by; then Growth and search. | |
 
@@ -52,7 +52,7 @@ Each phase goes to `dev` by its own pull request, merged when its checks pass.
 | Stayed to the end, still watching by minute | `airing_stats.stayed_to_end`, `audience_at_start`, `tune_aways[]` | Collected |
 | "Not for me" per 1,000 hours | `airing_stats.not_for_me`, `watch_seconds` | Worked out |
 | A program across stations | `airing_stats` by `program_id`, the `MakerProgramWatch` rules | Collected |
-| Break hold | New `break_stats`, from session heartbeats around each break and `as_run` (worked out from the 30 days of sessions kept, so it can be added later without losing history) | Phase 5 |
+| Break hold | `break_stats`, from session minutes at each break's start and end and the as-run log (the first run filled in the 30 days kept) | Collected (Phase 5) |
 
 ### Money, airtime and cost
 

@@ -80,7 +80,12 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
 
   const minuteOf = (at: Date) => new Date(Math.floor(at.getTime() / MINUTE) * MINUTE);
 
-  const totals = createTotals(db, deps.clock, () => services.stations.dialPlaces());
+  const totals = createTotals(
+    db,
+    deps.clock,
+    () => services.stations.dialPlaces(),
+    (from, to) => services.playout.airedBreaks(from, to)
+  );
   const service: AudienceService = {
     watch: createWatchData({ deps, services }),
     totals,

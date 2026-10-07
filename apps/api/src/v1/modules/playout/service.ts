@@ -106,6 +106,12 @@ export interface PlayoutService {
   airtimeMinutes(stationId: string, from: Date, to: Date): Promise<{ programs: number; breaks: number; live: number; deadAir: number }>;
   /** A251: a station's breaks as they aired in a window, touching ones joined. */
   breakSpans(stationId: string, from: Date, to: Date): Promise<Array<{ start: Date; end: Date }>>;
+  /**
+   * A251 Phase 5: breaks as they aired, ending in a window, every station: when, how long, where they
+   * sat (`opening` a program's slot when no program aired just before it, `inside` one when the same
+   * log entry's program aired either side, `between` two otherwise), what opened them and how many spots.
+   */
+  airedBreaks(from: Date, to: Date): Promise<Array<{ breakId: string; stationId: string; start: Date; end: Date; position: "opening" | "inside" | "between"; firstElement: "bumper" | "spot" | "sponsor" | "station_id" | "other"; spots: number }>>;
   /** A251: why each of these as-run rows aired (planned, live, a fill…). */
   asRunReasons(ids: string[]): Promise<Map<string, string>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
@@ -372,6 +378,50 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         const last = out[out.length - 1];
         if (last && r.start.getTime() - last.end.getTime() <= 1000) last.end = new Date(Math.max(last.end.getTime(), r.end.getTime()));
         else out.push({ start: r.start, end: r.end });
+      }
+      return out;
+    },
+
+    async airedBreaks(from, to) {
+      const A = schema.asRun;
+      // Every row of the breaks that ended in the window (one break may have aired in several rows).
+      const rows = await db
+        .select({ breakId: A.breakId, stationId: A.stationId, code: A.code, start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(sql`${A.breakId} is not null`, gte(A.endedAt, new Date(from.getTime() - 3 * 3_600_000)), lt(A.startedAt, to)))
+        .orderBy(asc(A.startedAt));
+      type Aired = { breakId: string; stationId: string; start: Date; end: Date; first: string; spots: number };
+      const byBreak = new Map<string, Aired>();
+      for (const r of rows) {
+        // The same break airing again later (a replay) is another airing: keyed by its start too.
+        const open = byBreak.get(r.breakId!);
+        if (open && r.start.getTime() - open.end.getTime() <= 5_000) {
+          open.end = new Date(Math.max(open.end.getTime(), r.end.getTime()));
+          if (r.code === "SPT") open.spots++;
+          continue;
+        }
+        if (open) byBreak.set(`${r.breakId}@${open.start.getTime()}`, open);
+        byBreak.set(r.breakId!, { breakId: r.breakId!, stationId: r.stationId, start: r.start, end: r.end, first: r.code, spots: r.code === "SPT" ? 1 : 0 });
+      }
+      const aired = [...byBreak.values()].filter((b) => b.end >= from && b.end < to);
+      const out: Awaited<ReturnType<PlayoutService["airedBreaks"]>> = [];
+      for (const b of aired) {
+        // The programs either side, within a few seconds.
+        const [before] = await db
+          .select({ entry: A.logEntryId })
+          .from(A)
+          .where(and(eq(A.stationId, b.stationId), eq(A.code, "PGM"), sql`${A.breakId} is null`, lte(A.endedAt, new Date(b.start.getTime() + 5_000)), gte(A.endedAt, new Date(b.start.getTime() - 60_000))))
+          .orderBy(desc(A.endedAt))
+          .limit(1);
+        const [after] = await db
+          .select({ entry: A.logEntryId })
+          .from(A)
+          .where(and(eq(A.stationId, b.stationId), eq(A.code, "PGM"), sql`${A.breakId} is null`, gte(A.startedAt, new Date(b.end.getTime() - 5_000)), lte(A.startedAt, new Date(b.end.getTime() + 60_000))))
+          .orderBy(asc(A.startedAt))
+          .limit(1);
+        const position = !before ? "opening" : after && before.entry && before.entry === after.entry ? "inside" : "between";
+        const firstElement = b.first === "BMP" ? "bumper" : b.first === "SPT" ? "spot" : b.first === "UND" ? "sponsor" : b.first === "SID" ? "station_id" : "other";
+        out.push({ breakId: b.breakId, stationId: b.stationId, start: b.start, end: b.end, position, firstElement, spots: b.spots });
       }
       return out;
     },

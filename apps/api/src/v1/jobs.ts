@@ -36,7 +36,7 @@ export interface JobResults {
   watchData?: { computed: number; finalized: number; votesDeleted: number } | null;
   watchDataPurged?: { sessions: number; minutes: number; votes: number; searches?: number } | null;
   /** A251: the analytics totals worked out this tick. */
-  analyticsTotals?: { hours: number; days: number } | null;
+  analyticsTotals?: { hours: number; days: number; breaks?: number } | null;
   /**
    * Pay-as-you-go (added 2026-09-29, follow-up Phase 2): usage measured (hourly), days and months
    * closed (UTC midnight), grace steps, Clear payments checked again.

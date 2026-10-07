@@ -66,8 +66,10 @@ export function scopesFor(place: { band: "tv" | "radio" | null; marketId: string
 }
 
 export interface Totals {
-  /** Works out what's due: the last few hours, today and yesterday, and anything missing. */
-  tick(): Promise<{ hours: number; days: number }>;
+  /** Works out what's due: the last few hours, today and yesterday, anything missing, and breaks. */
+  tick(): Promise<{ hours: number; days: number; breaks?: number }>;
+  /** Phase 5: break hold for breaks that ended in [from, to). */
+  breaks(from: Date, to: Date): Promise<number>;
   /** Hours starting in [from, to), worked out again. */
   hours(from: Date, to: Date): Promise<number>;
   /** These Pacific days worked out again. */
@@ -78,8 +80,10 @@ export interface Totals {
 
 /** Each station's band and market on the dial (the stations module's channels). */
 type DialPlaces = () => Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
+/** Breaks as they aired (the playout module's as-run log). */
+type AiredBreaks = (from: Date, to: Date) => Promise<Array<{ breakId: string; stationId: string; start: Date; end: Date; position: "opening" | "inside" | "between"; firstElement: "bumper" | "spot" | "sponsor" | "station_id" | "other"; spots: number }>>;
 
-export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPlaces): Totals {
+export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPlaces, airedBreaks: AiredBreaks = async () => []): Totals {
   const SM = schema.sessionMinutes;
   const S = schema.sessions;
 
@@ -324,10 +328,36 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
     }
   }
 
+  async function breaks(from: Date, to: Date): Promise<number> {
+    const list = await airedBreaks(from, to);
+    let n = 0;
+    for (const b of list) {
+      const startMinute = new Date(Math.floor(b.start.getTime() / 60_000) * 60_000);
+      const endMinute = new Date(Math.floor((b.end.getTime() - 1) / 60_000) * 60_000);
+      // Tuned in when it started, and of those, still there in the minute it ended.
+      const [r] = (
+        (await db.execute(sql`
+          select count(*)::int as "atStart",
+            count(*) filter (where exists (select 1 from ${SM} e where e.session_id = s.session_id and e.station_id = ${b.stationId} and e.minute = ${endMinute}))::int as "atEnd"
+          from ${SM} s where s.station_id = ${b.stationId} and s.minute = ${startMinute}`)) as unknown as Rows<{ atStart: number; atEnd: number }>
+      ).rows;
+      await db
+        .insert(schema.breakStats)
+        .values({ stationId: b.stationId, breakId: b.breakId, startedAt: b.start, endedAt: b.end, seconds: Math.round((b.end.getTime() - b.start.getTime()) / 1000), position: b.position, firstElement: b.firstElement, spots: b.spots, tunedAtStart: r?.atStart ?? 0, stillAtEnd: r?.atEnd ?? 0, computedAt: clock.now() })
+        .onConflictDoUpdate({
+          target: [schema.breakStats.breakId, schema.breakStats.startedAt],
+          set: { endedAt: b.end, seconds: Math.round((b.end.getTime() - b.start.getTime()) / 1000), position: b.position, firstElement: b.firstElement, spots: b.spots, tunedAtStart: r?.atStart ?? 0, stillAtEnd: r?.atEnd ?? 0, computedAt: clock.now() }
+        });
+      n++;
+    }
+    return n;
+  }
+
   return {
     places,
     hours,
     days,
+    breaks,
     async tick() {
       const now = clock.now();
       // The first run fills in from the oldest minute kept; after that, the last few hours.
@@ -348,7 +378,11 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
         for (let d = dayOf(new Date(firstSession.at)); d < yesterday; d = nextDay(d)) if (!have.has(d)) due.add(d);
       }
       await days([...due].sort());
-      return { hours: hoursDone, days: due.size };
+      // Breaks: once their last minute is counted (a few minutes after), from where the last left off.
+      const [lastBreak] = await db.select({ at: sql<Date | string | null>`max(${schema.breakStats.endedAt})` }).from(schema.breakStats);
+      const breaksFrom = lastBreak?.at ? new Date(new Date(lastBreak.at).getTime() - 15 * 60_000) : oldest?.minute ? new Date(oldest.minute) : new Date(now.getTime() - 3 * HOUR);
+      const breaksDone = await breaks(breaksFrom, new Date(now.getTime() - 5 * 60_000));
+      return { hours: hoursDone, days: due.size, breaks: breaksDone };
     }
   };
 }

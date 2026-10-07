@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, Programs and breaks (A251, Phase 5)
+
+Additive: two new desk endpoints and new shapes. Migration **0057**: new table `audience.break_stats`, one row per aired break, kept for good, naming no one.
+
+- `analytics.ts`: new `AnalyticsProgram`, `AnalyticsBreakHold`, `AnalyticsPrograms`, `AnalyticsProgramDetail`.
+- New endpoints, `auth: "desk"`:
+  - `analyticsApi.programs` (`GET /desk/analytics/programs`): every program aired in the view, added up across its stations (carried airings included), with its maker (null for the catalog), whether any airing was live, stations, airings, hours, average tuned in, stayed to the end and "Not for me" (null under the minimum, its airings' peaks added up). Also break hold (of those tuned in when breaks started, the percent still there when they ended): all, by length (`30`, `60`, `90`, `120`, `150_plus` seconds), by position (`opening`, `inside`, `between`), by first element (`bumper`, `spot`, `sponsor`, `station_id`, `other`), and the share opening with a bumper.
+  - `analyticsApi.program` (`GET /desk/analytics/programs/:programId`): still watching minute by minute (the first minute's audience less everyone who has left), tune-aways by minute, its breaks as its biggest airing aired them, at the start and still at the end, and the biggest drop. A program that didn't air in the view is a 404.
+
 ## 2026-10-07: The desk's analytics, Audience (A251, Phase 4)
 
 Additive: one new desk endpoint, new shapes. Migration **0056**: `audience.station_days` gains `minutes_total` and `version`; `audience.device_days` gains `visits` and `visit_sessions` (all with defaults). Days worked out before are worked out again while their sessions are kept, with the reference's length bands.

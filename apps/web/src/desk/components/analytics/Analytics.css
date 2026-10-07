@@ -202,3 +202,19 @@ li.nd-an__none { display: block !important; }
 @media (max-width: 1280px) {
   .nd-an__two { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* 05 Programs and breaks. */
+.nd-an__pg { grid-template-columns: 22px minmax(0, 1.4fr) minmax(90px, .8fr) 54px 54px 60px 44px minmax(120px, 160px) 70px; }
+.nd-an__sel { background: color-mix(in srgb, var(--signal) 10%, transparent); border-radius: 8px; border-bottom-color: transparent; }
+.nd-an__pick-row { border: 0; background: none; padding: 0; font: 600 13.5px var(--font-text); color: var(--ink); cursor: pointer; text-align: left; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.nd-an__pick-row:hover { text-decoration: underline; }
+.nd-an__from { font-size: 13px; color: var(--ink-70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd-an__more { margin-top: 10px; }
+.nd-an__curve { margin: 0; }
+.nd-an__curve svg { display: block; width: 100%; height: auto; overflow: visible; }
+.nd-an__brk { fill: var(--ink-50); opacity: .14; }
+i.nd-an__brk { background: var(--ink-50); opacity: .35; }
+.nd-an__legend--top { margin: 0; }
+.nd-an__away { display: flex; align-items: flex-end; gap: 1px; height: 44px; }
+.nd-an__away i { flex: 1; background: var(--c2); min-height: 1px; border-radius: 1px 1px 0 0; opacity: .8; }
+.nd-an__sel small, .nd-an__sel .nd-an__q { color: var(--ink-70); }

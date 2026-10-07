@@ -330,3 +330,32 @@ export const stationFlows = audience.table(
   },
   (t) => [primaryKey({ columns: [t.day, t.fromStation, t.toStation] })]
 );
+
+/**
+ * A251 Phase 5 (added 2026-10-07, migration 0057): break hold, one row per aired break, kept for good
+ * and naming no one: how many were tuned in when it started and how many of them were still there
+ * when it ended (from session minutes, the minute each falls in), its length, where it sat
+ * (`opening` a program's slot, `inside` one, `between` two) and what opened it (`bumper`, `spot`,
+ * `sponsor`, `station_id`, `other`). Worked out once its minutes are counted.
+ */
+export const breakStats = audience.table(
+  "break_stats",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    /** The break as planned (no foreign key: it may come off the log after it aired). */
+    breakId: uuid("break_id").notNull(),
+    startedAt: at("started_at").notNull(),
+    endedAt: at("ended_at").notNull(),
+    seconds: integer("seconds").notNull(),
+    position: text("position", { enum: ["opening", "inside", "between"] }).notNull(),
+    firstElement: text("first_element", { enum: ["bumper", "spot", "sponsor", "station_id", "other"] }).notNull(),
+    spots: integer("spots").notNull().default(0),
+    tunedAtStart: integer("tuned_at_start").notNull(),
+    stillAtEnd: integer("still_at_end").notNull(),
+    computedAt: at("computed_at").notNull().defaultNow()
+  },
+  (t) => [uniqueIndex("break_stats_aired").on(t.breakId, t.startedAt), index("break_stats_station_time").on(t.stationId, t.startedAt)]
+);
