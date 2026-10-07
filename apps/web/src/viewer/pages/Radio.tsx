@@ -71,7 +71,7 @@ function RadioBand() {
   const slug = useMarketSlug();
   const radio = useDial("radio");
   const np = useNowPlaying();
-  const tune = useTune();
+  const tune = useTune("dial");
   const openStation = useOpenStation();
   const now = useNow(15_000);
   const rows = useMemo(() => [...(radio.data?.rows ?? [])].sort((a, b) => frequencyOf(a) - frequencyOf(b)), [radio.data]);

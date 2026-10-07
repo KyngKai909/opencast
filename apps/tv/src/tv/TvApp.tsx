@@ -193,7 +193,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     // The last station's id (or, on the mirror, the address's `station`, which may be a slug: "rivc-15-2").
     const lastRef = getDevice().lastStationId;
     const last = getDevice().settings.startOn === "last_channel" && lastRef ? findByRef(channels, lastRef, (c) => c.station) : null;
-    void engine.tune((last ?? channels[0]).station.id, { input: "app" });
+    void engine.tune((last ?? channels[0]).station.id, { input: "app", via: "resume" });
   }, [channels, engine, state.currentId, state.pendingId, loc.pathname]);
   useEffect(() => {
     if (state.currentId && state.currentId !== getDevice().lastStationId) setDevice({ lastStationId: state.currentId });
@@ -208,7 +208,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     const held = engine.getState().channels.find((c) => c.station.id === state.currentId);
     if (held?.station.kind === "listed" && held.station.marketSlug === channels[0]?.station.marketSlug) return;
     const first = channels.find((c) => c.station.band === "tv") ?? channels[0];
-    void engine.tune(first.station.id, { input: "app" });
+    void engine.tune(first.station.id, { input: "app", via: "resume" });
   }, [channels, engine, state.currentId]);
 
   // First launch on the TV app: sign in on your phone, or watch without signing in.

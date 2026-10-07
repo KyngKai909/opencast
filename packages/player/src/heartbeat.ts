@@ -1,7 +1,7 @@
 // "Tuned in": players send a heartbeat every 30 seconds while tuned in, with the station and a
 // session id (POST /v1/heartbeat). Stations see the count; viewers never do.
 
-import type { Platform } from "@opencast/contracts";
+import type { Platform, TuneVia } from "@opencast/contracts";
 import type { PlayerEngine } from "./engine/PlayerEngine";
 
 export interface HeartbeatBody {
@@ -10,6 +10,11 @@ export interface HeartbeatBody {
   platform: Platform;
   mediaTimeMs: number;
   playing: boolean;
+  /** A251: the device's id (deviceId()), for counts of devices; never tied to an account. */
+  deviceId?: string;
+  /** A251: on a station's first beat, how it was tuned and how long the picture took. */
+  via?: TuneVia;
+  tuneMs?: number;
 }
 
 /**
@@ -35,6 +40,26 @@ export function sessionId(): string {
   }
 }
 
+const DEVICE_KEY = "oc-device";
+
+/**
+ * A251 (2026-10-06): a random id kept on the device (this browser, this app), for the desk's counts
+ * of devices. Not the person and never tied to an account; the API keeps only a hash of it. Null
+ * where the device can't keep it (private browsing): those beats count as sessions only.
+ */
+export function deviceId(): string | null {
+  try {
+    const existing = localStorage.getItem(DEVICE_KEY);
+    if (existing) return existing;
+    const id = globalThis.crypto?.randomUUID?.();
+    if (!id) return null;
+    localStorage.setItem(DEVICE_KEY, id);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
 /** Sends to the API: `${apiBase}/v1/heartbeat`. */
 export function httpHeartbeat(apiBase: string): SendHeartbeat {
   const url = `${apiBase.replace(/\/+$/, "")}/v1/heartbeat`;
@@ -51,8 +76,10 @@ export function httpHeartbeat(apiBase: string): SendHeartbeat {
  * API asks. During a station's planned off air (the answer has `offAirUntil`) it stops beating for
  * that station until `nextInMs` has passed, even if you tune away and back. Returns a stop function.
  */
-export function startHeartbeat(engine: PlayerEngine, send: SendHeartbeat, platform: Platform, session = sessionId()): () => void {
+export function startHeartbeat(engine: PlayerEngine, send: SendHeartbeat, platform: Platform, session = sessionId(), device: string | null = deviceId()): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /** A251: the station whose first beat is still to go (it carries how it was tuned). */
+  let firstFor: string | null = null;
   let stopped = false;
   /** Stations off air on a schedule, and when (Date.now()) to try them again. */
   const quiet = new Map<string, number>();
@@ -72,7 +99,19 @@ export function startHeartbeat(engine: PlayerEngine, send: SendHeartbeat, platfo
       if (embed && embedSince?.stationId !== stationId) embedSince = { stationId, at: Date.now() };
       const mediaTimeMs = embed ? Date.now() - embedSince!.at : engine.mediaTimeMs();
       try {
-        const r = await send({ stationId, sessionId: session, platform, mediaTimeMs, playing: s.status !== "paused" });
+        const tune = firstFor === stationId && s.lastTune?.stationId === stationId ? s.lastTune : null;
+        const first = firstFor === stationId;
+        firstFor = null;
+        const r = await send({
+          stationId,
+          sessionId: session,
+          platform,
+          mediaTimeMs,
+          playing: s.status !== "paused",
+          ...(device ? { deviceId: device } : {}),
+          ...(first && tune?.via ? { via: tune.via } : {}),
+          ...(first && tune ? { tuneMs: Math.max(0, tune.ms) } : {})
+        });
         if (r && typeof r.nextInMs === "number" && r.nextInMs > 0) next = r.nextInMs;
         if (r && r.offAirUntil) quiet.set(stationId, Date.now() + next);
       } catch {
@@ -87,6 +126,7 @@ export function startHeartbeat(engine: PlayerEngine, send: SendHeartbeat, platfo
     const s = engine.getState();
     if (s.currentId !== lastId && (s.status === "playing" || s.status === "embed")) {
       lastId = s.currentId;
+      firstFor = s.currentId;
       if (timer) clearTimeout(timer);
       void beat();
     }

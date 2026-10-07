@@ -120,7 +120,8 @@ function useStartOnLastChannel(on: boolean) {
     if (id && !channels.length) return; // the dial, still loading
     startChecked = true;
     const row = id ? channels.find((c) => c.station.id === id) : undefined;
-    if (row) navigate(`/watch/${stationSlug(row.station)}`, { replace: true });
+    // A251: the tune says it's the app starting on its last channel, not a link.
+    if (row) navigate(`/watch/${stationSlug(row.station)}`, { replace: true, state: { via: "resume" } });
   }, [on, auth.ready, auth.signedIn, atDial, settings, history.isLoading, history.data, device.lastStationId, channels, navigate]);
 }
 

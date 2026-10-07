@@ -197,7 +197,7 @@ export function SwipeScreen({ w, form }: { w: WatchData; form: SwipeForm }) {
   const land = (target: DialRowX, picture: boolean) => {
     setLanding({ id: target.station.id, picture });
     setDevice({ lastStationId: target.station.id });
-    void engine.tune(target.station.id, { input: "touch" });
+    void engine.tune(target.station.id, { input: "touch", via: "swipe" });
     busy.current = false;
   };
 

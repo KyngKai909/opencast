@@ -20,7 +20,7 @@ export default function Radio() {
   useEffect(() => {
     if (!ready) return;
     const target = dial.data ? bandTarget(dial.data.rows, band, lastOnBand(band)) : null;
-    if (target) void engine.tune(target.station.id, { input: "remote" });
+    if (target) void engine.tune(target.station.id, { input: "remote", via: "dial" });
     navigate("/", { replace: true });
   }, [ready, dial.data, band, engine, navigate]);
 

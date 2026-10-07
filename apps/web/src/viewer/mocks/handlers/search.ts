@@ -62,5 +62,7 @@ export const searchHandlers = [
   http.get(path(stationsApi.search), ({ request }) => {
     const u = new URL(request.url);
     return reply(SearchFull, searchResults(u.searchParams.get("q") ?? "", u.searchParams.get("market")));
-  })
+  }),
+  // A251: a settled search, for the desk's analytics; the mocks keep nothing.
+  http.post(path(stationsApi.searchSeen), () => reply(stationsApi.searchSeen.response, { ok: true as const }))
 ];

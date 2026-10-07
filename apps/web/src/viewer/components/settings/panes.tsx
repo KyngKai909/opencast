@@ -411,6 +411,8 @@ function PrivacyPane() {
       />
       <SettingRow title="Clear watch history" help="Starts fresh, here and on the account" control={() => <Button size="sm" onClick={() => void clear()}>Clear</Button>} />
       <SettingRow title="What stations see" help="Tuned-in counts that stations see are anonymous." />
+      {/* A251 (2026-10-06): the device id the player sends for Opencast's counts of devices. */}
+      <SettingRow title="Counting devices" help="Opencast counts devices with a random number kept on this device. It isn't tied to your account, and only totals are kept after 30 days." />
       <Err error={error ?? clearError} />
     </>
   );

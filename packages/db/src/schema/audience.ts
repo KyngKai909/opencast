@@ -28,9 +28,38 @@ export const sessions = audience.table(
      * their chosen market when signed in, else a coarse location from the connection (GEOIP_URL),
      * looked up once and forgotten. Null: Opencast can't place them (not billed to local businesses).
      */
-    marketId: uuid("market_id").references(() => markets.id)
+    marketId: uuid("market_id").references(() => markets.id),
+    // ---- A251 (added 2026-10-06, migration 0054): the desk's analytics ----
+    /**
+     * The tab's (or TV app run's) id the player beat with: the session's own id for the first
+     * station, and the same for each station after, whose sessions get ids of their own. Sessions
+     * of one visit one after another are channel changes.
+     */
+    visitId: uuid("visit_id"),
+    /** A hash of the player's device id (never the id itself, never an account): counts of devices only. */
+    deviceHash: text("device_hash"),
+    /** How it was tuned (`Heartbeat.via`), from its first beat. */
+    via: text("via"),
+    /** Ms from the press to the first picture, from its first beat. */
+    tuneMs: integer("tune_ms")
   },
-  (t) => [index("sessions_station_beat").on(t.stationId, t.lastBeatAt)]
+  (t) => [index("sessions_station_beat").on(t.stationId, t.lastBeatAt), index("sessions_visit").on(t.visitId, t.startedAt), index("sessions_device").on(t.deviceHash, t.startedAt)]
+);
+
+/**
+ * A251 (added 2026-10-06, migration 0054): a search a viewer settled on (`POST /search/seen`): its
+ * words, lower-cased, and how many results it had. No account, device or session. Kept 90 days,
+ * then only the desk's totals.
+ */
+export const searches = audience.table(
+  "searches",
+  {
+    id: id(),
+    term: text("term").notNull(),
+    results: integer("results").notNull(),
+    at: at("at").notNull().defaultNow()
+  },
+  (t) => [index("searches_at").on(t.at)]
 );
 
 /** Tuned-in concurrency per station per minute, by platform. Per-thousand billing reads this. */

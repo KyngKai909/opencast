@@ -194,6 +194,13 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     };
   });
 
+  // A251 (2026-10-06): a search the viewer settled on, for the desk's analytics: the words (lower
+  // case, spaces evened) and how many results; no account, device or session. Kept 90 days.
+  r.handle(api.searchSeen, async ({ body }) => {
+    await services.audience.recordSearch(body.q, body.results);
+    return { ok: true as const };
+  });
+
   r.handle(api.search, async ({ query }) => {
     const market = query.market ? await network.marketBySlug(query.market) : null;
     const now = deps.clock.now();

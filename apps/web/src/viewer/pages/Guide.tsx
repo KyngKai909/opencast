@@ -89,7 +89,7 @@ export default function GuidePage() {
   const only = useMemo(() => (presetsOnly && !phone ? new Set(presets.map((p) => p.station.id)) : null), [presetsOnly, phone, presets]);
   const orders = useSwipeOrders();
   const np = useNowPlaying();
-  const tune = useTune();
+  const tune = useTune("guide");
   const navigate = useNavigate();
   const [, engine] = usePlayer();
   const rows = useMemo(() => {

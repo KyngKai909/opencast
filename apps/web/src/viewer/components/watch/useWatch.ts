@@ -3,7 +3,7 @@
 // station's night.
 
 import { useEffect, useMemo, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { libraryApi, stationsApi } from "@opencast/contracts";
 import { usePlayer } from "@opencast/player";
 import { StationPageX, type DialRowX } from "../../api/ext";
@@ -11,6 +11,7 @@ import { useChannels, useDial, useMarketSlug } from "../../data/viewer";
 import { useNowPlaying, useTune } from "../../player/PlayerRoot";
 import { useApiAs } from "./overlay";
 import { backAtOf, isOffAir, resolveStation, rowFromPage, stationSlug, tuneForUrl, urlForChannel, watchKey, withOutsideStation } from "./logic";
+import type { TuneVia } from "@opencast/contracts";
 
 export function useWatch(stationRef: string | undefined, o: { arrows?: boolean } = {}) {
   const arrows = o.arrows !== false;
@@ -20,7 +21,8 @@ export function useWatch(stationRef: string | undefined, o: { arrows?: boolean }
   const tvDial = useDial("tv");
   const radioDial = useDial("radio");
   const dialReady = !!slug && tvDial.isSuccess && radioDial.isSuccess;
-  const tune = useTune();
+  const tune = useTune("link");
+  const location = useLocation();
   const navigate = useNavigate();
   const np = useNowPlaying();
 
@@ -69,7 +71,8 @@ export function useWatch(stationRef: string | undefined, o: { arrows?: boolean }
     if (!target) return;
     const id = tuneForUrl(target.station.id, playingNow());
     lastSynced.current = target.station.id;
-    if (id) void tune(id);
+    // A251: how it was tuned, when the app said (starting on the last channel); else a link.
+    if (id) void tune(id, (location.state as { via?: TuneVia } | null)?.via ?? "link");
     // Only when the URL changes (or the dial first arrives), not on every channel change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.station.id]);

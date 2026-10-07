@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-06: Data for the desk's analytics (A251, Phase 1)
+
+Additive: three optional fields on `Heartbeat`, one new enum and one new public endpoint. Migration **0054** (`drizzle-kit generate`): `audience.sessions` gains `visit_id`, `device_hash`, `via` and `tune_ms`, all nullable and null for every existing row; new table `audience.searches`.
+
+- `audience.ts`: new `TuneVia` (`swipe`, `channel`, `keypad`, `guide`, `search`, `link`, `preset`, `last`, `remote`, `reminder`, `resume`, `dial`, `suggestion`). `Heartbeat` gains optional `deviceId` (a random id kept on the device, kept by the API only as a hash, 30 days), `via` and `tuneMs` (the station's first beat only).
+- Behaviour: a `sessionId` that beats for a second station is no longer refused (it was a 400, so nobody was counted after a channel change). The API keeps a session per station for it, with an id worked out from the two, and the id itself as the visit. `POST /stations/:stationId/not-for-me` finds the session on its station the same way.
+- `stations.ts`: new `searchSeen` (`POST /search/seen`, public, `{ q, results }`, answers `{ ok: true }`): a search the viewer settled on. Kept with no account, device or session for 90 days.
+- How older builds tolerate it: every new field is optional, and players that don't send them are counted as before (better: per station). Nothing an app reads changed.
+
 ## 2026-10-06: Large and compressed XMLTV guides, and "Find this channel's guide" (A249)
 
 Additive: one new endpoint (request and response both new), new values on a desk-only enum, an optional field on `ListedSource.schedule` and on `SchedulePreview`, and new shapes. `ExternalInfo` (the dial, the guide, the station page, every app) is unchanged. Migration **0053** (after 0052, written by hand and checked with `drizzle-kit generate`, which reports no changes after it): `network.listed_sources.guide_read` (jsonb), nullable and null for every existing row; the new `calendar_sync` values are text, as the column's others are, so no type changes.

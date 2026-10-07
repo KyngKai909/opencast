@@ -3,6 +3,7 @@
 // player and scripts sending beats never count. Per-minute concurrency is kept per
 // station; billing per thousand tuned in reads it.
 
+import { createHash } from "node:crypto";
 import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { AudienceReport } from "@opencast/contracts";
@@ -11,6 +12,22 @@ import { badRequest } from "../../errors.js";
 import { createWatchData, recordSessionMinute, type WatchData } from "./watch.js";
 
 type Platform = "phone" | "cast" | "web" | "tv_app" | "mirror";
+type TuneVia = import("@opencast/contracts").TuneVia;
+
+/**
+ * A251 (2026-10-06): a session is one station's. A player keeps one id for the tab (or the TV app's
+ * run), so a second station it beats for gets a session of its own: an id worked out from the two,
+ * the same every time. Before, those beats were refused and never counted.
+ */
+export function stationSessionId(visitId: string, stationId: string): string {
+  const h = createHash("sha256").update(`${visitId}:${stationId}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${((parseInt(h.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${h.slice(18, 20)}-${h.slice(20, 32)}`;
+}
+
+/** A251: the device id as kept, a hash of it: counts of devices only, never the id. */
+export function deviceHash(deviceId: string): string {
+  return createHash("sha256").update(`opencast-device:${deviceId}`).digest("hex").slice(0, 32);
+}
 
 export const HEARTBEAT_MS = 30_000;
 /** Closer beats than this aren't a real player. */
@@ -22,7 +39,7 @@ const MINUTE = 60_000;
 export interface AudienceService {
   /** Not counted during the station's planned off air time: then it says when the station is back. */
   heartbeat(
-    input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean },
+    input: { stationId: string; sessionId: string; platform: Platform; mediaTimeMs: number; playing: boolean; deviceId?: string; via?: TuneVia; tuneMs?: number },
     /**
      * Added 2026-09-30 (follow-up Phase 3): where the viewer is, asked once when their session
      * starts: their chosen market, or a coarse location from the connection. Only the market is kept.
@@ -41,6 +58,10 @@ export interface AudienceService {
   /** The usual tuned in for a station at this hour, from the last week: for estimates and holds. */
   typicalTunedIn(stationIds: string[], at: Date): Promise<Map<string, number>>;
   report(stationId: string, from: Date, to: Date): Promise<AudienceReport>;
+  /** A251: the session a player's id stands for on this station (its own, or the one made for the station), if there is one. */
+  sessionOn(sessionId: string, stationId: string): Promise<string | null>;
+  /** A251: a search a viewer settled on: its words (lower case, spaces evened) and result count, nothing else. */
+  recordSearch(q: string, results: number): Promise<void>;
   /** Watch data (added 2026-09-29, follow-up Phase 1): per airing of each program; votes; the daily purge. */
   watch: WatchData;
 }
@@ -61,24 +82,35 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
       // Planned off air (off air hours, a sign-off on the log): nothing's on, so nobody's tuned in.
       const off = await services.log.offAirAt(input.stationId, now);
       if (off) return { offAirUntil: off.backAt };
-      const [existing] = await db.select().from(S).where(eq(S.id, input.sessionId));
+      // A251: the tab's id is the first station's session; any other station's is made from both.
+      let [existing] = await db.select().from(S).where(eq(S.id, input.sessionId));
+      let sessionId = input.sessionId;
+      if (existing && existing.stationId !== input.stationId) {
+        sessionId = stationSessionId(input.sessionId, input.stationId);
+        [existing] = await db.select().from(S).where(eq(S.id, sessionId));
+      }
       if (!existing) {
         // Placed once, by market only: the address it came from is never kept.
         const marketId = options.place ? await options.place().catch(() => null) : null;
-        await db.insert(S).values({
-          id: input.sessionId,
-          stationId: input.stationId,
-          platform: input.platform,
-          startedAt: now,
-          lastBeatAt: now,
-          beats: 1,
-          lastMediaTimeMs: input.mediaTimeMs,
-          marketId
-        });
+        await db
+          .insert(S)
+          .values({
+            id: sessionId,
+            stationId: input.stationId,
+            platform: input.platform,
+            startedAt: now,
+            lastBeatAt: now,
+            beats: 1,
+            lastMediaTimeMs: input.mediaTimeMs,
+            marketId,
+            visitId: input.sessionId,
+            deviceHash: input.deviceId ? deviceHash(input.deviceId) : null,
+            via: input.via ?? null,
+            tuneMs: input.tuneMs ?? null
+          })
+          // Two first beats at once (a retry): the first one stands.
+          .onConflictDoNothing();
         return { offAirUntil: null };
-      }
-      if (existing.stationId !== input.stationId) {
-        throw badRequest("A session is for one station; start a new one when you change channel.");
       }
       const gap = now.getTime() - existing.lastBeatAt.getTime();
       const progress = input.mediaTimeMs - (existing.lastMediaTimeMs ?? 0);
@@ -95,7 +127,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
           lastMediaTimeMs: input.mediaTimeMs,
           ...(flagReason ? { flaggedBot: true, flagReason } : {})
         })
-        .where(eq(S.id, input.sessionId));
+        .where(eq(S.id, sessionId));
 
       // Count each session once per minute it's watching.
       // The first heartbeat never counts, so the second always does; after that, once a minute.
@@ -105,7 +137,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         // never in the tuned-in counts the pool and per-thousand billing read.
         const external = (await services.stations.kindOf(input.stationId)) === "listed";
         const count = async (minute: Date) => {
-          if (external) return recordSessionMinute(db, { sessionId: input.sessionId, stationId: input.stationId, minute });
+          if (external) return recordSessionMinute(db, { sessionId, stationId: input.stationId, minute });
           await db
             .insert(M)
             .values({ stationId: input.stationId, minute, tunedIn: 1, [key]: 1 })
@@ -118,7 +150,7 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
               .onConflictDoUpdate({ target: [MM.stationId, MM.minute, MM.marketId], set: { tunedIn: sql`${MM.tunedIn} + 1` } });
           }
           // Watch data: the same minute, for this session, kept 30 days (watch.ts).
-          await recordSessionMinute(db, { sessionId: input.sessionId, stationId: input.stationId, minute });
+          await recordSessionMinute(db, { sessionId, stationId: input.stationId, minute });
         };
         await count(minuteOf(now));
         // A beat covers the half minute before it too.
@@ -128,6 +160,19 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         }
       }
       return { offAirUntil: null };
+    },
+
+    async recordSearch(q, results) {
+      const term = q.trim().toLowerCase().replace(/\s+/g, " ");
+      if (term.length >= 2) await db.insert(schema.searches).values({ term, results, at: deps.clock.now() });
+    },
+
+    async sessionOn(sessionId, stationId) {
+      for (const id of [sessionId, stationSessionId(sessionId, stationId)]) {
+        const [row] = await db.select({ stationId: S.stationId }).from(S).where(eq(S.id, id));
+        if (row?.stationId === stationId) return id;
+      }
+      return null;
     },
 
     async watchMinutes(from, to) {

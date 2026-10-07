@@ -61,7 +61,7 @@ export function CarriedFrom({ programId, onClose, now }: { programId: string; on
   const channels = useChannels();
   const tv = useDial("tv");
   const radio = useDial("radio");
-  const tune = useTune();
+  const tune = useTune("dial");
   const navigate = useNavigate();
   const p = program.data;
   const maker = p?.station;

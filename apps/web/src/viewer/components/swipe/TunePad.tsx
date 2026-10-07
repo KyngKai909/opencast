@@ -32,7 +32,7 @@ function TunePadPanel({ onClose }: { onClose: () => void }) {
   const landscape = useLandscape();
   const navigate = useNavigate();
   const loc = useLocation();
-  const tune = useTune();
+  const tune = useTune("keypad");
   const now = useNow(30_000);
   const [typed, setTyped] = useState("");
   const read = useMemo(() => readPad(typed, channels), [typed, channels]);
