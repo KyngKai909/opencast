@@ -227,3 +227,52 @@ describe("the Audience tab (Ref. 12d 04)", () => {
     await lee.get(`/v1/desk/analytics/audience?from=${DAY.from}&to=${DAY.to}&station=${mojv}`).expect(404);
   });
 });
+
+describe("Programs and breaks (Ref. 12d 05)", () => {
+  it("adds up a program across the stations that aired it, and the share still watching minute by minute", async () => {
+    const [program] = await h.db.insert(schema.programs).values({ stationId: beat, title: "Late Crate" }).returning();
+    const at = (iso: string) => new Date(iso);
+    // BEAT's own airing and MOJV carrying it: 10 and 4 at the start, people leaving as it goes.
+    await h.db.insert(schema.airingStats).values([
+      { airingKey: "t:beat", stationId: beat, programId: program!.id, makerStationId: beat, band: "tv", startedAt: at("2026-10-01T19:00:00Z"), endedAt: at("2026-10-01T19:05:00Z"), minutes: 5, watchSeconds: 2400, audienceAtStart: 10, peakAudience: 12, audienceAtEnd: 7, stayedToEnd: 6, tuneAways: [0, 2, 1, 1, 0], notForMe: 1 },
+      { airingKey: "t:mojv", stationId: mojv, programId: program!.id, makerStationId: beat, carried: true, band: "tv", startedAt: at("2026-10-01T20:00:00Z"), endedAt: at("2026-10-01T20:05:00Z"), minutes: 5, watchSeconds: 900, audienceAtStart: 4, peakAudience: 4, audienceAtEnd: 3, stayedToEnd: 3, tuneAways: [0, 1, 0, 0, 0], notForMe: 0 }
+    ]);
+    const { body } = await dee.get(`/v1/desk/analytics/programs?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    const late = body.programs.find((p: { title: string }) => p.title === "Late Crate");
+    expect(late).toMatchObject({ airings: 2, hours: 0.9, catalog: false, maker: { callSign: "BEAT" }, underMinimum: true, stayedToTheEnd: null });
+    expect(late.stations.map((s: { callSign: string }) => s.callSign)).toEqual(["BEAT", "MOJV"]);
+    const detail = (await dee.get(`/v1/desk/analytics/programs/${program!.id}?from=${DAY.from}&to=${DAY.to}`).expect(200)).body;
+    // 14 at the start; 3 gone by minute 1, 4 by 2, 5 by 3.
+    expect(detail.stillWatching.slice(0, 4)).toEqual([100, 78.6, 71.4, 64.3]);
+    expect(detail.tuneAways).toEqual([0, 3, 1, 1, 0]);
+    expect(detail).toMatchObject({ atStart: 14, stillAtEnd: 9, biggestDrop: { minute: 1, points: 21.4, inBreak: false } });
+    await lee.get(`/v1/desk/analytics/programs/${program!.id}?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    await dee.get(`/v1/desk/analytics/programs/00000000-0000-4000-8000-000000000999?from=${DAY.from}&to=${DAY.to}`).expect(404);
+  });
+
+  it("works out break hold from the as-run log and session minutes, by length, position and what opened it", async () => {
+    const at = (iso: string) => new Date(iso);
+    const brk = async (startsAt: string) => (await h.db.insert(schema.breaks).values({ stationId: beat, startsAt: at(startsAt), lengthMs: 120_000, origin: "rule" }).returning())[0]!.id;
+    const inside = await brk("2026-10-01T19:03:00Z");
+    const opening = await brk("2026-10-01T19:35:00Z");
+    await h.db.insert(schema.asRun).values([
+      // A program, a break that opens with a bumper, the program again: between two program rows.
+      { stationId: beat, code: "PGM", startedAt: at("2026-10-01T18:30:00Z"), endedAt: at("2026-10-01T19:03:00Z"), reason: "planned" },
+      { stationId: beat, code: "BMP", breakId: inside, startedAt: at("2026-10-01T19:03:00Z"), endedAt: at("2026-10-01T19:03:10Z"), reason: "planned" },
+      { stationId: beat, code: "SPT", breakId: inside, startedAt: at("2026-10-01T19:03:10Z"), endedAt: at("2026-10-01T19:05:00Z"), reason: "planned" },
+      { stationId: beat, code: "PGM", startedAt: at("2026-10-01T19:05:00Z"), endedAt: at("2026-10-01T19:30:00Z"), reason: "planned" },
+      // Five minutes after the program: a break opening with a spot, nothing just before it.
+      { stationId: beat, code: "SPT", breakId: opening, startedAt: at("2026-10-01T19:35:00Z"), endedAt: at("2026-10-01T19:35:30Z"), reason: "planned" }
+    ]);
+    h.clock.set("2026-10-02T06:00:00.000Z");
+    expect((await h.services.audience.totals.tick()).breaks).toBeGreaterThanOrEqual(2);
+    const rows = await h.db.select().from(schema.breakStats);
+    expect(rows.find((r) => r.breakId === inside)).toMatchObject({ seconds: 120, position: "between", firstElement: "bumper", spots: 1, tunedAtStart: 1, stillAtEnd: 1 });
+    expect(rows.find((r) => r.breakId === opening)).toMatchObject({ seconds: 30, position: "opening", firstElement: "spot", tunedAtStart: 1, stillAtEnd: 1 });
+    const { body } = await dee.get(`/v1/desk/analytics/programs?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.breaks.all).toMatchObject({ breaks: 2, tunedAtStart: 2, held: 100 });
+    expect(body.breaks.byLength.find((b: { band: string }) => b.band === "120")).toMatchObject({ breaks: 1 });
+    expect(body.breaks.byFirst.map((b: { first: string }) => b.first)).toEqual(["bumper", "spot"]);
+    expect(body.breaks.bumperShare).toBe(50);
+  });
+});

@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsAudience, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -259,7 +259,107 @@ function audience(request: Request): AnalyticsAudience | Response {
   };
 }
 
+/** Ref. 12d 05's programs (title, maker index or "catalog", stations by index, airings, hours, avg, stayed, not for me, live). */
+const PROGRAMS: Array<[string, number | "catalog", number[], number, number, number, number, number, boolean]> = [
+  ["Late Crate", 0, [0, 2, 9], 11, 2541, 231, 64, 2.8, false],
+  ["Crate Session", 0, [0], 7, 2128, 152, 60, 3.1, false],
+  ["Night Shift", 4, [4], 7, 2016, 96, 71, 1.6, false],
+  ["Saturday Reel", 1, [1, 0], 4, 1952, 244, 58, 3.9, false],
+  ["Classic Matinee", "catalog", [3, 8, 11], 21, 1638, 52, 49, 6.9, false],
+  ["Tamales for forty", 2, [2], 14, 616, 88, 62, 2.1, false],
+  ["Council Watch", 8, [8], 2, 590, 118, 44, 9.8, true],
+  ["Beat Tape Live", 0, [0, 10], 2, 492, 164, 66, 2.0, true],
+  ["Tía Lupe’s Kitchen", 6, [6], 14, 427, 61, 57, 2.6, false],
+  ["Prep Football Live", 11, [11], 1, 183, 61, 41, 7.5, true],
+  ["Field Notes", 12, [12], 7, 61, 3, 0, 0, false]
+];
+
+function programsOf(request: Request): { list: AnalyticsProgram[]; scope: AnalyticsOverview["scope"]; scale: number } {
+  const { scope, scale, rows } = scopeOf(request);
+  const inView = new Set(rows.map((f) => f.station.id));
+  const list = PROGRAMS.map(([title, maker, on, airings, hours, avg, stayed, nfm, live], i): AnalyticsProgram => {
+    const stations = on.map((j) => WEEK[j]!.station).filter((s) => inView.has(s.id));
+    const under = title === "Field Notes";
+    return {
+      programId: U(98000 + i),
+      title,
+      maker: maker === "catalog" ? null : WEEK[maker]!.station,
+      catalog: maker === "catalog",
+      live,
+      stations,
+      airings: Math.max(1, Math.round(airings * scale)),
+      hours: Math.round(hours * scale),
+      averageTunedIn: avg,
+      stayedToTheEnd: under ? null : stayed,
+      notForMePer1000Hours: under ? null : nfm,
+      underMinimum: under
+    };
+  }).filter((p) => p.stations.length);
+  return { list, scope, scale };
+}
+
 export const analyticsHandlers = [
+  http.get(path(analyticsApi.programs), ({ request }) => {
+    const no = denied(request);
+    if (no) return no;
+    const { list, scope, scale } = programsOf(request);
+    const hold = (breaks: number, held: number) => ({ breaks: Math.round(breaks * scale), tunedAtStart: Math.round(breaks * 180 * scale), held });
+    const body: AnalyticsPrograms = {
+      scope,
+      programs: list,
+      breaks: {
+        all: hold(4212, 92.4),
+        byLength: [
+          { band: "30", ...hold(612, 97.1) },
+          { band: "60", ...hold(1408, 95.0) },
+          { band: "90", ...hold(1102, 92.2) },
+          { band: "120", ...hold(744, 88.4) },
+          { band: "150_plus", ...hold(346, 83.1) }
+        ],
+        byPosition: [
+          { position: "opening", ...hold(812, 95.6) },
+          { position: "inside", ...hold(2377, 91.4) },
+          { position: "between", ...hold(1023, 89.2) }
+        ],
+        byFirst: [
+          { first: "bumper", ...hold(2569, 93.9) },
+          { first: "spot", ...hold(1643, 89.8) }
+        ],
+        bumperShare: 61
+      }
+    };
+    return reply(analyticsApi.programs.response, body);
+  }),
+  http.get(path(analyticsApi.program), ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    const { list, scope } = programsOf(request);
+    const program = list.find((p) => p.programId === params.programId);
+    if (!program) return fail(404, "not_found", "That program didn't air in this view.");
+    const minutes = 60;
+    const still: number[] = [];
+    const away: number[] = [];
+    const breaks = [{ from: 14, to: 16 }, { from: 29, to: 32 }, { from: 44, to: 46 }];
+    let v = 100;
+    for (let i = 0; i <= minutes; i++) {
+      const drop = i === 0 ? 0 : 0.42 + (breaks.some((b) => i >= b.from && i <= b.to) ? 1.6 : 0) + (i === 30 ? 2.4 : 0);
+      v = Math.max(0, v - drop);
+      still.push(Math.round(v * 10) / 10);
+      away.push(Math.round(drop * 22.8));
+    }
+    const atStart = Math.round(2286 * (program.hours / 2541 || 0.1));
+    const body: AnalyticsProgramDetail = {
+      scope,
+      program,
+      stillWatching: still,
+      tuneAways: away,
+      breaks,
+      atStart,
+      stillAtEnd: Math.round((atStart * (program.stayedToTheEnd ?? still[minutes]!)) / 100),
+      biggestDrop: { minute: 30, points: 4.4, inBreak: true }
+    };
+    return reply(analyticsApi.program.response, body);
+  }),
   http.get(path(analyticsApi.audience), ({ request }) => {
     const no = denied(request);
     if (no) return no;

@@ -5,7 +5,7 @@
 
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
+import type { AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
 import type { CurrentUser } from "../../http.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, forbidden, notFound } from "../../errors.js";
@@ -24,6 +24,10 @@ const MAX_SPAN = 400 * DAY;
 export interface Analytics {
   overview(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsOverview>;
   stations(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsStations>;
+  /** The Programs and breaks tab (Ref. 12d 05). */
+  programs(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsPrograms>;
+  /** One program's airings in the span, still watching by the minute. */
+  program(user: CurrentUser, programId: string, query: AnalyticsQuery): Promise<AnalyticsProgramDetail>;
   /** The Audience tab (Ref. 12d 04), the network or one station. */
   audience(user: CurrentUser, query: AnalyticsAudienceQuery): Promise<AnalyticsAudience>;
   /** One station's page (Ref. 12d 03); a market lead only for a station in their market. */
@@ -340,6 +344,130 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       };
     }
   } as Analytics;
+  /** The span's airings of programs in the view (stations in it), and what each program adds up to. */
+  async function programsIn(user: CurrentUser, query: AnalyticsQuery, only?: string) {
+    const { scope, from, to, previousFrom, market, band, markets } = await scopeOf(user, query);
+    const stations = await stationsIn(market, band, previousFrom, to, markets);
+    const ids = [...stations.keys()];
+    const rows = ids.length
+      ? await db
+          .select()
+          .from(schema.airingStats)
+          .where(and(inArray(schema.airingStats.stationId, ids), gte(schema.airingStats.startedAt, from), lt(schema.airingStats.startedAt, to), sql`${schema.airingStats.programId} is not null`, ...(only ? [eq(schema.airingStats.programId, only)] : [])))
+      : [];
+    const programIds = [...new Set(rows.map((r) => r.programId!))];
+    const [refs, minimum, reasons] = await Promise.all([
+      services.library.programsByIds(programIds),
+      services.settings.valueAt("watch_data.minimum_audience", deps.clock.now()),
+      services.playout.asRunReasons(rows.map((r) => r.asRunId).filter((x): x is string => !!x))
+    ]);
+    const makerIds = [...new Set([...refs.values()].map((r) => r.stationId))].filter((id) => !stations.has(id));
+    const extra = await services.stations.idents(makerIds);
+    const identOf = (id: string): AnalyticsStation | null => {
+      const s = stations.get(id);
+      if (s) return s;
+      const i = extra.get(id);
+      return i ? { id, callSign: i.callSign ?? null, channel: i.channel ?? null, name: i.name, kind: kindOf(i.kind), band: null, colour: i.colour ?? null, market: null } : null;
+    };
+    const programs: AnalyticsProgram[] = [];
+    const byProgram = new Map<string, typeof rows>();
+    for (const r of rows) byProgram.set(r.programId!, [...(byProgram.get(r.programId!) ?? []), r]);
+    for (const [programId, list] of byProgram) {
+      const ref = refs.get(programId);
+      const maker = ref ? identOf(ref.stationId) : null;
+      const catalog = maker?.kind === "catalog";
+      const airedOn = [...new Set(list.map((r) => r.stationId))].map((id) => stations.get(id)!).filter(Boolean);
+      airedOn.sort((a, b) => (a.id === maker?.id ? -1 : b.id === maker?.id ? 1 : 0));
+      const watchSeconds = list.reduce((t, r) => t + r.watchSeconds, 0);
+      const minutes = list.reduce((t, r) => t + r.minutes, 0);
+      const atStart = list.reduce((t, r) => t + r.audienceAtStart, 0);
+      const stayed = list.reduce((t, r) => t + r.stayedToEnd, 0);
+      const votes = list.reduce((t, r) => t + r.notForMe, 0);
+      // The maker's rule: shown once its airings reach the minimum together.
+      const underMinimum = list.reduce((t, r) => t + r.peakAudience, 0) < minimum.viewers;
+      const hoursOf = watchSeconds / 3600;
+      programs.push({
+        programId,
+        title: ref?.title ?? "A program",
+        maker: catalog ? null : maker,
+        catalog,
+        live: list.some((r) => (r.asRunId && reasons.get(r.asRunId) === "live") || ref?.live),
+        stations: airedOn,
+        airings: list.length,
+        hours: round1(hoursOf),
+        averageTunedIn: round1(watchSeconds / 60 / Math.max(1, minutes)),
+        stayedToTheEnd: underMinimum || !atStart ? null : Math.round((stayed / atStart) * 100),
+        notForMePer1000Hours: underMinimum || !hoursOf ? null : round1((votes / hoursOf) * 1000),
+        underMinimum
+      });
+    }
+    programs.sort((a, b) => b.hours - a.hours || a.title.localeCompare(b.title));
+    return { scope, from, to, stations, ids, rows, programs };
+  }
+
+  service.programs = async (user, query) => {
+    const { scope, from, to, ids, programs } = await programsIn(user, query);
+    const breaks = ids.length
+      ? await db.select().from(schema.breakStats).where(and(inArray(schema.breakStats.stationId, ids), gte(schema.breakStats.startedAt, from), lt(schema.breakStats.startedAt, to)))
+      : [];
+    const hold = (list: typeof breaks): AnalyticsBreakHold => {
+      const atStart = list.reduce((t, b) => t + b.tunedAtStart, 0);
+      const still = list.reduce((t, b) => t + b.stillAtEnd, 0);
+      return { breaks: list.length, tunedAtStart: atStart, held: atStart ? round1((still / atStart) * 100) : null };
+    };
+    const bands: Array<[string, (s: number) => boolean]> = [
+      ["30", (s) => s <= 30],
+      ["60", (s) => s > 30 && s <= 60],
+      ["90", (s) => s > 60 && s <= 90],
+      ["120", (s) => s > 90 && s <= 120],
+      ["150_plus", (s) => s > 120]
+    ];
+    return {
+      scope,
+      programs,
+      breaks: {
+        all: hold(breaks),
+        byLength: bands.map(([band, f]) => ({ band, ...hold(breaks.filter((b) => f(b.seconds))) })),
+        byPosition: (["opening", "inside", "between"] as const).map((position) => ({ position, ...hold(breaks.filter((b) => b.position === position)) })),
+        byFirst: (["bumper", "spot", "sponsor", "station_id", "other"] as const).map((first) => ({ first, ...hold(breaks.filter((b) => b.firstElement === first)) })).filter((x) => x.breaks > 0),
+        bumperShare: breaks.length ? Math.round((breaks.filter((b) => b.firstElement === "bumper").length / breaks.length) * 100) : null
+      }
+    };
+  };
+
+  service.program = async (user, programId, query) => {
+    const { scope, rows, programs } = await programsIn(user, query, programId);
+    const program = programs[0];
+    if (!program) throw notFound("That program didn't air in this view.");
+    // Still watching: each minute, those at the first minute less everyone who has left by then, all airings added up.
+    const longest = Math.min(240, Math.max(...rows.map((r) => r.minutes)));
+    const tuneAways = new Array<number>(longest).fill(0);
+    const base = new Array<number>(longest).fill(0);
+    const gone = new Array<number>(longest).fill(0);
+    for (const r of rows) {
+      let left = 0;
+      for (let i = 0; i < Math.min(longest, r.minutes); i++) {
+        const away = r.tuneAways[i] ?? 0;
+        left += away;
+        tuneAways[i]! += away;
+        base[i]! += r.audienceAtStart;
+        gone[i]! += Math.min(left, r.audienceAtStart);
+      }
+    }
+    const stillWatching = base.map((b, i) => (b ? round1(((b - gone[i]!) / b) * 100) : 0));
+    // Its breaks, as its biggest airing aired them.
+    const biggest = [...rows].sort((a, b) => b.audienceAtStart - a.audienceAtStart)[0]!;
+    const spans = await services.playout.breakSpans(biggest.stationId, biggest.startedAt, biggest.endedAt);
+    const breaks = spans.map((s) => ({ from: round1((s.start.getTime() - biggest.startedAt.getTime()) / MINUTE), to: round1((s.end.getTime() - biggest.startedAt.getTime()) / MINUTE) }));
+    let drop: AnalyticsProgramDetail["biggestDrop"] = null;
+    for (let i = 1; i < stillWatching.length; i++) {
+      const points = round1(stillWatching[i - 1]! - stillWatching[i]!);
+      if (points > 0 && (!drop || points > drop.points)) drop = { minute: i, points, inBreak: breaks.some((b) => i >= Math.floor(b.from) && i <= Math.ceil(b.to)) };
+    }
+    const atStart = rows.reduce((t, r) => t + r.audienceAtStart, 0);
+    return { scope, program, stillWatching, tuneAways, breaks, atStart, stillAtEnd: rows.reduce((t, r) => t + r.stayedToEnd, 0), biggestDrop: drop };
+  };
+
   service.audience = async (user, query) => {
     const { scope, from, to, previousFrom, previousTo, market, band, markets } = await scopeOf(user, query);
     const stations = await stationsIn(market, band, previousFrom, to, markets);
@@ -374,8 +502,9 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       const counts = new Array<number>(168).fill(0);
       const until = Math.min(b.getTime(), deps.clock.now().getTime());
       for (let t = Math.floor(a.getTime() / HOUR) * HOUR; t < until; t += HOUR) counts[cellOf(t)]!++;
-      for (const r of rows) sums[cellOf(r.hour.getTime())]! += r.tunedMinutes / 60;
-      return sums.map((s, i) => (counts[i] ? s / counts[i]! : null));
+      // Minutes added up first (whole numbers), divided once: the same answer whatever the rows' order.
+      for (const r of rows) sums[cellOf(r.hour.getTime())]! += r.tunedMinutes;
+      return sums.map((s, i) => (counts[i] ? s / 60 / counts[i]! : null));
     };
     const now = gridOf(hours, from, to);
     const before = gridOf(hoursBefore, previousFrom, previousTo);

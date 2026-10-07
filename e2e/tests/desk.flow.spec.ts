@@ -646,6 +646,13 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await page.getByRole("button", { name: "All stations" }).click();
   await expect(page).toHaveURL(/\/desk\/analytics\/stations\?/);
 
+  // Programs and breaks (Ref. 12d 05): pick a program to see who stayed.
+  await page.getByRole("tab", { name: "Programs" }).click();
+  await expect(page.getByRole("heading", { name: "Late Crate, still watching" })).toBeVisible();
+  await page.getByRole("table", { name: "Programs across stations" }).getByRole("button", { name: "Saturday Reel" }).click();
+  await expect(page.getByRole("heading", { name: "Saturday Reel, still watching" })).toBeVisible();
+  await expect(page.getByText(/Breaks that open with a bumper keep/)).toBeVisible();
+
   // Audience (Ref. 12d 04): the week's grid, then narrowed to BEAT.
   await page.getByRole("tab", { name: "Audience" }).click();
   await expect(page).toHaveURL(/\/desk\/analytics\/audience/);

@@ -355,16 +355,16 @@ describe("after 30 days, only the numbers", () => {
     }
     // The analytics totals (A251 Phase 2) count sessions and devices, so the words are in their
     // columns; what they never hold is anyone's id, hash, visit or address.
-    for (const table of ["station_hours", "station_hour_places", "network_hours", "station_days", "device_days", "station_flows"]) {
+    for (const table of ["station_hours", "station_hour_places", "network_hours", "station_days", "device_days", "station_flows", "break_stats"]) {
       for (const column of await columns(table)) {
         expect(column, `${table}.${column}`).not.toMatch(/hash|user|voter|visit_id|person|email|ip_|address/);
-        if (column.endsWith("_id")) expect(column, `${table}.${column}`).toBe("station_id");
+        if (column.endsWith("_id")) expect(["station_id", "break_id"], `${table}.${column}`).toContain(column);
       }
     }
     const values = JSON.stringify(after);
     for (const id of [...sessionIds, ...userIds]) expect(values).not.toContain(id);
     // The tables that held sessions are the only ones with a session in them, and they're empty of the evening.
     const tables = ((await h.db.execute(sql`select table_name from information_schema.tables where table_schema = 'audience' order by table_name`)) as unknown as { rows: Array<{ table_name: string }> }).rows.map((r) => r.table_name);
-    expect(tables).toEqual(["airing_stats", "device_days", "minute_markets", "minute_samples", "network_hours", "not_for_me_votes", "searches", "session_minutes", "sessions", "station_days", "station_flows", "station_hour_places", "station_hours", "translator_samples"]);
+    expect(tables).toEqual(["airing_stats", "break_stats", "device_days", "minute_markets", "minute_samples", "network_hours", "not_for_me_votes", "searches", "session_minutes", "sessions", "station_days", "station_flows", "station_hour_places", "station_hours", "translator_samples"]);
   });
 });

@@ -261,6 +261,64 @@ export const AnalyticsAudience = z.object({
 });
 export type AnalyticsAudience = z.infer<typeof AnalyticsAudience>;
 
+/** A program across every station that aired it (Ref. 12d 05): its own airings and carriers' added up. */
+export const AnalyticsProgram = z.object({
+  programId: Id,
+  title: z.string(),
+  /** The station that makes it (null for a catalog program: "Opencast catalog"). */
+  maker: AnalyticsStation.nullable(),
+  catalog: z.boolean(),
+  /** Any of its airings was live. */
+  live: z.boolean(),
+  /** Every station that aired it in the span, the maker first. */
+  stations: z.array(AnalyticsStation),
+  airings: z.number().int(),
+  hours: z.number(),
+  averageTunedIn: z.number(),
+  /** Percent of those at its airings' first minutes still there at their last; null under the minimum. */
+  stayedToTheEnd: z.number().nullable(),
+  notForMePer1000Hours: z.number().nullable(),
+  underMinimum: z.boolean()
+});
+export type AnalyticsProgram = z.infer<typeof AnalyticsProgram>;
+
+/** Break hold: of those tuned in when breaks started, the percent still there when they ended. */
+export const AnalyticsBreakHold = z.object({ breaks: z.number().int(), tunedAtStart: z.number().int(), held: z.number().nullable() });
+export type AnalyticsBreakHold = z.infer<typeof AnalyticsBreakHold>;
+
+export const AnalyticsPrograms = z.object({
+  scope: AnalyticsScope,
+  /** Every program aired in the span, most hours first. */
+  programs: z.array(AnalyticsProgram),
+  breaks: z.object({
+    all: AnalyticsBreakHold,
+    /** By length: `30` (up to 0:30), `60`, `90`, `120`, `150_plus` (2:30 and longer). */
+    byLength: z.array(AnalyticsBreakHold.extend({ band: z.string() })),
+    byPosition: z.array(AnalyticsBreakHold.extend({ position: z.enum(["opening", "inside", "between"]) })),
+    byFirst: z.array(AnalyticsBreakHold.extend({ first: z.enum(["bumper", "spot", "sponsor", "station_id", "other"]) })),
+    /** Percent of breaks that opened with a bumper. */
+    bumperShare: z.number().nullable()
+  })
+});
+export type AnalyticsPrograms = z.infer<typeof AnalyticsPrograms>;
+
+/** One program's airings in the span, still watching minute by minute (Ref. 12d 05's curve). */
+export const AnalyticsProgramDetail = z.object({
+  scope: AnalyticsScope,
+  program: AnalyticsProgram,
+  /** Percent of the first minute's audience still there at each minute (index 0 is the first minute, 100). */
+  stillWatching: z.array(z.number()),
+  /** Tune-aways at each minute, all airings added up. */
+  tuneAways: z.array(z.number().int()),
+  /** Its breaks, minutes from the start, as its biggest airing aired them. */
+  breaks: z.array(z.object({ from: z.number(), to: z.number() })),
+  atStart: z.number().int(),
+  stillAtEnd: z.number().int(),
+  /** The minute that lost the most, in points, and whether a break was on then. */
+  biggestDrop: z.object({ minute: z.number().int(), points: z.number(), inBreak: z.boolean() }).nullable()
+});
+export type AnalyticsProgramDetail = z.infer<typeof AnalyticsProgramDetail>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -277,6 +335,23 @@ export const analyticsApi = {
     summary: "Every station's span in one table, with the network's row (A251)",
     query: AnalyticsQuery,
     response: AnalyticsStations
+  }),
+  programs: endpoint({
+    method: "GET",
+    path: "/desk/analytics/programs",
+    auth: "desk",
+    summary: "Programs across every station that aired them, and break hold by length, position and first element (A251, Ref. 12d 05)",
+    query: AnalyticsQuery,
+    response: AnalyticsPrograms
+  }),
+  program: endpoint({
+    method: "GET",
+    path: "/desk/analytics/programs/:programId",
+    auth: "desk",
+    summary: "One program's airings in the span: still watching minute by minute, tune-aways, its breaks, the biggest drop (A251, Ref. 12d 05)",
+    params: z.object({ programId: Id }),
+    query: AnalyticsQuery,
+    response: AnalyticsProgramDetail
   }),
   audience: endpoint({
     method: "GET",

@@ -15,6 +15,7 @@ import { Overview } from "../components/analytics/Overview";
 import { StationsTab } from "../components/analytics/StationsTab";
 import { StationPage } from "../components/analytics/StationPage";
 import { AudienceTab } from "../components/analytics/AudienceTab";
+import { ProgramsTab } from "../components/analytics/ProgramsTab";
 import { ErrorLine, Quiet } from "./common";
 import "../components/analytics/Analytics.css";
 
@@ -30,9 +31,8 @@ const TABS: ReadonlyArray<{ value: AnalyticsTab; label: string }> = [
   { value: "growth", label: "Growth" }
 ];
 
-/** What a tab not built yet will hold (docs/analytics-map.md, Phases 5 to 7). */
+/** What a tab not built yet will hold (docs/analytics-map.md, Phases 6 and 7). */
 const COMING: Partial<Record<AnalyticsTab, string>> = {
-  programs: "Programs across every station that aired them, with how many were still watching at each minute, and how many stay through a break.",
   money: "Stations' earnings by kind, earnings held for claimable stations, the spot market, per 1,000 hours, and Opencast's week against the estimated cost to run.",
   health: "How each station's airtime was filled, the week's incidents, relays, sessions filtered as bots, and how fast channels start.",
   growth: "New and active accounts, new stations by kind, creators in the pipeline, markets opened, TV devices and paired phones, uploads, and what people search for."
@@ -112,6 +112,8 @@ export default function Analytics() {
         <ErrorLine error={scopeQ.error} />
       ) : stationId ? (
         <StationPage stationId={stationId} query={filters.query} span={filters.span} exporter={exporters} back={() => go("stations")} />
+      ) : tab === "programs" ? (
+        <ProgramsTab query={filters.query} span={filters.span} exporter={exporters} />
       ) : tab === "audience" ? (
         <AudienceTab query={{ ...filters.query, ...(filters.station ? { station: filters.station } : {}) }} span={filters.span} exporter={exporters} stationHref={stationHref} />
       ) : tab === "stations" ? (
