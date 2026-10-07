@@ -60,6 +60,8 @@ export interface AudienceService {
   report(stationId: string, from: Date, to: Date): Promise<AudienceReport>;
   /** A251: the session a player's id stands for on this station (its own, or the one made for the station), if there is one. */
   sessionOn(sessionId: string, stationId: string): Promise<string | null>;
+  /** A251: a search a viewer settled on: its words (lower case, spaces evened) and result count, nothing else. */
+  recordSearch(q: string, results: number): Promise<void>;
   /** Watch data (added 2026-09-29, follow-up Phase 1): per airing of each program; votes; the daily purge. */
   watch: WatchData;
 }
@@ -158,6 +160,11 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         }
       }
       return { offAirUntil: null };
+    },
+
+    async recordSearch(q, results) {
+      const term = q.trim().toLowerCase().replace(/\s+/g, " ");
+      if (term.length >= 2) await db.insert(schema.searches).values({ term, results, at: deps.clock.now() });
     },
 
     async sessionOn(sessionId, stationId) {

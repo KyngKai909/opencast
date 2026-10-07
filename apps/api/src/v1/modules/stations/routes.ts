@@ -1,5 +1,4 @@
 import { logApi, stationsApi as api, type Airing, type StationIdent } from "@opencast/contracts";
-import { schema } from "@opencast/db";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest, HttpError, notFound } from "../../errors.js";
@@ -198,8 +197,7 @@ export function stationsRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   // A251 (2026-10-06): a search the viewer settled on, for the desk's analytics: the words (lower
   // case, spaces evened) and how many results; no account, device or session. Kept 90 days.
   r.handle(api.searchSeen, async ({ body }) => {
-    const term = body.q.trim().toLowerCase().replace(/\s+/g, " ");
-    if (term.length >= 2) await deps.db.insert(schema.searches).values({ term, results: body.results, at: deps.clock.now() });
+    await services.audience.recordSearch(body.q, body.results);
     return { ok: true as const };
   });
 
