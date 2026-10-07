@@ -169,7 +169,7 @@ function Wiring({ mode, adapters, path, ui, engineRef }: { mode: TvMode; adapter
     () => engine.setOptions({ bannerMs: bannerSeconds * 1000, numberWaitMs: numberWaitSeconds * 1000, neighbours: { sameBand: !includeRadioBand, skipDash: mode === "cast" }, quality, eveningOut }),
     [engine, bannerSeconds, numberWaitSeconds, includeRadioBand, quality, eveningOut, mode]
   );
-  // "Tuning sound", per band: the soft hiss when changing channel (the player plays it).
+  // "Tuning sound", per band: the static and click when changing channel (the player plays them).
   useEffect(() => engine.setOptions({ tuningSound: { video: tuningSound, radio: radioTuningSound } }), [engine, tuningSound, radioTuningSound]);
 
   useEffect(() => engine.setChannels(channels), [engine, channels]);

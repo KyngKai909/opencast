@@ -12,7 +12,7 @@ export interface TvSettings {
   /** Remote and phones: channel up goes up the dial, or down. */
   channelUp: "up_the_dial" | "down_the_dial";
   bannerSeconds: 3 | 5 | 8;
-  /** "Tuning sound": a soft hiss when changing channel, on video (the account's `watching.tuningSound`). On by default. */
+  /** "Tuning sound": the static and click when changing channel, on video (the account's `watching.tuningSound`). On by default. */
   tuningSound: boolean;
   /** The radio band's own tuning sound (the account's `watching.radioTuningSound`), turned off on the radio band. On by default. */
   radioTuningSound: boolean;

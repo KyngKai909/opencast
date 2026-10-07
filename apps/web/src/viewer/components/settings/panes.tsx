@@ -223,7 +223,7 @@ function WatchingPane({ phone }: { phone: boolean }) {
       />
       <SettingRow
         title="Tuning sound"
-        help="A soft hiss when changing channel, on the TV and radio bands. On unless you turn it off"
+        help="Static and a click when changing channel, on the TV and radio bands. On unless you turn it off"
         control={({ labelId, helpId }) => <Toggle checked={w.tuningSound ?? true} onChange={(v) => void save({ watching: { tuningSound: v } })} aria-labelledby={labelId} aria-describedby={helpId} />}
       />
       <SettingGroup>Playback</SettingGroup>

@@ -299,7 +299,12 @@ export class PlayerEngine {
     this.audio.setEvenOut(this.o.eveningOut);
     this.hiss = new Hiss(() => this.audio.context());
     this.change = new ChannelChange({
-      onChange: (tuning) => this.patch({ tuning }),
+      onChange: (tuning) => {
+        // The tuning sound lasts as long as the cover: it clicks and fades as the picture arrives
+        // (clearing), and only fades on Stand by or when the change ends without one.
+        if (!tuning || tuning.phase === "clearing") this.hiss.stop(tuning?.phase === "clearing");
+        this.patch({ tuning });
+      },
       onStandby: (stationId) => this.standBy(stationId),
       onCleared: (stationId, _look, fromStandby) => {
         // The banner slides in once the static has cleared (or a picture replaced Stand by).
@@ -828,11 +833,11 @@ export class PlayerEngine {
     if (d && d.role === "active") d.video.muted = true;
   }
 
-  /** The tuning hiss, when the band's "Tuning sound" is on, someone has interacted, and it isn't muted. */
+  /** The tuning sound, when the band's "Tuning sound" is on, someone has interacted, and it isn't muted. */
   private playHiss(c: Channel) {
     const setting = this.tuningSoundOn(c.station.id);
     if (!hissAllowed({ setting, interacted: this.interacted || pageHasBeenActive(), muted: this.state.muted || this.state.mutedByBrowser })) return;
-    this.hiss.play(this.volume);
+    this.hiss.play(this.volume, c.station.band === "radio" ? "dial" : "set");
   }
 
   /** Hisses played so far (tests, and the recordings). */
@@ -1251,6 +1256,8 @@ export class PlayerEngine {
       this.interacted = true;
       this.audio.unlock();
     }
+    // Muted mid-change: the tuning sound goes too.
+    if (muted) this.hiss.stop();
     const d = this.active();
     if (d) d.video.muted = muted;
     this.patch({ muted, mutedByBrowser: false });

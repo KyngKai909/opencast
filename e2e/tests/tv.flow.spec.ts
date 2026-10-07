@@ -63,6 +63,7 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   // ▶ opens the menu (Samsung's TVs take a held Return for themselves); Back closes it.
   await page.keyboard.press("ArrowRight");
   await expect(page).toHaveURL(/\/menu$/);
+  await expect(page.getByRole("menuitem", { name: "Guide" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/$/);
 
@@ -247,7 +248,7 @@ test("TV settings: Tuning sound, on until turned off, and kept on this TV (tv-up
   // Captions, Caption size, Channel up goes, Banner stays for, then Tuning sound.
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowDown");
   await expect(row).toContainText("Tuning sound");
-  await expect(row).toContainText("A soft hiss when changing channel");
+  await expect(row).toContainText("Static and a click when changing channel");
   await expect(row.locator(".tvs-row__val")).toContainText("On");
   await page.keyboard.press("ArrowLeft");
   await expect(row.locator(".tvs-row__val")).toContainText("Off");
