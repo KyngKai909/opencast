@@ -34,6 +34,23 @@ describe("guide layout", () => {
     expect(c.colEnd).toBe(17);
     expect(c.began).toBe(true);
   });
+  it("keeps a row on one line: an overlap ends where the next starts, a sliver isn't drawn", () => {
+    const cells = guideCells(
+      [
+        { id: "batman", title: "Batman Animated", start: at(21), end: at(21, 25) },
+        { id: "cartoons", title: "Cartoons", start: at(20, 5), end: at(21, 5) },
+        { id: "filler", title: "S", start: at(21, 25), end: at(21, 26) },
+        { id: "kids", title: "HappyKids", start: at(21, 26), end: at(21, 50) }
+      ],
+      at(20),
+      at(23)
+    );
+    expect(cells.map((c) => [c.program.id, c.colStart, c.colEnd])).toEqual([
+      ["cartoons", 3, 14],
+      ["batman", 14, 19],
+      ["kids", 19, 24]
+    ]);
+  });
   it("leaves out programs outside the window", () => {
     expect(guideCells([{ id: "x", title: "x", start: at(18), end: at(19) }], at(20), at(23))).toEqual([]);
   });

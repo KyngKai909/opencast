@@ -119,6 +119,19 @@ describe("the guide's rows and cells", () => {
     const cells = rowCells(row(station("X", "40.1"), [airing("20:30", "21:30", "A"), airing("21:00", "21:15", "B"), airing("21:30", "22:00", "C")]), FROM, at("22:00"));
     expect(cells.map((c) => c.airing?.title)).toEqual(["A", "C"]);
   });
+
+  it("ends an airing where an overlapping one starts, and lets a sliver the grid can't draw run into what's before it", () => {
+    const cells = rowCells(
+      row(station("FIZZ", "32.1"), [airing("20:30", "21:05", "Cartoons"), airing("21:00", "21:25", "Batman"), airing("21:25", "21:27", "Filler"), airing("21:27", "22:00", "Superman")]),
+      FROM,
+      at("22:00")
+    );
+    expect(cells.map((c) => [c.airing?.title, c.start, c.end])).toEqual([
+      ["Cartoons", at("20:30"), at("21:00")],
+      ["Batman", at("21:00"), at("21:27")],
+      ["Superman", at("21:27"), at("22:00")]
+    ]);
+  });
 });
 
 describe("focus", () => {

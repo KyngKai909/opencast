@@ -96,25 +96,34 @@ export interface GuideCell {
   onNow: boolean;
 }
 
-/** Places programs on the grid: each spans its start to its end, clipped to the window. */
+/**
+ * Places programs on the grid: each spans its start to its end, clipped to the window, on one line.
+ * An outside guide can overlap itself or list programs shorter than a grid unit (2026-10-06: Fizz's
+ * "Cartoons" until 9:05 with "Batman Animated" at 9:00; HappyKids' 2-minute fillers): the grid would
+ * push those onto a line of their own. So a program ends where the next one starts, and one that
+ * comes to nothing at the grid's 5 minutes isn't drawn.
+ */
 export function guideCells(programs: GuideProgram[], from: TimeInput, to: TimeInput, now?: TimeInput): GuideCell[] {
   const a0 = ms(from);
   const b0 = ms(to);
   const t = now != null ? ms(now) : NaN;
   const cells: GuideCell[] = [];
-  for (const p of programs) {
+  const sorted = [...programs].sort((x, y) => ms(x.start) - ms(y.start));
+  for (const p of sorted) {
     const s = ms(p.start);
     const e = ms(p.end);
     const a = Math.max(s, a0);
     const b = Math.min(e, b0);
     if (b <= a) continue;
-    cells.push({
-      program: p,
-      colStart: Math.round((a - a0) / GUIDE_UNIT_MS) + 2,
-      colEnd: Math.round((b - a0) / GUIDE_UNIT_MS) + 2,
-      began: s < a0,
-      onNow: s <= t && t < e
-    });
+    const colStart = Math.round((a - a0) / GUIDE_UNIT_MS) + 2;
+    const colEnd = Math.round((b - a0) / GUIDE_UNIT_MS) + 2;
+    if (colEnd <= colStart) continue;
+    const prev = cells[cells.length - 1];
+    if (prev && prev.colEnd > colStart) {
+      prev.colEnd = colStart;
+      if (prev.colEnd <= prev.colStart) cells.pop();
+    }
+    cells.push({ program: p, colStart, colEnd, began: s < a0, onNow: s <= t && t < e });
   }
   return cells;
 }
