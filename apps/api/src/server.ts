@@ -18,7 +18,8 @@ function addCorsOriginWithAliases(input: string, allowed: Set<string>) {
   }
   try {
     const base = new URL(trimmed);
-    allowed.add(base.origin);
+    // A scheme with no origin of its own (file://, the Samsung TV app's page) is matched as written.
+    allowed.add(base.origin === "null" ? trimmed : base.origin);
     if (base.hostname === "localhost") {
       const alias = new URL(trimmed);
       alias.hostname = "127.0.0.1";

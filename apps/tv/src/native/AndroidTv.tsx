@@ -2,6 +2,7 @@
 // the screen on while the picture plays, goes back to the TV's home screen when the sleep timer
 // ends, and pauses in the background. The rules are in lifecycle.ts; the remote's keys come in
 // through keys.ts (startNativeKeys), and Back with nothing to go back to is the watching screen's.
+// The Samsung TV app runs the same rules with Tizen's own calls (tizen.ts: tizenTv).
 
 import { useEffect, useRef } from "react";
 import { App } from "@capacitor/app";

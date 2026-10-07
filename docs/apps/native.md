@@ -6,6 +6,9 @@ Three builds wrap the web apps with Capacitor 8:
 - the Opencast app on Android;
 - TV mode on Android TV and Fire TV.
 
+A fourth packages TV mode without Capacitor, as a Tizen web app for Samsung TVs (see
+[TV mode on Samsung TVs (Tizen)](#tv-mode-on-samsung-tvs-tizen)).
+
 The Opencast app is `apps/web`: the viewer at `/`, master control at `/control` and Network desk at
 `/desk`, with one sign-in. The phone apps wrap all of it, so creators get master control on their
 phones too (going live from the phone included); viewers never download master control or the desk,
@@ -622,3 +625,145 @@ TV mode's debug build was compiled and run on the "opencast-tv" AVD (Android TV 
 - **Detecting Google TV** from its home-screen package is a heuristic. Google has no official feature flag for it; check it on a Chromecast with Google TV and on a Google TV set.
 - **The API's CORS** must allow `https://localhost` for the app. Is that in the platform's allowed origins?
 - **Back with no last channel exits.** Should the first Back show a "Press Back again to leave" hint instead? Android TV and Fire TV apps usually just exit.
+
+## TV mode on Samsung TVs (Tizen)
+
+TV mode's web build packaged as a Tizen web app (`.wgt`) for sideloading onto a Samsung TV (A250). No Capacitor: the TV's own web runtime runs the page. Nothing has been submitted to Samsung's store.
+
+**Never run on a TV.** It was checked with unit tests (a fake `window.tizen`) and in Chrome at 1920×1080 with a fake `window.tizen`, over http on the mocks and from `file://` against staging. The Tizen CLI isn't installed on the Mac it was written on, so no `.wgt` has been signed or installed yet.
+
+**Why a packaged copy, not a page in Samsung's browser or a hosted wrapper:** in the browser, the remote's arrows move a pointer and the channel buttons never reach the page. A Tizen app gets keys only by registering them (`tizen.tvinputdevice.registerKey`), and that API exists only for content inside the package. A wrapper that loads opencast-tv.vercel.app would be a remote page without it. The cost: a new web build reaches the TV only as a new `.wgt`.
+
+### What's where
+
+| File | What it does |
+|---|---|
+| `tizen/config.xml` | The app: package `OpcastTv01`, app id `OpcastTv01.Opencast`, name "Opencast", `tv-samsung` profile, `required_version` 7.0, privileges `internet` and `tv.inputdevice`, `<access origin="*">` (the API and the stations' streams come from many hosts), landscape, no context menu, no pointer, no background play. |
+| `tizen/icon.png` | The 512×423 icon (the lockup on TV mode's ground), drawn by `npm run tizen:art -w @opencast/tv` (`scripts/tizen-art.mjs`, sharing `scripts/brand-art.mjs` with the Android art). |
+| `scripts/build-tizen.mjs` | `npm run build:tizen -w @opencast/tv`: builds into `dist-tizen/` and copies `config.xml` and the icon beside it. With the Tizen CLI on `PATH` it runs `tizen build-web`, and `tizen package` when `TIZEN_PROFILE` names a certificate profile; otherwise it prints the commands. |
+| `vite.config.ts` (`tizenBuild`) | For this build only: one classic script (iife, no module scripts: Tizen can refuse a module from `file://` for its MIME type), syntax for Chromium 94, one CSS file, no receiver entry, and Samsung's `webapis.js` (the TV's own copy, `$WEBAPIS/webapis/webapis.js`) before the app. |
+| `src/config.ts` (`hashRoutes`) | `VITE_TIZEN=true`: routes in the hash (`#/guide`), since the page's own path is the file's. |
+| `src/native/tizen.ts` | Registers the remote's keys and renames them to the keys `keyboard.ts` maps; leaves the app; the Android app's lifecycle rules with Tizen's calls. |
+
+### Which TVs
+
+`required_version` 7.0 installs on Samsung's 2023 TVs and later. Samsung's web engines by year:
+
+| Year | Tizen | Chromium | Opencast |
+|---|---|---|---|
+| 2025, 2026 | 9.0, 10.0 | 120, 130 | Everything as designed. |
+| 2024 | 8.0 | 108 | Works; `color-mix()` tints (the guide's tuned row, stand-by fills) are missing. |
+| 2023 | 7.0 | 94 | Works; also no `:has()` (the guide doesn't move the picture into its window) and no container-query sizes (the bug and lower thirds use the default size). |
+| 2022 and older | 6.5 and older | 85 and older | Refused at install. Below Chromium 88 the layout itself breaks (flex `gap`, `aspect-ratio`). To try anyway, lower `required_version` and `TIZEN_TARGET` in `vite.config.ts` together. |
+
+The API client no longer uses `URLSearchParams.size` (Chromium 113): before 2025, TVs dropped every query string with it.
+
+### The remote
+
+Tizen delivers the arrows, OK (`Enter`) and Back (Return) by itself. `src/native/tizen.ts` registers the rest at start, using the codes the TV reports (`getSupportedKeys()`; Samsung's documented codes if it can't say), and renames each key as it arrives (a capture listener on the window, before anything reads it) to the key `packages/player`'s `keyboard.ts` already maps. So a Samsung remote means what an Android TV remote means:
+
+| Samsung key (code) | Page key | Command |
+|---|---|---|
+| Return (10009) | `GoBack` | Picture: last channel, or **leave the app when there's no last channel**. Overlay: close. Hold: menu. Needs no registering. |
+| Enter (13), arrows | as they are | OK and the arrows, as on every TV. |
+| `ChannelUp` / `ChannelDown` (427/428) | `ChannelUp` / `ChannelDown` | Channel up and down; pages the guide. |
+| `0`–`9` (48–57) | `0`–`9` | Tune by number. |
+| `Minus` (189) | `.` | The dot: "18-2" tunes 18.2. |
+| `Info` (457) | `Info` | Banner or details. |
+| `Guide` (458), `ChannelList` (10073) | `Guide` | Guide. |
+| `PreviousChannel` (10190) | `MediaLast` | Last channel. |
+| `Tools` (10135, older remotes) | `ContextMenu` | Menu rail. |
+| `MediaPlayPause` (10252), `MediaPlay` (415), `MediaPause` (19) | the same | Pause and play. |
+| `MediaStop` (413) | `MediaPause` | Pause (nothing to stop to on live TV). |
+| `MediaRewind` / `MediaFastForward` (412/417) | the same | ⏪: nothing yet. ⏩: back to live on the picture. |
+| `MediaTrackNext` / `MediaTrackPrevious` (10233/10232) | `ChannelUp` / `ChannelDown` | Channel. |
+
+- **Not registered:** Exit (Samsung requires it to leave the app at once; the TV does that), Menu, Home, Source, volume and mute (the TV's), and the colour keys (unused).
+- **Back at the root** leaves with `tizen.application.getCurrentApplication().exit()`. Samsung's store policy asks for an exit popup at an app's home screen, but its FAQ allows Return there to exit or hide the app; this matches the Android app. Revisit before a store submission.
+- **The pointer is off** (`pointing-device-support="disable"`): the remote's arrows are keys.
+- **What each remote has:** Samsung's Smart Remotes (2016 and later) have CH ▲▼, OK, the arrows and Return, but no number keys. Their `123` button (or a long press on it) shows an on-screen number pad with the numbers and "-", and on some models CH LIST, PRE-CH and GUIDE. Check on the TV which of these reach the app. Basic IR remotes have numbers, "-", PRE-CH, CH LIST, INFO, GUIDE and TOOLS.
+
+### The env and the API
+
+- `VITE_API_BASE`: from Vite's env for the mode, then the shell. **Unset, the build points at staging** (`https://api-staging-9fae.up.railway.app`), with `VITE_VIEWER_URL` at `https://opencast-web.vercel.app` for "sign in on your phone". A production build sets both.
+- **CORS:** a packaged Tizen app's requests carry `Origin: file://` (what Samsung's forums report for Tizen) or `Origin: null` (Chromium's own for a file page). The API must allow both. In `WEB_ORIGIN`, add `file://,null`; `apps/api/src/server.ts` keeps `file://` as written (before, it was parsed to the origin "null" and never matched). For staging (set by `.railway/railway.ts` today), the api service's value becomes:
+  ```
+  https://opencast-web.vercel.app,https://opencast-business.vercel.app,https://opencast-site.vercel.app,https://opencast-tv.vercel.app,file://,null
+  ```
+  `null` works with the API as deployed; `file://` needs this branch's `server.ts` on staging.
+- **Sign-in** is TV mode's code sign-in with bearer tokens in `localStorage`, as on Android TV. No cookies.
+- **Streams** are fetched from their own hosts. A stream whose server allows only the web app's origin (not `*`) won't play in the Samsung app; the stream checks (A238) test with the web app's origin.
+
+### Playback
+
+- **hls.js** plays HLS through Media Source Extensions, which every Tizen TV from 2017 on has. Samsung's own HLS (a native `<video src=…m3u8>` or AVPlay) isn't used: one player everywhere, and AVPlay would be a second player for the same streams. Add it only if hls.js fails on the TV.
+- **dash.js** plays DASH stream links the same way. Its content-steering code calls `Array.prototype.at` (Chromium 92); fine from 2023 on.
+- **Autoplay with sound:** desktop Chrome holds the sound until a key is pressed ("Tap for sound"); a packaged Tizen app is expected not to. Check on the TV that the first channel starts with sound.
+- **Codecs:** H.264 and AAC, in TS (hls.js remuxes it) or fMP4, play on every Samsung TV. Check any station that sends HEVC or AC-3 on the TV itself.
+- **The screen saver** is turned off while the picture plays (`webapis.appcommon.setScreenSaver`, from the TV's `webapis.js`) and allowed again when it's paused, off air or stopped. Not checked on a TV.
+- **Leaving the app** (Home, Source, another app) hides it: the picture pauses (`visibilitychange`), and coming back returns to live. `background-support="disable"` stops it playing on behind the home screen.
+- **The sleep timer's end** leaves the app, as on Android TV.
+
+### Sideloading onto your TV (on a Mac)
+
+The TV and the Mac must be on the same network.
+
+1. **Install Tizen Studio.** Download "Tizen Studio with IDE installer" (or the CLI installer) for macOS from developer.tizen.org, and install it to `~/tizen-studio`. Then put the CLI on your `PATH`:
+   ```sh
+   export PATH="$HOME/tizen-studio/tools/ide/bin:$HOME/tizen-studio/tools:$PATH"
+   ```
+2. **Add Samsung's extensions.** Open the Package Manager (in `~/tizen-studio/package-manager/`, or **Tools → Package Manager** in Tizen Studio). On the **Extension SDK** tab, install **Samsung Certificate Extension** and **TV Extensions** (the newest version), with **TV Extension Tools** if it's listed separately.
+3. **Put the TV in Developer mode.**
+   1. On the TV, open **Apps**.
+   2. Press **1 2 3 4 5** on the remote (on a remote without numbers, use the `123` button's on-screen number pad).
+   3. Turn **Developer mode** on, and enter your Mac's IP address (`ipconfig getifaddr en0` in Terminal, or System Settings → Wi-Fi → Details).
+   4. Restart the TV: hold the power button until the TV turns off and on again (a quick press only puts it to standby).
+   5. Apps now shows "Developer mode" at the top.
+4. **Find the TV's IP address:** Settings → General (or Connection) → Network → Network Status → IP Settings.
+5. **Connect to the TV.**
+   ```sh
+   sdb connect <tv-ip>        # port 26101
+   sdb devices                # the TV's serial (<tv-ip>:26101), "device", and its name, e.g. QE55Q80T
+   ```
+   Or in Tizen Studio: **Tools → Device Manager → Remote Device Manager → +**, enter a name, the TV's IP and port **26101**, and switch **Connection** on.
+6. **Make a Samsung certificate** (once). Open **Tools → Certificate Manager** in Tizen Studio.
+   1. Click **+**, choose **Samsung**, then **TV**.
+   2. Name the certificate profile, for example `opencast`.
+   3. **Author certificate:** create a new one (a name and a password you keep), then sign in with your Samsung account.
+   4. **Distributor certificate:** create a new one, privilege **Public**. It must list your TV's **DUID**. With the TV connected (step 5), Certificate Manager lists the connected TV's DUID and adds it. Otherwise `sdb -s <tv-ip>:26101 shell 0 getduid` should print it.
+   5. Finish. The files go to `~/SamsungCertificate/opencast/`.
+7. **Let the TV accept your certificate** (once per TV): in Device Manager, right-click the TV and choose **Permit to install applications**.
+8. **Build and package:**
+   ```sh
+   npm run build:tizen -w @opencast/tv          # staging; or VITE_API_BASE=https://… for another API
+   tizen build-web -- apps/tv/dist-tizen
+   tizen package -t wgt -s opencast -- apps/tv/dist-tizen/.buildResult
+   ```
+   With the CLI on `PATH`, `TIZEN_PROFILE=opencast npm run build:tizen -w @opencast/tv` runs all three. The package is `apps/tv/dist-tizen/.buildResult/Opencast.wgt`.
+9. **Install and open:**
+   ```sh
+   tizen install -n Opencast.wgt -t <TV name from sdb devices> -- apps/tv/dist-tizen/.buildResult
+   tizen run -p OpcastTv01.Opencast -t <TV name>
+   ```
+   Opencast is in the TV's Apps from then on. In Tizen Studio you can instead import `apps/tv/dist-tizen` as a project and choose **Run As → Tizen Web Application**.
+10. **A new version:** build, package and install again (steps 8 and 9). Installing over the same app id with the same certificate replaces it, and should keep its storage (the TV's registration and sign-in).
+
+**Logs and debugging:** start the app in debug mode and open its Web Inspector in Chrome on the Mac:
+```sh
+sdb -s <tv-ip>:26101 shell 0 debug OpcastTv01.Opencast      # prints "... port: 7011" (the number varies)
+sdb -s <tv-ip>:26101 forward tcp:7011 tcp:7011
+```
+Then open `http://localhost:7011` in Chrome (or `chrome://inspect` → Configure → `localhost:7011`). In Tizen Studio, **Debug As → Tizen Web Application** does the same.
+
+**Uninstalling:** `tizen uninstall -p OpcastTv01.Opencast -t <TV name>`, or on the TV: Apps → Settings (the gear) → Opencast → Delete. Developer mode stays on until you turn it off in Apps (1 2 3 4 5 again).
+
+### Trying the build on a computer
+
+`npm run build:tizen -w @opencast/tv -- --mode mock` builds against the mocks for a computer's browser. Serve `apps/tv/dist-tizen` over http with the mock streams (the dev server's `/mock-hls` middleware), and inject a fake `window.tizen` (an object with `tvinputdevice.getSupportedKeys`, `registerKey`, `unregisterKey` and `application.getCurrentApplication().exit`) before the page loads. Keyboard arrows and Enter work as on the TV; Samsung's keys can be sent as `KeyboardEvent`s with their codes (427 for CH ▲). A file page has no service worker, so mock mode never runs from `file://` or on the TV.
+
+### Open questions
+
+- **The origin the TV sends:** `file://` or `null`? Both are in the value above; once known, the other can go.
+- **An exit popup** at the root, for a store submission (Samsung's policy) rather than sideloading?
+- **2022 and older TVs:** worth a build for them (polyfills and plainer CSS), or 2023 on only?
+- **Samsung's store:** a Samsung Seller Office account and Samsung's review would be needed; nothing has started.

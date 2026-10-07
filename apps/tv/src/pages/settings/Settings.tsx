@@ -17,6 +17,7 @@ import { PhoneRows } from "../../components/settings/PhoneRows";
 import { TvRow } from "../../components/settings/TvRow";
 import { useAccountSettingsSync, useTvSettings } from "../../components/settings/useTvSettings";
 import { isAndroidApp, nativeInfo } from "../../native/plugin";
+import { isTizenApp } from "../../native/tizen";
 import { useCommandLayer } from "../../tv/commands";
 import { useDial, useMe } from "../../tv/data";
 import { useDevice } from "../../tv/device";
@@ -257,7 +258,7 @@ function AboutRows({ focusRow }: Pick<RowsProps, "focusRow">) {
   const tv = useDial("tv");
   const navigate = useNavigate();
   // Capacitor's core sets window.Capacitor in a browser too: ask it whether this is the app.
-  const isApp = isAndroidApp();
+  const isApp = isAndroidApp() || isTizenApp();
   return (
     <>
       <TvRow title="Version" control={{ type: "value", label: version }} />

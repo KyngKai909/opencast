@@ -1,10 +1,11 @@
 // TV mode: one tree for the TV app (Android TV, Google TV, Fire TV, TV browsers), the Cast Web
 // Receiver and the iPhone's external display. They differ only in their input (the remote's keys,
 // Cast messages from phones, the bridge from the iPhone app), their router (the TV app has
-// history; the receiver and mirror run in memory) and where they count as tuned in.
+// history, in the hash in the Samsung TV app; the receiver and mirror run in memory) and where
+// they count as tuned in.
 
 import { createContext, useContext, useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
-import { BrowserRouter, MemoryRouter, Outlet, useLocation, useNavigate } from "react-router";
+import { BrowserRouter, HashRouter, MemoryRouter, Outlet, useLocation, useNavigate } from "react-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { audienceApi } from "@opencast/contracts";
 import { PlayerProvider, PlayerSurface, startHeartbeat, startInputs, usePlayer, type Command, type CommandSource, type EngineOptions, type InputAdapter } from "@opencast/player";
@@ -102,7 +103,7 @@ export function TvApp({ mode, inputs, routes, children }: TvAppProps) {
     window.addEventListener("oc-mock-changed", again);
     return () => window.removeEventListener("oc-mock-changed", again);
   }, []);
-  const Router = mode === "tv" ? BrowserRouter : MemoryRouter;
+  const Router = mode !== "tv" ? MemoryRouter : config.hashRoutes ? HashRouter : BrowserRouter;
   return (
     <QueryClientProvider client={queryClient}>
       <GroundProvider>
