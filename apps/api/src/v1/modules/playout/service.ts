@@ -100,6 +100,8 @@ export interface PlayoutService {
   /** Whether each station is on air, and where to play it. */
   /** `standingBy`: a live block is on the stand-by slate, waiting for its signal (S13). */
   statusFor(stationIds: string[]): Promise<Map<string, { onAir: boolean; playbackUrl: string | null; standingBy: boolean }>>;
+  /** A251: minutes of dead-air fill and slate per station in a span (time nobody scheduled, or something not ready). */
+  fillMinutes(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
   signOn(stationId: string): Promise<PlayoutStatusView>;
   signOff(stationId: string, permanently: boolean): Promise<PlayoutStatusView>;
@@ -334,6 +336,17 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
   }
 
   const service: PlayoutService = {
+    async fillMinutes(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, minutes: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))) / 60, 0)::float` })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), inArray(A.reason, ["dead_air_fill", "slate"]), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.stationId);
+      return new Map(rows.map((r) => [r.stationId, Math.round(r.minutes)]));
+    },
+
     async statusFor(stationIds) {
       if (!stationIds.length) return new Map();
       const states = await db.select().from(P).where(inArray(P.stationId, stationIds));

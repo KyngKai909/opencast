@@ -115,6 +115,12 @@ export interface LedgerService extends BusinessMoney {
   withdraw(businessId: string, input: { amountMicros: number; fundingSourceId: string }): Promise<{ payoutId: string; balance: BalanceView }>;
   statements(accountOwner: { businessId?: string; stationId?: string }): Promise<StatementView[]>;
   stationEarnings(stationId: string, period: "week" | "month" | "year"): Promise<StationEarningsView>;
+  /**
+   * A251: what each station earned in a span, after card fees: settlements, pledges, card fees and
+   * reversals posted to its earnings (or, a claimable station's, to what's owed into escrow).
+   * Carriage moves money between stations and isn't in it; nor are payouts.
+   */
+  earnedBetween(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
   moveToBank(stationId: string, micros: number): Promise<{ payoutId: string; scheduledFor: string }>;
   pledge(userId: string, stationId: string, input: { cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean }): Promise<{ pledge: PledgeView; checkoutUrl: string | null }>;
   pledges(userId: string): Promise<PledgeView[]>;
@@ -1114,6 +1120,26 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           destination: payout?.destination ?? null
         };
       });
+    },
+
+    async earnedBetween(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: L.stationId, micros: sql<number>`coalesce(sum(${P.amountMicros}), 0)::float` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(
+          and(
+            inArray(L.stationId, stationIds),
+            inArray(L.kind, ["station_earnings", "escrow_owed"]),
+            inArray(E.kind, ["settle", "pledge", "card_fee", "reversal"]),
+            gte(E.occurredAt, from),
+            lt(E.occurredAt, to)
+          )
+        )
+        .groupBy(L.stationId);
+      return new Map(rows.map((r) => [r.stationId!, Math.round(r.micros)]));
     },
 
     async stationEarnings(stationId, period) {

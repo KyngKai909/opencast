@@ -1,4 +1,4 @@
-import { audienceApi as api } from "@opencast/contracts";
+import { analyticsApi, audienceApi as api } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 import { badRequest } from "../../errors.js";
@@ -55,4 +55,8 @@ export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
     const { status } = await services.audience.watch.vote({ stationId: params.stationId, sessionId });
     return { ok: true as const, status };
   });
+
+  // A251 (2026-10-06): the Network desk's analytics; admins, and market leads for their market.
+  r.handle(analyticsApi.overview, ({ user, query }) => services.audience.analytics.overview(user, query));
+  r.handle(analyticsApi.stations, ({ user, query }) => services.audience.analytics.stations(user, query));
 }

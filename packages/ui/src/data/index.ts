@@ -7,7 +7,7 @@ export { Movements, type MovementsProps, type Movement, type MovementKind } from
 export { Timeline, type TimelineProps, type TimelineItem, type TimelineState } from "./Timeline";
 export { StepRail, type StepRailProps, type Step, type StepState } from "./StepRail";
 export { PermissionsTable, type PermissionsTableProps, type Ability, type Permission } from "./PermissionsTable";
-export { LineChart, niceStep, niceTop, hourTicks, type LineChartProps, type ChartPoint, type ChartBreak } from "./LineChart";
+export { LineChart, niceStep, niceTop, hourTicks, dayTicks, type LineChartProps, type ChartPoint, type ChartBreak } from "./LineChart";
 export { BalanceBar, balanceShares, type BalanceBarProps, type BalanceSegment, type BalanceTone } from "./BalanceBar";
 export { BalanceChip, type BalanceChipProps } from "./BalanceChip";
 export { Checks, checksSummary, type ChecksProps, type Check, type CheckState } from "./Checks";

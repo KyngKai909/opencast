@@ -47,6 +47,10 @@ const ROUTES: Route[] = [
   { path: `${IE}/listed`, ready: async (p) => { await h1("External sources")(p); await expect(p.getByRole("heading", { name: "Opencast catalog station" })).toBeVisible(); } },
   { path: `${IE}/listed?add=1`, ready: async (p) => { await expect(p.getByRole("dialog", { name: "List a source" })).toBeVisible(); } },
   { path: `${IE}/catalog`, ready: async (p) => { await h1("Catalog")(p); await expect(p.getByRole("grid", { name: "Catalog series" })).toBeVisible(); } },
+  // A251: the analytics tabs built so far (Ref. 12d), and one still to come.
+  { path: "/desk/analytics/overview", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Tuned in at once" })).toBeVisible(); } },
+  { path: "/desk/analytics/stations", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Every station's span" })).toBeVisible(); } },
+  { path: "/desk/analytics/money", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Money" })).toBeVisible(); } },
   { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
   { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
   { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByRole("grid", { name: "Open claims" })).toBeVisible(); } },

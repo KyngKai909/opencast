@@ -15,8 +15,8 @@ The user's request (2026-10-06): an Analytics page in the Network desk for the w
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | **The data**, shipped first so history builds up: a session per station (and the fix that comes with it), the visit, the device hash, how it was tuned, press-to-picture, searches. Migration 0054. | Done |
-| 2 | **Totals and the API**: hourly station totals (every station, external included, from session minutes), nightly totals (sessions and their length, bots by reason, devices, how people tuned in, station flows), `deskApi.analytics` (overview and stations) with CSV, the rail's "Analytics" first under Network, the **Overview** and **Stations** tabs. | |
+| 1 | **The data**, shipped first so history builds up: a session per station (and the fix that comes with it), the visit, the device hash, how it was tuned, press-to-picture, searches. Migration 0054. | Done (PR #28) |
+| 2 | **Totals and the API**: hourly station totals (every station, external included, from session minutes), nightly totals (sessions and their length, bots by reason, devices, how people tuned in, station flows), `analyticsApi` (overview and stations), the rail's "Analytics" first under Network, the **Overview** and **Stations** tabs with CSV. Migration 0055. | Done |
 | 3 | **One station** (03): the night by the minute with breaks, airings, surfaces, markets, came from and went to, airtime fill, earned, cost to run. | |
 | 4 | **Audience** (04): the hour-by-day grid, session lengths, surfaces by day, moving around the dial, relays, how people tuned in, devices. | |
 | 5 | **Programs and breaks** (05): programs across stations with still-watching curves; `break_stats` and break hold. | |

@@ -297,6 +297,10 @@ export interface StationsService {
    */
   resolveBreakRule(stationId: string, rule: BreakRuleInput): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
+  /** A251: every station on the dial's band and market (its channel not released). */
+  dialPlaces(): Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
+  /** A251: these stations' relays (YouTube, Twitch, RTMP), for the desk's analytics. */
+  relaysOf(stationIds: string[]): Promise<Array<{ id: string; stationId: string; service: "youtube" | "twitch" | "rtmp" }>>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
   updateTranslator(stationId: string, translatorId: string, input: Partial<TranslatorInput & { enabled: boolean }>): Promise<TranslatorView>;
   removeTranslator(stationId: string, translatorId: string): Promise<void>;
@@ -1395,6 +1399,22 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (categories.length) await tx.insert(schema.blockedCategories).values(categories.map((category) => ({ stationId, category })));
       });
       return service.breakRule(stationId);
+    },
+
+    async dialPlaces() {
+      const rows = await db
+        .select({ stationId: schema.channels.stationId, band: schema.channels.band, marketId: schema.channels.marketId })
+        .from(schema.channels)
+        .where(isNull(schema.channels.releasedAt));
+      return new Map(rows.map((r) => [r.stationId, { band: r.band as "tv" | "radio", marketId: r.marketId }]));
+    },
+
+    async relaysOf(stationIds) {
+      if (!stationIds.length) return [];
+      return db
+        .select({ id: schema.translators.id, stationId: schema.translators.stationId, service: schema.translators.service })
+        .from(schema.translators)
+        .where(inArray(schema.translators.stationId, stationIds));
     },
 
     async translators(stationId) {

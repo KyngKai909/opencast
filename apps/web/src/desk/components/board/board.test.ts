@@ -63,7 +63,8 @@ describe("external sources", () => {
     const { SLOT_STATE_LABELS } = await import("@opencast/contracts");
     const { DESK_RAIL } = await import("@opencast/ui");
     expect(Object.values(SLOT_STATE_LABELS)).toEqual(["Independent station", "Claimable, run by Opencast", "External city stream", "Opencast catalog", "Held for the waitlist", "Open"]);
-    expect(DESK_RAIL[0]!.items.map((i) => i.label)).toEqual(["Market board", "Creator pipeline", "External sources", "Catalog"]);
+    // The Markets group (Network's Analytics comes first since A251).
+    expect(DESK_RAIL.find((g) => g.label === "Markets")!.items.map((i) => i.label)).toEqual(["Market board", "Creator pipeline", "External sources", "Catalog"]);
     const [tv] = boards();
     const nine = tv.slots.find((s) => s.major === 9)!;
     expect(slotLabel(nine, "tv")).toContain("External city stream");
