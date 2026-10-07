@@ -340,7 +340,7 @@ TV screens no frame draws follow the drawn ones' pattern: About a station, choos
 | First launch | "That code ran out, so here's a new one. Scan it, or go to useopencast.org/tv and enter:"; "Your market: {name}. Change it any time in the menu."; "No market is open near this TV's connection yet, so it's showing {name}. Change it any time in the menu." |
 | Settings line | "Saved on this TV. Sign in to use them on your other TVs too." (signed out) |
 | Watching | Captions "Off", "On", "Muted only"; Caption size "Small", "Medium", "Large"; "Down the dial" / "Down the dial, 9.1 to 7.1"; "3 seconds", "8 seconds"; "1 second", "1.5 seconds", "3 seconds" |
-| Remote and phones | "Who on the Wi-Fi can change the channel" / "While a phone is playing to this TV" / "Any phone", "The phone that started"; "Open the menu" / "On a remote without a Menu key, hold Back" / "Menu" |
+| Remote and phones | "Who on the Wi-Fi can change the channel" / "While a phone is playing to this TV" / "Any phone", "The phone that started"; "Open the menu" / "On a remote without a Menu key, press ▶" / "Menu" |
 | Picture and sound | "Picture quality" / "Auto follows your connection" / "Auto", "Data saver", "Best"; "Even out the sound" / "So one station isn't much louder than the next" |
 | Account | "Signed in as" (the email as help); "Sign out of this TV" / "Your presets and reminders stay on your account"; "Not signed in" / "Signing in adds your presets, reminders and pledges from your phone"; "Sign in" / "With a code, on your phone" |
 | About this TV | "Version", "Your market", "This TV"; "Opencast app on Fire TV", "Web browser", "TV browser" |

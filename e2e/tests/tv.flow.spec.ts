@@ -60,11 +60,9 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   await expect(page.locator(".oc-numpad")).toBeHidden();
   await onChannel(page, "24.1", "REEL");
 
-  // ▶ opens the guide on the channel that's on; Back closes it.
+  // ▶ opens the menu (Samsung's TVs take a held Return for themselves); Back closes it.
   await page.keyboard.press("ArrowRight");
-  await expect(page).toHaveURL(/\/guide$/);
-  await expect(page.getByText("Now on REEL 24.1")).toBeVisible();
-  await expect(page.getByText("Close guide")).toBeVisible();
+  await expect(page).toHaveURL(/\/menu$/);
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/$/);
 
@@ -75,6 +73,8 @@ test("change channel by number and arrows, open the guide, set the sleep timer",
   await expect(banner(page)).toContainText("Guide");
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/guide$/);
+  await expect(page.getByText("Now on REEL 24.1")).toBeVisible();
+  await expect(page.getByText("Close guide")).toBeVisible();
 
   // In the guide, ▲ moves up a row, and OK on what's on now tunes to it and closes the guide.
   await expect(focused(page)).toContainText("Cartoons from 1928 to 1934");

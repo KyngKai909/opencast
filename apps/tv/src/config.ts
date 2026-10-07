@@ -10,6 +10,11 @@ export const config = {
   viewerUrl: (env.VITE_VIEWER_URL as string | undefined) ?? "http://localhost:5174",
   /** The Cast receiver's application id, registered in the Cast console (the senders use it too). */
   castAppId: (env.VITE_CAST_APP_ID as string | undefined) || null,
+  /**
+   * The Samsung TV app's build (npm run build:tizen): its page is a file (file://…/index.html), so
+   * TV mode's routes go in the address's hash (#/guide) instead of its path.
+   */
+  hashRoutes: env.VITE_TIZEN === "true",
   /** Where mock mode's clock starts (the reference frames' moment), or null for the real time. */
   mockClock: (env.VITE_MOCK_CLOCK as string | undefined) || null
 };

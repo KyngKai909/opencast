@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 // @ts-expect-error: a plain .mjs module with no types
 import { mockLiveHls } from "@opencast/player/mock";
@@ -43,12 +43,43 @@ channel.onmessage = (e) => {
 </script>`;
 }
 
+/** Samsung's oldest web engine the Samsung TV app supports: Chromium 94, Tizen 7.0 (2023 TVs; tizen/config.xml). */
+const TIZEN_TARGET = "chrome94";
+
+/**
+ * The Samsung TV app's build (npm run build:tizen): the TV opens index.html as a file, where module
+ * scripts can fail (no MIME type for a file://), so the app is one classic script (iife, the
+ * dynamic imports inlined) with its syntax for Samsung's older engines, and no receiver entry.
+ * Samsung's product API (webapis.js, the TV's own copy: the screen saver) loads before it.
+ */
+function tizenBuild(): Plugin {
+  return {
+    name: "opencast-tizen",
+    apply: "build",
+    config: () => ({
+      build: { target: TIZEN_TARGET, modulePreload: false, cssCodeSplit: false, rollupOptions: { output: { format: "iife", inlineDynamicImports: true } } }
+    }),
+    transformIndexHtml: {
+      order: "post",
+      handler: (html) =>
+        html
+          .replace(/<script type="module" crossorigin src=/g, "<script defer src=")
+          .replace(/ crossorigin(?=[ >])/g, "")
+          .replace("<script defer src=", `<script src="$WEBAPIS/webapis/webapis.js"></script>\n    <script defer src=`)
+    }
+  };
+}
+
 export default defineConfig(({ mode }) => {
-  const viewer = loadEnv(mode, here("."), "VITE_").VITE_VIEWER_URL || "http://localhost:5174";
+  const env = loadEnv(mode, here("."), "VITE_");
+  const viewer = env.VITE_VIEWER_URL || "http://localhost:5174";
   const viewerOrigins = [new URL(viewer).origin];
+  // The Samsung TV app (npm run build:tizen sets VITE_TIZEN): see tizenBuild.
+  const tizen = env.VITE_TIZEN === "true";
   return {
     plugins: [
       react(),
+      ...(tizen ? [tizenBuild()] : []),
       {
         name: "opencast-mock-streams",
         configureServer(server) {
@@ -77,7 +108,7 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         // TV mode (the Android TV and Fire TV app, TV browsers) and the Cast Web Receiver: one build.
-        input: { index: here("index.html"), receiver: here("receiver.html") }
+        input: { index: here("index.html"), ...(tizen ? {} : { receiver: here("receiver.html") }) } as Record<string, string>
       }
     },
     server: { port: 5175, strictPort: true }

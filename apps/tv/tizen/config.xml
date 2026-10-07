@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The Samsung TV app: TV mode packaged as a Tizen web app. `npm run build:tizen -w @opencast/tv`
+  copies this file and icon.png into dist-tizen/ beside the build (docs/apps/native.md,
+  "Samsung TV (Tizen)").
+  - required_version 7.0: Samsung's 2023 TVs and later (Chromium 94: vite.config.ts's TIZEN_TARGET).
+  - Privileges: internet, and tv.inputdevice for the remote's keys (src/native/tizen.ts).
+  - access *: the API and the stations' streams, which come from many hosts.
+  - No pointer (the remote's arrows are keys), landscape, no context menu, no background play.
+-->
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="http://useopencast.org/tv" version="0.1.0" viewmodes="maximized">
+  <tizen:application id="OpcastTv01.Opencast" package="OpcastTv01" required_version="7.0"/>
+  <tizen:profile name="tv-samsung"/>
+  <name>Opencast</name>
+  <description>Opencast: local TV and radio, on the remote's channel buttons.</description>
+  <author href="https://github.com/KyngKai909/opencast">Opencast</author>
+  <icon src="icon.png"/>
+  <content src="index.html"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <access origin="*" subdomains="true"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable" pointing-device-support="disable"/>
+</widget>

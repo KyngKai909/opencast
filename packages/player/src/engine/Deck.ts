@@ -186,19 +186,19 @@ export class Deck {
       this.opts.onChange();
     };
     const v = this.video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+    // The clock moving on counts too, whichever comes first: Samsung's TVs (A250) draw the picture
+    // on a plane of their own, and their requestVideoFrameCallback never fires.
+    const start = v.currentTime;
+    const onTime = () => {
+      if (v.currentTime !== start) {
+        v.removeEventListener("timeupdate", onTime);
+        done();
+      }
+    };
+    v.addEventListener("timeupdate", onTime);
     if (typeof v.requestVideoFrameCallback === "function" && v.videoWidth > 0) v.requestVideoFrameCallback(done);
-    else {
-      const start = v.currentTime;
-      const onTime = () => {
-        if (v.currentTime !== start) {
-          v.removeEventListener("timeupdate", onTime);
-          done();
-        }
-      };
-      v.addEventListener("timeupdate", onTime);
-      // Audio-only streams have no frames; the first timeupdate after playing is enough.
-      if (v.videoWidth === 0) setTimeout(done, 0);
-    }
+    // Audio-only streams have no frames; the first timeupdate after playing is enough.
+    else if (v.videoWidth === 0) setTimeout(done, 0);
   }
 
   /**

@@ -25,6 +25,7 @@ import { watchCommand } from "../../components/watching/watchCommands";
 import { useSavePreset } from "../../components/watching/useSavePreset";
 import { useNow } from "../../lib/clock";
 import { isAndroidApp, OpencastTv } from "../../native/plugin";
+import { exitTizenApp, isTizenApp } from "../../native/tizen";
 import { useCommandLayer } from "../../tv/commands";
 import { useMarketSlug, useSignedIn } from "../../tv/data";
 import { getDevice } from "../../tv/device";
@@ -36,8 +37,10 @@ const handled = new Set<string>();
 
 export default function Watching() {
   const mode = useTvMode();
-  // The Android TV and Fire TV app: Back with nothing to go back to leaves for the TV's home.
-  const nativeApp = mode === "tv" && isAndroidApp();
+  // The Android TV and Fire TV app, and the Samsung TV app: Back with nothing to go back to leaves
+  // for the TV's home.
+  const tizenApp = mode === "tv" && isTizenApp();
+  const nativeApp = (mode === "tv" && isAndroidApp()) || tizenApp;
   const [s, engine] = usePlayer();
   const navigate = useNavigate();
   const now = useNow(1000);
@@ -107,7 +110,8 @@ export default function Watching() {
           engine.sleep(30);
           break;
         case "exit":
-          void OpencastTv.exitToHome();
+          if (tizenApp) exitTizenApp();
+          else void OpencastTv.exitToHome();
           break;
         case "restart":
           window.location.reload();

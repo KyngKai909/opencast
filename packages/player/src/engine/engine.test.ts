@@ -49,6 +49,36 @@ describe("tuning", () => {
     expect(visible()).toEqual([CIVC.station.id]);
   });
 
+  it("takes the clock moving on as the first frame where frame callbacks never come (Samsung's TVs)", async () => {
+    let t = 0;
+    const saved = [
+      [HTMLVideoElement.prototype, "videoWidth"],
+      [HTMLMediaElement.prototype, "currentTime"],
+      [HTMLVideoElement.prototype, "requestVideoFrameCallback"]
+    ].map(([o, k]) => [o, k, Object.getOwnPropertyDescriptor(o, k as string)] as const);
+    Object.defineProperty(HTMLVideoElement.prototype, "videoWidth", { configurable: true, get: () => 1280 });
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", { configurable: true, get: () => t, set: () => {} });
+    const rvfc = vi.fn();
+    Object.defineProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback", { configurable: true, value: rvfc });
+    try {
+      const done = engine.tune(CIVC.station.id);
+      await flush(100);
+      expect(rvfc).toHaveBeenCalled();
+      expect(visible()).toEqual([]);
+      t = 0.5;
+      host.querySelector<HTMLVideoElement>(`video[data-station="${CIVC.station.id}"]`)!.dispatchEvent(new Event("timeupdate"));
+      await flush(400);
+      await done;
+      expect(engine.getState()).toMatchObject({ currentId: CIVC.station.id, status: "playing" });
+      expect(visible()).toEqual([CIVC.station.id]);
+    } finally {
+      for (const [o, k, d] of saved) {
+        if (d) Object.defineProperty(o, k as string, d);
+        else delete (o as unknown as Record<string, unknown>)[k as string];
+      }
+    }
+  });
+
   it("keeps the old picture until the new one is ready", async () => {
     const first = engine.tune(CIVC.station.id);
     await flush(10);

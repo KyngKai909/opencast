@@ -1,10 +1,10 @@
 // What the watching screen ("/") does with a command before the player gets it, as a rule apart
 // from the screen. In order: the sleep fade's notice takes OK ("30 more minutes"); after the
 // sleep timer, OK starts again (TV app); the reminder card takes OK (switch) and Back (wave it
-// away), except while a number is being typed; in the Android TV and Fire TV app, the remote's
-// Back with no last channel to go back to leaves for the TV's home screen; a phone's "+" saves
-// what's on to its key; off air and stand by take the arrows (◀ ▶ between the buttons, ▲ ▼
-// still change channel) and OK. Null: the player's, as usual.
+// away), except while a number is being typed; in the Android TV, Fire TV and Samsung TV apps,
+// the remote's Back with no last channel to go back to leaves for the TV's home screen; a phone's
+// "+" saves what's on to its key; off air and stand by take the arrows (◀ ▶ between the buttons,
+// ▲ ▼ still change channel) and OK. Null: the player's, as usual.
 
 import type { Command } from "@opencast/player";
 
@@ -19,8 +19,9 @@ export interface WatchState {
   /** Remote and phones: channel up goes down the dial (the TV remote's keys only). */
   flip: boolean;
   /**
-   * The Android TV app's remote pressed Back and there's no last channel to go back to: Back
-   * leaves the app, as Android TV and Fire TV apps do. Never from a phone, never in a browser.
+   * The Android TV app's (or the Samsung TV app's) remote pressed Back and there's no last
+   * channel to go back to: Back leaves the app, as Android TV and Fire TV apps do. Never from a
+   * phone, never in a browser.
    */
   exitable?: boolean;
 }

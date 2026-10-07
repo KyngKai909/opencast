@@ -72,7 +72,9 @@ export function urlFor(endpoint: EndpointDef, args: CallArgs = {}): string {
   const path = buildPath(endpoint.path, args.params ?? {});
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(args.query ?? {})) if (v !== undefined && v !== null) qs.set(k, String(v));
-  return `${config.apiBase}${API_PREFIX}${path}${qs.size ? `?${qs}` : ""}`;
+  // Not qs.size: TV browsers before Chromium 113 (Samsung's TVs before 2025) don't have it.
+  const search = qs.toString();
+  return `${config.apiBase}${API_PREFIX}${path}${search ? `?${search}` : ""}`;
 }
 
 /**
