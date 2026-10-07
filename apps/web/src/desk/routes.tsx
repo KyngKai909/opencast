@@ -2,6 +2,7 @@
 // Opencast team only (an admin, a rights reviewer or a market lead): signed out, the sign-in page;
 // signed in but not on the team, NotForYou; otherwise the desk.
 //
+//   /desk/analytics/:tab                         Ref. 12d analytics (A251): overview, stations, programs, audience, money, health, growth (?span=7d|30d|90d|today|custom&from&to, ?market=<id>, ?band=tv|radio)
 //   /desk/markets/:marketSlug/board              01.1 the market board (?ch=33 selects a slot, ?ch=92.0 on radio)
 //   /desk/markets/:marketSlug/pipeline           02.1 the creator pipeline (?stage=said_yes filters, ?add=1 opens Add a creator)
 //   /desk/markets/:marketSlug/pipeline/:id/ask   03.1 asking permission
@@ -38,6 +39,7 @@ import NotForYou from "./pages/NotForYou";
 import Pipeline from "./pages/Pipeline";
 import Reserved from "./pages/Reserved";
 import Settings from "./pages/Settings";
+import Analytics from "./pages/Analytics";
 import Sponsors from "./pages/Sponsors";
 import Setup from "./pages/Setup";
 import SignIn from "./pages/SignIn";
@@ -66,6 +68,8 @@ export function AppRoutes() {
           <Route path="catalog/series/:seriesId" element={<CatalogSeries />} />
           <Route path="catalog/items/:itemId" element={<CatalogItem />} />
         </Route>
+        <Route path="analytics" element={<Navigate to="overview" replace />} />
+        <Route path="analytics/:tab" element={<Analytics />} />
         <Route path="held-earnings" element={<Held />} />
         <Route path="reserved-call-signs" element={<Reserved />} />
         <Route path="reserved-call-signs/:marketSlug" element={<Reserved />} />

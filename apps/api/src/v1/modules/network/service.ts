@@ -16,6 +16,8 @@ export interface NetworkService extends DeskPart {
   marketsByIds(ids: string[]): Promise<Map<string, Market>>;
   marketBySlug(slug: string): Promise<Market | null>;
   allMarkets(): Promise<Market[]>;
+  /** A251: an external station's minutes down in a span (its outages overlapping it), per station. */
+  outageMinutes(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
   marketForZip(zip: string): Promise<Market | null>;
   /** Other markets within `maxMiles` of this one's centre, nearest first. */
   nearbyMarkets(marketId: string, maxMiles?: number): Promise<Array<{ market: Market; miles: number }>>;
@@ -82,6 +84,23 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
     async marketBySlug(slug) {
       const [row] = await db.select().from(m).where(eq(m.slug, slug));
       return row ? toMarket(row) : null;
+    },
+
+    async outageMinutes(stationIds, from, to) {
+      const out = new Map<string, number>();
+      if (!stationIds.length) return out;
+      const now = deps.clock.now();
+      const rows = await db
+        .select({ stationId: schema.listedSources.stationId, downSince: schema.externalOutages.downSince, backAt: schema.externalOutages.backAt })
+        .from(schema.externalOutages)
+        .innerJoin(schema.listedSources, eq(schema.listedSources.id, schema.externalOutages.listedSourceId))
+        .where(and(inArray(schema.listedSources.stationId, stationIds), lt(schema.externalOutages.downSince, to)));
+      for (const r of rows) {
+        const a = Math.max(r.downSince.getTime(), from.getTime());
+        const b = Math.min((r.backAt ?? now).getTime(), to.getTime());
+        if (b > a) out.set(r.stationId, (out.get(r.stationId) ?? 0) + Math.round((b - a) / 60_000));
+      }
+      return out;
     },
 
     async allMarkets() {

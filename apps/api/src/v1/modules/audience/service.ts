@@ -10,6 +10,8 @@ import type { AudienceReport } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import { badRequest } from "../../errors.js";
 import { createWatchData, recordSessionMinute, type WatchData } from "./watch.js";
+import { createTotals, type Totals } from "./totals.js";
+import { createAnalytics, type Analytics } from "./analytics.js";
 
 type Platform = "phone" | "cast" | "web" | "tv_app" | "mirror";
 type TuneVia = import("@opencast/contracts").TuneVia;
@@ -64,6 +66,10 @@ export interface AudienceService {
   recordSearch(q: string, results: number): Promise<void>;
   /** Watch data (added 2026-09-29, follow-up Phase 1): per airing of each program; votes; the daily purge. */
   watch: WatchData;
+  /** A251 (2026-10-06): the desk's analytics totals, worked out every ten minutes and kept for good. */
+  totals: Totals;
+  /** A251: the desk's Analytics tabs. */
+  analytics: Analytics;
 }
 
 export function createAudienceService({ deps, services }: ModuleContext): AudienceService {
@@ -74,8 +80,11 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
 
   const minuteOf = (at: Date) => new Date(Math.floor(at.getTime() / MINUTE) * MINUTE);
 
+  const totals = createTotals(db, deps.clock, () => services.stations.dialPlaces());
   const service: AudienceService = {
     watch: createWatchData({ deps, services }),
+    totals,
+    analytics: createAnalytics({ deps, services }, totals),
 
     async heartbeat(input, options = {}) {
       const now = deps.clock.now();

@@ -34,7 +34,9 @@ export interface JobResults {
    * once a day the sessions, minutes and votes past `watch_data.retention` deleted. Null in other minutes.
    */
   watchData?: { computed: number; finalized: number; votesDeleted: number } | null;
-  watchDataPurged?: { sessions: number; minutes: number; votes: number } | null;
+  watchDataPurged?: { sessions: number; minutes: number; votes: number; searches?: number } | null;
+  /** A251: the analytics totals worked out this tick. */
+  analyticsTotals?: { hours: number; days: number } | null;
   /**
    * Pay-as-you-go (added 2026-09-29, follow-up Phase 2): usage measured (hourly), days and months
    * closed (UTC midnight), grace steps, Clear payments checked again.
@@ -114,10 +116,16 @@ export function createJobs(deps: Deps, services: Services) {
     });
     // Watch data: each program airing's numbers, every ten minutes (collected only; nothing reads them to pay).
     let watchData: JobResults["watchData"] = null;
+    let analyticsTotals: JobResults["analyticsTotals"] = null;
     if (now.getTime() - lastWatch >= 10 * 60_000) {
       lastWatch = now.getTime();
       watchData = await services.audience.watch.aggregate().catch((error) => {
         console.error("[jobs] watch data failed", error);
+        return null;
+      });
+      // A251: the desk's analytics totals (hours, days, devices, flows), before any session goes.
+      analyticsTotals = await services.audience.totals.tick().catch((error) => {
+        console.error("[jobs] analytics totals failed", error);
         return null;
       });
     }
@@ -166,6 +174,8 @@ export function createJobs(deps: Deps, services: Services) {
     let pool: JobResults["pool"] = null;
     let watchDataPurged: JobResults["watchDataPurged"] = null;
     if (lastDay && day !== lastDay) {
+      // A251: the analytics totals are worked out first, so no session goes before it's counted.
+      await services.audience.totals.tick().catch((error) => console.error("[jobs] analytics totals before the purge failed", error));
       // Viewing sessions past the retention rule (30 days) go; each airing's numbers stay.
       watchDataPurged = await services.audience.watch.purge().catch((error) => {
         console.error("[jobs] watch data purge failed", error);
@@ -214,7 +224,7 @@ export function createJobs(deps: Deps, services: Services) {
       }
       lastMonth = month;
     }
-    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, watchDataPurged, billing, platforms, relayViewers, translatorKeys, uploads };
+    return { reminders: due.length, deadAirChecked: onAir.length, claimsExpired, ordersApproved, unairedReleased, moves, chain, clearTransfers, escrowDeposit, payouts, pledgesRenewed, pool, dailyCapsResumed, sponsorships, signOns, closedSwept, templates, reservations, watchData, analyticsTotals, watchDataPurged, billing, platforms, relayViewers, translatorKeys, uploads };
   }
 
   let timer: NodeJS.Timeout | undefined;

@@ -2,6 +2,14 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, Overview and Stations (A251, Phase 2)
+
+Additive: a new module of two desk endpoints, all new shapes. Migration **0055** (`drizzle-kit generate`): six new tables in `audience` (`station_hours`, `station_hour_places`, `network_hours`, `station_days`, `device_days`, `station_flows`), the totals worked out every ten minutes and kept for good, naming no session, device or person.
+
+- New `analytics.ts`: `AnalyticsQuery` (`from`, `to`, optional `market`, `band`, `previousFrom`), `AnalyticsScope`, `AnalyticsMeasure`, `AnalyticsStation` (`kind`: `independent`, `claimable`, `catalog`, `external`), `AnalyticsOverview`, `AnalyticsStationRow`, `AnalyticsStations`.
+- New endpoints, `auth: "desk"`: `analyticsApi.overview` (`GET /desk/analytics/overview`) and `analyticsApi.stations` (`GET /desk/analytics/stations`). Admins see every market. A market lead sees their own market's stations, whatever `market` asks (`scope.fixedMarket`). A rights reviewer gets 403. A span over a year, or one that ends before it starts, is a 400.
+- How older builds tolerate it: nothing existing changed; only the desk calls these.
+
 ## 2026-10-06: Data for the desk's analytics (A251, Phase 1)
 
 Additive: three optional fields on `Heartbeat`, one new enum and one new public endpoint. Migration **0054** (`drizzle-kit generate`): `audience.sessions` gains `visit_id`, `device_hash`, `via` and `tune_ms`, all nullable and null for every existing row; new table `audience.searches`.

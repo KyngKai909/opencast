@@ -29,6 +29,7 @@ import { relayApi } from "./relay.js";
 import { platformsApi } from "./platforms.js";
 import { uploadsApi } from "./uploads.js";
 import { blocksApi } from "./blocks.js";
+import { analyticsApi } from "./analytics.js";
 
 export * from "./core.js";
 export * from "./common.js";
@@ -62,6 +63,7 @@ export * from "./relay.js";
 export * from "./platforms.js";
 export * from "./uploads.js";
 export * from "./blocks.js";
+export * from "./analytics.js";
 
 export const API_PREFIX = "/v1";
 
@@ -88,6 +90,8 @@ export const api = {
   config: configApi,
   /** Added 2026-09-29 (follow-up Phase 2): pay-as-you-go, the Station account. */
   billing: billingApi,
+  /** Added 2026-10-06 (A251): the Network desk's analytics. */
+  analytics: analyticsApi,
   /** Added 2026-09-30 (follow-up Phase 3): platform connections for relays (YouTube, Twitch, any RTMP address). */
   platforms: platformsApi,
   /** Added 2026-09-30 (follow-up Phase 3): relays, set once for all of a station's translators (modes, breaks, the bug, restarts). */

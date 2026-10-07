@@ -25,6 +25,7 @@ export function pageOf(pathname: string): DeskPage {
     return "market-board";
   }
   const direct: Record<string, DeskPage> = {
+    analytics: "analytics",
     "held-earnings": "held-earnings",
     "rights-claims": "rights-claims",
     "reserved-call-signs": "reserved-call-signs",
@@ -68,6 +69,7 @@ export function DeskLayout() {
   const linkTo = (p: DeskPage) =>
     deskPath(
       {
+        analytics: "/analytics",
         "market-board": `/markets/${slug}/board`,
         "creator-pipeline": `/markets/${slug}/pipeline`,
         "listed-sources": `/markets/${slug}/listed`,

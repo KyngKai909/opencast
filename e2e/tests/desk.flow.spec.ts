@@ -601,3 +601,42 @@ test("Catalog sponsors: an open slot offered, and the business says yes", async 
   await expect(list.getByRole("row", { name: /Orange Street Coffee/ })).toContainText("Starts October 1");
   await expect(grid.getByRole("button", { name: /^Cartoons, 1928 to 1936 in Inland Empire: Orange Street Coffee\. Starts October 1/ })).toBeVisible();
 });
+
+test("Analytics (A251): the network's week, then every station sorted and filtered, exported; a market lead's market fixed", async ({ page }) => {
+  // Signed in through storage (not an init script), so the test can sign in as someone else later.
+  await page.goto("/desk");
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
+  await page.goto("/desk");
+  await page.getByRole("navigation").getByRole("link", { name: "Analytics" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/overview$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Analytics" })).toBeVisible();
+  await expect(page.getByText("Hours watched", { exact: true })).toBeVisible();
+  await expect(page.getByText("76,783")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tuned in at once" })).toBeVisible();
+  // 30 days: the span is in the address, and the numbers grow with it.
+  await page.getByRole("group", { name: "Span" }).getByRole("button", { name: "30 days" }).click();
+  await expect(page).toHaveURL(/span=30d/);
+  await expect(page.getByText("76,783")).toBeHidden();
+  await page.getByRole("group", { name: "Span" }).getByRole("button", { name: "7 days" }).click();
+
+  // Every station: sorted by hours, then by peak; External alone; exported.
+  await page.getByRole("button", { name: "All 13 stations" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations/);
+  const table = page.getByRole("table", { name: "Every station's span" });
+  const firstRow = table.getByRole("row").nth(1);
+  await expect(firstRow).toContainText("BEAT");
+  await table.getByRole("button", { name: "Peak" }).click();
+  await expect(firstRow).toContainText("REEL");
+  await page.getByRole("group", { name: "Kind of station" }).getByRole("button", { name: /External/ }).click();
+  await expect(firstRow).toContainText("RDLS");
+  await expect(firstRow).toContainText("Their stream");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV" }).click();
+  expect((await download).suggestedFilename()).toMatch(/^opencast-stations-\d{4}-\d{2}-\d{2}\.csv$/);
+
+  // Lee leads the High Desert: their market, fixed.
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
+  await page.goto("/desk/analytics/overview");
+  await expect(page.getByText("Every station in High Desert", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Market" })).toBeDisabled();
+});
