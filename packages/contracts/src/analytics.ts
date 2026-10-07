@@ -211,7 +211,26 @@ export const AnalyticsStationPage = z.object({
   /** Spots and sponsors per 1,000 hours watched; null with no hours or no earnings. */
   adMicrosPer1000Hours: z.number().int().nullable(),
   /** An external station's minutes down in the span. */
-  timeDownMinutes: z.number().int().nullable()
+  timeDownMinutes: z.number().int().nullable(),
+  /**
+   * Added Phase 6: what it cost Opencast to run, estimated from what it used and the Costs rules
+   * (each null while its price is "Not set yet"), against what it was charged. Null for an external station.
+   */
+  cost: z
+    .object({
+      storageGb: z.number(),
+      storageMicros: z.number().int().nullable(),
+      relayHours: z.number(),
+      relayMicros: z.number().int().nullable(),
+      liveHours: z.number(),
+      liveMicros: z.number().int().nullable(),
+      totalMicros: z.number().int().nullable(),
+      chargedMicros: z.number().int(),
+      /** Percent of its breaks that had spots in them. */
+      breaksWithSpots: z.number().nullable()
+    })
+    .nullable()
+    .optional()
 });
 export type AnalyticsStationPage = z.infer<typeof AnalyticsStationPage>;
 
@@ -319,6 +338,51 @@ export const AnalyticsProgramDetail = z.object({
 });
 export type AnalyticsProgramDetail = z.infer<typeof AnalyticsProgramDetail>;
 
+/** Ref. 12d 06 Money: what stations earned, what Opencast took, and what it cost. Amounts in micros. */
+export const AnalyticsMoney = z.object({
+  scope: AnalyticsScope,
+  /** Opencast's share of earnings is set (the shares rule). Unset, nothing is taken and its line says "Not set yet". */
+  shareSet: z.boolean(),
+  /** Independent stations' earnings after card fees. */
+  earnedByStations: AnalyticsMeasure,
+  /** Claimable stations' earnings, into escrow, and how many stations. */
+  heldForClaimable: AnalyticsMeasure.extend({ stations: z.number().int() }),
+  /** Catalog stations' earnings (catalog sponsors, until the catalog sponsorship share is set). */
+  catalogSponsors: AnalyticsMeasure,
+  /** Pay-as-you-go charges (storage, relays, live). */
+  payAsYouGo: AnalyticsMeasure,
+  /** Opencast's cost to run, estimated; `complete` false while some Costs rules are "Not set yet". */
+  costToRun: AnalyticsMeasure.extend({ complete: z.boolean() }),
+  /** Earnings week by week (before card fees), the 8 weeks to the span's end. */
+  weeks: z.array(z.object({ from: Timestamp, spots: z.number().int(), sponsors: z.number().int(), pledges: z.number().int(), catalogSponsors: z.number().int() })),
+  spotMarket: z.object({
+    breaksAired: z.number().int(),
+    breaksWithSpots: z.number().int(),
+    spotsAired: z.number().int(),
+    spotsAiredBefore: z.number().int().nullable(),
+    /** The average per-thousand rate of the spots that aired. */
+    perThousandMicros: z.number().int().nullable(),
+    businesses: z.number().int(),
+    businessesBefore: z.number().int().nullable(),
+    /** Money set aside for spots placed to air in the week after the span. */
+    heldNextWeekMicros: z.number().int()
+  }),
+  /** Spots and sponsors per 1,000 hours watched, by station, most first. */
+  per1000Hours: z.array(z.object({ station: AnalyticsStation, micros: z.number().int(), held: z.boolean() })),
+  /** Opencast's span: charges in, estimated costs out (null: price not set yet), and what's measured. */
+  opencast: z.object({
+    in: z.object({ storage: z.number().int(), relays: z.number().int(), live: z.number().int(), share: z.number().int().nullable() }),
+    out: z.object({ storage: z.number().int().nullable(), preparing: z.number().int().nullable(), relays: z.number().int().nullable(), live: z.number().int().nullable(), platform: z.number().int().nullable() }),
+    net: z.number().int(),
+    measured: z.object({ storageGb: z.number(), prepareMinutes: z.number().int(), relayHours: z.number(), liveHours: z.number() })
+  }),
+  /** Claimable stations' money in escrow until each creator claims. */
+  held: z.array(z.object({ station: AnalyticsStation, since: Timestamp.nullable(), balanceMicros: z.number().int(), addedMicros: z.number().int() })),
+  /** Carriage, between stations, so never in the totals. */
+  carriage: z.object({ agreements: z.number().int(), cashMicros: z.number().int(), barterMicros: z.number().int(), barterMinutes: z.number().int(), programsCarried: z.number().int() })
+});
+export type AnalyticsMoney = z.infer<typeof AnalyticsMoney>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -352,6 +416,14 @@ export const analyticsApi = {
     params: z.object({ programId: Id }),
     query: AnalyticsQuery,
     response: AnalyticsProgramDetail
+  }),
+  money: endpoint({
+    method: "GET",
+    path: "/desk/analytics/money",
+    auth: "desk",
+    summary: "Stations' earnings by kind, held for claimable stations, catalog sponsors, the spot market, per 1,000 hours, Opencast's charges against its estimated cost to run, carriage (A251, Ref. 12d 06)",
+    query: AnalyticsQuery,
+    response: AnalyticsMoney
   }),
   audience: endpoint({
     method: "GET",

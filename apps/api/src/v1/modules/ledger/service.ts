@@ -122,6 +122,20 @@ export interface LedgerService extends BusinessMoney {
    */
   earnedBetween(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
   /**
+   * A251 Phase 6: stations' earnings in a span, per station per Pacific day, by kind (spots,
+   * sponsors with production orders, pledges, carriage in, card fees), as posted to each station's
+   * earnings (or, claimable, what's owed into escrow).
+   */
+  earningRows(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; day: string; spots: number; sponsors: number; pledges: number; carriageIn: number; cardFees: number }>>;
+  /** A251 Phase 6: pay-as-you-go in a span (closed days), charged and measured, by type: storage (charge, GB-days), relays and live (charge, hours). */
+  usageTotals(stationIds: string[] | null, from: Date, to: Date): Promise<{ storage: { chargeMicros: number; gbDays: number }; relays: { chargeMicros: number; hours: number }; live: { chargeMicros: number; hours: number } }>;
+  /** A251 Phase 6: what Opencast's share took in a span (its account's postings). */
+  opencastShareBetween(from: Date, to: Date): Promise<number>;
+  /** A251 Phase 6: when each claimable station's money first went into escrow (owed or held). */
+  escrowSince(stationIds: string[]): Promise<Map<string, Date>>;
+  /** A251 Phase 6: carriage in a span, network-wide: cash fees and barter splits paid to makers, and how many agreements paid. */
+  carriageVolume(from: Date, to: Date): Promise<{ cashMicros: number; barterMicros: number; agreements: number }>;
+  /**
    * A251: one station's earnings in a span by kind (Ref. 12d 03's "Earned"): spots, sponsors (and
    * production orders), pledges and how many, carriage in, card fees, and the total after them.
    */
@@ -1152,6 +1166,81 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
       }
       out.totalMicros = out.spotsMicros + out.sponsorsMicros + out.pledgesMicros + out.carriageInMicros + out.cardFeesMicros;
       return out;
+    },
+
+    async earningRows(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const day = sql<string>`to_char(${E.occurredAt} at time zone 'America/Los_Angeles', 'YYYY-MM-DD')`;
+      const rows = await db
+        .select({
+          stationId: L.stationId,
+          day,
+          spots: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} in ('settle', 'reversal') and coalesce(${E.sourceType}, '') not in ('sponsorship_month', 'production_order')), 0)::float`,
+          sponsors: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'settle' and ${E.sourceType} in ('sponsorship_month', 'production_order')), 0)::float`,
+          pledges: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'pledge'), 0)::float`,
+          carriageIn: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} in ('carriage_fee', 'barter_split') and ${P.amountMicros} > 0), 0)::float`,
+          cardFees: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'card_fee'), 0)::float`
+        })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(inArray(L.stationId, stationIds), inArray(L.kind, ["station_earnings", "escrow_owed"]), gte(E.occurredAt, from), lt(E.occurredAt, to)))
+        .groupBy(L.stationId, day);
+      return rows.map((r) => ({ stationId: r.stationId!, day: r.day, spots: Math.round(r.spots), sponsors: Math.round(r.sponsors), pledges: Math.round(r.pledges), carriageIn: Math.round(r.carriageIn), cardFees: Math.round(r.cardFees) }));
+    },
+
+    async usageTotals(stationIds, from, to) {
+      const U = schema.usageDays;
+      const dayOf = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(d);
+      const rows = await db
+        .select({ type: U.usageType, charge: sql<number>`coalesce(sum(${U.chargeMicros}), 0)::float`, quantity: sql<number>`coalesce(sum(${U.quantity}), 0)::float` })
+        .from(U)
+        .where(and(gte(U.day, dayOf(from)), lt(U.day, dayOf(to)), ...(stationIds ? [inArray(U.stationId, stationIds.length ? stationIds : ["00000000-0000-0000-0000-000000000000"])] : [])))
+        .groupBy(U.usageType);
+      const of = (types: string[]) => rows.filter((r) => types.includes(r.type)).reduce((t, r) => ({ charge: t.charge + r.charge, quantity: t.quantity + r.quantity }), { charge: 0, quantity: 0 });
+      const storage = of(["storage"]);
+      const relays = of(["relay_everything", "relay_live_only"]);
+      const live = of(["live_hours", "radio_live"]);
+      return {
+        storage: { chargeMicros: Math.round(storage.charge), gbDays: storage.quantity },
+        relays: { chargeMicros: Math.round(relays.charge), hours: relays.quantity },
+        live: { chargeMicros: Math.round(live.charge), hours: live.quantity }
+      };
+    },
+
+    async opencastShareBetween(from, to) {
+      const [r] = await db
+        .select({ micros: sql<number>`coalesce(sum(${P.amountMicros}), 0)::float` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(eq(L.kind, "opencast_share"), gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      return Math.round(r?.micros ?? 0);
+    },
+
+    async escrowSince(stationIds) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: L.stationId, at: sql<Date>`min(${E.occurredAt})` })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .innerJoin(L, eq(L.id, P.accountId))
+        .where(and(inArray(L.stationId, stationIds), inArray(L.kind, ["escrow_owed", "escrow"]), sql`${P.amountMicros} > 0`))
+        .groupBy(L.stationId);
+      return new Map(rows.map((r) => [r.stationId!, new Date(r.at)]));
+    },
+
+    async carriageVolume(from, to) {
+      const [r] = await db
+        .select({
+          cash: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'carriage_fee'), 0)::float`,
+          barter: sql<number>`coalesce(sum(${P.amountMicros}) filter (where ${E.kind} = 'barter_split'), 0)::float`,
+          agreements: sql<number>`count(distinct ${E.sourceId})::int`
+        })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .where(and(inArray(E.kind, ["carriage_fee", "barter_split"]), sql`${P.amountMicros} > 0`, gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      return { cashMicros: Math.round(r?.cash ?? 0), barterMicros: Math.round(r?.barter ?? 0), agreements: r?.agreements ?? 0 };
     },
 
     async earnedBetween(stationIds, from, to) {

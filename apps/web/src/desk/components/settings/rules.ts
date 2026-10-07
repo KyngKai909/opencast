@@ -14,7 +14,9 @@ export const GROUPS: Array<{ id: RuleView["group"]; label: string }> = [
   { id: "watch_data", label: "Watch data" },
   // Added 2026-09-30 (follow-up Phase 6): other markets' streams and DASH stream links (A200, A201).
   { id: "external", label: "External stations" },
-  { id: "features", label: "Features" }
+  { id: "features", label: "Features" },
+  // Added 2026-10-07 (A251 Phase 6): what running Opencast costs, for the analytics' estimate.
+  { id: "costs", label: "Costs" }
 ];
 
 /** `letters`: a list of capital-letter words, typed with commas between (call signs' lists). */
@@ -64,7 +66,11 @@ const LABELS: Record<string, [string, FieldKind]> = {
   opencastBps: ["Opencast", "percent"],
   poolBps: ["The co-op pool", "percent"],
   viewers: ["Viewers at once", "number"],
-  carriedAirings: ["Other stations' airings, together", "number"]
+  carriedAirings: ["Other stations' airings, together", "number"],
+  costPerGbMonthMicros: ["Cost a GB a month", "dollars"],
+  costPerMinuteMicros: ["Cost a minute", "dollars"],
+  costPerHourMicros: ["Cost an hour", "dollars"],
+  costPerWeekMicros: ["Cost a week", "dollars"]
 };
 
 const YES_NO = [

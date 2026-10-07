@@ -53,6 +53,10 @@ export interface SpotsService extends SponsorshipsPart, CatalogSponsorsPart, Ord
   reviewBalance(businessId: string, toppedUp?: boolean): Promise<void>;
   typicalAiringCost(businessId: string): Promise<number | null>;
   heldAirings(stationId: string, from: Date, to: Date): Promise<Array<{ airingId: string; holdId: string; scheduledAt: Date; breakId: string }>>;
+  /** A251 Phase 6: these placements' businesses (distinct) and their average per-thousand rate. */
+  spotStats(airingIds: string[]): Promise<{ businesses: number; perThousandMicros: number | null }>;
+  /** A251 Phase 6: money held for spots placed on these stations to air in a window. */
+  heldForPlaced(stationIds: string[], from: Date, to: Date): Promise<number>;
   businessesAiredOn(stationId: string, from: Date, to: Date): Promise<number>;
   businessOfSpot(spotId: string): Promise<string>;
   /** What the ledger needs to warn a business: its thresholds, auto top-up, and when it started. */
@@ -807,6 +811,30 @@ export function createSpotsService(ctx: ModuleContext): SpotsService {
       if (perAiring.length) return Math.round(perAiring.reduce((a, b) => a + b, 0) / perAiring.length);
       // Per thousand: a typical 262 tuned in, as the funding page illustrates, until there's history.
       return Math.round((262 * rows[0].rateMicros) / 1000);
+    },
+
+    async spotStats(airingIds) {
+      if (!airingIds.length) return { businesses: 0, perThousandMicros: null };
+      const rows = await db
+        .select({ advertiserId: schema.spotsTable.advertiserId, rateKind: schema.airings.rateKind, rateMicros: schema.airings.rateMicros })
+        .from(schema.airings)
+        .innerJoin(schema.spotsTable, eq(schema.spotsTable.id, schema.airings.spotId))
+        .where(inArray(schema.airings.id, airingIds));
+      const perThousand = rows.filter((r) => r.rateKind === "per_thousand" && r.rateMicros != null);
+      return {
+        businesses: new Set(rows.map((r) => r.advertiserId)).size,
+        perThousandMicros: perThousand.length ? Math.round(perThousand.reduce((t, r) => t + Number(r.rateMicros), 0) / perThousand.length) : null
+      };
+    },
+
+    async heldForPlaced(stationIds, from, to) {
+      if (!stationIds.length) return 0;
+      const rows = await db
+        .select({ holdId: schema.airings.holdId })
+        .from(schema.airings)
+        .where(and(inArray(schema.airings.stationId, stationIds), gte(schema.airings.scheduledAt, from), lt(schema.airings.scheduledAt, to)));
+      const open = await services.ledger.openAmount(rows.map((r) => r.holdId).filter((x): x is string => !!x));
+      return [...open.values()].reduce((t, n) => t + n, 0);
     },
 
     async heldAirings(stationId, from, to) {

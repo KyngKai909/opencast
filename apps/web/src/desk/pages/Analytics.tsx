@@ -16,6 +16,7 @@ import { StationsTab } from "../components/analytics/StationsTab";
 import { StationPage } from "../components/analytics/StationPage";
 import { AudienceTab } from "../components/analytics/AudienceTab";
 import { ProgramsTab } from "../components/analytics/ProgramsTab";
+import { MoneyTab } from "../components/analytics/MoneyTab";
 import { ErrorLine, Quiet } from "./common";
 import "../components/analytics/Analytics.css";
 
@@ -31,9 +32,8 @@ const TABS: ReadonlyArray<{ value: AnalyticsTab; label: string }> = [
   { value: "growth", label: "Growth" }
 ];
 
-/** What a tab not built yet will hold (docs/analytics-map.md, Phases 6 and 7). */
+/** What a tab not built yet will hold (docs/analytics-map.md, Phase 7). */
 const COMING: Partial<Record<AnalyticsTab, string>> = {
-  money: "Stations' earnings by kind, earnings held for claimable stations, the spot market, per 1,000 hours, and Opencast's week against the estimated cost to run.",
   health: "How each station's airtime was filled, the week's incidents, relays, sessions filtered as bots, and how fast channels start.",
   growth: "New and active accounts, new stations by kind, creators in the pipeline, markets opened, TV devices and paired phones, uploads, and what people search for."
 };
@@ -112,6 +112,8 @@ export default function Analytics() {
         <ErrorLine error={scopeQ.error} />
       ) : stationId ? (
         <StationPage stationId={stationId} query={filters.query} span={filters.span} exporter={exporters} back={() => go("stations")} />
+      ) : tab === "money" ? (
+        <MoneyTab query={filters.query} span={filters.span} exporter={exporters} stationHref={stationHref} />
       ) : tab === "programs" ? (
         <ProgramsTab query={filters.query} span={filters.span} exporter={exporters} />
       ) : tab === "audience" ? (

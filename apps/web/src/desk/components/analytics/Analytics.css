@@ -218,3 +218,12 @@ i.nd-an__brk { background: var(--ink-50); opacity: .35; }
 .nd-an__away { display: flex; align-items: flex-end; gap: 1px; height: 44px; }
 .nd-an__away i { flex: 1; background: var(--c2); min-height: 1px; border-radius: 1px 1px 0 0; opacity: .8; }
 .nd-an__sel small, .nd-an__sel .nd-an__q { color: var(--ink-70); }
+
+/* 06 Money. */
+.nd-an__banner { margin: 0 0 14px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--signal) 10%, var(--card)); font-size: 13.5px; color: var(--ink-70); }
+.nd-an__banner b { color: var(--ink); }
+.nd-an__banner a, .nd-an__note a { color: inherit; }
+.nd-an__sbars--weeks { height: 220px; }
+.nd-an__per { grid-template-columns: minmax(0, 1fr) minmax(80px, 160px) 76px; min-height: 42px; padding: 6px 4px; }
+.nd-an__heldrow { grid-template-columns: minmax(0, 1fr) minmax(100px, auto) 90px 80px; min-height: 42px; padding: 6px 4px; }
+.nd-an__big.nd-an__neg { color: var(--bad); }

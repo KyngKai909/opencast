@@ -642,6 +642,7 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await expect(page.getByRole("heading", { name: "Saturday night" })).toBeVisible();
   await expect(page.getByRole("table", { name: "That night's airings" })).toContainText("Carried from REEL 24.1");
   await expect(page.getByText("Paid out")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cost to run" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open in master control" })).toHaveAttribute("href", "/control/BEAT/audience");
   await page.getByRole("button", { name: "All stations" }).click();
   await expect(page).toHaveURL(/\/desk\/analytics\/stations\?/);
@@ -652,6 +653,12 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await page.getByRole("table", { name: "Programs across stations" }).getByRole("button", { name: "Saturday Reel" }).click();
   await expect(page.getByRole("heading", { name: "Saturday Reel, still watching" })).toBeVisible();
   await expect(page.getByText(/Breaks that open with a bumper keep/)).toBeVisible();
+
+  // Money (Ref. 12d 06): Opencast's share not set yet, never a guessed $0; the cost to run estimated.
+  await page.getByRole("tab", { name: "Money" }).click();
+  await expect(page.getByText("Opencast’s share: not set yet.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Held for claimable stations" })).toBeVisible();
 
   // Audience (Ref. 12d 04): the week's grid, then narrowed to BEAT.
   await page.getByRole("tab", { name: "Audience" }).click();

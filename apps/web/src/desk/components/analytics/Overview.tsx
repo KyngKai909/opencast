@@ -203,12 +203,13 @@ function Kpi({ label, value, unit, m, vs }: { label: string; value: string; unit
   );
 }
 
-/** "↑ 14%" against the span before; "New" with nothing before. */
-export function Pill({ value, previous }: { value: number | null; previous: number | null }) {
+/** "↑ 14%" against the span before; "New" with nothing before. `upIsBad` for a cost: up is red. */
+export function Pill({ value, previous, upIsBad }: { value: number | null; previous: number | null; upIsBad?: boolean }) {
   const c = change(value, previous);
   if (!c) return previous == null && value ? <span className="nd-an__pill ne">New</span> : <span className="nd-an__pill ne">—</span>;
+  const look = upIsBad && c.dir !== "fl" ? (c.dir === "up" ? "dn" : "up") : c.dir;
   return (
-    <span className={`nd-an__pill ${c.dir}`} aria-label={c.dir === "fl" ? "No change" : `${c.dir === "up" ? "Up" : "Down"} ${c.text.slice(2)} on the span before`}>
+    <span className={`nd-an__pill ${look}`} aria-label={c.dir === "fl" ? "No change" : `${c.dir === "up" ? "Up" : "Down"} ${c.text.slice(2)} on the span before`}>
       {c.text}
     </span>
   );
