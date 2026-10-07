@@ -132,7 +132,7 @@ test("an external station says External, and Tuning sound is on until turned off
   await page.goto("/settings/watching");
   const sound = page.getByRole("switch", { name: "Tuning sound" });
   await expect(sound).toHaveAttribute("aria-checked", "true");
-  await expect(page.getByText("A soft hiss when changing channel, on the TV and radio bands. On unless you turn it off")).toBeVisible();
+  await expect(page.getByText("Static and a click when changing channel, on the TV and radio bands. On unless you turn it off")).toBeVisible();
   const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname.endsWith("/me"));
   await sound.click();
   await expect(sound).toHaveAttribute("aria-checked", "false");

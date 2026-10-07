@@ -37,7 +37,7 @@ function PlayerSync() {
     // The account's, or this device's when signed out.
     const w = settings?.watching;
     if (w?.captions) engine.setCaptions(w.captions, w.captionSize);
-    // "Tuning sound", per band (on for both unless turned off): the hiss when changing channel.
+    // "Tuning sound", per band (on for both unless turned off): the static and click when changing channel.
     engine.setOptions({ tuningSound: tuningSoundFrom(w) });
   }, [engine, settings?.watching]);
   useEffect(() => startHeartbeat(engine, (body) => call(audienceApi.heartbeat, { body }), isPhone() ? "phone" : "web"), [engine]);

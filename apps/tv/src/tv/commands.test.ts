@@ -25,9 +25,12 @@ describe("TV commands", () => {
     const { ui, engine, handle } = setup("/");
     onPictureCommand({ type: "guide" }, ui, engine);
     onPictureCommand({ type: "focus", dir: "left" }, ui, engine);
+    onPictureCommand({ type: "focus", dir: "right" }, ui, engine);
     onPictureCommand({ type: "back" }, ui, engine);
     expect(ui.go).toHaveBeenNthCalledWith(1, "/guide");
     expect(ui.go).toHaveBeenNthCalledWith(2, "/presets");
+    // A phone's ▶, as the remote's: the menu.
+    expect(ui.go).toHaveBeenNthCalledWith(3, "/menu");
     expect(handle).toHaveBeenCalledWith({ type: "last" }, undefined);
   });
 

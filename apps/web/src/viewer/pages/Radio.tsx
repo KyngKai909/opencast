@@ -1,6 +1,6 @@
 // The radio band (viewer/opencast-station-pages.html 04.1, 05.3): a tuner scale from 88 to 108
 // with each station at its frequency and the needle where you're tuned (it sweeps to the next
-// station in 400 ms, and the player plays the band's soft hiss: follow-up Phase 5), then the same
+// station in 400 ms, and the player plays the dial's tuning sound: follow-up Phase 5), then the same
 // stations as rows. Clicking a mark or a row tunes in; the arrow keys move along the band. The station you're
 // on gets the tally edge and "You're here" (never a lit tally in a list: open question A2). On
 // phones and tablets the radio band is the swipe home's Radio (A245): `/radio` opens it on the

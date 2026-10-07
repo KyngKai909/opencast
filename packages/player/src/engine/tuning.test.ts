@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerEngine, type EngineOptions } from "./PlayerEngine";
 import { fakeDriver, flush, frameDelay, stalled, station, stubMedia, stubWebAudio, until } from "../test-helpers";
-import { HISS_GAIN, HISS_MS, LAND_MS, MIN_STATIC_MS, REBUILD_AFTER_MS, RETRY_FIRST_MS, ROLL_MS, STANDBY_MS, SWEEP_MS, TUNING_IN_MS } from "../tuning/constants";
+import { DIAL_PEAK_HZ, DIAL_REST_HZ, LAND_MS, MIN_STATIC_MS, REBUILD_AFTER_MS, RETRY_FIRST_MS, ROLL_MS, STANDBY_MS, SWEEP_MS, TUNING_IN_MS, TUNING_SOUND_MAX_MS, TUNING_SOUND_RELEASE_MS } from "../tuning/constants";
 
 const SATURDAY_842PM = new Date("2026-09-27T03:42:00Z");
 
@@ -293,16 +293,53 @@ describe("the radio band", () => {
       await until(engine.tune(SOLA.station.id));
       await flush(1000);
       expect(hisses(audio)).toHaveLength(0);
-      // A press: now it plays, 250 ms of band-passed noise, soft, with no click at either end.
+      // A press: the dial's sound (looped noise through a band that rises with the needle and
+      // settles lower) and a soft click as the dial turns.
       engine.handle({ type: "channel", dir: "up" });
       await flush(0);
       expect(engine.hissesPlayed()).toBe(1);
-      const [src] = hisses(audio);
-      expect(src!.stopped! - src!.started!).toBeCloseTo(HISS_MS / 1000);
-      const filter = audio.nodes.find((n) => n.kind === "biquad")!;
-      const gain = filter.to[0]!;
-      expect(gain.ramps!.map((r) => r.value)).toEqual([HISS_GAIN, 0]);
-      expect(gain.to[0]!.kind).toBe("destination");
+      expect(hisses(audio)).toHaveLength(2);
+      const band = audio.nodes.find((n) => n.kind === "biquad" && n.ramps?.some((r) => r.value === DIAL_PEAK_HZ))!;
+      expect(band.ramps!.map((r) => r.value)).toEqual([DIAL_PEAK_HZ, DIAL_REST_HZ]);
+      const [noise] = hisses(audio);
+      expect(noise!.stopped).toBeUndefined();
+    });
+
+    it("lasts as long as the cover, then clicks and fades as the station lands (the TV band: an old set)", async () => {
+      const audio = stubWebAudio();
+      make();
+      await onAir(CIVC);
+      frameDelay[BEAT.station.id] = 2000;
+      engine.handle({ type: "channel", dir: "up" });
+      await flush(0);
+      // The noise, the thump and the hum.
+      expect(hisses(audio)).toHaveLength(1);
+      expect(audio.nodes.filter((n) => n.kind === "oscillator" && n.started !== undefined)).toHaveLength(2);
+      const [noise] = hisses(audio);
+      await flush(1500);
+      expect(noise!.stopped).toBeUndefined();
+      // The picture: a click, and the sound fades out.
+      await flush(600);
+      expect(engine.getState().tuning?.phase).toBe("clearing");
+      expect(hisses(audio)).toHaveLength(2);
+      expect(noise!.stopped! - noise!.started!).toBeCloseTo(2 + TUNING_SOUND_RELEASE_MS / 1000 + 0.05, 1);
+    });
+
+    it("goes quiet without a click when the channel is slow to come (at most a few seconds)", async () => {
+      const audio = stubWebAudio();
+      make();
+      await onAir(CIVC);
+      stalled.add(BEAT.station.id);
+      engine.handle({ type: "channel", dir: "up" });
+      await flush(0);
+      const [noise] = hisses(audio);
+      await flush(TUNING_SOUND_MAX_MS - 10);
+      expect(noise!.stopped).toBeUndefined();
+      await flush(20);
+      expect(noise!.stopped).toBeDefined();
+      await flush(STANDBY_MS);
+      expect(engine.getState().status).toBe("standby");
+      expect(hisses(audio)).toHaveLength(1);
     });
 
     it("is on by default for video too, and stops there when Tuning sound is turned off", async () => {

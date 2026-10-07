@@ -75,7 +75,7 @@ export function onPictureCommand(c: Command, ui: Ui, engine: PlayerEngine, sourc
     case "focus":
       // A phone sending arrows while the picture shows: they mean what the remote's arrows mean.
       if (c.dir === "up" || c.dir === "down") return engine.handle({ type: "channel", dir: c.dir }, source);
-      return ui.go(c.dir === "left" ? "/presets" : "/guide");
+      return ui.go(c.dir === "left" ? "/presets" : "/menu");
   }
 }
 
