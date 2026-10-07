@@ -2,6 +2,29 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, Health and Growth (A251, Phase 7)
+
+Additive: two new desk endpoints and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsHealth` and `AnalyticsGrowth`.
+- New endpoint `analyticsApi.health` (`GET /desk/analytics/health`) returns:
+  - dead-air fill and the slate (minutes, against the span before, how many stations);
+  - relay drops;
+  - bots, with their share and reasons;
+  - press to picture (median and 90th percentile);
+  - each station's airtime by kind from the as-run log (programs, breaks, live, planned off air, dead-air fill, slate), and external stations' minutes down;
+  - incidents (dead air, slate, relay, external), with how many were tuned in when each began;
+  - relay sessions, hours and drops;
+  - the slowest stations to start.
+- New endpoint `analyticsApi.growth` (`GET /desk/analytics/growth`) returns:
+  - new and active accounts;
+  - stations started by kind, and first sign-ons;
+  - the creator pipeline by stage, and markets open and opened;
+  - TVs registered by platform and seen, and phones paired;
+  - uploads (items, program items, hours);
+  - searches viewers settled on: the most searched, and those that found nothing.
+- Both are `auth: "desk"`, under the shared filters.
+
 ## 2026-10-07: The desk's analytics, Money, and the Costs rules (A251, Phase 6)
 
 Additive: one new desk endpoint, a new rule group with five rules, an optional field on the station page. No migration (rules without a first version use their fallback, "Not set yet").

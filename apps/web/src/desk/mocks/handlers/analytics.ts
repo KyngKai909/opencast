@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsMoney, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsGrowth, type AnalyticsHealth, type AnalyticsMoney, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -335,7 +335,85 @@ function moneyOf(request: Request): AnalyticsMoney {
   };
 }
 
+/** Ref. 12d 07's week. */
+function healthOf(request: Request): AnalyticsHealth {
+  const { scope, from, scale, rows } = scopeOf(request);
+  const st = (cs: string) => WEEK.find((f) => f.station.callSign === cs)!.station;
+  const inView = (cs: string) => rows.some((f) => f.station.callSign === cs);
+  const at = (days: number, h: number, m: number) => new Date(from.getTime() + days * DAY + (h * 60 + m) * 60_000 + 7 * 3_600_000).toISOString();
+  const minutesOfWeek = 7 * 24 * 60 * Math.min(1, scale);
+  const air = rows
+    .filter((f) => f.station.kind !== "external")
+    .map((f) => {
+      const dead = Math.round((f.dead ?? 0) * scale);
+      const slate = f.station.callSign === "PREP" ? Math.round(9 * scale) : 0;
+      const off = f.station.band === "radio" ? 0 : Math.round(minutesOfWeek * 0.08);
+      const live = ["BEAT", "CIVC", "PREP"].includes(f.station.callSign ?? "") ? Math.round(minutesOfWeek * 0.05) : 0;
+      const rest = minutesOfWeek - dead - slate - off - live;
+      return { station: f.station, programs: Math.round(rest * 0.86), breaks: Math.round(rest * 0.14), live, offAir: off, deadAirFill: dead, slate };
+    })
+    .sort((a, b) => b.deadAirFill + b.slate - (a.deadAirFill + a.slate));
+  const incidents: AnalyticsHealth["incidents"] = [
+    { at: at(1, 2, 10), station: st("PREP"), kind: "dead_air" as const, minutes: 47, tunedIn: 3, detail: null },
+    { at: at(2, 16, 5), station: st("VOZE"), kind: "dead_air" as const, minutes: 3, tunedIn: 12, detail: null },
+    { at: at(3, 19, 30), station: st("SAZN"), kind: "dead_air" as const, minutes: 12, tunedIn: 41, detail: null },
+    { at: at(4, 21, 12), station: st("PREP"), kind: "slate" as const, minutes: 9, tunedIn: 58, detail: null },
+    { at: at(5, 15, 40), station: st("BEAT"), kind: "relay" as const, minutes: null, tunedIn: null, detail: "YouTube relay dropped outside a break; reconnected in 40 s" },
+    { at: at(6, 11, 0), station: st("RDLS"), kind: "external" as const, minutes: 14, tunedIn: 9, detail: null }
+  ].filter((i) => inView(i.station.callSign!) && Date.parse(i.at) < Date.now());
+  return {
+    scope,
+    deadAirFill: { minutes: Math.round(62 * scale), previous: Math.round(18 * scale), stations: 3 },
+    slate: { minutes: Math.round(9 * scale), previous: 0, stations: 1 },
+    relayDrops: { drops: 1, previous: 2 },
+    bots: { sessions: Math.round(13_012 * scale), share: 6.1, previousShare: 5.8 },
+    pressToPicture: { medianMs: 840, p90Ms: 2_100, previousMedianMs: 910 },
+    airtime: air,
+    externalDown: rows.filter((f) => f.station.kind === "external").map((f) => ({ station: f.station, minutes: Math.round((f.down ?? 0) * scale) })),
+    incidents,
+    relays: { stations: 7, sessions: 62, hours: Math.round(14_112 * scale), drops: 1 },
+    botReasons: [
+      { reason: "beats too close together", sessions: Math.round(9_870 * scale), share: 75.9 },
+      { reason: "media time moving faster than the clock", sessions: Math.round(3_142 * scale), share: 24.1 }
+    ],
+    slowest: [
+      { station: st("PREP"), medianMs: 1_640, p90Ms: 3_900 },
+      { station: st("OCAT"), medianMs: 1_210, p90Ms: 2_800 },
+      { station: st("RDLS"), medianMs: 1_180, p90Ms: 3_400 }
+    ].filter((s) => inView(s.station.callSign!))
+  };
+}
+
+function growthOf(request: Request): AnalyticsGrowth {
+  const { scope, from, to, scale } = scopeOf(request);
+  return {
+    scope,
+    accounts: { new: Math.round(412 * scale), previous: Math.round(366 * scale), active: Math.round(5_870 * Math.min(1, scale + 0.3)), byDay: byDay(412 * scale, from, to) },
+    stations: { started: { station: Math.round(6 * scale), studio: Math.round(2 * scale), claimable: 1, listed: Math.round(3 * scale) }, previousStarted: Math.round(9 * scale), signedOn: Math.round(4 * scale) },
+    pipeline: { byStage: [{ stage: "found", creators: 31 }, { stage: "asked", creators: 12 }, { stage: "said_yes", creators: 4 }, { stage: "setting_up", creators: 2 }, { stage: "on_air", creators: 9 }, { stage: "claimed", creators: 3 }, { stage: "declined", creators: 5 }], added: Math.round(7 * scale) },
+    markets: { open: 3, opened: 0 },
+    tvs: { new: [{ platform: "android_tv", tvs: Math.round(64 * scale) }, { platform: "fire_tv", tvs: Math.round(41 * scale) }, { platform: "tv_browser", tvs: Math.round(18 * scale) }, { platform: "google_tv", tvs: Math.round(12 * scale) }], active: Math.round(1_210 * Math.min(1, scale + 0.3)), phonesPaired: Math.round(88 * scale) },
+    uploads: { items: Math.round(146 * scale), programItems: Math.round(118 * scale), hours: Math.round(102 * scale), previousItems: Math.round(131 * scale) },
+    searches: {
+      total: Math.round(3_904 * scale),
+      noResults: Math.round(611 * scale),
+      top: [["late crate", 214, 3], ["anime", 188, 24], ["naruto", 161, 2], ["cooking", 140, 9], ["news", 133, 6], ["dragon ball", 97, 4], ["football", 91, 2], ["spongebob", 77, 1], ["horror", 64, 0], ["la liga", 51, 0]].map(([term, n, results]) => ({ term: term as string, searches: Math.round((n as number) * scale), results: results as number })),
+      nothingFound: [["horror", 64], ["la liga", 51], ["k-drama", 38], ["golf", 22], ["telenovelas", 19]].map(([term, n]) => ({ term: term as string, searches: Math.round((n as number) * scale) }))
+    }
+  };
+}
+
 export const analyticsHandlers = [
+  http.get(path(analyticsApi.health), ({ request }) => {
+    const no = denied(request);
+    if (no) return no;
+    return reply(analyticsApi.health.response, healthOf(request));
+  }),
+  http.get(path(analyticsApi.growth), ({ request }) => {
+    const no = denied(request);
+    if (no) return no;
+    return reply(analyticsApi.growth.response, growthOf(request));
+  }),
   http.get(path(analyticsApi.money), ({ request }) => {
     const no = denied(request);
     if (no) return no;

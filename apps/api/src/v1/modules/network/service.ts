@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { Market } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
@@ -16,6 +16,10 @@ export interface NetworkService extends DeskPart {
   marketsByIds(ids: string[]): Promise<Map<string, Market>>;
   marketBySlug(slug: string): Promise<Market | null>;
   allMarkets(): Promise<Market[]>;
+  /** A251 Phase 7: the creator pipeline by stage (in these markets, or all), and markets opened in a span. */
+  growth(marketIds: string[] | null, from: Date, to: Date): Promise<{ pipeline: Record<string, number>; addedToPipeline: number; marketsOpened: number; marketsOpen: number }>;
+  /** A251 Phase 7: external stations' outages overlapping a span. */
+  outagesBetween(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; downSince: Date; backAt: Date | null }>>;
   /** A251: an external station's minutes down in a span (its outages overlapping it), per station. */
   outageMinutes(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
   marketForZip(zip: string): Promise<Market | null>;
@@ -101,6 +105,32 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
         if (b > a) out.set(r.stationId, (out.get(r.stationId) ?? 0) + Math.round((b - a) / 60_000));
       }
       return out;
+    },
+
+    async growth(marketIds, from, to) {
+      const C = schema.creators;
+      const inMarkets = marketIds ? [inArray(C.marketId, marketIds.length ? marketIds : ["00000000-0000-0000-0000-000000000000"])] : [];
+      const [stages, added, markets] = await Promise.all([
+        db.select({ stage: C.stage, n: sql<number>`count(*)::int` }).from(C).where(and(...inMarkets)).groupBy(C.stage),
+        db.select({ n: sql<number>`count(*)::int` }).from(C).where(and(gte(C.createdAt, from), lt(C.createdAt, to), ...inMarkets)),
+        db.select({ openedAt: schema.markets.openedAt }).from(schema.markets)
+      ]);
+      return {
+        pipeline: Object.fromEntries(stages.map((r) => [r.stage, r.n])),
+        addedToPipeline: added[0]?.n ?? 0,
+        marketsOpened: markets.filter((m) => m.openedAt && m.openedAt >= from && m.openedAt < to).length,
+        marketsOpen: markets.filter((m) => m.openedAt && m.openedAt < to).length
+      };
+    },
+
+    async outagesBetween(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const rows = await db
+        .select({ stationId: schema.listedSources.stationId, downSince: schema.externalOutages.downSince, backAt: schema.externalOutages.backAt })
+        .from(schema.externalOutages)
+        .innerJoin(schema.listedSources, eq(schema.listedSources.id, schema.externalOutages.listedSourceId))
+        .where(and(inArray(schema.listedSources.stationId, stationIds), lt(schema.externalOutages.downSince, to)));
+      return rows.filter((r) => !r.backAt || r.backAt > from);
     },
 
     async allMarkets() {

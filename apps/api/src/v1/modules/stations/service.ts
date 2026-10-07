@@ -301,6 +301,8 @@ export interface StationsService {
   dialPlaces(): Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
   /** A251: when a station came on the dial: its first sign-on, else when its channel was given. */
   onDialSince(stationId: string): Promise<Date | null>;
+  /** A251 Phase 7: stations started in a span, by kind, and how many signed on for the first time. */
+  growth(from: Date, to: Date): Promise<{ started: Record<string, number>; signedOn: number }>;
   /** A251: these stations' relays (YouTube, Twitch, RTMP), for the desk's analytics. */
   relaysOf(stationIds: string[]): Promise<Array<{ id: string; stationId: string; service: "youtube" | "twitch" | "rtmp" }>>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
@@ -1401,6 +1403,15 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (categories.length) await tx.insert(schema.blockedCategories).values(categories.map((category) => ({ stationId, category })));
       });
       return service.breakRule(stationId);
+    },
+
+    async growth(from, to) {
+      const S = schema.stations;
+      const [started, signedOn] = await Promise.all([
+        db.select({ kind: S.kind, n: sql<number>`count(*)::int` }).from(S).where(and(sql`${S.createdAt} >= ${from}`, sql`${S.createdAt} < ${to}`)).groupBy(S.kind),
+        db.select({ n: sql<number>`count(*)::int` }).from(S).where(and(sql`${S.firstSignedOnAt} >= ${from}`, sql`${S.firstSignedOnAt} < ${to}`))
+      ]);
+      return { started: Object.fromEntries(started.map((r) => [r.kind, r.n])), signedOn: signedOn[0]?.n ?? 0 };
     },
 
     async onDialSince(stationId) {
