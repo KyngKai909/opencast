@@ -276,3 +276,38 @@ describe("Programs and breaks (Ref. 12d 05)", () => {
     expect(body.breaks.bumperShare).toBe(50);
   });
 });
+
+describe("Money (Ref. 12d 06)", () => {
+  it("says what's not set yet, adds up pay-as-you-go, and estimates the cost to run from the Costs rules", async () => {
+    const before = (await dee.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(200)).body;
+    expect(before).toMatchObject({ shareSet: false, earnedByStations: { value: 0 }, costToRun: { value: 0, complete: false }, opencast: { in: { share: null }, out: { storage: null, platform: null } } });
+    expect(before.weeks).toHaveLength(8);
+
+    // BEAT's day of pay-as-you-go: 10 GB stored, 2 hours relayed, closed.
+    await h.db.insert(schema.usageDays).values([
+      { stationId: beat, usageType: "storage", day: "2026-10-01", quantity: 10, chargeMicros: 1_000_000, closedAt: new Date("2026-10-02T07:00:00Z") },
+      { stationId: beat, usageType: "relay_everything", day: "2026-10-01", quantity: 2, chargeMicros: 500_000, closedAt: new Date("2026-10-02T07:00:00Z") }
+    ]);
+    // Opencast's costs: $0.03 a GB a month, $0.40 a relay hour, $70 a week for the servers.
+    for (const [key, value] of [
+      ["costs.storage", { costPerGbMonthMicros: 30_000 }],
+      ["costs.relays", { costPerHourMicros: 400_000 }],
+      ["costs.platform", { costPerWeekMicros: 70_000_000 }]
+    ] as const)
+      await dee.post(`/v1/admin/rules/${key}/versions`, { value, effectiveFrom: "2026-10-02" }).expect(200);
+
+    const { body } = await dee.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.payAsYouGo.value).toBe(1_500_000);
+    expect(body.opencast.in).toMatchObject({ storage: 1_000_000, relays: 500_000, live: 0, share: null });
+    expect(body.opencast.out).toMatchObject({ storage: 10_000, relays: 800_000, preparing: null, live: null });
+    // The servers: $70 a week, for the part of the day gone.
+    expect(body.opencast.out.platform).toBeGreaterThan(9_000_000);
+    expect(body.opencast.out.platform).toBeLessThanOrEqual(10_000_000);
+    expect(body.costToRun.complete).toBe(false);
+    expect(body.spotMarket).toMatchObject({ breaksAired: 2, breaksWithSpots: 2, spotsAired: 0 });
+
+    const page = (await dee.get(`/v1/desk/analytics/stations/${beat}?from=${DAY.from}&to=${DAY.to}`).expect(200)).body;
+    expect(page.cost).toMatchObject({ relayHours: 2, relayMicros: 800_000, storageMicros: 10_000, liveMicros: null, chargedMicros: 1_500_000, breaksWithSpots: 100 });
+    await sam.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(403);
+  });
+});

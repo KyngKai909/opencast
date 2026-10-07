@@ -447,6 +447,27 @@ A TV live block's channel playlists point at the worker's own copies of Livepeer
 | A251 (Phase 3) | **One station** (Ref. 12d 03), opened from any station row (its call sign links to `/desk/analytics/stations/:id`, the span kept). Its five numbers are against the span before and the network's (stayed and "Not for me" in points and per 1,000 hours, down being good for "Not for me"). **Its busiest night** is the evening (6 pm to 2 am Pacific) of the day its busiest hour fell on, minute by minute from session minutes against the same night a week before, its breaks from the as-run log shaded, that night's airings beside it with where each came from (library, carried from a station, live, an external station's guide or nothing listed). It's null once the span's minutes are past the 30 days kept. **Came from and went to** add up the nightly station flows. **Airtime** is the as-run log by kind (programs, breaks and what aired between, live, dead-air fill and slate). **Earned** is the station's ledger account by kind, held for a claimable station. **Deviations**: no sub-tabs on the station yet (its Programs, Money and Health come with those tabs), no "Cost to run" until the costs rule group (Phase 6), and "72% of its breaks had spots" waits for the spot market (Phase 6). Reads of other modules go through `playout.airtimeMinutes`, `breakSpans`, `asRunReasons`, `ledger.earnedBreakdown`, `stations.onDialSince`, `library.titles` and `network.listedAiringsByIds` | packages/contracts `analytics.ts`; apps/api audience `analytics.ts` (`station`, `airingsOf`), `routes.ts`; playout, ledger and stations services; the desk's `StationPage`, `Analytics` (the route), station links, mocks | as described |
 | A251 (Phase 4) | **Audience** (Ref. 12d 04). A station picker narrows every chart (`?station=`; changing market or band clears it).
 | A251 (Phase 5) | **Programs and breaks** (Ref. 12d 05).
+| A251 (Phase 6) | **Money** (Ref. 12d 06), and a **Costs** rule group in Settings: what a GB stored costs Opencast a month, a minute preparing, an hour relayed, an hour live, and a week of the API, database and worker. Each is "Not set yet" until an admin sets it, and the estimate leaves an unset one out and says so.
+
+**Where each number comes from:**
+- **Earnings:** the ledger postings to each station's earnings (claimable: what's owed to escrow), by kind.
+  - "Earned by stations" is independent stations' after card fees.
+  - "Held for claimable" is claimable stations'.
+  - "Catalog sponsors" is catalog stations' (until the catalog sponsorship share is set, that's where it settles).
+  - Week by week is before card fees, the 8 weeks to the span's end.
+- **The spot market:** breaks and those with spots (`break_stats`), spots aired (as-run rows with a placement), businesses buying and the average per-thousand rate of what aired (spots), and money held for spots placed for the week after (open holds).
+- **Opencast's span:** pay-as-you-go charges by type (closed `usage_days`), its share of earnings ("Not set yet" while `shares.opencast` is all zero, never a guessed $0), against the estimated costs. Storage is GB-days ÷ 30 × the month's price, preparing is `prepared_items.prep_ms`, relays and live are the hours measured, and the servers are a week's price × the span's weeks.
+- **Held for claimable stations:** their escrow balances, the date money first went in, and what was added in the span.
+- **Carriage:** cash fees and barter splits paid (agreements that paid), barter break minutes (the log's producer shares), and programs carried (`airing_stats.carried`).
+
+**The station page** gains Cost to run (its storage, relays and live priced; preparing stays network-wide because an upload can be on several stations), what it was charged, and the share of its breaks with spots.
+
+**Deviations:**
+- The tab's "Opencast's week" reads "Opencast's span" (any span).
+- "Businesses buying +4" is against the span before, not new businesses.
+- The average rate is the placed per-thousand rate of the spots that aired, not cost over viewers. Viewers per spot window aren't kept apart.
+
+New service methods: `ledger.earningRows`, `usageTotals`, `opencastShareBetween`, `escrowSince`, `carriageVolume`; `playout.prepareMinutes`, `spotsAired`; `spots.spotStats`, `heldForPlaced`; `log.barterMinutes` | packages/contracts `desk.ts`, `rules.ts`, `analytics.ts`; apps/api audience `analytics.ts` (`money`, `costs`, `stationCost`), routes; ledger, playout, spots and log services; the desk's `MoneyTab`, the station page's Cost card, Settings' Costs group, mocks | as described |
 - **Programs:** every program aired in the view, from `airing_stats`, added up across the stations that aired it, carried airings included. It's under the minimum when its airings' peaks added up stay under `watch_data.minimum_audience` (the maker's rule, in short). A catalog program's From is "Opencast catalog". The sub-line says "Live" (any airing live, or a live program), "Also on …", "On …" (catalog), or "Claimable station".
 - **Still watching:** at each minute, the first minute's audience less everyone who has left by then (`tune_aways`), all airings added up. So tune-ins partway don't lift it.
 - **Its breaks** are as its biggest airing aired them, and the **biggest drop** says whether a break was on.

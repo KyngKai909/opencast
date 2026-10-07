@@ -112,6 +112,10 @@ export interface PlayoutService {
    * log entry's program aired either side, `between` two otherwise), what opened them and how many spots.
    */
   airedBreaks(from: Date, to: Date): Promise<Array<{ breakId: string; stationId: string; start: Date; end: Date; position: "opening" | "inside" | "between"; firstElement: "bumper" | "spot" | "sponsor" | "station_id" | "other"; spots: number }>>;
+  /** A251 Phase 6: minutes spent preparing uploads in a span (each item's last preparation). */
+  prepareMinutes(from: Date, to: Date): Promise<number>;
+  /** A251 Phase 6: the placements (spot airings) that aired on these stations in a span. */
+  spotsAired(stationIds: string[], from: Date, to: Date): Promise<string[]>;
   /** A251: why each of these as-run rows aired (planned, live, a fill…). */
   asRunReasons(ids: string[]): Promise<Map<string, string>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
@@ -424,6 +428,24 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         out.push({ breakId: b.breakId, stationId: b.stationId, start: b.start, end: b.end, position, firstElement, spots: b.spots });
       }
       return out;
+    },
+
+    async prepareMinutes(from, to) {
+      const [r] = await db
+        .select({ ms: sql<number>`coalesce(sum(${schema.preparedItems.prepMs}), 0)::float` })
+        .from(schema.preparedItems)
+        .where(and(gte(schema.preparedItems.preparedAt, from), lt(schema.preparedItems.preparedAt, to)));
+      return Math.round((r?.ms ?? 0) / 60_000);
+    },
+
+    async spotsAired(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .selectDistinct({ airingId: A.airingId })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), sql`${A.airingId} is not null`, gte(A.startedAt, from), lt(A.startedAt, to)));
+      return rows.map((r) => r.airingId!);
     },
 
     async asRunReasons(ids) {

@@ -242,7 +242,8 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
               </ul>
               {d.adMicrosPer1000Hours != null && (
                 <p className="nd-an__note">
-                  {money(d.adMicrosPer1000Hours)} in spots and sponsors per 1,000 hours. Cost to run comes with Money.
+                  {money(d.adMicrosPer1000Hours)} in spots and sponsors per 1,000 hours.
+                  {d.cost?.breaksWithSpots != null ? ` ${d.cost.breaksWithSpots}% of its breaks had spots.` : ""}
                 </p>
               )}
             </>
@@ -251,6 +252,59 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
           )}
         </section>
       </div>
+      {d.cost && <Cost c={d.cost} name={s.callSign ?? s.name} />}
+    </div>
+  );
+}
+
+/** Ref. 12d 03's "Cost to run, estimated": what the station used, priced by the Costs rules, against what it was charged. */
+function Cost({ c, name }: { c: NonNullable<AnalyticsStationPage["cost"]>; name: string }) {
+  const margin = c.totalMicros == null ? null : c.chargedMicros - c.totalMicros;
+  const priced = (m: number | null) => (m == null ? <span className="nd-an__q">Not set yet</span> : money(m));
+  return (
+    <div className="nd-an__two">
+      <section className="nd-an__card" aria-labelledby="st-cost">
+        <header className="nd-an__card-head">
+          <div>
+            <h2 id="st-cost">Cost to run</h2>
+            <p>Estimated, this span</p>
+          </div>
+        </header>
+        <p className={`nd-an__big${margin != null && margin < 0 ? " nd-an__neg" : ""}`}>
+          {margin == null ? "—" : `${margin < 0 ? "−" : ""}${money(Math.abs(margin))}`} <small>Opencast on {name} this span</small>
+        </p>
+        <ul className="nd-an__rows nd-an__rows--money">
+          <li>
+            <span>
+              Storage <small className="nd-an__q">{num(c.storageGb)} GB on average</small>
+            </span>
+            <b>{priced(c.storageMicros)}</b>
+          </li>
+          <li>
+            <span>
+              Relays <small className="nd-an__q">{num(c.relayHours)} hours</small>
+            </span>
+            <b>{priced(c.relayMicros)}</b>
+          </li>
+          <li>
+            <span>
+              Live <small className="nd-an__q">{num(c.liveHours)} hours</small>
+            </span>
+            <b>{priced(c.liveMicros)}</b>
+          </li>
+          <li className="nd-an__tot">
+            <span>Cost, estimated</span>
+            <b>{priced(c.totalMicros)}</b>
+          </li>
+          <li>
+            <span>
+              Charged to {name} <small className="nd-an__q">Pay-as-you-go, past the free allowance</small>
+            </span>
+            <b>{money(c.chargedMicros)}</b>
+          </li>
+        </ul>
+        <p className="nd-an__note">Preparing is counted for the network, not per station: one upload can be on several stations.</p>
+      </section>
     </div>
   );
 }

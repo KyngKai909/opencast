@@ -290,6 +290,54 @@ export const RULES = {
     display: (v) => (!v.opencastBps && !v.poolBps && !v.fundBps ? "Not set yet" : `${pct(v.opencastBps)} Opencast, ${pct(v.poolBps)} the pool, ${pct(v.fundBps)} the creator fund`),
     isSet: (v) => !!(v.opencastBps || v.poolBps || v.fundBps)
   }),
+  // Costs (added 2026-10-07, A251 Phase 6; no first version): what running Opencast costs, for the
+  // desk's "Cost to run, estimated". Prices Opencast pays its own suppliers, not what stations pay;
+  // each is "Not set yet" until someone sets it, and the estimate leaves it out until then.
+  "costs.storage": def({
+    group: "costs",
+    title: "Storage",
+    detail: "What a GB stored costs Opencast a month, originals and prepared together",
+    schema: z.object({ costPerGbMonthMicros: PriceOrUnset }),
+    fallback: { costPerGbMonthMicros: null },
+    display: (v) => (v.costPerGbMonthMicros === null ? "Not set yet" : `${dollars(v.costPerGbMonthMicros)} a GB a month`),
+    isSet: (v) => v.costPerGbMonthMicros !== null
+  }),
+  "costs.preparing": def({
+    group: "costs",
+    title: "Preparing",
+    detail: "What a minute spent preparing uploads costs Opencast",
+    schema: z.object({ costPerMinuteMicros: PriceOrUnset }),
+    fallback: { costPerMinuteMicros: null },
+    display: (v) => (v.costPerMinuteMicros === null ? "Not set yet" : `${dollars(v.costPerMinuteMicros)} a minute`),
+    isSet: (v) => v.costPerMinuteMicros !== null
+  }),
+  "costs.relays": def({
+    group: "costs",
+    title: "Relays",
+    detail: "What an hour relayed to YouTube or Twitch costs Opencast",
+    schema: z.object({ costPerHourMicros: PriceOrUnset }),
+    fallback: { costPerHourMicros: null },
+    display: (v) => (v.costPerHourMicros === null ? "Not set yet" : `${dollars(v.costPerHourMicros)} an hour`),
+    isSet: (v) => v.costPerHourMicros !== null
+  }),
+  "costs.live": def({
+    group: "costs",
+    title: "Live (Livepeer)",
+    detail: "What an hour live costs Opencast",
+    schema: z.object({ costPerHourMicros: PriceOrUnset }),
+    fallback: { costPerHourMicros: null },
+    display: (v) => (v.costPerHourMicros === null ? "Not set yet" : `${dollars(v.costPerHourMicros)} an hour`),
+    isSet: (v) => v.costPerHourMicros !== null
+  }),
+  "costs.platform": def({
+    group: "costs",
+    title: "API, database and worker",
+    detail: "What running Opencast's own servers costs a week, whatever the stations do",
+    schema: z.object({ costPerWeekMicros: PriceOrUnset }),
+    fallback: { costPerWeekMicros: null },
+    display: (v) => (v.costPerWeekMicros === null ? "Not set yet" : `${dollars(v.costPerWeekMicros)} a week`),
+    isSet: (v) => v.costPerWeekMicros !== null
+  }),
   // Watch data (added 2026-09-29, follow-up Phase 1; no first version: the fallback is the value until one is set).
   "watch_data.retention": def({
     group: "watch_data",

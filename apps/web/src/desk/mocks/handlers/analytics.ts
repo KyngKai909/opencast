@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsMoney, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -188,7 +188,8 @@ function stationPage(request: Request, id: string): AnalyticsStationPage | Respo
       ? null
       : { spotsMicros: earnedScale(134_830_000), sponsorsMicros: earnedScale(46_150_000), pledgesMicros: earnedScale(374_000_000), pledgeMembers: Math.round(61 * k), carriageInMicros: earnedScale(11_100_000), cardFeesMicros: -earnedScale(12_660_000), totalMicros: earnedScale(553_420_000), held: f.station.kind === "claimable" },
     adMicrosPer1000Hours: external ? null : 11_260_000,
-    timeDownMinutes: external ? (f.down ?? 0) : null
+    timeDownMinutes: external ? (f.down ?? 0) : null,
+    cost: external ? null : { storageGb: Math.round(412 * k), storageMicros: earnedScale(4_590_000), relayHours: Math.round(168 * k), relayMicros: earnedScale(8_400_000), liveHours: Math.round(9 * k), liveMicros: earnedScale(5_400_000), totalMicros: earnedScale(18_390_000), chargedMicros: earnedScale(14_820_000), breaksWithSpots: 72 }
   };
 }
 
@@ -298,7 +299,48 @@ function programsOf(request: Request): { list: AnalyticsProgram[]; scope: Analyt
   return { list, scope, scale };
 }
 
+/** Ref. 12d 06's week. */
+function moneyOf(request: Request): AnalyticsMoney {
+  const { scope, to, scale, rows } = scopeOf(request);
+  const share = rows.reduce((t, f) => t + f.hours, 0) / WEEK_HOURS;
+  const k = (n: number) => Math.round(n * scale * share);
+  const kindTotal = (kind: string) => rows.filter((f) => f.station.kind === kind).reduce((t, f) => t + (f.earned ?? 0), 0);
+  const measure = (value: number, was: number) => ({ value: Math.round(value * scale), previous: Math.round(was * scale), byDay: byDay(value * scale, new Date(to.getTime() - 7 * DAY), to) });
+  const weeks = Array.from({ length: 8 }, (_, i) => {
+    const grow = 0.55 + i * 0.07;
+    return { from: new Date(to.getTime() - (8 - i) * 7 * DAY).toISOString(), spots: Math.round(620_000_000 * grow * share), sponsors: Math.round(260_000_000 * grow * share), pledges: Math.round(880_000_000 * grow * share), catalogSponsors: Math.round(90_000_000 * grow * share) };
+  });
+  const per = [[2, 32_260_000], [7, 27_100_000], [10, 24_870_000], [1, 24_750_000], [4, 22_150_000], [9, 18_270_000], [6, 17_690_000], [0, 11_260_000], [8, 11_130_000], [11, 6_100_000]] as const;
+  return {
+    scope,
+    shareSet: false,
+    earnedByStations: measure(kindTotal("independent"), kindTotal("independent") / 1.11),
+    heldForClaimable: { ...measure(kindTotal("claimable"), kindTotal("claimable") / 1.19), stations: rows.filter((f) => f.station.kind === "claimable").length },
+    catalogSponsors: measure(kindTotal("catalog"), kindTotal("catalog") / 1.33),
+    payAsYouGo: { value: k(150_100_000), previous: k(131_700_000), byDay: [] },
+    costToRun: { value: k(173_100_000), previous: k(168_000_000), byDay: [], complete: true },
+    weeks,
+    spotMarket: { breaksAired: k(4212), breaksWithSpots: k(2569), spotsAired: k(3906), spotsAiredBefore: k(3426), perThousandMicros: 6_800_000, businesses: 23, businessesBefore: 19, heldNextWeekMicros: k(412_000_000) },
+    per1000Hours: per.filter(([i]) => rows.includes(WEEK[i]!)).map(([i, micros]) => ({ station: WEEK[i]!.station, micros, held: WEEK[i]!.station.kind === "claimable" })),
+    opencast: {
+      in: { storage: k(41_200_000), relays: k(86_400_000), live: k(22_500_000), share: null },
+      out: { storage: k(37_400_000), preparing: k(24_100_000), relays: k(52_000_000), live: k(18_600_000), platform: Math.round(41_000_000 * scale) },
+      net: k(150_100_000) - k(37_400_000) - k(24_100_000) - k(52_000_000) - k(18_600_000) - Math.round(41_000_000 * scale),
+      measured: { storageGb: Math.round(2140 * share), prepareMinutes: k(1446), relayHours: k(1728), liveHours: k(31) }
+    },
+    held: rows
+      .filter((f) => f.station.kind === "claimable")
+      .map((f) => ({ station: f.station, since: { LUPE: "2026-08-03T19:00:00.000Z", CRAT: "2026-09-20T19:00:00.000Z", FLDR: "2026-09-01T19:00:00.000Z" }[f.station.callSign ?? ""] ?? null, balanceMicros: { LUPE: 1_104_600_000, CRAT: 388_100_000, FLDR: 96_750_000 }[f.station.callSign ?? ""] ?? 0, addedMicros: Math.round((f.earned ?? 0) * scale) })),
+    carriage: { agreements: Math.round(14 * Math.min(1, scale)), cashMicros: k(58_300_000), barterMicros: k(38_100_000), barterMinutes: k(161), programsCarried: 9 }
+  };
+}
+
 export const analyticsHandlers = [
+  http.get(path(analyticsApi.money), ({ request }) => {
+    const no = denied(request);
+    if (no) return no;
+    return reply(analyticsApi.money.response, moneyOf(request));
+  }),
   http.get(path(analyticsApi.programs), ({ request }) => {
     const no = denied(request);
     if (no) return no;

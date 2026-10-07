@@ -2,6 +2,23 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, Money, and the Costs rules (A251, Phase 6)
+
+Additive: one new desk endpoint, a new rule group with five rules, an optional field on the station page. No migration (rules without a first version use their fallback, "Not set yet").
+
+- `desk.ts`: `RuleGroup` gains `costs`. `rules.ts`: new `costs.storage` (`costPerGbMonthMicros`), `costs.preparing` (`costPerMinuteMicros`), `costs.relays` and `costs.live` (`costPerHourMicros`), `costs.platform` (`costPerWeekMicros`). These are what running Opencast costs, nullable and "Not set yet" until set.
+- `analytics.ts`: new `AnalyticsMoney`, and new endpoint `analyticsApi.money` (`GET /desk/analytics/money`, `auth: "desk"`). It returns:
+  - whether Opencast's share is set;
+  - earnings: independent stations' after card fees, claimable stations' (held) and catalog stations' (catalog sponsors);
+  - pay-as-you-go charges, and the estimated cost to run (`complete` false while a price isn't set);
+  - earnings week by week for 8 weeks;
+  - the spot market;
+  - spots and sponsors per 1,000 hours by station;
+  - Opencast's charges in and estimated costs out (null per line until priced), with what was measured;
+  - claimable stations' escrow (held since, balance, added);
+  - carriage volume.
+- `AnalyticsStationPage` gains optional `cost`: the station's storage, relays and live used and priced, the total, what it was charged, and the share of its breaks with spots.
+
 ## 2026-10-07: The desk's analytics, Programs and breaks (A251, Phase 5)
 
 Additive: two new desk endpoints and new shapes. Migration **0057**: new table `audience.break_stats`, one row per aired break, kept for good, naming no one.

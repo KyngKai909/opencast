@@ -5,7 +5,7 @@
 
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
+import type { AnalyticsMoney, AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
 import type { CurrentUser } from "../../http.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, forbidden, notFound } from "../../errors.js";
@@ -24,6 +24,8 @@ const MAX_SPAN = 400 * DAY;
 export interface Analytics {
   overview(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsOverview>;
   stations(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsStations>;
+  /** The Money tab (Ref. 12d 06). */
+  money(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsMoney>;
   /** The Programs and breaks tab (Ref. 12d 05). */
   programs(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsPrograms>;
   /** One program's airings in the span, still watching by the minute. */
@@ -344,6 +346,152 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       };
     }
   } as Analytics;
+  /** What running Opencast cost over a span, estimated from what was used and the Costs rules (null while a price isn't set). */
+  async function costs(at: Date, used: { gbDays: number; prepareMinutes: number; relayHours: number; liveHours: number; days: number }) {
+    const [storage, preparing, relays, live, platform] = await Promise.all([
+      services.settings.valueAt("costs.storage", at),
+      services.settings.valueAt("costs.preparing", at),
+      services.settings.valueAt("costs.relays", at),
+      services.settings.valueAt("costs.live", at),
+      services.settings.valueAt("costs.platform", at)
+    ]);
+    const times = (price: number | null, n: number) => (price == null ? null : Math.round(price * n));
+    return {
+      storage: times(storage.costPerGbMonthMicros, used.gbDays / 30),
+      preparing: times(preparing.costPerMinuteMicros, used.prepareMinutes),
+      relays: times(relays.costPerHourMicros, used.relayHours),
+      live: times(live.costPerHourMicros, used.liveHours),
+      platform: times(platform.costPerWeekMicros, used.days / 7)
+    };
+  }
+
+  service.money = async (user, query) => {
+    const { scope, from, to, previousFrom, previousTo, market, band, markets } = await scopeOf(user, query);
+    const stations = await stationsIn(market, band, previousFrom, to, markets);
+    const ids = [...stations.keys()];
+    const now = deps.clock.now();
+    const kindOfId = (id: string) => stations.get(id)?.kind;
+    // Earnings: this span, the one before, and the 8 weeks to the span's end.
+    const weeksFrom = new Date(to.getTime() - 8 * 7 * DAY);
+    const [rows, rowsBefore, weekRows] = await Promise.all([
+      services.ledger.earningRows(ids, from, to),
+      services.ledger.earningRows(ids, previousFrom, previousTo),
+      services.ledger.earningRows(ids, weeksFrom, to)
+    ]);
+    const net = (r: (typeof rows)[number]) => r.spots + r.sponsors + r.pledges + r.carriageIn + r.cardFees;
+    const sumOf = (list: typeof rows, kinds: Array<string | undefined>, f = net) => list.filter((r) => kinds.includes(kindOfId(r.stationId))).reduce((t, r) => t + f(r), 0);
+    const spanDays = daysIn(from, to);
+    const byDay = (list: typeof rows, kinds: Array<string | undefined>) => spanDays.map((d) => sumOf(list.filter((r) => r.day === d), kinds));
+    const independent = ["independent"];
+    const measure = (kinds: string[]) => ({ value: sumOf(rows, kinds), previous: rowsBefore.length ? sumOf(rowsBefore, kinds) : null, byDay: byDay(rows, kinds) });
+
+    // Pay-as-you-go and what Opencast's own running cost, estimated.
+    const days = Math.max(1, (Math.min(to.getTime(), now.getTime()) - from.getTime()) / DAY);
+    const daysBefore = Math.max(1, (previousTo.getTime() - previousFrom.getTime()) / DAY);
+    const [usage, usageBefore, prepare, prepareBefore, share, shareRule] = await Promise.all([
+      services.ledger.usageTotals(ids, from, to),
+      services.ledger.usageTotals(ids, previousFrom, previousTo),
+      services.playout.prepareMinutes(from, to),
+      services.playout.prepareMinutes(previousFrom, previousTo),
+      services.ledger.opencastShareBetween(from, to),
+      services.settings.valueAt("shares.opencast", now)
+    ]);
+    const shareSet = !!(shareRule.spotBps || shareRule.pledgeBps || shareRule.productionBps);
+    const out = await costs(now, { gbDays: usage.storage.gbDays, prepareMinutes: prepare, relayHours: usage.relays.hours, liveHours: usage.live.hours, days });
+    const outBefore = await costs(now, { gbDays: usageBefore.storage.gbDays, prepareMinutes: prepareBefore, relayHours: usageBefore.relays.hours, liveHours: usageBefore.live.hours, days: daysBefore });
+    const sumCosts = (c: typeof out) => Object.values(c).reduce((t: number, v) => t + (v ?? 0), 0);
+    const charges = usage.storage.chargeMicros + usage.relays.chargeMicros + usage.live.chargeMicros;
+    const chargesBefore = usageBefore.storage.chargeMicros + usageBefore.relays.chargeMicros + usageBefore.live.chargeMicros;
+
+    // The spot market.
+    const [aired, airedBefore, breakRows, held, hoursRows] = await Promise.all([
+      services.playout.spotsAired(ids, from, to),
+      services.playout.spotsAired(ids, previousFrom, previousTo),
+      ids.length ? db.select({ spots: schema.breakStats.spots }).from(schema.breakStats).where(and(inArray(schema.breakStats.stationId, ids), gte(schema.breakStats.startedAt, from), lt(schema.breakStats.startedAt, to))) : Promise.resolve([]),
+      services.spots.heldForPlaced(ids, to, new Date(to.getTime() + 7 * DAY)),
+      stationHours(ids, from, to)
+    ]);
+    const [stats, statsBefore] = await Promise.all([services.spots.spotStats(aired), services.spots.spotStats(airedBefore)]);
+
+    // Per 1,000 hours: spots and sponsors over hours watched.
+    const tunedOf = new Map<string, number>();
+    for (const h of hoursRows) tunedOf.set(h.stationId, (tunedOf.get(h.stationId) ?? 0) + h.tunedMinutes);
+    const per1000Hours = ids
+      .filter((id) => kindOfId(id) !== "external" && (tunedOf.get(id) ?? 0) > 0)
+      .map((id) => {
+        const ad = rows.filter((r) => r.stationId === id).reduce((t, r) => t + r.spots + r.sponsors, 0);
+        return { station: stations.get(id)!, micros: Math.round((ad / (tunedOf.get(id)! / 60)) * 1000), held: kindOfId(id) === "claimable" };
+      })
+      .sort((a, b) => b.micros - a.micros);
+
+    // Held for claimable stations.
+    const claimable = ids.filter((id) => kindOfId(id) === "claimable");
+    const [balances, since] = await Promise.all([services.ledger.escrowBalances(claimable), services.ledger.escrowSince(claimable)]);
+    const heldRows = claimable
+      .map((id) => {
+        const b = balances.get(id) ?? { owed: 0, held: 0 };
+        return { station: stations.get(id)!, since: since.get(id)?.toISOString() ?? null, balanceMicros: Math.round(b.owed + b.held), addedMicros: rows.filter((r) => r.stationId === id).reduce((t, r) => t + net(r), 0) };
+      })
+      .filter((r) => r.balanceMicros || r.addedMicros)
+      .sort((a, b) => b.balanceMicros - a.balanceMicros);
+
+    // Carriage: between stations, never in the totals.
+    const [carriage, barterMinutes] = await Promise.all([services.ledger.carriageVolume(from, to), services.log.barterMinutes(ids, from, to)]);
+    const [carried] = ids.length
+      ? await db
+          .select({ n: sql<number>`count(distinct ${schema.airingStats.programId})::int` })
+          .from(schema.airingStats)
+          .where(and(inArray(schema.airingStats.stationId, ids), eq(schema.airingStats.carried, true), gte(schema.airingStats.startedAt, from), lt(schema.airingStats.startedAt, to)))
+      : [{ n: 0 }];
+
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+      const a = new Date(weeksFrom.getTime() + i * 7 * DAY);
+      const b = new Date(a.getTime() + 7 * DAY);
+      const inWeek = weekRows.filter((r) => {
+        const t = dayStart(r.day).getTime();
+        return t >= a.getTime() && t < b.getTime();
+      });
+      const notCatalog = inWeek.filter((r) => kindOfId(r.stationId) !== "catalog");
+      return {
+        from: a.toISOString(),
+        spots: notCatalog.reduce((t, r) => t + r.spots, 0),
+        sponsors: notCatalog.reduce((t, r) => t + r.sponsors, 0),
+        pledges: notCatalog.reduce((t, r) => t + r.pledges, 0),
+        catalogSponsors: inWeek.filter((r) => kindOfId(r.stationId) === "catalog").reduce((t, r) => t + r.spots + r.sponsors + r.pledges, 0)
+      };
+    });
+    const costValues = Object.values(out);
+    return {
+      scope,
+      shareSet,
+      earnedByStations: measure(independent),
+      heldForClaimable: { ...measure(["claimable"]), stations: claimable.length },
+      catalogSponsors: measure(["catalog"]),
+      payAsYouGo: { value: charges, previous: chargesBefore, byDay: [] },
+      costToRun: { value: sumCosts(out), previous: sumCosts(outBefore), byDay: [], complete: costValues.every((v) => v != null) },
+      weeks,
+      spotMarket: {
+        breaksAired: breakRows.length,
+        breaksWithSpots: breakRows.filter((b) => b.spots > 0).length,
+        spotsAired: aired.length,
+        spotsAiredBefore: airedBefore.length,
+        perThousandMicros: stats.perThousandMicros,
+        businesses: stats.businesses,
+        businessesBefore: statsBefore.businesses,
+        heldNextWeekMicros: Math.round(held)
+      },
+      per1000Hours,
+      opencast: {
+        in: { storage: usage.storage.chargeMicros, relays: usage.relays.chargeMicros, live: usage.live.chargeMicros, share: shareSet ? share : null },
+        out,
+        net: charges + (shareSet ? share : 0) - sumCosts(out),
+        measured: { storageGb: round1(usage.storage.gbDays / days), prepareMinutes: prepare, relayHours: round1(usage.relays.hours), liveHours: round1(usage.live.hours) }
+      },
+      held: heldRows,
+      carriage: { agreements: carriage.agreements, cashMicros: carriage.cashMicros, barterMicros: carriage.barterMicros, barterMinutes, programsCarried: carried?.n ?? 0 }
+    };
+  };
+
   /** The span's airings of programs in the view (stations in it), and what each program adds up to. */
   async function programsIn(user: CurrentUser, query: AnalyticsQuery, only?: string) {
     const { scope, from, to, previousFrom, market, band, markets } = await scopeOf(user, query);
@@ -790,9 +938,32 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       airtime,
       earned,
       adMicrosPer1000Hours: earned && hoursWatched > 0 ? Math.round(((earned.spotsMicros + earned.sponsorsMicros) / hoursWatched) * 1000) : null,
-      timeDownMinutes: down ? (down.get(stationId) ?? 0) : null
+      timeDownMinutes: down ? (down.get(stationId) ?? 0) : null,
+      cost: external ? null : await stationCost(stationId, from, to)
     };
   };
+
+  /** A station's cost to run, estimated, against what it was charged (Phase 6). */
+  async function stationCost(stationId: string, from: Date, to: Date): Promise<NonNullable<AnalyticsStationPage["cost"]>> {
+    const days = Math.max(1, (Math.min(to.getTime(), deps.clock.now().getTime()) - from.getTime()) / DAY);
+    const [usage, brk] = await Promise.all([
+      services.ledger.usageTotals([stationId], from, to),
+      db.select({ spots: schema.breakStats.spots }).from(schema.breakStats).where(and(eq(schema.breakStats.stationId, stationId), gte(schema.breakStats.startedAt, from), lt(schema.breakStats.startedAt, to)))
+    ]);
+    const c = await costs(deps.clock.now(), { gbDays: usage.storage.gbDays, prepareMinutes: 0, relayHours: usage.relays.hours, liveHours: usage.live.hours, days: 0 });
+    const parts = [c.storage, c.relays, c.live];
+    return {
+      storageGb: round1(usage.storage.gbDays / days),
+      storageMicros: c.storage,
+      relayHours: round1(usage.relays.hours),
+      relayMicros: c.relays,
+      liveHours: round1(usage.live.hours),
+      liveMicros: c.live,
+      totalMicros: parts.every((p) => p == null) ? null : parts.reduce((t: number, p) => t + (p ?? 0), 0),
+      chargedMicros: usage.storage.chargeMicros + usage.relays.chargeMicros + usage.live.chargeMicros,
+      breaksWithSpots: brk.length ? Math.round((brk.filter((b) => b.spots > 0).length / brk.length) * 100) : null
+    };
+  }
 
   /** A station's airings in a window, with their titles and where they came from. */
   async function airingsOf(station: AnalyticsStation, a: Date, b: Date): Promise<AnalyticsAiring[]> {

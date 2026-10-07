@@ -168,6 +168,8 @@ export interface LogService {
    * `everyPart`, as the rule lays them out with every part in every break (its cadence left aside).
    */
   breaks(stationId: string, from: Date, to: Date, options?: { everyPart?: boolean }): Promise<BreakSlotView[]>;
+  /** A251 Phase 6: break time owed to makers under barter (their share of breaks inside carried programs), minutes, in a span. */
+  barterMinutes(stationIds: string[] | null, from: Date, to: Date): Promise<number>;
   /**
    * A246: a window's entries and breaks (with their rows) rebuilt with a break rule that isn't
    * saved, as `log` would answer after saving it (`previewBreakRule`). Reads only: nothing is
@@ -1729,6 +1731,15 @@ export function createLogService(ctx: ModuleContext): LogService {
     async gaps(stationId, from, to) {
       const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       return gapsIn(rows, from, to, offAir);
+    },
+
+    async barterMinutes(stationIds, from, to) {
+      const B = schema.breaks;
+      const [r] = await db
+        .select({ ms: sql<number>`coalesce(sum(${B.producerShareMs}), 0)::float` })
+        .from(B)
+        .where(and(gte(B.startsAt, from), lt(B.startsAt, to), ...(stationIds ? [inArray(B.stationId, stationIds.length ? stationIds : ["00000000-0000-0000-0000-000000000000"])] : [])));
+      return Math.round((r?.ms ?? 0) / 60_000);
     },
 
     async breaks(stationId, from, to, options) {
