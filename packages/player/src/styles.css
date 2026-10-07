@@ -160,13 +160,14 @@
 /* On TV the tags are the ten-foot size (.tv .tag). */
 .oc-banner--tv .oc-tag { height: 36px; padding: 0 14px; font-size: 22px; border-width: 1.5px; }
 .oc-banner--tv .oc-tag__dot { width: 10px; height: 10px; }
-/* On TV, the title and Next are one line each, cut short with "…" (the user's call, 2026-10-06): a
-   long title ran to three lines and pushed "Next at" onto two. */
-.oc-banner--tv .oc-banner__now { min-width: 0; }
-.oc-banner--tv .oc-banner__now h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.oc-banner--tv .oc-banner__nx { white-space: nowrap; min-width: 0; }
-.oc-banner--tv .oc-banner__nx > :not(b) { flex-shrink: 0; }
-.oc-banner--tv .oc-banner__nx b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* On TV and the desktop, the title and Next are one line each, cut short with "…" (the user's call,
+   2026-10-06): a long title ran to three lines and pushed "Next at" onto two. The phone's narrow
+   banner wraps as before (below). */
+.oc-banner__now { min-width: 0; }
+.oc-banner__now h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-banner__nx { white-space: nowrap; min-width: 0; }
+.oc-banner__nx > :not(b) { flex-shrink: 0; }
+.oc-banner__nx b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* In a web page the banner is shorter: one row, and no hint row unless one is given. */
 .oc-banner--web { grid-template-columns: auto minmax(0, 1fr) auto; gap: max(calc(44 * var(--u)), 14px); padding: max(calc(26 * var(--u)), 10px) max(calc(34 * var(--u)), 12px); left: 3%; right: 3%; bottom: 4%; }
@@ -178,7 +179,9 @@
   .oc-banner--web .oc-banner__id { grid-column: 1; grid-template-columns: auto 1fr; }
   .oc-banner--web .oc-banner__now { grid-column: 1 / -1; grid-row: 2; }
   .oc-banner--web .oc-banner__side { grid-column: 2; grid-row: 1; flex-direction: row; align-items: center; gap: 12px; }
-  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; }
+  .oc-banner--web .oc-banner__now h3 { font-size: 16px; margin-bottom: 9px; white-space: normal; }
+  .oc-banner--web .oc-banner__nx { white-space: normal; }
+  .oc-banner--web .oc-banner__nx b { overflow: visible; }
   .oc-banner--web .oc-banner__ch { font-size: 20px; }
   .oc-banner--web .oc-banner__cs { font-size: 15px; }
   .oc-banner--web .oc-banner__csrow .oc-tag { height: 16px; padding: 0 5px; font-size: 10.5px; }
