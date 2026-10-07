@@ -95,6 +95,18 @@ And a busy TV station as Phase 5 assumed it (300 hours kept prepared, 1,440 GB; 
 
 So recommendation 1 alone cuts the relay's cost by about 85% and removes the Livepeer risk; recommendation 2 passes most of that saving on to stations. The other examples at recommendation 2's $0.05: BEAT's 186 relay hours would be $9.30 instead of $37.20, and REEL's 744 hours $37.20 instead of $148.80 (or $25 flat).
 
+## What running Opencast costs (the Costs rules)
+
+The desk's Analytics, Money, "Cost to run, estimated" multiplies what was used by the Costs rules (Settings, Rules, Costs). Their first set versions, from October 1, 2026 (migration 0058, A251), every number for review:
+
+| Rule | Cost | From |
+|---|---|---|
+| `costs.storage` | **$0.015** a GB-month | R2 Standard. Preparing is its own line here, so it isn't spread over storage as in the sheet's $0.018 |
+| `costs.preparing` | **$0.0048** a minute of preparing | A minute of the worker's wall clock: 2.0 vCPU-hours per media hour in about 1,046 s at $0.0278 ($0.0032), R2's segment writes ($0.0012) and memory ($0.0005) |
+| `costs.relays` | **$0.085** an hour | On Railway, if Livepeer doesn't charge the split ($0.415 if it does) |
+| `costs.live` | **$0.48** an hour | Livepeer $0.33 plus the R2 copies $0.15 |
+| `costs.platform` | **$5.77** a week | An estimate, about $25 a month: Railway Pro's $20 with its included usage, and the Cloudflare Worker's $5. Not Livepeer's Growth minimum. Replace it with the real bill |
+
 ## How billing works
 
 - **Measured daily** (UTC), by the jobs: storage once an hour (what's kept at the time: every file a station's items, caption tracks and relay background point at, once each, plus the segments prepared from them); relay hours from `translator_sessions` (per station: sessions at the same time count once); live hours from the as-run log's `live` rows (a TV station's are Livepeer's, transcoded there and copied once into R2; a radio station's are its own type). Independent stations and studios pay; claimable stations (Opencast runs them) and the catalog station don't (Open). External stations (follow-up Phase 6) never use any of it: nothing is stored, relayed or transcoded for them, since viewers play the source's own stream.

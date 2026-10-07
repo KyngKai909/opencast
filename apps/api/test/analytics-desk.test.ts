@@ -279,8 +279,11 @@ describe("Programs and breaks (Ref. 12d 05)", () => {
 
 describe("Money (Ref. 12d 06)", () => {
   it("says what's not set yet, adds up pay-as-you-go, and estimates the cost to run from the Costs rules", async () => {
+    // The starting costs (migration 0058): nothing used yet but the servers, $5.77 a week.
     const before = (await dee.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(200)).body;
-    expect(before).toMatchObject({ shareSet: false, earnedByStations: { value: 0 }, costToRun: { value: 0, complete: false }, opencast: { in: { share: null }, out: { storage: null, platform: null } } });
+    expect(before).toMatchObject({ shareSet: false, earnedByStations: { value: 0 }, costToRun: { complete: true }, opencast: { in: { share: null }, out: { storage: 0, preparing: 0, relays: 0, live: 0 } } });
+    expect(before.opencast.out.platform).toBeGreaterThan(0);
+    expect(before.opencast.out.platform).toBeLessThanOrEqual(Math.round(5_770_000 / 7));
     expect(before.weeks).toHaveLength(8);
 
     // BEAT's day of pay-as-you-go: 10 GB stored, 2 hours relayed, closed.
@@ -299,15 +302,15 @@ describe("Money (Ref. 12d 06)", () => {
     const { body } = await dee.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(200);
     expect(body.payAsYouGo.value).toBe(1_500_000);
     expect(body.opencast.in).toMatchObject({ storage: 1_000_000, relays: 500_000, live: 0, share: null });
-    expect(body.opencast.out).toMatchObject({ storage: 10_000, relays: 800_000, preparing: null, live: null });
+    expect(body.opencast.out).toMatchObject({ storage: 10_000, relays: 800_000, preparing: 0, live: 0 });
     // The servers: $70 a week, for the part of the day gone.
     expect(body.opencast.out.platform).toBeGreaterThan(9_000_000);
     expect(body.opencast.out.platform).toBeLessThanOrEqual(10_000_000);
-    expect(body.costToRun.complete).toBe(false);
+    expect(body.costToRun.complete).toBe(true);
     expect(body.spotMarket).toMatchObject({ breaksAired: 2, breaksWithSpots: 2, spotsAired: 0 });
 
     const page = (await dee.get(`/v1/desk/analytics/stations/${beat}?from=${DAY.from}&to=${DAY.to}`).expect(200)).body;
-    expect(page.cost).toMatchObject({ relayHours: 2, relayMicros: 800_000, storageMicros: 10_000, liveMicros: null, chargedMicros: 1_500_000, breaksWithSpots: 100 });
+    expect(page.cost).toMatchObject({ relayHours: 2, relayMicros: 800_000, storageMicros: 10_000, liveMicros: 0, chargedMicros: 1_500_000, breaksWithSpots: 100 });
     await sam.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(403);
   });
 });

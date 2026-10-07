@@ -34,7 +34,7 @@ const def = <S extends z.ZodType>(d: RuleDef<S>) => d;
 
 const dollars = (micros: number) => {
   const d = micros / 1_000_000;
-  return `$${d < 1 ? d.toFixed(d < 0.1 ? 3 : 2) : d.toFixed(2)}`.replace(/(\.\d*?[1-9])0+$/, "$1");
+  return `$${d < 1 ? d.toFixed(d < 0.01 ? 4 : d < 0.1 ? 3 : 2) : d.toFixed(2)}`.replace(/(\.\d*?[1-9])0+$/, "$1");
 };
 const pct = (bps: number) => `${bps % 100 ? (bps / 100).toFixed(2).replace(/0+$/, "") : String(bps / 100)}%`;
 
