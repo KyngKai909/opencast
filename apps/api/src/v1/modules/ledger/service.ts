@@ -121,6 +121,11 @@ export interface LedgerService extends BusinessMoney {
    * Carriage moves money between stations and isn't in it; nor are payouts.
    */
   earnedBetween(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /**
+   * A251: one station's earnings in a span by kind (Ref. 12d 03's "Earned"): spots, sponsors (and
+   * production orders), pledges and how many, carriage in, card fees, and the total after them.
+   */
+  earnedBreakdown(stationId: string, from: Date, to: Date): Promise<{ spotsMicros: number; sponsorsMicros: number; pledgesMicros: number; pledgeMembers: number; carriageInMicros: number; cardFeesMicros: number; totalMicros: number; held: boolean }>;
   moveToBank(stationId: string, micros: number): Promise<{ payoutId: string; scheduledFor: string }>;
   pledge(userId: string, stationId: string, input: { cadence: "monthly" | "once"; amountMicros: number; creditOnAir: boolean }): Promise<{ pledge: PledgeView; checkoutUrl: string | null }>;
   pledges(userId: string): Promise<PledgeView[]>;
@@ -1120,6 +1125,33 @@ export function createLedgerService({ deps, services }: ModuleContext): LedgerSe
           destination: payout?.destination ?? null
         };
       });
+    },
+
+    async earnedBreakdown(stationId, from, to) {
+      const kind = await stationAccountKind(stationId);
+      const [account] = await db.select({ id: L.id }).from(L).where(and(eq(L.kind, kind), eq(L.stationId, stationId)));
+      const out = { spotsMicros: 0, sponsorsMicros: 0, pledgesMicros: 0, pledgeMembers: 0, carriageInMicros: 0, cardFeesMicros: 0, totalMicros: 0, held: kind === "escrow_owed" };
+      if (!account) return out;
+      const rows = await db
+        .select({ kind: E.kind, sourceType: E.sourceType, amount: P.amountMicros })
+        .from(P)
+        .innerJoin(E, eq(E.id, P.entryId))
+        .where(and(eq(P.accountId, account.id), gte(E.occurredAt, from), lt(E.occurredAt, to)));
+      for (const r of rows) {
+        const a = Number(r.amount);
+        if (r.kind === "settle" && r.sourceType === "as_run") out.spotsMicros += a;
+        else if (r.kind === "settle" && (r.sourceType === "sponsorship_month" || r.sourceType === "production_order")) out.sponsorsMicros += a;
+        else if (r.kind === "settle") out.spotsMicros += a;
+        else if (r.kind === "pledge") {
+          out.pledgesMicros += a;
+          if (a > 0) out.pledgeMembers++;
+        } else if ((r.kind === "carriage_fee" || r.kind === "barter_split") && a > 0) out.carriageInMicros += a;
+        else if (r.kind === "card_fee") out.cardFeesMicros += a;
+        else if (r.kind === "reversal") out.spotsMicros += a;
+        else continue;
+      }
+      out.totalMicros = out.spotsMicros + out.sponsorsMicros + out.pledgesMicros + out.carriageInMicros + out.cardFeesMicros;
+      return out;
     },
 
     async earnedBetween(stationIds, from, to) {

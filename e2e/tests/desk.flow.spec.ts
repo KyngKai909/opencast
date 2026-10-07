@@ -634,6 +634,18 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await page.getByRole("button", { name: "Export CSV" }).click();
   expect((await download).suggestedFilename()).toMatch(/^opencast-stations-\d{4}-\d{2}-\d{2}\.csv$/);
 
+  // One station (Ref. 12d 03): BEAT, opened from the table, its span kept.
+  await page.getByRole("group", { name: "Kind of station" }).getByRole("button", { name: /^All/ }).click();
+  await table.getByRole("link", { name: "BEAT" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations\/[0-9a-f-]+\?span=7d/);
+  await expect(page.getByRole("heading", { name: /^BEAT/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Saturday night" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "That night's airings" })).toContainText("Carried from REEL 24.1");
+  await expect(page.getByText("Paid out")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in master control" })).toHaveAttribute("href", "/control/BEAT/audience");
+  await page.getByRole("button", { name: "All stations" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/stations\?/);
+
   // Lee leads the High Desert: their market, fixed.
   await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
   await page.goto("/desk/analytics/overview");

@@ -134,6 +134,87 @@ export const AnalyticsStations = z.object({
 });
 export type AnalyticsStations = z.infer<typeof AnalyticsStations>;
 
+/** A number for one station, with the span before and the network's for comparison (Ref. 12d 03). */
+export const AnalyticsVsNetwork = AnalyticsMeasure.extend({ network: z.number().nullable() });
+export type AnalyticsVsNetwork = z.infer<typeof AnalyticsVsNetwork>;
+
+/** Where an airing came from: its own library, carried from another station, live, or an external station's guide. */
+export const AnalyticsAiringSource = z.enum(["library", "carried", "live", "guide", "nothing_listed"]);
+export type AnalyticsAiringSource = z.infer<typeof AnalyticsAiringSource>;
+
+export const AnalyticsAiring = z.object({
+  key: z.string(),
+  title: z.string(),
+  source: AnalyticsAiringSource,
+  /** The station it was carried from. */
+  from: AnalyticsStation.nullable(),
+  startedAt: Timestamp,
+  endedAt: Timestamp,
+  averageTunedIn: z.number(),
+  peakTunedIn: z.number().int(),
+  /** Percent of those at its first minute still there at its last; null with nobody at the start. */
+  stayedToTheEnd: z.number().int().nullable(),
+  notForMePer1000Hours: z.number().nullable(),
+  hours: z.number()
+});
+export type AnalyticsAiring = z.infer<typeof AnalyticsAiring>;
+
+/** One end of a change between stations: another station, or null for "Started here" / "Stopped here". */
+export const AnalyticsFlow = z.object({ station: AnalyticsStation.nullable(), changes: z.number().int(), share: z.number() });
+export type AnalyticsFlow = z.infer<typeof AnalyticsFlow>;
+
+export const AnalyticsStationPage = z.object({
+  scope: AnalyticsScope,
+  station: AnalyticsStation.extend({ onDialSince: Timestamp.nullable() }),
+  hoursWatched: AnalyticsMeasure.extend({ shareOfNetwork: z.number().nullable() }),
+  averageTunedIn: AnalyticsMeasure,
+  peakTunedIn: AnalyticsMeasure.extend({ at: Timestamp.nullable() }),
+  stayedToTheEnd: AnalyticsVsNetwork,
+  notForMePer1000Hours: AnalyticsVsNetwork,
+  underMinimum: z.boolean(),
+  /**
+   * Its busiest night in the span (6 pm to 2 am, the market's time), minute by minute, against the
+   * same night a week before, with its breaks. Null when the span's minutes are past the 30 days kept.
+   */
+  night: z
+    .object({
+      from: Timestamp,
+      to: Timestamp,
+      minutes: z.array(z.object({ at: Timestamp, value: z.number().int(), previous: z.number().int().nullable() })),
+      breaks: z.array(z.object({ start: Timestamp, end: Timestamp })),
+      airings: z.array(AnalyticsAiring)
+    })
+    .nullable(),
+  /** Airings in the whole span. */
+  airingsInSpan: z.number().int(),
+  platforms: z.array(z.object({ platform: Platform, hours: z.number() })),
+  /** By where viewers are; `own` marks the station's own market. */
+  places: z.array(z.object({ market: AnalyticsMarket.nullable(), own: z.boolean(), hours: z.number() })),
+  /** Where its sessions came from and went to: "Started here" and "Stopped here" (station null), then other stations, most first. */
+  cameFrom: z.array(AnalyticsFlow),
+  wentTo: z.array(AnalyticsFlow),
+  /** How its airtime was filled, minutes from the as-run log; null for an external station. */
+  airtime: z.object({ programs: z.number().int(), breaks: z.number().int(), live: z.number().int(), deadAir: z.number().int() }).nullable(),
+  /** Earned in the span after card fees, by kind; null for an external station. */
+  earned: z
+    .object({
+      spotsMicros: z.number().int(),
+      sponsorsMicros: z.number().int(),
+      pledgesMicros: z.number().int(),
+      pledgeMembers: z.number().int(),
+      carriageInMicros: z.number().int(),
+      cardFeesMicros: z.number().int(),
+      totalMicros: z.number().int(),
+      held: z.boolean()
+    })
+    .nullable(),
+  /** Spots and sponsors per 1,000 hours watched; null with no hours or no earnings. */
+  adMicrosPer1000Hours: z.number().int().nullable(),
+  /** An external station's minutes down in the span. */
+  timeDownMinutes: z.number().int().nullable()
+});
+export type AnalyticsStationPage = z.infer<typeof AnalyticsStationPage>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -150,5 +231,14 @@ export const analyticsApi = {
     summary: "Every station's span in one table, with the network's row (A251)",
     query: AnalyticsQuery,
     response: AnalyticsStations
+  }),
+  station: endpoint({
+    method: "GET",
+    path: "/desk/analytics/stations/:stationId",
+    auth: "desk",
+    summary: "One station's span: its numbers against the network's, its busiest night by the minute, airings, surfaces, places, flow, airtime and earnings (A251, Ref. 12d 03)",
+    params: z.object({ stationId: Id }),
+    query: AnalyticsQuery.omit({ market: true, band: true }),
+    response: AnalyticsStationPage
   })
 };

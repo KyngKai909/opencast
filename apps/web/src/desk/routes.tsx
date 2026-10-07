@@ -70,6 +70,7 @@ export function AppRoutes() {
         </Route>
         <Route path="analytics" element={<Navigate to="overview" replace />} />
         <Route path="analytics/:tab" element={<Analytics />} />
+        <Route path="analytics/stations/:stationId" element={<Analytics />} />
         <Route path="held-earnings" element={<Held />} />
         <Route path="reserved-call-signs" element={<Reserved />} />
         <Route path="reserved-call-signs/:marketSlug" element={<Reserved />} />

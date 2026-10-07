@@ -102,6 +102,12 @@ export interface PlayoutService {
   statusFor(stationIds: string[]): Promise<Map<string, { onAir: boolean; playbackUrl: string | null; standingBy: boolean }>>;
   /** A251: minutes of dead-air fill and slate per station in a span (time nobody scheduled, or something not ready). */
   fillMinutes(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /** A251: how a station's airtime was filled, minutes from the as-run log: programs, breaks (and what aired between), live, dead air (fill and slate). */
+  airtimeMinutes(stationId: string, from: Date, to: Date): Promise<{ programs: number; breaks: number; live: number; deadAir: number }>;
+  /** A251: a station's breaks as they aired in a window, touching ones joined. */
+  breakSpans(stationId: string, from: Date, to: Date): Promise<Array<{ start: Date; end: Date }>>;
+  /** A251: why each of these as-run rows aired (planned, live, a fill…). */
+  asRunReasons(ids: string[]): Promise<Map<string, string>>;
   checks(stationId: string): Promise<{ ready: boolean; checks: SignOnCheck[] }>;
   signOn(stationId: string): Promise<PlayoutStatusView>;
   signOff(stationId: string, permanently: boolean): Promise<PlayoutStatusView>;
@@ -336,6 +342,46 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
   }
 
   const service: PlayoutService = {
+    async airtimeMinutes(stationId, from, to) {
+      const A = schema.asRun;
+      const rows = await db
+        .select({ code: A.code, reason: A.reason, breakId: A.breakId, seconds: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))), 0)::float` })
+        .from(A)
+        .where(and(eq(A.stationId, stationId), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.code, A.reason, A.breakId);
+      const out = { programs: 0, breaks: 0, live: 0, deadAir: 0 };
+      for (const r of rows) {
+        const m = r.seconds / 60;
+        if (r.reason === "dead_air_fill" || r.reason === "slate") out.deadAir += m;
+        else if (r.reason === "live") out.live += m;
+        else if (r.code === "PGM" && !r.breakId) out.programs += m;
+        else out.breaks += m;
+      }
+      return { programs: Math.round(out.programs), breaks: Math.round(out.breaks), live: Math.round(out.live), deadAir: Math.round(out.deadAir) };
+    },
+
+    async breakSpans(stationId, from, to) {
+      const A = schema.asRun;
+      const rows = await db
+        .select({ start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(eq(A.stationId, stationId), sql`${A.breakId} is not null`, lt(A.startedAt, to), gt(A.endedAt, from)))
+        .orderBy(asc(A.startedAt));
+      const out: Array<{ start: Date; end: Date }> = [];
+      for (const r of rows) {
+        const last = out[out.length - 1];
+        if (last && r.start.getTime() - last.end.getTime() <= 1000) last.end = new Date(Math.max(last.end.getTime(), r.end.getTime()));
+        else out.push({ start: r.start, end: r.end });
+      }
+      return out;
+    },
+
+    async asRunReasons(ids) {
+      if (!ids.length) return new Map();
+      const rows = await db.select({ id: schema.asRun.id, reason: schema.asRun.reason }).from(schema.asRun).where(inArray(schema.asRun.id, ids));
+      return new Map(rows.map((r) => [r.id, r.reason]));
+    },
+
     async fillMinutes(stationIds, from, to) {
       if (!stationIds.length) return new Map();
       const A = schema.asRun;

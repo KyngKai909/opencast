@@ -6,7 +6,7 @@ import type { AnalyticsOverview, AnalyticsStation } from "@opencast/contracts";
 import { LineChart, Tag } from "@opencast/ui";
 import { PLATFORMS, change, clockText, csv, download, minutesText, num, type Span } from "./span";
 
-export function Overview({ data, span, exporter, onAllStations }: { data: AnalyticsOverview; span: Span; exporter: { current: (() => void) | null }; onAllStations: () => void }) {
+export function Overview({ data, span, exporter, onAllStations, stationHref }: { data: AnalyticsOverview; span: Span; exporter: { current: (() => void) | null }; onAllStations: () => void; stationHref: (id: string) => string }) {
   const d = data;
   exporter.current = () => download(`opencast-overview-${span.from.toISOString().slice(0, 10)}.csv`, overviewCsv(d));
   const peakAt = d.peakTunedIn.at ? new Date(d.peakTunedIn.at) : null;
@@ -122,7 +122,7 @@ export function Overview({ data, span, exporter, onAllStations }: { data: Analyt
                 <span className="nd-an__q" role="cell">
                   {i + 1}
                 </span>
-                <StationCell station={r.station} />
+                <StationCell station={r.station} href={stationHref(r.station.id)} />
                 <span className="n" role="cell">
                   {num(r.hours)}
                 </span>
@@ -231,7 +231,7 @@ export function Spark({ values, width = 120, height = 28 }: { values: number[]; 
 }
 
 /** The station's channel badge in its colour, call sign and name. */
-export function StationCell({ station, tags }: { station: AnalyticsStation; tags?: boolean }) {
+export function StationCell({ station, tags, href }: { station: AnalyticsStation; tags?: boolean; href?: string }) {
   return (
     <div className="nd-an__stn" role="cell">
       <span className="nd-an__badge" style={station.colour ? { background: station.colour } : undefined}>
@@ -239,7 +239,13 @@ export function StationCell({ station, tags }: { station: AnalyticsStation; tags
       </span>
       <div>
         <b>
-          {station.callSign ?? station.name}
+          {href ? (
+            <a href={href} className="nd-an__stlink">
+              {station.callSign ?? station.name}
+            </a>
+          ) : (
+            (station.callSign ?? station.name)
+          )}
           {tags && station.kind === "external" && (
             <Tag variant="listed" className="nd-an__tag">
               External

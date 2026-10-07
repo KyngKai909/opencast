@@ -299,6 +299,8 @@ export interface StationsService {
   translators(stationId: string): Promise<TranslatorView[]>;
   /** A251: every station on the dial's band and market (its channel not released). */
   dialPlaces(): Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
+  /** A251: when a station came on the dial: its first sign-on, else when its channel was given. */
+  onDialSince(stationId: string): Promise<Date | null>;
   /** A251: these stations' relays (YouTube, Twitch, RTMP), for the desk's analytics. */
   relaysOf(stationIds: string[]): Promise<Array<{ id: string; stationId: string; service: "youtube" | "twitch" | "rtmp" }>>;
   addTranslator(stationId: string, input: TranslatorInput): Promise<TranslatorView>;
@@ -1399,6 +1401,16 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         if (categories.length) await tx.insert(schema.blockedCategories).values(categories.map((category) => ({ stationId, category })));
       });
       return service.breakRule(stationId);
+    },
+
+    async onDialSince(stationId) {
+      const [s] = await db.select({ at: schema.stations.firstSignedOnAt }).from(schema.stations).where(eq(schema.stations.id, stationId));
+      if (s?.at) return s.at;
+      const [c] = await db
+        .select({ at: schema.channels.createdAt })
+        .from(schema.channels)
+        .where(and(eq(schema.channels.stationId, stationId), isNull(schema.channels.releasedAt)));
+      return c?.at ?? null;
     },
 
     async dialPlaces() {

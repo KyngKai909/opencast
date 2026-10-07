@@ -2,6 +2,18 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, one station (A251, Phase 3)
+
+Additive: one new desk endpoint and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsVsNetwork`, `AnalyticsAiringSource` (`library`, `carried`, `live`, `guide`, `nothing_listed`), `AnalyticsAiring`, `AnalyticsFlow`, `AnalyticsStationPage`. New endpoint `analyticsApi.station` (`GET /desk/analytics/stations/:stationId`, `auth: "desk"`, the span's `from`, `to`, `previousFrom`):
+  - the station's numbers against the network's;
+  - its busiest night (6 pm to 2 am Pacific) minute by minute, against the same night a week before, with its breaks and airings (null once its minutes are past the 30 days kept);
+  - surfaces, places (its own market marked), and where its sessions came from and went;
+  - airtime from the as-run log, earnings by kind, spots and sponsors per 1,000 hours, and an external station's time down.
+  - A market lead gets a 403 for a station outside their market. An unknown station is a 404.
+- How older builds tolerate it: nothing existing changed.
+
 ## 2026-10-07: The desk's analytics, Overview and Stations (A251, Phase 2)
 
 Additive: a new module of two desk endpoints, all new shapes. Migration **0055** (`drizzle-kit generate`): six new tables in `audience` (`station_hours`, `station_hour_places`, `network_hours`, `station_days`, `device_days`, `station_flows`), the totals worked out every ten minutes and kept for good, naming no session, device or person.

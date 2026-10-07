@@ -161,7 +161,8 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
         let tuned = 0;
         for (const [t, v] of n.perMinute) {
           tuned += v;
-          if (v > peak) [peak, peakAt] = [v, new Date(t)];
+          // The busiest minute; on a tie, the first (rows come in no order).
+          if (v > peak || (v === peak && peakAt && t < peakAt.getTime())) [peak, peakAt] = [v, new Date(t)];
         }
         return { scope: k.slice(0, at), hour: new Date(Number(k.slice(at + 1))), tunedMinutes: tuned, peak, peakAt };
       });
