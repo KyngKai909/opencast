@@ -6,10 +6,10 @@ import { bridgeInput } from "./bridge";
 const key = (k: string, keyCode = 0) => ({ key: k, keyCode });
 
 describe("the TV remote", () => {
-  it("on the picture: ▲ ▼ change channel, ◀ presets, ▶ guide, numbers tune, Back is last channel", () => {
+  it("on the picture: ▲ ▼ change channel, ◀ presets, ▶ menu, numbers tune, Back is last channel", () => {
     expect(commandForKey(key("ArrowUp"), "tv")).toEqual({ type: "channel", dir: "up" });
     expect(commandForKey(key("ArrowLeft"), "tv")).toEqual({ type: "presets" });
-    expect(commandForKey(key("ArrowRight"), "tv")).toEqual({ type: "guide" });
+    expect(commandForKey(key("ArrowRight"), "tv")).toEqual({ type: "menu" });
     expect(commandForKey(key("1"), "tv")).toEqual({ type: "digit", digit: 1 });
     expect(commandForKey(key("Enter"), "tv")).toEqual({ type: "select" });
     expect(commandForKey(key("GoBack"), "tv")).toEqual({ type: "last" });

@@ -313,7 +313,7 @@ One command set, fed by every input adapter (`packages/player`). "Cast message" 
 | Open presets | Arrow ◀ on the picture | Same | `{type:"presets"}` | Presets strip on the phone |
 | Tune preset n | Keys 1–6 while the strip is up | Arrows + OK on the strip | `{type:"preset", key:n}` | Preset key n |
 | Save / replace preset | OK on an empty slot / hold OK on a full slot | Same | `{type:"savePreset", key:n}` | "+" key; press and hold (viewer note) |
-| Open guide | Arrow ▶, Guide; OK twice | Arrow ▶, or OK twice | `{type:"guide"}` (casting: opens the phone's guide instead) | Guide (phone guide; choosing tunes the TV) |
+| Open guide | Guide; OK twice | OK twice | `{type:"guide"}` (casting: opens the phone's guide instead) | Guide (phone guide; choosing tunes the TV) |
 | Close guide / overlay | Guide, Back | Back | `{type:"back"}` | n/a |
 | Show banner / details | OK, Info (banner); Info on a focused program (details) | OK | `{type:"info"}` | Info |
 | Choose | OK | OK | `{type:"select"}` | n/a |

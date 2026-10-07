@@ -193,7 +193,7 @@ function SectionRows({ section, steppers, focusRow }: RowsProps) {
         <>
           {saved}
           {stepRow("othersOnWifiCanChange", "Who on the Wi-Fi can change the channel", { help: "While a phone is playing to this TV", fallback: true })}
-          <TvRow title="Open the menu" help="On a remote without a Menu key, hold Back" control={{ type: "value", label: "Menu" }} />
+          <TvRow title="Open the menu" help="On a remote without a Menu key, press ▶" control={{ type: "value", label: "Menu" }} />
           {err}
           <PhoneRows focusRow={focusRow} />
         </>

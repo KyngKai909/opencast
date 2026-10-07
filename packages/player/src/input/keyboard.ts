@@ -1,10 +1,10 @@
 // Keys, for two places:
 // - "tv": a TV's remote (Android TV, Google TV, Fire TV, TV browsers). On the picture, ▲ ▼ change
-//   channel, ◀ opens presets, ▶ the guide, OK the banner (OK again the guide), numbers tune.
+//   channel, ◀ opens presets, ▶ the menu rail, OK the banner (OK again the guide), numbers tune.
 //   In the guide and menus, the arrows move focus. OK and Back act when they're let go, so they
 //   can be held: hold OK is OK with `hold` (replace a full preset slot; on the picture, behind live,
-//   Back to live), hold Back opens the menu rail (a basic remote has no Menu key, and Home never
-//   reaches apps). ⏩ (MediaFastForward), next track and l go back to live on the picture.
+//   Back to live), hold Back opens the menu rail too (a basic remote has no Menu key, and Home never
+//   reaches apps; Samsung's TVs take a held Return for themselves, hence ▶, A250). ⏩ (MediaFastForward), next track and l go back to live on the picture.
 // - "web": the viewer app on a computer. Digits 1 to 6 tune presets from anywhere; arrows change
 //   channel on the tuned-in page (enable the adapter there); l or End go back to live; "/" belongs
 //   to search, not here.
@@ -70,7 +70,8 @@ export function commandForKey(e: Pick<KeyboardEvent, "key" | "keyCode">, profile
     if (key === "ArrowUp") return { type: "channel", dir: "up" };
     if (key === "ArrowDown") return { type: "channel", dir: "down" };
     if (key === "ArrowLeft") return { type: "presets" };
-    return { type: "guide" };
+    // The menu (2026-10-06): Samsung's TVs close the app on a held Return. OK twice is the guide.
+    return { type: "menu" };
   }
   // A computer's keyboard in TV mode: the space bar (or k) pauses and resumes, on the picture only.
   if ((key === " " || key === "k") && where === "picture") return { type: "togglePlay" };
@@ -150,7 +151,8 @@ export function keyboardInput(o: KeyboardOptions): InputAdapter {
       return [
         { kind: "key", key: "▲▼", label: "Channels" },
         { kind: "key", key: "OK", label: "Guide" },
-        { kind: "key", key: "◀", label: "Presets" }
+        { kind: "key", key: "◀", label: "Presets" },
+        { kind: "key", key: "▶", label: "Menu" }
       ];
     }
   };

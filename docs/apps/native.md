@@ -501,8 +501,8 @@ When the system cancels a key-up (it took the long press), the page lets go of t
 **What each remote has:**
 - **Basic remotes** (Chromecast with Google TV's remote, most Android TV remotes): D-pad, OK, Back, Home, volume and app shortcuts. No numbers, channel, guide, info or menu keys. On those remotes:
   - Presets are ◀ on the picture.
-  - The guide is ▶, or OK twice.
-  - The menu is **holding Back**.
+  - The guide is OK twice.
+  - The menu is **▶** (holding Back too, except on Samsung's TVs, which close the app on a held Return).
   - Tuning by number isn't available.
 - **Fire TV remotes:** these add Menu (≡), play/pause, ⏪ and ⏩. Recent Alexa Voice Remotes also have a live-TV "Guide" button. Check on a device that it arrives as `KEYCODE_GUIDE`.
 - **TV-maker remotes** (Sony, TCL, Hisense, the Fire TV Edition sets) usually send channel, number, info and guide keys.
@@ -610,7 +610,7 @@ Mocks run from the dev server (the mock HLS streams are dev-server middleware), 
 TV mode's debug build was compiled and run on the "opencast-tv" AVD (Android TV 14, arm64, 1920 by 1080; WebView 113) against `dev:mock` through `adb reverse`. What it showed:
 
 - **Works:** first launch registering the device and showing the sign-in code; "Watch without signing in"; the picture; `KEYCODE_CHANNEL_UP` (with the banner); `1`, `2` tuning 12.1 BEAT; ▶ opening the guide and ▼ moving through it; Back closing it; holding Back opening the menu rail; Info, Menu and Last channel reaching the page; Settings; About this TV reading "Opencast app on Android TV".
-- **`KEYCODE_GUIDE` never reaches the app on Android TV.** The system takes it for its own guide before dispatch. TV mode's guide is on ▶ (and OK twice), as on a basic remote. Check a Fire TV remote's guide key separately.
+- **`KEYCODE_GUIDE` never reaches the app on Android TV.** The system takes it for its own guide before dispatch. TV mode's guide is OK twice, as on a basic remote (▶ was the guide until 2026-10-06; it's the menu now). Check a Fire TV remote's guide key separately.
 - **Holding Back:** Android marks a long press at 400 ms, sooner than the page's 500 ms hold. The key bridge (`src/native/keys.ts`) holds back a release that follows Android's long-press repeat until the hold has counted, so a long press always opens the menu.
 - **WebView 113 draws `color-mix()` with a variable inside a `box-shadow` as the text colour.** The guide's dim painted the whole screen in the ink colour. It's a plain colour now (`--tvg-dim` in `pages/guide/Guide.css`); keep `color-mix()` out of shadows for older TV WebViews.
 - **The emulator's data partition** defaults to 10 GB; `disk.dataPartition.size=2G` in the AVD's `config.ini` is plenty.

@@ -161,7 +161,7 @@ describe("the Samsung TV app's remote keys", () => {
     stops.push(r.stop);
     press(38, "ArrowUp");
     press(39, "ArrowRight");
-    expect(r.got).toEqual([{ type: "channel", dir: "up" }, { type: "guide" }]);
+    expect(r.got).toEqual([{ type: "channel", dir: "up" }, { type: "menu" }]);
   });
 
   it("stops: the keys are unregistered and arrive as Tizen's again", () => {
