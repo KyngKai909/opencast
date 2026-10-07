@@ -51,6 +51,7 @@ const ROUTES: Route[] = [
   { path: "/desk/analytics/overview", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Tuned in at once" })).toBeVisible(); } },
   { path: "/desk/analytics/stations", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Every station's span" })).toBeVisible(); } },
   { path: "/desk/analytics/stations/00000000-0000-4000-8000-000000097001", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Saturday night" })).toBeVisible(); } },
+  { path: "/desk/analytics/audience", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Average tuned in by weekday and hour" })).toBeVisible(); } },
   { path: "/desk/analytics/money", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Money" })).toBeVisible(); } },
   { path: "/desk/held-earnings", ready: async (p) => { await h1("Held earnings")(p); await expect(p.getByRole("heading", { name: "Where held money can go" })).toBeVisible(); } },
   { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },

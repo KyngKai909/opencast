@@ -646,6 +646,16 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await page.getByRole("button", { name: "All stations" }).click();
   await expect(page).toHaveURL(/\/desk\/analytics\/stations\?/);
 
+  // Audience (Ref. 12d 04): the week's grid, then narrowed to BEAT.
+  await page.getByRole("tab", { name: "Audience" }).click();
+  await expect(page).toHaveURL(/\/desk\/analytics\/audience/);
+  await expect(page.getByRole("table", { name: "Average tuned in by weekday and hour" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How people tuned in" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Changes between stations" })).toContainText("REEL");
+  await page.getByRole("combobox", { name: "Station" }).selectOption({ label: "12.1 BEAT" });
+  await expect(page).toHaveURL(/station=/);
+  await expect(page.getByText("BEAT 12.1, in the market’s time")).toBeVisible();
+
   // Lee leads the High Desert: their market, fixed.
   await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
   await page.goto("/desk/analytics/overview");

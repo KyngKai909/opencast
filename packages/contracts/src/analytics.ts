@@ -215,6 +215,52 @@ export const AnalyticsStationPage = z.object({
 });
 export type AnalyticsStationPage = z.infer<typeof AnalyticsStationPage>;
 
+/** The Audience tab's filters: the shared ones, and one station to narrow every chart to. */
+export const AnalyticsAudienceQuery = AnalyticsQuery.extend({ station: Id.optional() });
+export type AnalyticsAudienceQuery = z.infer<typeof AnalyticsAudienceQuery>;
+
+/** Ref. 12d 04 Audience: when, how long, on what, and from where (and, A251's additions, devices and how people tuned in). */
+export const AnalyticsAudience = z.object({
+  scope: AnalyticsScope,
+  /** The station every chart is narrowed to, if one is; and the stations that can be picked. */
+  station: AnalyticsStation.nullable(),
+  stations: z.array(AnalyticsStation),
+  /**
+   * Average tuned in by day of the week and hour (the market's time): `weekday` 0 is Monday. With
+   * the span before's at the same hour, when it has one.
+   */
+  grid: z.array(z.object({ weekday: z.number().int().min(0).max(6), hour: z.number().int().min(0).max(23), value: z.number(), previous: z.number().nullable() })),
+  /** Sessions by length band: `1_2` (the shortest counted, under 2 minutes), `2_5`, `5_15`, `15_30`, `30_60`, `60_120`, `120_plus`. */
+  lengths: z.array(z.object({ band: z.string(), sessions: z.number().int(), share: z.number() })),
+  sessions: AnalyticsMeasure,
+  medianMinutes: z.number().nullable(),
+  averageMinutes: z.number().nullable(),
+  /** Stations a visit (a tab's or TV app run's sessions) tuned, on average. */
+  stationsPerVisit: z.number().nullable(),
+  /** Percent of tune-ins that came from another station (a change, not a start). */
+  cameFromAnotherStation: z.number().nullable(),
+  bots: z.object({ sessions: z.number().int(), share: z.number().nullable(), reasons: z.array(z.object({ reason: z.string(), sessions: z.number().int() })) }),
+  presets: z.object({ total: z.number().int(), added: z.number().int(), stations: z.array(z.object({ station: AnalyticsStation, total: z.number().int(), added: z.number().int() })) }),
+  /** Hours by surface, day by day. */
+  platformsByDay: z.array(z.object({ day: z.string(), phone: z.number(), web: z.number(), tv_app: z.number(), cast: z.number(), mirror: z.number() })),
+  /** Relays: average viewers on each platform, day by day; never billed, never in the totals. */
+  relays: z.object({
+    byDay: z.array(z.object({ day: z.string(), youtube: z.number(), twitch: z.number() })),
+    youtubeStations: z.number().int(),
+    twitchStations: z.number().int(),
+    hours: z.number(),
+    /** Relay hours as a percent of Opencast's own hours in the same view. */
+    shareOfOwn: z.number().nullable()
+  }),
+  /** The most common changes from one station to another, with each as a share of the From station's changes to other stations. */
+  moves: z.array(z.object({ from: AnalyticsStation, to: AnalyticsStation, changes: z.number().int(), shareOfFrom: z.number() })),
+  /** Devices counted once (A251): the span's (up to 30 days), the span before's, and the share seen in the 30 days before. */
+  devices: z.object({ value: z.number().int().nullable(), previous: z.number().int().nullable(), returningShare: z.number().nullable(), byDay: z.array(z.number()) }),
+  /** How sessions were tuned (A251, `Heartbeat.via`, counted since it was added), most first; `unknown` for players that don't say. */
+  via: z.array(z.object({ via: z.string(), sessions: z.number().int(), share: z.number() }))
+});
+export type AnalyticsAudience = z.infer<typeof AnalyticsAudience>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -231,6 +277,14 @@ export const analyticsApi = {
     summary: "Every station's span in one table, with the network's row (A251)",
     query: AnalyticsQuery,
     response: AnalyticsStations
+  }),
+  audience: endpoint({
+    method: "GET",
+    path: "/desk/analytics/audience",
+    auth: "desk",
+    summary: "The network's audience in depth: the hour-by-day grid, session lengths, presets, surfaces and relays by day, moves between stations, devices, how people tuned in (A251, Ref. 12d 04)",
+    query: AnalyticsAudienceQuery,
+    response: AnalyticsAudience
   }),
   station: endpoint({
     method: "GET",

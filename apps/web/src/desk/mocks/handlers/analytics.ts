@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsAudience, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -192,7 +192,80 @@ function stationPage(request: Request, id: string): AnalyticsStationPage | Respo
   };
 }
 
+/** The Audience tab: Ref. 12d 04's week, narrowed to a station by its share. */
+function audience(request: Request): AnalyticsAudience | Response {
+  const { scope, from, to, length, scale, rows } = scopeOf(request);
+  const stationId = new URL(request.url).searchParams.get("station");
+  const pick = stationId ? WEEK.find((f) => f.station.id === stationId) : null;
+  if (stationId && (!pick || !rows.includes(pick))) return fail(404, "not_found", "That station isn't in this view.");
+  const view = pick ? [pick] : rows;
+  const share = view.reduce((t, f) => t + f.hours, 0) / WEEK_HOURS;
+  const sessions = Math.round(200_304 * share * scale);
+  const grid: AnalyticsAudience["grid"] = [];
+  const monday = new Date("2026-09-28T07:00:00.000Z");
+  for (let wd = 0; wd < 7; wd++)
+    for (let h = 0; h < 24; h++) {
+      const at = new Date(monday.getTime() + (wd * 24 + h) * 3_600_000);
+      grid.push({ weekday: wd, hour: h, value: r1(1500 * share * shape(at)), previous: r1(1420 * share * shape(at)) });
+    }
+  const lengthShares: Array<[string, number]> = [["1_2", 18], ["2_5", 22], ["5_15", 21], ["15_30", 14], ["30_60", 12], ["60_120", 8], ["120_plus", 5]];
+  const dayList = Array.from({ length: days(from, to) }, (_, i) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(from.getTime() + i * DAY + 12 * 3_600_000)));
+  const hoursByDay = byDay(76_783 * share * scale, from, to);
+  const moves = (
+    [
+      [1, 0, 1412, 31],
+      [0, 1, 1288, 24],
+      [2, 6, 904, 29],
+      [4, 10, 611, 38],
+      [6, 2, 588, 22],
+      [3, 1, 502, 19],
+      [0, 2, 437, 8]
+    ] as const
+  )
+    .map(([a, b, n, pct]) => ({ from: WEEK[a]!.station, to: WEEK[b]!.station, changes: Math.round(n * scale), shareOfFrom: pct }))
+    .filter((mv) => rows.some((f) => f.station.id === mv.from.id) && rows.some((f) => f.station.id === mv.to.id) && (!pick || mv.from.id === pick.station.id || mv.to.id === pick.station.id));
+  const viaShares: Array<[string, number]> = [["swipe", 24], ["channel", 19], ["guide", 14], ["preset", 12], ["resume", 9], ["search", 7], ["keypad", 5], ["link", 4], ["remote", 3], ["reminder", 2], ["unknown", 1]];
+  return {
+    scope,
+    station: pick?.station ?? null,
+    stations: rows.map((f) => f.station),
+    grid,
+    lengths: lengthShares.map(([band, pct]) => ({ band, sessions: Math.round((sessions * pct) / 100), share: pct })),
+    sessions: { value: sessions, previous: Math.round(194_470 * share * (length / (7 * DAY))), byDay: byDay(sessions, from, to) },
+    medianMinutes: 9,
+    averageMinutes: 23,
+    stationsPerVisit: 1.6,
+    cameFromAnotherStation: 37,
+    bots: { sessions: Math.round(13_012 * share * scale), share: 6.1, reasons: [{ reason: "beats too close together", sessions: Math.round(9_870 * share * scale) }, { reason: "media time moving faster than the clock", sessions: Math.round(3_142 * share * scale) }] },
+    presets: {
+      total: view.reduce((t, f) => t + f.presets, 0),
+      added: Math.round(129 * share * scale),
+      stations: [...view].sort((a, b) => b.presets - a.presets).slice(0, 5).map((f) => ({ station: f.station, total: f.presets, added: Math.round(f.presets * 0.09 * scale) }))
+    },
+    platformsByDay: dayList.map((day, i) => {
+      const h = hoursByDay[i] ?? 0;
+      return { day, phone: r1(h * 0.41), web: r1(h * 0.22), tv_app: r1(h * 0.19), cast: r1(h * 0.13), mirror: r1(h * 0.05) };
+    }),
+    relays: {
+      byDay: dayList.map((day, i) => ({ day, youtube: r1(60 + 30 * Math.sin(i) * share + 40 * share), twitch: r1(18 + 8 * Math.cos(i)) })),
+      youtubeStations: pick ? 1 : 5,
+      twitchStations: pick ? 0 : 2,
+      hours: Math.round(14_112 * share * scale),
+      shareOfOwn: 18
+    },
+    moves,
+    devices: { value: length <= 31 * DAY ? Math.round(61_420 * share) : null, previous: length <= 31 * DAY ? Math.round(58_900 * share) : null, returningShare: 64, byDay: byDay(18_200 * share * days(from, to), from, to) },
+    via: viaShares.map(([v, pct]) => ({ via: v, sessions: Math.round((sessions * pct) / 100), share: pct }))
+  };
+}
+
 export const analyticsHandlers = [
+  http.get(path(analyticsApi.audience), ({ request }) => {
+    const no = denied(request);
+    if (no) return no;
+    const body = audience(request);
+    return body instanceof Response ? body : reply(analyticsApi.audience.response, body);
+  }),
   http.get(path(analyticsApi.station), ({ request, params }) => {
     const no = denied(request);
     if (no) return no;

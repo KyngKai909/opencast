@@ -197,3 +197,33 @@ describe("one station (Ref. 12d 03)", () => {
     await dee.get(`/v1/desk/analytics/stations/00000000-0000-4000-8000-000000000999?from=${DAY.from}&to=${DAY.to}`).expect(404);
   });
 });
+
+describe("the Audience tab (Ref. 12d 04)", () => {
+  // By now: the afternoon's four sessions (and a bot), and two evening tabs on BEAT.
+  it("has the hour-by-day grid, session lengths, visits, changes between stations, devices and how people tuned in", async () => {
+    const { body } = await dee.get(`/v1/desk/analytics/audience?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.station).toBeNull();
+    expect(body.stations.map((s: { callSign: string }) => s.callSign)).toEqual(["RDLS", "BEAT", "MOJV"]);
+    // Thursday noon Pacific: 45 minutes tuned in, across one Thursday.
+    expect(body.grid.find((c: { weekday: number; hour: number }) => c.weekday === 3 && c.hour === 12)).toMatchObject({ value: 0.8, previous: null });
+    expect(body.grid).toHaveLength(168);
+    expect(body.sessions.value).toBe(6);
+    expect(Object.fromEntries(body.lengths.map((l: { band: string; sessions: number }) => [l.band, l.sessions]))).toMatchObject({ "2_5": 2, "5_15": 4 });
+    expect(body.stationsPerVisit).toBe(1.2);
+    // Six tune-ins, one of them a change from another station.
+    expect(body.cameFromAnotherStation).toBe(17);
+    expect(body.bots).toMatchObject({ sessions: 1, reasons: [{ reason: "beats too close together", sessions: 1 }] });
+    expect(body.moves).toEqual([expect.objectContaining({ from: expect.objectContaining({ callSign: "BEAT" }), to: expect.objectContaining({ callSign: "RDLS" }), changes: 1, shareOfFrom: 100 })]);
+    expect(body.devices.value).toBe(2);
+    expect(body.via).toEqual([{ via: "unknown", sessions: 6, share: 100 }]);
+    expect(body.platformsByDay[0]).toMatchObject({ day: "2026-10-01" });
+  });
+
+  it("narrows to one station, and refuses one outside the view", async () => {
+    const { body } = await dee.get(`/v1/desk/analytics/audience?from=${DAY.from}&to=${DAY.to}&station=${beat}`).expect(200);
+    expect(body.station.callSign).toBe("BEAT");
+    expect(body.sessions.value).toBe(4);
+    expect(body.moves.map((m: { from: { callSign: string } }) => m.from.callSign)).toEqual(["BEAT"]);
+    await lee.get(`/v1/desk/analytics/audience?from=${DAY.from}&to=${DAY.to}&station=${mojv}`).expect(404);
+  });
+});
