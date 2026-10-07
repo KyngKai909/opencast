@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import type { AccountExport, ClearLink, InvitePreview, Me, NotificationTiming, OpencastTeamMember, StationIdent, WatchHistory } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
@@ -62,6 +62,8 @@ export interface AccountsService {
   suggestPresetKey(userId: string): Promise<number | null>;
   usePresetKey(userId: string, key: number): Promise<void>;
   presetCounts(stationIds: string[]): Promise<Map<string, number>>;
+  /** A251: presets saved in a span, per station (still saved now). */
+  presetsAdded(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
 
   reminders(userId: string): Promise<ReminderRow[]>;
   addReminder(userId: string, input: { logEntryId?: string; listedAiringId?: string; switchMeOver: boolean }): Promise<ReminderRow>;
@@ -673,6 +675,16 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           target: [schema.presetKeyUse.userId, schema.presetKeyUse.key, schema.presetKeyUse.day],
           set: { uses: sql`${schema.presetKeyUse.uses} + 1` }
         });
+    },
+
+    async presetsAdded(stationIds, from, to) {
+      if (!stationIds.length) return new Map();
+      const rows = await db
+        .select({ stationId: schema.presets.stationId, n: sql<number>`count(*)::int` })
+        .from(schema.presets)
+        .where(and(inArray(schema.presets.stationId, stationIds), gte(schema.presets.createdAt, from), lt(schema.presets.createdAt, to)))
+        .groupBy(schema.presets.stationId);
+      return new Map(rows.map((r) => [r.stationId, r.n]));
     },
 
     async presetCounts(stationIds) {

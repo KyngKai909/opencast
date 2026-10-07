@@ -2,6 +2,22 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's analytics, Audience (A251, Phase 4)
+
+Additive: one new desk endpoint, new shapes. Migration **0056**: `audience.station_days` gains `minutes_total` and `version`; `audience.device_days` gains `visits` and `visit_sessions` (all with defaults). Days worked out before are worked out again while their sessions are kept, with the reference's length bands.
+
+- `analytics.ts`: new `AnalyticsAudienceQuery` (the shared filters and an optional `station`) and `AnalyticsAudience`. New endpoint `analyticsApi.audience` (`GET /desk/analytics/audience`, `auth: "desk"`) returns:
+  - average tuned in by weekday and hour, against the span before;
+  - sessions by length band (`1_2`, `2_5`, `5_15`, `15_30`, `30_60`, `60_120`, `120_plus`), with median and average length;
+  - stations per visit, and the share of tune-ins that came from another station;
+  - bots by reason;
+  - presets saved, and added in the span, per station;
+  - hours by surface and relays' average viewers, day by day, with relay hours against Opencast's own;
+  - the most common changes between stations;
+  - devices, with the share returning;
+  - how sessions were tuned (`unknown` for players that don't say).
+- A station outside the view is a 404.
+
 ## 2026-10-07: The desk's analytics, one station (A251, Phase 3)
 
 Additive: one new desk endpoint and new shapes; no migration.

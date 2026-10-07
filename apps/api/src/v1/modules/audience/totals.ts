@@ -40,15 +40,19 @@ export function nextDay(day: string): string {
   return dayOf(new Date(dayStart(day).getTime() + 30 * HOUR));
 }
 
-/** Session length buckets, in minutes. */
+/** Session length bands, in minutes (the reference's; the shortest counted sessions are in "1_2"). */
 export const LENGTH_BUCKETS = [
-  { key: "under_5", max: 5 },
+  { key: "1_2", max: 2 },
+  { key: "2_5", max: 5 },
   { key: "5_15", max: 15 },
   { key: "15_30", max: 30 },
   { key: "30_60", max: 60 },
   { key: "60_120", max: 120 },
   { key: "120_plus", max: Infinity }
 ] as const;
+
+/** How `station_days` rows are worked out now (2: the reference's bands, total minutes, visits). */
+export const DAY_VERSION = 2;
 
 export function lengthBucket(minutes: number): string {
   return LENGTH_BUCKETS.find((b) => minutes < b.max)!.key;
@@ -179,7 +183,7 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
       const to = dayStart(nextDay(day));
       // Sessions started that day: counted ones (a minute counted) and bots.
       const sessions = await db
-        .select({ id: S.id, stationId: S.stationId, startedAt: S.startedAt, lastBeatAt: S.lastBeatAt, flaggedBot: S.flaggedBot, flagReason: S.flagReason, via: S.via, tuneMs: S.tuneMs, deviceHash: S.deviceHash, marketId: S.marketId })
+        .select({ id: S.id, stationId: S.stationId, startedAt: S.startedAt, lastBeatAt: S.lastBeatAt, flaggedBot: S.flaggedBot, flagReason: S.flagReason, via: S.via, tuneMs: S.tuneMs, deviceHash: S.deviceHash, marketId: S.marketId, visitId: S.visitId })
         .from(S)
         .where(and(gte(S.startedAt, from), lt(S.startedAt, to)));
       const counted = new Set(
@@ -193,6 +197,8 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
           : []
       );
       type Acc = { sessions: number; lengths: Record<string, number>; minutes: number[]; bots: number; botReasons: Record<string, number>; via: Record<string, number>; tune: number[] };
+      /** Visits: each scope's counted sessions, by the visit they're in. */
+      const visitsBy = new Map<string, Map<string, number>>();
       const acc = new Map<string, Acc>();
       const of = (id: string) => {
         let a = acc.get(id);
@@ -215,6 +221,13 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
         a.lengths[bucket] = (a.lengths[bucket] ?? 0) + 1;
         if (s.via) a.via[s.via] = (a.via[s.via] ?? 0) + 1;
         if (s.tuneMs != null) a.tune.push(s.tuneMs);
+        if (s.visitId) {
+          for (const scope of [`station:${s.stationId}`, ...scopesFor(where.get(s.stationId) ?? { band: null, marketId: null })]) {
+            let v = visitsBy.get(scope);
+            if (!v) visitsBy.set(scope, (v = new Map()));
+            v.set(s.visitId, (v.get(s.visitId) ?? 0) + 1);
+          }
+        }
       }
       const pct = (xs: number[], p: number) => {
         if (!xs.length) return null;
@@ -228,6 +241,8 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
         sessions: a.sessions,
         lengths: a.lengths,
         medianMinutes: pct(a.minutes, 0.5),
+        minutesTotal: Math.round(a.minutes.reduce((t, m) => t + m, 0)),
+        version: DAY_VERSION,
         bots: a.bots,
         botReasons: a.botReasons,
         via: a.via,
@@ -262,9 +277,22 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
         }
       }
       await db.delete(schema.deviceDays).where(eq(schema.deviceDays.day, day));
+      for (const scope of visitsBy.keys()) setOf(scope);
       const dRows = [...sets]
-        .filter(([, s]) => s.d1.size || s.d7.size || s.d30.size)
-        .map(([scope, s]) => ({ day, scope, devices: s.d1.size, devices7: s.d7.size, devices30: s.d30.size, returning: [...s.d1].filter((d) => s.before.has(d)).length }));
+        .filter(([scope, s]) => s.d1.size || s.d7.size || s.d30.size || visitsBy.has(scope))
+        .map(([scope, s]) => {
+          const v = visitsBy.get(scope);
+          return {
+            day,
+            scope,
+            devices: s.d1.size,
+            devices7: s.d7.size,
+            devices30: s.d30.size,
+            returning: [...s.d1].filter((d) => s.before.has(d)).length,
+            visits: v?.size ?? 0,
+            visitSessions: v ? [...v.values()].reduce((t, n) => t + n, 0) : 0
+          };
+        });
       for (let i = 0; i < dRows.length; i += 500) await db.insert(schema.deviceDays).values(dRows.slice(i, i + 500));
 
       // Moving around the dial: a visit's minutes in a row, station to station (with a margin so a
@@ -313,7 +341,10 @@ export function createTotals(db: Db, clock: { now(): Date }, dialPlaces: DialPla
       const due = new Set([yesterday, today]);
       const [firstSession] = await db.select({ at: sql<Date | string | null>`min(${S.startedAt})` }).from(S);
       if (firstSession?.at) {
-        const have = new Set((await db.selectDistinct({ day: schema.stationDays.day }).from(schema.stationDays)).map((r) => String(r.day)));
+        // Days missing, or worked out by an older version, while their sessions are kept.
+        const have = new Set(
+          (await db.selectDistinct({ day: schema.stationDays.day }).from(schema.stationDays).where(sql`${schema.stationDays.version} >= ${DAY_VERSION}`)).map((r) => String(r.day))
+        );
         for (let d = dayOf(new Date(firstSession.at)); d < yesterday; d = nextDay(d)) if (!have.has(d)) due.add(d);
       }
       await days([...due].sort());

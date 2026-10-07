@@ -273,9 +273,17 @@ export const stationDays = audience.table(
       .notNull()
       .references(() => stations.id),
     sessions: integer("sessions").notNull(),
-    /** Session lengths, minutes: { "under_5", "5_15", "15_30", "30_60", "60_120", "120_plus" }. */
+    /**
+     * Session lengths, minutes, by band. Since Phase 4 (migration 0056, `version` 2) the reference's:
+     * { "1_2", "2_5", "5_15", "15_30", "30_60", "60_120", "120_plus" } ("1_2" includes the shortest
+     * counted ones); version 1 had { "under_5", … }.
+     */
     lengths: jsonb("lengths").$type<Record<string, number>>().notNull(),
     medianMinutes: integer("median_minutes"),
+    /** Phase 4 (migration 0056): every counted session's minutes added up, for the average length. */
+    minutesTotal: integer("minutes_total").notNull().default(0),
+    /** Phase 4 (migration 0056): how this row was worked out; a day kept as an older version is worked out again while its sessions are kept. */
+    version: integer("version").notNull().default(1),
     bots: integer("bots").notNull().default(0),
     botReasons: jsonb("bot_reasons").$type<Record<string, number>>().notNull(),
     via: jsonb("via").$type<Record<string, number>>().notNull(),
@@ -299,7 +307,11 @@ export const deviceDays = audience.table(
     devices: integer("devices").notNull(),
     devices7: integer("devices_7").notNull(),
     devices30: integer("devices_30").notNull(),
-    returning: integer("returning").notNull()
+    returning: integer("returning").notNull(),
+    /** Phase 4 (migration 0056): visits (a tab's or TV app run's sessions) that day, for stations per visit. */
+    visits: integer("visits").notNull().default(0),
+    /** Phase 4: those visits' sessions (one per station they tuned). */
+    visitSessions: integer("visit_sessions").notNull().default(0)
   },
   (t) => [primaryKey({ columns: [t.day, t.scope] })]
 );

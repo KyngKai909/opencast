@@ -357,7 +357,7 @@ describe("after 30 days, only the numbers", () => {
     // columns; what they never hold is anyone's id, hash, visit or address.
     for (const table of ["station_hours", "station_hour_places", "network_hours", "station_days", "device_days", "station_flows"]) {
       for (const column of await columns(table)) {
-        expect(column, `${table}.${column}`).not.toMatch(/hash|user|voter|visit|person|email|ip_|address/);
+        expect(column, `${table}.${column}`).not.toMatch(/hash|user|voter|visit_id|person|email|ip_|address/);
         if (column.endsWith("_id")) expect(column, `${table}.${column}`).toBe("station_id");
       }
     }

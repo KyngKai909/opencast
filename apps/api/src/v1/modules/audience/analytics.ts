@@ -5,11 +5,11 @@
 
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AnalyticsAiring, AnalyticsBand, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
+import type { AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
 import type { CurrentUser } from "../../http.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, forbidden, notFound } from "../../errors.js";
-import { dayOf, dayStart, nextDay, type Totals } from "./totals.js";
+import { LENGTH_BUCKETS, dayOf, dayStart, nextDay, type Totals } from "./totals.js";
 
 /** The busiest night's window: 6 pm to 2 am, the market's time. */
 const NIGHT_FROM_HOUR = 18;
@@ -24,6 +24,8 @@ const MAX_SPAN = 400 * DAY;
 export interface Analytics {
   overview(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsOverview>;
   stations(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsStations>;
+  /** The Audience tab (Ref. 12d 04), the network or one station. */
+  audience(user: CurrentUser, query: AnalyticsAudienceQuery): Promise<AnalyticsAudience>;
   /** One station's page (Ref. 12d 03); a market lead only for a station in their market. */
   station(user: CurrentUser, stationId: string, query: Omit<AnalyticsQuery, "market" | "band">): Promise<AnalyticsStationPage>;
 }
@@ -338,6 +340,172 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       };
     }
   } as Analytics;
+  service.audience = async (user, query) => {
+    const { scope, from, to, previousFrom, previousTo, market, band, markets } = await scopeOf(user, query);
+    const stations = await stationsIn(market, band, previousFrom, to, markets);
+    const list = [...stations.values()].sort((a, b) => (a.band ?? "").localeCompare(b.band ?? "") || Number.parseFloat(a.channel ?? "0") - Number.parseFloat(b.channel ?? "0"));
+    let station: AnalyticsStation | null = null;
+    if (query.station) {
+      station = stations.get(query.station) ?? null;
+      if (!station) throw notFound("That station isn't in this view.");
+    }
+    const ids = station ? [station.id] : list.map((s) => s.id);
+    const key = station ? `station:${station.id}` : `${band}|${market ?? "all"}`;
+    const spanDays = daysIn(from, to);
+    const daysBeforeList = daysIn(previousFrom, previousTo);
+    const [hours, hoursBefore, days, daysBefore, presetTotals, presetsNew] = await Promise.all([
+      stationHours(ids, from, to),
+      stationHours(ids, previousFrom, previousTo),
+      sessionDays(ids, from, to),
+      sessionDays(ids, previousFrom, previousTo),
+      services.accounts.presetCounts(ids),
+      services.accounts.presetsAdded(ids, from, to)
+    ]);
+
+    // The hour-by-day grid: each weekday and hour's average across the span's (and the span before's) hours.
+    const local = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short", hour: "numeric", hourCycle: "h23" });
+    const cellOf = (t: number) => {
+      const p = local.formatToParts(new Date(t));
+      const wd = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(p.find((x) => x.type === "weekday")!.value);
+      return wd * 24 + (Number(p.find((x) => x.type === "hour")!.value) % 24);
+    };
+    const gridOf = (rows: typeof hours, a: Date, b: Date) => {
+      const sums = new Array<number>(168).fill(0);
+      const counts = new Array<number>(168).fill(0);
+      const until = Math.min(b.getTime(), deps.clock.now().getTime());
+      for (let t = Math.floor(a.getTime() / HOUR) * HOUR; t < until; t += HOUR) counts[cellOf(t)]!++;
+      for (const r of rows) sums[cellOf(r.hour.getTime())]! += r.tunedMinutes / 60;
+      return sums.map((s, i) => (counts[i] ? s / counts[i]! : null));
+    };
+    const now = gridOf(hours, from, to);
+    const before = gridOf(hoursBefore, previousFrom, previousTo);
+    const grid: AnalyticsAudience["grid"] = now.map((v, i) => ({ weekday: Math.floor(i / 24), hour: i % 24, value: round1(v ?? 0), previous: before[i] == null ? null : round1(before[i]!) }));
+
+    // Sessions: length bands, median and average, bots and their reasons, how they were tuned.
+    const sessions = days.reduce((t, d) => t + d.sessions, 0);
+    const bands = new Map<string, number>();
+    const reasons = new Map<string, number>();
+    const via = new Map<string, number>();
+    let bots = 0;
+    let minutesTotal = 0;
+    for (const d of days) {
+      for (const [k, n] of Object.entries(d.lengths)) bands.set(k, (bands.get(k) ?? 0) + n);
+      for (const [k, n] of Object.entries(d.botReasons)) reasons.set(k, (reasons.get(k) ?? 0) + n);
+      for (const [k, n] of Object.entries(d.via)) via.set(k, (via.get(k) ?? 0) + n);
+      bots += d.bots;
+      minutesTotal += d.minutesTotal;
+    }
+    const medianOf = (rs: typeof days) => {
+      const w = rs.filter((r) => r.medianMinutes != null && r.sessions > 0);
+      const n = w.reduce((t, r) => t + r.sessions, 0);
+      return n ? round1(w.reduce((t, r) => t + r.medianMinutes! * r.sessions, 0) / n) : null;
+    };
+    const told = [...via.values()].reduce((t, n) => t + n, 0);
+    if (sessions > told) via.set("unknown", sessions - told);
+
+    // Visits, devices and changes between stations.
+    const deviceRows = await db
+      .select()
+      .from(schema.deviceDays)
+      .where(and(eq(schema.deviceDays.scope, key), inArray(schema.deviceDays.day, [...new Set([...daysBeforeList, ...spanDays])])));
+    const inSpan = deviceRows.filter((r) => spanDays.includes(String(r.day)));
+    const visits = inSpan.reduce((t, r) => t + r.visits, 0);
+    const visitSessions = inSpan.reduce((t, r) => t + r.visitSessions, 0);
+    const length = to.getTime() - from.getTime();
+    const devicesOn = (day: string) => {
+      const r = deviceRows.find((x) => String(x.day) === day);
+      if (!r) return null;
+      return length <= DAY + HOUR ? r.devices : length <= 7 * DAY + HOUR ? r.devices7 : length <= 30 * DAY + HOUR ? r.devices30 : null;
+    };
+    const lastDay = dayOf(new Date(Math.min(to.getTime(), deps.clock.now().getTime()) - 1));
+    const lastRow = deviceRows.find((r) => String(r.day) === lastDay);
+    const flows = spanDays.length
+      ? await db
+          .select({ from: schema.stationFlows.fromStation, to: schema.stationFlows.toStation, n: sql<number>`sum(${schema.stationFlows.changes})::int` })
+          .from(schema.stationFlows)
+          .where(inArray(schema.stationFlows.day, spanDays))
+          .groupBy(schema.stationFlows.fromStation, schema.stationFlows.toStation)
+      : [];
+    const inView = new Set(ids);
+    const tuneIns = flows.filter((f) => f.to && inView.has(f.to));
+    const tuneInsTotal = tuneIns.reduce((t, f) => t + f.n, 0);
+    const changesIn = tuneIns.filter((f) => f.from).reduce((t, f) => t + f.n, 0);
+    const outOf = new Map<string, number>();
+    for (const f of flows) if (f.from && f.to) outOf.set(f.from, (outOf.get(f.from) ?? 0) + f.n);
+    const moves = flows
+      .filter((f) => f.from && f.to && stations.has(f.from) && stations.has(f.to) && (!station || f.from === station.id || f.to === station.id))
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 10)
+      .map((f) => ({ from: stations.get(f.from)!, to: stations.get(f.to)!, changes: f.n, shareOfFrom: round1((f.n / (outOf.get(f.from) || 1)) * 100) }));
+
+    // Surfaces day by day.
+    const platformsByDay = spanDays.map((d) => {
+      const rs = hours.filter((h) => dayOf(h.hour) === d);
+      const sum = (f: (h: (typeof hours)[number]) => number) => round1(rs.reduce((t, h) => t + f(h), 0) / 60);
+      return { day: d, phone: sum((h) => h.phone), web: sum((h) => h.web), tv_app: sum((h) => h.tvApp), cast: sum((h) => h.cast), mirror: sum((h) => h.mirror) };
+    });
+
+    // Relays: each platform's own count, by day.
+    const relays = (await services.stations.relaysOf(ids)).filter((r) => r.service !== "rtmp");
+    const relayDay = new Map<string, { youtube: number; twitch: number }>();
+    let relayMinutes = 0;
+    for (const r of relays) {
+      const rows = await db
+        .select({ minute: schema.translatorSamples.minute, viewers: schema.translatorSamples.viewers })
+        .from(schema.translatorSamples)
+        .where(and(eq(schema.translatorSamples.translatorId, r.id), gte(schema.translatorSamples.minute, from), lt(schema.translatorSamples.minute, to)));
+      const perDay = new Map<string, { sum: number; n: number }>();
+      for (const row of rows) {
+        relayMinutes += row.viewers;
+        const d = dayOf(row.minute);
+        const p = perDay.get(d) ?? { sum: 0, n: 0 };
+        p.sum += row.viewers;
+        p.n++;
+        perDay.set(d, p);
+      }
+      for (const [d, p] of perDay) {
+        const e = relayDay.get(d) ?? { youtube: 0, twitch: 0 };
+        e[r.service as "youtube" | "twitch"] += p.sum / (24 * 60);
+        relayDay.set(d, e);
+      }
+    }
+    const ownMinutes = hours.reduce((t, h) => t + h.tunedMinutes, 0);
+    const presetRows = list
+      .filter((s) => inView.has(s.id))
+      .map((s) => ({ station: s, total: presetTotals.get(s.id) ?? 0, added: presetsNew.get(s.id) ?? 0 }))
+      .sort((a, b) => b.total - a.total);
+    return {
+      scope,
+      station,
+      stations: list,
+      grid,
+      lengths: LENGTH_BUCKETS.map((b) => ({ band: b.key, sessions: bands.get(b.key) ?? 0, share: sessions ? round1(((bands.get(b.key) ?? 0) / sessions) * 100) : 0 })),
+      sessions: { value: sessions, previous: daysBefore.length ? daysBefore.reduce((t, d) => t + d.sessions, 0) : null, byDay: spanDays.map((d) => days.filter((r) => String(r.day) === d).reduce((t, r) => t + r.sessions, 0)) },
+      medianMinutes: medianOf(days),
+      averageMinutes: sessions ? round1(minutesTotal / sessions) : null,
+      stationsPerVisit: visits ? Math.round((visitSessions / visits) * 10) / 10 : null,
+      cameFromAnotherStation: tuneInsTotal ? Math.round((changesIn / tuneInsTotal) * 100) : null,
+      bots: { sessions: bots, share: sessions + bots ? round1((bots / (sessions + bots)) * 100) : null, reasons: [...reasons].map(([reason, n]) => ({ reason, sessions: n })).sort((a, b) => b.sessions - a.sessions) },
+      presets: { total: presetRows.reduce((t, r) => t + r.total, 0), added: presetRows.reduce((t, r) => t + r.added, 0), stations: presetRows.slice(0, 5) },
+      platformsByDay,
+      relays: {
+        byDay: spanDays.map((d) => ({ day: d, youtube: round1(relayDay.get(d)?.youtube ?? 0), twitch: round1(relayDay.get(d)?.twitch ?? 0) })),
+        youtubeStations: new Set(relays.filter((r) => r.service === "youtube").map((r) => r.stationId)).size,
+        twitchStations: new Set(relays.filter((r) => r.service === "twitch").map((r) => r.stationId)).size,
+        hours: round1(relayMinutes / 60),
+        shareOfOwn: ownMinutes ? round1((relayMinutes / ownMinutes) * 100) : null
+      },
+      moves,
+      devices: {
+        value: devicesOn(lastDay),
+        previous: devicesOn(dayOf(new Date(previousTo.getTime() - 1))),
+        returningShare: lastRow && lastRow.devices ? Math.round((lastRow.returning / lastRow.devices) * 100) : null,
+        byDay: spanDays.map((d) => deviceRows.find((r) => String(r.day) === d)?.devices ?? 0)
+      },
+      via: [...via].map(([v, n]) => ({ via: v, sessions: n, share: sessions ? round1((n / sessions) * 100) : 0 })).sort((a, b) => (a.via === "unknown" ? 1 : 0) - (b.via === "unknown" ? 1 : 0) || b.sessions - a.sessions)
+    };
+  };
+
   service.station = async (user, stationId, query) => {
     const places = await totals.places();
     const place = places.get(stationId) ?? { band: null, marketId: null };

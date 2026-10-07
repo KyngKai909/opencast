@@ -60,4 +60,5 @@ export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   r.handle(analyticsApi.overview, ({ user, query }) => services.audience.analytics.overview(user, query));
   r.handle(analyticsApi.stations, ({ user, query }) => services.audience.analytics.stations(user, query));
   r.handle(analyticsApi.station, ({ user, params, query }) => services.audience.analytics.station(user, params.stationId, query));
+  r.handle(analyticsApi.audience, ({ user, query }) => services.audience.analytics.audience(user, query));
 }
