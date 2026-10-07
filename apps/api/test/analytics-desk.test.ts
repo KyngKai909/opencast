@@ -150,3 +150,50 @@ describe("the Stations table", () => {
     expect(body.total).toMatchObject({ hours: 0.8, sessions: 4, peakTunedIn: 2 });
   });
 });
+
+describe("one station (Ref. 12d 03)", () => {
+  it("has its numbers against the network's, its busiest night by the minute, and where its sessions came from and went", async () => {
+    // Two tabs on BEAT at 8:00 pm Pacific (its busiest hour now), then the totals again.
+    for (const tab of ["eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1", "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2"]) {
+      const start = Date.parse("2026-10-02T03:00:00.000Z");
+      for (let i = 0; i < 10; i++) {
+        h.clock.set(new Date(start + i * 30_000).toISOString());
+        await h.services.audience.heartbeat({ stationId: beat, sessionId: tab, platform: "tv_app", mediaTimeMs: i * 30_000, playing: true });
+      }
+    }
+    h.clock.set("2026-10-02T05:00:00.000Z");
+    await h.services.audience.totals.tick();
+
+    const { body } = await dee.get(`/v1/desk/analytics/stations/${beat}?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.station).toMatchObject({ callSign: "BEAT", kind: "independent", market: { slug: "inland-empire" } });
+    expect(body.station.onDialSince).toBeTruthy();
+    expect(body.hoursWatched.value).toBe(0.5);
+    expect(body.hoursWatched.shareOfNetwork).toBeGreaterThan(0);
+    expect(body.peakTunedIn).toMatchObject({ value: 2, at: "2026-10-02T03:00:00.000Z" });
+    expect(body.underMinimum).toBe(true);
+    // Its night: 6 pm to 2 am Pacific, October 1, the two tabs at 8 pm.
+    expect(body.night).toMatchObject({ from: "2026-10-02T01:00:00.000Z", to: "2026-10-02T09:00:00.000Z" });
+    expect(body.night.minutes.find((m: { at: string }) => m.at === "2026-10-02T03:02:00.000Z").value).toBe(2);
+    expect(body.platforms[0]).toMatchObject({ platform: "web" });
+    expect(body.places).toEqual([{ market: null, own: false, hours: 0.5 }]);
+    // Sessions starting on it (three visits), and the one that went on to RDLS.
+    expect(body.cameFrom[0]).toMatchObject({ station: null, changes: 4 });
+    expect(body.wentTo.find((f: { station: { callSign: string } | null }) => f.station?.callSign === "RDLS")).toMatchObject({ changes: 1 });
+    expect(body.airtime).toEqual({ programs: 0, breaks: 0, live: 0, deadAir: 0 });
+    expect(body.earned).toMatchObject({ totalMicros: 0, held: false });
+    expect(body.timeDownMinutes).toBeNull();
+  });
+
+  it("an external station's: no airtime or earnings of ours, its time down instead", async () => {
+    const { body } = await dee.get(`/v1/desk/analytics/stations/${rdls}?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body).toMatchObject({ station: { kind: "external" }, airtime: null, earned: null, timeDownMinutes: 0, adMicrosPer1000Hours: null });
+    expect(body.cameFrom.find((f: { station: { callSign: string } | null }) => f.station?.callSign === "BEAT")).toMatchObject({ changes: 1 });
+  });
+
+  it("a market lead sees their market's stations only; a rights reviewer none", async () => {
+    await lee.get(`/v1/desk/analytics/stations/${beat}?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    await lee.get(`/v1/desk/analytics/stations/${mojv}?from=${DAY.from}&to=${DAY.to}`).expect(403);
+    await sam.get(`/v1/desk/analytics/stations/${beat}?from=${DAY.from}&to=${DAY.to}`).expect(403);
+    await dee.get(`/v1/desk/analytics/stations/00000000-0000-4000-8000-000000000999?from=${DAY.from}&to=${DAY.to}`).expect(404);
+  });
+});

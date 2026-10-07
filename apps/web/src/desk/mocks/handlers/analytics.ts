@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -96,7 +96,109 @@ function denied(request: Request): Response | null {
   return null;
 }
 
+/** Midnight Pacific at the start of the day an instant falls on. */
+function pacificMidnight(at: Date): Date {
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(at);
+  const guess = Date.parse(`${date}T00:00:00Z`);
+  const offset = (t: number) => {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(t));
+    const g = (k: string) => Number(p.find((x) => x.type === k)!.value);
+    return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute")) - t;
+  };
+  return new Date(guess - offset(guess - offset(guess)));
+}
+
+/** A station's page: Ref. 12d's BEAT, scaled for any other station. */
+function stationPage(request: Request, id: string): AnalyticsStationPage | Response {
+  const f = WEEK.find((x) => x.station.id === id);
+  if (!f) return fail(404, "not_found", "No such station.");
+  const { scope, from, to, length, scale } = scopeOf(request);
+  if (scope.fixedMarket && f.station.market?.id !== scope.fixedMarket) return fail(403, "forbidden", "That station isn't in your market.");
+  const k = f.hours / 16078;
+  const external = f.station.kind === "external";
+  // Its busiest night: the span's last Saturday, 6 pm to 2 am.
+  let sat = new Date(Math.min(to.getTime(), Date.now()) - 3_600_000);
+  for (let i = 0; i < 7 && new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", weekday: "short" }).format(sat) !== "Sat"; i++) sat = new Date(sat.getTime() - DAY);
+  const nightFrom = new Date(pacificMidnight(sat).getTime() + 18 * 3_600_000);
+  const nightTo = new Date(nightFrom.getTime() + 8 * 3_600_000);
+  const minutes: NonNullable<AnalyticsStationPage["night"]>["minutes"] = [];
+  const BREAKS = [[38, 41], [58, 62], [118, 122], [178, 183], [238, 241], [298, 302], [358, 361], [418, 421]];
+  const inBreak = (i: number) => BREAKS.some(([a, b]) => i >= a! && i < b!);
+  for (let i = 0; i < 480; i++) {
+    const rise = i < 156 ? 120 + i * 1.25 : 318 - (i - 156) * 0.72;
+    const wobble = Math.sin(i / 7) * 9 + Math.sin(i / 2.3) * 4;
+    const v = Math.max(4, rise + wobble - (inBreak(i) ? 34 : 0));
+    minutes.push({ at: new Date(nightFrom.getTime() + i * 60_000).toISOString(), value: Math.round(v * k), previous: Math.round((v * 0.9 + Math.cos(i / 9) * 8) * k) });
+  }
+  const at = (h: number, m = 0) => new Date(nightFrom.getTime() + ((h - 18) * 60 + m) * 60_000).toISOString();
+  const REEL = WEEK[1]!.station;
+  const CRAT = WEEK[10]!.station;
+  const air = (title: string, source: AnalyticsAiring["source"], s: [number, number], e: [number, number], avg: number, peak: number, stayed: number, nfm: number, hours: number, fromStation: AnalyticsStation | null = null): AnalyticsAiring => ({
+    key: `mock:${title}`,
+    title,
+    source,
+    from: fromStation,
+    startedAt: at(...s),
+    endedAt: at(...e),
+    averageTunedIn: Math.round(avg * k),
+    peakTunedIn: Math.round(peak * k),
+    stayedToTheEnd: stayed,
+    notForMePer1000Hours: nfm,
+    hours: Math.round(hours * k)
+  });
+  const airings = external
+    ? [air("Planning Commission", "guide", [18, 0], [21, 0], 34, 95, 52, 5.0, 102), air("Redlands Community TV, nothing listed", "nothing_listed", [21, 0], [26, 0], 21, 48, 44, 6.1, 105)]
+    : [
+        air("Crate Session 02", "library", [18, 0], [20, 0], 184, 221, 61, 2.9, 368),
+        air("Late Crate, ep. 14", "library", [20, 0], [21, 0], 262, 318, 66, 2.1, 262),
+        air("Saturday Reel", "carried", [21, 0], [23, 0], 241, 296, 59, 3.4, 482, REEL),
+        air("Beat Tape Live", "live", [23, 0], [24, 30], 148, 205, 70, 1.8, 222),
+        air("Overnight Crates", "library", [24, 30], [26, 0], 71, 104, 48, 4.6, 107)
+      ];
+  const flow = (station: AnalyticsStation | null, share: number): AnalyticsFlow => ({ station, changes: Math.round(share * 120 * k), share });
+  const hours = Math.round(f.hours * scale * 10) / 10;
+  const earnedScale = (n: number) => Math.round(n * k * scale);
+  return {
+    scope,
+    station: { ...f.station, onDialSince: "2026-06-14T19:00:00.000Z" },
+    hoursWatched: { value: hours, previous: Math.round(f.was * (length / (7 * DAY)) * 10) / 10, byDay: byDay(hours, from, to), shareOfNetwork: Math.round((f.hours / WEEK_HOURS) * 1000) / 10 },
+    averageTunedIn: { value: f.avg, previous: Math.round(f.avg * (f.was / f.hours)), byDay: byDay(f.avg * days(from, to), from, to) },
+    peakTunedIn: { value: f.peak, previous: Math.round(f.peak * 0.88), at: minutes.reduce((p, m) => (m.value > p.value ? m : p), minutes[0]!).at, byDay: byDay(f.peak * days(from, to), from, to) },
+    stayedToTheEnd: { value: f.stayed, previous: f.stayed == null ? null : f.stayed - 2, network: 62, byDay: [] },
+    notForMePer1000Hours: { value: f.nfm, previous: f.nfm == null ? null : Math.round((f.nfm + 0.4) * 10) / 10, network: 4.0, byDay: [] },
+    underMinimum: f.peak < 20,
+    night: { from: nightFrom.toISOString(), to: nightTo.toISOString(), minutes: minutes.filter((m) => Date.parse(m.at) < Date.now()), breaks: external ? [] : BREAKS.map(([a, b]) => ({ start: new Date(nightFrom.getTime() + a! * 60_000).toISOString(), end: new Date(nightFrom.getTime() + b! * 60_000).toISOString() })), airings },
+    airingsInSpan: Math.round(214 * k * scale),
+    platforms: [
+      { platform: "phone", hours: Math.round(hours * 0.38) },
+      { platform: "tv_app", hours: Math.round(hours * 0.22) },
+      { platform: "web", hours: Math.round(hours * 0.2) },
+      { platform: "cast", hours: Math.round(hours * 0.15) },
+      { platform: "mirror", hours: Math.round(hours * 0.05) }
+    ],
+    places: [
+      { market: f.station.market, own: true, hours: Math.round(hours * 0.81) },
+      { market: m(LA), own: false, hours: Math.round(hours * 0.09) },
+      { market: null, own: false, hours: Math.round(hours * 0.1) }
+    ],
+    cameFrom: [flow(null, 58), flow(REEL, 12), flow(WEEK[2]!.station, 8), flow(WEEK[4]!.station, 6), flow(WEEK[3]!.station, 5), flow(WEEK[8]!.station, 6), flow(WEEK[11]!.station, 5)].filter((x) => x.station?.id !== id),
+    wentTo: [flow(null, 61), flow(REEL, 14), flow(WEEK[2]!.station, 7), flow(CRAT, 5), flow(WEEK[4]!.station, 4), flow(WEEK[9]!.station, 9)].filter((x) => x.station?.id !== id),
+    airtime: external ? null : { programs: Math.round(8222 * scale), breaks: Math.round(1318 * scale), live: Math.round(540 * scale), deadAir: f.dead ?? 0 },
+    earned: external
+      ? null
+      : { spotsMicros: earnedScale(134_830_000), sponsorsMicros: earnedScale(46_150_000), pledgesMicros: earnedScale(374_000_000), pledgeMembers: Math.round(61 * k), carriageInMicros: earnedScale(11_100_000), cardFeesMicros: -earnedScale(12_660_000), totalMicros: earnedScale(553_420_000), held: f.station.kind === "claimable" },
+    adMicrosPer1000Hours: external ? null : 11_260_000,
+    timeDownMinutes: external ? (f.down ?? 0) : null
+  };
+}
+
 export const analyticsHandlers = [
+  http.get(path(analyticsApi.station), ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    const body = stationPage(request, String(params.stationId));
+    return body instanceof Response ? body : reply(analyticsApi.station.response, body);
+  }),
   http.get(path(analyticsApi.overview), ({ request }) => {
     const no = denied(request);
     if (no) return no;

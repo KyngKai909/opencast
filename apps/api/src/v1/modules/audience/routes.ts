@@ -59,4 +59,5 @@ export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   // A251 (2026-10-06): the Network desk's analytics; admins, and market leads for their market.
   r.handle(analyticsApi.overview, ({ user, query }) => services.audience.analytics.overview(user, query));
   r.handle(analyticsApi.stations, ({ user, query }) => services.audience.analytics.stations(user, query));
+  r.handle(analyticsApi.station, ({ user, params, query }) => services.audience.analytics.station(user, params.stationId, query));
 }

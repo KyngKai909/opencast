@@ -16,8 +16,8 @@ The user's request (2026-10-06): an Analytics page in the Network desk for the w
 | Phase | What | Status |
 |---|---|---|
 | 1 | **The data**, shipped first so history builds up: a session per station (and the fix that comes with it), the visit, the device hash, how it was tuned, press-to-picture, searches. Migration 0054. | Done (PR #28) |
-| 2 | **Totals and the API**: hourly station totals (every station, external included, from session minutes), nightly totals (sessions and their length, bots by reason, devices, how people tuned in, station flows), `analyticsApi` (overview and stations), the rail's "Analytics" first under Network, the **Overview** and **Stations** tabs with CSV. Migration 0055. | Done |
-| 3 | **One station** (03): the night by the minute with breaks, airings, surfaces, markets, came from and went to, airtime fill, earned, cost to run. | |
+| 2 | **Totals and the API**: hourly station totals (every station, external included, from session minutes), nightly totals (sessions and their length, bots by reason, devices, how people tuned in, station flows), `analyticsApi` (overview and stations), the rail's "Analytics" first under Network, the **Overview** and **Stations** tabs with CSV. Migration 0055. | Done (PR #29) |
+| 3 | **One station** (03): the night by the minute with breaks, airings, surfaces, markets, came from and went to, airtime fill, earned. Cost to run comes with Money (Phase 6); the station's own Programs, Money and Health views come with those tabs. | Done |
 | 4 | **Audience** (04): the hour-by-day grid, session lengths, surfaces by day, moving around the dial, relays, how people tuned in, devices. | |
 | 5 | **Programs and breaks** (05): programs across stations with still-watching curves; `break_stats` and break hold. | |
 | 6 | **Money** (06): earnings by kind, held for claimable stations, the spot market, per 1,000 hours, Opencast's week, carriage; the `costs` rule group in Settings. | |

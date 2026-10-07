@@ -33,7 +33,7 @@ const COLUMNS: ReadonlyArray<{ key: SortKey; label: string; value: (r: Analytics
   { key: "earned", label: "Earned", value: (r) => r.earnedMicros }
 ];
 
-export function StationsTab({ query, span, exporter }: { query: AnalyticsQuery; span: Span; exporter: { current: (() => void) | null } }) {
+export function StationsTab({ query, span, exporter, stationHref }: { query: AnalyticsQuery; span: Span; exporter: { current: (() => void) | null }; stationHref: (id: string) => string }) {
   const q = useApi(analyticsApi.stations, { query });
   const [sort, setSort] = useState<SortKey>("hours");
   const [kind, setKind] = useState<Kind>("all");
@@ -78,7 +78,7 @@ export function StationsTab({ query, span, exporter }: { query: AnalyticsQuery; 
         </div>
         {rows.map((r) => (
           <div key={r.station.id} className="nd-an__tr nd-an__all" role="row">
-            <StationCell station={r.station} tags />
+            <StationCell station={r.station} tags href={stationHref(r.station.id)} />
             <span className="n" role="cell">
               {num(r.hours)}
             </span>
