@@ -114,7 +114,7 @@ export default function Guide() {
       const act = okAction(c, now);
       if (act === "tune") {
         leaving.current = true;
-        if (c.stationId !== player.currentId) void engine.tune(c.stationId, { input: "app" });
+        if (c.stationId !== player.currentId) void engine.tune(c.stationId, { input: "app", via: "guide" });
         navigate("/", { replace: true });
       } else if (act === "options") navigate(`/guide/options/${encodeURIComponent(c.key)}`, { replace: true });
     },

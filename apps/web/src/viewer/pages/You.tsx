@@ -58,7 +58,7 @@ function useYou() {
   const mine = useMyStation();
   const open = useOpenChannels(me.data?.market?.slug ?? null);
   const removeReminder = useRemoveReminder();
-  const tune = useTune();
+  const tune = useTune("preset");
   const now = useNow(60_000);
   const qc = useQueryClient();
   const toast = useToast();

@@ -418,6 +418,28 @@ describe("the heartbeat", () => {
     expect(beatsToBeat()).toBe(2);
     stop();
   });
+
+  it("says how each station was tuned, and how long its picture took, on its first beat only; the device on every beat (A251)", async () => {
+    const send = vi.fn().mockResolvedValue({ nextInMs: 30_000 });
+    const stop = startHeartbeat(engine, send, "web", "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222");
+    const t = engine.tune(BEAT.station.id, { input: "app", via: "guide" });
+    await flush(10);
+    await t;
+    await flush(0);
+    expect(send.mock.calls[0][0]).toMatchObject({ stationId: BEAT.station.id, deviceId: "22222222-2222-4222-8222-222222222222", via: "guide" });
+    expect(typeof send.mock.calls[0][0].tuneMs).toBe("number");
+    await flush(30_000);
+    expect(send.mock.calls[1][0]).not.toHaveProperty("via");
+    expect(send.mock.calls[1][0]).not.toHaveProperty("tuneMs");
+    expect(send.mock.calls[1][0].deviceId).toBe("22222222-2222-4222-8222-222222222222");
+    // Channel down (to CIVC): the engine knows that one itself.
+    engine.handle({ type: "channel", dir: "down" });
+    await flush(CHANGE_MS);
+    await flush(0);
+    const first = send.mock.calls.find((c) => c[0].stationId !== BEAT.station.id)![0];
+    expect(first.via).toBe("channel");
+    stop();
+  });
 });
 
 void byId;

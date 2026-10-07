@@ -90,7 +90,7 @@ function KeySheet({ keyNo, presets, onClose }: { keyNo: number | null; presets: 
 export function HomePresets({ phone }: { phone: boolean }) {
   const { presets, loading } = usePresets();
   const np = useNowPlaying();
-  const tune = useTune();
+  const tune = useTune("preset");
   const [sheetKey, setSheetKey] = useState<number | null>(null);
   const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
   const held = useRef(false);

@@ -583,6 +583,19 @@ export const stationsApi = {
     query: z.object({ q: z.string().min(1).max(80), market: z.string().optional() }),
     response: SearchResult
   }),
+  /**
+   * Added 2026-10-06 (A251, the desk's analytics): a search the viewer settled on (typing stopped,
+   * or a result was picked), so the desk can see what people look for and what finds nothing. Kept
+   * with no account, device or session: the words and how many results, for 90 days; then totals.
+   */
+  searchSeen: endpoint({
+    method: "POST",
+    path: "/search/seen",
+    auth: "public",
+    summary: "A search the viewer settled on: its words and how many results it had",
+    body: z.object({ q: z.string().min(1).max(80), results: z.number().int().nonnegative().max(10_000) }),
+    response: z.object({ ok: z.literal(true) })
+  }),
 
   createStation: endpoint({
     method: "POST",

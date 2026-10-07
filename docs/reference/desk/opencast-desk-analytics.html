@@ -1,0 +1,1721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Network Desk Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:ital,wght@0,400..700;1,400&display=swap" rel="stylesheet">
+<style>
+
+
+/* ===== Tokens (from the Opencast style guide) ===== */
+:root {
+  color-scheme: light;
+  --ground:#E3E6EC; --raised:#F3F5F8; --ink:#0F1830; --ink-70:#3F4960; --ink-50:#525C73;
+  --line:#737D92; --hair:#C6CCD7;
+  --tally:#C42A1C; --on-tally:#FFFFFF; --tally-glow:rgb(196 42 28 / .35); --live:#B02518;
+  --standby:#8A5A00; --standby-fill:#E9A93A; --on-standby:#0F1830;
+  --signal:#0A6883; --signal-fill:#0A6883; --on-signal:#FFFFFF;
+  --screen:#0F1830; --on-screen:#ECE9E1; --on-screen-70:#B1B8C9;
+  --scrim: rgb(15 24 48 / .55);
+  --font-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --font-text:"Public Sans","Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --s7:104px;
+  --r-sign:3px; --r-control:6px; --r-screen:14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+    --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+    --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+    --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0F1830; --raised:#18244A; --ink:#ECE9E1; --ink-70:#B1B8C9; --ink-50:#8F98AE; --line:#67759A; --hair:#26345A;
+  --tally:#D9301F; --tally-glow:rgb(217 48 31 / .55); --live:#FF7A69;
+  --standby:#F0B43C; --standby-fill:#F0B43C; --signal:#6CCFEA; --signal-fill:#6CCFEA; --on-signal:#0F1830;
+  --screen:#0A1124; --scrim: rgb(4 8 20 / .7);
+}
+
+/* ===== Reference page ===== */
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after { box-sizing:inherit; }
+body { margin:0; background:var(--ground); color:var(--ink); font:17px/1.6 var(--font-text); -webkit-font-smoothing:antialiased; }
+a { color:inherit; }
+button { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+.mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.wrap { max-width:1320px; margin:0 auto; padding-left:max(var(--s4),env(safe-area-inset-left,0px)); padding-right:max(var(--s4),env(safe-area-inset-right,0px)); }
+.ref-head { border-bottom:1px solid var(--hair); }
+.ref-head .wrap { display:flex; align-items:center; gap:var(--s3); min-height:60px; }
+.ref-brand { display:inline-flex; align-items:center; gap:10px; text-decoration:none; font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:20px; letter-spacing:-.02em; }
+.ref-brand svg { width:28px; height:23px; }
+.ref-head .crumb { color:var(--ink-50); font-size:15px; }
+.ground-toggle { margin-left:auto; font:500 14px var(--font-text); color:var(--ink-70); background:none; border:1px solid var(--line); border-radius:var(--r-control); height:36px; padding:0 12px; cursor:pointer; }
+.intro { padding:var(--s6) 0 var(--s5); }
+.ch-label { display:flex; gap:12px; align-items:baseline; font-size:15px; color:var(--ink-70); margin-bottom:var(--s3); }
+.ch-label .n { font-family:var(--font-mono); font-size:13px; color:var(--ink-50); }
+.intro h1 { font-family:var(--font-display); font-stretch:125%; font-weight:800; font-size:clamp(40px,6vw,84px); line-height:.95; letter-spacing:-.04em; margin:0 0 var(--s4); max-width:14ch; }
+.intro p { color:var(--ink-70); font-size:clamp(17px,1.6vw,20px); line-height:1.5; max-width:62ch; margin:0 0 var(--s3); }
+.toc { display:flex; flex-wrap:wrap; gap:6px 20px; list-style:none; padding:0; margin:var(--s4) 0 0; font-size:15px; }
+.toc a { text-decoration:none; color:var(--ink-70); } .toc a:hover { color:var(--ink); text-decoration:underline; }
+.toc .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+.principles { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s4); margin-top:var(--s5); }
+.principles div { border-top:2px solid var(--ink); padding-top:var(--s3); }
+.principles h3 { margin:0 0 6px; font:700 18px/1.25 var(--font-display); letter-spacing:-.01em; }
+.principles p { font-size:15px; margin:0; }
+@media (max-width:900px) { .principles { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .principles { grid-template-columns:1fr; } }
+
+section.ref { padding:var(--s6) 0; border-top:1px solid var(--hair); }
+.ref > .wrap > h2 { font-family:var(--font-display); font-stretch:112%; font-weight:800; font-size:clamp(30px,4.2vw,54px); line-height:1; letter-spacing:-.035em; margin:0 0 var(--s3); max-width:20ch; }
+.ref .lede { color:var(--ink-70); font-size:18px; line-height:1.5; max-width:64ch; margin:0 0 var(--s5); }
+.stage { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s5); align-items:start; }
+.stage.phones { grid-template-columns:auto minmax(240px,1fr); }
+.notes h3 { font:700 17px/1.3 var(--font-display); letter-spacing:-.01em; margin:0 0 4px; }
+.notes p { font-size:15px; line-height:1.5; color:var(--ink-70); margin:0 0 var(--s3); }
+.notes .note { border-top:1px solid var(--hair); padding-top:12px; }
+.notes .open { border-top:1px solid var(--standby); }
+.notes .open h3::before { content:"Open: "; color:var(--standby); }
+@media (max-width:1060px) { .stage, .stage.phones { grid-template-columns:1fr; } }
+.phone-row { display:flex; flex-wrap:wrap; gap:var(--s4); align-items:flex-start; }
+.cap { font-size:14px; color:var(--ink-70); margin-top:10px; }
+.cap b { color:var(--ink); font-weight:600; }
+
+/* frame fitting */
+.fit { position:relative; width:100%; }
+.fit > .scaler { transform-origin:0 0; position:absolute; top:0; left:0; }
+.fit.ph { width:100%; }
+.phone-row > div { width:406px; max-width:100%; flex:none; }
+.stage > * { min-width:0; }
+
+/* ===== App components ===== */
+.app { width:1280px; height:820px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:12px; box-shadow:0 0 0 1px var(--line); position:relative; font-size:15px; line-height:1.45; }
+.phone { width:390px; height:844px; display:flex; flex-direction:column; background:var(--ground); color:var(--ink); overflow:hidden; border-radius:46px; box-shadow:0 0 0 1px var(--line), 0 0 0 7px var(--raised), 0 0 0 8px var(--line); position:relative; font-size:15px; line-height:1.45; margin:8px; }
+.fit.ph .phone { margin:8px; }
+.sbar { height:48px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 8px; font:600 15px var(--font-text); }
+.sbar .dots { display:flex; gap:5px; align-items:center; } .sbar .dots i { width:17px; height:10px; border:1.5px solid currentColor; border-radius:3px; display:block; }
+.sbar .dots b { width:4px; height:10px; background:currentColor; border-radius:1px; display:block; }
+.hind { height:22px; flex:none; display:grid; place-items:center; } .hind i { width:134px; height:5px; border-radius:3px; background:var(--ink); opacity:.8; }
+
+.i { width:18px; height:18px; flex:none; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:44px; padding:0 20px; border-radius:var(--r-control); font:600 15px var(--font-text); text-decoration:none; cursor:pointer; border:1px solid transparent; white-space:nowrap; background:none; }
+.btn-primary { background:var(--signal-fill); color:var(--on-signal); }
+.btn-ghost { color:var(--ink); border-color:var(--line); }
+.btn-sm { height:34px; padding:0 12px; font-size:14px; }
+.btn-block { width:100%; }
+.btn-text { color:var(--signal); padding:0; height:auto; border:0; font-weight:600; }
+.icon-btn { width:40px; height:40px; border-radius:var(--r-control); border:1px solid var(--line); background:transparent; color:var(--ink); display:grid; place-items:center; cursor:pointer; flex:none; }
+.icon-btn.bare { border-color:transparent; }
+.tag { display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.tag .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+.tag-live { color:var(--live); border-color:var(--live); }
+.tag-next { background:var(--standby-fill); color:var(--on-standby); border-color:var(--standby-fill); }
+.tag-listed { border-style:dashed; }
+.tally { display:inline-flex; align-items:center; height:24px; padding:0 9px; border-radius:var(--r-sign); font:800 11px/1 var(--font-display); font-stretch:112%; letter-spacing:.09em; border:1.5px solid currentColor; color:var(--ink-50); white-space:nowrap; }
+.tally.lit { background:var(--tally); border-color:var(--tally); color:var(--on-tally); box-shadow:0 0 12px 2px var(--tally-glow); }
+.tally.onpic { color:var(--on-screen-70); }
+.sec-h { display:flex; align-items:baseline; gap:12px; margin:0 0 12px; }
+.sec-h h3 { margin:0; font:700 20px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-h .sub { color:var(--ink-50); font-size:14px; }
+.sec-h .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:var(--r-control); overflow:hidden; }
+.seg button { height:32px; padding:0 12px; border:0; background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--ink); color:var(--ground); }
+.chips { display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.chip { height:32px; padding:0 12px; border-radius:var(--r-control); border:1px solid var(--hair); font:500 13px var(--font-text); color:var(--ink-70); background:none; white-space:nowrap; cursor:pointer; }
+.chip.on { border-color:var(--ink); color:var(--ink); }
+.cs { font-family:var(--font-display); font-stretch:125%; font-weight:800; letter-spacing:-.005em; }
+.ch { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+.tc { border-radius:8px; color:#fff; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; aspect-ratio:16/9; overflow:hidden; }
+.tc .t { font:800 13px/1.05 var(--font-display); letter-spacing:-.01em; }
+.tc .b { font:500 10px var(--font-mono); opacity:.9; }
+.tc.lg { border-radius:var(--r-screen); padding:14px 16px; }
+.tc.lg .t { font-size:22px; font-stretch:112%; } .tc.lg .b { font-size:12px; }
+.clamp1 { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:var(--ink-70); } .quiet { color:var(--ink-50); }
+.rowline { border-bottom:1px solid var(--hair); }
+
+/* desktop app shell */
+.a-head { height:60px; flex:none; display:flex; align-items:center; gap:22px; padding:0 28px; border-bottom:1px solid var(--hair); }
+.a-logo { display:inline-flex; align-items:center; gap:8px; font:800 19px var(--font-display); font-stretch:125%; letter-spacing:-.02em; }
+.a-logo svg { width:26px; height:21px; }
+.a-nav { display:flex; gap:20px; height:100%; }
+.a-nav a { display:flex; align-items:center; text-decoration:none; color:var(--ink-70); font-weight:500; }
+.a-nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+.a-search { display:flex; align-items:center; gap:8px; width:300px; height:38px; padding:0 12px; background:var(--raised); border:1px solid var(--hair); border-radius:var(--r-control); color:var(--ink-50); font-size:14px; margin-left:auto; }
+.a-search kbd { margin-left:auto; font:500 12px var(--font-mono); border:1px solid var(--line); border-radius:3px; padding:0 5px; color:var(--ink-50); }
+.market { display:inline-flex; align-items:center; gap:6px; height:38px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); font-weight:600; font-size:14px; background:none; cursor:pointer; white-space:nowrap; }
+.avatar { width:34px; height:34px; border-radius:50%; background:var(--raised); border:1px solid var(--line); display:grid; place-items:center; font:700 13px var(--font-text); }
+.a-main { flex:1; overflow-y:auto; overflow-x:hidden; }
+.a-pad { padding:24px 28px 36px; }
+.a-player { flex:none; height:72px; display:flex; align-items:center; gap:14px; padding:0 20px 0 14px; border-top:1px solid var(--hair); background:var(--raised); }
+.a-player .tc { width:84px; padding:5px 7px; } .a-player .tc .t { font-size:10px; }
+.a-player .ti { font:700 15px/1.2 var(--font-display); letter-spacing:-.01em; }
+.a-player .st { font-size:13px; color:var(--ink-70); }
+.a-player .ctl { margin-left:auto; display:flex; gap:8px; align-items:center; }
+
+/* home hero */
+.hero { display:grid; grid-template-columns:600px 1fr 272px; gap:24px; margin-bottom:36px; }
+.pic { position:relative; aspect-ratio:16/9; border-radius:var(--r-screen); overflow:hidden; background:#2A3A40; color:#fff; }
+.pic .scene { position:absolute; inset:0; background:repeating-linear-gradient(90deg,#33474d 0 18%,#2c3e44 18% 19%); }
+.pic .podium { position:absolute; left:38%; bottom:0; width:24%; height:40%; background:#4A3A2C; border-radius:4px 4px 0 0; }
+.pic .figure { position:absolute; left:44%; bottom:36%; width:12%; aspect-ratio:1/1.1; background:#1d2a30; border-radius:45% 45% 10% 10%; }
+.pic .l3 { position:absolute; left:5%; bottom:8%; }
+.pic .l3 .nm { display:inline-block; background:#ECE9E1; color:#0F1830; font:800 clamp(10px,2.2cqw,20px) var(--font-display); font-stretch:112%; padding:.2em .5em; }
+.pic .l3 .tt { display:inline-block; background:#0F1830; color:#ECE9E1; font-size:clamp(8px,1.4cqw,13px); padding:.25em .7em; }
+.pic .bug { position:absolute; right:3.5%; bottom:7%; opacity:.78; text-align:right; line-height:1; }
+.pic .bug .cs { display:block; font-size:clamp(10px,2cqw,18px); } .pic .bug .ch { font-size:clamp(8px,1.1cqw,11px); }
+.pic .corner { position:absolute; left:4%; top:6%; display:flex; gap:6px; }
+.pic .corner .tag { background:rgb(15 24 48 / .72); border-color:rgb(236 233 225 / .5); color:#ECE9E1; }
+.pic .corner .tag-live { border-color:#FF7A69; color:#FF7A69; }
+.pic .tr { position:absolute; right:4%; top:6%; }
+.pic.cq { container-type:inline-size; }
+.pic.reel { background:#161513; }
+.pic.reel .scene { background:
+  radial-gradient(circle at 50% 46%, #3a3833 0 22%, transparent 22.5%),
+  repeating-linear-gradient(0deg, rgb(255 255 255 / .025) 0 2px, transparent 2px 4px), #1d1c19; }
+.pic.reel .card { position:absolute; inset:0; display:grid; place-items:center; text-align:center; }
+.pic.reel .card b { display:block; font:800 clamp(18px,6cqw,56px)/1 var(--font-display); font-stretch:125%; letter-spacing:-.03em; color:#E8E0CC; }
+.pic.reel .card span { display:block; font:500 clamp(8px,1.6cqw,15px) var(--font-mono); color:#B5AC98; margin-top:.6em; }
+.feat-info { display:flex; flex-direction:column; min-width:0; }
+.feat-info .kick { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+.feat-info h2 { font:800 30px/1.02 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:0 0 10px; }
+.feat-info .by { font-size:14px; color:var(--ink-70); margin:0 0 6px; }
+.feat-info .by b { color:var(--ink); }
+.feat-info p { font-size:15px; color:var(--ink-70); margin:0; }
+.feat-info .acts { margin-top:auto; display:flex; gap:10px; }
+.presets h4 { margin:0 0 8px; font:700 16px var(--font-display); display:flex; justify-content:space-between; align-items:baseline; }
+.presets h4 span { font:500 13px var(--font-text); color:var(--ink-50); }
+.pre { display:grid; grid-template-columns:26px 44px 1fr; gap:10px; align-items:center; padding:7px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.pre:first-of-type { border-top:1px solid var(--hair); }
+.pre .k { width:26px; height:26px; border:1px solid var(--line); border-radius:4px; display:grid; place-items:center; font:500 13px var(--font-mono); }
+.pre.on .k { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pre .ch { font-size:13px; color:var(--ink-50); }
+.pre .w { min-width:0; } .pre .w .cs { font-size:14px; display:block; line-height:1.2; } .pre .w small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pre.empty .k { border-style:dashed; color:var(--ink-50); } .pre.empty .w { color:var(--ink-50); font-size:13px; }
+
+/* the dial list */
+.dial { border-top:1px solid var(--line); }
+.drow { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.drow:hover { background:var(--raised); }
+.drow .ch { font-size:17px; font-weight:500; letter-spacing:-.02em; }
+.drow .stn .cs { font-size:15px; display:block; line-height:1.2; } .drow .stn small { font-size:13px; color:var(--ink-70); }
+.drow .now b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.drow .now small { font-size:13px; color:var(--ink-70); display:flex; gap:8px; align-items:center; margin-top:2px; }
+.drow .nx { font-size:13px; color:var(--ink-50); } .drow .nx .mono { color:var(--ink-70); margin-right:6px; }
+.dial-h { display:grid; grid-template-columns:104px 54px 150px minmax(0,1fr) 260px; gap:16px; font-size:12.5px; color:var(--ink-50); padding:0 0 6px; }
+.mrow { margin-bottom:36px; }
+.cards4 { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.carried .tc { margin-bottom:8px; }
+.carried b { display:block; font:700 16px/1.2 var(--font-display); letter-spacing:-.01em; }
+.carried .from { font-size:13px; color:var(--ink-70); }
+.carried .where { font-size:13px; color:var(--ink-50); margin-top:4px; display:flex; gap:6px; align-items:center; }
+.two-col { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; }
+.up { display:grid; grid-template-columns:92px 1fr auto; gap:14px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.up:first-of-type { border-top:1px solid var(--line); }
+.up .when { font:500 13px var(--font-mono); color:var(--ink-70); line-height:1.35; }
+.up b { display:block; font:700 15px/1.25 var(--font-display); }
+.up small { font-size:13px; color:var(--ink-70); }
+.radio4 { display:grid; grid-template-columns:repeat(2,1fr); gap:0 20px; border-top:1px solid var(--line); }
+.rt { display:grid; grid-template-columns:88px 1fr; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.rt .f { font:500 22px var(--font-mono); letter-spacing:-.04em; }
+.rt .cs { font-size:14px; display:block; line-height:1.2; } .rt small { font-size:13px; color:var(--ink-70); display:block; }
+
+/* phone app */
+.p-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 18px 10px; }
+.p-top .a-logo { font-size:18px; } .p-top .a-logo svg { width:24px; height:19px; }
+.p-top .market { height:34px; padding:0 10px; font-size:13px; margin-left:auto; }
+.p-main { flex:1; overflow-y:auto; overflow-x:hidden; scrollbar-width:none; }
+.p-main::-webkit-scrollbar { display:none; }
+.p-pad { padding:4px 18px 24px; }
+.p-feat .pic { margin-bottom:12px; }
+.p-feat h2 { font:800 23px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; margin:6px 0 6px; }
+.p-feat .by { font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.p-feat .acts { display:flex; gap:10px; } .p-feat .acts .btn { flex:1; }
+.p-sec { margin-top:28px; }
+.p-sec .sec-h h3 { font-size:18px; }
+.p-pres { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.pbtn { flex:none; width:96px; border:1px solid var(--line); border-radius:var(--r-control); padding:8px 10px; background:none; text-align:left; cursor:pointer; }
+.pbtn.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.pbtn .k { font:500 11px var(--font-mono); opacity:.7; }
+.pbtn .ch { display:block; font-size:18px; font-weight:500; letter-spacing:-.03em; line-height:1.15; }
+.pbtn .cs { font-size:12px; }
+.pbtn.empty { border-style:dashed; color:var(--ink-50); }
+.prow { display:grid; grid-template-columns:40px minmax(0,1fr) 72px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); }
+.prow .ch { font-size:15px; font-weight:500; letter-spacing:-.02em; }
+.prow .w { min-width:0; } .prow .w .top { display:flex; gap:8px; align-items:center; } .prow .w .cs { font-size:13px; }
+.prow .w b { display:block; font:700 15px/1.25 var(--font-display); letter-spacing:-.01em; }
+.prow .w small { display:block; font-size:12.5px; color:var(--ink-50); }
+.prow .tc { padding:4px 6px; } .prow .tc .t { font-size:9px; }
+.p-carried { display:flex; gap:12px; overflow-x:auto; scrollbar-width:none; margin:0 -18px; padding:0 18px; }
+.p-carried .carried { flex:none; width:200px; }
+.p-mini { flex:none; display:grid; grid-template-columns:56px 1fr auto; gap:10px; align-items:center; margin:0 10px 6px; padding:8px; border-radius:12px; background:var(--raised); box-shadow:0 0 0 1px var(--hair); }
+.p-mini .tc { padding:3px 5px; } .p-mini .tc .t { font-size:8px; }
+.p-mini .ti { font:700 14px/1.2 var(--font-display); } .p-mini .st { font-size:12px; color:var(--ink-70); }
+.p-mini .ctl { display:flex; gap:6px; align-items:center; }
+.p-tabs { flex:none; display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--hair); padding-top:6px; }
+.p-tabs a { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; font-weight:600; color:var(--ink-50); text-decoration:none; }
+.p-tabs a.on { color:var(--ink); }
+.p-tabs svg { width:22px; height:22px; }
+
+/* watch */
+.w-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; height:100%; }
+.w-left { overflow-y:auto; padding:20px 24px 28px; }
+.w-bar { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair); }
+.w-bar .ch-tune { display:flex; align-items:center; gap:6px; margin-left:4px; }
+.w-bar .ch-tune .ch { font-size:15px; font-weight:500; min-width:44px; text-align:center; }
+.w-bar .right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.w-title { margin:16px 0 4px; font:800 30px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.w-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; font-size:14px; color:var(--ink-70); }
+.w-meta a { color:var(--signal); font-weight:600; text-decoration:none; }
+.w-desc { font-size:15px; color:var(--ink-70); margin:10px 0 0; max-width:64ch; }
+.w-rail { border-left:1px solid var(--hair); overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:18px; }
+.stn-block { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; }
+.stn-block .ch { grid-row:span 2; font-size:26px; font-weight:500; letter-spacing:-.03em; padding-right:14px; border-right:1px solid var(--line); line-height:1.1; }
+.stn-block .cs { font-size:20px; line-height:1.1; } .stn-block small { font-size:13px; color:var(--ink-70); }
+.rail-acts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+.rail-acts .btn { padding:0 8px; font-size:13.5px; }
+.btn.is-set { border-color:var(--ink); }
+.sched h4 { margin:0 0 6px; font:700 15px var(--font-display); }
+.sch { display:grid; grid-template-columns:64px 1fr; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.sch .mono { font-size:13px; color:var(--ink-50); }
+.sch b { font-weight:600; display:block; line-height:1.3; } .sch small { color:var(--ink-50); font-size:12.5px; }
+.sch.past { opacity:.6; }
+.sch.now { background:var(--raised); margin:0 -10px; padding:9px 10px; box-shadow:inset 3px 0 0 var(--tally); }
+.pledge-note { font-size:13px; color:var(--ink-70); border-top:1px solid var(--hair); padding-top:12px; }
+
+/* radio screen */
+.radio-panel { margin:0 18px; border-radius:var(--r-screen); color:#fff; padding:22px 20px; aspect-ratio:1/1; display:flex; flex-direction:column; }
+.radio-panel .f { font:500 88px/1 var(--font-mono); letter-spacing:-.06em; }
+.radio-panel .cs { font-size:22px; margin-top:6px; }
+.radio-panel .nm { font-size:14px; opacity:.85; }
+.radio-panel .meter { margin-top:auto; display:flex; gap:3px; align-items:flex-end; height:36px; }
+.radio-panel .meter i { width:5px; background:rgb(255 255 255 / .75); border-radius:1px; }
+.radio-panel .tt { position:relative; }
+
+/* guide */
+.gd { position:relative; min-width:980px; }
+.gd-head, .gd-row { display:grid; grid-template-columns:150px repeat(18,1fr); }
+.gd-head { position:sticky; top:0; background:var(--ground); z-index:2; border-bottom:1px solid var(--line); font:500 12.5px var(--font-mono); color:var(--ink-50); }
+.gd-head div { padding:6px 8px; }
+.gd-row { min-height:62px; border-bottom:1px solid var(--hair); }
+.gd-st { position:sticky; left:0; background:var(--ground); z-index:1; padding:8px 10px 8px 0; display:flex; flex-direction:column; justify-content:center; border-right:1px solid var(--hair); }
+.gd-st .cs { font-size:14px; line-height:1.2; } .gd-st .ch { font-size:12px; color:var(--ink-50); }
+.gd-p { padding:8px 10px; border-left:1px solid var(--hair); font-size:13px; line-height:1.3; display:flex; flex-direction:column; justify-content:center; min-width:0; cursor:pointer; }
+.gd-p b { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p small { color:var(--ink-50); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gd-p.on { background:var(--raised); }
+.gd-p.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.gd-p .lv { color:var(--live); font-weight:600; font-size:12px; }
+.gd-p.cont b::before { content:"‹ "; color:var(--ink-50); }
+.gd-now { position:absolute; top:0; bottom:0; width:2px; background:var(--ink); z-index:3; pointer-events:none; }
+.gd-now span { position:absolute; top:4px; left:50%; transform:translateX(-50%); font:500 11px var(--font-mono); background:var(--ink); color:var(--ground); padding:1px 5px; border-radius:2px; white-space:nowrap; }
+.gd-tools { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.gd-tools h2 { margin:0; font:800 30px/1 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.gd-tools .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.gd-wrap { overflow:auto; }
+
+/* modals */
+.backdrop { position:absolute; inset:0; background:var(--scrim); display:grid; place-items:center; z-index:10; }
+.phone .backdrop { place-items:end stretch; }
+.modal { width:480px; max-height:92%; background:var(--ground); border-radius:var(--r-screen); box-shadow:0 0 0 1px var(--line), 0 24px 60px rgb(0 0 0 / .35); display:flex; flex-direction:column; overflow:hidden; }
+.sheet { width:100%; max-height:88%; background:var(--ground); border-radius:22px 22px 0 0; box-shadow:0 0 0 1px var(--line); display:flex; flex-direction:column; overflow:hidden; }
+.sheet .grab { height:18px; display:grid; place-items:center; flex:none; } .sheet .grab i { width:40px; height:5px; border-radius:3px; background:var(--line); }
+.m-head { padding:18px 22px 14px; border-bottom:1px solid var(--hair); display:flex; gap:12px; align-items:flex-start; flex:none; }
+.m-head h3 { margin:0; font:800 22px/1.1 var(--font-display); font-stretch:112%; letter-spacing:-.02em; }
+.m-head p { margin:4px 0 0; font-size:14px; color:var(--ink-70); }
+.m-head .x { margin-left:auto; }
+.m-main { padding:16px 22px; overflow-y:auto; flex:1; }
+.m-foot { padding:14px 22px 18px; border-top:1px solid var(--hair); display:flex; gap:10px; flex:none; }
+.m-foot .btn { flex:1; }
+.m-foot.stack { flex-direction:column; }
+.sheet .m-foot { padding-bottom:28px; }
+.stn-band { color:#fff; padding:18px 22px; display:flex; align-items:flex-end; gap:14px; flex:none; }
+.stn-band .ch { font-size:30px; font-weight:500; letter-spacing:-.04em; line-height:1; }
+.stn-band .cs { font-size:30px; line-height:1; }
+.stn-band .nm { font-size:14px; opacity:.9; margin-left:auto; text-align:right; line-height:1.3; }
+.stn-band .x { margin-left:8px; color:#fff; border-color:rgb(255 255 255 / .5); }
+.lst { display:grid; grid-template-columns:70px 1fr; gap:10px; padding:10px 0; border-bottom:1px solid var(--hair); }
+.lst:first-child { padding-top:0; }
+.lst .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; line-height:1.3; }
+.lst .lbl .mono { display:block; font-weight:500; color:var(--ink-70); }
+.lst b { display:block; font:700 16px/1.25 var(--font-display); letter-spacing:-.01em; }
+.lst small { font-size:13px; color:var(--ink-70); }
+.m-note { font-size:13px; color:var(--ink-70); margin:12px 0 0; }
+.field { display:flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-control); background:var(--raised); font-size:15px; color:var(--ink-50); }
+.opts { border-top:1px solid var(--hair); }
+.opt { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.opt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); flex:none; display:grid; place-items:center; }
+.opt.sel .rad { border-color:var(--signal); } .opt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.opt b { display:block; font-weight:600; font-size:15px; } .opt small { font-size:13px; color:var(--ink-70); }
+.opt .end { margin-left:auto; font:500 13px var(--font-mono); color:var(--ink-50); }
+.amts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+.amt { height:52px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:600 16px var(--font-text); cursor:pointer; }
+.amt.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.check { display:flex; gap:10px; align-items:flex-start; font-size:14px; color:var(--ink-70); padding:12px 0; border-top:1px solid var(--hair); }
+.check .bx { width:20px; height:20px; border:1.5px solid var(--signal); background:var(--signal-fill); border-radius:4px; flex:none; display:grid; place-items:center; color:var(--on-signal); margin-top:1px; }
+.check .bx svg { width:14px; height:14px; }
+.check b { color:var(--ink); font-weight:600; }
+.linkbox { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-control); font:500 13px var(--font-mono); color:var(--ink-70); margin-top:12px; }
+.preview-card { display:grid; grid-template-columns:120px 1fr; gap:12px; border:1px solid var(--hair); border-radius:var(--r-control); padding:10px; margin-top:12px; }
+.preview-card b { display:block; font:700 14px/1.25 var(--font-display); } .preview-card small { font-size:12.5px; color:var(--ink-70); display:block; }
+.toggle { width:40px; height:24px; border-radius:12px; background:var(--signal-fill); position:relative; flex:none; }
+.toggle::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:var(--on-signal); }
+.toggle.off { background:var(--line); } .toggle.off::after { right:auto; left:3px; background:var(--ground); }
+.carriers .opt .cs { font-size:14px; }
+.toast { position:absolute; left:50%; bottom:90px; transform:translateX(-50%); background:var(--ink); color:var(--ground); padding:10px 16px; border-radius:var(--r-control); font-size:14px; font-weight:500; display:flex; gap:14px; align-items:center; white-space:nowrap; z-index:12; }
+.toast a { color:var(--ground); font-weight:700; text-decoration:underline; }
+
+/* first visit */
+.fv { padding:10px 22px 22px; display:flex; flex-direction:column; flex:1; }
+.fv h2 { font:800 34px/1 var(--font-display); font-stretch:125%; letter-spacing:-.04em; margin:26px 0 12px; }
+.fv p { font-size:15px; color:var(--ink-70); margin:0 0 20px; }
+.fv .or { font-size:13px; color:var(--ink-50); margin:16px 0 8px; }
+.mk-list .opt .end { font-family:var(--font-text); }
+.fv .skip { margin-top:auto; text-align:center; font-size:14px; color:var(--ink-70); }
+
+/* ===== Master control ===== */
+.step-h { display:flex; align-items:baseline; gap:12px; margin:var(--s6) 0 var(--s3); }
+.step-h:first-of-type { margin-top:0; }
+.step-h .mono { font-size:13px; color:var(--ink-50); }
+.step-h h3 { margin:0; font:700 22px/1.2 var(--font-display); letter-spacing:-.015em; }
+.flow-map { display:flex; flex-wrap:wrap; gap:6px 0; margin:0 0 var(--s5); padding:0; list-style:none; font-size:14px; }
+.flow-map li { display:flex; align-items:center; color:var(--ink-70); }
+.flow-map li + li::before { content:""; width:22px; height:1px; background:var(--line); margin:0 10px; }
+.flow-map .mono { font-size:12px; color:var(--ink-50); margin-right:6px; }
+
+.mc-head { height:56px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1px solid var(--hair); }
+.mc-lock { display:inline-flex; align-items:center; gap:12px; }
+.mc-lock .a-logo { font-size:18px; } .mc-lock .a-logo svg { width:24px; height:19px; }
+.mc-lock .div { width:1px; height:20px; background:var(--line); }
+.mc-lock b { font-weight:600; font-size:15px; }
+.stn-switch { display:inline-flex; align-items:center; gap:10px; height:36px; padding:0 10px; border:1px solid var(--line); border-radius:var(--r-control); background:none; cursor:pointer; }
+.stn-switch .sw { width:14px; height:14px; border-radius:3px; }
+.stn-switch .ch { font-size:14px; } .stn-switch .cs { font-size:14px; }
+.mc-clock { margin-left:auto; font:500 15px var(--font-mono); font-variant-numeric:tabular-nums; }
+.mc-end { display:flex; align-items:center; gap:10px; }
+.mc-body { flex:1; display:grid; grid-template-columns:200px minmax(0,1fr); min-height:0; }
+.mc-rail { border-right:1px solid var(--hair); padding:14px 10px; overflow:auto; }
+.mc-rail .g { font-size:12px; font-weight:600; color:var(--ink-50); padding:12px 10px 4px; }
+.mc-rail .g:first-child { padding-top:0; }
+.mc-rail a { display:flex; align-items:center; gap:8px; height:34px; padding:0 10px; border-radius:var(--r-control); text-decoration:none; color:var(--ink-70); font-size:14.5px; font-weight:500; }
+.mc-rail a.on { background:var(--raised); color:var(--ink); box-shadow:inset 0 0 0 1px var(--hair); }
+.mc-rail a .ct { margin-left:auto; font:500 12px var(--font-mono); color:var(--ink-50); }
+.mc-rail a .ct.warn { color:var(--standby); }
+.mc-steps { padding:18px 14px; }
+.mc-steps .st { display:flex; align-items:center; gap:10px; padding:9px 4px; font-size:14.5px; color:var(--ink-50); font-weight:500; }
+.mc-steps .st .n { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; font:500 12px var(--font-mono); flex:none; }
+.mc-steps .st.done { color:var(--ink-70); } .mc-steps .st.done .n { background:var(--ink); border-color:var(--ink); color:var(--ground); }
+.mc-steps .st.cur { color:var(--ink); } .mc-steps .st.cur .n { border-color:var(--signal); color:var(--signal); box-shadow:0 0 0 3px color-mix(in srgb, var(--signal) 20%, transparent); }
+.mc-steps .hint { margin-top:18px; padding-top:14px; border-top:1px solid var(--hair); font-size:13px; color:var(--ink-70); line-height:1.45; }
+.mc-main { overflow:auto; padding:22px 28px 28px; position:relative; }
+.mc-title { display:flex; align-items:flex-end; gap:14px; margin-bottom:18px; }
+.mc-title h2 { margin:0; font:800 28px/1.05 var(--font-display); font-stretch:112%; letter-spacing:-.03em; }
+.mc-title p { margin:4px 0 0; font-size:14.5px; color:var(--ink-70); max-width:62ch; }
+.mc-title .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.mc-foot { display:flex; align-items:center; gap:12px; padding-top:16px; margin-top:18px; border-top:1px solid var(--hair); }
+.mc-foot .end { margin-left:auto; display:flex; gap:10px; }
+.split { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:28px; }
+.pane { border-left:1px solid var(--hair); padding-left:28px; }
+.pane h4 { margin:0 0 10px; font:700 15px var(--font-display); }
+.fld { margin-bottom:16px; }
+.fld > label, .fld > .lb { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.fld .field { color:var(--ink); }
+.fld .ok { font-size:13px; color:var(--signal); margin-top:6px; display:flex; gap:6px; align-items:center; }
+.fld .help { font-size:13px; color:var(--ink-50); margin-top:6px; }
+.fld-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.chgrid { display:grid; grid-template-columns:repeat(10,1fr); gap:5px; }
+.cn { height:32px; border:1px solid var(--line); border-radius:var(--r-control); background:none; font:500 13px var(--font-mono); color:var(--ink); cursor:pointer; }
+.cn.taken { border-style:dashed; border-color:var(--hair); color:var(--ink-50); text-decoration:line-through; cursor:not-allowed; }
+.cn.sel { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.swatches { display:flex; gap:8px; align-items:center; }
+.swatches i { width:30px; height:30px; border-radius:var(--r-control); display:block; cursor:pointer; }
+.swatches i.sel { box-shadow:0 0 0 2px var(--ground), 0 0 0 4px var(--ink); }
+.swatches .field { height:34px; width:120px; font:500 13px var(--font-mono); }
+.vis { display:flex; flex-direction:column; gap:14px; }
+.vis .lbl { font-size:12.5px; color:var(--ink-50); font-weight:600; }
+.mini-listing { display:grid; grid-template-columns:40px 1fr 72px; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+.mini-listing .ch { font-size:15px; font-weight:500; } .mini-listing .cs { font-size:13px; } .mini-listing b { display:block; font:700 14px/1.2 var(--font-display); } .mini-listing small { font-size:12px; color:var(--ink-50); }
+.mini-listing .tc { padding:4px 6px; } .mini-listing .tc .t { font-size:9px; }
+
+/* library */
+.drop { border:1.5px dashed var(--line); border-radius:var(--r-screen); padding:18px; display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+.drop .ic { width:44px; height:44px; border-radius:var(--r-control); background:var(--raised); display:grid; place-items:center; flex:none; }
+.drop b { display:block; font-weight:600; } .drop small { color:var(--ink-70); font-size:13px; }
+.drop .end { margin-left:auto; display:flex; gap:8px; }
+.lib-h, .lib-row { display:grid; grid-template-columns:88px minmax(0,1fr) 128px 64px 190px 36px; gap:14px; align-items:center; }
+.lib-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding:0 0 6px; border-bottom:1px solid var(--line); }
+.lib-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.lib-row .tc { padding:4px 6px; } .lib-row .tc .t { font-size:9.5px; }
+.lib-row b { display:block; font-weight:600; font-size:14.5px; } .lib-row small { font-size:12.5px; color:var(--ink-50); }
+.lib-row .d { font:500 13px var(--font-mono); }
+.typesel { display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 8px; border:1px solid var(--line); border-radius:var(--r-control); font:500 12px var(--font-mono); background:none; }
+.typesel.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.typesel.spt { color:var(--standby); border-color:var(--standby); }
+.typesel.und { border-style:dashed; }
+.status { font-size:13px; display:flex; flex-direction:column; gap:4px; }
+.status.ready { color:var(--ink-70); } .status.ready::before { content:"Ready for air"; color:var(--ink); font-weight:600; }
+.status .bar { height:4px; background:var(--hair); border-radius:2px; overflow:hidden; } .status .bar i { display:block; height:100%; background:var(--signal); }
+.status.need { color:var(--standby); font-weight:600; }
+.dots3 { width:30px; height:30px; border-radius:var(--r-control); border:0; background:none; color:var(--ink-50); font-size:18px; line-height:1; cursor:pointer; }
+.lib-sum { display:flex; gap:18px; font-size:13.5px; color:var(--ink-70); margin:0 0 12px; }
+.lib-sum b { color:var(--ink); font-weight:600; }
+
+/* program log timeline */
+.days { display:flex; gap:4px; margin-bottom:14px; }
+.days button { height:32px; padding:0 12px; border:1px solid var(--hair); border-radius:var(--r-control); background:none; font:600 13px var(--font-text); color:var(--ink-70); cursor:pointer; }
+.days button.on { border-color:var(--ink); color:var(--ink); }
+.tl { position:relative; display:grid; grid-template-columns:56px 1fr; }
+.tl .hrs { position:relative; }
+.tl .hrs span { position:absolute; left:0; font:500 12px var(--font-mono); color:var(--ink-50); transform:translateY(-50%); }
+.tl .col { position:relative; border-left:1px solid var(--line); }
+.tl .col .hl { position:absolute; left:0; right:0; height:1px; background:var(--hair); }
+.blk { position:absolute; left:8px; right:0; border-radius:var(--r-control); padding:5px 10px; font-size:13px; overflow:hidden; display:flex; gap:10px; align-items:flex-start; }
+.blk b { font-weight:600; font-size:13.5px; }
+.blk small { color:var(--ink-70); font-size:12px; }
+.blk .code { flex:none; margin-top:1px; }
+.blk.pgm { background:var(--raised); box-shadow:inset 0 0 0 1px var(--hair); }
+.blk.car { background:var(--raised); box-shadow:inset 0 0 0 1px var(--line); border:1px dashed var(--line); }
+.blk.brk { background:color-mix(in srgb, var(--standby-fill) 22%, var(--ground)); box-shadow:inset 3px 0 0 var(--standby); padding:0 10px; align-items:center; font-size:11.5px; color:var(--ink-70); }
+.blk.dead { background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--standby-fill) 18%, transparent) 0 8px, transparent 8px 16px); border:1.5px dashed var(--standby); color:var(--standby); align-items:center; justify-content:center; font-weight:600; }
+.blk.sel { box-shadow:inset 0 0 0 2px var(--signal); }
+.code { display:inline-block; min-width:36px; text-align:center; font:500 11px var(--font-mono); padding:1px 5px; border-radius:var(--r-sign); border:1px solid var(--line); }
+.code.pgm { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.code.spt { border-color:var(--standby); color:var(--standby); }
+.code.und { border-style:dashed; }
+.warnbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--standby); border-radius:var(--r-control); color:var(--ink); font-size:14px; margin-bottom:14px; }
+.warnbar .ic { color:var(--standby); }
+.warnbar b { font-weight:600; }
+.warnbar .end { margin-left:auto; }
+.okbar { display:flex; gap:12px; align-items:center; padding:10px 14px; border:1px solid var(--line); border-radius:var(--r-control); font-size:14px; margin-bottom:14px; }
+
+/* translators */
+.tr-row { display:grid; grid-template-columns:44px minmax(0,1fr) 250px 90px; gap:14px; align-items:center; padding:14px 0; border-bottom:1px solid var(--hair); }
+.tr-row:first-of-type { border-top:1px solid var(--line); }
+.tr-row .lg { width:44px; height:44px; border-radius:var(--r-control); display:grid; place-items:center; font:800 13px var(--font-display); color:#fff; }
+.tr-row b { display:block; font-weight:600; } .tr-row small { font-size:13px; color:var(--ink-70); display:block; }
+.tr-row .lb { font-size:12px; color:var(--ink-50); font-weight:600; margin-bottom:4px; }
+.tr-row .seg button { font-size:12px; padding:0 10px; }
+
+/* preflight + monitor */
+.check-list { border-top:1px solid var(--line); }
+.ck { display:grid; grid-template-columns:28px 1fr auto; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--hair); }
+.ck .m { width:24px; height:24px; border-radius:50%; display:grid; place-items:center; }
+.ck.ok .m { background:var(--ink); color:var(--ground); } .ck.ok .m svg { width:14px; height:14px; }
+.ck.warn .m { border:1.5px solid var(--standby); color:var(--standby); font:700 13px var(--font-text); }
+.ck b { font-weight:600; display:block; font-size:14.5px; } .ck small { font-size:13px; color:var(--ink-70); }
+.signon { display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px; border:1px solid var(--hair); border-radius:var(--r-screen); text-align:center; }
+.signon .btn { height:56px; padding:0 40px; font-size:17px; }
+.signon small { font-size:13px; color:var(--ink-70); max-width:32ch; }
+.mon { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; }
+.mon .lbl { font-size:12.5px; font-weight:600; color:var(--ink-50); margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+.mon .pv { opacity:.85; }
+.rundown { margin-top:16px; border-top:1px solid var(--line); }
+.rd { display:grid; grid-template-columns:78px 50px minmax(0,1fr) 64px; gap:12px; align-items:center; padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.rd .t { font:500 13px var(--font-mono); color:var(--ink-70); }
+.rd .d { font:500 13px var(--font-mono); text-align:right; }
+.rd.now { background:var(--raised); box-shadow:inset 3px 0 0 var(--tally); }
+.rd.now .t { padding-left:10px; }
+.rd small { display:block; font-size:12px; color:var(--ink-50); }
+.cd { font:500 28px var(--font-mono); letter-spacing:-.03em; }
+.health { border-top:1px solid var(--line); }
+.hl-row { display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.hl-row span:last-child { color:var(--ink-70); font-family:var(--font-mono); font-size:13px; }
+.hl-row .good::before { content:""; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ink-70); margin-right:6px; }
+
+/* syndication + spots */
+.filters { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.syn-h, .syn-row { display:grid; grid-template-columns:112px minmax(0,1fr) 230px 92px 150px; gap:14px; align-items:center; }
+.syn-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.syn-row { padding:10px 0; border-bottom:1px solid var(--hair); }
+.syn-row .tc { padding:6px 8px; } .syn-row .tc .t { font-size:11px; }
+.syn-row b { display:block; font:700 15px/1.2 var(--font-display); } .syn-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.syn-row .terms { font-size:13px; line-height:1.35; } .syn-row .terms em { font-style:normal; font-weight:600; display:block; }
+.syn-row .by { font-size:13px; color:var(--ink-70); }
+.syn-row .acts { display:flex; gap:6px; justify-content:flex-end; }
+.syn-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.syn-row.sel > :first-child { margin-left:10px; }
+.termopt { display:grid; grid-template-columns:22px 1fr auto; gap:12px; padding:13px 0; border-bottom:1px solid var(--hair); cursor:pointer; }
+.termopt .rad { width:20px; height:20px; border-radius:50%; border:1.5px solid var(--line); display:grid; place-items:center; margin-top:2px; }
+.termopt.sel .rad { border-color:var(--signal); } .termopt.sel .rad::after { content:""; width:10px; height:10px; border-radius:50%; background:var(--signal); }
+.termopt b { font-weight:600; display:block; font-size:15px; } .termopt small { font-size:13px; color:var(--ink-70); display:block; margin-top:2px; }
+.termopt .p { font:500 14px var(--font-mono); text-align:right; }
+.brkbar { display:flex; height:18px; border-radius:3px; overflow:hidden; border:1px solid var(--line); }
+.brkbar i { display:block; height:100%; }
+.brkbar .f { background:var(--ink); } .brkbar .th { background:repeating-linear-gradient(135deg, var(--line) 0 4px, transparent 4px 8px); } .brkbar .o { background:transparent; }
+.brkbar .n { background:var(--standby-fill); }
+.bk-h, .bk-row { display:grid; grid-template-columns:78px minmax(0,1fr) 220px 110px 120px; gap:14px; align-items:center; }
+.bk-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.bk-row { padding:12px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.bk-row .t { font:500 13px var(--font-mono); }
+.bk-row b { display:block; font-weight:600; } .bk-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.bk-row .open { font-size:13px; } .bk-row .open .mono { font-weight:500; }
+.legend { display:flex; gap:16px; font-size:12.5px; color:var(--ink-70); margin-top:10px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.legend i { width:14px; height:10px; border-radius:2px; border:1px solid var(--line); display:inline-block; }
+.sp-h, .sp-row { display:grid; grid-template-columns:100px minmax(0,1fr) 54px 150px; gap:12px; align-items:center; }
+.sp-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.sp-row { padding:9px 0; border-bottom:1px solid var(--hair); font-size:14px; cursor:pointer; }
+.sp-row.sel { background:var(--raised); box-shadow:inset 3px 0 0 var(--signal); }
+.sp-row.sel > :first-child { margin-left:10px; }
+.sp-row .tc { padding:5px 7px; } .sp-row .tc .t { font-size:10px; }
+.sp-row b { display:block; font-weight:600; } .sp-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.sp-row .d { font:500 13px var(--font-mono); }
+.sp-row .rate { font-size:13px; } .sp-row .rate .mono { font-weight:500; }
+.spot-detail .pic { margin-bottom:12px; }
+.adpic { background:#5a3a22 !important; }
+.adpic .card { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:8%; color:#fff; }
+.adpic .card b { font:800 clamp(14px,7cqw,34px)/1 var(--font-display); font-stretch:112%; }
+.adpic .card span { font-size:clamp(9px,3cqw,14px); opacity:.9; margin-top:4px; }
+.adpic .qr { position:absolute; right:6%; top:10%; width:18%; aspect-ratio:1; background:#fff; border-radius:4px; padding:4%; }
+.adpic .qr i { display:block; width:100%; height:100%; background:
+  linear-gradient(90deg,#111 0 30%,transparent 30% 40%,#111 40% 50%,transparent 50% 70%,#111 70%) 0 0/100% 20%,
+  linear-gradient(90deg,transparent 0 20%,#111 20% 45%,transparent 45% 60%,#111 60% 80%,transparent 80%) 0 50%/100% 20%,
+  linear-gradient(90deg,#111 0 35%,transparent 35% 55%,#111 55%) 0 100%/100% 20%; background-repeat:no-repeat; }
+.kv { border-top:1px solid var(--line); margin:10px 0; }
+.kv div { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--hair); font-size:13.5px; }
+.kv div span:first-child { color:var(--ink-70); } .kv div span:last-child { font-weight:600; text-align:right; }
+.week { display:grid; grid-template-columns:56px repeat(7,1fr); border-top:1px solid var(--line); }
+.week .wh { font-size:12.5px; font-weight:600; color:var(--ink-50); padding:6px 8px; border-bottom:1px solid var(--line); }
+.week .wh.on { color:var(--ink); }
+.week .tm { font:500 12px var(--font-mono); color:var(--ink-50); padding:8px 0; border-bottom:1px solid var(--hair); }
+.week .cl { border-left:1px solid var(--hair); border-bottom:1px solid var(--hair); padding:4px; font-size:12px; min-height:48px; }
+.week .cl .it { border-radius:4px; padding:4px 6px; background:var(--raised); height:100%; line-height:1.25; }
+.week .cl .it.new { background:transparent; border:2px solid var(--signal); }
+.week .cl .it.rep { text-decoration:line-through; color:var(--ink-50); }
+.week .cl .it.live { box-shadow:inset 2px 0 0 var(--live); }
+
+/* phone master control */
+.pm-top { flex:none; display:flex; align-items:center; gap:10px; padding:6px 16px 10px; border-bottom:1px solid var(--hair); }
+.pm-top .cs { font-size:16px; } .pm-top .ch { font-size:14px; color:var(--ink-50); }
+.pm-sec { padding:14px 16px; border-bottom:1px solid var(--hair); }
+.pm-sec h4 { margin:0 0 8px; font:700 15px var(--font-display); }
+.pm-next { display:flex; align-items:center; gap:12px; }
+.pm-next small { display:block; font-size:12.5px; color:var(--ink-70); }
+.pm-acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:14px 16px; }
+.notif { margin:14px 12px 0; padding:12px 14px; border-radius:16px; background:var(--raised); box-shadow:0 0 0 1px var(--hair), 0 8px 24px rgb(0 0 0 / .25); font-size:13.5px; }
+.notif .top { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--ink-50); margin-bottom:4px; }
+.notif .top svg { width:16px; height:13px; }
+.notif b { display:block; font-weight:600; font-size:14.5px; }
+
+.sec-top { display:flex; align-items:baseline; gap:12px; padding-bottom:8px; border-bottom:1px solid var(--line); margin-top:22px; }
+.sec-top:first-child { margin-top:0; }
+.sec-top h3 { margin:0; font:700 17px/1.2 var(--font-display); letter-spacing:-.015em; }
+.sec-top .sub { font-size:13px; color:var(--ink-50); }
+.sec-top .end { margin-left:auto; display:flex; gap:8px; }
+.row2 { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:16px; align-items:center; padding:10px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.row2 b { display:block; font-weight:600; font-size:14.5px; } .row2 small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:1px; }
+.row2 .end { display:flex; gap:8px; align-items:center; }
+
+/* network desk shell */
+.nd-head { height:56px; flex:none; display:flex; align-items:center; gap:18px; padding:0 22px; border-bottom:1px solid var(--hair); background:var(--raised); }
+.nd-head .mc-lock b { font-weight:600; font-size:15px; }
+.nd-head .internal { font:600 11.5px var(--font-text); color:var(--standby); border:1px solid var(--standby); border-radius:var(--r-sign); padding:2px 7px; }
+.nd-head .end { margin-left:auto; display:flex; gap:10px; align-items:center; }
+.nd-rail a .ct { margin-left:auto; font:500 12px var(--font-mono); color:var(--ink-50); }
+
+/* market board */
+.legend3 { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--ink-70); margin:4px 0 12px; }
+.legend3 span { display:inline-flex; align-items:center; gap:6px; }
+.legend3 i { width:14px; height:14px; border-radius:3px; display:inline-block; }
+.dialmap { display:grid; grid-template-columns:repeat(17,1fr); gap:4px; }
+.slot { height:52px; border-radius:4px; border:1px solid var(--hair); display:flex; flex-direction:column; justify-content:space-between; padding:4px 5px; font:500 11px var(--font-mono); color:var(--ink-50); overflow:hidden; }
+.slot b { font:800 11px var(--font-display); font-stretch:112%; color:#fff; letter-spacing:0; }
+.slot.st { color:rgb(255 255 255 / .8); border:0; }
+.slot.cl { border:2px dashed var(--signal); color:var(--ink); } .slot.cl b { color:var(--ink); }
+.slot.li { border:1px dashed var(--line); color:var(--ink-70); } .slot.li b { color:var(--ink-70); }
+.slot.rs { background:repeating-linear-gradient(135deg, var(--hair) 0 4px, transparent 4px 8px); color:var(--ink-70); } .slot.rs b { color:var(--ink-70); }
+.slot.ho { background:var(--ink); color:var(--ground); border:0; } .slot.ho b { color:var(--ground); }
+.slot.sel { box-shadow:0 0 0 2px var(--standby); }
+.radiomap { display:grid; grid-template-columns:repeat(20,1fr); gap:4px; }
+.cov { display:grid; grid-template-columns:repeat(4,1fr); border-top:2px solid var(--ink); margin-bottom:16px; }
+.cov > div { padding:12px 16px 0 0; }
+.cov > div + div { padding-left:16px; border-left:1px solid var(--hair); }
+.cov .v { font:500 26px var(--font-mono); letter-spacing:-.03em; }
+.cov small { display:block; font-size:12.5px; color:var(--ink-70); margin-top:2px; }
+
+/* pipeline */
+.stages { display:grid; grid-template-columns:repeat(7,1fr); border-top:2px solid var(--ink); margin-bottom:14px; }
+.stages > div { padding:10px 12px 0 0; }
+.stages > div + div { padding-left:12px; border-left:1px solid var(--hair); }
+.stages .v { font:500 24px var(--font-mono); letter-spacing:-.03em; }
+.stages small { display:block; font-size:12.5px; color:var(--ink-70); }
+.stages > div.on small { color:var(--ink); font-weight:600; }
+.pp-h, .pp { display:grid; grid-template-columns:minmax(0,1.2fr) 150px 130px 150px minmax(0,1fr) 110px; gap:12px; align-items:center; }
+.pp-h { font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.pp { padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.pp b { display:block; font-weight:600; } .pp small { display:block; font-size:12.5px; color:var(--ink-70); }
+.stg { display:inline-flex; align-items:center; gap:6px; height:24px; padding:0 9px; border-radius:var(--r-sign); font:600 12px var(--font-text); border:1px solid var(--line); color:var(--ink-70); white-space:nowrap; }
+.stg.yes { border-color:var(--signal); color:var(--signal); }
+.stg.air { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+.stg.wait { border-color:var(--standby); color:var(--standby); }
+.stg.no { border-style:dashed; color:var(--ink-50); }
+.stg.lic { border-color:var(--ink); color:var(--ink); background:var(--raised); }
+.pp .next { font-size:13px; color:var(--ink-70); }
+.pp .next.due { color:var(--standby); font-weight:600; }
+
+/* ask */
+.ask { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:28px; }
+.msg { border:1px solid var(--line); border-radius:var(--r-screen); padding:16px 18px; background:var(--raised); font-size:14.5px; line-height:1.55; }
+.msg .from { font-size:12.5px; color:var(--ink-50); margin-bottom:10px; }
+.msg p { margin:0 0 10px; }
+.msg .lnk { display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 16px; border-radius:var(--r-control); background:var(--signal-fill); color:var(--on-signal); font-weight:600; font-size:14px; }
+.works { border-top:1px solid var(--line); }
+.wk { display:grid; grid-template-columns:22px minmax(0,1fr) auto; gap:10px; padding:9px 0; border-bottom:1px solid var(--hair); font-size:13.5px; align-items:center; }
+.wk .bx { width:18px; height:18px; border-radius:4px; background:var(--signal-fill); color:var(--on-signal); display:grid; place-items:center; }
+.wk .bx svg { width:12px; height:12px; }
+.wk.off .bx { background:transparent; border:1.5px solid var(--line); }
+.wk small { color:var(--ink-70); font-size:12.5px; }
+
+/* recipe */
+.recipe { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:26px; }
+.day24 { display:flex; height:46px; border-radius:6px; overflow:hidden; border:1px solid var(--line); margin:10px 0 6px; }
+.day24 i { display:flex; align-items:center; justify-content:center; font:600 11px var(--font-text); color:#fff; white-space:nowrap; overflow:hidden; }
+.hours { display:flex; justify-content:space-between; font:500 11px var(--font-mono); color:var(--ink-50); }
+.src-row { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; align-items:center; padding:11px 0; border-bottom:1px solid var(--hair); font-size:14px; }
+.src-row b { display:block; font-weight:600; } .src-row small { display:block; font-size:12.5px; color:var(--ink-70); }
+.src-h { display:grid; grid-template-columns:minmax(0,1fr) 150px 170px 110px; gap:12px; font-size:12.5px; color:var(--ink-50); font-weight:600; padding-bottom:6px; border-bottom:1px solid var(--line); }
+.ok-t { font-size:13px; color:var(--ink-70); display:flex; gap:6px; align-items:center; }
+.ok-t svg { width:14px; height:14px; }
+/* creator phone */
+.perm-page { padding:18px 18px 22px; display:flex; flex-direction:column; flex:1; overflow:auto; }
+.perm-page h2 { margin:10px 0 10px; font:800 28px/1.02 var(--font-display); font-stretch:125%; letter-spacing:-.035em; }
+.perm-page > p { font-size:14.5px; color:var(--ink-70); margin:0 0 14px; }
+</style>
+<style>
+/* ===== Analytics (Ref. 12d), panel layout v2 ===== */
+/* Layout: page head, tabs, one filter bar, KPI cards, then panels on a 3-column grid. */
+:root{
+  --card:#F7F8FB; --card-2:#EAEDF3; --hover:rgb(15 24 48 / .035);
+  --c1:#2a78d6; --c2:#eb6834; --c3:#1baf7a; --c4:#eda100; --c5:#e87ba4; --c6:#008300;
+  --q1:#cde2fb; --q2:#9ec5f4; --q3:#6da7ec; --q4:#3987e5; --q5:#256abf; --q6:#184f95; --q7:#0d366b;
+  --good:#127a2f; --bad:#B02518; --warnc:#8A5A00; --prev:#9AA3B6; --main:#0A6883; --brk:rgb(15 24 48 / .08); --wash:rgb(10 104 131 / .10);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --card:#16213F; --card-2:#1F2C52; --hover:rgb(236 233 225 / .035);
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300;
+  --q1:#1c2c55; --q2:#104281; --q3:#184f95; --q4:#256abf; --q5:#3987e5; --q6:#6da7ec; --q7:#b7d3f6;
+  --good:#5BD07A; --bad:#FF7A69; --warnc:#F0B43C; --prev:#5E6C92; --main:#6CCFEA; --brk:rgb(236 233 225 / .07); --wash:rgb(108 207 234 / .12);
+}}
+:root[data-theme="dark"]{
+  --card:#16213F; --card-2:#1F2C52; --hover:rgb(236 233 225 / .035);
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70; --c4:#c98500; --c5:#d55181; --c6:#008300;
+  --q1:#1c2c55; --q2:#104281; --q3:#184f95; --q4:#256abf; --q5:#3987e5; --q6:#6da7ec; --q7:#b7d3f6;
+  --good:#5BD07A; --bad:#FF7A69; --warnc:#F0B43C; --prev:#5E6C92; --main:#6CCFEA; --brk:rgb(236 233 225 / .07); --wash:rgb(108 207 234 / .12);
+}
+.app.nd .mc-main{padding:26px 30px 30px;font-variant-numeric:tabular-nums}
+/* head */
+.an-head{display:flex;align-items:flex-end;gap:16px;margin-bottom:12px}
+.an-head h2{margin:0;font:800 30px/1 var(--font-display);font-stretch:112%;letter-spacing:-.03em}
+.an-head p{margin:7px 0 0;font-size:14px;color:var(--ink-70)}
+.a-act{margin-left:auto;display:flex;align-items:center;gap:12px}
+.a-upd{font-size:12.5px;color:var(--ink-50);display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.a-upd i{width:7px;height:7px;border-radius:50%;background:var(--good);display:inline-block}
+.a-btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 13px var(--font-text);white-space:nowrap}
+.a-btn svg{width:15px;height:15px}
+/* tabs */
+.a-tabs{display:flex;gap:2px;border-bottom:1px solid var(--hair);margin-bottom:16px}
+.a-tabs a{position:relative;font:600 14px var(--font-text);color:var(--ink-70);text-decoration:none;padding:10px 14px 12px}
+.a-tabs a.on{color:var(--ink)}
+.a-tabs a.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--ink)}
+/* filters */
+.a-fil{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.a-f{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--hair);background:var(--card);font:500 13px var(--font-text);color:var(--ink-70);white-space:nowrap}
+.a-f b{font-weight:600;color:var(--ink)}
+.a-f svg{width:14px;height:14px;color:var(--ink-50)}
+.a-vs{font-size:12.5px;color:var(--ink-50);margin:0 4px}
+.a-fil .sp{flex:1}
+.a-seg{display:inline-flex;padding:3px;border-radius:9px;background:var(--card-2);gap:2px}
+.a-seg button{height:28px;padding:0 11px;border:0;border-radius:7px;background:none;font:600 12.5px var(--font-text);color:var(--ink-70);white-space:nowrap}
+.a-seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgb(0 0 0 / .12),0 0 0 1px var(--hair)}
+.a-seg button .c{font-weight:500;color:var(--ink-50);margin-left:5px}
+/* kpi cards */
+.a-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.a-kpi{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:14px 16px 0;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.a-kpi .l{font-size:12.5px;font-weight:600;color:var(--ink-70);display:flex;align-items:center;gap:7px;white-space:nowrap}
+.a-kpi .l .st{width:8px;height:8px;border-radius:50%}
+.a-kpi .v{font:700 28px/1.1 var(--font-display);letter-spacing:-.02em;margin-top:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.a-kpi .v small{font:600 14px var(--font-text);color:var(--ink-50);letter-spacing:0;margin-left:4px}
+.a-kpi .v.mute{color:var(--ink-50);font-size:21px;font-weight:600;line-height:31px}
+.a-kpi .d{display:flex;align-items:center;gap:7px;margin-top:7px;font-size:12px;color:var(--ink-50);white-space:nowrap;min-height:20px;overflow:hidden}
+.a-kpi .sk{margin:10px -16px 0;height:36px;display:block}
+.a-kpi .sk svg{display:block;width:100%;height:36px}
+.a-kpi.nosk{padding-bottom:16px}
+.pill{display:inline-flex;align-items:center;gap:3px;height:20px;padding:0 7px;border-radius:10px;font:700 11.5px var(--font-text);white-space:nowrap;vertical-align:middle}
+.pill.up{color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)}
+.pill.dn{color:var(--bad);background:color-mix(in srgb,var(--bad) 15%,transparent)}
+.pill.fl,.pill.ne{color:var(--ink-70);background:var(--card-2)}
+.pill.warn{color:var(--warnc);background:color-mix(in srgb,var(--warnc) 16%,transparent)}
+.pill.cl{color:var(--signal);background:color-mix(in srgb,var(--signal) 14%,transparent)}
+.pill.ex{color:var(--ink-70);background:none;box-shadow:inset 0 0 0 1px var(--line)}
+/* grid + cards */
+.a-row{display:grid;gap:12px;margin-bottom:12px}
+.r21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.r11{grid-template-columns:repeat(2,minmax(0,1fr))}
+.r111{grid-template-columns:repeat(3,minmax(0,1fr))}
+.r1{grid-template-columns:minmax(0,1fr)}
+.a-card{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:16px 18px 18px;min-width:0;position:relative}
+.a-stack{display:grid;gap:12px;align-content:start;min-width:0}
+.a-ch{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.a-ch h3{margin:0;font:700 15.5px/1.25 var(--font-display);letter-spacing:-.01em}
+.a-ch .s{display:block;font:400 12.5px var(--font-text);color:var(--ink-50);margin-top:3px}
+.a-ch .e{margin-left:auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.a-link{font:600 12.5px var(--font-text);color:var(--signal);text-decoration:none;white-space:nowrap}
+.lg{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-70);white-space:nowrap}
+.lg i{width:12px;height:3px;border-radius:2px;display:inline-block}
+.lg i.sq{width:9px;height:9px;border-radius:2px}
+.lg i.br{width:10px;height:10px;border-radius:2px;background:var(--brk);box-shadow:inset 0 0 0 1px var(--line)}
+.a-lgs{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px}
+/* charts */
+.viz{position:relative}
+.viz svg{display:block;width:100%;overflow:visible}
+.viz .gl{stroke:var(--hair);stroke-width:1;shape-rendering:crispEdges}
+.viz .ax{font:500 10.5px var(--font-text);fill:var(--ink-50);font-variant-numeric:tabular-nums}
+.viz .axl{font:500 10.5px var(--font-text);fill:var(--ink-50)}
+.viz .lab{font:700 11px var(--font-text);fill:var(--ink)}
+.viz .ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.viz .xh{stroke:var(--ink-50);stroke-width:1;opacity:0}
+.viz .hit{fill:transparent;cursor:crosshair}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--ground);font:500 12px/1.5 var(--font-text);padding:8px 11px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .08s;z-index:5;box-shadow:0 6px 18px rgb(0 0 0 / .28);font-variant-numeric:tabular-nums}
+.tip b{font-weight:700} .tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+.tip .r{display:flex;gap:16px;justify-content:space-between}
+/* list rows */
+.a-li{display:grid;grid-template-columns:minmax(0,1fr) auto 52px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--hair);font-size:13.5px}
+.a-li:first-child{border-top:0;padding-top:0}
+.a-li.k{grid-template-columns:10px minmax(0,1fr) auto 46px}
+.a-li.two{grid-template-columns:minmax(0,1fr) auto}
+.a-li .kk{width:10px;height:10px;border-radius:3px}
+.a-li .v{font-weight:600;text-align:right;white-space:nowrap}
+.a-li .p{font-size:12.5px;color:var(--ink-50);text-align:right;white-space:nowrap}
+.a-li small{display:block;font-size:12px;color:var(--ink-50);margin-top:1px}
+.a-li.tot{border-top:1px solid var(--line);font-weight:700}
+.a-li .neg{color:var(--bad)} .a-li .pos{color:var(--good)} .a-li .q{color:var(--ink-50);font-weight:500}
+.a-sub{font:700 11px var(--font-text);color:var(--ink-50);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px}
+.a-sub:first-child{margin-top:0}
+.a-bar{display:flex;gap:2px;height:10px;margin:0 0 14px}
+.a-bar span{display:block;height:100%}
+.a-bar span:first-child{border-radius:5px 0 0 5px}.a-bar span:last-child{border-radius:0 5px 5px 0}
+.a-big{display:flex;align-items:baseline;gap:10px;margin:-2px 0 14px}
+.a-big .v{font:700 26px var(--font-display);letter-spacing:-.02em}
+.a-big .v.neg{color:var(--bad)}
+.a-big span{font-size:12.5px;color:var(--ink-50)}
+/* station badge */
+.stn{display:flex;align-items:center;gap:10px;min-width:0}
+.badge{display:inline-grid;place-items:center;min-width:46px;height:26px;padding:0 6px;border-radius:6px;color:#fff;font:600 12px var(--font-mono);letter-spacing:-.02em;flex:none}
+.stn b{display:block;font:800 13.5px/1.2 var(--font-display);font-stretch:112%;letter-spacing:.03em}
+.stn small{display:block;font-size:12px;color:var(--ink-50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:400}
+.stn > div{min-width:0}
+/* tables */
+.a-t{font-size:13.5px}
+.a-t .th,.a-t .tr{display:grid;align-items:center;gap:12px}
+.a-t .th{font:600 12px var(--font-text);color:var(--ink-50);padding:0 10px 10px;border-bottom:1px solid var(--hair)}
+.a-t .th .on{color:var(--ink)} .a-t .th .on::after{content:" \2193"}
+.a-t .tr{padding:9px 10px;border-bottom:1px solid var(--hair);min-height:48px}
+.a-t .tr:last-child{border-bottom:0}
+.a-t .tr.sel{background:color-mix(in srgb,var(--signal) 10%,transparent);border-radius:8px;border-bottom-color:transparent}
+.a-t .tr.tot{border-top:1px solid var(--line);font-weight:700;min-height:44px}
+.a-t .n{text-align:right;white-space:nowrap}
+.a-t .q{color:var(--ink-50)}
+.a-t .neg{color:var(--bad)}
+.a-t .tr.dim .n{color:var(--ink-50)}
+.a-t .pr b{display:block;font-weight:600}
+.a-t .pr small{display:block;font-size:12px;color:var(--ink-50)}
+.shb{height:8px;border-radius:4px;background:var(--card-2);position:relative;overflow:hidden}
+.shb i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--main)}
+/* station page head */
+.a-back{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--font-text);color:var(--ink-70);text-decoration:none;margin-bottom:14px}
+.a-back svg{width:14px;height:14px;transform:rotate(90deg)}
+.a-stn-head{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.a-stn-head .bigb{display:grid;place-items:center;width:78px;height:58px;border-radius:12px;color:#fff;font:600 22px var(--font-mono);letter-spacing:-.03em;flex:none}
+.a-stn-head h2{margin:0;font:800 30px/1 var(--font-display);font-stretch:112%;letter-spacing:.01em;display:flex;align-items:baseline;gap:12px}
+.a-stn-head h2 span{font:500 15px var(--font-text);color:var(--ink-70);letter-spacing:0}
+.a-stn-head .meta{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+/* heatmap */
+.hm{display:grid;grid-template-columns:40px repeat(24,minmax(0,1fr));gap:3px}
+.hm .c{height:26px;border-radius:4px}
+.hm .dlab{font:600 11.5px var(--font-text);color:var(--ink-50);align-self:center}
+.hm .hlab{font:500 10.5px var(--font-text);color:var(--ink-50);padding-top:5px;white-space:nowrap}
+.ramp{display:inline-flex;align-items:center;gap:2px;font:500 11px var(--font-text);color:var(--ink-50)}
+.ramp i{width:18px;height:8px;border-radius:2px;display:block}
+.ramp span{margin:0 6px}
+/* stacked 100 rows */
+.s100{display:grid;grid-template-columns:180px minmax(0,1fr) 64px;gap:14px;align-items:center;padding:7px 0;border-top:1px solid var(--hair);font-size:13px}
+.s100:first-child{border-top:0;padding-top:0}
+.s100 .bar{display:flex;gap:2px;height:14px}
+.s100 .bar span{display:block;height:100%}
+.s100 .bar span:first-child{border-radius:4px 0 0 4px}.s100 .bar span:last-child{border-radius:0 4px 4px 0}
+.s100 .n{text-align:right;font-weight:600}
+.s100.tot{border-top:1px solid var(--line);font-weight:700}
+/* flow */
+.flow2{display:grid;grid-template-columns:104px minmax(0,1fr) 40px;gap:10px;align-items:center;font-size:13px;padding:4px 0}
+.flow2 .fb{height:10px;border-radius:0 5px 5px 0;background:var(--main);min-width:2px}
+.flow2 .n{text-align:right;font-weight:600}
+/* incidents */
+.inc{display:grid;grid-template-columns:58px minmax(0,1fr);gap:12px;padding:11px 0;border-top:1px solid var(--hair);font-size:13.5px}
+.inc:first-child{border-top:0;padding-top:0}
+.inc .w{font-size:12px;color:var(--ink-50);line-height:1.4}
+.inc .w b{display:block;color:var(--ink-70);font-weight:600}
+.inc .t{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}
+.inc .t b{font-weight:600}
+.inc small{display:block;font-size:12.5px;color:var(--ink-70);margin-top:3px;line-height:1.45}
+.a-note{display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;background:var(--card-2);font-size:13px;color:var(--ink-70);margin-bottom:12px}
+.a-note b{color:var(--ink)}
+.a-note .dot{width:8px;height:8px;border-radius:50%;background:var(--standby-fill);flex:none}
+.a-callout{padding:11px 14px;border-radius:10px;background:color-mix(in srgb,var(--signal) 10%,transparent);font-size:13px;color:var(--ink-70);margin-top:14px;line-height:1.45}
+.a-callout b{color:var(--ink)}
+.a-foot{font-size:12.5px;color:var(--ink-50);margin:12px 2px 0;line-height:1.5}
+/* spec */
+.spec-t{width:100%;border-collapse:collapse;font-size:14.5px;margin:0 0 var(--s5)}
+.spec-t th{text-align:left;font:600 12.5px var(--font-text);color:var(--ink-50);padding:0 14px 8px 0;border-bottom:1px solid var(--line);vertical-align:bottom}
+.spec-t td{padding:10px 14px 10px 0;border-bottom:1px solid var(--hair);vertical-align:top;line-height:1.45;color:var(--ink-70)}
+.spec-t td:first-child{color:var(--ink);font-weight:600;width:19%}
+.spec-t code{font:500 12.5px var(--font-mono);color:var(--ink)}
+.spec-t .st{font:600 11.5px var(--font-text);white-space:nowrap}
+.st.have{color:var(--good)} .st.der{color:var(--signal)} .st.req{color:var(--standby)} .st.no{color:var(--ink-50)}
+.spec-h{font:700 22px/1.2 var(--font-display);letter-spacing:-.02em;margin:var(--s5) 0 var(--s3)}
+.spec-h:first-of-type{margin-top:0}
+.spec-p{color:var(--ink-70);font-size:16px;max-width:72ch;margin:0 0 var(--s3)}
+.spec-scroll{overflow-x:auto}
+@media (max-width:760px){ .spec-t td:first-child{width:auto} .spec-t{font-size:13.5px} }
+</style>
+
+
+
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <symbol id="mk" viewBox="0 0 62 50"><rect x="3.5" y="3.5" width="55" height="43" rx="11" fill="none" stroke="currentColor" stroke-width="7"/><circle cx="43" cy="18" r="5.5" fill="var(--tally)"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><path d="M10 18s-5.5-5.2-5.5-9.3A5.5 5.5 0 0 1 15.5 8.7C15.5 12.8 10 18 10 18Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="8.6" r="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 20 20"><path d="M6 4.5v11l9.5-5.5Z" fill="currentColor"/></symbol>
+  <symbol id="i-vol" viewBox="0 0 20 20"><path d="M3 8v4h3l4 3.5v-11L6 8Z" fill="currentColor"/><path d="M13 7.2a4 4 0 0 1 0 5.6M15.2 5a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M4 8V4h4M16 8V4h-4M4 12v4h4M16 12v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dial" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="10" r="1.7" fill="currentColor"/></symbol>
+  <symbol id="i-guide" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18M9 3v18" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20c1.2-3.7 4-5.5 7.5-5.5s6.3 1.8 7.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 20 20"><path d="M10 3v10M6.5 6.5L10 3l3.5 3.5M4.5 11v5h11v-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 20 20"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a2.8 2.8 0 0 0 4 4L11 13M13 11l1.5-1.5a2.8 2.8 0 0 0-4-4L9 7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-upload" viewBox="0 0 20 20"><path d="M10 13V4M6.5 7.5L10 4l3.5 3.5M4 13v3h12v-3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 20 20"><path d="M10 3l8 14H2Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10 8v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</defs></svg>
+
+
+<header class="ref-head"><div class="wrap">
+  <a class="ref-brand" href="#top"><svg><use href="#mk"/></svg>opencast</a>
+  <span class="crumb">Reference: Network desk, analytics</span>
+  <button class="ground-toggle" id="groundToggle" type="button">Light ground</button>
+</div></header>
+
+<main id="top">
+<section class="intro"><div class="wrap">
+  <div class="ch-label"><span class="n">Ref. 12d</span><span>Network desk, analytics</span></div>
+  <h1>Every station, added up and taken apart.</h1>
+  <p>The Network desk's analytics page. The whole network first: how many were tuned in, where, on what, and to which stations. Then any station, program, market or day on its own. Every number comes from data Opencast already collects, or names the small addition it needs. Part 08 lists the source of each one.</p>
+  <p>Same tokens and Network desk shell as Ref. 12a to 12c. Tuesday, October 6, 2026, looking at the last 7 days: Tuesday, September 29, to Monday, October 5.</p>
+  <ul class="toc">
+    <li><a href="#overview"><span class="mono">01</span>Overview</a></li>
+    <li><a href="#stations"><span class="mono">02</span>Stations</a></li>
+    <li><a href="#station"><span class="mono">03</span>One station</a></li>
+    <li><a href="#audience"><span class="mono">04</span>Audience</a></li>
+    <li><a href="#programs"><span class="mono">05</span>Programs and breaks</a></li>
+    <li><a href="#money"><span class="mono">06</span>Money</a></li>
+    <li><a href="#health"><span class="mono">07</span>Health</a></li>
+    <li><a href="#spec"><span class="mono">08</span>For the build pass</a></li>
+  </ul>
+  <div class="principles">
+    <div><h3>Sessions, not people</h3><p class="muted">Opencast counts tuned-in sessions and never knows who's watching. The page says "sessions" and "tuned in", and never "viewers" for something it can't count.</p></div>
+    <div><h3>Network, then any slice</h3><p class="muted">One set of filters (dates, market, band) runs through every tab. Any station, program or market opens to the same views, narrowed.</p></div>
+    <div><h3>Counted apart is shown apart</h3><p class="muted">Relays and other apps never go into the network total. They have their own lines, so nobody bills on them by mistake.</p></div>
+    <div><h3>Every number has a source</h3><p class="muted">Each figure traces to a table and a rule, and the CSV matches the page. Estimates are labelled as estimates.</p></div>
+  </div>
+</div></section>
+
+<section class="ref" id="overview"><div class="wrap">
+  <div class="ch-label"><span class="n">01</span><span>Overview</span></div>
+  <h2>The network this week, against the week before.</h2>
+  <p class="lede">What the desk opens to. Five numbers with their change and a week of trend, tuned in at once hour by hour across all seven days, where people watched, and the stations that made up the total. Relays and other apps sit to the side, outside the total.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1350"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1350px">
+  <div class="a-top" data-tab="overview"></div>
+  <div class="a-kpis" id="kpOverview"></div>
+  <div class="a-row r21">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Tuned in at once</h3><span class="s">Every station on Opencast, hour by hour</span></div><div class="e"><span class="lg"><i style="background:var(--main)"></i>This week</span><span class="lg"><i style="background:var(--prev)"></i>The week before</span></div></div>
+      <div class="viz" id="vNet" data-h="262"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Where they watch</h3><span class="s">Share of hours watched</span></div></div>
+      <div class="a-bar" id="surfBar"></div>
+      <div id="surfRows"></div>
+    </div>
+  </div>
+  <div class="a-row r21" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Stations</h3><span class="s">Top 7 of 13, by hours watched</span></div><div class="e"><a class="a-link" href="#stations">All 13 stations</a></div></div>
+      <div class="a-t" id="tbTop"></div>
+    </div>
+    <div class="a-stack">
+      <div class="a-card">
+        <div class="a-ch"><div><h3>Where they are</h3><span class="s">Hours, by market</span></div></div>
+        <div id="mktRows"></div>
+      </div>
+      <div class="a-card">
+        <div class="a-ch"><div><h3>Counted apart</h3><span class="s">Not in any number above</span></div></div>
+        <div id="apartRows"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Hours watched leads</h3><p>Hours watched is the one number that adds up across stations, markets and days. Average and peak tuned in only make sense for one moment, so they sit beside it, never summed.</p></div>
+      <div class="note"><h3>Compared with the same span</h3><p>Every delta is against the span just before, the same length. "7 days" compares with the 7 days before; "Today" with the same weekday last week, to the same minute.</p></div>
+      <div class="note"><h3>Hover for the hour</h3><p>The line answers "how many at 8 pm Saturday?" with this week and the week before. Every chart has the same numbers in Export CSV.</p></div>
+      <div class="note"><h3>Market leads see their market</h3><p>A market lead opens this already filtered to their market, and can't remove the filter. Admins see everything.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="stations"><div class="wrap">
+  <div class="ch-label"><span class="n">02</span><span>Stations</span></div>
+  <h2>Every station in one table, sortable by anything.</h2>
+  <p class="lede">The league table. Each row is a station's week: hours, change, average and peak tuned in, how many stayed to the end, "Not for me" votes, presets saved, dead air and what it earned. Claimable stations show held earnings, and the External station shows only what Opencast can count. Selecting a row opens the station (03).</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1199"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1199px">
+  <div class="a-top" data-tab="stations"></div>
+  <div class="a-card">
+    <div class="a-ch"><div><h3>13 stations</h3><span class="s">Sorted by hours watched. Select a row to open the station.</span></div><div class="e"><div class="a-seg" id="typeSeg"></div></div></div>
+    <div class="a-t" id="tbAll"></div>
+  </div>
+  <p class="a-foot" id="allNote"></p>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Stayed to the end</h3><p>Of the sessions tuned in at a program's first minute, the share still there at its last minute, averaged over the station's airings. It's the clearest single sign of whether programming holds people.</p></div>
+      <div class="note"><h3>"Not for me" per 1,000 hours</h3><p>Votes divided by hours watched, so a big station and a small one compare fairly. Only votes from sessions that watched at least 2 minutes count.</p></div>
+      <div class="note"><h3>Under the minimum</h3><p>FLDR never had 20 tuned in at once this week. The station sees "Not enough viewers yet". The desk sees hours and presets but not the per-airing numbers, which would be too few to mean anything.</p></div>
+      <div class="note"><h3>External stations</h3><p>RDLS plays its own stream, so there's nothing to earn and no dead air of ours. What it does have is time down: minutes its source was unreachable while someone was tuned in.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="station"><div class="wrap">
+  <div class="ch-label"><span class="n">03</span><span>One station</span></div>
+  <h2>BEAT 12.1, opened from the table.</h2>
+  <p class="lede">Everything the network view shows, for one station, plus what only makes sense for one: a night minute by minute with its breaks, each airing, where its audience came from and went, how its airtime was filled, what it earned, and what it costs Opencast to run.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1760"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1760px">
+  <a class="a-back" href="#stations"><svg><use href="#i-down"/></svg>All stations</a>
+  <div class="a-stn-head">
+    <span class="bigb" style="background:#8C3B7A">12.1</span>
+    <div><h2>BEAT <span>Beat Tape TV</span></h2><div class="meta"><span class="pill ne">Independent</span><span class="pill ne">Inland Empire</span><span class="pill ne">On the dial since June 14</span></div></div>
+    <div class="a-act"><div class="a-seg"><button>Today</button><button class="on">7 days</button><button>30 days</button><button>90 days</button></div><button class="a-btn">Open in master control</button></div>
+  </div>
+  <nav class="a-tabs"><a class="on" href="#station">Audience</a><a href="#station">Programs</a><a href="#station">Money</a><a href="#station">Health</a></nav>
+  <div class="a-kpis" id="kpStation"></div>
+  <div class="a-row r21">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Saturday night</h3><span class="s">Oct 3, 6 pm to 2 am, by the minute</span></div><div class="e"><span class="lg"><i style="background:var(--main)"></i>Oct 3</span><span class="lg"><i style="background:var(--prev)"></i>Sept 26</span><span class="lg"><i class="br"></i>Breaks</span></div></div>
+      <div class="viz" id="vSat" data-h="236"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Where they watch</h3><span class="s">Share of hours watched</span></div></div>
+      <div class="a-bar" id="stSurfBar"></div>
+      <div id="stSurfRows"></div>
+    </div>
+  </div>
+  <div class="a-row r21">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Airings</h3><span class="s">Saturday, Oct 3, evening</span></div><div class="e"><a class="a-link" href="#station">All 214 this week</a></div></div>
+      <div class="a-t" id="tbAir"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Where they are</h3><span class="s">Hours, by market</span></div></div>
+      <div id="stMkt"></div>
+      <div class="a-callout" style="margin-top:12px">Local businesses on BEAT pay only for the <b>81% placed in the Inland Empire</b>.</div>
+    </div>
+  </div>
+  <div class="a-row r111" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Came from, and went to</h3><span class="s">Each tune-in and tune-away</span></div></div>
+      <div class="a-sub">Came from</div><div id="flowIn"></div>
+      <div class="a-sub">Went to</div><div id="flowOut"></div>
+    </div>
+    <div class="a-stack">
+      <div class="a-card">
+        <div class="a-ch"><div><h3>How its airtime was filled</h3><span class="s">From the as-run log</span></div></div>
+        <div id="stAsRun"></div>
+      </div>
+      <div class="a-card">
+        <div class="a-ch"><div><h3>Earned</h3><span class="s">This week, after card fees</span></div></div>
+        <div id="stMoney"></div>
+      </div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Cost to run</h3><span class="s">Estimated, this week</span></div></div>
+      <div id="stCost"></div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The station's own view, and more</h3><p>The chart, airings and surfaces match BEAT's Audience page in master control to the number. The desk adds flow, cost to run and the comparison with the network.</p></div>
+      <div class="note"><h3>Breaks are shaded</h3><p>Each break in the night is a band. Most dips line up with them, which is what Programs and breaks (05) measures across the network.</p></div>
+      <div class="note"><h3>Flow, from session minutes</h3><p>A session's minutes in a row show where it was before and after. "Started here" means the session began on BEAT; "Stopped" means it ended there. Session rows go after 30 days, so the counts are added up every night and kept.</p></div>
+      <div class="note"><h3>Cost to run is an estimate</h3><p>Storage, relay hours, live hours and preparing are measured. Their price comes from a cost table in Settings, so the dollars are labelled "estimated". The margin line is what makes a free plan's real cost visible.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="audience"><div class="wrap">
+  <div class="ch-label"><span class="n">04</span><span>Audience</span></div>
+  <h2>When, how long, on what, and from where.</h2>
+  <p class="lede">The network's audience in depth. The week as an hour-by-day grid, how long sessions last, the surfaces day by day, how people move around the dial, and the relays beside it all. Pick a station at the top and every chart narrows to it.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1908"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1908px">
+  <div class="a-top" data-tab="audience" data-station="1"></div>
+  <div class="a-row r1">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Average tuned in, by hour and day</h3><span class="s">All stations, in the market's time</span></div><div class="e"><span class="ramp" id="hmRamp"></span></div></div>
+      <div class="viz" id="vHeat"></div>
+    </div>
+  </div>
+  <div class="a-row r111">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>How long sessions last</h3><span class="s" id="sessSub"></span></div></div>
+      <div class="viz" id="vSess" data-h="200"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Sessions</h3><span class="s">Counted once a player advances</span></div></div>
+      <div id="sessRows"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Presets</h3><span class="s">Stations saved to a phone or TV</span></div></div>
+      <div id="presetRows"></div>
+    </div>
+  </div>
+  <div class="a-row r11">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Where they watch, day by day</h3><span class="s">Hours</span></div></div>
+      <div class="viz" id="vSurfDays" data-h="210"></div>
+      <div class="a-lgs" id="surfLegend"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Relays</h3><span class="s">Average tuned in on each platform, by day</span></div><div class="e"><span class="pill ne">Never billed</span></div></div>
+      <div class="viz" id="vRelay" data-h="210"></div>
+      <div class="a-lgs" id="relayLegend"></div>
+    </div>
+  </div>
+  <div class="a-row r1" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Moving around the dial</h3><span class="s">The most common changes from one station to another</span></div><div class="e"><span class="a-upd" id="flowSum"></span></div></div>
+      <div class="a-t" id="tbFlow"></div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>The grid shows the shape of the week</h3><p>One square per hour per day, darker for more tuned in. Prime time on Friday and Saturday stands out at a glance, and so do dead hours worth programming differently. Hover any square for its number and last week's.</p></div>
+      <div class="note"><h3>Sessions under a minute aren't counted</h3><p>A session counts once its player has advanced media time. Bots are filtered before anything is counted, and the filtered share is shown with its reasons in Health (07).</p></div>
+      <div class="note"><h3>Moving around the dial</h3><p>Which changes happen most tells you which stations share an audience. That's useful for carriage offers ("REEL's viewers already come to BEAT") and for where to put a new station's number.</p></div>
+      <div class="note open"><h3>How people tuned in</h3><p>Opencast doesn't record whether a session started from a swipe, the guide, the keypad, search or a shared link. Knowing that would show which part of the viewer app finds people stations. It's one optional field on the heartbeat (see 08).</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="programs"><div class="wrap">
+  <div class="ch-label"><span class="n">05</span><span>Programs and breaks</span></div>
+  <h2>What holds people, and what loses them.</h2>
+  <p class="lede">Programs across every station that aired them, carried airings added in. Selecting one shows how many were still watching at each minute, with its breaks marked. Below that, breaks across the network: how many sessions stay through one, by length and by what opens it.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1609"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1609px">
+  <div class="a-top" data-tab="programs"></div>
+  <div class="a-row r1">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Programs</h3><span class="s">Every airing added up, carried ones included. Top 10 by hours watched.</span></div><div class="e"><div class="a-seg"><button class="on">Hours</button><button>Stayed</button><button>Not for me</button></div></div></div>
+      <div class="a-t" id="tbProg"></div>
+    </div>
+  </div>
+  <div class="a-row r11" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Late Crate, still watching</h3><span class="s">11 airings on 3 stations</span></div><div class="e"><span class="lg"><i class="br"></i>Breaks</span></div></div>
+      <div class="viz" id="vRet" data-h="200"></div>
+      <div class="a-sub" style="margin-top:14px">Tuned away, by minute</div>
+      <div class="viz" id="vAway" data-h="64"></div>
+      <p class="a-foot">The line is the share of each airing's first-minute audience still there.</p>
+      <div class="a-sub">Across the 11 airings</div>
+      <div id="retRows"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Breaks: how many stay</h3><span class="s">Share still there when the break ended</span></div></div>
+      <div class="viz" id="vHoldLen" data-h="170"></div>
+      <div class="a-sub" style="margin-top:16px">By position and first element</div>
+      <div id="holdRows"></div>
+      <div class="a-callout"><b>Breaks that open with a bumper keep 4 points more</b> than breaks that open straight into a spot. 61% of breaks this week opened with a bumper.</div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>A program across stations</h3><p>A maker's program counts every airing, its own and its carriers', the same way master control shows makers their numbers. Carriers' airings join the totals once two of them reach the minimum audience together.</p></div>
+      <div class="note"><h3>Still watching, not total audience</h3><p>The curve follows the people there at the start, so a program that gains viewers partway doesn't look like it held everyone. Tune-ins partway show in average tuned in, in the table.</p></div>
+      <div class="note"><h3>Break hold is the ad number</h3><p>It's what a spot buyer really pays for: people still there when their spot airs. Measured per break, by length, position and what opens it.</p></div>
+      <div class="note open"><h3>Counting breaks needs finer timing</h3><p>Minute samples are too coarse for a 30-second break. Break hold is worked out from session heartbeats around each break's start and end, and kept per break (see 08).</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="money"><div class="wrap">
+  <div class="ch-label"><span class="n">06</span><span>Money</span></div>
+  <h2>What stations earned, what Opencast took, and what it cost.</h2>
+  <p class="lede">Every dollar from the ledger: stations' earnings by kind, earnings held for claimable stations, the spot market's fill and rates, pay-as-you-go charges, and the estimated cost of running it all. One line shows whether the network paid for itself this week.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1859"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1859px">
+  <div class="a-top" data-tab="money"></div>
+  <div class="a-note"><span class="dot"></span><span><b>Opencast's share: not set yet.</b> The shares rule is still open in Settings, so nothing is taken from stations' earnings. The share fills in from the date the rule takes effect.</span></div>
+  <div class="a-kpis" id="kpMoney"></div>
+  <div class="a-row r21">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Earnings, week by week</h3><span class="s">All stations, before card fees, last 8 weeks</span></div></div>
+      <div class="viz" id="vRev" data-h="238"></div>
+      <div class="a-lgs" id="revLegend"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Spot market</h3><span class="s">This week</span></div></div>
+      <div id="spotRows"></div>
+    </div>
+  </div>
+  <div class="a-row r11">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Earned per 1,000 hours watched</h3><span class="s">Spots and sponsors, by station</span></div></div>
+      <div id="rpmRows"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Opencast's week</h3><span class="s">Charges in, estimated costs out</span></div></div>
+      <div id="ocRows"></div>
+    </div>
+  </div>
+  <div class="a-row r11" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Held for claimable stations</h3><span class="s">In escrow until each creator claims</span></div></div>
+      <div id="heldRows"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Carriage</h3><span class="s">Between stations, so not in the totals</span></div></div>
+      <div id="carRows"></div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Earned, from the ledger</h3><p>Every line is a sum of ledger entries, so the CSV lists the entries behind each number. Carriage moves money between stations, so it's shown as volume and never added to the network's earnings.</p></div>
+      <div class="note"><h3>Per 1,000 hours</h3><p>Ad money per 1,000 hours watched compares stations of any size. A low number on a big station means its breaks are open, not sold. That's a spot market lead.</p></div>
+      <div class="note"><h3>Opencast's share is still open</h3><p>The shares rule isn't set, so Opencast's share shows "Not set yet" in Settings' words, never a guessed $0. It fills in on the date the rule takes effect.</p></div>
+      <div class="note"><h3>The honest line</h3><p>Pay-as-you-go charges against the estimated cost to run. It's negative this week, which is expected before launch, and it's the number to watch as free plans grow.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="ref" id="health"><div class="wrap">
+  <div class="ch-label"><span class="n">07</span><span>Health</span></div>
+  <h2>How airtime was filled, and what went wrong.</h2>
+  <p class="lede">The as-run log for every station: how its minutes went to programs, breaks, live, planned off air, and the fills that cover a mistake. Next to it, the week's incidents with what happened and what Opencast did, and the sessions filtered as bots, with the reasons.</p>
+  <div class="stage">
+    <div class="fit" data-w="1280" data-h="1504"><div class="scaler">
+<div class="app nd" data-nav="analytics" style="height:1504px">
+  <div class="a-top" data-tab="health"></div>
+  <div class="a-kpis" id="kpHealth"></div>
+  <div class="a-row r21">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>How each station's airtime was filled</h3><span class="s">Share of the week's minutes, from the as-run log</span></div><div class="e"><span class="a-upd">Right: dead-air fill and slate</span></div></div>
+      <div class="a-lgs" id="asrLegend" style="margin:0 0 14px"></div>
+      <div id="asrRows"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Incidents</h3><span class="s">This week, newest last</span></div></div>
+      <div id="incRows"></div>
+    </div>
+  </div>
+  <div class="a-row r11" style="margin-bottom:0">
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Relays</h3><span class="s">7 stations relaying</span></div></div>
+      <div id="relayHealth"></div>
+    </div>
+    <div class="a-card">
+      <div class="a-ch"><div><h3>Filtered as bots</h3><span class="s" id="botSub"></span></div></div>
+      <div id="botRows"></div>
+    </div>
+  </div>
+</div>
+    </div></div>
+    <div class="notes">
+      <div class="note"><h3>Off air isn't a problem</h3><p>Planned off air hours are their own grey part of the bar and never count against a station. Dead-air fill and the slate are the mistakes: time nobody scheduled, or something that wasn't ready.</p></div>
+      <div class="note"><h3>Incidents explain themselves</h3><p>Each one says what happened, how long, how many were tuned in, and what playout did instead. That's the line the desk sends a station when it reaches out.</p></div>
+      <div class="note"><h3>Relay restarts are routine</h3><p>Planned restarts timed to breaks (YouTube's 12 hours, Twitch's 48) aren't incidents. A relay that dropped outside a break is.</p></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= 08 SPEC ================= -->
+<section class="ref" id="spec"><div class="wrap">
+  <div class="ch-label"><span class="n">08</span><span>For the build pass</span></div>
+  <h2>Where every number comes from.</h2>
+  <p class="lede">The metrics on these pages, the table each one reads, and how long the raw rows are kept. "Collected" exists in the repo today (staging, Oct 6). "Worked out" is derived from what's collected. "Needs adding" is a small addition, listed again under contract requests.</p>
+
+  <h3 class="spec-h">Audience</h3>
+  <div class="spec-scroll"><table class="spec-t">
+    <thead><tr><th>Metric</th><th>How it's worked out</th><th>Source</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Tuned in at once</td><td>Sessions whose heartbeat advanced media time in that minute, bots excluded. Average over a span is the mean of its minutes; peak is the highest minute.</td><td><code>audience.minute_samples.tuned_in</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Hours watched</td><td>The sum of every minute's tuned-in count, divided by 60. The radio band calls it hours listened.</td><td><code>minute_samples</code></td><td><span class="st der">Worked out</span></td></tr>
+      <tr><td>Where they watch</td><td>Phone, web, TV app, Cast and mirror per minute.</td><td><code>minute_samples.phone / web / tv_app / cast / mirror</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Where they are</td><td>The market placed from the session's address when it starts. The address isn't kept.</td><td><code>market_minutes</code>, <code>sessions.market_id</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Sessions and their length</td><td>Started to last heartbeat, per session. Session rows go after 30 days, so the count and the length buckets are added up every night and kept.</td><td><code>audience.sessions</code></td><td><span class="st req">Needs adding: daily totals</span></td></tr>
+      <tr><td>Moving around the dial</td><td>A session's consecutive minutes on two different stations is one change. Added up nightly by pair of stations, with "started here" and "stopped here".</td><td><code>session_minutes</code></td><td><span class="st req">Needs adding: nightly flows</span></td></tr>
+      <tr><td>Presets saved</td><td>Phones and TVs with the station on their dial presets.</td><td><code>AudienceReport.presetCount</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Relays</td><td>Tuned in on each relay platform, per minute, from the platform's own count. Never billed.</td><td><code>translator_minutes</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Other apps</td><td>Playlist requests with <code>via=iptv</code>, a run of polls counted as a session.</td><td>Programming prompt, Phase 5</td><td><span class="st req">Coming</span></td></tr>
+      <tr><td>How people tuned in</td><td>Swipe, guide, keypad, search, a shared link, or a preset. Optional.</td><td>A new <code>Heartbeat.via</code> field, first beat only</td><td><span class="st req">Needs adding</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="spec-h">Programs and breaks</h3>
+  <div class="spec-scroll"><table class="spec-t">
+    <thead><tr><th>Metric</th><th>How it's worked out</th><th>Source</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Stayed to the end</td><td>Of those at a program's first minute, the share at its last. A station's figure is the average over its airings.</td><td><code>airing_stats.stayed_to_end</code>, <code>audience_at_start</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Still watching, by minute</td><td>Worked out from the tune-aways per minute against the first minute's audience.</td><td><code>airing_stats.tune_aways[]</code></td><td><span class="st der">Worked out</span></td></tr>
+      <tr><td>"Not for me" per 1,000 hours</td><td>Counted votes (2 minutes watched or more) divided by hours watched.</td><td><code>airing_stats.not_for_me</code>, <code>watch_seconds</code></td><td><span class="st der">Worked out</span></td></tr>
+      <tr><td>A program across stations</td><td>Every airing added up, carriers' once two airings reach the minimum together.</td><td><code>MakerProgramWatch</code> rules</td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Break hold</td><td>Sessions tuned in at a break's start, still there at its end, from heartbeats rather than minute samples. Kept per break with its length, position and first element.</td><td>A new <code>break_stats</code> table, from <code>sessions</code> and <code>as_run</code></td><td><span class="st req">Needs adding</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="spec-h">Money, airtime and cost</h3>
+  <div class="spec-scroll"><table class="spec-t">
+    <thead><tr><th>Metric</th><th>How it's worked out</th><th>Source</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Earned, by kind</td><td>Ledger entries by kind: spots, sponsors, pledges, catalog sponsors, card fees. Carriage is shown as volume.</td><td><code>ledger</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Held for claimable stations</td><td>Escrow balances by station, with the date each one goes to the CreatorFund.</td><td><code>ledger</code> encumbrances, escrow contracts</td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Spot market</td><td>Breaks with spots against open time, the average rate per 1,000 tuned in, and spots held and settled.</td><td><code>breaks</code>, <code>airings</code>, <code>as_run</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>How airtime was filled</td><td>As-run minutes by reason: planned, live, off air, dead-air fill, slate, and break content.</td><td><code>as_run.reason</code>, <code>code</code></td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Pay-as-you-go charges</td><td>Storage, relay hours on "Everything I air", and live hours past the free allowance.</td><td>Billing</td><td><span class="st have">Collected</span></td></tr>
+      <tr><td>Cost to run, estimated</td><td>Measured usage (stored bytes, preparing minutes, relay hours, live minutes) times unit prices from a new <code>costs</code> rule group in Settings.</td><td>Usage is collected; preparing minutes and the prices need adding</td><td><span class="st req">Needs adding</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="spec-h">Not collected, on purpose</h3>
+  <p class="spec-p">People. Opencast counts sessions: one person on a phone and a TV is two sessions, and the same person tomorrow is a new one. There's no "unique viewers" across days, no age, gender or other demographics, no address and no location finer than the market. Signed-in watch history stays the person's own and never feeds these pages. The page never uses "viewers" for a number it can't count; it says "tuned in", "sessions" or "hours".</p>
+
+  <h3 class="spec-h">Rules the pages follow</h3>
+  <div class="spec-scroll"><table class="spec-t">
+    <tbody>
+      <tr><td>The minimum audience</td><td>Below 20 tuned in at once (the <code>watch_data.minimum_audience</code> rule), a station sees "Not enough viewers yet". The desk sees hours, presets and sessions, but not per-airing numbers, and the station row is marked "Under the minimum".</td></tr>
+      <tr><td>Who sees what</td><td>Admins see everything. Market leads see their market only, with the filter fixed. Rights reviewers don't see analytics.</td></tr>
+      <tr><td>Freshness</td><td>"Today" reads minute samples live, every minute. Every other span reads the nightly totals, updated at 6:00 am market time, and says so beside Export CSV.</td></tr>
+      <tr><td>Comparison</td><td>Always the span just before, of the same length. "Today" compares with the same weekday last week, to the same minute.</td></tr>
+      <tr><td>Exports</td><td>Every tab exports its tables as CSV, with the same columns and filters as the page.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 class="spec-h">Contract requests</h3>
+  <div class="spec-scroll"><table class="spec-t">
+    <thead><tr><th>Request</th><th>What it adds</th></tr></thead>
+    <tbody>
+      <tr><td><code>deskApi.analytics</code></td><td><code>GET /desk/analytics/{overview|stations|stations/:id|programs|audience|money|health}</code> with <code>from</code>, <code>to</code>, <code>market</code>, <code>band</code> and <code>station</code>, plus <code>format=csv</code>. Roles: admin, and market lead scoped to their market.</td></tr>
+      <tr><td>Nightly totals</td><td><code>daily_session_stats</code> (sessions, length buckets, bots by reason) and <code>station_flows</code> (station pairs, started here, stopped here), written before the 30-day session cleanup runs.</td></tr>
+      <tr><td><code>break_stats</code></td><td>One row per aired break: start, length, position (opening, middle, closing), first element, tuned in at start, still there at end.</td></tr>
+      <tr><td><code>Heartbeat.via</code></td><td>Optional, first beat only: <code>swipe</code>, <code>guide</code>, <code>keypad</code>, <code>search</code>, <code>link</code>, <code>preset</code>. Kept as a nightly count by station, never per session after 30 days.</td></tr>
+      <tr><td>Cost to run</td><td>A <code>costs</code> rule group in Settings (price per GB-month by storage class, per preparing minute, per relay hour, per live minute), and preparing minutes recorded on each prepare job.</td></tr>
+      <tr><td>Desk rail</td><td>"Analytics" goes first in the rail, under Network. Ref. 12a to 12c still show the old rail.</td></tr>
+    </tbody>
+  </table></div>
+</div></section>
+</main>
+<footer style="border-top:1px solid var(--hair);padding:var(--s5) 0"><div class="wrap"><p class="quiet" style="font-size:13px;margin:0;max-width:80ch">Opencast reference, Network desk analytics. Stations, programs, audiences, amounts and costs are illustrations. Opencast is a working name.</p></div></footer>
+
+<script>
+(function(){
+  /* Network desk shell */
+  var NAV = [['Network',[['analytics','Analytics']]],['Markets',[['board','Market board'],['pipeline','Creator pipeline','4'],['listed','External sources','1'],['catalog','Catalog']]],['Stations',[['team','Held earnings','$227'],['claims','Rights claims'],['reserved','Reserved call signs','26']]],['Opencast',[['sponsors','Catalog sponsors'],['settings','Settings']]]];
+  document.querySelectorAll('.app.nd').forEach(function(app){
+    var nav=app.dataset.nav, content=app.innerHTML;
+    var head='<div class="nd-head"><span class="mc-lock"><span class="a-logo"><svg><use href="#mk"/></svg>opencast</span><span class="div"></span><b>Network desk</b></span><span class="internal">Internal</span><div class="end"><span class="quiet" style="font-size:13px">Opencast team</span><span class="avatar">DA</span></div></div>';
+    var rail='<nav class="mc-rail nd-rail">'+NAV.map(function(g){ return '<div class="g">'+g[0]+'</div>'+g[1].map(function(it){ return '<a href="#top" class="'+(it[0]===nav?'on':'')+'">'+it[1]+(it[2]?'<span class="ct">'+it[2]+'</span>':'')+'</a>'; }).join(''); }).join('')+'</nav>';
+    app.innerHTML=head+'<div class="mc-body">'+rail+'<div class="mc-main">'+content+'</div></div>';
+  });
+  function fitAll(){ document.querySelectorAll('.fit').forEach(function(f){ var w=+f.dataset.w, h=+f.dataset.h, s=Math.min(1, f.clientWidth/w); var sc=f.querySelector('.scaler'); sc.style.transform='scale('+s+')'; sc.style.width=w+'px'; f.style.height=(h*s)+'px'; }); }
+  fitAll(); window.addEventListener('resize', fitAll);
+  if (window.ResizeObserver){ var ro=new ResizeObserver(fitAll); document.querySelectorAll('.fit').forEach(function(f){ ro.observe(f); }); }
+  var root=document.documentElement, btn=document.getElementById('groundToggle');
+  function cur(){ var t=root.getAttribute('data-theme'); if(t) return t; return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'; }
+  function lab(){ btn.textContent = cur()==='dark'?'Light ground':'Dark ground'; }
+  try { var sv=localStorage.getItem('oc-ground'); if(sv==='dark'||sv==='light') root.setAttribute('data-theme', sv); } catch(e){}
+  lab();
+  btn.addEventListener('click', function(){ var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme', n); try{ localStorage.setItem('oc-ground', n); }catch(e){} lab(); });
+})();
+</script>
+<script>(function(){
+'use strict';
+/* ---------- helpers ---------- */
+function rng(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; var t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+var R=rng(20261006);
+function nf(n,d){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+function money(n){ return (n<0?'−':'')+'$'+nf(Math.abs(n),2); }
+function pct(n,d){ return nf(n,d||0)+'%'; }
+function delta(cur,prev){ if(!prev) return '<span class="pill ne">New</span>'; var p=(cur-prev)/prev*100; var c=Math.abs(p)<0.5?'fl':(p>0?'up':'dn'); return '<span class="pill '+c+'">'+(c==='fl'?'Flat':(p>0?'↑ ':'↓ ')+nf(Math.abs(p),0)+'%')+'</span>'; }
+function deltaInv(cur,prev){ if(!prev) return '<span class="pill dn">New</span>'; var p=(cur-prev)/prev*100; var c=Math.abs(p)<0.5?'fl':(p<0?'up':'dn'); return '<span class="pill '+c+'">'+(c==='fl'?'Flat':(p>0?'↑ ':'↓ ')+nf(Math.abs(p),0)+'%')+'</span>'; }
+function $(id){ return document.getElementById(id); }
+function set(id,h){ var e=$(id); if(e) e.innerHTML=h; }
+var NS='http://www.w3.org/2000/svg';
+var DAYS=['Tue','Wed','Thu','Fri','Sat','Sun','Mon'];
+var DATES=['Sept 29','Sept 30','Oct 1','Oct 2','Oct 3','Oct 4','Oct 5'];
+function hourLabel(h){ var hh=h%24; return (hh%12===0?12:hh%12)+(hh<12?' am':' pm'); }
+function clock(min){ var h=Math.floor(min/60)%24, m=min%60; return (h%12===0?12:h%12)+':'+(m<10?'0':'')+m+(h<12?' am':' pm'); }
+
+/* ---------- stations ---------- */
+var ST=[
+ {cs:'BEAT',n:'12.1',band:'tv',type:'Independent',col:'#8C3B7A',name:'Beat Tape TV',avg:96,last:84,stayed:64,nfm:3.2,presets:412,pl:374,dead:0,earn:553.42,ads:180.98,shape:'tv'},
+ {cs:'REEL',n:'24.1',band:'tv',type:'Independent',col:'#9A5412',name:'Saturday Reel',avg:71,last:66,stayed:58,nfm:4.1,presets:288,pl:271,dead:0,earn:402.10,ads:294.40,shape:'film'},
+ {cs:'SAZN',n:'18.1',band:'tv',type:'Independent',col:'#A3402A',name:'Sazón',avg:52,last:55,stayed:61,nfm:2.4,presets:236,pl:229,dead:12,earn:318.75,ads:281.02,shape:'day'},
+ {cs:'OCAT',n:'60.1',band:'tv',type:'Catalog',col:'#3F4960',name:'Opencast Classics',avg:41,last:43,stayed:49,nfm:6.8,presets:150,pl:147,dead:0,cat:96.00,ads:0,shape:'tv'},
+ {cs:'NITE',n:'88.4',band:'radio',type:'Independent',col:'#33507A',name:'Night Shift Radio',avg:38,last:34,stayed:70,nfm:1.9,presets:201,pl:190,dead:0,earn:241.30,ads:141.25,shape:'late'},
+ {cs:'RDLS',n:'9.1',band:'tv',type:'External',col:'#525C73',name:'Redlands Community TV',avg:34,last:35,stayed:52,nfm:5.0,presets:96,pl:95,dead:null,down:14,shape:'day'},
+ {cs:'LUPE',n:'33.1',band:'tv',type:'Claimable',col:'#7B5B2A',name:'Tía Lupe’s Kitchen',avg:31,last:22,stayed:55,nfm:2.9,presets:133,pl:98,dead:0,held:118.40,ads:92.60,shape:'day'},
+ {cs:'VOZE',n:'104.2',band:'radio',type:'Independent',col:'#1D6A70',name:'La Voz del Valle',avg:26,last:25,stayed:66,nfm:2.2,presets:141,pl:136,dead:3,earn:156.90,ads:118.30,shape:'radio'},
+ {cs:'CIVC',n:'7.1',band:'tv',type:'Independent',col:'#2E6B5A',name:'Civic Channel',avg:22,last:20,stayed:47,nfm:8.9,presets:88,pl:85,dead:0,earn:61.00,ads:41.00,shape:'civic'},
+ {cs:'HALL',n:'90.6',band:'radio',type:'Independent',col:'#56508A',name:'Hall Radio',avg:17,last:18,stayed:59,nfm:3.6,presets:74,pl:74,dead:0,earn:72.15,ads:52.15,shape:'radio'},
+ {cs:'CRAT',n:'101.8',band:'radio',type:'Claimable',col:'#6B4A2E',name:'Crate Radio',avg:14,last:11,stayed:62,nfm:2.5,presets:61,pl:52,dead:0,held:81.20,ads:58.70,shape:'late'},
+ {cs:'PREP',n:'31.1',band:'tv',type:'Independent',col:'#1F5E8C',name:'Prep Sports',avg:12,last:14,stayed:38,nfm:11.4,presets:40,pl:41,dead:47,slate:9,earn:18.30,ads:12.30,shape:'day'},
+ {cs:'FLDR',n:'92.0',band:'radio',type:'Claimable',col:'#4E6B3A',name:'Mojave Field Recordings',avg:4,last:5,under:true,presets:22,pl:21,dead:0,held:27.40,ads:0,shape:'flat'}
+];
+var SHAPES={
+ tv:[.35,.25,.18,.14,.12,.14,.25,.4,.5,.55,.6,.65,.75,.75,.7,.75,.85,1,1.35,1.9,2.6,2.8,2.2,1.3],
+ day:[.3,.2,.15,.12,.12,.2,.5,.8,1,1.1,1.2,1.4,1.5,1.3,1.2,1.3,1.5,1.8,2,1.8,1.5,1.2,.8,.5],
+ radio:[.4,.3,.25,.25,.4,.9,1.7,2.2,1.9,1.4,1.2,1.2,1.3,1.2,1.1,1.3,1.7,1.9,1.5,1.1,.9,.8,.7,.5],
+ late:[1.6,1.3,.9,.6,.4,.3,.4,.5,.5,.5,.5,.6,.6,.6,.6,.7,.8,.9,1,1.2,1.5,1.9,2.3,2.1],
+ flat:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+};
+function rawShape(kind,d,h){
+  var k=kind==='film'?'tv':kind==='civic'?'day':kind, v=SHAPES[k][h];
+  var fri=d===3, sat=d===4, sun=d===5, wkd=sat||sun;
+  if(kind==='tv'||kind==='film'){ if((fri||sat)&&h>=18) v*=kind==='film'?1.45:1.25; if(wkd&&h>=9&&h<18) v*=1.3; }
+  if(kind==='day'&&wkd&&h>=8&&h<19) v*=1.3;
+  if(kind==='radio'&&wkd&&h>=6&&h<10) v*=.6;
+  if(kind==='late'&&(fri||sat)&&(h>=21||h<2)) v*=1.3;
+  if(kind==='civic'){ v=v*.55; if(d===0&&h>=18&&h<21) v*=5.2; if(d===2&&h>=18&&h<20) v*=2.4; }
+  return v;
+}
+ST.forEach(function(s,si){
+  var raw=[],i,d,h,sum=0;
+  for(d=0;d<7;d++) for(h=0;h<24;h++){ var v=rawShape(s.shape,d,h); raw.push(v); sum+=v; }
+  var mean=sum/168, r=rng(1000+si);
+  s.hr=raw.map(function(v){ return s.avg*v/mean*(1+(r()-.5)*.12); });
+  s.prev=raw.map(function(v,j){ var dd=Math.floor(j/24); return s.last*v/mean*(1+(r()-.5)*.14)*(s.shape==='civic'&&dd===0&&(j%24)>=18&&(j%24)<21?.9:1); });
+  s.hours=s.hr.reduce(function(a,b){return a+b;},0);
+  s.hoursPrev=s.prev.reduce(function(a,b){return a+b;},0);
+  var mx=0,mi=0; s.hr.forEach(function(v,j){ if(v>mx){mx=v;mi=j;} });
+  s.peak=Math.round(mx*1.09); s.peakMin=Math.floor(r()*50)+5; s.peakAt=DAYS[Math.floor(mi/24)]+' '+clock((mi%24)*60+s.peakMin);
+  s.daily=[]; for(d=0;d<7;d++){ var t=0; for(h=0;h<24;h++) t+=s.hr[d*24+h]; s.daily.push(t); }
+});
+var BEAT=ST[0]; BEAT.peak=318; BEAT.peakAt='Sat 8:36 pm';
+var NET=[],NETP=[]; for(var j=0;j<168;j++){ var a=0,b=0; ST.forEach(function(s){a+=s.hr[j];b+=s.prev[j];}); NET.push(a); NETP.push(b); }
+var netHours=NET.reduce(function(a,b){return a+b;},0), netHoursP=NETP.reduce(function(a,b){return a+b;},0);
+var nmx=0,nmi=0; NET.forEach(function(v,j){ if(v>nmx){nmx=v;nmi=j;} });
+var netPeak=Math.round(nmx*1.06), netPeakAt=DAYS[Math.floor(nmi/24)]+' '+clock((nmi%24)*60+34);
+var netPeakP=Math.round(Math.max.apply(null,NETP)*1.06);
+var MEAN_SESS=23, sessions=Math.round(netHours*60/MEAN_SESS), sessionsP=Math.round(netHoursP*60/(MEAN_SESS-.6));
+var BOT=0.061, botN=Math.round(sessions/(1-BOT)*BOT);
+var withAud=ST.filter(function(s){return !s.under;}).length;
+
+/* ---------- tooltip + svg helpers ---------- */
+function el(tag,attrs,parent){ var e=document.createElementNS(NS,tag); for(var k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+function tipFor(box){ var t=box.querySelector('.tip'); if(!t){ t=document.createElement('div'); t.className='tip'; box.appendChild(t);} return t; }
+function showTip(box,html,fx,fy){ var t=tipFor(box); t.innerHTML=html; t.style.opacity=1; var W=box.offsetWidth; var tw=t.offsetWidth; var left=fx*W+14; if(left+tw>W) left=fx*W-tw-14; if(left<0) left=0; t.style.left=left+'px'; t.style.top=Math.max(0,fy-10)+'px'; }
+function hideTip(box){ var t=box.querySelector('.tip'); if(t) t.style.opacity=0; }
+function niceMax(v){ var p=Math.pow(10,Math.floor(Math.log10(v))), n=v/p; var m=n<=1?1:n<=1.5?1.5:n<=2?2:n<=2.5?2.5:n<=3?3:n<=4?4:n<=5?5:n<=6?6:n<=8?8:10; return m*p; }
+
+/* line chart */
+function lineChart(box,o){
+  var W=box.offsetWidth, H=+box.dataset.h||200, pl=o.pl||42, pr=10, pt=8, pb=22;
+  var svg=el('svg',{viewBox:'0 0 '+W+' '+H,height:H},null); box.appendChild(svg);
+  var n=o.series[0].v.length, max=o.max||niceMax(Math.max.apply(null,o.series.map(function(s){return Math.max.apply(null,s.v);}))*1.05);
+  function X(i){ return pl+(W-pl-pr)*i/(n-1); } function Y(v){ return pt+(H-pt-pb)*(1-v/max); }
+  (o.bands||[]).forEach(function(b){ el('rect',{x:X(b[0]),y:pt,width:Math.max(1,X(b[1])-X(b[0])),height:H-pt-pb,fill:'var(--brk)'},svg); });
+  var ticks=o.yTicks||4; for(var t=0;t<=ticks;t++){ var v=max*t/ticks, y=Y(v); el('line',{x1:pl,x2:W-pr,y1:y,y2:y,class:'gl'},svg); var tx=el('text',{x:pl-8,y:y+3.5,'text-anchor':'end',class:'ax'},svg); tx.textContent=o.yFmt?o.yFmt(v):nf(v); }
+  (o.xTicks||[]).forEach(function(x){ var xx=X(x.i); if(x.line) el('line',{x1:xx,x2:xx,y1:pt,y2:H-pb,class:'gl'},svg); var tx=el('text',{x:xx+(x.anchor==='start'?4:0),y:H-6,'text-anchor':x.anchor||'middle',class:x.word?'axl':'ax'},svg); tx.textContent=x.label; });
+  o.series.slice().reverse().forEach(function(s){
+    var d=s.v.map(function(v,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);}).join('');
+    if(s.area) el('path',{d:d+'L'+X(n-1)+' '+Y(0)+'L'+X(0)+' '+Y(0)+'Z',fill:'var(--wash)'},svg);
+    el('path',{d:d,class:'ln',stroke:s.color,'stroke-width':s.w||2},svg);
+  });
+  (o.marks||[]).forEach(function(m){ var cx=X(m.i), cy=Y(o.series[0].v[m.i]); el('circle',{cx:cx,cy:cy,r:4.5,fill:'var(--main)',stroke:'var(--card)','stroke-width':2},svg); var tx=el('text',{x:cx+(m.anchor==='end'?-8:8),y:cy-(m.dy||8),'text-anchor':m.anchor||'start',class:'lab'},svg); tx.textContent=m.label; });
+  var xh=el('line',{y1:pt,y2:H-pb,class:'xh'},svg);
+  var dots=o.series.map(function(s){ return el('circle',{r:4,fill:s.color,stroke:'var(--card)','stroke-width':2,opacity:0},svg); });
+  var hit=el('rect',{x:pl,y:0,width:W-pl-pr,height:H,class:'hit'},svg);
+  hit.addEventListener('mousemove',function(e){ var r=svg.getBoundingClientRect(), x=(e.clientX-r.left)/r.width*W; var i=Math.max(0,Math.min(n-1,Math.round((x-pl)/(W-pl-pr)*(n-1)))); var xx=X(i); xh.setAttribute('x1',xx); xh.setAttribute('x2',xx); xh.style.opacity=1; dots.forEach(function(dt,k){ dt.setAttribute('cx',xx); dt.setAttribute('cy',Y(o.series[k].v[i])); dt.setAttribute('opacity',1); }); showTip(box,o.tip(i),xx/W,Y(o.series[0].v[i])); });
+  hit.addEventListener('mouseleave',function(){ xh.style.opacity=0; dots.forEach(function(dt){dt.setAttribute('opacity',0);}); hideTip(box); });
+}
+/* stacked / single columns */
+function colChart(box,o){
+  var W=box.offsetWidth, H=+box.dataset.h||180, pl=o.pl||42, pr=6, pt=14, pb=22;
+  var svg=el('svg',{viewBox:'0 0 '+W+' '+H,height:H},null); box.appendChild(svg);
+  var n=o.cats.length, tot=o.cats.map(function(_,i){ return o.series.reduce(function(a,s){return a+s.v[i];},0); });
+  var max=o.max||niceMax(Math.max.apply(null,tot)*1.08);
+  var band=(W-pl-pr)/n, bw=Math.min(o.bw||24,band*.6);
+  function Y(v){ return pt+(H-pt-pb)*(1-v/max); }
+  var ticks=o.yTicks||4; for(var t=0;t<=ticks;t++){ var v=max*t/ticks, y=Y(v); el('line',{x1:pl,x2:W-pr,y1:y,y2:y,class:'gl'},svg); var tx=el('text',{x:pl-8,y:y+3.5,'text-anchor':'end',class:'ax'},svg); tx.textContent=o.yFmt?o.yFmt(v):nf(v); }
+  o.cats.forEach(function(c,i){
+    var cx=pl+band*(i+.5), x=cx-bw/2, base=0, segs=[];
+    o.series.forEach(function(s){ if(s.v[i]>0) segs.push({s:s,v:s.v[i]}); });
+    segs.forEach(function(sg,k){
+      var y0=Y(base), y1=Y(base+sg.v); base+=sg.v;
+      var top=k===segs.length-1, gap=k>0?2:0, hgt=Math.max(0,y0-y1-gap), yTop=y1;
+      if(top&&hgt>4){ var rr=4; el('path',{d:'M'+x+' '+(yTop+hgt)+'V'+(yTop+rr)+'Q'+x+' '+yTop+' '+(x+rr)+' '+yTop+'H'+(x+bw-rr)+'Q'+(x+bw)+' '+yTop+' '+(x+bw)+' '+(yTop+rr)+'V'+(yTop+hgt)+'Z',fill:sg.s.color},svg); }
+      else el('rect',{x:x,y:yTop,width:bw,height:hgt,fill:sg.s.color},svg);
+    });
+    if(o.labelTop){ var tx0=el('text',{x:cx,y:Y(tot[i])-5,'text-anchor':'middle',class:'lab'},svg); tx0.textContent=o.labelTop(i,tot[i]); }
+    var tx=el('text',{x:cx,y:H-6,'text-anchor':'middle',class:o.wordCats?'axl':'ax'},svg); tx.textContent=c;
+    var hit=el('rect',{x:pl+band*i,y:0,width:band,height:H,class:'hit'},svg);
+    hit.addEventListener('mousemove',function(){ showTip(box,o.tip(i,tot[i]),cx/W,Y(tot[i])); });
+    hit.addEventListener('mouseleave',function(){ hideTip(box); });
+  });
+}
+function legend(items){ return items.map(function(it){ return '<span class="lg"><i class="sq" style="background:'+it[1]+'"></i>'+it[0]+'</span>'; }).join(''); }
+
+
+/* ---------- v2 building blocks ---------- */
+function stn(s,sub,tag){ return '<div class="stn"><span class="badge" style="background:'+s.col+'">'+s.n+'</span><div><b>'+s.cs+(tag||'')+'</b><small>'+(sub!==undefined?sub:s.name)+'</small></div></div>'; }
+function ttag(s){ var t={Claimable:'cl',Catalog:'ne',External:'ex'}[s.type]; return t?' <span class="pill '+t+'" style="height:17px;font-size:10.5px;padding:0 6px;margin-left:4px;letter-spacing:0;font-stretch:100%">'+s.type+'</span>':''; }
+function st(cs){ return ST.filter(function(s){return s.cs===cs;})[0]; }
+var SPK=[];
+function kpis(id,items){
+  set(id,items.map(function(k){
+    var sk=''; if(k.spark){ SPK.push({id:id+'_'+SPK.length,v:k.spark,c:k.sc||'var(--main)'}); sk='<span class="sk" id="'+SPK[SPK.length-1].id+'"></span>'; }
+    return '<div class="a-kpi'+(k.spark?'':' nosk')+'"><span class="l">'+(k.st?'<i class="st" style="background:'+k.st+'"></i>':'')+k.l+'</span><span class="v'+(k.mute?' mute':'')+'">'+k.v+'</span><span class="d">'+(k.d||'')+'<span>'+(k.c||'')+'</span></span>'+sk+'</div>';
+  }).join(''));
+}
+function drawSparks(){
+  SPK.forEach(function(s){ var box=$(s.id); if(!box) return; var W=box.offsetWidth, H=36, n=s.v.length, mx=Math.max.apply(null,s.v), mn=Math.min.apply(null,s.v); var lo=mn-(mx-mn)*.25, hi=mx+(mx-mn)*.15||1;
+    function X(i){ return 16+(W-32)*i/(n-1); } function Y(v){ return 4+(H-10)*(1-(v-lo)/((hi-lo)||1)); }
+    var d=s.v.map(function(v,i){return (i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1);}).join('');
+    box.innerHTML='<svg viewBox="0 0 '+W+' '+H+'"><path d="'+d+'L'+X(n-1)+' '+H+'L'+X(0)+' '+H+'Z" fill="var(--wash)"/><path d="'+d+'" fill="none" stroke="'+s.c+'" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round"/><circle cx="'+X(n-1)+'" cy="'+Y(s.v[n-1])+'" r="3.5" fill="'+s.c+'" stroke="var(--card)" stroke-width="2"/></svg>';
+  });
+}
+function li(label,val,p,opt){ opt=opt||{}; return '<div class="a-li'+(opt.k?' k':'')+(opt.two?' two':'')+(opt.tot?' tot':'')+'">'+(opt.k?'<span class="kk" style="background:'+opt.k+'"></span>':'')+'<span>'+label+'</span><span class="v'+(opt.cls?' '+opt.cls:'')+'">'+val+'</span>'+(opt.two?'':'<span class="p">'+(p||'')+'</span>')+'</div>'; }
+var TABS=[['overview','Overview'],['stations','Stations'],['programs','Programs'],['audience','Audience'],['money','Money'],['health','Health']];
+document.querySelectorAll('.a-top').forEach(function(t){
+  var tab=t.dataset.tab, ws=t.dataset.station==='1';
+  t.outerHTML='<div class="an-head"><div><h2>Analytics</h2><p>Every station on Opencast, in every market</p></div><div class="a-act"><span class="a-upd"><i></i>Updated today, 6:00 am</span><button class="a-btn">Export CSV</button></div></div>'+
+   '<nav class="a-tabs">'+TABS.map(function(x){ return '<a href="#'+x[0]+'"'+(x[0]===tab?' class="on"':'')+'>'+x[1]+'</a>'; }).join('')+'</nav>'+
+   '<div class="a-fil"><div class="a-seg"><button>Today</button><button class="on">7 days</button><button>30 days</button><button>90 days</button><button>Custom</button></div><span class="a-vs">Sept 29 to Oct 5, vs Sept 22 to 28</span><span class="sp"></span>'+
+   (ws?'<button class="a-f">Station <b>All</b><svg><use href="#i-down"/></svg></button>':'')+
+   '<button class="a-f">Market <b>All markets</b><svg><use href="#i-down"/></svg></button><button class="a-f">Band <b>TV and radio</b><svg><use href="#i-down"/></svg></button></div>';
+});
+var dayTot=[], dayTotP=[], dayPeak=[]; for(var dd0=0;dd0<7;dd0++){ var a0=0,b0=0,m0=0; for(var hh0=0;hh0<24;hh0++){ a0+=NET[dd0*24+hh0]; b0+=NETP[dd0*24+hh0]; m0=Math.max(m0,NET[dd0*24+hh0]); } dayTot.push(a0); dayTotP.push(b0); dayPeak.push(m0*1.06); }
+
+/* ---------- 01 overview ---------- */
+var SURF=[['Phone','var(--c1)',.41],['Web','var(--c2)',.22],['TV app','var(--c3)',.19],['Cast','var(--c4)',.13],['iPhone mirror','var(--c5)',.05]];
+var MKT=[['Inland Empire',.71,'Home market'],['Los Angeles',.13],['San Diego',.03],['Elsewhere in the US',.09],['Outside the US',.04]];
+var avgAt=netHours/168, avgAtP=netHoursP/168;
+kpis('kpOverview',[
+ {l:'Hours watched',v:nf(netHours),d:delta(netHours,netHoursP),c:'vs '+nf(netHoursP),spark:dayTot},
+ {l:'Average tuned in',v:nf(avgAt),d:delta(avgAt,avgAtP),c:'vs '+nf(avgAtP),spark:dayTot.map(function(v){return v/24;})},
+ {l:'Peak tuned in',v:nf(netPeak),d:delta(netPeak,netPeakP),c:netPeakAt,spark:dayPeak},
+ {l:'Sessions',v:nf(sessions),d:delta(sessions,sessionsP),c:pct(BOT*100,1)+' bots filtered',spark:dayTot.map(function(v){return v*60/MEAN_SESS;})},
+ {l:'Median session',v:'9<small>min</small>',d:'<span class="pill fl">Flat</span>',c:'Average 23 min',spark:[8,9,8,10,12,11,8]}
+]);
+var xt=[]; for(var d=0;d<7;d++) xt.push({i:d*24,label:DAYS[d]+' '+DATES[d].split(' ')[1],anchor:'start',line:d>0});
+lineChart($('vNet'),{series:[{v:NET,color:'var(--main)',area:true},{v:NETP,color:'var(--prev)',w:1.5}],xTicks:xt,max:1500,yTicks:3,
+ marks:[{i:nmi,label:'Peak '+nf(netPeak)+', '+netPeakAt,anchor:'end'}],
+ tip:function(i){ var dd=Math.floor(i/24), h=i%24; return '<b>'+DAYS[dd]+' '+DATES[dd]+', '+hourLabel(h)+'</b><div class="r"><span><i style="background:var(--main)"></i>This week</span><span>'+nf(NET[i])+'</span></div><div class="r"><span><i style="background:var(--prev)"></i>Week before</span><span>'+nf(NETP[i])+'</span></div>'; }});
+var byH=ST.slice().sort(function(a,b){return b.hours-a.hours;});
+var TC='22px minmax(0,1fr) 78px 64px 130px 50px';
+set('tbTop','<div class="th" style="grid-template-columns:'+TC+'"><span>#</span><span>Station</span><span class="n on">Hours</span><span class="n">Change</span><span>Share of the network</span><span class="n">Share</span></div>'+byH.slice(0,7).map(function(s,i){ var sh=s.hours/netHours*100; return '<div class="tr" style="grid-template-columns:'+TC+'"><span class="q">'+(i+1)+'</span>'+stn(s,s.name)+'<span class="n">'+nf(s.hours)+'</span><span class="n">'+delta(s.hours,s.hoursPrev)+'</span><div class="shb"><i style="width:'+(s.hours/byH[0].hours*100).toFixed(1)+'%"></i></div><span class="n q">'+nf(sh,1)+'%</span></div>'; }).join(''));
+set('surfBar',SURF.map(function(s){return '<span style="width:'+s[2]*100+'%;background:'+s[1]+'"></span>';}).join(''));
+set('surfRows',SURF.map(function(s){ return li(s[0],nf(netHours*s[2]),pct(s[2]*100),{k:s[1]}); }).join(''));
+set('mktRows',MKT.map(function(m){ return li(m[0]+(m[2]?'<small>'+m[2]+'</small>':''),nf(netHours*m[1]),pct(m[1]*100)); }).join(''));
+var ytHours=61*168, twHours=23*168;
+set('apartRows',li('YouTube relays<small>5 stations, average 61 tuned in</small>',nf(ytHours),'hours')+li('Twitch relays<small>2 stations, average 23 tuned in</small>',nf(twHours),'hours')+li('Other apps<small>The M3U list, once it’s built</small>','Not yet','',{cls:'q'}));
+
+/* ---------- 02 stations ---------- */
+set('typeSeg',[['All',13],['Independent',8],['Claimable',3],['Catalog',1],['External',1]].map(function(t,i){ return '<button'+(i===0?' class="on"':'')+'>'+t[0]+'<span class="c">'+t[1]+'</span></button>'; }).join(''));
+var COLS='minmax(0,1fr) 72px 70px 48px 48px 58px 70px 56px 64px 84px 80px';
+function spark(s){ var mx=Math.max.apply(null,s.daily), mn=Math.min.apply(null,s.daily), w=80, h=24; var pts=s.daily.map(function(v,i){ return (2+i*(w-6)/6).toFixed(1)+','+(h-3-(v-mn)/((mx-mn)||1)*(h-6)).toFixed(1); }); var last=pts[6].split(','); return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" style="display:block;overflow:visible;margin-left:auto"><polyline points="'+pts.join(' ')+'" fill="none" stroke="var(--main)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="2.5" fill="var(--main)"/></svg>'; }
+function sm(t){ return '<small style="display:block;font-size:11.5px;color:var(--ink-50);font-weight:400">'+t+'</small>'; }
+function earnCell(s){ if(s.type==='External') return '<span class="n q">None'+sm('Their stream')+'</span>'; if(s.held) return '<span class="n">'+money(s.held)+sm('Held')+'</span>'; if(s.cat) return '<span class="n">'+money(s.cat)+sm('Catalog')+'</span>'; return '<span class="n">'+money(s.earn)+'</span>'; }
+function deadCell(s){ if(s.type==='External') return '<span class="n">'+s.down+' min'+sm('Down')+'</span>'; if(!s.dead) return '<span class="n q">0</span>'; return '<span class="n neg">'+s.dead+' min</span>'; }
+function allRow(s){ var u=s.under; return '<div class="tr'+(s.cs==='BEAT'?' sel':'')+(u?' dim':'')+'" style="grid-template-columns:'+COLS+'">'+stn(s,s.name,ttag(s))+'<span class="n">'+nf(s.hours)+'</span><span class="n">'+delta(s.hours,s.hoursPrev)+'</span><span class="n">'+nf(s.avg)+'</span><span class="n">'+nf(s.peak)+'</span>'+(u?'<span class="n" style="grid-column:span 2"><span class="pill warn">Under the minimum</span></span>':'<span class="n">'+pct(s.stayed)+'</span><span class="n">'+nf(s.nfm,1)+'</span>')+'<span class="n">'+nf(s.presets)+'</span>'+deadCell(s)+earnCell(s)+'<span>'+spark(s)+'</span></div>'; }
+var tPres=ST.reduce(function(a,s){return a+s.presets;},0), tDead=ST.reduce(function(a,s){return a+(s.dead||0);},0), tEarn=ST.reduce(function(a,s){return a+(s.earn||0)+(s.held||0)+(s.cat||0);},0);
+set('tbAll','<div class="th" style="grid-template-columns:'+COLS+'"><span>Station</span><span class="n on">Hours</span><span class="n">Change</span><span class="n">Avg</span><span class="n">Peak</span><span class="n">Stayed</span><span class="n">Not for me</span><span class="n">Presets</span><span class="n">Dead air</span><span class="n">Earned</span><span class="n">By day</span></div>'+byH.map(allRow).join('')+
+ '<div class="tr tot" style="grid-template-columns:'+COLS+'"><span>All 13 stations</span><span class="n">'+nf(netHours)+'</span><span class="n">'+delta(netHours,netHoursP)+'</span><span class="n">'+nf(avgAt)+'</span><span class="n">'+nf(netPeak)+'</span><span class="n">62%</span><span class="n">4.0</span><span class="n">'+nf(tPres)+'</span><span class="n neg">'+tDead+' min</span><span class="n">'+money(tEarn)+'</span><span></span></div>');
+set('allNote','Avg and Peak are tuned in at once. Stayed is the share at a program’s first minute still there at its last. Not for me is votes per 1,000 hours. The network row’s Stayed and Not for me are weighted by hours. Earned is after card fees; claimable stations’ earnings are held in escrow.');
+
+/* ---------- 03 one station ---------- */
+var bH=BEAT.hours, bHP=BEAT.hoursPrev, bPk=[]; for(var d4=0;d4<7;d4++){ var m4=0; for(var h6=0;h6<24;h6++) m4=Math.max(m4,BEAT.hr[d4*24+h6]); bPk.push(m4*1.09); } bPk[4]=318;
+kpis('kpStation',[
+ {l:'Hours watched',v:nf(bH),d:delta(bH,bHP),c:pct(bH/netHours*100,1)+' of all',spark:BEAT.daily},
+ {l:'Average tuned in',v:nf(BEAT.avg),d:delta(BEAT.avg,BEAT.last),c:'vs '+BEAT.last,spark:BEAT.daily.map(function(v){return v/24;})},
+ {l:'Peak tuned in',v:'318',d:delta(318,281),c:'Sat 8:36 pm',spark:bPk},
+ {l:'Stayed to the end',v:'64%',d:'<span class="pill up">↑ 2 pts</span>',c:'Network 62%',spark:[61,63,62,65,67,66,64]},
+ {l:'Not for me',v:'3.2<small>per 1,000 h</small>',d:'<span class="pill up">↓ 0.4</span>',c:'Network 4.0',spark:[3.9,3.6,3.4,3.1,2.8,3.0,3.2]}
+]);
+var PRG=[{t:'Crate Session 02',s:0,e:120,avg:184},{t:'Late Crate, ep. 14',s:120,e:180,avg:262},{t:'Saturday Reel',s:180,e:300,avg:241},{t:'Beat Tape Live',s:300,e:390,avg:148},{t:'Overnight Crates',s:390,e:480,avg:71}];
+var BRK=[]; PRG.forEach(function(p){ var len=p.e-p.s; for(var m=p.s+14;m<p.e-5;m+=15){ if(len<=60||((m-p.s)%30===14)) BRK.push([m,m+2]); } if(p.e<480) BRK.push([p.e-2,p.e]); });
+var SAT=[],SATP=[], rs=rng(77);
+for(var m=0;m<480;m++){ var p=PRG.filter(function(q){return m>=q.s&&m<q.e;})[0], pos=(m-p.s)/(p.e-p.s); var v=p.avg*(0.86+0.28*Math.sin(Math.PI*Math.min(1,pos*1.2))); if(p.t==='Overnight Crates') v=p.avg*(1.35-0.75*pos); BRK.forEach(function(b){ if(m>=b[0]&&m<b[1]) v*=0.9; if(m>=b[1]&&m<b[1]+3) v*=0.95; }); v*=1+(rs()-.5)*.05; SAT.push(v); SATP.push(v*(0.86+(rs()-.5)*.08)); }
+SAT[156]=318; for(var k2=150;k2<163;k2++){ if(k2!==156) SAT[k2]=Math.min(SAT[k2],312-Math.abs(156-k2)*1.5); }
+var sxt=[]; for(var hh=0;hh<=8;hh++) sxt.push({i:Math.min(479,hh*60),label:hourLabel((18+hh)%24),anchor:hh===8?'end':(hh===0?'start':'middle')});
+lineChart($('vSat'),{series:[{v:SAT,color:'var(--main)',area:true},{v:SATP,color:'var(--prev)',w:1.5}],xTicks:sxt,bands:BRK,max:400,
+ marks:[{i:156,label:'318 at 8:36 pm'}],
+ tip:function(i){ var p=PRG.filter(function(q){return i>=q.s&&i<q.e;})[0]; var inb=BRK.some(function(b){return i>=b[0]&&i<b[1];}); return '<b>'+clock(18*60+i)+'</b> · '+(inb?'Break':p.t)+'<div class="r"><span><i style="background:var(--main)"></i>Oct 3</span><span>'+nf(SAT[i])+'</span></div><div class="r"><span><i style="background:var(--prev)"></i>Sept 26</span><span>'+nf(SATP[i])+'</span></div>'; }});
+var BSURF=[['Phone','var(--c1)',.38],['Web','var(--c2)',.20],['TV app','var(--c3)',.22],['Cast','var(--c4)',.15],['iPhone mirror','var(--c5)',.05]];
+set('stSurfBar',BSURF.map(function(s){return '<span style="width:'+s[2]*100+'%;background:'+s[1]+'"></span>';}).join(''));
+set('stSurfRows',BSURF.map(function(s){ return li(s[0],nf(bH*s[2]),pct(s[2]*100),{k:s[1]}); }).join(''));
+set('stMkt',[['Inland Empire<small>Its market</small>',.81],['Los Angeles',.09],['Elsewhere in the US',.07],['Outside the US',.03]].map(function(m){ return li(m[0],nf(bH*m[1]),pct(m[1]*100)); }).join(''));
+var AIRC='minmax(0,1fr) 66px 46px 46px 56px 70px 52px';
+var AIR=[['Crate Session 02','6:00 pm','Library',184,221,61,2.9],['Late Crate, ep. 14','8:00 pm','Library',262,318,66,2.1],['Saturday Reel','9:00 pm','Carried from REEL 24.1',241,296,59,3.4],['Beat Tape Live','11:00 pm','Live, also on CRAT',148,205,70,1.8],['Overnight Crates','12:30 am','Library',71,104,48,4.6]];
+set('tbAir','<div class="th" style="grid-template-columns:'+AIRC+'"><span>Program</span><span class="n">Aired</span><span class="n">Avg</span><span class="n">Peak</span><span class="n">Stayed</span><span class="n">Not for me</span><span class="n">Hours</span></div>'+AIR.map(function(a,i){ var p=PRG[i]; return '<div class="tr'+(i===1?' sel':'')+'" style="grid-template-columns:'+AIRC+'"><div class="pr"><b>'+a[0]+'</b><small>'+a[2]+'</small></div><span class="n">'+a[1]+'</span><span class="n">'+a[3]+'</span><span class="n">'+a[4]+'</span><span class="n">'+a[5]+'%</span><span class="n">'+nf(a[6],1)+'</span><span class="n">'+nf(a[3]*(p.e-p.s)/60)+'</span></div>'; }).join(''));
+function flowList(rows){ var mx=Math.max.apply(null,rows.map(function(r){return r[1];})); return rows.map(function(r){ return '<div class="flow2"><span>'+r[0]+'</span><div><div class="fb" style="width:'+(r[1]/mx*100).toFixed(1)+'%;'+(r[2]?'background:'+r[2]:'')+'"></div></div><span class="n">'+r[1]+'%</span></div>'; }).join(''); }
+set('flowIn',flowList([['Started here',58,'var(--prev)'],['REEL 24.1',12],['SAZN 18.1',8],['NITE 88.4',6],['OCAT 60.1',5],['Other stations',11]]));
+set('flowOut',flowList([['Stopped here',61,'var(--prev)'],['REEL 24.1',14],['SAZN 18.1',7],['CRAT 101.8',5],['NITE 88.4',4],['Other stations',9]]));
+var ASR=[['Programs','var(--c1)'],['Breaks','var(--c2)'],['Live','var(--c3)'],['Planned off air','var(--line)'],['Dead-air fill','var(--c5)'],['Slate','var(--c4)']];
+set('stAsRun','<div class="a-bar"><span style="width:81.6%;background:var(--c1)"></span><span style="width:13.1%;background:var(--c2)"></span><span style="width:5.3%;background:var(--c3)"></span></div>'+li('Programs','8,222 min','81.6%',{k:'var(--c1)'})+li('Breaks','1,318 min','13.1%',{k:'var(--c2)'})+li('Live','540 min','5.4%',{k:'var(--c3)'})+li('Dead air, slate, not ready','None','',{cls:'pos'}));
+set('stMoney',li('Spots','$134.83','',{two:1})+li('Sponsors','$46.15','',{two:1})+li('Pledges<small>61 members</small>','$374.00','',{two:1})+li('Carriage, in','$11.10','',{two:1})+li('Card fees','−$12.66','',{two:1})+li('Paid out','$553.42','',{two:1,tot:1}));
+set('stCost','<div class="a-big"><span class="v neg">−$5.37</span><span>Opencast on BEAT this week</span></div>'+li('Storage<small>412 GB: 318 originals, 94 prepared</small>','$4.59','',{two:1})+li('Preparing<small>6.1 hours of new uploads</small>','$1.80','',{two:1})+li('YouTube relay<small>168 hours, Everything I air</small>','$8.40','',{two:1})+li('Live<small>9 hours through Livepeer</small>','$5.40','',{two:1})+li('Cost, estimated','$20.19','',{two:1,tot:1})+li('Charged to BEAT<small>Pay-as-you-go, past the free allowance</small>','$14.82','',{two:1})+'<p class="a-foot">'+money(BEAT.ads/bH*1000)+' in spots and sponsors per 1,000 hours. 72% of its breaks had spots.</p>');
+
+/* ---------- 04 audience ---------- */
+var hmMax=Math.max.apply(null,NET), RAMP=['var(--q1)','var(--q2)','var(--q3)','var(--q4)','var(--q5)','var(--q6)','var(--q7)'];
+var hm='<div class="hm">';
+for(var d2=0;d2<7;d2++){ hm+='<span class="dlab">'+DAYS[d2]+'</span>'; for(var h3=0;h3<24;h3++){ var v2=NET[d2*24+h3], q=Math.min(6,Math.floor(v2/hmMax*7)); hm+='<span class="c" data-i="'+(d2*24+h3)+'" style="background:'+RAMP[q]+'"></span>'; } }
+hm+='<span></span>'; for(var h4=0;h4<24;h4++) hm+='<span class="hlab">'+(h4%3===0?(h4===0?'12 am':h4===12?'12 pm':(h4%12)+(h4<12?' am':' pm')):'')+'</span>'; hm+='</div>';
+var vh=$('vHeat'); vh.innerHTML=hm;
+vh.querySelectorAll('.c').forEach(function(c){ c.addEventListener('mousemove',function(){ var i=+c.dataset.i, dd=Math.floor(i/24); var bx=vh.getBoundingClientRect(), cr=c.getBoundingClientRect(); showTip(vh,'<b>'+DAYS[dd]+' '+DATES[dd]+', '+hourLabel(i%24)+'</b><div class="r"><span>Average tuned in</span><span>'+nf(NET[i])+'</span></div><div class="r"><span>Week before</span><span>'+nf(NETP[i])+'</span></div>',(cr.left-bx.left+cr.width/2)/bx.width,(cr.top-bx.top)/bx.height*vh.offsetHeight); }); c.addEventListener('mouseleave',function(){hideTip(vh);}); });
+set('hmRamp','<span>Fewer</span>'+RAMP.map(function(r){return '<i style="background:'+r+'"></i>';}).join('')+'<span>'+nf(niceMax(hmMax))+'</span>');
+var SHR=dayTot.map(function(_,i){ return (i===4||i===5)?[.36,.21,.23,.15,.05]:[.42,.225,.18,.125,.05]; });
+colChart($('vSurfDays'),{cats:DAYS.map(function(d,i){return d+' '+DATES[i].split(' ')[1];}),series:SURF.map(function(s,k){ return {name:s[0],color:s[1],v:dayTot.map(function(t,i){return t*SHR[i][k];})}; }),bw:28,max:15000,yTicks:3,yFmt:function(v){return v>=1000?nf(v/1000)+'k':nf(v);},
+ tip:function(i,t){ return '<b>'+DAYS[i]+' '+DATES[i]+'</b> · '+nf(t)+' hours'+SURF.map(function(s,k){ return '<div class="r"><span><i style="background:'+s[1]+'"></i>'+s[0]+'</span><span>'+nf(t*SHR[i][k])+' · '+pct(SHR[i][k]*100)+'</span></div>'; }).join(''); }});
+set('surfLegend',legend(SURF.map(function(s){return [s[0],s[1]];})));
+var BINS=[['1–2 min',.18],['2–5',.22],['5–15',.21],['15–30',.14],['30–60',.12],['1–2 h',.08],['2 h+',.05]];
+set('sessSub',nf(sessions)+' sessions this week');
+colChart($('vSess'),{cats:BINS.map(function(b){return b[0];}),series:[{name:'Sessions',color:'var(--main)',v:BINS.map(function(b){return b[1]*sessions;})}],bw:22,wordCats:true,pl:34,max:50000,yTicks:5,yFmt:function(v){return v>=1000?nf(v/1000)+'k':nf(v);},
+ labelTop:function(i){ return pct(BINS[i][1]*100); },
+ tip:function(i,t){ return '<b>'+BINS[i][0]+(i>0&&i<5?' min':'')+'</b><div class="r"><span>Sessions</span><span>'+nf(t)+'</span></div>'; }});
+set('sessRows',li('Sessions',nf(sessions),delta(sessions,sessionsP))+li('Median length','9 min','')+li('Average length','23 min','')+li('Stations per session<small>Counting each change</small>','1.6','')+li('Came from another station<small>Of every tune-in</small>','37%','')+li('Filtered as bots',nf(botN),pct(BOT*100,1)));
+var topP=ST.slice().sort(function(a,b){return b.presets-a.presets;}).slice(0,5);
+set('presetRows','<div class="a-big"><span class="v">'+nf(tPres)+'</span><span>saved, +'+nf(tPres-ST.reduce(function(a,s){return a+s.pl;},0))+' this week</span></div>'+topP.map(function(s){ return '<div class="a-li">'+stn(s)+'<span class="v">'+nf(s.presets)+'</span><span class="p">+'+(s.presets-s.pl)+'</span></div>'; }).join(''));
+var YT=[58,57,59,64,72,66,51], TW=[21,20,22,27,31,25,15];
+colChart($('vRelay'),{cats:DAYS.map(function(d,i){return d+' '+DATES[i].split(' ')[1];}),series:[{name:'YouTube',color:'var(--c1)',v:YT},{name:'Twitch',color:'var(--c2)',v:TW}],bw:28,max:120,
+ tip:function(i){ return '<b>'+DAYS[i]+' '+DATES[i]+'</b><div class="r"><span><i style="background:var(--c1)"></i>YouTube</span><span>'+YT[i]+'</span></div><div class="r"><span><i style="background:var(--c2)"></i>Twitch</span><span>'+TW[i]+'</span></div>'; }});
+set('relayLegend',legend([['YouTube, 5 stations','var(--c1)'],['Twitch, 2 stations','var(--c2)']])+'<span class="lg" style="margin-left:auto;color:var(--ink-50)">'+nf(ytHours+twHours)+' relay hours, '+pct((ytHours+twHours)/netHours*100)+' of Opencast’s own</span>');
+var FLC='minmax(0,1fr) 18px minmax(0,1fr) 80px 200px';
+var FL=[['REEL','BEAT',1412,31],['BEAT','REEL',1288,24],['SAZN','LUPE',904,29],['NITE','CRAT',611,38],['LUPE','SAZN',588,22],['OCAT','REEL',502,19],['BEAT','SAZN',437,8]];
+set('flowSum','37% of tune-ins came from another station');
+set('tbFlow','<div class="th" style="grid-template-columns:'+FLC+'"><span>From</span><span></span><span>To</span><span class="n on">Changes</span><span>Share of From’s changes</span></div>'+FL.map(function(f){ return '<div class="tr" style="grid-template-columns:'+FLC+'">'+stn(st(f[0]))+'<span class="q">→</span>'+stn(st(f[1]))+'<span class="n">'+nf(f[2])+'</span><div style="display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:10px;align-items:center"><div class="shb"><i style="width:'+(f[3]/40*100)+'%"></i></div><span class="n">'+f[3]+'%</span></div></div>'; }).join(''));
+
+/* ---------- 05 programs ---------- */
+var PG=[['Late Crate','BEAT 12.1','Also on SAZN, and HALL as audio',3,11,60,231,64,2.8],['Crate Session','BEAT 12.1','',1,7,120,152,60,3.1],['Night Shift','NITE 88.4','',1,7,180,96,71,1.6],['Saturday Reel','REEL 24.1','Also on BEAT',2,4,120,244,58,3.9],['Classic Matinee','Opencast catalog','On OCAT, CIVC and PREP',3,21,90,52,49,6.9],['Tamales for forty','SAZN 18.1','',1,14,30,88,62,2.1],['Council Watch','CIVC 7.1','Live',1,2,150,118,44,9.8],['Beat Tape Live','BEAT 12.1','Live, also on CRAT',2,2,90,164,66,2.0],['Tía Lupe’s Kitchen','LUPE 33.1','Claimable station',1,14,30,61,57,2.6],['Prep Football Live','PREP 31.1','Live',1,1,180,61,41,7.5]];
+PG.forEach(function(p){ p.h=p[6]*p[4]*p[5]/60; }); PG.sort(function(a,b){return b.h-a.h;});
+var PGC='22px minmax(0,1fr) 130px 64px 60px 70px 50px 150px 76px';
+set('tbProg','<div class="th" style="grid-template-columns:'+PGC+'"><span>#</span><span>Program</span><span>From</span><span class="n">Stations</span><span class="n">Airings</span><span class="n on">Hours</span><span class="n">Avg</span><span>Stayed to the end</span><span class="n">Not for me</span></div>'+PG.map(function(p,i){ return '<div class="tr'+(p[0]==='Late Crate'?' sel':'')+'" style="grid-template-columns:'+PGC+'"><span class="q">'+(i+1)+'</span><div class="pr"><b>'+p[0]+'</b>'+(p[2]?'<small>'+p[2]+'</small>':'')+'</div><span>'+p[1]+'</span><span class="n">'+p[3]+'</span><span class="n">'+p[4]+'</span><span class="n">'+nf(p.h)+'</span><span class="n">'+p[6]+'</span><div style="display:grid;grid-template-columns:minmax(0,1fr) 36px;gap:10px;align-items:center"><div class="shb"><i style="width:'+p[7]+'%"></i></div><span class="n">'+p[7]+'%</span></div><span class="n">'+nf(p[8],1)+'</span></div>'; }).join(''));
+var RET=[], START=2286, cur=100, PBRK=[[14,15.5],[29,30.5],[44,45.5]], rr=rng(5);
+for(var mi2=0;mi2<60;mi2++){ var drop=0.32+rr()*.18; if(mi2===14) drop=2.6; if(mi2===15) drop=1.0; if(mi2===29) drop=5.2; if(mi2===30) drop=1.6; if(mi2===44) drop=3.1; if(mi2===45) drop=1.0; if(mi2===0) drop=0; if(mi2>=57) drop=.9; cur-=drop; RET.push(cur); }
+var scl=(100-64)/(100-RET[59]); RET=RET.map(function(v){ return 100-(100-v)*scl; });
+var AWAY=RET.map(function(v,i){ return i?Math.round((RET[i-1]-v)/100*START):0; });
+var rxt=[0,10,20,30,40,50,59].map(function(m){ return {i:m,label:(m===59?'60 min':m),anchor:m===0?'start':(m===59?'end':'middle')}; });
+lineChart($('vRet'),{series:[{v:RET,color:'var(--main)',area:true}],xTicks:rxt,bands:PBRK,max:100,yFmt:function(v){return v+'%';},
+ marks:[{i:59,label:'64% at the end',anchor:'end',dy:14}],
+ tip:function(i){ var inb=PBRK.some(function(b){return i>=Math.floor(b[0])&&i<b[1];}); return '<b>Minute '+(i+1)+'</b>'+(inb?' · Break':'')+'<div class="r"><span>Still watching</span><span>'+nf(RET[i],1)+'%</span></div><div class="r"><span>Tuned away this minute</span><span>'+nf(AWAY[i])+'</span></div>'; }});
+(function(){ var box=$('vAway'), W=box.offsetWidth, H=64, pl=42, pr=10; var svg=el('svg',{viewBox:'0 0 '+W+' '+H,height:H},null); box.appendChild(svg); var mx=niceMax(Math.max.apply(null,AWAY)); var bw=Math.max(2,(W-pl-pr)/60-2);
+  el('line',{x1:pl,x2:W-pr,y1:H-1,y2:H-1,class:'gl'},svg); var tx=el('text',{x:pl-8,y:10,'text-anchor':'end',class:'ax'},svg); tx.textContent=nf(mx);
+  AWAY.forEach(function(a,i){ var x=pl+(W-pl-pr)*i/59-bw/2, h=a/mx*(H-6); if(h<=0) return; var inb=PBRK.some(function(b){return i>=Math.floor(b[0])&&i<b[1];}); var y=H-1-h, r2=Math.min(2,bw/2,h); el('path',{d:'M'+x+' '+(H-1)+'V'+(y+r2)+'Q'+x+' '+y+' '+(x+r2)+' '+y+'H'+(x+bw-r2)+'Q'+(x+bw)+' '+y+' '+(x+bw)+' '+(y+r2)+'V'+(H-1)+'Z',fill:inb?'var(--c2)':'var(--prev)'},svg);
+    var hit=el('rect',{x:x-1,y:0,width:bw+2,height:H,class:'hit'},svg); hit.addEventListener('mousemove',function(){ showTip(box,'<b>Minute '+(i+1)+'</b>'+(inb?' · Break':'')+'<div class="r"><span>Tuned away</span><span>'+nf(a)+'</span></div>',(x+bw/2)/W,y); }); hit.addEventListener('mouseleave',function(){hideTip(box);}); });
+})();
+set('retRows',li('At the first minute<small>All airings added up</small>','2,286','sessions')+li('Still there at the last','64%','1,463')+li('Biggest drop<small>The break at minute 29, 3 spots</small>','\u22125.2 pts','',{cls:'neg'})+li('Tuned in partway<small>Not in the line; in Avg</small>','1,104','sessions'));
+var HL=[['0:30',97.1,612],['1:00',95.0,1188],['1:30',92.2,1406],['2:00',88.4,803],['2:30+',83.1,203]];
+colChart($('vHoldLen'),{cats:HL.map(function(h){return h[0];}),series:[{name:'Stayed',color:'var(--main)',v:HL.map(function(h){return h[1];})}],max:100,bw:34,yFmt:function(v){return v+'%';},
+ labelTop:function(i){ return nf(HL[i][1],1)+'%'; },
+ tip:function(i){ return '<b>Breaks of '+HL[i][0]+'</b><div class="r"><span>Still there at the end</span><span>'+nf(HL[i][1],1)+'%</span></div><div class="r"><span>Breaks this week</span><span>'+nf(HL[i][2])+'</span></div>'; }});
+set('holdRows',li('Opening a program’s slot<small>812 breaks</small>','95.6%','')+li('Inside a program<small>2,377 breaks</small>','91.4%','')+li('Between programs<small>1,023 breaks</small>','89.2%','')+li('Opens with a bumper<small>2,569 breaks</small>','93.9%','<span class="pill up">+4.1</span>')+li('Opens with a spot<small>1,643 breaks</small>','89.8%',''));
+
+/* ---------- 06 money ---------- */
+var stationsEarned=ST.reduce(function(a,s){return a+(s.earn||0);},0), held=ST.reduce(function(a,s){return a+(s.held||0);},0);
+kpis('kpMoney',[
+ {l:'Earned by stations',v:money(stationsEarned),d:delta(stationsEarned,1642.10),c:'after card fees',spark:[812,903,1002,1121,1296,1430,1642,stationsEarned]},
+ {l:'Held for claimable',v:money(held),d:delta(held,191.40),c:'3 stations',spark:[88,96,121,140,152,170,191,held]},
+ {l:'Catalog sponsors',v:money(96),d:delta(96,72),c:'catalog credit',spark:[0,0,0,24,48,72,72,96]},
+ {l:'Pay-as-you-go',v:'$150.10',d:delta(150.10,131.80),c:'storage, relays',spark:[61,74,88,97,112,124,132,150]},
+ {l:'Cost to run',v:'$173.10',d:deltaInv(173.10,168.40),c:'estimated',spark:[141,146,150,155,160,164,168,173],sc:'var(--ink-50)'}
+]);
+var WK=['Aug 11','Aug 18','Aug 25','Sept 1','Sept 8','Sept 15','Sept 22','Sept 29'];
+var REV=[['Spots','var(--c1)',[402,455,519,603,688,781,902,1010.55]],['Sponsors','var(--c2)',[120,120,148,163,190,214,240,262.15]],['Pledges','var(--c3)',[512,540,566,601,655,712,770,824]],['Catalog sponsors','var(--c4)',[0,0,0,24,48,72,72,96]]];
+colChart($('vRev'),{cats:WK,series:REV.map(function(r){return {name:r[0],color:r[1],v:r[2]};}),bw:34,max:2500,yTicks:5,yFmt:function(v){return '$'+nf(v);},
+ labelTop:function(i,t){ return i===WK.length-1?'$'+nf(t):''; },
+ tip:function(i,t){ return '<b>Week of '+WK[i]+'</b> · '+money(t)+REV.map(function(r){ return '<div class="r"><span><i style="background:'+r[1]+'"></i>'+r[0]+'</span><span>'+money(r[2][i])+'</span></div>'; }).join(''); }});
+set('revLegend',legend(REV.map(function(r){return [r[0],r[1]];})));
+var rpm=ST.filter(function(s){return s.ads>0;}).map(function(s){ return {s:s,v:s.ads/s.hours*1000}; }).sort(function(a,b){return b.v-a.v;});
+var rmx=Math.max.apply(null,rpm.map(function(r){return r.v;}));
+set('rpmRows',rpm.map(function(r,i){ return '<div class="a-li" style="grid-template-columns:150px minmax(0,1fr) 64px">'+stn(r.s,r.s.type==='Claimable'?'Claimable, held':r.s.name)+'<div class="shb"><i style="width:'+(r.v/rmx*100).toFixed(1)+'%"></i></div><span class="v">'+money(r.v)+'</span></div>'; }).join('')+'<p class="a-foot">BEAT has the second-most hours but earns among the least per hour: most of its breaks are open time. That’s a spot market lead.</p>');
+set('spotRows',li('Breaks aired','4,212','')+li('With spots<small>The rest went to station IDs and bumpers</small>','2,569','61%')+li('Spots aired','3,906',delta(3906,3412))+li('Average rate<small>Per 1,000 tuned in</small>','$6.80','')+li('Businesses buying','23','<span class="pill up">+4</span>')+li('Held for next week<small>Money set aside for placed spots</small>','$412.00',''));
+set('heldRows',[['LUPE','Held since Aug 3',1104.60,118.40],['CRAT','Held since Sept 20',388.10,81.20],['FLDR','Held since Sept 1',96.75,27.40]].map(function(h){ return '<div class="a-li">'+stn(st(h[0]),h[1])+'<span class="v">'+money(h[2])+'</span><span class="p" style="min-width:60px">+'+money(h[3])+'</span></div>'; }).join('')+li('In escrow','$1,589.45','+$227.00',{tot:1}));
+set('carRows',li('Agreements airing this week','14','<span class="pill up">+2</span>')+li('Paid in cash<small>Carriers to makers</small>','$58.30','')+li('Barter<small>Makers’ share of break time inside their programs</small>','$38.10','2 h 41 m')+li('Programs carried<small>On a station other than the maker’s</small>','9',''));
+set('ocRows','<div class="a-big"><span class="v neg">−$23.00</span><span>The week, estimated</span></div><div class="a-sub">In</div>'+li('Storage charges','$41.20','',{two:1})+li('Relay hours','$86.40','',{two:1})+li('Live hours','$22.50','',{two:1})+li('Share of earnings','Not set yet','',{two:1,cls:'q'})+'<div class="a-sub">Out, estimated</div>'+li('Storage','$37.40','',{two:1})+li('Preparing','$24.10','',{two:1})+li('Relays','$52.00','',{two:1})+li('Live (Livepeer)','$18.60','',{two:1})+li('API, database, worker','$41.00','',{two:1}));
+
+/* ---------- 07 health ---------- */
+var AS={BEAT:[8222,1318,540,0,0,0],REEL:[8890,1190,0,0,0,0],SAZN:[7300,980,108,1680,12,0],OCAT:[9070,1010,0,0,0,0],NITE:[8510,1150,420,0,0,0],LUPE:[6650,850,60,2520,0,0],VOZE:[8380,1240,457,0,3,0],CIVC:[6640,620,300,2520,0,0],HALL:[8900,1180,0,0,0,0],CRAT:[8870,1100,110,0,0,0],PREP:[6684,640,180,2520,47,9],FLDR:[9790,290,0,0,0,0]};
+var asT=[0,0,0,0,0,0]; Object.keys(AS).forEach(function(k){ AS[k].forEach(function(v,i){asT[i]+=v;}); }); var asAll=asT.reduce(function(a,b){return a+b;},0);
+kpis('kpHealth',[
+ {l:'Dead-air fill',st:'var(--bad)',v:'62<small>min</small>',d:deltaInv(62,18),c:'3 stations',spark:[47,0,3,12,0,0,0],sc:'var(--bad)'},
+ {l:'On the slate',st:'var(--warnc)',v:'9<small>min</small>',d:'<span class="pill dn">New</span>',c:'1 live source',spark:[0,0,0,0,9,0,0],sc:'var(--warnc)'},
+ {l:'Not ready at air',st:'var(--warnc)',v:'1<small>item</small>',d:deltaInv(1,3),c:'filled for 12 min',spark:[0,0,0,1,0,0,0],sc:'var(--warnc)'},
+ {l:'Relay drops',st:'var(--warnc)',v:'1',d:deltaInv(1,2),c:'outside a break',spark:[0,0,0,0,0,1,0],sc:'var(--warnc)'},
+ {l:'Filtered as bots',st:'var(--ink-50)',v:pct(BOT*100,1),d:deltaInv(6.1,5.8),c:nf(botN)+' sessions',spark:[5.6,5.9,6.2,6.0,6.4,6.3,6.1],sc:'var(--ink-50)'}
+]);
+set('asrLegend',legend(ASR));
+set('asrRows',Object.keys(AS).map(function(k){ var s=st(k), a=AS[k], t=a.reduce(function(x,y){return x+y;},0), bad=a[4]+a[5]; return '<div class="s100">'+stn(s,s.type==='Independent'?s.name:s.type)+'<div class="bar">'+a.map(function(v,i){ return v?'<span title="'+ASR[i][0]+': '+nf(v)+' min" style="width:'+(v/t*100)+'%;min-width:'+(i>=4?'4px':'0')+';background:'+ASR[i][1]+'"></span>':''; }).join('')+'</div><span class="n'+(bad?'" style="color:var(--bad)':' q')+'">'+(bad?bad+' min':'None')+'</span></div>'; }).join('')+
+ '<div class="s100 tot"><span>All stations</span><div class="bar">'+asT.map(function(v,i){ return v?'<span style="width:'+(v/asAll*100)+'%;min-width:'+(i>=4?'4px':'0')+';background:'+ASR[i][1]+'"></span>':''; }).join('')+'</div><span class="n" style="color:var(--bad)">71 min</span></div><p class="a-foot">RDLS plays its own stream, so it isn’t in the as-run log. Its 14 minutes down are under Incidents.</p>');
+var INC=[['Sept 30','2:10 am','PREP 31.1: dead air, 47 min','A game ran short and nothing was scheduled after it. Filled from its library. 3 tuned in.','<span class="pill dn">Dead air</span>'],
+ ['Oct 1','4:05 pm','VOZE 104.2: dead air, 3 min','A live block ended early. Station ID and bumpers filled it.','<span class="pill dn">Dead air</span>'],
+ ['Oct 2','7:30 pm','SAZN 18.1: an episode wasn’t ready','Tamales for forty, ep. 6 finished uploading 20 minutes before air. The planned fill ran for 12 min. 41 tuned in.','<span class="pill warn">Not ready</span>'],
+ ['Oct 3','9:12 pm','PREP 31.1: live source dropped','Prep Football Live’s camera feed stopped. The slate for 9 min, then back. 58 tuned in.','<span class="pill warn">Slate</span>'],
+ ['Oct 4','3:40 pm','BEAT 12.1: YouTube relay dropped','Outside a break. Reconnected in 40 s. 64 tuned in on YouTube.','<span class="pill ne">Relay</span>'],
+ ['Oct 5','','RDLS 9.1: source unreachable twice','14 min in all. Hidden from the dial after 5 min each time.','<span class="pill ex">External</span>']];
+set('incRows',INC.map(function(i){ return '<div class="inc"><span class="w"><b>'+i[0]+'</b>'+i[1]+'</span><div><div class="t"><b>'+i[2]+'</b>'+i[4]+'</div><small>'+i[3]+'</small></div></div>'; }).join(''));
+set('relayHealth',li('Up while the station was on air<small>YouTube and Twitch together</small>','99.98%','')+li('Planned restarts<small>Timed to breaks: YouTube every 12 hours, Twitch every 48</small>','31','')+li('Dropped outside a break','1','40 s',{cls:'neg'})+li('Relay hours<small>All platforms, never billed</small>',nf(ytHours+twHours),''));
+set('botSub',nf(botN)+' sessions, '+pct(BOT*100,1)+' of all');
+set('botRows',[['No media progress','The player never advanced',.61],['Many sessions from one address','',.27],['Data-center addresses','',.12]].map(function(b){ return '<div class="a-li" style="grid-template-columns:minmax(0,1fr) 120px 56px 40px"><span>'+b[0]+(b[1]?'<small>'+b[1]+'</small>':'')+'</span><div class="shb"><i style="width:'+b[2]*100/0.61*0.9+'%;background:var(--prev)"></i></div><span class="v">'+nf(botN*b[2])+'</span><span class="p">'+pct(b[2]*100)+'</span></div>'; }).join(''));
+
+drawSparks();
+})();
+</script>
+
+
+
+</body>
+</html>

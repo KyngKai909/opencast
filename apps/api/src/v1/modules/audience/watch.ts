@@ -24,6 +24,8 @@ import type { ProgramRow } from "../playout/service.js";
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
+/** A251: how long a search viewers settled on is kept (then only totals). */
+const SEARCH_DAYS = 90;
 /** An airing is worked out once it's been over this long (the last beats are in). */
 export const SETTLE_MS = 5 * MINUTE;
 /** ...and for the last time this long after it ended; its votes then go. */
@@ -120,7 +122,7 @@ export interface WatchData {
   /** Works out the airings that ended since `since` (26 hours ago) and aren't final. */
   aggregate(options?: { since?: Date }): Promise<{ computed: number; finalized: number; votesDeleted: number }>;
   /** Deletes sessions, their minutes and votes older than the retention rule (30 days). */
-  purge(): Promise<{ sessions: number; minutes: number; votes: number }>;
+  purge(): Promise<{ sessions: number; minutes: number; votes: number; searches: number }>;
   /** The station's own airings (by log entry) for its Audience page. */
   forStation(stationId: string, airings: Array<{ logEntryId: string | null; endsAt: string; onNow: boolean }>): Promise<Map<string, AiringWatch>>;
   /** A maker's programs across every station that aired them, added up. */
@@ -324,7 +326,9 @@ export function createWatchData({ deps, services }: ModuleContext): WatchData {
       const minutes = await db.delete(SM).where(lt(SM.minute, cutoff)).returning({ id: SM.sessionId });
       const votes = await db.delete(V).where(lt(V.votedAt, cutoff)).returning({ id: V.sessionId });
       const sessions = await db.delete(S).where(lt(S.lastBeatAt, cutoff)).returning({ id: S.id });
-      return { sessions: sessions.length, minutes: minutes.length, votes: votes.length };
+      // A251: searches viewers settled on go after 90 days, whatever the retention rule says.
+      const searches = await db.delete(schema.searches).where(lt(schema.searches.at, new Date(now.getTime() - SEARCH_DAYS * DAY))).returning({ id: schema.searches.id });
+      return { sessions: sessions.length, minutes: minutes.length, votes: votes.length, searches: searches.length };
     },
 
     async forStation(stationId, airings) {

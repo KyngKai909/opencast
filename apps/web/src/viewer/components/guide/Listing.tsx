@@ -49,7 +49,7 @@ function useListingContent({ airing: a, station, onDone }: { airing: AiringX; st
   const existing = useExistingReminder(a);
   const [switchOver, setSwitchOver] = useState(false);
   const { remind } = useViewerActions();
-  const tune = useTune();
+  const tune = useTune("guide");
   const navigate = useNavigate();
   const qc = useQueryClient();
   const cs = callSignOf(station);

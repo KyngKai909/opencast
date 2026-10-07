@@ -349,13 +349,14 @@ describe("after 30 days, only the numbers", () => {
       "created_at"
     ]);
     // minute_markets (2026-09-30): tuned in by market, a count per minute like minute_samples.
-    for (const table of ["airing_stats", "minute_samples", "minute_markets", "translator_samples"]) {
+    // searches (A251, 2026-10-06): the words viewers settled on and a count, no one's.
+    for (const table of ["airing_stats", "minute_samples", "minute_markets", "translator_samples", "searches"]) {
       for (const column of await columns(table)) expect(column, `${table}.${column}`).not.toMatch(/session|user|voter|device|person|email|ip_|address/);
     }
     const values = JSON.stringify(after);
     for (const id of [...sessionIds, ...userIds]) expect(values).not.toContain(id);
     // The tables that held sessions are the only ones with a session in them, and they're empty of the evening.
     const tables = ((await h.db.execute(sql`select table_name from information_schema.tables where table_schema = 'audience' order by table_name`)) as unknown as { rows: Array<{ table_name: string }> }).rows.map((r) => r.table_name);
-    expect(tables).toEqual(["airing_stats", "minute_markets", "minute_samples", "not_for_me_votes", "session_minutes", "sessions", "translator_samples"]);
+    expect(tables).toEqual(["airing_stats", "minute_markets", "minute_samples", "not_for_me_votes", "searches", "session_minutes", "sessions", "translator_samples"]);
   });
 });

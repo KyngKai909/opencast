@@ -69,7 +69,7 @@ export default function StationPreview() {
   const open = !!ref && !params.get("modal");
   const phone = useIsPhone();
   const navigate = useNavigate();
-  const tune = useTune();
+  const tune = useTune("dial");
   const page = useApiAs("watch", stationsApi.getStation, { params: { stationRef: ref ?? "" } }, StationPageFull, open);
   const markets = useMarkets();
   const tv = useDial("tv");

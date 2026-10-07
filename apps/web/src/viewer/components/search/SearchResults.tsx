@@ -2,11 +2,12 @@
 // "Tune to" row when the query is a channel or frequency, then Programs (airing next first),
 // Stations, and Recent searches kept on this device.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { stationsApi } from "@opencast/contracts";
 import { Button, Chip, Icon, Kbd, LiveText, TitleCard, clock } from "@opencast/ui";
 import { SearchFull, type SearchAiring, type SearchStation } from "../../api/ext/station";
 import { useApi } from "../../../api/hooks";
+import { call } from "../../../api/client";
 import { useChannels, useMarketSlug, useViewerActions } from "../../data/viewer";
 import { MARKET_TZ, useNow } from "../../../lib/clock";
 import { stationPath, useLink, useTuneIn } from "../station/actions";
@@ -99,13 +100,14 @@ export function SearchResults({ q, onQuery, phone }: SearchResultsProps) {
   const market = useMarketSlug();
   const t = useNow(30_000);
   const link = useLink();
-  const tuneIn = useTuneIn();
+  const tuneIn = useTuneIn("search");
   const { remind } = useViewerActions();
   const recent = useRecentSearches();
   const tuneTo = useTuneTo(query);
   const res = useApi(stationsApi.search, { query: { q: dq, market } }, { schema: SearchFull, enabled: dq.length > 0, placeholderData: (prev) => prev });
   const data = dq.length > 0 ? res.data : undefined;
   const remember = () => addRecentSearch(query);
+  useSearchSeen(dq, res.isPlaceholderData ? undefined : data);
 
   const tuneRow = tuneTo && (
     <div className="vw-tune-wrap">
@@ -315,4 +317,22 @@ export function SearchResults({ q, onQuery, phone }: SearchResultsProps) {
     );
   }
   return <div className={phone ? "vw-search__results vw-search__results--phone" : "vw-search__results"}>{body}</div>;
+}
+
+/**
+ * A251 (2026-10-06): tells the API a search the viewer settled on (its results on screen for 1.5 s
+ * without more typing), once per search, for the desk's analytics. Its words and result count
+ * only; nothing about the viewer.
+ */
+function useSearchSeen(q: string, data: { stations: unknown[]; airings: unknown[] } | undefined) {
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    const term = q.trim().toLowerCase();
+    if (!data || term.length < 2 || sent.current === term) return;
+    const t = setTimeout(() => {
+      sent.current = term;
+      void call(stationsApi.searchSeen, { body: { q: q.trim(), results: data.stations.length + data.airings.length } }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [q, data]);
 }

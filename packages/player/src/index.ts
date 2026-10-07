@@ -17,6 +17,6 @@ export { tuningStyle } from "./tuning/constants";
 export { ChannelChange, minimumFor, clearingFor, type TuningState, type TuningLook, type TuningPhase } from "./tuning/change";
 export { bandPercent, frequencyOf, needleAt, sweepDistance, type Sweep } from "./tuning/sweep";
 export { hissAllowed, type HissGate } from "./tuning/hiss";
-export { startHeartbeat, httpHeartbeat, sessionId, type SendHeartbeat, type HeartbeatBody } from "./heartbeat";
+export { startHeartbeat, httpHeartbeat, sessionId, deviceId, type SendHeartbeat, type HeartbeatBody } from "./heartbeat";
 export * from "./input";
 export * from "./react";

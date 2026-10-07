@@ -50,7 +50,9 @@ export function audienceRoutes(r: RouteRegistrar, { deps, services }: ModuleCont
   });
   r.handle(api.voteNotForMe, async ({ params, body }) => {
     // Taken whether or not the player shows the control (features.not_for_me); never tied to the person.
-    const { status } = await services.audience.watch.vote({ stationId: params.stationId, sessionId: body.sessionId });
+    // A251: the player's id stands for its session on this station (its own, or the one made for it).
+    const sessionId = (await services.audience.sessionOn(body.sessionId, params.stationId)) ?? body.sessionId;
+    const { status } = await services.audience.watch.vote({ stationId: params.stationId, sessionId });
     return { ok: true as const, status };
   });
 }

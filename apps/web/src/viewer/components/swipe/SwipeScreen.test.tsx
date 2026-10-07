@@ -161,7 +161,7 @@ describe("next and previous", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next channel: CIVC 7.1" }));
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
     expect(engine.peek).not.toHaveBeenCalledWith(rows[0]!.station.id);
-    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch", via: "swipe" });
     vi.useRealTimers();
   });
 
@@ -171,7 +171,7 @@ describe("next and previous", () => {
     show(w);
     fireEvent.keyDown(window, { key: "ArrowUp" });
     await act(async () => void (await vi.advanceTimersByTimeAsync(400)));
-    expect(engine.tune).toHaveBeenCalledWith(rows[2]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[2]!.station.id, { input: "touch", via: "swipe" });
     vi.useRealTimers();
   });
 
@@ -181,7 +181,7 @@ describe("next and previous", () => {
     show(w);
     fireEvent.click(screen.getByRole("button", { name: "Next channel: CIVC 7.1" }));
     await act(async () => void (await new Promise((r) => setTimeout(r, 10))));
-    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch", via: "swipe" });
   });
 });
 
@@ -252,7 +252,7 @@ describe("the drag", () => {
     expect(engine.peek).not.toHaveBeenCalledWith(rows[0]!.station.id);
     expect(container.querySelector(".vw-sw__peek .vw-sw__static")).not.toBeNull();
     await act(async () => void (await vi.advanceTimersByTimeAsync(300)));
-    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch" });
+    expect(engine.tune).toHaveBeenCalledWith(rows[0]!.station.id, { input: "touch", via: "swipe" });
     vi.useRealTimers();
   });
 

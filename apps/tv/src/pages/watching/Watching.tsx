@@ -85,7 +85,7 @@ export default function Watching() {
   useEffect(() => {
     if (!due) return;
     handled.add(due.id);
-    if (due.airing.station.id !== s.currentId) void engine.tune(due.airing.station.id, { input: "app" });
+    if (due.airing.station.id !== s.currentId) void engine.tune(due.airing.station.id, { input: "app", via: "reminder" });
     // The program changes now: read the dial again so the banner says what's starting.
     void qc.invalidateQueries({ queryKey: [stationsApi.getDial.method, stationsApi.getDial.path] });
     setTick((t) => t + 1);
@@ -119,7 +119,7 @@ export default function Watching() {
         case "switch":
           if (card) {
             wave(card);
-            void engine.tune(card.airing.station.id, source);
+            void engine.tune(card.airing.station.id, { input: "remote", ...source, via: "reminder" });
           }
           break;
         case "wave":
@@ -147,7 +147,7 @@ export default function Watching() {
   if (s.status === "stopped") return mode === "tv" ? <Stopped /> : null;
   return (
     <>
-      {showAir && row && air && <AirScreen kind={air} row={row} suggest={suggest} now={now} onTune={(id) => void engine.tune(id, { input: "remote" })} onGuide={() => navigate("/guide")} />}
+      {showAir && row && air && <AirScreen kind={air} row={row} suggest={suggest} now={now} onTune={(id) => void engine.tune(id, { input: "remote", via: "suggestion" })} onGuide={() => navigate("/guide")} />}
       {card && !s.entry && <ReminderCard text={cardText(card)} />}
     </>
   );

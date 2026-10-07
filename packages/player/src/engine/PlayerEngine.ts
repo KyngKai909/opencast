@@ -68,6 +68,8 @@ export interface TuneRecord {
   ms: number;
   /** Whether the station was warm when it was asked for. */
   warm: boolean;
+  /** A251: how it was tuned, where known (sent with the station's first heartbeat). */
+  via?: import("@opencast/contracts").TuneVia;
 }
 
 export interface PlayerState {
@@ -190,6 +192,11 @@ export function tuningSoundFrom(w: { tuningSound?: boolean; radioTuningSound?: b
 const THIRTY_MINUTES = 30 * 60 * 1000;
 
 /** A partial option without its undefined keys, so they don't overwrite what's set. */
+/** A251: the source with how it was tuned, unless the app already said (the app knows more). */
+function withVia(source: CommandSource | undefined, via: NonNullable<CommandSource["via"]>): CommandSource {
+  return source?.via ? source : { input: "app", ...source, via };
+}
+
 function definedOnly<T extends object>(o: T | undefined): Partial<T> {
   return o ? (Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>) : {};
 }
@@ -498,6 +505,7 @@ export class PlayerEngine {
    * staying until its first frame. Reduced motion keeps its crossfade, the radio band its needle.
    */
   swipeTo(stationId: string, source?: CommandSource): Promise<void> {
+    source = withVia(source, "swipe");
     this.swiped = this.swipeReady(stationId) ? stationId : null;
     return this.tune(stationId, source);
   }
@@ -694,7 +702,7 @@ export class PlayerEngine {
     this.watchWireless(deck);
     this.audio.measure(deck.video, this.driver.webAudio !== false);
     this.applyCaptions(deck);
-    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm }, error: null });
+    this.patch({ lastTune: { stationId, ms: Math.round(performance.now() - t0), warm: wasWarm, ...(source?.via ? { via: source.via } : {}) }, error: null });
     this.settle(stationId, previous, "playing");
     // The static rolls away over the new picture; the banner follows.
     this.change.clear();
@@ -1007,11 +1015,11 @@ export class PlayerEngine {
   channelStep(dir: "up" | "down", source?: CommandSource) {
     const from = this.state.pendingId ?? this.state.currentId;
     const next = this.stepFrom(from, dir);
-    if (next) void this.tune(next.station.id, source);
+    if (next) void this.tune(next.station.id, withVia(source, "channel"));
   }
 
   last(source?: CommandSource) {
-    if (this.state.lastId) void this.tune(this.state.lastId, source);
+    if (this.state.lastId) void this.tune(this.state.lastId, withVia(source, "last"));
   }
 
   // ---------- Banner ----------
@@ -1054,7 +1062,7 @@ export class PlayerEngine {
     const entry = this.state.entry;
     if (!entry) return;
     if (this.timers.entry) clearTimeout(this.timers.entry);
-    if (entry.match) void this.tune(entry.match.station.id, source);
+    if (entry.match) void this.tune(entry.match.station.id, withVia(source, "keypad"));
     else {
       // "No station on 13", with the nearest two, then it goes and the channel stays.
       this.timers.entry = setTimeout(() => this.clearEntry(), this.o.bannerMs);
@@ -1388,12 +1396,12 @@ export class PlayerEngine {
         return this.o.onCommand?.({ type: "guide" }, source);
       case "tune": {
         const c = findByChannel(this.state.channels, command.channel);
-        if (c) void this.tune(c.station.id, source);
+        if (c) void this.tune(c.station.id, withVia(source, "remote"));
         return;
       }
       case "preset": {
         const id = this.presets[command.key];
-        if (id) void this.tune(id, source);
+        if (id) void this.tune(id, withVia(source, "preset"));
         return;
       }
       case "last":
