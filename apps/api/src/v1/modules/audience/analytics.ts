@@ -5,7 +5,7 @@
 
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AnalyticsMoney, AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
+import type { AnalyticsGrowth, AnalyticsHealth, AnalyticsMoney, AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
 import type { CurrentUser } from "../../http.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, forbidden, notFound } from "../../errors.js";
@@ -24,6 +24,10 @@ const MAX_SPAN = 400 * DAY;
 export interface Analytics {
   overview(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsOverview>;
   stations(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsStations>;
+  /** The Health tab (Ref. 12d 07). */
+  health(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsHealth>;
+  /** The Growth tab (A251). */
+  growth(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsGrowth>;
   /** The Money tab (Ref. 12d 06). */
   money(user: CurrentUser, query: AnalyticsQuery): Promise<AnalyticsMoney>;
   /** The Programs and breaks tab (Ref. 12d 05). */
@@ -346,6 +350,128 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
       };
     }
   } as Analytics;
+  service.health = async (user, query) => {
+    const { scope, from, to, previousFrom, previousTo, market, band, markets } = await scopeOf(user, query);
+    const stations = await stationsIn(market, band, previousFrom, to, markets);
+    const ids = [...stations.keys()];
+    const ours = ids.filter((id) => stations.get(id)!.kind !== "external");
+    const external = ids.filter((id) => stations.get(id)!.kind === "external");
+    const [airtime, airtimeBefore, runs, relays, relaysBefore, outages, days, daysBefore] = await Promise.all([
+      services.playout.airtimeByStation(ours, from, to),
+      services.playout.airtimeByStation(ours, previousFrom, previousTo),
+      services.playout.fillRuns(ours, from, to),
+      services.playout.relayHealth(ids, from, to),
+      services.playout.relayHealth(ids, previousFrom, previousTo),
+      services.network.outagesBetween(external, from, to),
+      sessionDays(ids, from, to),
+      sessionDays(ids, previousFrom, previousTo)
+    ]);
+    const total = (m: typeof airtime, k: "deadAirFill" | "slate") => [...m.values()].reduce((t, a) => t + a[k], 0);
+    const withSome = (k: "deadAirFill" | "slate") => [...airtime.values()].filter((a) => a[k] > 0).length;
+    // How many were tuned in when each incident began (the minute it started, from session minutes).
+    const tunedAt = async (stationId: string, at: Date) => {
+      const minute = new Date(Math.floor(at.getTime() / MINUTE) * MINUTE);
+      const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.sessionMinutes).where(and(eq(schema.sessionMinutes.stationId, stationId), eq(schema.sessionMinutes.minute, minute)));
+      return r?.n ?? 0;
+    };
+    const now = deps.clock.now();
+    const incidents: AnalyticsHealth["incidents"] = [];
+    for (const r of runs.slice(-60))
+      incidents.push({ at: r.start.toISOString(), station: stations.get(r.stationId)!, kind: r.kind === "slate" ? "slate" : "dead_air", minutes: Math.max(1, Math.round((r.end.getTime() - r.start.getTime()) / MINUTE)), tunedIn: await tunedAt(r.stationId, r.start), detail: null });
+    for (const d of relays.drops.slice(-30)) incidents.push({ at: d.at.toISOString(), station: stations.get(d.stationId)!, kind: "relay", minutes: null, tunedIn: null, detail: d.error });
+    for (const o of outages) {
+      const a = Math.max(o.downSince.getTime(), from.getTime());
+      const b = Math.min((o.backAt ?? now).getTime(), to.getTime());
+      incidents.push({ at: o.downSince.toISOString(), station: stations.get(o.stationId)!, kind: "external", minutes: Math.max(0, Math.round((b - a) / MINUTE)), tunedIn: await tunedAt(o.stationId, o.downSince), detail: o.backAt ? null : "Still down" });
+    }
+    incidents.sort((x, y) => x.at.localeCompare(y.at));
+    const downBy = new Map<string, number>();
+    for (const i of incidents) if (i.kind === "external") downBy.set(i.station.id, (downBy.get(i.station.id) ?? 0) + (i.minutes ?? 0));
+
+    // Bots, and press to picture, from the nightly totals.
+    const counted = days.reduce((t, d) => t + d.sessions, 0);
+    const bots = days.reduce((t, d) => t + d.bots, 0);
+    const countedBefore = daysBefore.reduce((t, d) => t + d.sessions, 0);
+    const botsBefore = daysBefore.reduce((t, d) => t + d.bots, 0);
+    const reasons = new Map<string, number>();
+    for (const d of days) for (const [k, n] of Object.entries(d.botReasons)) reasons.set(k, (reasons.get(k) ?? 0) + n);
+    const weighted = (rs: typeof days, f: (r: (typeof days)[number]) => number | null) => {
+      const w = rs.filter((r) => f(r) != null && r.sessions > 0);
+      const n = w.reduce((t, r) => t + r.sessions, 0);
+      return n ? Math.round(w.reduce((t, r) => t + f(r)! * r.sessions, 0) / n) : null;
+    };
+    const perStation = new Map<string, typeof days>();
+    for (const d of days) perStation.set(d.stationId, [...(perStation.get(d.stationId) ?? []), d]);
+    const slowest = [...perStation]
+      .map(([id, rs]) => ({ station: stations.get(id)!, medianMs: weighted(rs, (r) => r.tuneMsMedian), p90Ms: weighted(rs, (r) => r.tuneMsP90), sessions: rs.reduce((t, r) => t + r.sessions, 0) }))
+      .filter((r) => r.station && r.medianMs != null && r.sessions >= 5)
+      .sort((a, b) => b.medianMs! - a.medianMs!)
+      .slice(0, 5)
+      .map((r) => ({ station: r.station, medianMs: r.medianMs!, p90Ms: r.p90Ms }));
+    return {
+      scope,
+      deadAirFill: { minutes: total(airtime, "deadAirFill"), previous: airtimeBefore.size ? total(airtimeBefore, "deadAirFill") : null, stations: withSome("deadAirFill") },
+      slate: { minutes: total(airtime, "slate"), previous: airtimeBefore.size ? total(airtimeBefore, "slate") : null, stations: withSome("slate") },
+      relayDrops: { drops: relays.drops.length, previous: relaysBefore.sessions ? relaysBefore.drops.length : null },
+      bots: { sessions: bots, share: counted + bots ? round1((bots / (counted + bots)) * 100) : null, previousShare: countedBefore + botsBefore ? round1((botsBefore / (countedBefore + botsBefore)) * 100) : null },
+      pressToPicture: { medianMs: weighted(days, (r) => r.tuneMsMedian), p90Ms: weighted(days, (r) => r.tuneMsP90), previousMedianMs: weighted(daysBefore, (r) => r.tuneMsMedian) },
+      airtime: ours
+        .map((id) => ({ station: stations.get(id)!, ...(airtime.get(id) ?? { programs: 0, breaks: 0, live: 0, offAir: 0, deadAirFill: 0, slate: 0 }) }))
+        .filter((a) => a.programs + a.breaks + a.live + a.offAir + a.deadAirFill + a.slate > 0)
+        .sort((a, b) => b.deadAirFill + b.slate - (a.deadAirFill + a.slate) || (a.station.channel ?? "").localeCompare(b.station.channel ?? "")),
+      externalDown: external.map((id) => ({ station: stations.get(id)!, minutes: downBy.get(id) ?? 0 })),
+      incidents,
+      relays: { stations: relays.stations, sessions: relays.sessions, hours: relays.hours, drops: relays.drops.length },
+      botReasons: [...reasons].map(([reason, n]) => ({ reason, sessions: n, share: bots ? round1((n / bots) * 100) : 0 })).sort((a, b) => b.sessions - a.sessions),
+      slowest
+    };
+  };
+
+  service.growth = async (user, query) => {
+    const { scope, from, to, previousFrom, previousTo, market, band, markets } = await scopeOf(user, query);
+    const stations = await stationsIn(market, band, previousFrom, to, markets);
+    const ids = market || band !== "all" ? [...stations.keys()] : null;
+    const marketIds = scope.fixedMarket ? [scope.fixedMarket] : market ? [market] : null;
+    const [accounts, accountsBefore, started, startedBefore, network, tvs, uploads, uploadsBefore] = await Promise.all([
+      services.accounts.growth(from, to),
+      services.accounts.growth(previousFrom, previousTo),
+      services.stations.growth(from, to),
+      services.stations.growth(previousFrom, previousTo),
+      services.network.growth(marketIds, from, to),
+      services.tv.growth(from, to),
+      services.library.uploadsBetween(ids, from, to),
+      services.library.uploadsBetween(ids, previousFrom, previousTo)
+    ]);
+    // Searches viewers settled on (kept 90 days).
+    const S = schema.searches;
+    const terms = await db
+      .select({ term: S.term, n: sql<number>`count(*)::int`, results: sql<number>`max(${S.results})::int` })
+      .from(S)
+      .where(and(gte(S.at, from), lt(S.at, to)))
+      .groupBy(S.term)
+      .orderBy(sql`count(*) desc`)
+      .limit(200);
+    const spanDays = daysIn(from, to);
+    return {
+      scope,
+      accounts: { new: accounts.newAccounts, previous: accountsBefore.newAccounts, active: accounts.activeAccounts, byDay: spanDays.map((d) => accounts.newByDay.get(d) ?? 0) },
+      stations: { started: started.started, previousStarted: Object.values(startedBefore.started).reduce((t, n) => t + n, 0), signedOn: started.signedOn },
+      pipeline: {
+        byStage: ["found", "asked", "said_yes", "setting_up", "on_air", "claimed", "already_licensed", "declined", "no_answer"].map((stage) => ({ stage, creators: network.pipeline[stage] ?? 0 })).filter((s) => s.creators > 0),
+        added: network.addedToPipeline
+      },
+      markets: { open: network.marketsOpen, opened: network.marketsOpened },
+      tvs: { new: Object.entries(tvs.newTvs).map(([platform, n]) => ({ platform, tvs: n })).sort((a, b) => b.tvs - a.tvs), active: tvs.activeTvs, phonesPaired: tvs.phonesPaired },
+      uploads: { items: uploads.items, programItems: uploads.programItems, hours: uploads.hours, previousItems: uploadsBefore.items },
+      searches: {
+        total: terms.reduce((t, r) => t + r.n, 0),
+        noResults: terms.filter((r) => r.results === 0).reduce((t, r) => t + r.n, 0),
+        top: terms.slice(0, 10).map((r) => ({ term: r.term, searches: r.n, results: r.results })),
+        nothingFound: terms.filter((r) => r.results === 0).slice(0, 10).map((r) => ({ term: r.term, searches: r.n }))
+      }
+    };
+  };
+
   /** What running Opencast cost over a span, estimated from what was used and the Costs rules (null while a price isn't set). */
   async function costs(at: Date, used: { gbDays: number; prepareMinutes: number; relayHours: number; liveHours: number; days: number }) {
     const [storage, preparing, relays, live, platform] = await Promise.all([

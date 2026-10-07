@@ -383,6 +383,45 @@ export const AnalyticsMoney = z.object({
 });
 export type AnalyticsMoney = z.infer<typeof AnalyticsMoney>;
 
+/** Ref. 12d 07 Health: how airtime was filled, and what went wrong (and A251's press to picture). */
+export const AnalyticsHealth = z.object({
+  scope: AnalyticsScope,
+  deadAirFill: z.object({ minutes: z.number().int(), previous: z.number().int().nullable(), stations: z.number().int() }),
+  slate: z.object({ minutes: z.number().int(), previous: z.number().int().nullable(), stations: z.number().int() }),
+  relayDrops: z.object({ drops: z.number().int(), previous: z.number().int().nullable() }),
+  bots: z.object({ sessions: z.number().int(), share: z.number().nullable(), previousShare: z.number().nullable() }),
+  /** From the press to the first picture, sessions' median and 90th percentile (ms); null before players said. */
+  pressToPicture: z.object({ medianMs: z.number().int().nullable(), p90Ms: z.number().int().nullable(), previousMedianMs: z.number().int().nullable() }),
+  /** Each station's airtime by kind, minutes from the as-run log (external stations aren't in it). */
+  airtime: z.array(z.object({ station: AnalyticsStation, programs: z.number().int(), breaks: z.number().int(), live: z.number().int(), offAir: z.number().int(), deadAirFill: z.number().int(), slate: z.number().int() })),
+  /** External stations' minutes down. */
+  externalDown: z.array(z.object({ station: AnalyticsStation, minutes: z.number().int() })),
+  /** What went wrong, oldest first: dead air filled, the slate, a relay dropped, an external source down; with how many were tuned in when it began. */
+  incidents: z.array(
+    z.object({ at: Timestamp, station: AnalyticsStation, kind: z.enum(["dead_air", "slate", "relay", "external"]), minutes: z.number().int().nullable(), tunedIn: z.number().int().nullable(), detail: z.string().nullable() })
+  ),
+  relays: z.object({ stations: z.number().int(), sessions: z.number().int(), hours: z.number(), drops: z.number().int() }),
+  botReasons: z.array(z.object({ reason: z.string(), sessions: z.number().int(), share: z.number() })),
+  /** The slowest stations to start, press to picture. */
+  slowest: z.array(z.object({ station: AnalyticsStation, medianMs: z.number().int(), p90Ms: z.number().int().nullable() }))
+});
+export type AnalyticsHealth = z.infer<typeof AnalyticsHealth>;
+
+/** A251's Growth tab: the network's growth, and what people search for. */
+export const AnalyticsGrowth = z.object({
+  scope: AnalyticsScope,
+  accounts: z.object({ new: z.number().int(), previous: z.number().int().nullable(), active: z.number().int(), byDay: z.array(z.number()) }),
+  /** Stations started in the span by kind (`station`, `studio`, `claimable`, `catalog`, `listed`), and first sign-ons. */
+  stations: z.object({ started: z.record(z.string(), z.number().int()), previousStarted: z.number().int().nullable(), signedOn: z.number().int() }),
+  pipeline: z.object({ byStage: z.array(z.object({ stage: z.string(), creators: z.number().int() })), added: z.number().int() }),
+  markets: z.object({ open: z.number().int(), opened: z.number().int() }),
+  tvs: z.object({ new: z.array(z.object({ platform: z.string(), tvs: z.number().int() })), active: z.number().int(), phonesPaired: z.number().int() }),
+  uploads: z.object({ items: z.number().int(), programItems: z.number().int(), hours: z.number(), previousItems: z.number().int().nullable() }),
+  /** Searches viewers settled on (kept 90 days): the most searched, and those that found nothing. */
+  searches: z.object({ total: z.number().int(), noResults: z.number().int(), top: z.array(z.object({ term: z.string(), searches: z.number().int(), results: z.number().int() })), nothingFound: z.array(z.object({ term: z.string(), searches: z.number().int() })) })
+});
+export type AnalyticsGrowth = z.infer<typeof AnalyticsGrowth>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -416,6 +455,22 @@ export const analyticsApi = {
     params: z.object({ programId: Id }),
     query: AnalyticsQuery,
     response: AnalyticsProgramDetail
+  }),
+  health: endpoint({
+    method: "GET",
+    path: "/desk/analytics/health",
+    auth: "desk",
+    summary: "How airtime was filled and what went wrong: dead-air fill, the slate, relay drops, bots by reason, press to picture, incidents (A251, Ref. 12d 07)",
+    query: AnalyticsQuery,
+    response: AnalyticsHealth
+  }),
+  growth: endpoint({
+    method: "GET",
+    path: "/desk/analytics/growth",
+    auth: "desk",
+    summary: "Accounts, stations by kind, the pipeline, markets, TVs and paired phones, uploads, and searches (A251)",
+    query: AnalyticsQuery,
+    response: AnalyticsGrowth
   }),
   money: endpoint({
     method: "GET",

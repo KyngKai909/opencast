@@ -87,6 +87,8 @@ export interface LibraryService {
    * prepared segments' bytes are playout's (`preparedBytes`).
    */
   storageUse(): Promise<Map<string, { originalBytes: number; contentIds: string[] }>>;
+  /** A251 Phase 7: programs and other items uploaded (or imported) in a span, and their hours. */
+  uploadsBetween(stationIds: string[] | null, from: Date, to: Date): Promise<{ items: number; programItems: number; hours: number }>;
   /** Every content ID an item's files point at (all versions, originals too). */
   contentOfItems(itemIds: string[]): Promise<string[]>;
   /** Other stations' items made from the same files (a takedown pulls them too). */
@@ -639,6 +641,15 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
   const service: LibraryService = {
     content,
     blocks: createBlockOps(ctx, content),
+
+    async uploadsBetween(stationIds, from, to) {
+      const A = schema.assets;
+      const [r] = await db
+        .select({ items: sql<number>`count(*)::int`, programItems: sql<number>`count(*) filter (where ${A.code} = 'PGM')::int`, ms: sql<number>`coalesce(sum(${A.durationMs}), 0)::float` })
+        .from(A)
+        .where(and(gte(A.createdAt, from), sql`${A.createdAt} < ${to}`, ...(stationIds ? [inArray(A.stationId, stationIds.length ? stationIds : ["00000000-0000-0000-0000-000000000000"])] : [])));
+      return { items: r?.items ?? 0, programItems: r?.programItems ?? 0, hours: Math.round(((r?.ms ?? 0) / 3_600_000) * 10) / 10 };
+    },
 
     async storageUse() {
       const CR = schema.contentRefs;

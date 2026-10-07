@@ -64,6 +64,8 @@ export interface AccountsService {
   presetCounts(stationIds: string[]): Promise<Map<string, number>>;
   /** A251: presets saved in a span, per station (still saved now). */
   presetsAdded(stationIds: string[], from: Date, to: Date): Promise<Map<string, number>>;
+  /** A251 Phase 7: accounts made in a span (by Pacific day) and accounts seen in it. */
+  growth(from: Date, to: Date): Promise<{ newAccounts: number; activeAccounts: number; newByDay: Map<string, number> }>;
 
   reminders(userId: string): Promise<ReminderRow[]>;
   addReminder(userId: string, input: { logEntryId?: string; listedAiringId?: string; switchMeOver: boolean }): Promise<ReminderRow>;
@@ -675,6 +677,16 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
           target: [schema.presetKeyUse.userId, schema.presetKeyUse.key, schema.presetKeyUse.day],
           set: { uses: sql`${schema.presetKeyUse.uses} + 1` }
         });
+    },
+
+    async growth(from, to) {
+      const U = schema.users;
+      const day = sql<string>`to_char(${U.createdAt} at time zone 'America/Los_Angeles', 'YYYY-MM-DD')`;
+      const [made, seen] = await Promise.all([
+        db.select({ day, n: sql<number>`count(*)::int` }).from(U).where(and(gte(U.createdAt, from), lt(U.createdAt, to), isNull(U.deletedAt))).groupBy(day),
+        db.select({ n: sql<number>`count(*)::int` }).from(U).where(and(gte(U.lastSeenAt, from), lt(U.lastSeenAt, to), isNull(U.deletedAt)))
+      ]);
+      return { newAccounts: made.reduce((t, r) => t + r.n, 0), activeAccounts: seen[0]?.n ?? 0, newByDay: new Map(made.map((r) => [r.day, r.n])) };
     },
 
     async presetsAdded(stationIds, from, to) {

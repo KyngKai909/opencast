@@ -112,6 +112,12 @@ export interface PlayoutService {
    * log entry's program aired either side, `between` two otherwise), what opened them and how many spots.
    */
   airedBreaks(from: Date, to: Date): Promise<Array<{ breakId: string; stationId: string; start: Date; end: Date; position: "opening" | "inside" | "between"; firstElement: "bumper" | "spot" | "sponsor" | "station_id" | "other"; spots: number }>>;
+  /** A251 Phase 7: each station's airtime by kind (programs, breaks, live, planned off air, dead-air fill, slate), minutes from the as-run log. */
+  airtimeByStation(stationIds: string[], from: Date, to: Date): Promise<Map<string, { programs: number; breaks: number; live: number; offAir: number; deadAirFill: number; slate: number }>>;
+  /** A251 Phase 7: dead-air fills and slates as they ran, back-to-back rows joined. */
+  fillRuns(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; kind: "dead_air_fill" | "slate"; start: Date; end: Date }>>;
+  /** A251 Phase 7: relay sessions in a span: stations relaying, hours, sessions that ended with an error (drops). */
+  relayHealth(stationIds: string[], from: Date, to: Date): Promise<{ stations: number; hours: number; sessions: number; drops: Array<{ stationId: string; at: Date; error: string | null }> }>;
   /** A251 Phase 6: minutes spent preparing uploads in a span (each item's last preparation). */
   prepareMinutes(from: Date, to: Date): Promise<number>;
   /** A251 Phase 6: the placements (spot airings) that aired on these stations in a span. */
@@ -428,6 +434,61 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         out.push({ breakId: b.breakId, stationId: b.stationId, start: b.start, end: b.end, position, firstElement, spots: b.spots });
       }
       return out;
+    },
+
+    async airtimeByStation(stationIds, from, to) {
+      const out = new Map<string, { programs: number; breaks: number; live: number; offAir: number; deadAirFill: number; slate: number }>();
+      if (!stationIds.length) return out;
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, code: A.code, reason: A.reason, breakId: A.breakId, seconds: sql<number>`coalesce(sum(extract(epoch from (${A.endedAt} - ${A.startedAt}))), 0)::float` })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .groupBy(A.stationId, A.code, A.reason, A.breakId);
+      for (const r of rows) {
+        const o = out.get(r.stationId) ?? { programs: 0, breaks: 0, live: 0, offAir: 0, deadAirFill: 0, slate: 0 };
+        const m = r.seconds / 60;
+        if (r.reason === "dead_air_fill") o.deadAirFill += m;
+        else if (r.reason === "slate") o.slate += m;
+        else if (r.code === "OFF") o.offAir += m;
+        else if (r.reason === "live") o.live += m;
+        else if (r.code === "PGM" && !r.breakId) o.programs += m;
+        else o.breaks += m;
+        out.set(r.stationId, o);
+      }
+      for (const [k, o] of out) out.set(k, { programs: Math.round(o.programs), breaks: Math.round(o.breaks), live: Math.round(o.live), offAir: Math.round(o.offAir), deadAirFill: Math.round(o.deadAirFill), slate: Math.round(o.slate) });
+      return out;
+    },
+
+    async fillRuns(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const A = schema.asRun;
+      const rows = await db
+        .select({ stationId: A.stationId, reason: A.reason, start: A.startedAt, end: A.endedAt })
+        .from(A)
+        .where(and(inArray(A.stationId, stationIds), inArray(A.reason, ["dead_air_fill", "slate"]), gte(A.startedAt, from), lt(A.startedAt, to)))
+        .orderBy(asc(A.stationId), asc(A.startedAt));
+      const out: Array<{ stationId: string; kind: "dead_air_fill" | "slate"; start: Date; end: Date }> = [];
+      for (const r of rows) {
+        const last = out[out.length - 1];
+        if (last && last.stationId === r.stationId && last.kind === r.reason && r.start.getTime() - last.end.getTime() <= 5_000) last.end = r.end;
+        else out.push({ stationId: r.stationId, kind: r.reason as "dead_air_fill" | "slate", start: r.start, end: r.end });
+      }
+      return out;
+    },
+
+    async relayHealth(stationIds, from, to) {
+      if (!stationIds.length) return { stations: 0, hours: 0, sessions: 0, drops: [] };
+      const T = schema.translatorSessions;
+      const rows = await db
+        .select({ stationId: T.stationId, start: T.startedAt, end: T.endedAt, error: T.lastError })
+        .from(T)
+        .where(and(inArray(T.stationId, stationIds), lt(T.startedAt, to), sql`coalesce(${T.endedAt}, now()) > ${from}`));
+      const now = deps.clock.now();
+      let ms = 0;
+      for (const r of rows) ms += Math.max(0, Math.min((r.end ?? now).getTime(), to.getTime()) - Math.max(r.start.getTime(), from.getTime()));
+      const drops = rows.filter((r) => r.end && r.error && r.end >= from && r.end < to).map((r) => ({ stationId: r.stationId, at: r.end!, error: r.error }));
+      return { stations: new Set(rows.map((r) => r.stationId)).size, hours: Math.round((ms / 3_600_000) * 10) / 10, sessions: rows.length, drops };
     },
 
     async prepareMinutes(from, to) {

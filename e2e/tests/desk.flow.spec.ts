@@ -660,6 +660,14 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await expect(page.getByRole("heading", { name: "Spot market" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Held for claimable stations" })).toBeVisible();
 
+  // Health (Ref. 12d 07) and Growth: what went wrong, and what people look for.
+  await page.getByRole("tab", { name: "Health" }).click();
+  await expect(page.getByRole("table", { name: "Each station's airtime by kind" })).toContainText("PREP");
+  await expect(page.getByText(/PREP 31\.1: dead air, 47 min/)).toBeVisible();
+  await page.getByRole("tab", { name: "Growth" }).click();
+  await expect(page.getByRole("heading", { name: "Found nothing" })).toBeVisible();
+  await expect(page.getByText("la liga").first()).toBeVisible();
+
   // Audience (Ref. 12d 04): the week's grid, then narrowed to BEAT.
   await page.getByRole("tab", { name: "Audience" }).click();
   await expect(page).toHaveURL(/\/desk\/analytics\/audience/);

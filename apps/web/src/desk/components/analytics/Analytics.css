@@ -227,3 +227,14 @@ i.nd-an__brk { background: var(--ink-50); opacity: .35; }
 .nd-an__per { grid-template-columns: minmax(0, 1fr) minmax(80px, 160px) 76px; min-height: 42px; padding: 6px 4px; }
 .nd-an__heldrow { grid-template-columns: minmax(0, 1fr) minmax(100px, auto) 90px 80px; min-height: 42px; padding: 6px 4px; }
 .nd-an__big.nd-an__neg { color: var(--bad); }
+
+/* 07 Health and Growth. */
+.nd-an__airrow { grid-template-columns: minmax(160px, 260px) minmax(0, 1fr) 80px; }
+.nd-an__stack--row { margin: 0; height: 12px; }
+.nd-an__incidents { list-style: none; margin: 0; padding: 0; }
+.nd-an__incidents li { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid var(--hair); font-size: 13.5px; }
+.nd-an__incidents li:first-child { border-top: 0; }
+.nd-an__incidents b { display: block; font-weight: 600; }
+.nd-an__incidents small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 2px; }
+.nd-an__when { font: 500 11.5px/1.35 var(--font-mono); }
+.nd-an__stage { grid-template-columns: 110px minmax(0, 1fr) 48px; min-height: 36px; padding: 4px; }

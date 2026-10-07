@@ -448,6 +448,30 @@ A TV live block's channel playlists point at the worker's own copies of Livepeer
 | A251 (Phase 4) | **Audience** (Ref. 12d 04). A station picker narrows every chart (`?station=`; changing market or band clears it).
 | A251 (Phase 5) | **Programs and breaks** (Ref. 12d 05).
 | A251 (Phase 6) | **Money** (Ref. 12d 06), and a **Costs** rule group in Settings: what a GB stored costs Opencast a month, a minute preparing, an hour relayed, an hour live, and a week of the API, database and worker. Each is "Not set yet" until an admin sets it, and the estimate leaves an unset one out and says so.
+| A251 (Phase 7) | **Health** (Ref. 12d 07) and **Growth** (the user's addition). Every analytics tab is now built.
+
+**Health:**
+- **Airtime fill:** each station's as-run log by kind. Dead-air fill and slate are the mistakes; planned off air (`OFF` rows) is its own grey part and never counts against a station.
+- **Incidents** are dead-air fills and slates as they ran (back-to-back rows joined), relay sessions that ended with an error, and external sources' outages, oldest first. Each has how many were tuned in during the minute it began (session minutes; the 30 days kept).
+- **Bots** by reason, from the nightly totals.
+- **Press to picture** (A251's addition, collected since Phase 1): sessions' median and 90th percentile weighted by sessions, and the five slowest stations with at least 5 sessions.
+
+**Growth:**
+- **Accounts** made and seen (`last_seen_at`), and **TVs** registered and seen, with phones paired. Both are Opencast-wide.
+- **Stations started** by kind, and first sign-ons.
+- **The pipeline** by stage now (in the market when one is picked), and creators added.
+- **Markets** open and opened.
+- **Uploads:** items, program items and hours.
+- **Searches** viewers settled on (90 days): the most searched, and those that found nothing, a lead for the pipeline.
+
+**Deviations from the reference's Health:**
+- "Not ready at air" isn't counted: the as-run log has no reason for it, and a not-ready fill reads as dead-air fill.
+- Relay drops are sessions ending with an error, not "outside a break".
+- Planned restarts and relay uptime aren't counted.
+- Stand by counts aren't collected; the player doesn't report them.
+- "Many sessions from one address" and "Data-center addresses" aren't bot reasons the API has (it filters by beat timing and media rate).
+
+New service methods: `playout.airtimeByStation`, `fillRuns`, `relayHealth`; `network.outagesBetween`, `growth`; `accounts.growth`; `stations.growth`; `tv.growth`; `library.uploadsBetween` | packages/contracts `analytics.ts`; apps/api audience `analytics.ts` (`health`, `growth`), routes; playout, network, accounts, stations, tv and library services; the desk's `HealthTab`, `GrowthTab`, mocks | as described |
 
 **Where each number comes from:**
 - **Earnings:** the ledger postings to each station's earnings (claimable: what's owed to escrow), by kind.

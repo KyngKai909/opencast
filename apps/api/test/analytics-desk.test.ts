@@ -311,3 +311,33 @@ describe("Money (Ref. 12d 06)", () => {
     await sam.get(`/v1/desk/analytics/money?from=${DAY.from}&to=${DAY.to}`).expect(403);
   });
 });
+
+describe("Health (Ref. 12d 07) and Growth", () => {
+  it("adds up dead-air fill and the slate, lists incidents with who was tuned in, bots by reason", async () => {
+    // Two minutes of dead-air fill on BEAT at 7:06 pm UTC, while the first tab was watching.
+    await h.db.insert(schema.asRun).values({ stationId: beat, code: "PGM", startedAt: new Date("2026-10-01T19:06:00Z"), endedAt: new Date("2026-10-01T19:08:00Z"), reason: "dead_air_fill" });
+    const { body } = await dee.get(`/v1/desk/analytics/health?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.deadAirFill).toMatchObject({ minutes: 2, stations: 1 });
+    expect(body.slate.minutes).toBe(0);
+    expect(body.incidents).toEqual([expect.objectContaining({ kind: "dead_air", minutes: 2, tunedIn: 1, station: expect.objectContaining({ callSign: "BEAT" }), at: "2026-10-01T19:06:00.000Z" })]);
+    expect(body.airtime[0]).toMatchObject({ station: { callSign: "BEAT" }, deadAirFill: 2 });
+    expect(body.externalDown).toEqual([expect.objectContaining({ station: expect.objectContaining({ callSign: "RDLS" }), minutes: 0 })]);
+    expect(body.bots).toMatchObject({ sessions: 1 });
+    expect(body.botReasons).toEqual([{ reason: "beats too close together", sessions: 1, share: 100 }]);
+    expect(body.pressToPicture.medianMs).toBeNull();
+    await sam.get(`/v1/desk/analytics/health?from=${DAY.from}&to=${DAY.to}`).expect(403);
+  });
+
+  it("has the network's growth, and what people searched for, with what found nothing", async () => {
+    h.clock.set("2026-10-01T20:00:00.000Z");
+    await h.services.audience.recordSearch("Late Crate", 3);
+    await h.services.audience.recordSearch("late crate", 3);
+    await h.services.audience.recordSearch("anime", 0);
+    const { body } = await dee.get(`/v1/desk/analytics/growth?from=${DAY.from}&to=${DAY.to}`).expect(200);
+    expect(body.searches).toEqual({ total: 3, noResults: 1, top: [{ term: "late crate", searches: 2, results: 3 }, { term: "anime", searches: 1, results: 0 }], nothingFound: [{ term: "anime", searches: 1 }] });
+    expect(body.markets.open).toBeGreaterThanOrEqual(0);
+    expect(body.accounts).toHaveProperty("active");
+    expect(body.uploads).toMatchObject({ items: expect.any(Number) });
+    await sam.get(`/v1/desk/analytics/growth?from=${DAY.from}&to=${DAY.to}`).expect(403);
+  });
+});

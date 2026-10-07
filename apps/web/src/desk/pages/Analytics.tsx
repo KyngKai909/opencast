@@ -17,6 +17,8 @@ import { StationPage } from "../components/analytics/StationPage";
 import { AudienceTab } from "../components/analytics/AudienceTab";
 import { ProgramsTab } from "../components/analytics/ProgramsTab";
 import { MoneyTab } from "../components/analytics/MoneyTab";
+import { HealthTab } from "../components/analytics/HealthTab";
+import { GrowthTab } from "../components/analytics/GrowthTab";
 import { ErrorLine, Quiet } from "./common";
 import "../components/analytics/Analytics.css";
 
@@ -32,11 +34,8 @@ const TABS: ReadonlyArray<{ value: AnalyticsTab; label: string }> = [
   { value: "growth", label: "Growth" }
 ];
 
-/** What a tab not built yet will hold (docs/analytics-map.md, Phase 7). */
-const COMING: Partial<Record<AnalyticsTab, string>> = {
-  health: "How each station's airtime was filled, the week's incidents, relays, sessions filtered as bots, and how fast channels start.",
-  growth: "New and active accounts, new stations by kind, creators in the pipeline, markets opened, TV devices and paired phones, uploads, and what people search for."
-};
+/** What a tab not built yet will hold (none left: every tab is built). */
+const COMING: Partial<Record<AnalyticsTab, string>> = {};
 
 /** The filters, from the address: ?span=7d (today, 7d, 30d, 90d, custom with from and to dates), ?market=<id>, ?band=tv|radio, and on Audience ?station=<id>. */
 export function useAnalyticsFilters() {
@@ -112,6 +111,10 @@ export default function Analytics() {
         <ErrorLine error={scopeQ.error} />
       ) : stationId ? (
         <StationPage stationId={stationId} query={filters.query} span={filters.span} exporter={exporters} back={() => go("stations")} />
+      ) : tab === "health" ? (
+        <HealthTab query={filters.query} span={filters.span} exporter={exporters} stationHref={stationHref} />
+      ) : tab === "growth" ? (
+        <GrowthTab query={filters.query} span={filters.span} exporter={exporters} />
       ) : tab === "money" ? (
         <MoneyTab query={filters.query} span={filters.span} exporter={exporters} stationHref={stationHref} />
       ) : tab === "programs" ? (

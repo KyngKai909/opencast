@@ -20,8 +20,8 @@ The user's request (2026-10-06): an Analytics page in the Network desk for the w
 | 3 | **One station** (03): the night by the minute with breaks, airings, surfaces, markets, came from and went to, airtime fill, earned. Cost to run comes with Money (Phase 6); the station's own Programs, Money and Health views come with those tabs. | Done (PR #30) |
 | 4 | **Audience** (04): the hour-by-day grid, session lengths (median and average), stations per visit, presets, surfaces and relays by day, moving around the dial, devices, how people tuned in; a station picker narrows it all. Migration 0056. | Done (PR #31) |
 | 5 | **Programs and breaks** (05): programs across stations (sortable), a program's still-watching curve with its breaks, tune-aways and biggest drop; `break_stats` and break hold by length, position and first element. Migration 0057. | Done (PR #32) |
-| 6 | **Money** (06): earnings by kind and week by week, held for claimable stations, catalog sponsors, the spot market, per 1,000 hours, Opencast's charges against its estimated cost to run, carriage; the Costs rules in Settings; the station page's Cost to run and breaks with spots. | Done |
-| 7 | **Health** (07) and **Growth**: airtime fill, incidents, relays, bots, press to picture and Stand by; then Growth and search. | |
+| 6 | **Money** (06): earnings by kind and week by week, held for claimable stations, catalog sponsors, the spot market, per 1,000 hours, Opencast's charges against its estimated cost to run, carriage; the Costs rules in Settings; the station page's Cost to run and breaks with spots. | Done (PR #33) |
+| 7 | **Health** (07): airtime fill by station, incidents with who was tuned in, relays, bots by reason, press to picture and the slowest stations; **Growth**: accounts, stations by kind, the pipeline, markets, TVs and phones, uploads, searches (most searched, found nothing). | Done |
 
 Each phase goes to `dev` by its own pull request, merged when its checks pass.
 
