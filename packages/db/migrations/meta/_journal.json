@@ -400,6 +400,13 @@
       "when": 1791415543610,
       "tag": "0058_costs_starting",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791419759275,
+      "tag": "0059_desk_holds",
+      "breakpoints": true
     }
   ]
 }

@@ -86,6 +86,13 @@ export const stations = broadcast.table(
     status: stationStatus("status").notNull().default("setting_up"),
     firstSignedOnAt: at("first_signed_on_at"),
     signedOffAt: at("signed_off_at"),
+    /**
+     * Taken off the air by Opencast (added 2026-10-07, the desk's station file): while set, the
+     * station can't sign on again; the desk lifts it. Who and why, for the station and the desk.
+     */
+    heldAt: at("held_at"),
+    heldReason: text("held_reason"),
+    heldBy: uuid("held_by").references(() => users.id),
     /** Stable number used as the station's key in the escrow contract. */
     escrowId: serial("escrow_id").notNull().unique(),
     bugMode: text("bug_mode", { enum: ["off", "call_sign_and_channel", "logo"] })
@@ -250,6 +257,9 @@ export const assets = broadcast.table(
     legacyId: text("legacy_id").unique(),
     /** Deleted from the library. Kept, because the as-run log and claims still point at it. */
     archivedAt: at("archived_at"),
+    /** Archived by Opencast from the desk (added 2026-10-07), not by the station: who and why. Null when the station archived it. */
+    archivedBy: uuid("archived_by").references(() => users.id),
+    archivedReason: text("archived_reason"),
     createdAt: createdAt(),
     /**
      * A243 (migration 0048): a bumper's role (`into_break`, `out_of_break`, `up_next`, `any`). Null

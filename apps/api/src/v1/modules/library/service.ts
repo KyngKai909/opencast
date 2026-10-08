@@ -96,7 +96,12 @@ export interface LibraryService {
   /** Every item's current content ID. */
   currentContent(itemIds: string[]): Promise<Map<string, string>>;
   /** The desk's station file (added 2026-10-07): every item a station has, archived ones too, newest first, with its rights and program. */
-  stationUploads(stationId: string): Promise<Array<{ id: string; title: string; program: string | null; code: string; source: "upload" | "link" | "creator_work" | "library"; sourceUrl: string | null; originalFilename: string | null; mediaKind: "video" | "audio"; durationMs: number | null; status: "preparing" | "ready" | "failed"; addedAt: Date; archivedAt: Date | null; rights: { basis: string; note: string | null; confirmedAt: Date } | null; contentId: string | null }>>;
+  stationUploads(stationId: string): Promise<Array<{ id: string; title: string; program: string | null; code: string; source: "upload" | "link" | "creator_work" | "library"; sourceUrl: string | null; originalFilename: string | null; mediaKind: "video" | "audio"; durationMs: number | null; status: "preparing" | "ready" | "failed"; addedAt: Date; archivedAt: Date | null; archivedBy: string | null; archivedReason: string | null; rights: { basis: string; note: string | null; confirmedAt: Date } | null; contentId: string | null }>>;
+  /**
+   * Added 2026-10-07: Opencast archives an item from the desk. It comes off every log from now on
+   * (carriers' too) and is archived with who and why; its files stay, unlike a rights claim's takedown.
+   */
+  archiveByOpencast(itemId: string, by: string, reason: string): Promise<{ stationId: string; title: string; pulled: number }>;
   /**
    * Items to prepare for air (added 2026-09-29, prepare once): ready, rights confirmed, not archived,
    * whose rights were confirmed or whose file changed since `since`.
@@ -702,6 +707,8 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
           status: A.status,
           addedAt: A.createdAt,
           archivedAt: A.archivedAt,
+          archivedBy: A.archivedBy,
+          archivedReason: A.archivedReason,
           basis: R.basis,
           note: R.note,
           confirmedAt: R.confirmedAt
@@ -1076,6 +1083,13 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const fileIds = (await db.select({ id: F.id }).from(F).where(eq(F.assetId, itemId))).map((f) => f.id);
       await content.release("asset_file", fileIds);
       await content.release("asset_original", fileIds);
+    },
+
+    async archiveByOpencast(itemId, by, reason) {
+      const row = await itemRow(itemId);
+      const pulled = await services.log.pullItem(itemId);
+      await db.update(A).set({ archivedAt: deps.clock.now(), archivedBy: by, archivedReason: reason }).where(eq(A.id, itemId));
+      return { stationId: row.stationId, title: row.title, pulled: pulled.reduce((t, p) => t + p.entries, 0) };
     },
 
     async archiveForClaim(itemId) {

@@ -454,6 +454,8 @@ export const StationFileUpload = z.object({
   status: z.enum(["preparing", "ready", "failed"]),
   addedAt: Timestamp,
   archivedAt: Timestamp.nullable(),
+  /** Added 2026-10-07: archived by Opencast from the desk, and why (null: the station archived it, or it isn't archived). */
+  archivedByOpencast: z.object({ by: z.string().nullable(), reason: z.string() }).nullable().optional(),
   /** Null: rights not confirmed yet, so it can't air. */
   rights: z.object({ basis: z.string(), note: z.string().nullable(), confirmedAt: Timestamp }).nullable(),
   /** The prepared file's preview; null when it has none (not prepared, locked by a claim). */
@@ -479,7 +481,9 @@ export const AnalyticsStationFile = z.object({
     createdAt: Timestamp,
     firstSignedOnAt: Timestamp.nullable(),
     signedOffAt: Timestamp.nullable(),
-    onAir: z.boolean()
+    onAir: z.boolean(),
+    /** Added 2026-10-07: taken off the air by Opencast from the desk; it can't sign on until lifted. */
+    held: z.object({ at: Timestamp, reason: z.string(), by: z.string().nullable() }).nullable().optional()
   }),
   /** How it started: someone signed up and made it, or the desk brought a creator on through the pipeline. */
   started: z.object({
@@ -505,6 +509,9 @@ export const AnalyticsStationFile = z.object({
   })
 });
 export type AnalyticsStationFile = z.infer<typeof AnalyticsStationFile>;
+
+/** Why the desk acts on a station (added 2026-10-07): the station's people see it. */
+export const DeskActionReason = z.object({ reason: z.string().trim().min(3).max(500) });
 
 export const analyticsApi = {
   overview: endpoint({
@@ -587,6 +594,32 @@ export const analyticsApi = {
     auth: "desk",
     summary: "One station's file: who made it and when, its people, its uploads with previews and rights, and its log ahead (added 2026-10-07)",
     params: z.object({ stationId: Id }),
+    response: AnalyticsStationFile
+  }),
+  takeOffAir: endpoint({
+    method: "POST",
+    path: "/desk/analytics/stations/:stationId/hold",
+    auth: "desk",
+    summary: "Admins: take a station off the air and hold it there (it can't sign on until the desk lifts it); its people are told why (added 2026-10-07)",
+    params: z.object({ stationId: Id }),
+    body: DeskActionReason,
+    response: AnalyticsStationFile
+  }),
+  liftHold: endpoint({
+    method: "DELETE",
+    path: "/desk/analytics/stations/:stationId/hold",
+    auth: "desk",
+    summary: "Admins: lift the desk's hold, so the station's people can sign on again (it doesn't sign on by itself; added 2026-10-07)",
+    params: z.object({ stationId: Id }),
+    response: AnalyticsStationFile
+  }),
+  archiveUpload: endpoint({
+    method: "POST",
+    path: "/desk/analytics/stations/:stationId/uploads/:itemId/archive",
+    auth: "desk",
+    summary: "Admins: archive one of a station's uploads, pulled from every log ahead (its files kept); its people are told why (added 2026-10-07)",
+    params: z.object({ stationId: Id, itemId: Id }),
+    body: DeskActionReason,
     response: AnalyticsStationFile
   })
 };

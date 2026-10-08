@@ -225,7 +225,11 @@ export interface StationsService {
     sharesCallSign?: boolean;
   } | null>;
   /** The desk's station file (added 2026-10-07): the station's own facts, and how many live sources it has. */
-  fileFacts(stationId: string): Promise<{ kind: string; status: string; handle: string | null; description: string | null; createdAt: Date; firstSignedOnAt: Date | null; signedOffAt: Date | null; liveSources: number } | null>;
+  fileFacts(stationId: string): Promise<{ kind: string; status: string; handle: string | null; description: string | null; createdAt: Date; firstSignedOnAt: Date | null; signedOffAt: Date | null; liveSources: number; held: { at: Date; reason: string; by: string | null } | null } | null>;
+  /** Added 2026-10-07: Opencast's hold (taken off the air from the desk), or null. */
+  holdOf(stationId: string): Promise<{ at: Date; reason: string; by: string | null } | null>;
+  /** Added 2026-10-07: sets or lifts Opencast's hold. Signing off is playout's. */
+  setHold(stationId: string, hold: { by: string; reason: string } | null): Promise<void>;
   /** Added 2026-09-29: stations that air (a station or a claimable one, setting up or on air, not signed off for good). */
   airingStationIds(): Promise<string[]>;
   /** Stations that take orders, and studios. */
@@ -1026,12 +1030,25 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
 
     async fileFacts(stationId) {
       const [row] = await db
-        .select({ kind: S.kind, status: S.status, handle: S.handle, description: S.description, createdAt: S.createdAt, firstSignedOnAt: S.firstSignedOnAt, signedOffAt: S.signedOffAt })
+        .select({ kind: S.kind, status: S.status, handle: S.handle, description: S.description, createdAt: S.createdAt, firstSignedOnAt: S.firstSignedOnAt, signedOffAt: S.signedOffAt, heldAt: S.heldAt, heldReason: S.heldReason, heldBy: S.heldBy })
         .from(S)
         .where(eq(S.id, stationId));
       if (!row) return null;
       const [sources] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.liveSources).where(eq(schema.liveSources.stationId, stationId));
-      return { ...row, kind: String(row.kind), status: String(row.status), liveSources: sources?.n ?? 0 };
+      const { heldAt, heldReason, heldBy, ...rest } = row;
+      return { ...rest, kind: String(row.kind), status: String(row.status), liveSources: sources?.n ?? 0, held: heldAt ? { at: heldAt, reason: heldReason ?? "", by: heldBy } : null };
+    },
+
+    async holdOf(stationId) {
+      const [row] = await db.select({ at: S.heldAt, reason: S.heldReason, by: S.heldBy }).from(S).where(eq(S.id, stationId));
+      return row?.at ? { at: row.at, reason: row.reason ?? "", by: row.by } : null;
+    },
+
+    async setHold(stationId, hold) {
+      await db
+        .update(S)
+        .set(hold ? { heldAt: deps.clock.now(), heldReason: hold.reason, heldBy: hold.by, updatedAt: deps.clock.now() } : { heldAt: null, heldReason: null, heldBy: null, updatedAt: deps.clock.now() })
+        .where(eq(S.id, stationId));
     },
 
     async airingStationIds() {

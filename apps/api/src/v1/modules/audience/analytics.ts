@@ -40,6 +40,10 @@ export interface Analytics {
   station(user: CurrentUser, stationId: string, query: Omit<AnalyticsQuery, "market" | "band">): Promise<AnalyticsStationPage>;
   /** The desk's station file (added 2026-10-07): who made it, its people, uploads and log ahead. */
   stationFile(user: CurrentUser, stationId: string): Promise<AnalyticsStationFile>;
+  /** Added 2026-10-07, admins only: take a station off the air and hold it there, lift that, or archive one of its uploads. */
+  takeOffAir(user: CurrentUser, stationId: string, reason: string): Promise<AnalyticsStationFile>;
+  liftHold(user: CurrentUser, stationId: string): Promise<AnalyticsStationFile>;
+  archiveUpload(user: CurrentUser, stationId: string, itemId: string, reason: string): Promise<AnalyticsStationFile>;
 }
 
 /** How the desk sorts a station kind. */
@@ -955,6 +959,8 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
     const current = sorted.find((e) => e.startsAt <= now && e.endsAt > now);
     const until = now.getTime() + 2 * DAY;
     const firstOwner = people.find((p) => p.role === "owner")?.userId ?? people[0]?.userId;
+    const actors = await services.accounts.peopleByIds([...new Set([facts.held?.by, ...uploads.map((u) => u.archivedBy)].filter((x): x is string => Boolean(x)))]);
+    const actor = (id: string | null | undefined) => (id ? (actors.get(id)?.name ?? null) : null);
     const live = uploads.filter((u) => !u.archivedAt);
     const marketOf = (id: string | null) => (id ? (allMarkets.find((m) => m.id === id) ?? null) : null);
     const creatorMarket = marketOf(creator?.marketId ?? null);
@@ -971,7 +977,8 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
         createdAt: facts.createdAt.toISOString(),
         firstSignedOnAt: facts.firstSignedOnAt?.toISOString() ?? null,
         signedOffAt: facts.signedOffAt?.toISOString() ?? null,
-        onAir: status.get(stationId)?.onAir ?? false
+        onAir: status.get(stationId)?.onAir ?? false,
+        held: facts.held ? { at: facts.held.at.toISOString(), reason: facts.held.reason, by: actor(facts.held.by) } : null
       },
       started: {
         how: creator ? "pipeline" : "signed_up",
@@ -993,10 +1000,11 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
         hours: round1(live.reduce((t, u) => t + (u.durationMs ?? 0), 0) / 3_600_000),
         rightsToConfirm: live.filter((u) => !u.rights).length,
         archived: uploads.length - live.length,
-        items: uploads.map(({ contentId, ...u }) => ({
+        items: uploads.map(({ contentId, archivedBy, archivedReason, ...u }) => ({
           ...u,
           addedAt: u.addedAt.toISOString(),
           archivedAt: u.archivedAt?.toISOString() ?? null,
+          archivedByOpencast: u.archivedAt && archivedReason ? { by: actor(archivedBy), reason: archivedReason } : null,
           rights: u.rights ? { ...u.rights, confirmedAt: u.rights.confirmedAt.toISOString() } : null,
           preview: (contentId && previews.get(contentId)) || null
         }))
@@ -1009,6 +1017,39 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
         liveSources: facts.liveSources
       }
     };
+  };
+
+  // The desk acts (added 2026-10-07): admins only, each with a reason the station's people see.
+  const adminOnly = (user: CurrentUser) => {
+    if (!user.isAdmin) throw forbidden("Only admins can act on a station from the desk.");
+  };
+
+  service.takeOffAir = async (user, stationId, reason) => {
+    adminOnly(user);
+    const facts = await services.stations.fileFacts(stationId);
+    if (!facts) throw notFound("No such station.");
+    if (facts.kind === "listed") throw badRequest("An external station is taken off the dial from External sources.");
+    await services.stations.setHold(stationId, { by: user.id, reason });
+    // Off the air now unless it's off already (or signed off for good, which stays as it is).
+    if (facts.status === "on_air" || facts.status === "setting_up") await services.playout.signOff(stationId, false);
+    deps.bus.emit("station.held", { stationId, reason });
+    return service.stationFile(user, stationId);
+  };
+
+  service.liftHold = async (user, stationId) => {
+    adminOnly(user);
+    if (!(await services.stations.holdOf(stationId))) throw notFound("That station isn't held.");
+    await services.stations.setHold(stationId, null);
+    deps.bus.emit("station.hold_lifted", { stationId });
+    return service.stationFile(user, stationId);
+  };
+
+  service.archiveUpload = async (user, stationId, itemId, reason) => {
+    adminOnly(user);
+    if ((await services.library.stationOfItem(itemId)) !== stationId) throw notFound("That item isn't this station's.");
+    const done = await services.library.archiveByOpencast(itemId, user.id, reason);
+    deps.bus.emit("item.archived_by_opencast", { stationId, itemId, title: done.title, reason, pulled: done.pulled });
+    return service.stationFile(user, stationId);
   };
 
   service.station = async (user, stationId, query) => {

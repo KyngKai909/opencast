@@ -109,6 +109,10 @@ function pacificMidnight(at: Date): Date {
 }
 
 /** A station's page: Ref. 12d's BEAT, scaled for any other station. */
+/** What the desk did to stations in this session (added 2026-10-07): holds, and uploads it archived. */
+const holds = new Map<string, NonNullable<AnalyticsStationFile["station"]["held"]>>();
+const archivedByDesk = new Map<string, { at: string; reason: string }>();
+
 /** The station file (added 2026-10-07): a made-up owner, a few uploads, and the next two days of log. */
 function stationFile(request: Request, id: string): AnalyticsStationFile | Response {
   const f = WEEK.find((x) => x.station.id === id);
@@ -144,24 +148,30 @@ function stationFile(request: Request, id: string): AnalyticsStationFile | Respo
     preview: { status: "ready" as const, url: "/mock-hls/preview.m3u8" },
     ...extra
   });
+  const held = holds.get(id) ?? null;
+  const items = [
+    upload(3, "Unconfirmed clip", 30, { rights: null, preview: null, status: "preparing" }),
+    upload(2, "Night Tape 2", 60),
+    upload(1, "Night Tape 1", 60),
+    upload(4, "Old promo", 1, { archivedAt: iso(now - 5 * DAY), preview: null })
+  ].map((u) => {
+    const a = archivedByDesk.get(`${id}:${u.id}`);
+    return a ? { ...u, archivedAt: a.at, archivedByOpencast: { by: "Dee A.", reason: a.reason }, preview: null } : u;
+  });
+  const live = items.filter((u) => !u.archivedAt);
   return {
-    station: { id, callSign: f.station.callSign, name: f.station.name, kind: f.station.kind === "external" ? "listed" : "station", status: "on_air", handle: null, homeCity: null, description: null, createdAt: iso(made), firstSignedOnAt: iso(made + 3 * DAY), signedOffAt: null, onAir: true },
+    station: { id, callSign: f.station.callSign, name: f.station.name, kind: f.station.kind === "external" ? "listed" : "station", status: held ? "off_air" : "on_air", handle: null, homeCity: null, description: null, createdAt: iso(made), firstSignedOnAt: iso(made + 3 * DAY), signedOffAt: null, onAir: !held, held },
     started: { how: "signed_up", creator: null },
     people: [
       { userId: "6f6f6f6f-0000-4000-8000-000000000001", name: "Kai Morgan", email: "kai@station.example", role: "owner", joinedAt: iso(made), lastInAt: iso(now - 2 * 3_600_000), lastSeenAt: iso(now - 3_600_000), accountCreatedAt: iso(made - DAY), madeIt: true },
       { userId: "6f6f6f6f-0000-4000-8000-000000000002", name: null, email: "host@station.example", role: "host", joinedAt: iso(made + 5 * DAY), lastInAt: null, lastSeenAt: iso(now - 4 * DAY), accountCreatedAt: iso(made + 5 * DAY), madeIt: false }
     ],
     uploads: {
-      total: 3,
-      hours: 2.5,
-      rightsToConfirm: 1,
-      archived: 1,
-      items: [
-        upload(3, "Unconfirmed clip", 30, { rights: null, preview: null, status: "preparing" }),
-        upload(2, "Night Tape 2", 60),
-        upload(1, "Night Tape 1", 60),
-        upload(4, "Old promo", 1, { archivedAt: iso(now - 5 * DAY), preview: null })
-      ]
+      total: live.length,
+      hours: Math.round(live.reduce((t, u) => t + (u.durationMs ?? 0), 0) / 360_000) / 10,
+      rightsToConfirm: live.filter((u) => !u.rights).length,
+      archived: items.length - live.length,
+      items
     },
     schedule: { now: entries[0] ?? null, week: { program: 6200, live: 60, offAir: 0, empty: 3820 }, entries, lastScheduledAt: iso(now + 5 * DAY), liveSources: 1 }
   };
@@ -543,6 +553,33 @@ export const analyticsHandlers = [
     if (no) return no;
     const body = audience(request);
     return body instanceof Response ? body : reply(analyticsApi.audience.response, body);
+  }),
+  // Acting from the desk (added 2026-10-07): admins only, with a reason.
+  http.post(path(analyticsApi.takeOffAir), async ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    if (!isAdminNow(personOf(request)!)) return fail(403, "forbidden", "Only admins can act on a station from the desk.");
+    const { reason } = (await request.json()) as { reason: string };
+    holds.set(String(params.stationId), { at: new Date().toISOString(), reason, by: "Dee A." });
+    const body = stationFile(request, String(params.stationId));
+    return body instanceof Response ? body : reply(analyticsApi.takeOffAir.response, body);
+  }),
+  http.delete(path(analyticsApi.liftHold), ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    if (!isAdminNow(personOf(request)!)) return fail(403, "forbidden", "Only admins can act on a station from the desk.");
+    if (!holds.delete(String(params.stationId))) return fail(404, "not_found", "That station isn't held.");
+    const body = stationFile(request, String(params.stationId));
+    return body instanceof Response ? body : reply(analyticsApi.liftHold.response, body);
+  }),
+  http.post(path(analyticsApi.archiveUpload), async ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    if (!isAdminNow(personOf(request)!)) return fail(403, "forbidden", "Only admins can act on a station from the desk.");
+    const { reason } = (await request.json()) as { reason: string };
+    archivedByDesk.set(`${String(params.stationId)}:${String(params.itemId)}`, { at: new Date().toISOString(), reason });
+    const body = stationFile(request, String(params.stationId));
+    return body instanceof Response ? body : reply(analyticsApi.archiveUpload.response, body);
   }),
   http.get(path(analyticsApi.stationFile), ({ request, params }) => {
     const no = denied(request);

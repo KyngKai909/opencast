@@ -19,7 +19,7 @@ import { isEveryBreak, partsOf } from "./engine/cadence.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
 import { STATION_ID_MS } from "./engine/fill.js";
 
-type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared";
+type CheckKey = "log_covers_24h" | "station_id_hourly" | "rights_confirmed" | "listings_complete" | "live_sources_connected" | "channel_chosen" | "call_sign_chosen" | "output" | "off_air_hours" | "items_prepared" | "held_by_opencast";
 
 export interface SignOnCheck {
   key: CheckKey;
@@ -599,7 +599,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       const liveEntries = entries.filter((e) => e.kind === "live");
       // By item, not by entry (G13); failed told apart from on its way (G14).
       const prep = summariseReadiness(prepared);
+      const hold = await services.stations.holdOf(stationId);
       const checks: SignOnCheck[] = [
+        // Added 2026-10-07: taken off the air from the desk; only Opencast lifts it.
+        ...(hold ? [{ key: "held_by_opencast" as const, label: "Opencast took this station off the air", passed: false, blocking: true, detail: hold.reason }] : []),
         { key: "call_sign_chosen", label: "Call sign chosen", passed: identity.callSign, blocking: true, detail: null },
         { key: "channel_chosen", label: "Channel chosen", passed: identity.channel, blocking: true, detail: null },
         {
@@ -678,6 +681,8 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async signOn(stationId) {
+      const hold = await services.stations.holdOf(stationId);
+      if (hold) throw refused("held_by_opencast", `Opencast took this station off the air: ${hold.reason.replace(/[.!?]?$/, ".")} It can sign on again once Opencast lifts that.`);
       const { ready, checks } = await service.checks(stationId);
       if (!ready) {
         const failing = checks.filter((c) => c.blocking && !c.passed).map((c) => c.label.toLowerCase());

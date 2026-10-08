@@ -769,8 +769,9 @@ export const SignOnCheck = z.object({
   /**
    * `off_air_hours` (added 2026-09-29): informational, never blocking; there when off air time is planned in the next 24 hours.
    * `items_prepared` (added 2026-09-29, prepare once): never blocking; how many items on the next 24 hours of the log are prepared for air (with `preparation`, G14).
+   * `held_by_opencast` (added 2026-10-07): blocking, there only while Opencast has taken the station off the air from the desk; `detail` is why.
    */
-  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours", "items_prepared"]),
+  key: z.enum(["log_covers_24h", "station_id_hourly", "rights_confirmed", "listings_complete", "live_sources_connected", "channel_chosen", "call_sign_chosen", "output", "off_air_hours", "items_prepared", "held_by_opencast"]),
   label: z.string(),
   passed: z.boolean(),
   /** Blockers stop sign-on; warnings don't. */
