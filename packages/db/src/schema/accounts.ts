@@ -30,8 +30,44 @@ export const users = accounts.table("users", {
    * records others hold point at it. Tokens issued before this are refused; signing in again later
    * starts a new, empty account.
    */
-  deletedAt: at("deleted_at")
+  deletedAt: at("deleted_at"),
+  /**
+   * Invite-only sign-ups (added 2026-10-07): when the person was let in, and how. Null while they
+   * wait (signed in, not in yet). Everyone with an account before 0060 was let in at their sign-up.
+   */
+  admittedAt: at("admitted_at"),
+  admittedHow: text("admitted_how", { enum: ["existing", "open", "admin", "code", "team_invite", "desk"] }),
+  /** The invite code they came in with (`invite_codes.id`). */
+  admittedByCode: uuid("admitted_by_code")
 });
+
+/**
+ * Invite codes (added 2026-10-07): a person's own (one use each, up to `signups.codes_per_person`)
+ * or the desk's (`created_by` null, any number of uses). `code` is 8 characters, stored without
+ * the dash, upper case.
+ */
+export const inviteCodes = accounts.table(
+  "invite_codes",
+  {
+    id: id(),
+    code: text("code").notNull().unique(),
+    kind: text("kind", { enum: ["personal", "internal"] }).notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    note: text("note"),
+    /** Null: any number (the desk's only). */
+    maxUses: integer("max_uses"),
+    uses: integer("uses").notNull().default(0),
+    expiresAt: at("expires_at"),
+    revokedAt: at("revoked_at"),
+    createdAt: createdAt()
+  },
+  (t) => [
+    index("invite_codes_created_by").on(t.createdBy),
+    check("invite_code_format", sql`${t.code} ~ '^[A-HJKMNP-Z2-9]{8}$'`),
+    check("invite_code_personal_once", sql`${t.kind} <> 'personal' or (${t.maxUses} = 1 and ${t.createdBy} is not null)`),
+    check("invite_code_uses_fit", sql`${t.maxUses} is null or ${t.uses} <= ${t.maxUses}`)
+  ]
+);
 
 /**
  * Privy sessions (the token's `sid`) this API has seen, so "sign out everywhere" can refuse a

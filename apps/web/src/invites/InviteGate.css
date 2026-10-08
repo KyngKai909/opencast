@@ -1,0 +1,10 @@
+/* Waiting for an invite (added 2026-10-07): the permission page's column, centred. */
+.oc-gate { min-height: 100vh; min-height: 100dvh; background: var(--ground); color: var(--ink); display: flex; justify-content: center; align-items: flex-start; }
+.oc-gate__col { width: 100%; max-width: 420px; box-sizing: border-box; padding: max(24px, env(safe-area-inset-top)) 18px 24px; display: flex; flex-direction: column; gap: 10px; }
+.oc-gate__h { margin: 14px 0 0; font: 800 28px/1.05 var(--font-display); font-stretch: var(--wide); letter-spacing: -.035em; }
+.oc-gate__lede { margin: 0 0 6px; font-size: 14.5px; color: var(--ink-70); }
+.oc-gate__form { display: flex; flex-direction: column; gap: 10px; }
+.oc-gate__note { margin: 14px 0 0; font-size: 13px; color: var(--ink-50); }
+@media (min-width: 768px) {
+  .oc-gate { align-items: center; }
+}

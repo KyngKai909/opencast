@@ -11,6 +11,7 @@ import { useApi } from "../../api/hooks";
 import { useAuth } from "../../auth/AuthProvider";
 import { ChangeLogSection, MarketsSection, RulesSection, SignersSection, TeamSection } from "../components/settings/SettingsSections";
 import { StorageSection } from "../components/settings/StorageSection";
+import { InvitesSection } from "../components/settings/InvitesSection";
 import { deskPath } from "../../areas";
 import { Quiet, SecTop } from "./common";
 import "./Catalog.css";
@@ -22,6 +23,8 @@ const SECTIONS = [
   { id: "markets", label: "Markets", description: "Each market's numbering ranges." },
   { id: "signers", label: "Escrow signers", description: "The keys that approve a creator's claim on held earnings." },
   { id: "storage", label: "Storage maintenance", description: "The one-off storage steps, checked and applied on the server. Admins only.", adminOnly: true },
+  // Added 2026-10-07: invite-only sign-ups.
+  { id: "invites", label: "Invites", description: "Who can sign up: the desk's invite codes, who's waiting to come in, and how everyone came in. Admins only.", adminOnly: true },
   { id: "log", label: "Change log", description: "Every change made here, newest first." },
   { id: "you", label: "You", description: "Your own settings for Network desk, on this device." }
 ] as const;
@@ -95,6 +98,7 @@ export default function Settings() {
       {current.id === "markets" && <MarketsSection />}
       {current.id === "signers" && <SignersSection />}
       {current.id === "storage" && <StorageSection />}
+      {current.id === "invites" && <InvitesSection />}
       {current.id === "log" && <ChangeLogSection />}
       {current.id === "you" && <You />}
     </SettingsLayout>

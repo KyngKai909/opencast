@@ -64,6 +64,7 @@ const ROUTES: Route[] = [
   { path: "/desk/reserved-call-signs", ready: async (p) => { await h1("Reserved call signs")(p); await expect(p.getByRole("table", { name: "Reserved call signs" })).toBeVisible(); } },
   { path: "/desk/rights-claims", ready: async (p) => { await h1("Rights claims")(p); await expect(p.getByRole("grid", { name: "Open claims" })).toBeVisible(); } },
   { path: "/desk/catalog-sponsors", ready: async (p) => { await h1("Catalog sponsors")(p); await expect(p.getByRole("grid", { name: "Catalog sponsors" })).toBeVisible(); } },
+  { path: "/desk/settings/invites", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Waiting to come in" })).toBeVisible(); } },
   { path: "/desk/settings", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Rules" })).toBeVisible(); } },
   { path: "/desk/settings/you", ready: async (p) => { await h1("Settings")(p); await expect(p.getByRole("heading", { name: "Appearance" })).toBeVisible(); } },
   { path: "/desk/no-such-page", ready: h1("There's nothing here.") }

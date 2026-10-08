@@ -34,3 +34,15 @@ section:first-of-type > .nd-grp { margin-top: 0; }
   .nd-rule__v { grid-column: 1; text-align: left; }
   .nd-job__head, .nd-job__last { flex-direction: column; align-items: flex-start; gap: 8px; }
 }
+
+/* Invites (added 2026-10-07). */
+.nd-inv { list-style: none; margin: 0 0 8px; padding: 0; }
+.nd-inv__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.nd-inv__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nd-inv__who b { font-weight: 600; overflow-wrap: anywhere; }
+.nd-inv__who small { font-size: 12.5px; color: var(--ink-50); }
+.nd-inv__code { font-family: var(--font-mono); letter-spacing: .04em; }
+.nd-inv__acts { display: flex; gap: 6px; flex: none; }
+.nd-inv__quiet { margin: 6px 0 12px; font-size: 13.5px; }
+.nd-inv__form { display: flex; flex-direction: column; gap: 12px; }
+.nd-inv__form .nd-form__error { margin: 0; font-size: 13px; color: var(--standby); font-weight: 600; }

@@ -290,6 +290,23 @@ export const RULES = {
     display: (v) => (!v.opencastBps && !v.poolBps && !v.fundBps ? "Not set yet" : `${pct(v.opencastBps)} Opencast, ${pct(v.poolBps)} the pool, ${pct(v.fundBps)} the creator fund`),
     isSet: (v) => !!(v.opencastBps || v.poolBps || v.fundBps)
   }),
+  // Sign-ups (added 2026-10-07, the user's request): invite-only, like Clubhouse while it grew.
+  "signups.invite_only": def({
+    group: "signups",
+    title: "Invite only",
+    detail: "New accounts need an invite code (or a team invite) before they can do anything; people already in stay in",
+    schema: z.object({ on: z.boolean() }),
+    fallback: { on: false },
+    display: (v) => (v.on ? "On: new accounts need an invite code" : "Off: anyone can sign up")
+  }),
+  "signups.codes_per_person": def({
+    group: "signups",
+    title: "Invite codes each",
+    detail: "How many invite codes each person who's in can make and send, one person each",
+    schema: z.object({ codes: z.number().int().min(0).max(100) }),
+    fallback: { codes: 10 },
+    display: (v) => `${v.codes} ${v.codes === 1 ? "code" : "codes"} each`
+  }),
   // Costs (added 2026-10-07, A251 Phase 6; no first version): what running Opencast costs, for the
   // desk's "Cost to run, estimated". Prices Opencast pays its own suppliers, not what stations pay;
   // each is "Not set yet" until someone sets it, and the estimate leaves it out until then.

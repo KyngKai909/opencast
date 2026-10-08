@@ -48,7 +48,7 @@ export const RoleInput = z
  * Where a rule sits on the Rules page. `watch_data` and `features` added 2026-09-29 (follow-up
  * Phase 1: how long watch data is kept, the minimum audience, and the "Not for me" flag).
  */
-export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow", "call_signs", "sponsors", "watch_data", "features", "external", "costs"]);
+export const RuleGroup = z.enum(["pay_as_you_go", "shares", "rights", "relays", "numbering", "escrow", "call_signs", "sponsors", "watch_data", "features", "external", "costs", "signups"]);
 export type RuleGroup = z.infer<typeof RuleGroup>;
 
 /** One version of a rule: its value from a date. */

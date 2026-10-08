@@ -407,6 +407,13 @@
       "when": 1791419759275,
       "tag": "0059_desk_holds",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791427759418,
+      "tag": "0060_invite_codes",
+      "breakpoints": true
     }
   ]
 }

@@ -40,8 +40,10 @@ describe("the rules registry", () => {
     const byKey = Object.fromEntries(rows.rows.map((r: { key: string; value: unknown }) => [r.key, r.value]));
     // 15 from 0027; the hold and the refused names from 0029 (reserved call signs); radio live and
     // the grace period from 0033 (pay-as-you-go), which also gives three prices their first set version;
-    // DASH stream links from 0041 (A201); the five starting costs from 0058 (A251).
-    expect(Object.keys(byKey)).toHaveLength(25);
+    // DASH stream links from 0041 (A201); the five starting costs from 0058 (A251); invite-only
+    // sign-ups and codes each from 0060.
+    expect(Object.keys(byKey)).toHaveLength(27);
+    expect(byKey["signups.invite_only"]).toEqual({ on: true });
     expect(byKey["costs.platform"]).toEqual({ costPerWeekMicros: 5_770_000 });
     expect(byKey["external.dash_stream_links"]).toEqual({ played: true });
     expect(byKey["billing.grace"]).toEqual({ days: 14, warnDaysBefore: 3 });

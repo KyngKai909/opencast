@@ -118,7 +118,13 @@ export const Me = z.object({
    * market). Empty for someone not on the Opencast team; `isAdmin` still says admin, as before.
    * Absent from older servers.
    */
-  deskRoles: z.array(DeskRoleGrant).optional()
+  deskRoles: z.array(DeskRoleGrant).optional(),
+  /**
+   * Added 2026-10-07 (invite-only sign-ups): false until the person is let in, by an invite code,
+   * a team invite, or the desk. Until then the account can only redeem a code, sign out or be
+   * deleted. Absent from older servers (everyone was in).
+   */
+  admitted: z.boolean().optional()
 });
 export type Me = z.infer<typeof Me>;
 
@@ -266,7 +272,9 @@ export const accountsApi = {
   getMe: endpoint({
     method: "GET",
     path: "/me",
-    auth: "user", tvSession: true,
+    auth: "user",
+    beforeAdmitted: true,
+    tvSession: true,
     summary: "The signed-in person, their identities, stations and businesses",
     response: Me
   }),
@@ -493,6 +501,7 @@ export const accountsApi = {
     method: "POST",
     path: "/invites/:inviteId/accept",
     auth: "user",
+    beforeAdmitted: true,
     summary:
       "Join the team the invite is for. Changed 2026-09-29: an invite to an email needs that email on the signed-in account (403 `invite_email_mismatch`; INVITE_EMAIL_MATCH=off turns the check off). 409 `invite_used` when someone else accepted it (accepting your own again changes nothing); 422 `invite_expired`.",
     params: z.object({ inviteId: Id }),
@@ -505,6 +514,7 @@ export const accountsApi = {
     method: "POST",
     path: "/me/sign-out-everywhere",
     auth: "user",
+    beforeAdmitted: true,
     summary:
       "A1: sign out every phone, computer and TV. Every Privy token issued before now, and every later token of a session seen before now, answers 401 `signed_out`; TVs signed in to the account are signed out and their phones dropped. This device signs out too.",
     response: Ok
@@ -543,6 +553,7 @@ export const accountsApi = {
     method: "DELETE",
     path: "/me",
     auth: "user",
+    beforeAdmitted: true,
     summary:
       "A3: delete the account now (no grace period). Presets, reminders, watch history, notices and TVs go; pledges stop after this month; team places are left. 409 `owns_station` or `owns_business` while the person owns one: hand it over (or close it) first.",
     response: Ok

@@ -16,6 +16,11 @@ export interface CurrentUser {
   id: string;
   privyDid: string | null;
   isAdmin: boolean;
+  /**
+   * Let in (added 2026-10-07, invite-only sign-ups). False while they wait: only endpoints marked
+   * `beforeAdmitted` answer them. Absent means in (TV sessions, tests).
+   */
+  admitted?: boolean;
   /** Set when a TV session acts as the person (endpoints marked `tvSession`). */
   viaTv?: { tvId: string; sessionId: string };
 }
@@ -275,6 +280,12 @@ export class RouteRegistrar {
       // Signed out everywhere, or the account deleted: say so (`signed_out`, `account_deleted`).
       if (error instanceof HttpError && error.status === 401) throw error;
       throw unauthorized("Your sign-in has expired. Sign in again.");
+    }
+    // Added 2026-10-07: someone signed in who hasn't been let in yet is signed out to `optional`
+    // and `public` endpoints, and refused by the rest except those marked `beforeAdmitted`.
+    if (user.admitted === false && !endpoint.beforeAdmitted) {
+      if (endpoint.auth === "public" || endpoint.auth === "optional") return callers;
+      throw new HttpError(403, "invite_required", "Opencast is invite-only for now. Enter an invite code to come in.");
     }
     if (endpoint.auth === "admin" && !user.isAdmin) {
       throw forbidden();

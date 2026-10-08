@@ -4,6 +4,7 @@
 //   /control/…   master control (control/routes.tsx): /control/:callSign/monitor, /control/new, /control/setup/…
 //   /desk/…      Network desk (desk/routes.tsx), for the Opencast team: /desk/markets/:slug/board…
 //   /invites/:id goes to /control/invites/:id, where a station invite is accepted.
+//   /join/:code  an invite code's link (added 2026-10-07, invite-only sign-ups).
 //
 // Master control and the desk load only when someone opens them (their own chunks), so viewers
 // never download them. /control and /desk are matched before the viewer's /:handle.
@@ -14,6 +15,7 @@ import ViewerArea from "./viewer/ViewerArea";
 
 const ControlArea = lazy(() => import("./control/ControlArea"));
 const DeskArea = lazy(() => import("./desk/DeskArea"));
+const Join = lazy(() => import("./invites/Join"));
 
 export function AppRoutes() {
   return (
@@ -36,6 +38,14 @@ export function AppRoutes() {
       />
       {/* A station invite's link lives in master control; /invites/:id is kept for links that say so. */}
       <Route path="invites/:inviteId" element={<InviteRedirect />} />
+      <Route
+        path="join/:code"
+        element={
+          <Suspense fallback={null}>
+            <Join />
+          </Suspense>
+        }
+      />
       <Route path="*" element={<ViewerArea />} />
     </Routes>
   );
