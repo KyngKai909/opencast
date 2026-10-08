@@ -51,6 +51,10 @@ const ROUTES: Route[] = [
   { path: "/desk/analytics/overview", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Tuned in at once" })).toBeVisible(); } },
   { path: "/desk/analytics/stations", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Every station's span" })).toBeVisible(); } },
   { path: "/desk/analytics/stations/00000000-0000-4000-8000-000000097001", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Saturday night" })).toBeVisible(); } },
+  // The station file (added 2026-10-07): its people, uploads and log.
+  { path: "/desk/analytics/stations/00000000-0000-4000-8000-000000097001?view=people", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Everyone on the station" })).toBeVisible(); } },
+  { path: "/desk/analytics/stations/00000000-0000-4000-8000-000000097001?view=uploads", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "The station's uploads" })).toBeVisible(); } },
+  { path: "/desk/analytics/stations/00000000-0000-4000-8000-000000097001?view=schedule", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "The next 48 hours of the log" })).toBeVisible(); } },
   { path: "/desk/analytics/audience", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("table", { name: "Average tuned in by weekday and hour" })).toBeVisible(); } },
   { path: "/desk/analytics/programs", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Late Crate, still watching" })).toBeVisible(); } },
   { path: "/desk/analytics/money", ready: async (p) => { await h1("Analytics")(p); await expect(p.getByRole("heading", { name: "Spot market" })).toBeVisible(); } },

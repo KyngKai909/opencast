@@ -40,6 +40,8 @@ export interface NetworkService extends DeskPart {
   claimableInfo(stationId: string): Promise<{ runFor: string; claimed: boolean } | null>;
   /** Added 2026-09-29: the market a creator is in (a market lead works only in theirs). */
   creatorMarket(creatorId: string): Promise<string | null>;
+  /** The desk's station file (added 2026-10-07): the pipeline's creator a station was set up for, if any. */
+  creatorOfStation(stationId: string): Promise<{ id: string; name: string; stage: string; sourceUrl: string; marketId: string | null } | null>;
 }
 
 export function toMarket(row: typeof schema.markets.$inferSelect): Market {
@@ -83,6 +85,12 @@ export function createNetworkService(ctx: ModuleContext): NetworkService {
     async creatorMarket(creatorId) {
       const [row] = await db.select({ marketId: schema.creators.marketId }).from(schema.creators).where(eq(schema.creators.id, creatorId));
       return row?.marketId ?? null;
+    },
+
+    async creatorOfStation(stationId) {
+      const C = schema.creators;
+      const [row] = await db.select({ id: C.id, name: C.displayName, stage: C.stage, sourceUrl: C.sourceUrl, marketId: C.marketId }).from(C).where(eq(C.stationId, stationId)).orderBy(asc(C.createdAt)).limit(1);
+      return row ? { ...row, stage: String(row.stage) } : null;
     },
 
     async marketBySlug(slug) {

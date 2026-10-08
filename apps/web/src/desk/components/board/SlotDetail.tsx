@@ -35,6 +35,15 @@ function openInControl(callSign: string | null | undefined, label = "Open in mas
   );
 }
 
+/** The station's page on the desk (added 2026-10-07): who made it, its people, uploads and log. */
+function openFile(s: StationIdent | undefined) {
+  return s ? (
+    <Button size="sm" href={deskPath(`/analytics/stations/${s.id}?view=people`)}>
+      Station file
+    </Button>
+  ) : null;
+}
+
 /** A station's part of master control's address: a family member's carries its channel ("beat-12-2", A229). */
 const controlRef = (s: StationIdent | undefined) => (s?.sharesCallSign && s.slug ? s.slug : s?.callSign);
 
@@ -57,10 +66,10 @@ export function slotLines(p: SlotDetailProps): KeyValueRow[] {
         detail = `Claimable, on air. ${who}'s station, waiting to be claimed`;
       }
       const pipelineHref = deskPath(creator ? `/markets/${marketSlug}/pipeline/${creator.id}/setup` : `/markets/${marketSlug}/pipeline`);
-      return [{ title: heading, detail, actions: (<>{openInControl(first?.callSign)}<Button size="sm" href={pipelineHref}>Pipeline</Button></>) }];
+      return [{ title: heading, detail, actions: (<>{openInControl(first?.callSign)}{openFile(first)}<Button size="sm" href={pipelineHref}>Pipeline</Button></>) }];
     }
     case "station": {
-      const line = { title: heading, detail: `Independent station. ${first?.name ?? ""}${first?.homeCity ? `, ${first.homeCity}` : ""}`, actions: openInControl(controlRef(first)) };
+      const line = { title: heading, detail: `Independent station. ${first?.name ?? ""}${first?.homeCity ? `, ${first.homeCity}` : ""}`, actions: (<>{openInControl(controlRef(first))}{openFile(first)}</>) };
       if (slot.stations.length < 2) return [line];
       // Subchannels: each its own line, and a station whose owners no longer match X.1's says so (A234).
       const apart = ownersApartOn(ownersApart, slot);
@@ -72,7 +81,7 @@ export function slotLines(p: SlotDetailProps): KeyValueRow[] {
           return {
             title: `${s.channel} ${s.callSign ?? s.name}`,
             detail: a ? `${s.name}. No longer shares an owner with ${a.head.channel} ${a.head.callSign}. ${ownersApartDetail(a, timeZone)}` : s.name,
-            actions: openInControl(controlRef(s), `Open ${s.channel}`)
+            actions: (<>{openInControl(controlRef(s), `Open ${s.channel}`)}{openFile(s)}</>)
           };
         })
       ];

@@ -103,6 +103,8 @@ export interface AccountsService {
   addStationMember(db: Executor, stationId: string, userId: string, role: StationRole): Promise<void>;
   addBusinessMember(db: Executor, businessId: string, userId: string, role: BusinessRole): Promise<void>;
   stationMemberIds(stationId: string, roles?: StationRole[]): Promise<string[]>;
+  /** The desk's station file (added 2026-10-07): everyone on a station, oldest first, with their account's dates. */
+  stationPeople(stationId: string): Promise<Array<{ userId: string; name: string | null; email: string | null; role: string; joinedAt: Date; lastInAt: Date | null; lastSeenAt: Date | null; accountCreatedAt: Date }>>;
   /** Added 2026-09-30 (A230): the stations a person holds the owner role on (their own subchannels). */
   ownedStationIds(userId: string): Promise<string[]>;
   /** Opencast admins (Network desk). */
@@ -929,6 +931,18 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         .from(schema.stationMemberships)
         .where(eq(schema.stationMemberships.stationId, stationId));
       return rows.filter((r) => !roles || roles.includes(r.role)).map((r) => r.userId);
+    },
+
+    async stationPeople(stationId) {
+      const M = schema.stationMemberships;
+      const U = schema.users;
+      const rows = await db
+        .select({ userId: M.userId, role: M.role, joinedAt: M.createdAt, lastInAt: M.lastInAt, name: U.displayName, email: U.email, lastSeenAt: U.lastSeenAt, accountCreatedAt: U.createdAt, deletedAt: U.deletedAt })
+        .from(M)
+        .innerJoin(U, eq(U.id, M.userId))
+        .where(eq(M.stationId, stationId))
+        .orderBy(asc(M.createdAt));
+      return rows.map(({ deletedAt, ...r }) => ({ ...r, role: String(r.role), name: deletedAt ? null : r.name, email: deletedAt ? null : r.email }));
     },
 
     async businessMemberIds(businessId, roles) {
