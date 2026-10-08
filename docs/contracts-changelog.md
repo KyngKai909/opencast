@@ -2,6 +2,19 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: Invite-only sign-ups
+
+Additive, with migration 0060.
+
+- New `invites.ts`:
+  - shapes: `InviteCodeView`, `MyInvites`, `InviteCheck`, `DeskInvites`;
+  - endpoints in `invitesApi`: `check` (public), `redeem`, `mine`, `make`, `takeBack`, and for admins `desk`, `deskMake`, `deskRevoke`, `letIn`.
+- `core.ts`: `EndpointDef.beforeAdmitted`. It marks the endpoints someone who isn't in yet may call; any other `user`, `admin` or `desk` endpoint answers them 403 `invite_required`.
+- `accounts.ts`:
+  - `Me.admitted` (optional);
+  - `getMe`, `signOutEverywhere`, `deleteAccount` and `acceptInvite` are `beforeAdmitted`.
+- `rules.ts`: `signups.invite_only` and `signups.codes_per_person`. `desk.ts`: `RuleGroup` gains `signups`.
+
 ## 2026-10-07: Acting from the desk's station file
 
 Additive, with migration 0059.

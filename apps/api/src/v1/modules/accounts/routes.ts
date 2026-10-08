@@ -1,4 +1,4 @@
-import { accountsApi as api } from "@opencast/contracts";
+import { accountsApi as api, invitesApi } from "@opencast/contracts";
 import type { ModuleContext } from "../../context.js";
 import type { RouteRegistrar } from "../../http.js";
 
@@ -124,5 +124,32 @@ export function accountsRoutes(r: RouteRegistrar, { services }: ModuleContext) {
   r.handle(api.acceptInvite, async ({ user, params }) => {
     await accounts.acceptInvite(user, params.inviteId);
     return accounts.me(user.id);
+  });
+
+  // Invite-only sign-ups (added 2026-10-07).
+  const invites = accounts.invites;
+  r.handle(invitesApi.check, ({ params }) => invites.check(params.code));
+  r.handle(invitesApi.redeem, async ({ user, params }) => {
+    await invites.redeem(user, params.code);
+    return accounts.me(user.id);
+  });
+  r.handle(invitesApi.mine, ({ user }) => invites.mine(user));
+  r.handle(invitesApi.make, ({ user }) => invites.make(user));
+  r.handle(invitesApi.takeBack, ({ user, params }) => invites.takeBack(user, params.code));
+  r.handle(invitesApi.desk, async ({ user }) => {
+    await services.settings.requireDesk(user, "admin");
+    return invites.desk();
+  });
+  r.handle(invitesApi.deskMake, async ({ user, body }) => {
+    await services.settings.requireDesk(user, "admin");
+    return invites.deskMake(user, body);
+  });
+  r.handle(invitesApi.deskRevoke, async ({ user, params }) => {
+    await services.settings.requireDesk(user, "admin");
+    return invites.deskRevoke(params.code);
+  });
+  r.handle(invitesApi.letIn, async ({ user, body }) => {
+    await services.settings.requireDesk(user, "admin");
+    return invites.letIn(body.userId);
   });
 }

@@ -12,5 +12,6 @@ import { settingsHandlers } from "./settings";
 import { shelfHandlers } from "./shelf";
 import { sponsorsHandlers } from "./sponsors";
 import { storageHandlers } from "./storage";
+import { deskInviteHandlers } from "../../../mocks/invites";
 
-export const handlers = [...analyticsHandlers, ...accountsHandlers, ...boardHandlers, ...creatorHandlers, ...listedHandlers, ...heldHandlers, ...settingsHandlers, ...storageHandlers, ...shelfHandlers, ...sponsorsHandlers, ...claimsHandlers, ...reservedHandlers, ...mockHandlers];
+export const handlers = [...analyticsHandlers, ...accountsHandlers, ...boardHandlers, ...creatorHandlers, ...listedHandlers, ...heldHandlers, ...settingsHandlers, ...storageHandlers, ...shelfHandlers, ...sponsorsHandlers, ...claimsHandlers, ...reservedHandlers, ...deskInviteHandlers, ...mockHandlers];

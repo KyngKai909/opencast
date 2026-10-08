@@ -19,6 +19,7 @@ import { setCached } from "../components/you/cache";
 import { PledgeModal } from "../components/you/PledgeModal";
 import { PresetTiles } from "../components/you/PresetTiles";
 import { TvCodeDialog } from "../components/you/TvCodeDialog";
+import { InvitesSection } from "../components/you/InvitesSection";
 import { PledgeRows, ReminderRows, RunStation, SignedOutYou, TvRows, comingUp, supportingSub } from "../components/you/YouSections";
 import { useMyStation, useOpenChannels, usePledges, useReminders, useRemoveReminder, useTvs } from "../components/you/useYouData";
 import "../components/you/sections.css";
@@ -172,6 +173,8 @@ function YouWeb({ columns }: { columns?: 2 | 3 }) {
         )}
       </section>
 
+      <InvitesSection form="web" />
+
       <RunStation form="web" marketName={me?.market?.name ?? null} open={y.open} mine={y.mine} />
       <TvCodeDialog open={y.tvCode.open} onClose={y.tvCode.close} />
     </div>
@@ -223,6 +226,8 @@ function YouPhone() {
         {y.tvs.isLoading ? <Placeholder rows={1} /> : <TvRows tvs={y.tvs.data ?? []} castingTo={y.castingTo} now={y.now} form="phone" onSignOut={(tv) => void y.signOutTv(tv)} onAdd={y.tvCode.show} />}
         {y.tvs.error && <ErrorLine error={y.tvs.error} />}
       </div>
+
+      <InvitesSection form="phone" />
 
       <h2 className="vw-y-psec">Run a station</h2>
       <div className="vw-you-p__list">

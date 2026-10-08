@@ -5,6 +5,7 @@ import { GroundProvider, ToastProvider } from "@opencast/ui";
 import { AuthProvider } from "./auth/AuthProvider";
 import { SettingsSync } from "./viewer/layout/SettingsSync";
 import { AppRoutes } from "./routes";
+import { InviteGate } from "./invites/InviteGate";
 import { config } from "./config";
 
 // One QueryClient for the three areas: an answer read in one (the account, a station) is there in the others.
@@ -26,7 +27,10 @@ export function App() {
             {/* The account's ground and "Reduce motion", in every area: one setting. */}
             <SettingsSync />
             <BrowserRouter>
-              <AppRoutes />
+              {/* Added 2026-10-07: signed in but not let in yet, the invite code comes first. */}
+              <InviteGate>
+                <AppRoutes />
+              </InviteGate>
             </BrowserRouter>
           </AuthProvider>
         </ToastProvider>

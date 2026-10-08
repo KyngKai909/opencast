@@ -6,6 +6,7 @@ import type { CurrentUser } from "../../http.js";
 import { ClearLookupUnavailable } from "../../clearLink.js";
 import { badRequest, conflict, forbidden, HttpError, notFound, refused } from "../../errors.js";
 import { maskEmail } from "../../email.js";
+import { createInvites, type Invites } from "./invites.js";
 
 export type StationRole = "owner" | "operator" | "host";
 export type BusinessRole = "owner" | "manager" | "viewer";
@@ -163,6 +164,8 @@ export interface AccountsService {
   resendInvite(user: CurrentUser, inviteId: string): Promise<InviteRow>;
   /** Joins the team. An invite to an email needs that email on the account, unless INVITE_EMAIL_MATCH=off. */
   acceptInvite(user: CurrentUser, inviteId: string): Promise<void>;
+  /** Invite-only sign-ups and invite codes (added 2026-10-07). */
+  invites: Invites;
   /** An invite as its link's page shows it; signed in, whether the account's email matches. */
   invitePreview(inviteId: string, user: CurrentUser | null): Promise<InvitePreview>;
 }
@@ -386,7 +389,23 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
     return row ?? null;
   }
 
+  const invites = createInvites({ deps, services });
+
+  /**
+   * Whether someone's in (added 2026-10-07). Not yet: let in now if sign-ups aren't invite-only,
+   * or they're an admin; otherwise they wait for a code, a team invite or the desk.
+   */
+  async function admitted(user: { id: string; isAdmin: boolean; admittedAt: Date | null }): Promise<boolean> {
+    if (user.admittedAt) return true;
+    const how = user.isAdmin ? "admin" : !(await invites.inviteOnly()) ? "open" : null;
+    if (!how) return false;
+    await invites.admit(db, user.id, how);
+    return true;
+  }
+
   const service: AccountsService = {
+    invites,
+
     async userForToken(token) {
       const verified = await deps.auth.verify(token);
       const user = await promoteByEmail(await findOrCreateUser(verified.privyDid, verified.issuedAt, verified.sessionId));
@@ -402,7 +421,7 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         if (session?.endedAt) throw signedOut();
         if (!session) await db.insert(S).values({ userId: user.id, sid: verified.sessionId, firstSeenAt: wallClock() }).onConflictDoNothing();
       }
-      return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin };
+      return { id: user.id, privyDid: user.privyDid, isAdmin: user.isAdmin, admitted: await admitted(user) };
     },
 
     async currentUser(userId) {
@@ -456,7 +475,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         settings: (user.settings ?? {}) as Me["settings"],
         clear: clear ? { address: clear.address, access: clear.access, linkedAt: clear.linkedAt } : null,
         // Added 2026-09-29: Network desk roles (admin, rights reviewer, market lead).
-        deskRoles: await services.settings.rolesOf({ id: user.id, isAdmin: user.isAdmin })
+        deskRoles: await services.settings.rolesOf({ id: user.id, isAdmin: user.isAdmin }),
+        admitted: !!user.admittedAt
       };
     },
 
@@ -1326,6 +1346,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
         // A4: the programs the invite named, still live programs of the station.
         if (row.stationId && row.role === "host" && row.programIds?.length) await services.stations.addHost(tx, row.stationId, user.id, row.programIds);
         if (row.advertiserId) await service.addBusinessMember(tx, row.advertiserId, user.id, row.role as BusinessRole);
+        // Added 2026-10-07: a team invite lets someone in, invite-only or not.
+        await invites.admit(tx, user.id, "team_invite");
       });
       if (row.stationId) await ownersChanged(row.stationId, before);
     },

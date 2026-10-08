@@ -49,6 +49,10 @@ export async function seed(ctx: SeedContext): Promise<Seed> {
   const h = { db, clock: ctx.deps.clock, services } as unknown as Harness;
   const now = ctx.deps.clock.now();
 
+  // --- Sign-ups (added 2026-10-07): migration 0060 starts them invite-only; these runs sign in new
+  // people throughout, so anyone can sign up here.
+  await db.insert(schema.rules).values({ key: "signups.invite_only", value: { on: false }, effectiveFrom: new Date("1970-01-01T00:00:01Z"), note: "e2e: anyone can sign up" });
+
   // --- Markets (packages/db/scripts/seed.ts put them in).
   const markets = await db.select().from(schema.markets);
   const marketId = (slug: string) => {

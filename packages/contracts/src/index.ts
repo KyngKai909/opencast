@@ -64,6 +64,7 @@ export * from "./platforms.js";
 export * from "./uploads.js";
 export * from "./blocks.js";
 export * from "./analytics.js";
+export * from "./invites.js";
 
 export const API_PREFIX = "/v1";
 

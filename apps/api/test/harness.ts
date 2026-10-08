@@ -70,6 +70,8 @@ export interface User {
 export async function createHarness(
   options: {
     realTime?: boolean;
+    /** Keep sign-ups invite-only, as migration 0060 starts them (added 2026-10-07). Off by default here, so tests' people are let in. */
+    inviteOnly?: boolean;
     payments?: (clock: { now(): Date }) => Deps["payments"];
     chain?: Deps["chain"];
     geo?: Deps["geo"];
@@ -154,6 +156,9 @@ export async function createHarness(
     }
   };
   const { router, services } = createV1(deps);
+  if (!options.inviteOnly) {
+    await database.db.insert(schema.rules).values({ key: "signups.invite_only", value: { on: false }, effectiveFrom: new Date("1970-01-01T00:00:01Z"), note: "Tests: anyone can sign up" });
+  }
   const app = express();
   app.use("/v1", router);
 

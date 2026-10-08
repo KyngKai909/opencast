@@ -20,6 +20,8 @@ interface Visit {
   path: string;
   /** Default true: Kai, signed in. */
   signedIn?: boolean;
+  /** Signed in as someone else (added 2026-10-07: new@invite.example waits for an invite code). */
+  as?: string;
   /** Default true: the Inland Empire is on this device. False is a first visit. */
   market?: boolean;
   only?: Width;
@@ -82,6 +84,9 @@ const VISITS: Visit[] = [
   { name: "replace key", path: `/presets?modal=replace-key&station=${PREP}`, sees: dialog("Where should PREP 31.1 go?") },
   { name: "you", path: "/you", sees: heading("Reminders") },
   { name: "you, signed out", path: "/you", signedIn: false, sees: (p) => p.getByRole("main") },
+  // Invite-only sign-ups (added 2026-10-07): waiting for a code, and an invite's link.
+  { name: "waiting for an invite", path: "/", as: "new@invite.example", sees: heading("Opencast is invite-only for now") },
+  { name: "invite link", path: "/join/OPEN-2026", signedIn: false, sees: heading("You're invited to Opencast") },
   {
     name: "sign in, email",
     path: "/you",
@@ -149,13 +154,13 @@ for (const width of ["web", "phone"] as const) {
         if (v.only && v.only !== width) continue;
         test(v.name, async ({ page, context }) => {
           await context.addInitScript(
-            ({ signedIn, market }) => {
+            ({ signedIn, market, as }) => {
               if (sessionStorage.getItem("oc-e2e-seeded")) return;
               sessionStorage.setItem("oc-e2e-seeded", "1");
-              if (signedIn) localStorage.setItem("oc-mock-signed-in", "kai@example.com");
+              if (signedIn) localStorage.setItem("oc-mock-signed-in", as);
               if (market) localStorage.setItem("oc-device", JSON.stringify({ marketSlug: "inland-empire", presets: [], reminders: [], settings: {}, lastStationId: null }));
             },
-            { signedIn: v.signedIn !== false, market: v.market !== false }
+            { signedIn: v.signedIn !== false, market: v.market !== false, as: v.as ?? "kai@example.com" }
           );
           await useGround(page, ground);
           if (v.casting) {

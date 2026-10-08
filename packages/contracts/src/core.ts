@@ -41,6 +41,12 @@ export interface EndpointDef {
    */
   tvSession?: boolean;
   /**
+   * Answers someone signed in who hasn't been let in yet (added 2026-10-07, invite-only sign-ups).
+   * Every other `user`, `admin` or `desk` endpoint answers them 403 `invite_required`, and an
+   * `optional` one treats them as signed out.
+   */
+  beforeAdmitted?: boolean;
+  /**
    * Server-Sent Events (added 2026-09-28): the response is a `text/event-stream`, not JSON. Each
    * event's name is a key here and its `data` is JSON matching the schema. The server sends a
    * comment (`: ping`) every 25 seconds. `response` describes the events as `{ event, data }`, for
