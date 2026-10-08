@@ -4,20 +4,43 @@
 // run comes with the Money tab, Phase 6.)
 
 import { analyticsApi, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsQuery, type AnalyticsStationPage } from "@opencast/contracts";
-import { Button, LineChart, money, Tag } from "@opencast/ui";
+import { Button, LineChart, money, Tabs, Tag } from "@opencast/ui";
+import { useSearchParams } from "react-router";
 import { useApi } from "../../../api/hooks";
 import { controlPath } from "../../../areas";
 import { ErrorLine, Quiet } from "../../pages/common";
 import { Pill, Spark } from "./Overview";
+import { MadeBy, PeopleView, ScheduleView, UploadsView } from "./StationFile";
 import { PLATFORMS, clockText, csv, dateOf, download, minutesText, num, shortDate, type Span } from "./span";
 
 const TZ = "America/Los_Angeles";
+// The station file's views beside its numbers (added 2026-10-07), kept in the address (`?view=`).
+const VIEWS = [
+  { value: "numbers", label: "Numbers" },
+  { value: "people", label: "People" },
+  { value: "uploads", label: "Uploads" },
+  { value: "schedule", label: "Schedule" }
+] as const;
+type View = (typeof VIEWS)[number]["value"];
 
 export function StationPage({ stationId, query, span, exporter, back }: { stationId: string; query: AnalyticsQuery; span: Span; exporter: { current: (() => void) | null }; back: () => void }) {
   const { market: _m, band: _b, ...q } = query;
   void _m;
   void _b;
   const page = useApi(analyticsApi.station, { params: { stationId }, query: q });
+  const file = useApi(analyticsApi.stationFile, { params: { stationId } });
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("view");
+  const view: View = VIEWS.some((v) => v.value === asked) ? (asked as View) : "numbers";
+  const setView = (v: View) =>
+    setParams(
+      (p) => {
+        if (v === "numbers") p.delete("view");
+        else p.set("view", v);
+        return p;
+      },
+      { replace: true }
+    );
   if (page.isLoading) return <Quiet />;
   if (page.error || !page.data) return <ErrorLine error={page.error} />;
   const d = page.data;
@@ -55,7 +78,23 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
           </Button>
         )}
       </header>
+      {s.kind !== "external" && file.data && <MadeBy file={file.data} />}
+      {s.kind !== "external" && <Tabs label="This station" items={VIEWS} value={view} onChange={setView} className="nd-an__views" />}
 
+      {view !== "numbers" && s.kind !== "external" ? (
+        file.isLoading ? (
+          <Quiet />
+        ) : file.error || !file.data ? (
+          <ErrorLine error={file.error} />
+        ) : view === "people" ? (
+          <PeopleView file={file.data} />
+        ) : view === "uploads" ? (
+          <UploadsView file={file.data} />
+        ) : (
+          <ScheduleView file={file.data} />
+        )
+      ) : (
+      <>
       <div className="nd-an__kps nd-an__kps--5">
         <Kpi label="Hours watched" value={num(d.hoursWatched.value)} m={d.hoursWatched} vs={d.hoursWatched.shareOfNetwork == null ? "" : `${d.hoursWatched.shareOfNetwork}% of all`} />
         <Kpi label="Average tuned in" value={num(d.averageTunedIn.value)} m={d.averageTunedIn} vs={`vs ${num(d.averageTunedIn.previous)}`} />
@@ -253,6 +292,8 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
         </section>
       </div>
       {d.cost && <Cost c={d.cost} name={s.callSign ?? s.name} />}
+      </>
+      )}
     </div>
   );
 }

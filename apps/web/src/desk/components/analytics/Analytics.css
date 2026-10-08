@@ -238,3 +238,31 @@ i.nd-an__brk { background: var(--ink-50); opacity: .35; }
 .nd-an__incidents small { display: block; font-size: 12.5px; color: var(--ink-70); margin-top: 2px; }
 .nd-an__when { font: 500 11.5px/1.35 var(--font-mono); }
 .nd-an__stage { grid-template-columns: 110px minmax(0, 1fr) 48px; min-height: 36px; padding: 4px; }
+
+/* The station file (added 2026-10-07): who made it, its people, uploads and log. */
+.nd-an__made { margin: -6px 0 12px; font-size: 13.5px; color: var(--ink-70); max-width: 100ch; }
+.nd-an__made b { color: var(--ink); font-weight: 600; }
+.nd-an__views { margin: 0 0 14px; }
+.nd-an__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nd-an__who b { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; overflow-wrap: anywhere; }
+.nd-an__who small { font-size: 12px; color: var(--ink-50); overflow-wrap: anywhere; }
+.nd-an__person { grid-template-columns: minmax(200px, 1.6fr) 90px 80px minmax(110px, 1fr) minmax(110px, 1fr) 90px; }
+.nd-an__upl { grid-template-columns: 32px minmax(0, 2fr) 70px 70px minmax(120px, 1fr); }
+.nd-an__uplwrap { border-bottom: 1px solid var(--hair); }
+.nd-an__uplwrap:last-child { border-bottom: 0; }
+.nd-an__uplwrap > .nd-an__tr { border-bottom: 0; }
+.nd-an__play { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: none; color: var(--ink); font-size: 11px; cursor: pointer; }
+.nd-an__play[aria-expanded="true"] { background: var(--card-2); }
+.nd-an__preview { padding: 0 10px 12px 52px; }
+.nd-an__preview video { display: block; width: 100%; max-width: 560px; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; }
+.nd-an__preview--audio video { aspect-ratio: auto; height: 44px; background: none; }
+.nd-an__logrow { grid-template-columns: minmax(170px, 220px) minmax(0, 1fr) auto; min-height: 40px; }
+@media (max-width: 720px) {
+  .nd-an__person { grid-template-columns: minmax(0, 1fr) auto; }
+  .nd-an__person > :nth-child(n + 3) { display: none; }
+  .nd-an__upl { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .nd-an__upl > :nth-child(n + 4) { display: none; }
+  .nd-an__logrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .nd-an__logrow > :first-child { grid-column: 1 / -1; }
+  .nd-an__preview { padding-left: 10px; }
+}

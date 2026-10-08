@@ -422,6 +422,90 @@ export const AnalyticsGrowth = z.object({
 });
 export type AnalyticsGrowth = z.infer<typeof AnalyticsGrowth>;
 
+/**
+ * The desk's station file (added 2026-10-07, the user's request): beside one station's numbers, who
+ * made it and when, everyone on it, what it uploaded (with a preview once prepared, and the rights
+ * reason its people gave) and what's on its log. Admins and the station's market lead, as the page.
+ */
+export const StationFilePerson = z.object({
+  userId: Id,
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  role: z.string(),
+  joinedAt: Timestamp,
+  /** Last opened the station's control room. */
+  lastInAt: Timestamp.nullable(),
+  /** Last seen anywhere on Opencast. */
+  lastSeenAt: Timestamp.nullable(),
+  accountCreatedAt: Timestamp,
+  /** The earliest owner: who made the station. */
+  madeIt: z.boolean()
+});
+export const StationFileUpload = z.object({
+  id: Id,
+  title: z.string(),
+  program: z.string().nullable(),
+  code: z.string(),
+  source: z.enum(["upload", "link", "creator_work", "library"]),
+  sourceUrl: z.string().nullable(),
+  originalFilename: z.string().nullable(),
+  mediaKind: z.enum(["video", "audio"]),
+  durationMs: z.number().int().nullable(),
+  status: z.enum(["preparing", "ready", "failed"]),
+  addedAt: Timestamp,
+  archivedAt: Timestamp.nullable(),
+  /** Null: rights not confirmed yet, so it can't air. */
+  rights: z.object({ basis: z.string(), note: z.string().nullable(), confirmedAt: Timestamp }).nullable(),
+  /** The prepared file's preview; null when it has none (not prepared, locked by a claim). */
+  preview: z.object({ status: z.enum(["ready", "preparing", "failed"]), url: z.string().nullable() }).nullable()
+});
+export const StationFileEntry = z.object({
+  startsAt: Timestamp,
+  endsAt: Timestamp,
+  kind: z.enum(["program", "live", "off_air"]),
+  code: z.string(),
+  title: z.string().nullable()
+});
+export const AnalyticsStationFile = z.object({
+  station: z.object({
+    id: Id,
+    callSign: z.string().nullable(),
+    name: z.string(),
+    kind: z.string(),
+    status: z.string(),
+    handle: z.string().nullable(),
+    homeCity: z.string().nullable(),
+    description: z.string().nullable(),
+    createdAt: Timestamp,
+    firstSignedOnAt: Timestamp.nullable(),
+    signedOffAt: Timestamp.nullable(),
+    onAir: z.boolean()
+  }),
+  /** How it started: someone signed up and made it, or the desk brought a creator on through the pipeline. */
+  started: z.object({
+    how: z.enum(["signed_up", "pipeline"]),
+    creator: z.object({ id: Id, name: z.string(), stage: z.string(), sourceUrl: z.string(), market: AnalyticsMarket.nullable() }).nullable()
+  }),
+  people: z.array(StationFilePerson),
+  uploads: z.object({
+    total: z.number().int(),
+    hours: z.number(),
+    rightsToConfirm: z.number().int(),
+    archived: z.number().int(),
+    items: z.array(StationFileUpload)
+  }),
+  schedule: z.object({
+    now: StationFileEntry.nullable(),
+    /** The next 7 days, in minutes: scheduled programs, live, planned off air, and nothing scheduled. */
+    week: z.object({ program: z.number().int(), live: z.number().int(), offAir: z.number().int(), empty: z.number().int() }),
+    /** The next 48 hours of the log, up to 200 rows. */
+    entries: z.array(StationFileEntry),
+    lastScheduledAt: Timestamp.nullable(),
+    liveSources: z.number().int()
+  })
+});
+export type AnalyticsStationFile = z.infer<typeof AnalyticsStationFile>;
+
 export const analyticsApi = {
   overview: endpoint({
     method: "GET",
@@ -496,5 +580,13 @@ export const analyticsApi = {
     params: z.object({ stationId: Id }),
     query: AnalyticsQuery.omit({ market: true, band: true }),
     response: AnalyticsStationPage
+  }),
+  stationFile: endpoint({
+    method: "GET",
+    path: "/desk/analytics/stations/:stationId/file",
+    auth: "desk",
+    summary: "One station's file: who made it and when, its people, its uploads with previews and rights, and its log ahead (added 2026-10-07)",
+    params: z.object({ stationId: Id }),
+    response: AnalyticsStationFile
   })
 };

@@ -2,7 +2,7 @@
 // the span asked for, with a shape through the day (evenings busiest, Friday and Saturday most). A
 // market lead gets their market only, fixed; a rights reviewer is refused, as the API does.
 import { http } from "msw";
-import { analyticsApi, type AnalyticsGrowth, type AnalyticsHealth, type AnalyticsMoney, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
+import { analyticsApi, type AnalyticsGrowth, type AnalyticsHealth, type AnalyticsMoney, type AnalyticsAudience, type AnalyticsProgram, type AnalyticsProgramDetail, type AnalyticsPrograms, type AnalyticsAiring, type AnalyticsFlow, type AnalyticsMarket, type AnalyticsOverview, type AnalyticsStation, type AnalyticsStationFile, type AnalyticsStationPage, type AnalyticsStationRow, type AnalyticsStations } from "@opencast/contracts";
 import { fail, path, personOf, reply } from "../respond";
 import { HD, IE, LA } from "../fixtures/markets";
 import { isAdminNow, onTeam, rolesOf } from "../settingsDb";
@@ -109,6 +109,64 @@ function pacificMidnight(at: Date): Date {
 }
 
 /** A station's page: Ref. 12d's BEAT, scaled for any other station. */
+/** The station file (added 2026-10-07): a made-up owner, a few uploads, and the next two days of log. */
+function stationFile(request: Request, id: string): AnalyticsStationFile | Response {
+  const f = WEEK.find((x) => x.station.id === id);
+  if (!f) return fail(404, "not_found", "No such station.");
+  const p = personOf(request)!;
+  const leads = isAdminNow(p) ? null : rolesOf(p).filter((r) => r.role === "market_lead" && r.market).map((r) => r.market!.id);
+  if (leads && !leads.includes(f.station.market?.id ?? "")) return fail(403, "forbidden", "That station isn't in your market.");
+  const now = Date.now();
+  const iso = (t: number) => new Date(t).toISOString();
+  const made = now - 40 * DAY;
+  const call = f.station.callSign ?? f.station.name;
+  const entries: AnalyticsStationFile["schedule"]["entries"] = [];
+  const start = Math.floor(now / 1_800_000) * 1_800_000;
+  for (let i = 0; i < 40; i++) {
+    const at = start + i * 3_600_000;
+    if (new Date(at).getUTCHours() % 6 === 5) continue;
+    entries.push({ startsAt: iso(at), endsAt: iso(at + 3_600_000), kind: i === 6 ? "live" : "program", code: "PGM", title: i === 6 ? `${call} Live` : ["Night Tape", "Desert Drive", "Record Club"][i % 3]! });
+  }
+  const upload = (n: number, title: string, minutes: number, extra: Partial<AnalyticsStationFile["uploads"]["items"][number]> = {}) => ({
+    id: `5e5e5e5e-0000-4000-8000-00000000000${n}`,
+    title,
+    program: n < 3 ? "Night Tape" : null,
+    code: "PGM",
+    source: "upload" as const,
+    sourceUrl: null,
+    originalFilename: `${title.toLowerCase().replace(/\W+/g, "-")}.mp4`,
+    mediaKind: "video" as const,
+    durationMs: minutes * 60_000,
+    status: "ready" as const,
+    addedAt: iso(made + n * DAY),
+    archivedAt: null,
+    rights: { basis: "made_it", note: "Filmed it at the station", confirmedAt: iso(made + n * DAY) },
+    preview: { status: "ready" as const, url: "/mock-hls/preview.m3u8" },
+    ...extra
+  });
+  return {
+    station: { id, callSign: f.station.callSign, name: f.station.name, kind: f.station.kind === "external" ? "listed" : "station", status: "on_air", handle: null, homeCity: null, description: null, createdAt: iso(made), firstSignedOnAt: iso(made + 3 * DAY), signedOffAt: null, onAir: true },
+    started: { how: "signed_up", creator: null },
+    people: [
+      { userId: "6f6f6f6f-0000-4000-8000-000000000001", name: "Kai Morgan", email: "kai@station.example", role: "owner", joinedAt: iso(made), lastInAt: iso(now - 2 * 3_600_000), lastSeenAt: iso(now - 3_600_000), accountCreatedAt: iso(made - DAY), madeIt: true },
+      { userId: "6f6f6f6f-0000-4000-8000-000000000002", name: null, email: "host@station.example", role: "host", joinedAt: iso(made + 5 * DAY), lastInAt: null, lastSeenAt: iso(now - 4 * DAY), accountCreatedAt: iso(made + 5 * DAY), madeIt: false }
+    ],
+    uploads: {
+      total: 3,
+      hours: 2.5,
+      rightsToConfirm: 1,
+      archived: 1,
+      items: [
+        upload(3, "Unconfirmed clip", 30, { rights: null, preview: null, status: "preparing" }),
+        upload(2, "Night Tape 2", 60),
+        upload(1, "Night Tape 1", 60),
+        upload(4, "Old promo", 1, { archivedAt: iso(now - 5 * DAY), preview: null })
+      ]
+    },
+    schedule: { now: entries[0] ?? null, week: { program: 6200, live: 60, offAir: 0, empty: 3820 }, entries, lastScheduledAt: iso(now + 5 * DAY), liveSources: 1 }
+  };
+}
+
 function stationPage(request: Request, id: string): AnalyticsStationPage | Response {
   const f = WEEK.find((x) => x.station.id === id);
   if (!f) return fail(404, "not_found", "No such station.");
@@ -485,6 +543,12 @@ export const analyticsHandlers = [
     if (no) return no;
     const body = audience(request);
     return body instanceof Response ? body : reply(analyticsApi.audience.response, body);
+  }),
+  http.get(path(analyticsApi.stationFile), ({ request, params }) => {
+    const no = denied(request);
+    if (no) return no;
+    const body = stationFile(request, String(params.stationId));
+    return body instanceof Response ? body : reply(analyticsApi.stationFile.response, body);
   }),
   http.get(path(analyticsApi.station), ({ request, params }) => {
     const no = denied(request);

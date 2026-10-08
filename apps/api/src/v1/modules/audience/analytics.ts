@@ -5,7 +5,7 @@
 
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
-import type { AnalyticsGrowth, AnalyticsHealth, AnalyticsMoney, AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
+import type { AnalyticsGrowth, AnalyticsHealth, AnalyticsMoney, AnalyticsAiring, AnalyticsAudience, AnalyticsAudienceQuery, AnalyticsBand, AnalyticsBreakHold, AnalyticsProgram, AnalyticsProgramDetail, AnalyticsPrograms, AnalyticsFlow, AnalyticsMarket, AnalyticsOverview, AnalyticsQuery, AnalyticsScope, AnalyticsStation, AnalyticsStationKind, AnalyticsStationFile, AnalyticsStationPage, AnalyticsStationRow, AnalyticsStations, StationIdent } from "@opencast/contracts";
 import type { CurrentUser } from "../../http.js";
 import type { ModuleContext } from "../../context.js";
 import { badRequest, forbidden, notFound } from "../../errors.js";
@@ -38,6 +38,8 @@ export interface Analytics {
   audience(user: CurrentUser, query: AnalyticsAudienceQuery): Promise<AnalyticsAudience>;
   /** One station's page (Ref. 12d 03); a market lead only for a station in their market. */
   station(user: CurrentUser, stationId: string, query: Omit<AnalyticsQuery, "market" | "band">): Promise<AnalyticsStationPage>;
+  /** The desk's station file (added 2026-10-07): who made it, its people, uploads and log ahead. */
+  stationFile(user: CurrentUser, stationId: string): Promise<AnalyticsStationFile>;
 }
 
 /** How the desk sorts a station kind. */
@@ -906,6 +908,106 @@ export function createAnalytics({ deps, services }: ModuleContext, totals: Total
         byDay: spanDays.map((d) => deviceRows.find((r) => String(r.day) === d)?.devices ?? 0)
       },
       via: [...via].map(([v, n]) => ({ via: v, sessions: n, share: sessions ? round1((n / sessions) * 100) : 0 })).sort((a, b) => (a.via === "unknown" ? 1 : 0) - (b.via === "unknown" ? 1 : 0) || b.sessions - a.sessions)
+    };
+  };
+
+  service.stationFile = async (user, stationId) => {
+    const place = (await totals.places()).get(stationId) ?? { band: null, marketId: null };
+    if (!user.isAdmin) {
+      const leads = (await services.settings.rolesOf(user)).filter((g) => g.role === "market_lead" && g.market).map((g) => g.market!.id);
+      if (!leads.length) throw forbidden("Analytics are for admins and market leads.");
+      if (!place.marketId || !leads.includes(place.marketId)) throw forbidden("That station isn't in your market.");
+    }
+    const [facts, ident] = await Promise.all([services.stations.fileFacts(stationId), services.stations.idents([stationId]).then((m) => m.get(stationId))]);
+    if (!facts || !ident) throw notFound("No such station.");
+    const now = deps.clock.now();
+    const weekEnd = new Date(now.getTime() + 7 * DAY);
+    const [people, creator, uploads, entries, lastEnd, status, allMarkets] = await Promise.all([
+      services.accounts.stationPeople(stationId),
+      services.network.creatorOfStation(stationId),
+      services.library.stationUploads(stationId),
+      services.log.entries(stationId, now, weekEnd),
+      services.log.lastEntryEnd(stationId),
+      services.playout.statusFor([stationId]),
+      services.network.allMarkets()
+    ]);
+    // Previews only for what's prepared already: the desk never queues preparing just to look.
+    const band = place.band ?? "tv";
+    const previews = await services.playout.previews(uploads.filter((u) => u.contentId && !u.archivedAt).map((u) => ({ contentId: u.contentId, mediaKind: u.mediaKind, band, durationMs: u.durationMs })));
+    const titles = await services.library.titles({ itemIds: entries.flatMap((e) => (e.assetId ? [e.assetId] : [])), programIds: entries.flatMap((e) => (e.programId ? [e.programId] : [])) });
+    const entry = (e: (typeof entries)[number]) => ({
+      startsAt: e.startsAt.toISOString(),
+      endsAt: e.endsAt.toISOString(),
+      kind: e.kind,
+      code: String(e.code),
+      title: e.episodeTitle ?? (e.programId ? titles.programs.get(e.programId) : undefined) ?? (e.assetId ? titles.items.get(e.assetId) : undefined) ?? (e.kind === "off_air" ? "Off air" : null)
+    });
+    // The next 7 days by kind, each entry clipped to the week; what nothing covers is empty.
+    const week = { program: 0, live: 0, offAir: 0, empty: 0 };
+    for (const e of entries) {
+      const minutes = Math.max(0, (Math.min(e.endsAt.getTime(), weekEnd.getTime()) - Math.max(e.startsAt.getTime(), now.getTime())) / 60_000);
+      if (e.kind === "live") week.live += minutes;
+      else if (e.kind === "off_air") week.offAir += minutes;
+      else week.program += minutes;
+    }
+    week.empty = Math.max(0, 7 * 24 * 60 - week.program - week.live - week.offAir);
+    const sorted = [...entries].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+    const current = sorted.find((e) => e.startsAt <= now && e.endsAt > now);
+    const until = now.getTime() + 2 * DAY;
+    const firstOwner = people.find((p) => p.role === "owner")?.userId ?? people[0]?.userId;
+    const live = uploads.filter((u) => !u.archivedAt);
+    const marketOf = (id: string | null) => (id ? (allMarkets.find((m) => m.id === id) ?? null) : null);
+    const creatorMarket = marketOf(creator?.marketId ?? null);
+    return {
+      station: {
+        id: stationId,
+        callSign: ident.callSign ?? null,
+        name: ident.name,
+        kind: facts.kind,
+        status: facts.status,
+        handle: facts.handle,
+        homeCity: ident.homeCity ?? null,
+        description: facts.description,
+        createdAt: facts.createdAt.toISOString(),
+        firstSignedOnAt: facts.firstSignedOnAt?.toISOString() ?? null,
+        signedOffAt: facts.signedOffAt?.toISOString() ?? null,
+        onAir: status.get(stationId)?.onAir ?? false
+      },
+      started: {
+        how: creator ? "pipeline" : "signed_up",
+        creator: creator ? { id: creator.id, name: creator.name, stage: creator.stage, sourceUrl: creator.sourceUrl, market: creatorMarket ? { id: creatorMarket.id, slug: creatorMarket.slug, name: creatorMarket.name } : null } : null
+      },
+      people: people.map((p) => ({
+        userId: p.userId,
+        name: p.name,
+        email: p.email,
+        role: p.role,
+        joinedAt: p.joinedAt.toISOString(),
+        lastInAt: p.lastInAt?.toISOString() ?? null,
+        lastSeenAt: p.lastSeenAt?.toISOString() ?? null,
+        accountCreatedAt: p.accountCreatedAt.toISOString(),
+        madeIt: p.userId === firstOwner
+      })),
+      uploads: {
+        total: live.length,
+        hours: round1(live.reduce((t, u) => t + (u.durationMs ?? 0), 0) / 3_600_000),
+        rightsToConfirm: live.filter((u) => !u.rights).length,
+        archived: uploads.length - live.length,
+        items: uploads.map(({ contentId, ...u }) => ({
+          ...u,
+          addedAt: u.addedAt.toISOString(),
+          archivedAt: u.archivedAt?.toISOString() ?? null,
+          rights: u.rights ? { ...u.rights, confirmedAt: u.rights.confirmedAt.toISOString() } : null,
+          preview: (contentId && previews.get(contentId)) || null
+        }))
+      },
+      schedule: {
+        now: current ? entry(current) : null,
+        week: { program: Math.round(week.program), live: Math.round(week.live), offAir: Math.round(week.offAir), empty: Math.round(week.empty) },
+        entries: sorted.filter((e) => e.startsAt.getTime() < until).slice(0, 200).map(entry),
+        lastScheduledAt: lastEnd?.toISOString() ?? null,
+        liveSources: facts.liveSources
+      }
     };
   };
 

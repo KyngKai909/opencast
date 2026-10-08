@@ -224,6 +224,8 @@ export interface StationsService {
     /** A229: its call sign is shared (name it with its channel where only a call sign would show). */
     sharesCallSign?: boolean;
   } | null>;
+  /** The desk's station file (added 2026-10-07): the station's own facts, and how many live sources it has. */
+  fileFacts(stationId: string): Promise<{ kind: string; status: string; handle: string | null; description: string | null; createdAt: Date; firstSignedOnAt: Date | null; signedOffAt: Date | null; liveSources: number } | null>;
   /** Added 2026-09-29: stations that air (a station or a claimable one, setting up or on air, not signed off for good). */
   airingStationIds(): Promise<string[]>;
   /** Stations that take orders, and studios. */
@@ -1020,6 +1022,16 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
         band: found.channel?.band ?? "tv",
         ...(profile.ident.sharesCallSign ? { sharesCallSign: true } : {})
       };
+    },
+
+    async fileFacts(stationId) {
+      const [row] = await db
+        .select({ kind: S.kind, status: S.status, handle: S.handle, description: S.description, createdAt: S.createdAt, firstSignedOnAt: S.firstSignedOnAt, signedOffAt: S.signedOffAt })
+        .from(S)
+        .where(eq(S.id, stationId));
+      if (!row) return null;
+      const [sources] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.liveSources).where(eq(schema.liveSources.stationId, stationId));
+      return { ...row, kind: String(row.kind), status: String(row.status), liveSources: sources?.n ?? 0 };
     },
 
     async airingStationIds() {

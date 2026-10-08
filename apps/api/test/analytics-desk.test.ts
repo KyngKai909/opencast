@@ -344,3 +344,28 @@ describe("Health (Ref. 12d 07) and Growth", () => {
     await sam.get(`/v1/desk/analytics/growth?from=${DAY.from}&to=${DAY.to}`).expect(403);
   });
 });
+
+describe("a station's file (added 2026-10-07)", () => {
+  it("says who made it, everyone on it, what it uploaded with its rights, and its log ahead", async () => {
+    h.clock.set("2026-10-02T06:00:00.000Z");
+    const [item] = await h.db.insert(schema.assets).values({ stationId: beat, title: "Night Tape 4", code: "PGM", source: "upload", mediaKind: "video", durationMs: 1_800_000, status: "ready", originalFilename: "tape4.mp4" }).returning({ id: schema.assets.id });
+    await h.db.insert(schema.rightsConfirmations).values({ assetId: item!.id, basis: "made_it", note: "Shot it myself" });
+    await h.db.insert(schema.assets).values({ stationId: beat, title: "Not confirmed", code: "PGM", source: "link", sourceUrl: "https://example.com/v", mediaKind: "video", durationMs: 600_000, status: "ready" });
+    await h.db.insert(schema.logEntries).values({ stationId: beat, startsAt: new Date("2026-10-02T05:45:00Z"), endsAt: new Date("2026-10-02T06:15:00Z"), kind: "program", code: "PGM", assetId: item!.id });
+
+    const { body } = await dee.get(`/v1/desk/analytics/stations/${beat}/file`).expect(200);
+    expect(body.station).toMatchObject({ callSign: "BEAT", kind: "station" });
+    expect(body.started).toEqual({ how: "signed_up", creator: null });
+    expect(body.people).toEqual([expect.objectContaining({ name: "Kai", role: "owner", madeIt: true })]);
+    expect(body.uploads).toMatchObject({ total: 2, hours: 0.7, rightsToConfirm: 1, archived: 0 });
+    expect(body.uploads.items.find((u: { title: string }) => u.title === "Night Tape 4")).toMatchObject({ originalFilename: "tape4.mp4", rights: { basis: "made_it", note: "Shot it myself" } });
+    expect(body.schedule.now).toMatchObject({ title: "Night Tape 4", kind: "program" });
+    expect(body.schedule.week).toMatchObject({ program: 15, live: 0, offAir: 0, empty: 7 * 24 * 60 - 15 });
+    expect(body.schedule.lastScheduledAt).toBe("2026-10-02T06:15:00.000Z");
+
+    // A market lead sees only their market's stations; a rights reviewer none.
+    await lee.get(`/v1/desk/analytics/stations/${beat}/file`).expect(200);
+    await lee.get(`/v1/desk/analytics/stations/${mojv}/file`).expect(403);
+    await sam.get(`/v1/desk/analytics/stations/${beat}/file`).expect(403);
+  });
+});

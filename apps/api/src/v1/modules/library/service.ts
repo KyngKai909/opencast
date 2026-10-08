@@ -95,6 +95,8 @@ export interface LibraryService {
   itemsSharingContent(itemIds: string[]): Promise<string[]>;
   /** Every item's current content ID. */
   currentContent(itemIds: string[]): Promise<Map<string, string>>;
+  /** The desk's station file (added 2026-10-07): every item a station has, archived ones too, newest first, with its rights and program. */
+  stationUploads(stationId: string): Promise<Array<{ id: string; title: string; program: string | null; code: string; source: "upload" | "link" | "creator_work" | "library"; sourceUrl: string | null; originalFilename: string | null; mediaKind: "video" | "audio"; durationMs: number | null; status: "preparing" | "ready" | "failed"; addedAt: Date; archivedAt: Date | null; rights: { basis: string; note: string | null; confirmedAt: Date } | null; contentId: string | null }>>;
   /**
    * Items to prepare for air (added 2026-09-29, prepare once): ready, rights confirmed, not archived,
    * whose rights were confirmed or whose file changed since `since`.
@@ -683,6 +685,41 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         .from(F)
         .where(sql`(${inArray(F.contentId, cids)} or ${inArray(F.originalContentId, cids)})`);
       return rows.map((r) => r.id).filter((id) => !itemIds.includes(id));
+    },
+
+    async stationUploads(stationId) {
+      const rows = await db
+        .select({
+          id: A.id,
+          title: A.title,
+          program: P.title,
+          code: A.code,
+          source: A.source,
+          sourceUrl: A.sourceUrl,
+          originalFilename: A.originalFilename,
+          mediaKind: A.mediaKind,
+          durationMs: A.durationMs,
+          status: A.status,
+          addedAt: A.createdAt,
+          archivedAt: A.archivedAt,
+          basis: R.basis,
+          note: R.note,
+          confirmedAt: R.confirmedAt
+        })
+        .from(A)
+        .leftJoin(P, eq(P.id, A.programId))
+        .leftJoin(R, eq(R.assetId, A.id))
+        .where(eq(A.stationId, stationId))
+        .orderBy(sql`${A.createdAt} desc`);
+      const content = await service.currentContent(rows.map((r) => r.id));
+      return rows.map(({ basis, note, confirmedAt, ...r }) => ({
+        ...r,
+        code: String(r.code),
+        source: r.source as "upload" | "link" | "creator_work" | "library",
+        status: (r.status ?? "preparing") as "preparing" | "ready" | "failed",
+        rights: basis && confirmedAt ? { basis: String(basis), note, confirmedAt } : null,
+        contentId: content.get(r.id) ?? null
+      }));
     },
 
     async currentContent(itemIds) {

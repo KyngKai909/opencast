@@ -202,6 +202,8 @@ export interface LogService {
   ensureBreaks(stationId: string, from: Date, to: Date): Promise<BreakSlotView[]>;
   /** Entries within a window, for sign-on checks and playout. */
   entries(stationId: string, from: Date, to: Date): Promise<Row[]>;
+  /** The desk's station file (added 2026-10-07): when the station's log runs out (its last entry's end). */
+  lastEntryEnd(stationId: string): Promise<Date | null>;
   /** One entry's slot. */
   entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
   /** Every station's items on the log in a window, earliest first (the readiness check reads ahead). */
@@ -1960,6 +1962,11 @@ export function createLogService(ctx: ModuleContext): LogService {
 
     async entries(stationId, from, to) {
       return load([stationId], from, to);
+    },
+
+    async lastEntryEnd(stationId) {
+      const [row] = await db.select({ at: sql<Date | string | null>`max(${E.endsAt})` }).from(E).where(eq(E.stationId, stationId));
+      return row?.at ? new Date(row.at) : null;
     },
 
     async entrySpan(entryId) {

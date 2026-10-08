@@ -2,6 +2,18 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: The desk's station file
+
+Additive: a new desk endpoint and new shapes; no migration.
+
+- `analytics.ts`: new `AnalyticsStationFile` (with `StationFilePerson`, `StationFileUpload` and `StationFileEntry`).
+- New endpoint `analyticsApi.stationFile` (`GET /desk/analytics/stations/:stationId/file`) returns:
+  - the station's own facts (made, first on air, signed off, on air now);
+  - how it started (signed up, or from the pipeline with its creator);
+  - everyone on it, with email, role and dates;
+  - its uploads with rights and a preview once prepared;
+  - its log ahead.
+
 ## 2026-10-07: The desk's analytics, Health and Growth (A251, Phase 7)
 
 Additive: two new desk endpoints and new shapes; no migration.
