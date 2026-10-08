@@ -2,6 +2,20 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-07: Acting from the desk's station file
+
+Additive, with migration 0059.
+
+- `analytics.ts`:
+  - new `DeskActionReason`;
+  - `AnalyticsStationFile.station.held` (optional);
+  - `StationFileUpload.archivedByOpencast` (optional).
+- New endpoints, admins only, each returning the station file:
+  - `analyticsApi.takeOffAir` (`POST /desk/analytics/stations/:stationId/hold`);
+  - `analyticsApi.liftHold` (`DELETE …/hold`);
+  - `analyticsApi.archiveUpload` (`POST …/uploads/:itemId/archive`).
+- `log.ts`: `SignOnCheck.key` gains `held_by_opencast`. It's a new value in an enum the control room reads, deployed with it.
+
 ## 2026-10-07: The desk's station file
 
 Additive: a new desk endpoint and new shapes; no migration.

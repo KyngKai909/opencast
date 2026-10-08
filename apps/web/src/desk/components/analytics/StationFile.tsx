@@ -1,10 +1,16 @@
 // The desk's station file (added 2026-10-07, the user's request): beside one station's numbers, who
 // made it and when, everyone on it, what it uploaded (with a preview once prepared, and the rights
 // reason its people gave) and what's on its log. Previews play what's prepared already; the desk
-// never asks for a file to be prepared just to look at it.
+// never asks for a file to be prepared just to look at it. Admins can act (added 2026-10-07): take
+// the station off the air and hold it there, lift that, or archive an upload, each with a reason
+// the station's people are told.
 
 import { useEffect, useRef, useState } from "react";
-import { RIGHTS_BASIS_LABELS, type AnalyticsStationFile } from "@opencast/contracts";
+import { accountsApi, analyticsApi, RIGHTS_BASIS_LABELS, type AnalyticsStationFile } from "@opencast/contracts";
+import { Button, Modal, TextAreaField, useToast } from "@opencast/ui";
+import { ApiError } from "../../../api/client";
+import { useApi, useApiMutation } from "../../../api/hooks";
+import { errorText } from "../../pages/common";
 import { clockText, dateOf, minutesText, num, shortDate } from "./span";
 
 type File = AnalyticsStationFile;
@@ -21,6 +27,125 @@ const when = (at: string) => `${day(at)}, ${clockText(new Date(at))}`;
 const length = (ms: number | null) => (ms == null ? "—" : minutesText(ms / 60_000));
 const who = (p: File["people"][number] | undefined) => (p ? (p.name ?? p.email ?? "A deleted account") : "nobody on it now");
 const rightsText = (r: Upload["rights"]) => (r ? (RIGHTS_BASIS_LABELS[r.basis as keyof typeof RIGHTS_BASIS_LABELS] ?? r.basis) : "Not confirmed");
+const ACTED = { invalidates: [analyticsApi.stationFile, analyticsApi.station] };
+
+/** Admins act from the desk; market leads look. */
+export function useDeskAdmin(): boolean {
+  const me = useApi(accountsApi.getMe);
+  return !!me.data?.isAdmin || !!me.data?.deskRoles?.some((g) => g.role === "admin");
+}
+
+/** Asks why before acting: the station's people read it. */
+function ReasonDialog({ title, subtitle, confirm, help, onSubmit, onClose }: { title: string; subtitle: string; confirm: string; help: string; onSubmit: (reason: string) => Promise<void>; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (reason.trim().length < 3) return setError("Say why: the station's people will read it.");
+    setError(null);
+    setBusy(true);
+    try {
+      await onSubmit(reason.trim());
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      width={520}
+      title={title}
+      subtitle={subtitle}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="ink" onClick={submit} disabled={busy}>
+            {confirm}
+          </Button>
+        </>
+      }
+    >
+      <TextAreaField label="Why" help={help} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500} error={error ?? undefined} />
+    </Modal>
+  );
+}
+
+/** Beside "Open in master control": take the station off the air (admins; not while it's held already). */
+export function TakeOffAir({ file }: { file: File }) {
+  const [open, setOpen] = useState(false);
+  const toast = useToast();
+  const hold = useApiMutation(analyticsApi.takeOffAir, ACTED);
+  const s = file.station;
+  if (s.held) return null;
+  const name = s.callSign ?? s.name;
+  return (
+    <>
+      <Button size="sm" variant="ink" onClick={() => setOpen(true)}>
+        Take off the air
+      </Button>
+      {open && (
+        <ReasonDialog
+          title={`Take ${name} off the air`}
+          subtitle={s.onAir ? "It signs off now and can't sign on again until the desk lifts this." : "It isn't on the air; this keeps it from signing on until the desk lifts it."}
+          confirm="Take it off the air"
+          help="Its owners and operators get this as a notice, and master control shows it."
+          onSubmit={async (reason) => {
+            await hold.mutateAsync({ params: { stationId: s.id }, body: { reason } });
+            toast.show({ message: `${name} is off the air and held.` });
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Under the header while Opencast holds the station off the air, with the way back (admins). */
+export function HeldBanner({ file, admin }: { file: File; admin: boolean }) {
+  const toast = useToast();
+  const lift = useApiMutation(analyticsApi.liftHold, ACTED);
+  const [error, setError] = useState<string | null>(null);
+  const held = file.station.held;
+  if (!held) return null;
+  const name = file.station.callSign ?? file.station.name;
+  return (
+    <div className="nd-an__held" role="status">
+      <p>
+        <b>Off the air, held by Opencast</b> since {when(held.at)}
+        {held.by ? ` (${held.by})` : ""}: {held.reason}
+      </p>
+      {admin && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={lift.isPending}
+          onClick={async () => {
+            setError(null);
+            try {
+              await lift.mutateAsync({ params: { stationId: file.station.id } });
+              toast.show({ message: `${name} can sign on again.` });
+            } catch (e) {
+              setError(e instanceof ApiError ? e.message : errorText(e));
+            }
+          }}
+        >
+          Lift the hold
+        </Button>
+      )}
+      {error && (
+        <p className="nd-form__error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** Under the station's name: when it was made, by whom, and how it started. */
 export function MadeBy({ file }: { file: File }) {
@@ -106,8 +231,11 @@ export function PeopleView({ file }: { file: File }) {
   );
 }
 
-export function UploadsView({ file }: { file: File }) {
+export function UploadsView({ file, admin }: { file: File; admin: boolean }) {
   const [playing, setPlaying] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<Upload | null>(null);
+  const toast = useToast();
+  const archive = useApiMutation(analyticsApi.archiveUpload, ACTED);
   const [archived, setArchived] = useState(false);
   const u = file.uploads;
   const items = u.items.filter((i) => archived || !i.archivedAt);
@@ -135,6 +263,9 @@ export function UploadsView({ file }: { file: File }) {
           <span role="columnheader">Length</span>
           <span role="columnheader">Added</span>
           <span role="columnheader">Rights</span>
+          <span role="columnheader">
+            <span className="nd-an__sr">Actions</span>
+          </span>
         </div>
         {items.map((i) => (
           <div key={i.id} className="nd-an__uplwrap" role="rowgroup">
@@ -172,12 +303,37 @@ export function UploadsView({ file }: { file: File }) {
                 <span className={i.rights ? undefined : "nd-an__neg"}>{rightsText(i.rights)}</span>
                 {i.rights?.note && <small>&ldquo;{i.rights.note}&rdquo;</small>}
               </span>
+              <span role="cell">
+                {admin && !i.archivedAt && (
+                  <Button size="sm" variant="ghost" onClick={() => setArchiving(i)} aria-label={`Archive ${i.title}`}>
+                    Archive
+                  </Button>
+                )}
+              </span>
             </div>
+            {i.archivedByOpencast && (
+              <p className="nd-an__byop">
+                Archived by Opencast{i.archivedByOpencast.by ? ` (${i.archivedByOpencast.by})` : ""}: {i.archivedByOpencast.reason}
+              </p>
+            )}
             {playing === i.id && i.preview?.url && <Preview url={i.preview.url} title={i.title} audio={i.mediaKind === "audio"} />}
           </div>
         ))}
         {!items.length && <p className="nd-an__none">Nothing uploaded.</p>}
       </div>
+      {archiving && (
+        <ReasonDialog
+          title={`Archive ${archiving.title}`}
+          subtitle="It comes off every log from its next airing, carriers' too; an airing on now finishes. Its files are kept. To stop it now, take the station off the air."
+          confirm="Archive it"
+          help="The station's owners and operators get this as a notice."
+          onSubmit={async (reason) => {
+            await archive.mutateAsync({ params: { stationId: file.station.id, itemId: archiving.id }, body: { reason } });
+            toast.show({ message: `${archiving.title} is archived.` });
+          }}
+          onClose={() => setArchiving(null)}
+        />
+      )}
     </section>
   );
 }

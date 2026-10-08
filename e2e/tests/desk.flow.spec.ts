@@ -684,3 +684,41 @@ test("Analytics (A251): the network's week, then every station sorted and filter
   await expect(page.getByText("Every station in High Desert", { exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Market" })).toBeDisabled();
 });
+
+test("A station's file (added 2026-10-07): who made it, then an admin archives an upload and takes the station off the air; a market lead only looks", async ({ page }) => {
+  await page.goto("/desk");
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "dee@opencast.example"));
+  await page.goto("/desk/analytics/stations/00000000-0000-4000-8000-000000097001");
+  await expect(page.getByText(/Made .* by Kai Morgan/)).toBeVisible();
+
+  // Uploads: archive one, with why.
+  await page.getByRole("tab", { name: "Uploads" }).click();
+  await expect(page).toHaveURL(/view=uploads/);
+  await page.getByRole("button", { name: "Archive Night Tape 2" }).click();
+  const archive = page.getByRole("dialog", { name: "Archive Night Tape 2" });
+  await archive.getByRole("button", { name: "Archive it" }).click();
+  await expect(archive.getByText("Say why: the station's people will read it.")).toBeVisible();
+  await archive.getByRole("textbox", { name: "Why" }).fill("Someone else's show");
+  await archive.getByRole("button", { name: "Archive it" }).click();
+  await expect(archive).toBeHidden();
+  await page.getByRole("button", { name: /Show 2 archived/ }).click();
+  await expect(page.getByText("Archived by Opencast (Dee A.): Someone else's show")).toBeVisible();
+
+  // Off the air and held, then lifted.
+  await page.getByRole("button", { name: "Take off the air" }).click();
+  const hold = page.getByRole("dialog", { name: "Take BEAT off the air" });
+  await hold.getByRole("textbox", { name: "Why" }).fill("Rebroadcasting a channel it doesn't own");
+  await hold.getByRole("button", { name: "Take it off the air" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Off the air, held by Opencast" })).toContainText("Rebroadcasting a channel it doesn't own");
+  await expect(page.getByRole("button", { name: "Take off the air" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Lift the hold" }).click();
+  await expect(page.getByText("Off the air, held by Opencast")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take off the air" })).toBeVisible();
+
+  // Lee leads the High Desert: the file, without the buttons.
+  await page.evaluate(() => localStorage.setItem("oc-mock-signed-in", "lee@opencast.example"));
+  await page.goto("/desk/analytics/stations/00000000-0000-4000-8000-000000097010?view=uploads");
+  await expect(page.getByRole("table", { name: "The station's uploads" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Archive / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Take off the air" })).toHaveCount(0);
+});

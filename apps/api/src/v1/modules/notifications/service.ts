@@ -424,6 +424,35 @@ export function createNotificationsService(ctx: ModuleContext): NotificationsSer
     });
   });
 
+  // Added 2026-10-07: Opencast acted on a station from the desk; its people always hear why.
+  deps.bus.on("station.held", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "station_account",
+      title: `Opencast took ${await name(e.stationId)} off the air`,
+      body: `${e.reason.replace(/[.!?]?$/, ".")} It can't sign on again until Opencast lifts this. Reply to Opencast to talk about it.`,
+      link: `/stations/${e.stationId}`,
+      scope: { kind: "station", id: e.stationId }
+    });
+  });
+  deps.bus.on("station.hold_lifted", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "station_account",
+      title: `${await name(e.stationId)} can sign on again`,
+      body: "Opencast lifted its hold. Sign on from master control when the log is ready.",
+      link: `/stations/${e.stationId}`,
+      scope: { kind: "station", id: e.stationId }
+    });
+  });
+  deps.bus.on("item.archived_by_opencast", async (e) => {
+    await service.notify(await stationTeam(e.stationId), {
+      kind: "station_account",
+      title: `Opencast archived ${e.title}`,
+      body: `${e.reason.replace(/[.!?]?$/, ".")}${e.pulled ? ` It came off ${e.pulled} ${e.pulled === 1 ? "slot" : "slots"} on the log.` : ""}`,
+      link: `/stations/${e.stationId}/library`,
+      scope: { kind: "station", id: e.stationId }
+    });
+  });
+
   // O1: a business hears when a station adds its spot.
   deps.bus.on("spot.added_to_rotation", async (e) => {
     const spot = await services.spots.spotSummary(e.spotId);

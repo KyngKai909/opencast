@@ -369,3 +369,37 @@ describe("a station's file (added 2026-10-07)", () => {
     await sam.get(`/v1/desk/analytics/stations/${beat}/file`).expect(403);
   });
 });
+
+describe("acting on a station from the desk (added 2026-10-07)", () => {
+  it("takes a station off the air and holds it there until an admin lifts it; only admins", async () => {
+    await lee.post(`/v1/desk/analytics/stations/${beat}/hold`, { reason: "Airing someone else's channel" }).expect(403);
+    await dee.post(`/v1/desk/analytics/stations/${beat}/hold`, { reason: "no" }).expect(400);
+    const { body } = await dee.post(`/v1/desk/analytics/stations/${beat}/hold`, { reason: "Airing someone else's channel" }).expect(200);
+    expect(body.station).toMatchObject({ status: "off_air", onAir: false, held: { reason: "Airing someone else's channel", by: "Dee A." } });
+    // Its people can't sign on again, and master control's checks say why.
+    await expect(h.services.playout.signOn(beat)).rejects.toMatchObject({ code: "held_by_opencast" });
+    const { checks } = await h.services.playout.checks(beat);
+    expect(checks[0]).toMatchObject({ key: "held_by_opencast", blocking: true, passed: false, detail: "Airing someone else's channel" });
+
+    await lee.delete(`/v1/desk/analytics/stations/${beat}/hold`).expect(403);
+    const lifted = (await dee.delete(`/v1/desk/analytics/stations/${beat}/hold`).expect(200)).body;
+    expect(lifted.station.held).toBeNull();
+    expect((await h.services.playout.checks(beat)).checks.some((c) => c.key === "held_by_opencast")).toBe(false);
+    await dee.delete(`/v1/desk/analytics/stations/${beat}/hold`).expect(404);
+  });
+
+  it("archives an upload: off every log ahead, files kept, with why", async () => {
+    const [item] = await h.db.select({ id: schema.assets.id }).from(schema.assets).where(eq(schema.assets.title, "Night Tape 4"));
+    // On now (it finishes) and again at 7 am (it comes off).
+    await h.db.insert(schema.logEntries).values({ stationId: beat, startsAt: new Date("2026-10-02T07:00:00Z"), endsAt: new Date("2026-10-02T07:30:00Z"), kind: "program", code: "PGM", assetId: item!.id });
+    await lee.post(`/v1/desk/analytics/stations/${beat}/uploads/${item!.id}/archive`, { reason: "Not theirs to air" }).expect(403);
+    await dee.post(`/v1/desk/analytics/stations/${mojv}/uploads/${item!.id}/archive`, { reason: "Not theirs to air" }).expect(404);
+    const { body } = await dee.post(`/v1/desk/analytics/stations/${beat}/uploads/${item!.id}/archive`, { reason: "Not theirs to air" }).expect(200);
+    const archived = body.uploads.items.find((u: { id: string }) => u.id === item!.id);
+    expect(archived).toMatchObject({ archivedByOpencast: { reason: "Not theirs to air", by: "Dee A." } });
+    expect(archived.archivedAt).not.toBeNull();
+    expect(body.uploads.archived).toBe(1);
+    expect(body.schedule.entries.map((e: { startsAt: string }) => e.startsAt)).toEqual(["2026-10-02T05:45:00.000Z"]);
+    await dee.post(`/v1/desk/analytics/stations/${beat}/uploads/${item!.id}/archive`, { reason: "Not theirs to air" }).expect(404);
+  });
+});

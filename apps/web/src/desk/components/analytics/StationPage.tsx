@@ -10,7 +10,7 @@ import { useApi } from "../../../api/hooks";
 import { controlPath } from "../../../areas";
 import { ErrorLine, Quiet } from "../../pages/common";
 import { Pill, Spark } from "./Overview";
-import { MadeBy, PeopleView, ScheduleView, UploadsView } from "./StationFile";
+import { HeldBanner, MadeBy, PeopleView, ScheduleView, TakeOffAir, UploadsView, useDeskAdmin } from "./StationFile";
 import { PLATFORMS, clockText, csv, dateOf, download, minutesText, num, shortDate, type Span } from "./span";
 
 const TZ = "America/Los_Angeles";
@@ -29,6 +29,7 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
   void _b;
   const page = useApi(analyticsApi.station, { params: { stationId }, query: q });
   const file = useApi(analyticsApi.stationFile, { params: { stationId } });
+  const admin = useDeskAdmin();
   const [params, setParams] = useSearchParams();
   const asked = params.get("view");
   const view: View = VIEWS.some((v) => v.value === asked) ? (asked as View) : "numbers";
@@ -72,12 +73,18 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
             {d.station.onDialSince && <span className="nd-an__pill ne">On the dial since {shortDate(dateOf(new Date(d.station.onDialSince)))}</span>}
           </div>
         </div>
-        {s.kind !== "external" && s.callSign && (
-          <Button size="sm" href={controlPath(`/${s.callSign}/audience`)}>
-            Open in master control
-          </Button>
+        {s.kind !== "external" && (
+          <div className="nd-an__stact">
+            {s.callSign && (
+              <Button size="sm" href={controlPath(`/${s.callSign}/audience`)}>
+                Open in master control
+              </Button>
+            )}
+            {admin && file.data && <TakeOffAir file={file.data} />}
+          </div>
         )}
       </header>
+      {s.kind !== "external" && file.data && <HeldBanner file={file.data} admin={admin} />}
       {s.kind !== "external" && file.data && <MadeBy file={file.data} />}
       {s.kind !== "external" && <Tabs label="This station" items={VIEWS} value={view} onChange={setView} className="nd-an__views" />}
 
@@ -89,7 +96,7 @@ export function StationPage({ stationId, query, span, exporter, back }: { statio
         ) : view === "people" ? (
           <PeopleView file={file.data} />
         ) : view === "uploads" ? (
-          <UploadsView file={file.data} />
+          <UploadsView file={file.data} admin={admin} />
         ) : (
           <ScheduleView file={file.data} />
         )

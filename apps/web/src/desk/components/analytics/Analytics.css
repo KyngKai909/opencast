@@ -247,7 +247,7 @@ i.nd-an__brk { background: var(--ink-50); opacity: .35; }
 .nd-an__who b { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-weight: 600; overflow-wrap: anywhere; }
 .nd-an__who small { font-size: 12px; color: var(--ink-50); overflow-wrap: anywhere; }
 .nd-an__person { grid-template-columns: minmax(200px, 1.6fr) 90px 80px minmax(110px, 1fr) minmax(110px, 1fr) 90px; }
-.nd-an__upl { grid-template-columns: 32px minmax(0, 2fr) 70px 70px minmax(120px, 1fr); }
+.nd-an__upl { grid-template-columns: 32px minmax(0, 2fr) 70px 70px minmax(120px, 1fr) 84px; }
 .nd-an__uplwrap { border-bottom: 1px solid var(--hair); }
 .nd-an__uplwrap:last-child { border-bottom: 0; }
 .nd-an__uplwrap > .nd-an__tr { border-bottom: 0; }
@@ -266,3 +266,10 @@ i.nd-an__brk { background: var(--ink-50); opacity: .35; }
   .nd-an__logrow > :first-child { grid-column: 1 / -1; }
   .nd-an__preview { padding-left: 10px; }
 }
+
+/* Acting from the desk (added 2026-10-07). */
+.nd-an__stact { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nd-an__held { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: 0 0 14px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--bad) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 40%, transparent); }
+.nd-an__held p { margin: 0; font-size: 13.5px; }
+.nd-an__held b { color: var(--bad); }
+.nd-an__byop { margin: -4px 10px 10px 52px; font-size: 12.5px; color: var(--ink-70); }

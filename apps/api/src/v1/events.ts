@@ -15,6 +15,11 @@ export interface Events {
   /** A file due within the hour isn't prepared for air (or wasn't, at air). */
   "station.file_not_ready": { stationId: string; itemId: string; title: string; airsAt: string; missedAtAir: boolean };
   "station.signed_off": { stationId: string; permanently: boolean };
+  /** Added 2026-10-07: Opencast took a station off the air from the desk, or lifted that. */
+  "station.held": { stationId: string; reason: string };
+  "station.hold_lifted": { stationId: string };
+  /** Added 2026-10-07: Opencast archived one of a station's items from the desk. */
+  "item.archived_by_opencast": { stationId: string; itemId: string; title: string; reason: string; pulled: number };
   "spot.paused": { spotId: string; businessId: string; reason: "daily_cap" | "budget_spent" | "balance" | "by_hand"; stationIds: string[] };
   "spot.resumed": { spotId: string; businessId: string; stationIds: string[] };
   /** A station put a spot in its rotation (or backup rotation) that wasn't there. */
