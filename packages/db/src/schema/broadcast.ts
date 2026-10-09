@@ -1175,6 +1175,12 @@ export const lowerThirds = broadcast.table("lower_thirds", {
  * picture and length; files from before content IDs use `loc-…`, made from their old location.
  * `renditions` is what's wanted (the union of the bands that air it); each one done is a row in
  * `prepared_renditions`.
+ *
+ * Cleaner pictures (programming prompt, Phase 1, migration 0061, 2026-10-09): `pipeline` is the
+ * picture pipeline the renditions were made with (1 before HDR tonemapping and deinterlacing, 2
+ * since), and `picture` what the probe found in the file. A file prepared under pipeline 1 that
+ * turns out to be HDR or interlaced is prepared again beside it, under `<key>-p2`, and airs from
+ * that once it's ready (`refKey` in playout/engine/prepare.ts).
  */
 export const preparedItems = broadcast.table(
   "prepared_items",
@@ -1199,7 +1205,25 @@ export const preparedItems = broadcast.table(
     bytes: bigint("bytes", { mode: "number" }),
     queuedAt: at("queued_at").notNull().defaultNow(),
     startedAt: at("started_at"),
-    preparedAt: at("prepared_at")
+    preparedAt: at("prepared_at"),
+    /** The picture pipeline its renditions were made with (1: before migration 0061). */
+    pipeline: smallint("pipeline").notNull().default(1),
+    /**
+     * What the probe found in the file's picture (null: not probed, or made before 0061): its
+     * colour, field order and rotation, and whether it's HDR (`pq`, `hlg`) or interlaced.
+     */
+    picture: jsonb("picture").$type<{
+      transfer: string | null;
+      primaries: string | null;
+      space: string | null;
+      fieldOrder: string | null;
+      rotation: number;
+      dolbyVision: boolean;
+      hdr: "pq" | "hlg" | null;
+      interlaced: boolean;
+      /** Which field comes first, when idet found it (the file didn't say). */
+      parity: "tff" | "bff" | null;
+    }>()
   },
   (t) => [index("prepared_items_queue").on(t.status, t.neededAt), index("prepared_items_content").on(t.contentId)]
 );

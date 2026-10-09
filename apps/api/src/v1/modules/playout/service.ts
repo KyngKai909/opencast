@@ -14,7 +14,7 @@ import { captionSources } from "./engine/captions.js";
 import { liveObjectPrefixes } from "./engine/assemble.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
 import { logReadiness, readyKeys, summariseReadiness } from "./engine/readiness.js";
-import { queuePreparation, refKey, wantRow } from "./engine/prepare.js";
+import { queuePreparation, refKey, syncPreparedVersions, versionedKey, wantRow } from "./engine/prepare.js";
 import { isEveryBreak, partsOf } from "./engine/cadence.js";
 import { GENERATED_SID_MS, generatedStationIdKey } from "./engine/stationId.js";
 import { STATION_ID_MS } from "./engine/fill.js";
@@ -172,8 +172,8 @@ export interface PlayoutService {
   onAirSince(stationIds: string[]): Promise<Map<string, Date>>;
   /** The log or off air hours changed: playout reads them again now. */
   replan(stationId: string): Promise<void>;
-  /** Where an item's preparation for air stands, for a band (the library's item history). */
-  preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null }>;
+  /** Where an item's preparation for air stands, for a band, and what it did to the picture (the library's item history). */
+  preparation(ref: { contentId: string | null; location: string | null }, band: "tv" | "radio"): Promise<{ status: "ready" | "queued" | "preparing" | "failed" | "not_asked"; renditions: string[]; preparedAt: string | null; converted: Array<"from_hdr" | "deinterlaced"> }>;
   /**
    * Added 2026-09-29: the station's generated station ID, for the library: null once a station ID
    * of its own can air (it wins).
@@ -1028,18 +1028,22 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async preparation(ref, band) {
+      await syncPreparedVersions(db);
       const key = refKey(ref);
-      if (!key) return { status: "not_asked", renditions: [], preparedAt: null };
+      if (!key) return { status: "not_asked", renditions: [], preparedAt: null, converted: [] };
       const [[item], renditions] = await Promise.all([
         db.select().from(schema.preparedItems).where(eq(schema.preparedItems.key, key)),
         db.select({ rendition: schema.preparedRenditions.rendition }).from(schema.preparedRenditions).where(eq(schema.preparedRenditions.key, key))
       ]);
       const done = renditions.map((r) => r.rendition).sort();
       const ready = BAND_RENDITIONS[band].every((r) => done.includes(r));
+      // Cleaner pictures (programming Phase 1): what preparing did to the picture, when it was this pipeline's.
+      const picture = item && item.pipeline >= 2 ? item.picture : null;
       return {
         status: ready ? "ready" : ((item?.status === "ready" ? "queued" : item?.status) ?? "not_asked"),
         renditions: done,
-        preparedAt: item?.preparedAt?.toISOString() ?? null
+        preparedAt: item?.preparedAt?.toISOString() ?? null,
+        converted: [...(picture?.hdr ? (["from_hdr"] as const) : []), ...(picture?.interlaced ? (["deinterlaced"] as const) : [])]
       };
     },
 
@@ -1126,7 +1130,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       if (!isContentId(key) || !Object.values(PREVIEW_RENDITION).includes(rendition as RenditionName)) return null;
       const file = (await services.library.content.info([key])).get(key);
       if (!file || file.locked || file.deleted) return null;
-      const [row] = await db.select({ segmentMs: PR.segmentMs }).from(PR).where(and(eq(PR.key, key), eq(PR.rendition, rendition)));
+      // The newer copy, once it's ready (it has every rendition the first one has).
+      await syncPreparedVersions(db);
+      const prepared = refKey({ contentId: key })!;
+      const [row] = await db.select({ segmentMs: PR.segmentMs }).from(PR).where(and(eq(PR.key, prepared), eq(PR.rendition, rendition)));
       if (!row?.segmentMs.length) return null;
       const target = Math.max(1, ...row.segmentMs.map((ms) => Math.ceil(ms / 1000)));
       const body = [
@@ -1136,7 +1143,7 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         "#EXT-X-MEDIA-SEQUENCE:0",
         "#EXT-X-PLAYLIST-TYPE:VOD",
         "#EXT-X-INDEPENDENT-SEGMENTS",
-        ...row.segmentMs.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, segmentUrl(key, rendition, i)]),
+        ...row.segmentMs.flatMap((ms, i) => [`#EXTINF:${(ms / 1000).toFixed(3)},`, segmentUrl(prepared, rendition, i)]),
         "#EXT-X-ENDLIST",
         ""
       ].join("\n");
@@ -1145,7 +1152,10 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
     },
 
     async dropPrepared(keys, { evenIfAiring }) {
-      const unique = [...new Set(keys.filter(Boolean))];
+      // A file's newer copy (`<key>-p2`, cleaner pictures) goes with it.
+      const given = keys.filter(Boolean);
+      const newer = given.length ? (await db.select({ key: PI.key }).from(PI).where(inArray(PI.key, given.map(versionedKey)))).map((r) => r.key) : [];
+      const unique = [...new Set([...given, ...newer])];
       const dropped: string[] = [];
       const deferred: string[] = [];
       if (!unique.length) return { dropped, deferred };

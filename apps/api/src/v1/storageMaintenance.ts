@@ -10,6 +10,9 @@
 //     over to the content ID (the same bytes), so nothing is prepared again.
 //   - copyPin (`storage:move-off-pinata --copy`): a Pinata pin copied into object storage and
 //     verified by hash; every row that used the pin then points at the new content ID.
+//   - prepareCleanerPictures (`storage:cleaner-pictures`, added 2026-10-09, programming Phase 1):
+//     items prepared before HDR tonemapping and deinterlacing are probed, and the HDR or interlaced
+//     ones prepared again beside their first copy (`<key>-p2`), which airs until the new one is ready.
 //
 // None of them unpins or deletes anything but the 1280 px copies, which the originals replace.
 //
@@ -27,7 +30,7 @@ import { schema } from "@opencast/db";
 import type { ModuleContext } from "./context.js";
 import { contentIdOf, objectKey, sha256FromCid } from "./storage.js";
 import { BAND_RENDITIONS, type Band } from "./modules/playout/engine/ladder.js";
-import { queuePreparation, refKey, wantRow } from "./modules/playout/engine/prepare.js";
+import { baseKey, PICTURE_PIPELINE, probe, queuePreparation, refKey, versionedKey, wantRow, type Picture } from "./modules/playout/engine/prepare.js";
 
 const F = schema.assetFiles;
 const A = schema.assets;
@@ -548,4 +551,136 @@ export async function prepareFromOriginals(ctx: ModuleContext, options: { apply:
     copyBytes,
     entries
   };
+}
+
+// --- Cleaner pictures: HDR and interlaced items prepared again ---------------------------------
+
+export interface PictureEntry {
+  /** The prepared item's key (its file's content ID). */
+  key: string;
+  /** Titles of the library items whose file it is, for the report. */
+  titles: string[];
+  hdr: "pq" | "hlg" | null;
+  interlaced: boolean;
+  dolbyVision: boolean;
+  /**
+   * `unchanged` (SDR and progressive: it keeps its segments), `unreadable` (the probe couldn't
+   * read the original). Report mode: `to_prepare` (HDR or interlaced, no newer copy yet). Applied:
+   * `queued` (the newer copy is waiting for the worker or being made). Either mode: `ready` (the
+   * newer copy has taken over), `failed` (it couldn't be prepared: the first copy stays on air).
+   */
+  state: "unchanged" | "unreadable" | "to_prepare" | "queued" | "ready" | "failed";
+  error?: string;
+}
+
+/**
+ * Items prepared before picture pipeline 2 (programming Phase 1): each video file is probed (from
+ * object storage, a presigned URL where the store has them, so only what's read is fetched), and
+ * one that's HDR or interlaced is prepared again under `<key>-p2`, beside its first copy, with the
+ * same renditions. The first copy airs until the new one is ready in all of them, then the new
+ * one does (`refKey`); nothing else is touched. Report mode (the default) probes and counts and
+ * changes nothing: `toPrepare` is how many items it would prepare again. With `apply`, what the
+ * probe found is kept on each item (a rerun doesn't probe again) and those items are queued, after
+ * anything airing soon. Run it again until nothing is `queued`; it's safe to rerun.
+ */
+export async function prepareCleanerPictures(
+  ctx: ModuleContext,
+  options: { apply: boolean; onProgress?: Progress }
+): Promise<{ items: number; probed: number; hdr: number; interlaced: number; unchanged: number; unreadable: number; toPrepare: number; queued: number; ready: number; failed: number; entries: PictureEntry[] }> {
+  const { db } = ctx.deps;
+  // Files prepared for TV before pipeline 2 (sound alone has no picture to change; old locations are relinked first).
+  const rows = await db
+    .select()
+    .from(PI)
+    .where(and(eq(PI.kind, "file"), eq(PI.mediaKind, "video"), isNotNull(PI.contentId), sql`${PI.key} = ${PI.contentId}`, sql`${PI.pipeline} < ${PICTURE_PIPELINE}`, sql`exists (select 1 from ${PR} r where r.key = ${PI.key} and r.rendition like 'v%')`))
+    .orderBy(PI.key);
+  const keys = rows.map((r) => r.key);
+  const [newer, done, titles] = keys.length
+    ? await Promise.all([
+        db.select().from(PI).where(inArray(PI.key, keys.map(versionedKey))),
+        db.select({ key: PR.key, rendition: PR.rendition }).from(PR).where(inArray(PR.key, [...keys, ...keys.map(versionedKey)])),
+        db.selectDistinct({ key: F.contentId, title: A.title }).from(F).innerJoin(A, eq(A.id, F.assetId)).where(inArray(F.contentId, keys))
+      ])
+    : [[], [], []];
+  const newerOf = new Map(newer.map((r) => [baseKey(r.key), r]));
+  const renditionsOf = new Map<string, Set<string>>();
+  for (const r of done) renditionsOf.set(r.key, (renditionsOf.get(r.key) ?? new Set()).add(r.rendition));
+  const titlesOf = new Map<string, string[]>();
+  for (const t of titles) titlesOf.set(t.key!, [...(titlesOf.get(t.key!) ?? []), t.title]);
+  const entries: PictureEntry[] = [];
+  let probed = 0;
+  await options.onProgress?.(0, rows.length);
+  for (const row of rows) {
+    if (entries.length) await options.onProgress?.(entries.length, rows.length);
+    const entry: PictureEntry = { key: row.key, titles: titlesOf.get(row.key) ?? [], hdr: null, interlaced: false, dolbyVision: false, state: "unchanged" };
+    entries.push(entry);
+    try {
+      let picture = row.picture;
+      if (!picture) {
+        picture = await probeOriginal(ctx, row.key);
+        probed++;
+        if (!picture) {
+          entry.state = "unreadable";
+          continue;
+        }
+        if (options.apply) await db.update(PI).set({ picture }).where(eq(PI.key, row.key));
+      }
+      Object.assign(entry, { hdr: picture.hdr, interlaced: picture.interlaced, dolbyVision: picture.dolbyVision });
+      if (!picture.hdr && !picture.interlaced) continue;
+      const first = renditionsOf.get(row.key) ?? new Set<string>();
+      const made = renditionsOf.get(versionedKey(row.key)) ?? new Set<string>();
+      const copy = newerOf.get(row.key);
+      if (copy && made.size && [...first].every((r) => made.has(r))) {
+        entry.state = "ready";
+        continue;
+      }
+      if (copy?.status === "failed") {
+        entry.state = "failed";
+        entry.error = copy.error ?? undefined;
+        continue;
+      }
+      if (!options.apply) {
+        entry.state = copy ? "queued" : "to_prepare";
+        continue;
+      }
+      // The same renditions as the first copy (and any it's still waiting for), after what airs soon.
+      await queuePreparation(db, [
+        { key: versionedKey(row.key), contentId: row.key, kind: "file", sourceLocation: null, mediaKind: "video", status: "queued", renditions: [...new Set([...first, ...row.renditions])].sort(), durationMs: row.durationMs, neededAt: null }
+      ]);
+      entry.state = "queued";
+    } catch (error) {
+      entry.state = "unreadable";
+      entry.error = (error as Error).message.slice(0, 300);
+    }
+  }
+  await options.onProgress?.(entries.length, rows.length);
+  const count = (state: PictureEntry["state"]) => entries.filter((e) => e.state === state).length;
+  return {
+    items: entries.length,
+    probed,
+    hdr: entries.filter((e) => e.hdr).length,
+    interlaced: entries.filter((e) => e.interlaced).length,
+    unchanged: count("unchanged"),
+    unreadable: count("unreadable"),
+    toPrepare: count("to_prepare"),
+    queued: count("queued"),
+    ready: count("ready"),
+    failed: count("failed"),
+    entries
+  };
+}
+
+/** The probe's picture for a stored original: read where it is (a presigned URL or a local path), else from a download. */
+async function probeOriginal(ctx: ModuleContext, cid: string): Promise<Picture | null> {
+  const objects = ctx.deps.storage.objects;
+  if (!(await objects.has(objectKey.file(cid)))) throw new Error("the original isn't stored");
+  if (objects.readUrl) return (await probe(await objects.readUrl(objectKey.file(cid), 3_600))).picture;
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "opencast-probe-"));
+  try {
+    const file = path.join(dir, "source");
+    await objects.download(objectKey.file(cid), file, sha256FromCid(cid));
+    return (await probe(file)).picture;
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 }

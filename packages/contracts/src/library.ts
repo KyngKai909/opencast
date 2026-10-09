@@ -238,7 +238,14 @@ export const ItemHistory = z.object({
     .object({
       status: z.enum(["ready", "queued", "preparing", "failed", "not_asked"]),
       renditions: z.array(z.string()),
-      preparedAt: Timestamp.nullable()
+      preparedAt: Timestamp.nullable(),
+      /**
+       * Added 2026-10-09 (cleaner pictures, programming Phase 1): what preparing did to the picture.
+       * `from_hdr`: an HDR file (PQ or HLG, phone video mostly) tonemapped to BT.709; `deinterlaced`:
+       * an interlaced one made progressive. Empty when it did neither, or the item was prepared
+       * before this (and the re-prepare job found nothing to change).
+       */
+      converted: z.array(z.enum(["from_hdr", "deinterlaced"])).optional()
     })
     .optional(),
   audioLayout: AudioLayout.nullable(),

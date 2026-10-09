@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { logEntryHref, preparationWords, preparedFixHref, readinessLine } from "./readiness";
+import { conversionWords, logEntryHref, preparationWords, preparedFixHref, readinessLine } from "./readiness";
 
 // Saturday, September 26, 8:42 pm in Redlands (03:42 UTC on the 27th).
 const NOW = Date.parse("2026-09-27T03:42:00.000Z");
@@ -93,5 +93,13 @@ describe("a library item's preparation", () => {
     expect(preparationWords("failed")).toBe("Couldn't be prepared");
     expect(preparationWords("not_asked")).toBeNull();
     expect(preparationWords(undefined)).toBeNull();
+  });
+
+  it("says what preparing did to the picture", () => {
+    expect(conversionWords(["from_hdr"])).toBe("Converted from HDR");
+    expect(conversionWords(["deinterlaced"])).toBe("Deinterlaced");
+    expect(conversionWords(["from_hdr", "deinterlaced"])).toBe("Converted from HDR, deinterlaced");
+    expect(conversionWords([])).toBeNull();
+    expect(conversionWords(undefined)).toBeNull();
   });
 });

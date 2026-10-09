@@ -21,6 +21,17 @@
 // `prepared_captions`). A track uploaded after the item was prepared is cut within a minute
 // (`captionsChangedSince`). Captions generated from speech wait on a provider: `CaptionGenerator`
 // is the seam, and the default makes none.
+//
+// Cleaner pictures (programming prompt, Phase 1, 2026-10-09; picture pipeline 2). The probe reads
+// the picture's colour, field order and rotation. HDR (PQ or HLG; a Dolby Vision file by its HLG or
+// HDR10 base layer, its enhancement layer ignored) is tonemapped to BT.709 with zscale and hable;
+// interlaced video (by its field order, or a short idet sample when the file doesn't say) is
+// deinterlaced with bwdif; a rotated phone clip is turned upright, then fitted and pillarboxed like
+// anything else. In that order: deinterlace (and turn), then fps, then tonemap, then scale. Every
+// rendition is tagged BT.709. What was prepared before keeps its segments; a file that the probe
+// finds HDR or interlaced is prepared again beside it (`<key>-p2`, the re-prepare job in
+// storageMaintenance.ts) and airs from that once it's ready: `refKey` makes the switch, so nothing
+// else needs to know.
 
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -91,11 +102,53 @@ export interface WantRef extends MediaRef {
   neededAt?: Date | null;
 }
 
-/** The prepared item's key: its content ID, or `loc-…` from an old location. */
+/** The picture pipeline this prepares with (`prepared_items.pipeline`): 2 tonemaps HDR and deinterlaces. */
+export const PICTURE_PIPELINE = 2;
+/** How often each process reads which items have a newer copy ready (`syncPreparedVersions`). */
+const VERSIONS_EVERY_MS = 30_000;
+
+/** The key a file's newer copy is prepared under, beside the one made before it (`<key>-p2`). */
+export function versionedKey(key: string): string {
+  return `${key}-p${PICTURE_PIPELINE}`;
+}
+
+/** The key a copy was prepared beside: a versioned key without its `-pN`. */
+export function baseKey(key: string): string {
+  return key.replace(/-p\d+$/, "");
+}
+
+/** Items prepared again by the re-prepare job, ready in everything the first copy had: base key to the new one. */
+const versions = new Map<string, string>();
+let versionsRead: { db: unknown; at: number } | null = null;
+
+/**
+ * Reads which items have a newer copy ready, at most every 30 s (and at once with `force`, or for
+ * another database). A newer copy takes over only when it has every rendition the first one has,
+ * so nothing on the log loses its readiness. Until it's read here, the first copy airs, which is
+ * still there.
+ */
+export async function syncPreparedVersions(db: ModuleContext["deps"]["db"], options: { force?: boolean } = {}): Promise<void> {
+  const now = Date.now();
+  if (!options.force && versionsRead?.db === db && now - versionsRead.at < VERSIONS_EVERY_MS) return;
+  versionsRead = { db, at: now };
+  const rows = (await db.execute(sql`
+    select b.key as base, v.key as key
+    from ${PI} v join ${PI} b on b.key = regexp_replace(v.key, '-p[0-9]+$', '')
+    where v.key ~ '-p[0-9]+$'
+      and exists (select 1 from ${PR} r where r.key = v.key)
+      and not exists (select 1 from ${PR} r where r.key = b.key and not exists (select 1 from ${PR} n where n.key = v.key and n.rendition = r.rendition))
+    order by v.key`)) as unknown as { rows: Array<{ base: string; key: string }> };
+  versions.clear();
+  for (const r of rows.rows) versions.set(r.base, r.key);
+}
+
+/**
+ * The prepared item's key: its content ID, or `loc-…` from an old location; or the newer copy
+ * prepared beside it, once that's ready (`syncPreparedVersions`).
+ */
 export function refKey(ref: MediaRef): string | null {
-  if (ref.contentId) return ref.contentId;
-  if (ref.location) return `loc-${createHash("sha256").update(ref.location).digest("hex").slice(0, 40)}`;
-  return null;
+  const key = ref.contentId ? ref.contentId : ref.location ? `loc-${createHash("sha256").update(ref.location).digest("hex").slice(0, 40)}` : null;
+  return key ? (versions.get(key) ?? key) : null;
 }
 
 /** Queues items to be prepared (the preparer's `want`, and previews from the API): an upsert on `prepared_items`. */
@@ -152,6 +205,8 @@ export interface TranscodeResult {
   captions?: { vtt: string; language: string | null } | null;
   /** The item's first MPEG-TS timestamp (90 kHz), where its captions' time zero goes. */
   startPts?: number | null;
+  /** What the probe found in the file's picture (null for slates and sound only). */
+  picture?: Picture | null;
 }
 
 export type Transcoder = (job: TranscodeJob) => Promise<TranscodeResult>;
@@ -173,28 +228,132 @@ export function segmentLengths(playlist: string): number[] {
   return [...playlist.matchAll(/^#EXTINF:([\d.]+)/gm)].map((m) => Math.round(Number(m[1]) * 1000));
 }
 
-async function probe(file: string): Promise<{ durationMs: number | null; hasAudio: boolean; hasVideo: boolean; subtitle: { index: number; language: string | null } | null }> {
-  const result = await run("ffprobe", ["-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,disposition:stream_tags=language", "-of", "json", file]);
+/** What the probe finds in a file's picture (stored as `prepared_items.picture`). */
+export type Picture = NonNullable<(typeof PI.$inferSelect)["picture"]>;
+
+/** Field orders that mean interlaced: top or bottom field first, coded either way. */
+const INTERLACED = new Set(["tt", "bb", "tb", "bt"]);
+/** HDR transfers, as FFmpeg names them: PQ (HDR10, and Dolby Vision's HDR10 base layer) and HLG. */
+const HDR: Record<string, "pq" | "hlg"> = { smpte2084: "pq", "arib-std-b67": "hlg" };
+
+export interface ProbeResult {
+  durationMs: number | null;
+  hasAudio: boolean;
+  hasVideo: boolean;
+  subtitle: { index: number; language: string | null } | null;
+  /** The picture's colour, fields and rotation (null for sound only). */
+  picture: Picture | null;
+}
+
+/**
+ * Reads a file (a local path, or a URL FFmpeg can read): its length, its streams, and its
+ * picture. A picture whose file doesn't give its field order gets a short idet sample.
+ */
+export async function probe(file: string): Promise<ProbeResult> {
+  const result = await run("ffprobe", [
+    "-v", "error",
+    "-show_entries", "format=duration:stream=codec_type,codec_name,disposition,color_transfer,color_primaries,color_space,field_order:stream_tags=language,rotate:stream_side_data=side_data_type,rotation",
+    "-of", "json", file
+  ]);
   try {
     const json = JSON.parse(result.stdout) as {
       format?: { duration?: string };
-      streams?: Array<{ codec_type: string; codec_name?: string; disposition?: { attached_pic?: number }; tags?: { language?: string } }>;
+      streams?: Array<{
+        codec_type: string;
+        codec_name?: string;
+        disposition?: { attached_pic?: number };
+        tags?: { language?: string; rotate?: string };
+        color_transfer?: string;
+        color_primaries?: string;
+        color_space?: string;
+        field_order?: string;
+        side_data_list?: Array<{ side_data_type?: string; rotation?: number }>;
+      }>;
     };
     const streams = json.streams ?? [];
     const duration = Number(json.format?.duration);
+    const durationMs = Number.isFinite(duration) ? Math.round(duration * 1000) : null;
     // The first text subtitle track, by its place among the file's subtitle streams.
     const subtitles = streams.filter((s) => s.codec_type === "subtitle");
     const index = subtitles.findIndex((s) => TEXT_SUBTITLES.has(s.codec_name ?? ""));
+    // Cover art on an audio file isn't a picture to air.
+    const video = streams.find((s) => s.codec_type === "video" && !s.disposition?.attached_pic);
+    let picture: Picture | null = null;
+    if (video) {
+      const known = (v: string | undefined) => (v && v !== "unknown" && v !== "reserved" ? v : null);
+      const sides = video.side_data_list ?? [];
+      // The display matrix turns it counter-clockwise; an old `rotate` tag says clockwise.
+      const matrix = sides.find((d) => typeof d.rotation === "number")?.rotation;
+      const turn = video.tags?.rotate !== undefined ? Number(video.tags.rotate) : typeof matrix === "number" ? -matrix : 0;
+      const transfer = known(video.color_transfer);
+      const fieldOrder = known(video.field_order);
+      const fields = fieldOrder ? null : await sampleFields(file, durationMs);
+      picture = {
+        transfer,
+        primaries: known(video.color_primaries),
+        space: known(video.color_space),
+        fieldOrder,
+        rotation: Number.isFinite(turn) ? (((Math.round(turn / 90) * 90) % 360) + 360) % 360 : 0,
+        dolbyVision: sides.some((d) => /dovi|dolby/i.test(d.side_data_type ?? "")),
+        hdr: (transfer && HDR[transfer]) || null,
+        interlaced: fieldOrder ? INTERLACED.has(fieldOrder) : fields !== null,
+        parity: fields
+      };
+    }
     return {
-      durationMs: Number.isFinite(duration) ? Math.round(duration * 1000) : null,
+      durationMs,
       hasAudio: streams.some((s) => s.codec_type === "audio"),
-      // Cover art on an audio file isn't a picture to air.
-      hasVideo: streams.some((s) => s.codec_type === "video" && !s.disposition?.attached_pic),
-      subtitle: index >= 0 ? { index, language: languageTag(subtitles[index].tags?.language) } : null
+      hasVideo: Boolean(video),
+      subtitle: index >= 0 ? { index, language: languageTag(subtitles[index].tags?.language) } : null,
+      picture
     };
   } catch {
-    return { durationMs: null, hasAudio: false, hasVideo: false, subtitle: null };
+    return { durationMs: null, hasAudio: false, hasVideo: false, subtitle: null, picture: null };
   }
+}
+
+/**
+ * A file that doesn't say whether it's interlaced: idet over 200 frames, from a quarter of the way
+ * in (at most a minute), past any black opening. Interlaced only when that's clear: at least 20
+ * frames found interlaced, and four in five of those it could tell. Returns which field comes first,
+ * or null for progressive (or not clear).
+ */
+async function sampleFields(file: string, durationMs: number | null): Promise<"tff" | "bff" | null> {
+  const from = durationMs ? Math.min(60, durationMs / 4000) : 0;
+  const result = await run("ffmpeg", ["-hide_banner", "-nostats", "-v", "info", "-ss", from.toFixed(3), "-i", file, "-map", "0:v:0", "-vf", "idet", "-frames:v", "200", "-an", "-sn", "-f", "null", "-"]);
+  const found = [...result.stderr.matchAll(/Multi frame detection: TFF:\s*(\d+)\s*BFF:\s*(\d+)\s*Progressive:\s*(\d+)/g)].pop();
+  if (!found) return null;
+  const [tff, bff, progressive] = found.slice(1, 4).map(Number);
+  const interlaced = tff + bff;
+  if (interlaced < 20 || interlaced < 4 * progressive) return null;
+  return tff >= bff ? "tff" : "bff";
+}
+
+/** zscale's names for the matrix and primaries an HDR file gives (BT.2020 when it doesn't say). */
+const HDR_MATRIX = new Set(["bt2020nc", "bt2020c"]);
+const HDR_PRIMARIES = new Set(["bt2020", "bt709", "smpte432", "smpte431"]);
+
+/**
+ * The picture's filters before it's split to the renditions: deinterlace (bwdif, a frame per
+ * frame) and turn it upright, then the channel's frame rate, then HDR tonemapped to BT.709 (zscale
+ * to linear light from the file's own transfer, hable with no desaturation, back to BT.709), then
+ * 8-bit 4:2:0. The renditions scale and pad after this.
+ */
+export function pictureFilters(picture: Picture | null): string[] {
+  const filters: string[] = [];
+  if (picture?.interlaced) filters.push(`bwdif=mode=send_frame${picture.parity ? `:parity=${picture.parity}` : ""}`);
+  if (picture?.rotation === 90) filters.push("transpose=clock");
+  else if (picture?.rotation === 180) filters.push("hflip,vflip");
+  else if (picture?.rotation === 270) filters.push("transpose=cclock");
+  filters.push(`fps=${FPS}`);
+  if (picture?.hdr) {
+    const transfer = picture.hdr === "pq" ? "smpte2084" : "arib-std-b67";
+    const matrix = picture.space && HDR_MATRIX.has(picture.space) ? picture.space : "bt2020nc";
+    const primaries = picture.primaries && HDR_PRIMARIES.has(picture.primaries) ? picture.primaries : "bt2020";
+    filters.push(`zscale=tin=${transfer}:min=${matrix}:pin=${primaries}:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv`);
+  }
+  filters.push("format=yuv420p");
+  return filters;
 }
 
 /** A TS segment's first timestamp (90 kHz), or null when it can't be read. */
@@ -206,8 +365,9 @@ export async function startPtsOf(segment: string): Promise<number | null> {
 
 /**
  * FFmpeg, one pass: the source decoded once, split to every rendition asked for. Video at 30 fps
- * with a keyframe every 4 s (every segment starts on one, in every rendition), fitted and padded to
- * each size; sound levelled, faded in and out, padded or cut to the item's exact length.
+ * with a keyframe every 4 s (every segment starts on one, in every rendition), deinterlaced, turned
+ * upright and tonemapped as it needs (`pictureFilters`), fitted and padded to each size, tagged
+ * BT.709; sound levelled, faded in and out, padded or cut to the item's exact length.
  */
 export function ffmpegTranscoder(options: { preset?: string; threads?: number } = {}): Transcoder {
   const preset = options.preset ?? "veryfast";
@@ -219,6 +379,7 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
     let audioIn: string;
     let levelled = true;
     let subtitle: { index: number; language: string | null } | null = null;
+    let picture: Picture | null = null;
     const wantsVideo = job.renditions.some((r) => r.kind === "video");
     if (src.kind === "slate") {
       durationMs = src.seconds * 1000;
@@ -234,9 +395,11 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
     } else {
       const info = await probe(src.path);
       subtitle = info.subtitle;
+      picture = info.picture;
       durationMs = info.durationMs ?? job.durationMs ?? 0;
       if (!durationMs) throw new Error("couldn't read the file's length");
-      inputs.push("-i", src.path);
+      // The picture is turned upright in the graph, from the probe's rotation (not by FFmpeg on its own).
+      inputs.push("-noautorotate", "-i", src.path);
       let next = 1;
       if (wantsVideo) {
         if (info.hasVideo && job.mediaKind === "video") videoIn = "0:v";
@@ -259,7 +422,8 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
     const n = job.renditions.length;
     const graph: string[] = [];
     if (videoIn && videos.length) {
-      graph.push(`[${videoIn}]fps=${FPS},format=yuv420p,split=${videos.length}${videos.map((_, i) => `[s${i}]`).join("")}`);
+      const filters = videoIn === "0:v" && src.kind === "file" ? pictureFilters(picture) : [`fps=${FPS}`, "format=yuv420p"];
+      graph.push(`[${videoIn}]${filters.join(",")},split=${videos.length}${videos.map((_, i) => `[s${i}]`).join("")}`);
       videos.forEach((r, i) => graph.push(`[s${i}]scale=w=${r.width}:h=${r.height}:force_original_aspect_ratio=decrease,pad=${r.width}:${r.height}:(ow-iw)/2:(oh-ih)/2,setsar=1[v${i}]`));
     }
     const fades = `afade=t=in:d=${EDGE_FADE_MS / 1000},afade=t=out:st=${fadeOut.toFixed(3)}:d=${EDGE_FADE_MS / 1000}`;
@@ -278,6 +442,8 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
         outputs.push(
           "-map", `[v${vi++}]`, "-map", `[a${i}]`,
           "-c:v", "libx264", "-preset", preset, "-profile:v", "high", "-pix_fmt", "yuv420p",
+          // Tagged, so players don't guess.
+          "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv",
           "-b:v", `${r.videoKbps}k`, "-maxrate", `${Math.round(r.videoKbps * 1.1)}k`, "-bufsize", `${r.videoKbps * 2}k`,
           "-g", gop, "-keyint_min", gop, "-sc_threshold", "0", "-force_key_frames", `expr:gte(t,n_forced*${SEGMENT_MS / 1000})`,
           ...audio, "-t", seconds, ...hls
@@ -299,7 +465,7 @@ export function ffmpegTranscoder(options: { preset?: string; threads?: number } 
     }
     const vtt = subtitle ? await fs.readFile(embedded, "utf8").catch(() => null) : null;
     const first = job.renditions[0] ? await startPtsOf(path.join(job.outDir, job.renditions[0].name, "seg_00000.ts")) : null;
-    return { durationMs, renditions, captions: vtt && /-->/.test(vtt) ? { vtt, language: subtitle!.language } : null, startPts: first };
+    return { durationMs, renditions, captions: vtt && /-->/.test(vtt) ? { vtt, language: subtitle!.language } : null, startPts: first, picture };
   };
 }
 
@@ -364,6 +530,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
    * (garbage collection, a takedown), and the same bytes stored again later must be prepared again.
    */
   async function refresh(keys: string[], options: { force?: boolean } = {}) {
+    await syncPreparedVersions(db);
     const unknown = [...new Set(keys)].filter((k) => options.force || !ready.has(k));
     if (!unknown.length) return;
     if (options.force) for (const k of unknown) ready.delete(k);
@@ -432,11 +599,24 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
         }
       }
       const prepMs = Date.now() - started;
+      // Made from nothing (not renditions added to an older copy): this pipeline's, and what its probe found.
+      const fresh = wanted.length > 0 && have.size === 0;
       await db
         .update(PI)
-        .set({ status: "ready", durationMs, prepMs, bytes: sql`coalesce(${PI.bytes}, 0) + ${bytes}`, preparedAt: deps.clock.now(), error: null })
+        .set({
+          status: "ready",
+          durationMs,
+          prepMs,
+          bytes: sql`coalesce(${PI.bytes}, 0) + ${bytes}`,
+          preparedAt: deps.clock.now(),
+          error: null,
+          ...(fresh ? { pipeline: PICTURE_PIPELINE } : {}),
+          ...(result?.picture ? { picture: result.picture } : {})
+        })
         .where(eq(PI.key, key));
       markReady(key, wanted.map((r) => r.name));
+      // A newer copy prepared beside an older one: it takes over now.
+      if (baseKey(key) !== key) await syncPreparedVersions(db, { force: true });
       if (wanted.length) log(`[prepare] ${key.slice(0, 16)}… ${wanted.map((r) => r.name).join(" ")} in ${(prepMs / 1000).toFixed(1)} s (${((durationMs ?? 0) / 1000).toFixed(0)} s of media)`);
       // Captions, once the segments they follow exist. They never hold the item up.
       if (row.kind === "file") {
@@ -478,7 +658,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
   async function uploadedTracks(key: string): Promise<CaptionInput[]> {
     // Files from before content IDs (`loc-…`) have no uploaded captions prepared with them.
     if (key.startsWith("loc-") || key.startsWith("slate-") || isGeneratedIdent(key)) return [];
-    const tracks = await services.library.captionTracksForContent(key);
+    const tracks = await services.library.captionTracksForContent(baseKey(key));
     return tracks.map((t) => ({ vtt: t.vtt, language: t.language, source: "uploaded" as const }));
   }
 
@@ -568,7 +748,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
     ladder,
 
     init() {
-      return (loaded ??= load());
+      return (loaded ??= load().then(() => syncPreparedVersions(db, { force: true })));
     },
 
     /** Is it prepared in every rendition this band airs? */
@@ -608,6 +788,7 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
 
     /** Prepares queued items, earliest airtime first, up to the concurrency. Doesn't wait for them. */
     async pump() {
+      await syncPreparedVersions(db);
       while (running.size < concurrency) {
         const queued = await db
           .select({ key: PI.key })
@@ -685,7 +866,8 @@ export function createPreparer({ deps, services }: ModuleContext, options: Prepa
       const itemIds = await services.library.captionTracksChangedSince(since);
       if (!itemIds.length) return 0;
       const current = await services.library.currentContent(itemIds);
-      const keys = [...new Set(current.values())];
+      await syncPreparedVersions(db);
+      const keys = [...new Set([...current.values()].map((cid) => refKey({ contentId: cid })!))];
       await refresh(keys);
       let made = 0;
       for (const key of keys) if (ready.get(key)?.has(REFERENCE.tv)) made += await prepareCaptions(key);

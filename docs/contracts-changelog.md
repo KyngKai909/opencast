@@ -2,6 +2,12 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-09: Cleaner pictures from prepare (programming Phase 1)
+
+Additive, with migration 0061.
+
+- `library.ts`: `ItemHistory.preparation.converted` (optional): what preparing did to the picture, `from_hdr` (an HDR file tonemapped to BT.709) and `deinterlaced`. Empty when it did neither, or when the item was prepared before 2026-10-09 and hasn't been prepared again.
+
 ## 2026-10-07: Invite-only sign-ups
 
 Additive, with migration 0060.

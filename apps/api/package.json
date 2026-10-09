@@ -15,6 +15,7 @@
     "demo:billing": "tsx --conditions=source scripts/demo-billing.ts",
     "demo:relay-viewers": "tsx --conditions=source scripts/demo-relay-viewers.ts",
     "demo:uploads": "tsx --conditions=source scripts/demo-uploads.ts",
+    "storage:cleaner-pictures": "tsx --conditions=source scripts/cleaner-pictures.ts",
     "storage:move-off-pinata": "tsx --conditions=source scripts/move-off-pinata.ts",
     "storage:prepare-from-originals": "tsx --conditions=source scripts/prepare-from-originals.ts",
     "storage:relink-locations": "tsx --conditions=source scripts/relink-locations.ts",

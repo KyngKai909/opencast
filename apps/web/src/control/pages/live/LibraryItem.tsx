@@ -1,7 +1,8 @@
 // 04.1 a library item (/:callSign/library/items/:itemId?folder=:folderId): the file, how it was
 // prepared for air, its rights, whether it's offered for carriage, where it's scheduled and every
 // time it has aired (L5), replacing its file (L6), and removing it (guarded while anything uses it).
-// "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared.
+// "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared. What
+// preparing did to the picture (programming Phase 1) follows its size: "1920 by 1080. Converted from HDR".
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -17,7 +18,7 @@ import { bumperCount, FolderRail, identityCounts, ItemStatus, refreshLibrary, Ri
 import { AirWindowSection, BlockSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
-import { preparationWords } from "../../components/onair/readiness";
+import { conversionWords, preparationWords } from "../../components/onair/readiness";
 import { SecTop } from "../../components/live/Studio";
 import { UploadList } from "@opencast/ui/upload";
 import { useUpload } from "../../components/live/upload";
@@ -89,6 +90,7 @@ export default function LibraryItem() {
   const captions = item.captions === "none" ? "None" : `${item.captions === "generated" ? "Generated" : "Uploaded"}${h?.captionLanguage ? `, ${languageName(h.captionLanguage)}` : ""}`;
   const contentId = item.storage?.contentId;
   const prepared = preparationWords(h?.preparation?.status);
+  const converted = conversionWords(h?.preparation?.converted);
 
   return (
     <div className="cc-libwrap">
@@ -212,7 +214,8 @@ export default function LibraryItem() {
               <KeyValueList
                 className="cc-item__kv"
                 items={[
-                  { label: "Picture", value: item.picture ? `${item.picture.width} by ${item.picture.height}` : item.mediaKind === "audio" ? "Audio only" : "Not yet" },
+                  // Cleaner pictures: an HDR phone clip tonemapped, an interlaced one deinterlaced, said after its size.
+                  { label: "Picture", value: [item.picture ? `${item.picture.width} by ${item.picture.height}` : item.mediaKind === "audio" ? "Audio only" : "Not yet", converted].filter(Boolean).join(". ") },
                   ...(sound ? [{ label: "Sound", value: sound }] : []),
                   { label: "Captions", value: captions },
                   ...(item.storage ? [{ label: "Stored", value: item.storage.sharedWith > 0 ? "Once, shared by every station airing it" : "Once" }] : []),

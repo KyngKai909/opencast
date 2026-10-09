@@ -1399,3 +1399,11 @@ For review. Viewers see nothing new: a guide's shows appear in the guide, on the
 | Network desk, External sources table, What's on | "Guide needs a channel" / "Pick one: Find this channel's guide"; "Channel not in the guide" / "What it listed before stays"; "Guide too big to read" / "What it listed before stays" |
 | Network desk, a listing's details, What's on | "Channel in the guide": "{ANIME x HIDIVE} ({6793eaa4bc03978b9bc63db1}), one of {427} channels"; "What was read": "{Read 32 airings to come for ANIME x HIDIVE, one of 427 channels in the guide}. {965 KB as it downloads (gzipped), 7.4 MB unzipped}. Last read {September 26 at 8:42 pm}" with "; not changed since, at {September 26 at 9:42 pm}"; "How often": "Read every hour (every 30 minutes at most while it runs out), asking first whether it changed." (a small guide: "Read every hour, asking first whether it changed."); notes: "This guide has {427 channels}, and none is picked, so nothing from it is listed. Change, then Find this channel's guide (or add #channel= and its id to the address)."; "The channel in its address isn't in the guide right now: what it listed before stays. Change, then Find this channel's guide for another file."; "{It's over 300 MB unzipped / It's over 40 MB as it downloads / It lists over 5,000 airings to come for the channel / It took over 90 seconds to read}, so it wasn't read: what it listed before stays." |
 | Viewer settings, Privacy | "Counting devices" / "Opencast counts devices with a random number kept on this device. It isn't tied to your account, and only totals are kept after 30 days." (A251, 2026-10-06) |
+
+## Cleaner pictures (programming Phase 1, 2026-10-09)
+
+For review. A library item says what preparing did to its picture, after its size, in the item's "Prepared for air".
+
+| Where | Words |
+|---|---|
+| Control room, a library item, Prepared for air, Picture | "{1920 by 1080}. Converted from HDR" (an HDR file, phone video mostly, tonemapped); "{1920 by 1080}. Deinterlaced"; both: "{1920 by 1080}. Converted from HDR, deinterlaced". Nothing more for a file that needed neither |

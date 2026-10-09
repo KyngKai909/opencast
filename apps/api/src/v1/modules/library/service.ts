@@ -1232,7 +1232,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         row.programId && row.source !== "link" ? services.catalog.openOfferTerms(row.programId) : Promise.resolve(null)
       ]);
       const idents = await services.stations.idents([row.stationId, ...schedule.entries.map((e) => e.stationId), ...aired.map((a) => a.stationId)]);
-      const preparation = ref && (ref.contentId || ref.location) ? await services.playout.preparation(ref, idents.get(row.stationId)?.band ?? "tv") : { status: "not_asked" as const, renditions: [], preparedAt: null };
+      const preparation = ref && (ref.contentId || ref.location) ? await services.playout.preparation(ref, idents.get(row.stationId)?.band ?? "tv") : { status: "not_asked" as const, renditions: [], preparedAt: null, converted: [] };
       const agreements = await services.catalog.agreementsByIds(aired.map((a) => a.carriageAgreementId).filter((v): v is string => Boolean(v)));
       const term = terms?.[0];
       return {
