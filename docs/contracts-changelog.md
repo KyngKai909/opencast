@@ -8,6 +8,18 @@ Additive, with migration 0061.
 
 - `library.ts`: `ItemHistory.preparation.converted` (optional): what preparing did to the picture, `from_hdr` (an HDR file tonemapped to BT.709) and `deinterlaced`. Empty when it did neither, or when the item was prepared before 2026-10-09 and hasn't been prepared again.
 
+## 2026-10-09: Seasons, multi-part episodes and playback orders (programming Phase 2)
+
+Additive, with migration 0062.
+
+- `library.ts`:
+  - `LibraryItem.seasonNumber`, `partOf`, `partNumber` (optional, nullable): its season, and a multi-part episode's shared words and part number;
+  - on `getLibrary` only, from the station's as-run log: `LibraryItem.neverAired`, `lastAiredAt`, and for a program's episodes `upNext` (where it comes in the program's walk, In order, after its last airing; 0 airs next; null when it can't air yet) and `nextEpisode` (optional);
+  - the update input (`updateItem`, and `upload`'s body) takes `seasonNumber`, `partOf` (1 to 200 characters) and `partNumber`, each nullable;
+  - new `PlaybackOrder` (`in_order`, `newest_first`, `shuffle`, `shuffle_shows`, `marathon`) and `PLAYBACK_ORDER_WORDS` (each order's label and meaning). Nothing takes an order yet; Phase 3's template slots will.
+- `uploads.ts`: `LibraryUploadFields.seasonNumber`, `partOf`, `partNumber` (optional).
+- Behaviour: an upload of a program that sends neither `seasonNumber` nor `episodeNumber` has both guessed from the file's name, and one that sends neither `partOf` nor `partNumber` has its part guessed from the title.
+
 ## 2026-10-07: Invite-only sign-ups
 
 Additive, with migration 0060.

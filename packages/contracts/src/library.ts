@@ -117,9 +117,49 @@ export const LibraryItem = z.object({
    * only during the block.
    */
   programBlockId: Id.nullable().optional(),
+  /** Programming Phase 2 (added 2026-10-09): its season, beside `episodeNumber`. Guessed from the file's name at upload. */
+  seasonNumber: z.number().int().nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09): a multi-part episode. What its parts share ("The Long
+   * Night"; the same words in one program, any case, are one episode) and this part's number. Its
+   * parts always air together, in part order. Guessed from the title at upload. Null: one episode.
+   */
+  partOf: z.string().nullable().optional(),
+  partNumber: z.number().int().nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09), on `getLibrary` only: what the station's as-run log
+   * says. `lastAiredAt` is when it last aired on the station (null: never, and `neverAired`).
+   */
+  neverAired: z.boolean().optional(),
+  lastAiredAt: Timestamp.nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09), on `getLibrary` only, for a program's episodes: where it
+   * comes in its program's walk, In order, picking up after the program's last airing on the station
+   * (as dead-air fill and "Repeat from your library" choose). 0 airs next (a multi-part episode's
+   * parts count one each, in part order); null when it can't air yet (not ready, rights not
+   * confirmed) or isn't in a program. `nextEpisode` is true for what airs next.
+   */
+  upNext: z.number().int().nullable().optional(),
+  nextEpisode: z.boolean().optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
+
+/**
+ * Programming Phase 2 (added 2026-10-09): the orders a program's episodes can air in, for template
+ * slots (Phase 3); dead-air fill and "Repeat from your library" use `in_order`. Every order airs
+ * each episode once before any repeats, and a multi-part episode's parts together. There's no plain
+ * random that can repeat.
+ */
+export const PlaybackOrder = z.enum(["in_order", "newest_first", "shuffle", "shuffle_shows", "marathon"]);
+export type PlaybackOrder = z.infer<typeof PlaybackOrder>;
+export const PLAYBACK_ORDER_WORDS: Record<PlaybackOrder, { label: string; meaning: string }> = {
+  in_order: { label: "In order", meaning: "Season, then episode, then date added" },
+  newest_first: { label: "Newest first", meaning: "The newest episode not yet aired from this slot, then back through the rest" },
+  shuffle: { label: "Shuffle", meaning: "Every episode once, in a random order, before any repeats; then a new random order" },
+  shuffle_shows: { label: "Shuffle shows, keep each in order", meaning: "Which program is random, and each program's episodes stay in order" },
+  marathon: { label: "Marathon", meaning: "A whole season in a row, then the next season" }
+};
 
 export const Folder = z.object({ id: Id, name: z.string(), parentFolderId: Id.nullable(), itemCount: z.number().int() });
 
@@ -272,6 +312,15 @@ const ItemFields = z.object({
   programId: Id.nullable(),
   folderId: Id.nullable(),
   episodeNumber: z.number().int().positive().nullable(),
+  /**
+   * Programming Phase 2 (2026-10-09): its season, and a multi-part episode's shared words and part
+   * number. On upload, when neither `seasonNumber` nor `episodeNumber` is sent, both are guessed from
+   * the file's name ("S02E05", "2x05", "Season 2 Episode 5"); when `partOf` isn't sent, the part is
+   * guessed from the title ("Part 1", "(1)").
+   */
+  seasonNumber: z.number().int().positive().nullable(),
+  partOf: z.string().trim().min(1).max(200).nullable(),
+  partNumber: z.number().int().positive().nullable(),
   episodeDescription: z.string().max(160).nullable(),
   breakPointsMs: z.array(Millis),
   /**

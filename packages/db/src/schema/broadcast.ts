@@ -235,6 +235,15 @@ export const assets = broadcast.table(
     folderId: uuid("folder_id").references(() => assetFolders.id),
     title: text("title").notNull(),
     episodeNumber: integer("episode_number"),
+    /** Programming Phase 2 (migration 0062): its season, beside the episode number. Guessed from the file's name at upload. */
+    seasonNumber: integer("season_number"),
+    /**
+     * Programming Phase 2 (migration 0062): a multi-part episode. What its parts share ("The Long
+     * Night"; the same in one program, any case, is one episode) and this part's number. Parts
+     * always air together, in part order. Guessed from the title at upload.
+     */
+    partOf: text("part_of"),
+    partNumber: integer("part_number"),
     episodeDescription: text("episode_description"),
     code: logCode("code").notNull(),
     source: assetSource("source").notNull(),

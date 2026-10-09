@@ -89,6 +89,13 @@ export const LibraryUploadFields = z.object({
   programId: Id.nullable().optional(),
   folderId: Id.nullable().optional(),
   episodeNumber: z.number().int().positive().nullable().optional(),
+  /**
+   * Programming Phase 2 (added 2026-10-09): its season, and a multi-part episode's shared words and
+   * part number. Not sent: guessed from the file's name and the title, as `libraryApi.upload`.
+   */
+  seasonNumber: z.number().int().positive().nullable().optional(),
+  partOf: z.string().trim().min(1).max(200).nullable().optional(),
+  partNumber: z.number().int().positive().nullable().optional(),
   episodeDescription: z.string().max(160).nullable().optional(),
   breakPointsMs: z.array(Millis).optional(),
   /** A caption file's text (WebVTT, or SRT turned into WebVTT; up to 1 MB), read in the browser and sent here. */

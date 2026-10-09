@@ -65,7 +65,7 @@ written onto the log entry is reachable from as-run through `log_entry_id`.
 - The end-of-series log warning, the "Next episode" mark on log entries, the preview line.
 
 **Files that change**
-- `packages/db/src/schema/broadcast.ts` (+ migration 0061): `day_template_entries` gets `slot_id`,
+- `packages/db/src/schema/broadcast.ts` (+ migration): `day_template_entries` gets `slot_id`,
   `what_airs`, `order`, `program_ids` (for a mix), `at_end`, `same_as_slot_id`;
   `log_entries.template_slot_id`.
 - `packages/contracts/src/log.ts`: `DayTemplateEntry` and `DayTemplateEntryInput` get the
@@ -304,4 +304,4 @@ Nothing in the code; it's research for `docs/iptv.md`.
   are started.
 - No Railway SSH: anything that needs staging (the worker's ffmpeg, counting items to re-prepare
   on real data) is a question to answer there, or a script to run there.
-- The next migration is `0061`.
+- The next migration is `0063` (0061 is Phase 1, 0062 Phase 2).

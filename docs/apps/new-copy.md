@@ -1407,3 +1407,15 @@ For review. A library item says what preparing did to its picture, after its siz
 | Where | Words |
 |---|---|
 | Control room, a library item, Prepared for air, Picture | "{1920 by 1080}. Converted from HDR" (an HDR file, phone video mostly, tonemapped); "{1920 by 1080}. Deinterlaced"; both: "{1920 by 1080}. Converted from HDR, deinterlaced". Nothing more for a file that needed neither |
+
+## Seasons and playback orders (programming Phase 2, 2026-10-09)
+
+For review. No frame draws these; they follow the item page's and the Add drawer's voice.
+
+| Where | Words |
+|---|---|
+| A library item's page, a program: the section "Episode" | the row "{Season 2, episode 5}" ("Episode {5}" without a season; ". Part {2} of {The Long Night}" for a multi-part episode, "A part of …" without a number; "Not numbered" when it has none) with "Repeats and next-episode slots air in season, then episode order. A multi-part episode's parts air together."; fields "Season", "Episode", "Part of" (placeholder "The Long Night", help "For a multi-part episode: the same words on each part."), "Part" (off until Part of has words); "A whole number, or leave it empty." under a field that isn't one; "Save" |
+| The item's picture placeholder | the same words as the row ("Season 2, episode 5", "Episode 5") |
+| The Add drawer's fit badges | "Never aired", and its line's lead "Never aired. " (as "Next episode. ") |
+| "Repeat from your library" (the Fill pane and the Add drawer) | with a season: "{Late Crate} season {2}, episodes {3} to {6}, in order, with your break rule" (the short line stays "{Late Crate} {3} to {6}, until {2:00 am}") |
+| Playback orders (contracts' `PLAYBACK_ORDER_WORDS`, for Phase 3's select) | "In order": "Season, then episode, then date added"; "Newest first": "The newest episode not yet aired from this slot, then back through the rest"; "Shuffle": "Every episode once, in a random order, before any repeats; then a new random order"; "Shuffle shows, keep each in order": "Which program is random, and each program's episodes stay in order"; "Marathon": "A whole season in a row, then the next season" (the prompt's words) |

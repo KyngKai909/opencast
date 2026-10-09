@@ -295,7 +295,7 @@ describe("the Add drawer", () => {
     const drawer = await screen.findByRole("dialog", { name: "Add at 11:40 pm" });
     expect(within(drawer).getByText("2 hr 20 min free, until Late Crate, ep. 12 at 2:00 am")).toBeTruthy();
     fireEvent.change(within(drawer).getByLabelText("Search your library"), { target: { value: "Late Crate, ep. 1" } });
-    fireEvent.click(within(drawer).getByRole("button", { name: /^Late Crate, ep\. 1 29:00\. Leaves 1 hr 51 min Fits/ }));
+    fireEvent.click(within(drawer).getByRole("button", { name: /^Late Crate, ep\. 1 Never aired\. 29:00\. Leaves 1 hr 51 min Never aired/ }));
     const t = await tray();
     expect(await within(t).findByText("Late Crate, ep. 1 goes on at 11:40 pm")).toBeTruthy();
   });

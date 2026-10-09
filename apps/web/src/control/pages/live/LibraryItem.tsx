@@ -3,6 +3,7 @@
 // time it has aired (L5), replacing its file (L6), and removing it (guarded while anything uses it).
 // "For air" is L5's `preparation`: prepared for air, being prepared, or couldn't be prepared. What
 // preparing did to the picture (programming Phase 1) follows its size: "1920 by 1080. Converted from HDR".
+// Programming Phase 2: a program's season, episode and part, to correct what the upload guessed.
 
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -16,6 +17,7 @@ import { useIsPhone, useShellOptions } from "../../layout/shell";
 import { useStation } from "../../station/StationContext";
 import { bumperCount, FolderRail, identityCounts, ItemStatus, refreshLibrary, RightsPane, typeOf } from "../../components/live/LibraryParts";
 import { AirWindowSection, BlockSection, BumperRoleSection, WINDOWED } from "../../components/live/BumperFields";
+import { EpisodeSection, episodeWords } from "../../components/live/EpisodeFields";
 import { airedLabel, readyLine, relativeLabel, whenLabel } from "../../components/live/logic";
 import { languageName } from "../../components/live/listings";
 import { conversionWords, preparationWords } from "../../components/onair/readiness";
@@ -154,7 +156,7 @@ export default function LibraryItem() {
         <div className="cc-item__grid">
           <div>
             <PictureFrame label={`${item.title}, the picture`}>
-              <PicturePlaceholder scene="reel" title={program?.title ?? item.title} subtitle={item.episodeNumber ? `Episode ${item.episodeNumber}` : undefined} />
+              <PicturePlaceholder scene="reel" title={program?.title ?? item.title} subtitle={item.episodeNumber || item.seasonNumber || item.partOf ? episodeWords(item) : undefined} />
             </PictureFrame>
             {item.status !== "ready" && (
               <div className="cc-item__status">
@@ -228,6 +230,8 @@ export default function LibraryItem() {
               {item.status === "ready" && !sound && <small className="cc-item__quiet">{readyLine(item)}</small>}
             </section>
 
+            {/* Programming Phase 2: a program's season, episode and part. */}
+            {typeOf(item) === "PGM" && <EpisodeSection item={item} canEdit={s.can("programming")} />}
             {/* A243: a bumper's role, and when bumpers, station IDs, openers and closers air. */}
             {typeOf(item) === "BMP" && <BumperRoleSection item={item} radio={s.station.band === "radio"} canEdit={s.can("programming")} />}
             {WINDOWED.includes(typeOf(item)) && <AirWindowSection item={item} canEdit={s.can("programming")} />}
