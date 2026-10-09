@@ -1,6 +1,7 @@
 import { asLogCode, isIdentCode } from "@opencast/contracts";
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
+import { walkEpisodes } from "@opencast/domain";
 import type { Airing, AiringBlock, BlockBand, BlockSpan, BreakContent, BreakRow, Listing, LogDay, LogEntry } from "@opencast/contracts";
 import type { Executor, ModuleContext } from "../../context.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
@@ -213,10 +214,14 @@ export interface LogService {
   markBreakFilled(breakId: string): Promise<void>;
   /**
    * Nobody filled the gap: repeat from the library, in order, and record that it happened.
-   * Whatever doesn't fit airs station ID and bumpers.
+   * Whatever doesn't fit airs station ID and bumpers. Programming Phase 2: each program's next
+   * episode, In order, picking up after its last airing in the as-run log, so filling twice airs
+   * different episodes.
    */
   /** `usable` (playout's): only items it can air now (prepared for air). */
   fillDeadAir(stationId: string, gap: Gap, options?: { usable?(item: ItemRef): boolean }): Promise<number>;
+  /** Programming Phase 2: what dead-air fill would air next (up to `count` items, in order), for playout to prepare ahead. */
+  repeatsAhead(stationId: string, count: number): Promise<ItemRef[]>;
   /** Adds a break now, cued from a live block. */
   cueBreak(stationId: string, at: Date, lengthMs: number, logEntryId: string | null): Promise<BreakSlotView>;
   /** "During Saturday Reel" / "After Late Crate, ep. 14" for stored breaks. */
@@ -301,6 +306,28 @@ export function createLogService(ctx: ModuleContext): LogService {
     const held = stored.filter((b) => filled.get(b.id)).map((b) => b.id);
     if (empty.length) await ex.delete(B).where(inArray(B.id, empty));
     if (held.length) await ex.update(B).set({ logEntryId: null }).where(inArray(B.id, held));
+  }
+
+  /**
+   * Programming Phase 2: dead-air fill's repeats, an airing at a time. Which program is chosen as
+   * before: the station's 20 newest repeatable programs, taking turns. Its episode is the walker's,
+   * In order, picking up after the program's last airing in the as-run log, then after what this
+   * fill has placed. A multi-part episode is one airing (its parts). An item in no program is its
+   * own airing, as before. Null when nothing can air.
+   */
+  async function deadAirRepeats(stationId: string, usable: (item: ItemRef) => boolean): Promise<() => ItemRef[] | null> {
+    const items = (await services.library.repeatable(stationId, 20)).filter(usable);
+    const walks = await services.library.episodeWalks(stationId, items.flatMap((i) => (i.programId ? [i.programId] : [])));
+    const walkers = new Map(
+      [...walks].map(([programId, w]) => [programId, walkEpisodes({ episodes: w.episodes.map((e) => ({ ...e, ready: w.repeatable.has(e.id) && usable(e) })), order: "in_order", seed: programId, position: w.aired })])
+    );
+    let i = 0;
+    return () => {
+      if (!items.length) return null;
+      const item = items[i++ % items.length];
+      const next = item.programId ? walkers.get(item.programId)?.next() : undefined;
+      return next && !next.done ? next.value.episodes : [item];
+    };
   }
 
   /**
@@ -2001,26 +2028,30 @@ export function createLogService(ctx: ModuleContext): LogService {
     async fillDeadAir(stationId, gap, options = {}) {
       const startsAt = new Date(gap.startsAt);
       const endsAt = new Date(gap.endsAt);
-      const items = (await services.library.repeatable(stationId, 20)).filter((i) => options.usable?.(i) ?? true);
+      const next = await deadAirRepeats(stationId, (i) => options.usable?.(i) ?? true);
       // From a segment boundary (the stream changes item there).
       let cursor = nextSegment(startsAt.getTime());
       let placed = 0;
-      for (let i = 0; items.length && i < 200; i++) {
-        const item = items[i % items.length];
-        const length = roundUpToMinute(item.durationMs!);
-        if (cursor + length > endsAt.getTime()) break;
-        await db.insert(E).values({
-          stationId,
-          startsAt: new Date(cursor),
-          endsAt: new Date(cursor + length),
-          kind: "program",
-          code: item.code,
-          assetId: item.id,
-          programId: item.programId,
-          localNote: DEAD_AIR_NOTE
-        });
-        cursor += length;
-        placed++;
+      for (let i = 0; i < 200; i++) {
+        const airing = next();
+        if (!airing) break;
+        // A multi-part episode fits whole, or not at all.
+        if (cursor + airing.reduce((t, item) => t + roundUpToMinute(item.durationMs!), 0) > endsAt.getTime()) break;
+        for (const item of airing) {
+          const length = roundUpToMinute(item.durationMs!);
+          await db.insert(E).values({
+            stationId,
+            startsAt: new Date(cursor),
+            endsAt: new Date(cursor + length),
+            kind: "program",
+            code: item.code,
+            assetId: item.id,
+            programId: item.programId,
+            localNote: DEAD_AIR_NOTE
+          });
+          cursor += length;
+          placed++;
+        }
       }
       const now = deps.clock.now();
       const [event] = await db
@@ -2031,6 +2062,17 @@ export function createLogService(ctx: ModuleContext): LogService {
       else await db.insert(schema.deadAirEvents).values({ stationId, gapStartsAt: startsAt, gapEndsAt: endsAt, autoFilledAt: now });
       deps.bus.emit("station.dead_air_filled", { stationId, gapStartsAt: gap.startsAt, gapEndsAt: gap.endsAt });
       return placed;
+    },
+
+    async repeatsAhead(stationId, count) {
+      const next = await deadAirRepeats(stationId, () => true);
+      const ahead = new Map<string, ItemRef>();
+      for (let i = 0; i < count * 4 && ahead.size < count; i++) {
+        const airing = next();
+        if (!airing) break;
+        for (const item of airing) ahead.set(item.id, item);
+      }
+      return [...ahead.values()].slice(0, count);
     },
 
     async markBreakFilled(breakId) {

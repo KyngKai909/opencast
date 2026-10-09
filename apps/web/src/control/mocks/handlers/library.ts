@@ -97,6 +97,9 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
     programId: null,
     folderId: null,
     episodeNumber: null,
+    seasonNumber: null,
+    partOf: null,
+    partNumber: null,
     episodeDescription: null,
     code: "PGM",
     source: "upload",
@@ -116,6 +119,32 @@ function newItem(stationId: string, o: Partial<LibraryItem> & Pick<LibraryItem, 
     createdAt: now().toISOString(),
     ...o
   };
+}
+
+/**
+ * Programming Phase 2, as the API: what aired (the mock's log before now stands in for the as-run
+ * log), and where each program's episodes come, In order, picking up after its last airing.
+ */
+export function airedFacts(items: LibraryItem[]): Map<string, Pick<LibraryItem, "neverAired" | "lastAiredAt" | "upNext" | "nextEpisode">> {
+  const t = now().toISOString();
+  const last = new Map<string, string>();
+  for (const e of getDb().log) if (e.itemId && e.endsAt <= t && (last.get(e.itemId) ?? "") < e.startsAt) last.set(e.itemId, e.startsAt);
+  const facts = new Map(items.map((i) => [i.id, { neverAired: !last.has(i.id), lastAiredAt: last.get(i.id) ?? null, upNext: null as number | null, nextEpisode: false }]));
+  const nulls = (a: number | null | undefined, b: number | null | undefined) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : a - b);
+  for (const programId of new Set(items.flatMap((i) => (i.programId && i.code === "PGM" ? [i.programId] : [])))) {
+    const all = getDb().library.items.filter((i) => i.programId === programId && i.code === "PGM");
+    const ready = all
+      .filter((i) => i.status === "ready" && i.rights && i.durationMs)
+      .sort((a, b) => nulls(a.seasonNumber, b.seasonNumber) || nulls(a.episodeNumber, b.episodeNumber) || a.createdAt.localeCompare(b.createdAt) || nulls(a.partNumber, b.partNumber));
+    const latest = all.reduce<LibraryItem | null>((m, i) => ((last.get(i.id) ?? "") > (m ? (last.get(m.id) ?? "") : "") ? i : m), null);
+    const from = latest ? ready.findIndex((i) => i.id === latest.id) + 1 : 0;
+    ready.forEach((_, n) => {
+      const i = ready[(from + n) % ready.length];
+      const f = facts.get(i.id);
+      if (f) Object.assign(f, { upNext: n, nextEpisode: n === 0 || (!!i.partOf && i.partOf === ready[from % ready.length].partOf) });
+    });
+  }
+  return facts;
 }
 
 /** A242: an item's type as the API stores it, as `code` (what apps built before read) and `identCode`. */
@@ -188,9 +217,10 @@ export const libraryHandlers = [
     if (q.get("needsAttention") === "true") items = items.filter((i) => !i.rights || i.status !== "ready");
     // A244: a programming block's items.
     if (q.get("programBlockId")) items = items.filter((i) => i.programBlockId === q.get("programBlockId"));
+    const facts = airedFacts(items);
     return reply(libraryApi.getLibrary.response, {
       generatedStationId: generatedStationIdOf(id, all),
-      items: items.map(withProbe),
+      items: items.map(withProbe).map((i) => ({ ...i, ...facts.get(i.id) })),
       folders: lib.folders.map((f) => ({ ...f, itemCount: all.filter((i) => i.folderId === f.id).length })),
       programs: programsOf(id),
       needsAttention: { rightsToConfirm: all.filter((i) => !i.rights).length, preparing: all.filter((i) => i.status === "preparing").length },

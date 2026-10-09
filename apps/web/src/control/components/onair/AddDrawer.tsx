@@ -2,8 +2,10 @@
 // min free, until Late Crate, ep. 13 at 12:00 am"), and what can go there, by tab: the library,
 // programs the station carries, a live block from one of its sources, or signing off. Each choice
 // says how it fits the space: "Fits", "9 min over" with what it pushes (as far as the next fixed
-// point, reorder.ts), and "Next episode" for a series, the episode after its latest airing on the
-// day loaded (G15 is the API's future answer). A choice joins the draft (edit mode). Quick fill
+// point, reorder.ts), "Next episode" for a series, and "Never aired". Programming Phase 2: the
+// library says which episode is next (after its program's last airing, from the as-run log) and
+// what never aired; a series on the day loaded goes on from its latest airing there, scheduled or
+// aired. A choice joins the draft (edit mode). Quick fill
 // fills dead air: repeat from the library, or sign off until the next program; with nothing
 // drafted it's written at once (`fillGap`) and the draft takes the new version, else it joins the
 // draft as inserts so one publish covers everything (decision 8).
@@ -50,22 +52,23 @@ export function spaceLine(s: AddSpace, tz = STATION_TZ): string {
 }
 
 export interface Fit {
-  badge: "fits" | "over" | "next";
-  /** "9 min over", "Fits", "Next episode". */
+  badge: "fits" | "over" | "next" | "never";
+  /** "9 min over", "Fits", "Next episode", "Never aired". */
   label: string;
   /** "29:10, runs 9 min over: ep. 13 moves to 12:09 am". */
   line: string;
 }
 
-/** How something of `lengthMs` fits the space, and what it pushes when it doesn't. */
-export function fitOf(lengthMs: number, space: AddSpace, reflow: Reflow, next: boolean, tz = STATION_TZ): Fit {
+/** How something of `lengthMs` fits the space, and what it pushes when it doesn't. Next episode wins over Never aired. */
+export function fitOf(lengthMs: number, space: AddSpace, reflow: Reflow, next: boolean, tz = STATION_TZ, neverAired = false): Fit {
   const len = wholeMinutes(lengthMs);
-  const lead = next ? "Next episode. " : "";
+  const lead = next ? "Next episode. " : neverAired ? "Never aired. " : "";
   const free = space.endsAt ? t(space.endsAt) - t(space.at) : null;
   if (free === null || len <= free) {
     const left = free === null ? null : free - len;
     const rest = left === null || left < MIN ? "" : left < 5 * MIN ? `. Leaves ${rowLength(left)} for a break` : `. Leaves ${minutesText(left)}`;
-    return { badge: next ? "next" : "fits", label: next ? "Next episode" : "Fits", line: `${lead}${rowLength(len)}${rest}` };
+    const [badge, label] = next ? (["next", "Next episode"] as const) : neverAired ? (["never", "Never aired"] as const) : (["fits", "Fits"] as const);
+    return { badge, label, line: `${lead}${rowLength(len)}${rest}` };
   }
   const over = Math.ceil((len - free) / MIN);
   const moves = makeRoom(reflow, space.at, len);
@@ -76,8 +79,9 @@ export function fitOf(lengthMs: number, space: AddSpace, reflow: Reflow, next: b
 }
 
 /**
- * G15 for now: the episode after each series' latest airing in what's loaded, from the library.
- * Never-aired series have none (the API will say, G15).
+ * Each series' next episode. On the day loaded, the episode after its latest airing there
+ * (scheduled or aired); otherwise the library's (`nextEpisode`: after its last airing in the as-run
+ * log, Programming Phase 2).
  */
 export function nextEpisodes(entries: Array<Pick<LogEntry, "itemId" | "programId" | "startsAt">>, items: LibraryItem[]): Set<string> {
   const latest = new Map<string, LibraryItem>();
@@ -87,9 +91,10 @@ export function nextEpisodes(entries: Array<Pick<LogEntry, "itemId" | "programId
   }
   const next = new Set<string>();
   for (const [programId, it] of latest) {
-    const n = items.find((i) => i.programId === programId && i.episodeNumber === (it.episodeNumber ?? 0) + 1);
+    const n = items.find((i) => i.programId === programId && (i.seasonNumber ?? null) === (it.seasonNumber ?? null) && i.episodeNumber === (it.episodeNumber ?? 0) + 1);
     if (n) next.add(n.id);
   }
+  for (const i of items) if (i.nextEpisode && i.programId && !latest.has(i.programId)) next.add(i.id);
   return next;
 }
 
@@ -236,8 +241,8 @@ export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd,
     </div>
   );
 
-  const pick = (key: string, title: string, lengthMs: number, isNext: boolean, colour: string | null, onPick: () => void, data?: string) => {
-    const f = fitOf(lengthMs, space, reflow, isNext);
+  const pick = (key: string, title: string, lengthMs: number, isNext: boolean, colour: string | null, onPick: () => void, data?: string, neverAired = false) => {
+    const f = fitOf(lengthMs, space, reflow, isNext, STATION_TZ, neverAired);
     return (
       <li key={key} data-item={data} className={data && data === highlight ? "cc-pick cc-pick--hl" : "cc-pick"}>
         <button type="button" onClick={onPick}>
@@ -278,7 +283,7 @@ export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd,
             <Field label="Search your library" size="sm" value={query} onChange={(e) => setQuery(e.target.value)} className="cc-add__search" />
             {shown.length ? (
               <ul ref={list} className="cc-picks" aria-label="Your library">
-                {(all || query ? shown : shown.slice(0, SHORT_LIST)).map((i) => pick(i.id, i.title, i.durationMs ?? 0, next.has(i.id), colourOf(i.programId), () => addItem(i), i.id))}
+                {(all || query ? shown : shown.slice(0, SHORT_LIST)).map((i) => pick(i.id, i.title, i.durationMs ?? 0, next.has(i.id), colourOf(i.programId), () => addItem(i), i.id, i.neverAired === true))}
               </ul>
             ) : (
               <p className="cc-log__quiet">{library.isLoading ? null : query ? "Nothing in your library by that name." : "Nothing in your library can air yet."}</p>

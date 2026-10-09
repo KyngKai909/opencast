@@ -194,7 +194,8 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
       // A244: programming blocks' own IDs, bumpers, intros and outros too (their automatic cards are asked for by the planner).
       const blockItems = [...(blocks ?? new Map()).values()].flatMap((b) => [...b.stationIds, ...b.bumpers, ...b.intros, ...b.outros]);
       for (const f of [...ids, ...bumpers, ...blockItems]) wants.push({ contentId: f.contentId, location: f.location, mediaKind: f.mediaKind, band: band(stationId), durationMs: f.durationMs, neededAt: now });
-      for (const r of await services.library.repeatable(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
+      // Programming Phase 2: the episodes fill would air next, not just the newest programs.
+      for (const r of await services.log.repeatsAhead(stationId, 5)) wants.push({ contentId: r.contentId, location: r.location, mediaKind: r.mediaKind, band: band(stationId), durationMs: r.durationMs, neededAt: new Date(now.getTime() + 2 * 3_600_000) });
     }
     // Barter breaks inside carried programs air the producer's spots: their rotations too.
     const producers = new Map<string, Band>();

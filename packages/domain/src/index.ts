@@ -5,3 +5,4 @@ export * from "./licence.js";
 export * from "./spots.js";
 export * from "./credit.js";
 export * from "./ads.js";
+export * from "./episodes.js";

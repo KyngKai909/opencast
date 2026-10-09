@@ -1,6 +1,7 @@
 // A246: the Add drawer, worked out: the space it adds into, the fit badges ("Fits", "9 min over"
-// with what it pushes as far as the next fixed point, "Next episode"), next episodes from the day
-// loaded (G15 for now), and quick fill's inserts when it joins a draft. Also the tray's title.
+// with what it pushes as far as the next fixed point, "Next episode", "Never aired"), next episodes
+// from the day loaded and, for the rest, the library's (Programming Phase 2), and quick fill's
+// inserts when it joins a draft. Also the tray's title.
 
 import { describe, expect, it, vi } from "vitest";
 import type { LibraryItem } from "@opencast/contracts";
@@ -46,6 +47,12 @@ describe("fit badges", () => {
   it("marks the next episode of a series when it fits", () => {
     expect(fitOf(15 * MIN, space, reflow, true)).toMatchObject({ badge: "next", label: "Next episode", line: "Next episode. 15:00. Leaves 5 min" });
   });
+
+  it("marks what never aired when it fits, unless it's the next episode", () => {
+    expect(fitOf(15 * MIN, space, reflow, false, undefined, true)).toEqual({ badge: "never", label: "Never aired", line: "Never aired. 15:00. Leaves 5 min" });
+    expect(fitOf(15 * MIN, space, reflow, true, undefined, true)).toMatchObject({ badge: "next", label: "Next episode" });
+    expect(fitOf(29 * MIN, space, reflow, false, undefined, true)).toMatchObject({ badge: "over", line: "Never aired. 29:00, runs 9 min over: Late Crate, ep. 13 moves to 12:09 am" });
+  });
 });
 
 describe("next episodes", () => {
@@ -57,6 +64,12 @@ describe("next episodes", () => {
       { itemId: "ct2", programId: "ct", startsAt: T("04:00:00") }
     ];
     expect([...nextEpisodes(aired, items)]).toEqual(["lc15"]);
+  });
+
+  it("are the library's for a series not on the day loaded (after its last airing in the as-run log)", () => {
+    const items = [item("lc14", "lc", 14), { ...item("lc15", "lc", 15), nextEpisode: false }, { ...item("ct1", "ct", 1), nextEpisode: false }, { ...item("ct2", "ct", 2), nextEpisode: true }, { ...item("lc1", "lc", 1), nextEpisode: true }];
+    // Late Crate is on the day loaded: ep. 14 there wins over the library's ep. 1.
+    expect([...nextEpisodes([{ itemId: "lc14", programId: "lc", startsAt: T("07:00:00") }], items)].sort()).toEqual(["ct2", "lc15"]);
   });
 });
 

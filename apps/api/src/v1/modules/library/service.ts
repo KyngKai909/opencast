@@ -1,10 +1,10 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { and, asc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { IDENT_LEGACY_CODE, isIdentCode, type CaptionTrack, type IdentCode, type ItemHistory, type LibraryItem } from "@opencast/contracts";
-import { iabContentCategories, isChildrensRating, type ContentRating } from "@opencast/domain";
+import { guessEpisode, iabContentCategories, isChildrensRating, nextEpisodes, type ContentRating } from "@opencast/domain";
 import type { Executor, ModuleContext } from "../../context.js";
 import type { CurrentUser, UploadedFile } from "../../http.js";
 import { badRequest, HttpError, notFound, refused } from "../../errors.js";
@@ -28,6 +28,10 @@ export interface ItemRef {
   programId: string | null;
   title: string;
   episodeNumber: number | null;
+  /** Programming Phase 2: its season, and a multi-part episode's shared words and part number. */
+  seasonNumber: number | null;
+  partOf: string | null;
+  partNumber: number | null;
   /** The episode's description (up to 160 characters). */
   episodeDescription: string | null;
   code: LogCode;
@@ -142,6 +146,11 @@ export interface LibraryService {
   blocks: BlockOps;
   /** Programs ready to repeat (for filling dead air), most recent first. */
   repeatable(stationId: string, limit: number): Promise<ItemRef[]>;
+  /**
+   * Programming Phase 2: what the episode walker needs for each of a station's programs: its
+   * episodes, which of them can be repeated now, and what aired on the station.
+   */
+  episodeWalks(stationId: string, programIds: string[]): Promise<Map<string, EpisodeWalk>>;
   /** A claimable station's import of a covered creator work (the file comes later). */
   addCreatorWork(db: Executor, input: { stationId: string; creatorWorkId: string; title: string; durationMs: number | null; sourceUrl: string; programId?: string }): Promise<string>;
 
@@ -201,6 +210,10 @@ export interface ItemFields {
   programId?: string | null;
   folderId?: string | null;
   episodeNumber?: number | null;
+  /** Programming Phase 2: guessed at upload when not sent (season and episode from the file's name, the part from the title). */
+  seasonNumber?: number | null;
+  partOf?: string | null;
+  partNumber?: number | null;
   episodeDescription?: string | null;
   breakPointsMs?: number[];
   /** A243: a bumper's role (null: Any). */
@@ -209,6 +222,31 @@ export interface ItemFields {
   airs?: AirWindowRef | null;
   /** A244: the programming block it belongs to (null: the station's). */
   programBlockId?: string | null;
+}
+
+/** Programming Phase 2: one program's episodes on a station, for the walker (`@opencast/domain`'s `walkEpisodes`). */
+export interface EpisodeWalk {
+  /** Its programs (`PGM`), not archived, in episode order. */
+  episodes: ItemRef[];
+  /** Those that can be repeated now: ready, rights confirmed, a length, the file available, not taken off air. */
+  repeatable: Set<string>;
+  /** Its episodes' airings on the station, oldest first (the as-run log: the last 5,000 rows of the programs read together). */
+  aired: string[];
+}
+
+/** Where each episode comes in its program's walk, In order from what aired (0 airs next), and what airs next. */
+export function upNextOf(walk: EpisodeWalk): { ranks: Map<string, number>; next: Set<string> } {
+  const ranks = new Map<string, number>();
+  const next = new Set<string>();
+  const episodes = walk.episodes.map((e) => ({ ...e, ready: walk.repeatable.has(e.id) }));
+  for (const [i, airing] of nextEpisodes({ episodes, order: "in_order", seed: "", position: walk.aired }, episodes.length).entries()) {
+    if (ranks.has(airing.episodes[0].id)) break;
+    for (const e of airing.episodes) {
+      ranks.set(e.id, ranks.size);
+      if (i === 0) next.add(e.id);
+    }
+  }
+  return { ranks, next };
 }
 
 export interface FolderView {
@@ -322,6 +360,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       programId: r.programId,
       title: r.title,
       episodeNumber: r.episodeNumber,
+      seasonNumber: r.seasonNumber,
+      partOf: r.partOf,
+      partNumber: r.partNumber,
       episodeDescription: r.episodeDescription,
       code: r.code,
       durationMs: r.durationMs,
@@ -421,6 +462,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         airs,
         airingNow: airs ? eligible({ airs }, now, zones.get(r.stationId) ?? "UTC") : true,
         programBlockId: r.programBlockId ?? null,
+        seasonNumber: r.seasonNumber,
+        partOf: r.partOf,
+        partNumber: r.partNumber,
         createdAt: r.createdAt.toISOString()
       };
     });
@@ -886,6 +930,40 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).slice(0, limit);
     },
 
+    async episodeWalks(stationId, programIds) {
+      const ids = [...new Set(programIds)];
+      if (!ids.length) return new Map();
+      const rows = await db
+        .select()
+        .from(A)
+        .where(and(eq(A.stationId, stationId), inArray(A.programId, ids), eq(A.code, "PGM"), isNull(A.archivedAt)))
+        .orderBy(sql`${A.seasonNumber} nulls last`, sql`${A.episodeNumber} nulls last`, asc(A.createdAt), asc(A.id));
+      const refs = await toRefs(rows);
+      const [offAir, aired] = await Promise.all([
+        services.trust.offAirItems(refs.map((r) => r.id)),
+        refs.length
+          ? db
+              .select({ assetId: schema.asRun.assetId })
+              .from(schema.asRun)
+              .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, refs.map((r) => r.id))))
+              .orderBy(desc(schema.asRun.startedAt), desc(schema.asRun.id))
+              .limit(5000)
+          : Promise.resolve([])
+      ]);
+      const history = aired.map((a) => a.assetId!).reverse();
+      const walks = new Map<string, EpisodeWalk>();
+      for (const programId of ids) {
+        const episodes = refs.filter((r) => r.programId === programId);
+        const mine = new Set(episodes.map((e) => e.id));
+        walks.set(programId, {
+          episodes,
+          repeatable: new Set(episodes.filter((r) => r.status === "ready" && r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).map((r) => r.id)),
+          aired: history.filter((id) => mine.has(id))
+        });
+      }
+      return walks;
+    },
+
     async addCreatorWork(tx, input) {
       const [row] = await tx
         .insert(A)
@@ -939,6 +1017,28 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       ]);
       let items = await toItems(rows);
       if (filter.needsAttention) items = items.filter((i) => !i.rights || i.status !== "ready");
+      // Programming Phase 2: what the station's as-run log says about each item, and where each
+      // program's episodes come in its walk (In order, as dead-air fill and repeats choose).
+      const ids = items.map((i) => i.id);
+      const [lastAired, walks] = await Promise.all([
+        ids.length
+          ? db
+              .select({ assetId: schema.asRun.assetId, at: max(schema.asRun.startedAt) })
+              .from(schema.asRun)
+              .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, ids)))
+              .groupBy(schema.asRun.assetId)
+          : Promise.resolve([]),
+        service.episodeWalks(stationId, items.filter((i) => i.code === "PGM" && i.programId).map((i) => i.programId!))
+      ]);
+      const last = new Map(lastAired.map((r) => [r.assetId!, r.at]));
+      const ranks = new Map<string, number>();
+      const next = new Set<string>();
+      for (const walk of walks.values()) {
+        const up = upNextOf(walk);
+        for (const [id, rank] of up.ranks) ranks.set(id, rank);
+        for (const id of up.next) next.add(id);
+      }
+      items = items.map((i) => ({ ...i, neverAired: !last.get(i.id), lastAiredAt: last.get(i.id)?.toISOString() ?? null, upNext: ranks.get(i.id) ?? null, nextEpisode: next.has(i.id) }));
       const perFolder = new Map<string, number>();
       for (const row of all) if (row.folderId) perFolder.set(row.folderId, (perFolder.get(row.folderId) ?? 0) + 1);
       return {
@@ -996,6 +1096,12 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
         await fs.copyFile(file.path, kept);
       }
 
+      const title = fields.title ?? file.originalName.replace(/\.[^.]+$/, "");
+      // Programming Phase 2: a program's season and episode from the file's name, and its part from
+      // the title, unless they were sent. The station corrects them on the item's page.
+      const guess = (fields.code ?? guessCode(probe.durationMs)) === "PGM" ? guessEpisode(file.originalName, title) : null;
+      const numbered = fields.seasonNumber !== undefined || fields.episodeNumber !== undefined;
+      const parted = fields.partOf !== undefined || fields.partNumber !== undefined;
       const item = await db.transaction(async (tx) => {
         const [row] = await tx
           .insert(A)
@@ -1004,8 +1110,11 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
             stationId,
             programId: fields.programId ?? null,
             folderId: fields.folderId ?? null,
-            title: fields.title ?? file.originalName.replace(/\.[^.]+$/, ""),
-            episodeNumber: fields.episodeNumber ?? null,
+            title,
+            episodeNumber: numbered ? (fields.episodeNumber ?? null) : (guess?.episodeNumber ?? null),
+            seasonNumber: numbered ? (fields.seasonNumber ?? null) : (guess?.seasonNumber ?? null),
+            partOf: parted ? (fields.partOf ?? null) : (guess?.partOf ?? null),
+            partNumber: parted ? (fields.partNumber ?? null) : (guess?.partNumber ?? null),
             episodeDescription: fields.episodeDescription ?? null,
             code: fields.code ?? guessCode(probe.durationMs),
             source: "upload",
@@ -1055,7 +1164,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const timing = airingFields(code, fields);
       await db.transaction(async (tx) => {
         const patch: Partial<typeof A.$inferInsert> = { ...timing };
-        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "episodeDescription", "bumperRole", "programBlockId"] as const) {
+        for (const key of ["title", "code", "programId", "folderId", "episodeNumber", "seasonNumber", "partOf", "partNumber", "episodeDescription", "bumperRole", "programBlockId"] as const) {
           if (fields[key] !== undefined) (patch as Record<string, unknown>)[key] = fields[key];
         }
         if (code !== "BMP" && row.bumperRole !== null) patch.bumperRole = null;
