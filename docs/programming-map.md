@@ -193,11 +193,105 @@ Note: Phase 1 and Phase 4 both change `prepare.ts`'s probe and graph; they run i
 
 ## 5. The dial in other apps (Phase 5)
 
-(see below)
+**Exists**
+- The stream: `GET /hls/:stationId/:file` (`apps/api/src/server.ts:83`, outside `/v1`) serves
+  `master.m3u8` and the variant playlists from `playout.playlist` (`playout/service.ts:149`,
+  rendered at `:306`). It sets public caching (30 s for the master), CORS `*`, and gzip, but no
+  ETag. The query string is ignored, so `?via=iptv` already works as a URL and only needs reading.
+- Which stations: `stations.kind` is `station | studio | claimable | listed | catalog`
+  (`schema/broadcast.ts:29`). The desk says independent, claimable, catalog and external
+  (`audience/analytics.ts:49`, `listed` is External). On the air is `playout_state.onAir`
+  without a current `off_air` airing (`stations/routes.ts:72`, `playout/service.ts:535`).
+  Waitlist numbers are `channel_holds` (`schema/network.ts:94`).
+- Everything an entry needs: the dial number (`channels.tenths` and `band`, formatted by
+  `formatChannelNumber`, `packages/domain/src/station.ts:59`), the call sign, the market
+  (`markets`: slug, name, timezone), and `StationIdent` (`contracts/src/common.ts:118`).
+- Programmes: the public guide (`getGuide`, 24 hours at most) builds `Airing`s with
+  `episodeTitle`, `episodeDescription`, `backAt` and `block` (`log/service.ts:412`, `toAiring`;
+  the window at `:1692`). Programs have `category`, `advisory`, `rating` and `isLive`
+  (`schema/broadcast.ts:174`). Planned off air comes from `off_air_hours` and `log/offair.ts`, with
+  its back time.
+- Market from IP: `apps/api/src/v1/geo.ts`, used by the heartbeat and the dial.
+
+**Missing**
+- Both endpoints, and a writer for XMLTV (`lib/guideStream.ts` only reads guides).
+- A public station logo: `stations.logo_url` is only in the station's own setup
+  (`StationSetup.logoUrl`), not in any public view. `tvg-logo` needs it public.
+- **There's no "log publish".** Log rows are public as soon as they're written; "publish" is only
+  master control's edit-mode batch (`log/changes.ts`), and `deps.bus` has no log event.
+  Recommendation: build the XMLTV on request, cache it for a minute in memory, and set an ETag from
+  a hash of the body. Rebuilding is cheap for seven days of logs; a bus event can come later if it
+  isn't.
+- Counting: viewers are counted from heartbeats only (`POST /heartbeat`, `audience/service.ts:44`;
+  `TuneVia` and `platform` on `audience.sessions`). Nothing counts playlist requests and there's
+  no "audience source". Phase 5 adds sessions made from runs of `via=iptv` master polls (a new
+  platform value `other_apps`, or a source column), kept out of spot billing.
+- `episode-num` needs the season (Phase 2) and `<new/>` needs "never aired" (Phase 2), so Phase 5
+  comes after Phase 2.
+- The "Watch in other apps" section in You (`apps/web/src/viewer/pages/You.tsx`,
+  `components/you/YouSections.tsx`), and `docs/iptv.md`.
+- Reminders: `Reminder.airing` (`contracts/src/accounts.ts:138`) has only `title`, no episode
+  title. Phase 3's check on the guide, station page and reminders will want it added (additive).
+
+**Files that change**
+- New: `apps/api/src/v1/modules/iptv/` (routes and service: M3U, XMLTV, gzip, ETag), mounted in
+  `apps/api/src/v1/`; `packages/contracts/src/iptv.ts` if the routes go in contracts.
+- `apps/api/src/server.ts` (read `via` on `/hls`), `playout/service.ts` (hand it to counting),
+  `audience/` (sessions from polls, the "Other apps" source, kept out of billing),
+  `contracts/src/audience.ts` and `analytics.ts` (the source, additive).
+- `stations/service.ts` (on-air stations with logo, market, number), `log/service.ts` (a 7-day
+  window of airings for every station at once, not one station at a time).
+- Web: `viewer/components/you/`. Docs: `docs/iptv.md`, `docs/open-decisions.md` (counting for
+  billing, Kai's call).
 
 ## 6. Where it can air (Phase 6)
 
-(see below)
+**Exists**
+- Rights basis, per item: `RightsBasis` = `made_it`, `owner_permission`, `public_domain`,
+  `permission_record`, `licence_record` (`contracts/src/library.ts:28`; DB enum in
+  `schema/namespaces.ts:28`). Kept in `rights_confirmations`, which log entries must reference
+  (`schema/broadcast.ts:526`). `permission_records` and `licence_records` are in
+  `schema/network.ts:202` and `:230`.
+- **CC licences aren't bases.** `cc_by` and `cc_by_sa` are values of `licence_records.licence`
+  (with `cc0`, the `nd` and `nc` ones, and `other`), and `allows_carriage` is computed from it. So
+  "CC licences allow every outlet" is a rule on `licence_record` items by their licence, not a new
+  basis.
+- Carriage: `Terms` (`contracts/src/catalog.ts:18`) are copied onto each agreement when it's made
+  (`schema/catalog.ts:12`), so "the maker narrows it for new carriers only" already holds for a
+  new term column. Agreements have `endsAt`.
+- Relays: `station_relays.mode` (`live_only | everything`) and `breakHandling`
+  (`air_spots | station_id_slate`) (`schema/broadcast.ts:1351`). `relayPicture`
+  (`playout/engine/relayBreaks.ts:34`) decides per row; `sender.ts:512` swaps each segment for the
+  prepared station-ID slate. Nothing checks rights for relays today: the gap the prompt names.
+- `packages/domain` has `licence.ts` (pure, tested in `test/station.test.ts`).
+- The Network desk: `apps/web/src/desk/` (`pages/Catalog.tsx`, `CatalogSeries.tsx`,
+  `CatalogItem.tsx`, …).
+
+**Missing**
+- The `Outlet` enum, an outlets list on `owner_permission`, `permission_record` and
+  `licence_record` rights, and on carriage `Terms` / agreements.
+- Network licences: no licensor, distributor, territory or end-date record exists (licence
+  records have no end date; only agreements end). A new table, with the items or programs it
+  covers.
+- The clearance function in `packages/domain`, and its three uses: `relayPicture` gets a third
+  case (`not_cleared`, the slate with "Airing on Opencast, channel 12.1"), the `via=iptv` variant
+  playlists swap to the slate's segments, and the log gets a quiet note.
+- End dates enforced in `fillDeadAir`, `templates.ts` `desiredFor`, and the log's warnings.
+- Territories need the viewer's country, but `geo.ts` keeps only the market. The other-apps
+  playlist request has an IP, so the country can be read there; relays have no viewer country
+  (treat a relay as worldwide).
+- The monthly licensor report from `as_run` (by station; by outlet from audience sessions'
+  platform and the new "Other apps" source), its desk page and CSV.
+
+**Files that change**
+- `packages/contracts/src/library.ts`, `catalog.ts`, a new `licences.ts`;
+  `packages/domain/src/clearance.ts` (new) and its tests.
+- `packages/db/src/schema/broadcast.ts`, `network.ts`, `catalog.ts` (+ migration): outlets columns
+  with the defaults the prompt gives, the licences table.
+- `playout/engine/relayBreaks.ts`, `sender.ts`, `playout/service.ts` (the iptv variant), the
+  iptv module, `log/service.ts` (notes, end-date warnings, fill), `log/templates.ts`.
+- A licensor report in `playout/service.ts` or a new `licences` module; desk pages.
+- `docs/open-decisions.md`: existing rows defaulting to `opencast` and `relays`.
 
 ## Phase 7
 
