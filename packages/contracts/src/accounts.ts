@@ -145,7 +145,13 @@ export const Reminder = z.object({
     station: StationIdent,
     listed: z.boolean(),
     logEntryId: Id.nullable(),
-    listedAiringId: Id.nullable()
+    listedAiringId: Id.nullable(),
+    /**
+     * Programming Phase 3 (added 2026-10-10): the episode, as the guide lists it ("Late Crate, ep.
+     * 14" is `title` Late Crate and this). A day template's Next episode slot names the real episode
+     * three weeks ahead. Absent or null: none (a listed meeting, a live block, a single item).
+     */
+    episodeTitle: z.string().nullable().optional()
   }),
   createdAt: Timestamp
 });

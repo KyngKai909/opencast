@@ -21,6 +21,7 @@ import { ROW_CODE_WORDS, rowLength, rowTime, type DayRow } from "./dayRows";
 import { handleRange, handleSpots, handleWords, memberNote, membershipChange, membershipWords, nudgeHandle, spotsIn, type HandleEdge, type HandleLimits } from "./blockHandles";
 import type { DraftEntry, DraftSpan } from "./logEdit";
 import { FIXED_WORDS, dropAfter, dropStart, endWithBreak, fixedReason, membershipNote, nudge, resizeTo, type Reflow } from "./reorder";
+import { nextEpisodeMark } from "./whatAirs";
 
 const MIN = 60_000;
 const t = (s: string) => Date.parse(s);
@@ -540,6 +541,11 @@ export function DayRundown({ rows, onAir, selected, onSelect, onFill, scrollTo, 
                   {now && <span className="cc-rr__tag">ON AIR</span>}
                   {edit && fixed && fixed !== "locked" && !row.removed && <span className="cc-rr__fixed">FIXED</span>}
                   {!edit && e.keepTime && <span className="cc-rr__fixed">KEPT</span>}
+                  {nextEpisodeMark(e) && !row.removed && (
+                    <span className="cc-rr__next" title={`From the ${e.templateSlot!.label} template`}>
+                      Next episode
+                    </span>
+                  )}
                 </b>
                 {state && <span className="oc-sr-only">, {state}</span>}
               </button>

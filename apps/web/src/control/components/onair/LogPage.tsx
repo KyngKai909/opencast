@@ -471,6 +471,14 @@ export function LogPage({ stationId, station, base, setup, canEdit = false, head
           </ul>
         </Notice>
       )}
+      {/* Programming Phase 3: day template warnings (a program's last new episode, a week ahead; an episode that would push a kept entry). */}
+      {!editing && (log.data?.warnings?.length ?? 0) > 0 && (
+        <ul className="cc-log__tplwarn" aria-label="From your templates">
+          {log.data!.warnings!.map((w) => (
+            <li key={`${w.code}:${w.slotId}:${w.date}`}>{w.message}</li>
+          ))}
+        </ul>
+      )}
       <div className="cc-log__split">
         <div className="cc-log__main">
           {rows.length ? (

@@ -304,4 +304,4 @@ Nothing in the code; it's research for `docs/iptv.md`.
   are started.
 - No Railway SSH: anything that needs staging (the worker's ffmpeg, counting items to re-prepare
   on real data) is a question to answer there, or a script to run there.
-- The next migration is `0063` (0061 is Phase 1, 0062 Phase 2).
+- The next migration is `0065` (0061 Phase 1, 0062 Phase 2, 0063 Phase 4, 0064 Phase 3).

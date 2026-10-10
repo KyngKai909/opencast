@@ -435,6 +435,13 @@
       "when": 1791591537729,
       "tag": "0063_suggested_break_points",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791595112215,
+      "tag": "0064_template_slots",
+      "breakpoints": true
     }
   ]
 }

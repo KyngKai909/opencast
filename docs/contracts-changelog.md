@@ -9,6 +9,20 @@ Additive, with migration 0063.
 - `library.ts`: `LibraryItem.suggestedBreakPoints` (optional, nullable): break points suggested for a program in the station's own library, found as its file was prepared, `{ source: "chapter" | "fade", pointsMs, previewUrl }`. Null when there are none to answer (none found, not looked for yet, already used or dismissed for this file, or the item has break points of its own). Never applied on their own.
 - `library.ts`: `answerBreakSuggestions` (`POST /library/:itemId/break-suggestions`, body `{ answer: "use" | "dismiss" }`, returns the `LibraryItem`). `use` makes them `breakPointsMs`; either answer ends them for this file. 409 `no_suggestions` when there are none to answer.
 
+## 2026-10-10: Template slots that air the next episode (programming Phase 3)
+
+Additive, with migration 0064.
+
+- `log.ts`:
+  - new `WhatAirs` (`this_episode`, `next_episode`, `fill`, `same_as`) with `WHAT_AIRS_WORDS` (each one's label and meaning), and `AtProgramEnd` (`start_over`, `stop`);
+  - `DayTemplateEntry.slotId` (optional): the slot's lasting id (`id` still changes on each save), and `whatAirs`, `programIds`, `order` (a `PlaybackOrder`), `atEnd`, `sameAsSlotId` (optional);
+  - `DayTemplateEntryInput` takes the same (`slotId`, `whatAirs`, `programIds` up to 20, `order`, `atEnd`, `sameAsSlotId`), each optional; for Next episode and Fill the slot `itemId` is optional. An entry sent without `slotId` (or with one that isn't the template's) is a new slot, whose walk starts afresh. Marathon on a slot with one program is refused (400);
+  - `DayTemplate.dates[].warnings` (optional) and `ProgramLog.warnings` (optional): new `TemplateWarning` (`last_episode`, `pushes_kept`; the template, slot, date, the airing's start and the words). The log lists a program's last new episode from a week before it;
+  - `LogEntry.templateSlot` (optional, nullable): the slot that made the entry (slot id, template, its name and label, the slot's start, what airs);
+  - new endpoint `previewTemplateSlot` (`POST /stations/:stationId/log/templates/:templateId/preview`, owner and operator): what a slot, saved or not, would air on the template's next dates (four by default), as `TemplateSlotPreview` (`dates`, `line`), and `slotPreviewLine`, the line's words for the apps and the mocks.
+- `accounts.ts`: `Reminder.airing.episodeTitle` (optional, nullable): the episode, as the guide lists it.
+- Behaviour: a template entry made before 2026-10-10 airs this episode, as before. Every entry a template makes names its slot; the day a template is built from becomes its slots' first airing.
+
 ## 2026-10-09: Cleaner pictures from prepare (programming Phase 1)
 
 Additive, with migration 0061.

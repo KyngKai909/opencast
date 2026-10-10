@@ -8,11 +8,14 @@
 // aired. A choice joins the draft (edit mode). Quick fill
 // fills dead air: repeat from the library, or sign off until the next program; with nothing
 // drafted it's written at once (`fillGap`) and the draft takes the new version, else it joins the
-// draft as inserts so one publish covers everything (decision 8).
+// draft as inserts so one publish covers everything (decision 8). Programming Phase 3: in a day
+// template (template mode) the library has "What airs" above it: This episode puts an item on, as
+// before; Next episode and Fill the slot list the programs, with the order as a select, and the
+// program chosen shows the preview line ("Next 4 Saturdays: ep. 13, 14, 15, 16") before it's added.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { catalogApi, libraryApi, logApi, stationsApi, type LibraryItem, type LogChange, type LogEntry } from "@opencast/contracts";
-import { Drawer, Field, SelectField, Tabs, clock, minutesText, snapTime, useToast } from "@opencast/ui";
+import { Button, Drawer, Field, Segmented, SelectField, Tabs, clock, minutesText, snapTime, useToast } from "@opencast/ui";
 import { useApi, useApiMutation } from "../../../api/hooks";
 import { now as clockNow, STATION_TZ } from "../../../lib/clock";
 import { stationLabel } from "../../station/slug";
@@ -22,6 +25,8 @@ import { itemOf } from "./LogEditor";
 import { wholeMinutes, type DraftItem } from "./logEdit";
 import { makeRoom, type Reflow } from "./reorder";
 import { airable, planRepeat } from "./repeat";
+import { previewEntry, useSlotPreview } from "./WhatAirs";
+import { WHAT_AIRS_OPTIONS, orderOptions, type PlaybackOrder, type SlotSetting, type WhatAirs } from "./whatAirs";
 
 const MIN = 60_000;
 const t = (s: string) => Date.parse(s);
@@ -129,8 +134,14 @@ export interface AddDrawerProps {
   loaded: LogEntry[];
   /** Nothing drafted: quick fill writes at once. */
   draftEmpty: boolean;
-  /** A choice joins the draft (and opens edit mode). */
-  onAdd: (changes: LogChange[], items: DraftItem[]) => void;
+  /** A choice joins the draft (and opens edit mode). In template mode, with what airs from the slot (left out: This episode). */
+  onAdd: (changes: LogChange[], items: DraftItem[], slot?: SlotSetting) => void;
+  /**
+   * Programming Phase 3: template mode (the template editor's drawer). What airs from a program
+   * added: This episode (an item, as on the log), Next episode or Fill the slot (a program, in an
+   * order), with the preview line. `startTime` is a moment's wall-clock time in the template.
+   */
+  template?: { id: string; startTime: (at: string) => string };
   /** Quick fill wrote to the log at once: the draft takes the new version. */
   onFilled: () => void;
   nextKey: () => string;
@@ -140,9 +151,13 @@ export interface AddDrawerProps {
   onClose: () => void;
 }
 
-export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd, onFilled, nextKey, highlight, base, onClose }: AddDrawerProps) {
+export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd, onFilled, nextKey, highlight, base, onClose, template }: AddDrawerProps) {
   const toast = useToast();
   const [tab, setTab] = useState<AddTab>("library");
+  // Programming Phase 3 (template mode): what airs from a program added, and the program chosen.
+  const [airs, setAirs] = useState<WhatAirs>("this_episode");
+  const [order, setOrder] = useState<PlaybackOrder>("in_order");
+  const [chosen, setChosen] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   // The first few, then all of them: quick fill stays in view below a short list.
   const [all, setAll] = useState(false);
@@ -216,6 +231,56 @@ export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd,
     onClose();
   };
 
+  // Programming Phase 3 (template mode): a program's slot, airing its next episode(s). Its length:
+  // the program's longest episode (Next episode), or the space (Fill the slot, an hour with no end).
+  const walkPrograms = (library.data?.programs ?? []).filter((p) => !p.live && items.some((i) => i.programId === p.id));
+  const episodesOf = (programId: string) => items.filter((i) => i.programId === programId).sort((a, b) => (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) || (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0));
+  const slotLength = (programId: string) =>
+    airs === "fill" ? (free !== Infinity && free >= MIN ? Math.floor(free / MIN) * MIN : 60 * MIN) : wholeMinutes(Math.max(MIN, ...episodesOf(programId).map((i) => i.durationMs ?? 0)));
+  const chosenProgram = template && airs !== "this_episode" ? walkPrograms.find((p) => p.id === chosen) : undefined;
+  const chosenSetting: SlotSetting | null = chosenProgram ? { whatAirs: airs, programIds: [chosenProgram.id], order, atEnd: "start_over", sameAsSlotId: null } : null;
+  const preview = useSlotPreview(
+    stationId,
+    template?.id ?? null,
+    chosenProgram && chosenSetting && template ? previewEntry({ startTime: template.startTime(space.at), lengthMs: slotLength(chosenProgram.id), itemId: episodesOf(chosenProgram.id)[0]?.id }, chosenSetting) : null
+  );
+  const addSlot = () => {
+    if (!chosenProgram || !chosenSetting) return;
+    const first = episodesOf(chosenProgram.id)[0];
+    if (!first) return;
+    const length = slotLength(chosenProgram.id);
+    const endsAt = iso(t(space.at) + length);
+    onAdd(
+      [{ op: "insert", key: nextKey(), entry: { kind: "program", startsAt: space.at, endsAt, itemId: first.id, programId: chosenProgram.id } }, ...makeRoom(reflow, space.at, length)],
+      [{ ...itemOf(first), title: chosenProgram.title }],
+      chosenSetting
+    );
+  };
+  const whatAirs = template && (
+    <div className="cc-whatairs">
+      <Segmented
+        label="What airs"
+        size="sm"
+        options={WHAT_AIRS_OPTIONS.filter((o) => o.value !== "same_as")}
+        value={airs}
+        onChange={(v) => {
+          setAirs(v);
+          setChosen(null);
+        }}
+        className="cc-whatairs__seg"
+      />
+      {airs !== "this_episode" && (
+        <SelectField label="Order" size="sm" value={order} onChange={(e) => setOrder(e.target.value as PlaybackOrder)} help={orderOptions(1).find((o) => o.value === order)?.meaning}>
+          {orderOptions(1).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </SelectField>
+      )}
+    </div>
+  );
+
   const quick = (
     <div className="cc-quick">
       {space.gap && space.endsAt && (
@@ -278,8 +343,42 @@ export function AddDrawer({ stationId, space, reflow, loaded, draftEmpty, onAdd,
         className="cc-add__tabs"
       />
       <div id="cc-add-panel" role="tabpanel" className="cc-add__panel">
-        {tab === "library" && (
+        {tab === "library" && template && airs !== "this_episode" && (
           <>
+            {whatAirs}
+            {walkPrograms.length ? (
+              <ul className="cc-picks" aria-label="Your programs">
+                {walkPrograms.map((p) => (
+                  <li key={p.id} className={p.id === chosen ? "cc-pick cc-pick--hl" : "cc-pick"}>
+                    <button type="button" onClick={() => setChosen(p.id)} aria-pressed={p.id === chosen}>
+                      <span className="cc-pick__th" style={{ "--cc-pc": colourOf(p.id) ?? "var(--ink-70)" } as never} aria-hidden="true" />
+                      <span className="cc-pick__w">
+                        <b>{p.title}</b>
+                        <small>{fitOf(slotLength(p.id), space, reflow, false).line}</small>
+                      </span>
+                      <span className="cc-fitb cc-fitb--next">{airs === "fill" ? "Fill the slot" : "Next episode"}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="cc-log__quiet">{library.isLoading ? null : "No programs with episodes that can air yet."}</p>
+            )}
+            {chosenProgram && (
+              <div className="cc-whatairs">
+                <p className={preview.error ? "cc-log__err" : "cc-whatairs__preview"} aria-live="polite">
+                  {preview.error?.message ?? preview.data?.line ?? " "}
+                </p>
+                <Button size="sm" variant="ink" onClick={addSlot}>
+                  Add {chosenProgram.title}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+        {tab === "library" && (!template || airs === "this_episode") && (
+          <>
+            {whatAirs}
             <Field label="Search your library" size="sm" value={query} onChange={(e) => setQuery(e.target.value)} className="cc-add__search" />
             {shown.length ? (
               <ul ref={list} className="cc-picks" aria-label="Your library">

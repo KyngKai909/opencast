@@ -6,7 +6,9 @@
 // or dead air), edited with the day's own rows, drawer and block handles (templateDraft.ts). The
 // tray says what each change does and what blocks saving, checked here (a template has no dry run),
 // and Save replaces the template's entries and blocks at once, then says how many dates were
-// rebuilt and how many edited ones kept. Leaving with unsaved changes asks first.
+// rebuilt and how many edited ones kept. Leaving with unsaved changes asks first. Programming
+// Phase 3: a program picked has "What airs" under it (WhatAirs.tsx); a changed one is a line in the
+// tray, and saving sends each entry's slot id back, so a Next episode slot's walk carries on.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { StationIdent } from "@opencast/contracts";
@@ -24,7 +26,9 @@ import { blockWords, dayRows } from "./dayRows";
 import { itemOf, AddBlockDialog, EntrySection, SpanSection } from "./LogEditor";
 import { draftEntries, draftSpans, insertId, isBlockChange, newSpanId, withChange, type DraftEntry, type DraftItem } from "./logEdit";
 import { edgesOf, fixedReason, type Reflow } from "./reorder";
-import { BLOCK_CROSSES_DAY, blocksInput, checkTemplate, dayEndOf, entriesInput, minuteBreaks, placeOn, templateEntries, templateSpans } from "./templateDraft";
+import { BLOCK_CROSSES_DAY, blocksInput, checkTemplate, dayEndOf, entriesInput, minuteBreaks, placeOn, templateEntries, templateSpans, wallClockOf } from "./templateDraft";
+import { WhatAirsSection } from "./WhatAirs";
+import { earlierSlots, sameSetting, settingLine, settingOf, settingProblem, type SlotSetting } from "./whatAirs";
 import { monthDate, referenceDate, resetLine, saveCounts, savedLine, shortDate, templateName } from "./templates";
 import { RepeatDialog, StopDialog } from "./RepeatDay";
 import { broadcastDay, isoDate } from "./time";
@@ -37,6 +41,8 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
   const qc = useQueryClient();
   const [changes, setChanges] = useState<LogChange[]>([]);
   const [items, setItems] = useState<Record<string, DraftItem>>({});
+  // Programming Phase 3: What airs, changed, by the draft's entry id (a slot isn't a log change).
+  const [slots, setSlots] = useState<Record<string, SlotSetting>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const keys = useRef(0);
@@ -46,6 +52,7 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
   useEffect(() => {
     setChanges([]);
     setItems({});
+    setSlots({});
     setSaveError(null);
   }, [template.id]);
 
@@ -69,6 +76,17 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
   );
   const dayEnd = dayEndOf(date);
   const check = useMemo(() => checkTemplate({ changes, before: base, after: entries, spansBefore: baseSpans, spansAfter: spans, dayEnd }), [changes, base, entries, baseSpans, spans, dayEnd]);
+  // Programming Phase 3: each program's What airs (the draft's, else as saved), and its tray lines.
+  const settingFor = (e: Pick<DraftEntry, "id">): SlotSetting => {
+    const saved = template.entries.find((x) => x.id === e.id);
+    return slots[e.id] ?? (saved ? settingOf(saved) : settingOf({ programId: null }));
+  };
+  const programTitle = (id: string) => library.data?.programs.find((p) => p.id === id)?.title;
+  const slotTitle = (slotId: string) => template.entries.find((x) => x.slotId === slotId)?.title;
+  const slotLines = Object.entries(slots).flatMap(([id, s]) => {
+    const e = entries.find((x) => x.id === id);
+    return e ? [{ id, line: settingLine(e.title, s, programTitle, slotTitle), problem: settingProblem(s) }] : [];
+  });
   // Rows and spans with a problem, to mark on the rundown.
   const troubled = new Set(
     check.problems.flatMap((p) => {
@@ -92,6 +110,24 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
     dayEnd,
     saving,
     saveError,
+    /** Programming Phase 3: What airs. */
+    slots,
+    slotLines,
+    settingFor,
+    /** How many changes the draft has: the rundown's and What airs'. */
+    count: changes.length + slotLines.length,
+    setSlot(e: Pick<DraftEntry, "id">, s: SlotSetting) {
+      setSaveError(null);
+      const saved = template.entries.find((x) => x.id === e.id);
+      setSlots((x) => {
+        const { [e.id]: _was, ...rest } = x;
+        // Back to how it's saved: no change.
+        return saved && sameSetting(settingOf(saved), s) ? rest : { ...rest, [e.id]: s };
+      });
+    },
+    dropSlot(id: string) {
+      setSlots(({ [id]: _was, ...rest }) => rest);
+    },
     /** Nothing in a template is on air: nothing's locked. */
     locked: (_e: Pick<DraftEntry, "id" | "startsAt" | "endsAt">): string | null => null,
     add(change: LogChange | LogChange[], item?: DraftItem | DraftItem[]) {
@@ -117,6 +153,7 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
     discard() {
       setChanges([]);
       setItems({});
+      setSlots({});
       setSaveError(null);
     },
     /** One `updateTemplate`: the entries and blocks as the draft leaves them. */
@@ -124,10 +161,12 @@ export function useTemplateEdit({ stationId, template, date, carriedFrom }: { st
       setSaving(true);
       setSaveError(null);
       try {
-        const r = await call(logApi.updateTemplate, { params: { stationId, templateId: template.id }, body: { entries: entriesInput(entries, template), blocks: blocksInput(spans) } });
+        const r = await call(logApi.updateTemplate, { params: { stationId, templateId: template.id }, body: { entries: entriesInput(entries, template, (e) => slots[e.id] ?? null), blocks: blocksInput(spans) } });
         await Promise.all([...LOG_READS, logApi.getTemplate, blocksApi.listBlocks, blocksApi.getBlock].map((e) => qc.invalidateQueries({ queryKey: [e.method, e.path] })));
+        await qc.invalidateQueries({ queryKey: ["slot-preview", stationId] });
         setChanges([]);
         setItems({});
+        setSlots({});
         return r;
       } catch (e) {
         setSaveError(e instanceof ApiError && e.code === "block_crosses_day" ? BLOCK_CROSSES_DAY : e instanceof Error ? e.message : "That didn't save. Try again.");
@@ -149,12 +188,14 @@ export function templateTrayTitle(count: number, problems: number): string {
 
 /** The tray at the foot of a template being edited: its changes, what blocks saving, what saving does. */
 function TemplateTray({ edit, counts, onSave }: { edit: TemplateEdit; counts: string; onSave: () => void }) {
-  if (!edit.changes.length) return null;
-  const { lines, problems } = edit.check;
+  if (!edit.count) return null;
+  const { lines } = edit.check;
+  // Programming Phase 3: a What airs that misses something blocks saving too.
+  const problems = [...edit.check.problems.map((p) => p.message), ...edit.slotLines.flatMap((s) => (s.problem ? [s.problem] : []))];
   return (
     <section className="cc-tray" aria-label="Your changes" role="region">
       <div className="cc-tray__body">
-        <b aria-live="polite">{templateTrayTitle(edit.changes.length, problems.length)}</b>
+        <b aria-live="polite">{templateTrayTitle(edit.count, problems.length)}</b>
         <ul className="cc-tray__lines">
           {lines.map((l) => (
             <li key={l.index}>
@@ -164,9 +205,17 @@ function TemplateTray({ edit, counts, onSave }: { edit: TemplateEdit; counts: st
               </button>
             </li>
           ))}
+          {edit.slotLines.map((l) => (
+            <li key={`slot:${l.id}`}>
+              <span>{l.line}</span>
+              <button type="button" className="cc-tray__undo" onClick={() => edit.dropSlot(l.id)} aria-label={`Undo: ${l.line}`}>
+                Undo
+              </button>
+            </li>
+          ))}
           {problems.map((p, i) => (
             <li key={`p${i}`} className="cc-tray__problem">
-              {p.message}
+              {p}
             </li>
           ))}
         </ul>
@@ -228,7 +277,7 @@ export function TemplateEditor({ stationId, callSign, template, base, canEdit, e
   const [saved, setSaved] = useState<string | null>(null);
   const [repeat, setRepeat] = useState<"change" | "stop" | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const dirty = edit.changes.length > 0;
+  const dirty = edit.count > 0;
   const guard = useLeaveGuard(dirty, edit.discard, { title: "Leave without saving?", subtitle: `Your changes to ${templateName(template)} haven't been saved. Leaving drops them.` });
   useEffect(() => {
     if (editing && addBlock) setAddingBlock(true);
@@ -418,7 +467,27 @@ export function TemplateEditor({ stationId, callSign, template, base, canEdit, e
         {editing && (
           <aside className="cc-log__pane" aria-label="The row picked">
             {pickedEntry ? (
-              <EntrySection edit={edit} entry={pickedEntry} base={base} place="template" onAdd={(at) => setAdding(spaceAt(at))} onClose={() => setPicked(null)} />
+              <>
+                <EntrySection edit={edit} entry={pickedEntry} base={base} place="template" onAdd={(at) => setAdding(spaceAt(at))} onClose={() => setPicked(null)} />
+                {/* Programming Phase 3: what airs from the slot, under the program. A carried program airs what its agreement sends. */}
+                {pickedEntry.kind === "program" && !pickedEntry.carriageAgreementId && (
+                  <WhatAirsSection
+                    stationId={stationId}
+                    templateId={template.id}
+                    slot={{
+                      startTime: wallClockOf(pickedEntry.startsAt),
+                      lengthMs: Math.max(MIN, t(pickedEntry.endsAt) - t(pickedEntry.startsAt)),
+                      itemId: pickedEntry.itemId,
+                      programId: pickedEntry.programId,
+                      slotId: template.entries.find((x) => x.id === pickedEntry.id)?.slotId ?? null
+                    }}
+                    setting={edit.settingFor(pickedEntry)}
+                    programs={(edit.library?.programs ?? []).filter((p) => !p.live)}
+                    earlier={earlierSlots(template.entries, wallClockOf(pickedEntry.startsAt))}
+                    onChange={(s) => edit.setSlot(pickedEntry, s)}
+                  />
+                )}
+              </>
             ) : pickedSpanRow ? (
               <SpanSection edit={edit} span={pickedSpanRow} onAir={false} place="template" onClose={() => setPickedSpan(null)} />
             ) : (
@@ -462,8 +531,12 @@ export function TemplateEditor({ stationId, callSign, template, base, canEdit, e
           reflow={reflow}
           loaded={edit.entries}
           draftEmpty={false}
-          onAdd={(changes, items) => {
+          template={{ id: template.id, startTime: (at) => wallClockOf(at) }}
+          onAdd={(changes, items, slot) => {
             edit.add(changes, items);
+            // Programming Phase 3: a slot added as Next episode or Fill the slot.
+            const insert = changes.find((c) => c.op === "insert");
+            if (slot && insert?.op === "insert" && insert.key) edit.setSlot({ id: insertId(insert.key) }, slot);
             setAdding(null);
           }}
           onFilled={() => undefined}
@@ -493,7 +566,7 @@ export function TemplateEditor({ stationId, callSign, template, base, canEdit, e
           onClose={() => setLeaving(false)}
           width={420}
           title="Leave without saving?"
-          subtitle={`${edit.changes.length === 1 ? "1 change" : `${edit.changes.length} changes`} to ${templateName(template)} haven't been saved. Leaving drops them.`}
+          subtitle={`${edit.count === 1 ? "1 change" : `${edit.count} changes`} to ${templateName(template)} haven't been saved. Leaving drops them.`}
           footer={
             <>
               <Button onClick={() => setLeaving(false)}>Keep editing</Button>
