@@ -6,13 +6,15 @@
 // added by the lead) the other-apps playlists read it. And the licensor's monthly minutes, from the
 // as-run log.
 
-import { eq, inArray, or } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, or } from "drizzle-orm";
 import { schema } from "@opencast/db";
 import { outletsWithOpencast, type LicensorMinutes, type NetworkLicence, type NetworkLicenceInput, type Outlet, type StationIdent } from "@opencast/contracts";
-import { clearance as decide, dateIn, type Clearance, type ClearanceLicence } from "@opencast/domain";
+import { clearance as decide, dateIn, licenceEnding, type Clearance, type ClearanceLicence } from "@opencast/domain";
 import type { ModuleContext } from "../../context.js";
 import type { CurrentUser } from "../../http.js";
 import { badRequest, notFound } from "../../errors.js";
+import { clockTime } from "../../lib/time.js";
+import { dayWords } from "../log/templates.js";
 
 const L = schema.networkLicences;
 const C = schema.networkLicenceCovers;
@@ -49,6 +51,13 @@ export interface LicencesService {
   /** The licensor's monthly report (`month` "2026-10"; this month by default). */
   minutes(user: CurrentUser, licenceId: string, month?: string): Promise<LicensorMinutes>;
   minutesCsv(user: CurrentUser, licenceId: string, month?: string): Promise<{ filename: string; csv: string }>;
+  /**
+   * P6.8, from the jobs' hourly pass: when a licence comes within two weeks of its last day (the
+   * log's warning, the same rule), each station with something it covers on its log tells its
+   * owners once, and the Network desk hears once per licence. A licence whose end moves is told
+   * about again near its new end.
+   */
+  tellEnding(): Promise<{ stations: number; desk: number }>;
 }
 
 /** The deal as columns. */
@@ -377,7 +386,153 @@ export function createLicencesService(ctx: ModuleContext): LicencesService {
       ];
       const slug = report.licensor.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "licence";
       return { filename: `minutes-${slug}-${report.month}.csv`, csv: lines.map((l) => l.map(cell).join(",")).join("\n") + "\n" };
+    },
+
+    async tellEnding() {
+      const now = deps.clock.now();
+      // A day either side of the desk's calendar (UTC) takes in every station's own.
+      const near = await db
+        .select()
+        .from(L)
+        .where(and(gte(L.endsOn, dateIn(new Date(now.getTime() - DAY))), lte(L.endsOn, dateIn(new Date(now.getTime() + (LICENCE_WARNING_DAYS + 1) * DAY)))));
+      if (!near.length) return { stations: 0, desk: 0 };
+      const covers = await db.select().from(C).where(inArray(C.licenceId, near.map((l) => l.id)));
+      // What they cover: single items, and every episode of a program.
+      const programIds = [...new Set(covers.flatMap((c) => (c.programId ? [c.programId] : [])))];
+      const [episodes, singles] = await Promise.all([Promise.all(programIds.map((id) => services.library.episodes(id))), services.library.itemsByIds(covers.flatMap((c) => (c.assetId ? [c.assetId] : [])))]);
+      const items = new Map([...episodes.flat(), ...singles.values()].map((i) => [i.id, i]));
+      const entries = await services.log.upcomingOfItems([...items.keys()], now);
+      // Every licence covering each item on a log: one ending matters only when none runs on past it.
+      const covering = await service.covering([...new Set(entries.map((e) => e.itemId))].map((id) => ({ id, programId: items.get(id)?.programId ?? null })));
+      const zones = new Map<string, string>();
+      const byStation = new Map<string, { licence: ClearanceLicence; stationId: string; timeZone: string; entries: typeof entries }>();
+      for (const e of entries) {
+        if (!zones.has(e.stationId)) zones.set(e.stationId, await services.stations.timezoneOf(e.stationId));
+        const timeZone = zones.get(e.stationId)!;
+        // The log's warning: the last day any of them airs it is within two weeks, where the station is.
+        const ending = licenceEnding(covering.get(e.itemId) ?? [], { at: now, timeZone, days: LICENCE_WARNING_DAYS });
+        if (!ending) continue;
+        const key = `licence-ending:${ending.id}:${ending.endsOn}:${e.stationId}`;
+        const found = byStation.get(key) ?? { licence: ending, stationId: e.stationId, timeZone, entries: [] };
+        found.entries.push(e);
+        byStation.set(key, found);
+      }
+      const deskKey = (l: typeof L.$inferSelect) => `licence-ending:${l.id}:${l.endsOn}:desk`;
+      const deskDue = near.filter((l) => licenceEnding([asClearance(l)], { at: now, days: LICENCE_WARNING_DAYS }));
+      const told = await services.notifications.told([...byStation.keys(), ...deskDue.map(deskKey)]);
+      const stationIds = [...new Set([...byStation.values()].map((f) => f.stationId))];
+      const [idents, titles] = await Promise.all([
+        services.stations.idents(stationIds),
+        services.library.titles({ itemIds: covers.flatMap((c) => (c.assetId ? [c.assetId] : [])), programIds: [...new Set([...programIds, ...[...items.values()].flatMap((i) => (i.programId ? [i.programId] : []))])] })
+      ]);
+      const stationName = (id: string) => {
+        const ident = idents.get(id);
+        return ident ? `${ident.callSign ?? ident.name}${ident.channel ? ` ${ident.channel}` : ""}` : "your station";
+      };
+      // The program's name, or the item's own title.
+      const nameOf = (itemId: string) => {
+        const item = items.get(itemId);
+        return (item?.programId ? titles.programs.get(item.programId) : undefined) ?? item?.title ?? "An item";
+      };
+      const entryLine = (e: (typeof entries)[number], tz: string) => {
+        const item = items.get(e.itemId);
+        const program = item?.programId ? titles.programs.get(item.programId) : undefined;
+        return `${program && item?.episodeNumber != null ? `${program}, ep. ${item.episodeNumber}` : (item?.title ?? "An item")}, ${dayWords(dateIn(e.startsAt, tz))} at ${clockTime(e.startsAt, tz)}`;
+      };
+
+      let stations = 0;
+      for (const [key, f] of byStation) {
+        if (told.has(key)) continue;
+        const owners = await services.accounts.stationMemberIds(f.stationId, ["owner"]);
+        if (!owners.length) continue;
+        const letter = endingLetter({
+          licensor: f.licence.licensor,
+          endsOn: f.licence.endsOn,
+          station: stationName(f.stationId),
+          names: [...new Set(f.entries.map((e) => nameOf(e.itemId)))],
+          lines: f.entries.map((e) => ({ line: entryLine(e, f.timeZone), after: dateIn(e.startsAt, f.timeZone) > f.licence.endsOn }))
+        });
+        await services.notifications.notify(owners, {
+          kind: "licence_ending",
+          title: letter.title,
+          body: letter.body,
+          link: `/stations/${f.stationId}/log`,
+          scope: { kind: "station", id: f.stationId },
+          dedupeKey: key,
+          action: "Open the log",
+          footer: "Opencast sends this once for each licence, to the owners of stations with something it covers on their log."
+        });
+        stations++;
+      }
+
+      let desk = 0;
+      const admins = deskDue.some((l) => !told.has(deskKey(l))) ? await services.accounts.adminIds() : [];
+      for (const l of deskDue) {
+        if (told.has(deskKey(l)) || !admins.length) continue;
+        const covered = covers
+          .filter((c) => c.licenceId === l.id)
+          .map((c) => (c.programId ? titles.programs.get(c.programId) : titles.items.get(c.assetId!)))
+          .filter((t): t is string => Boolean(t))
+          .sort((a, b) => a.localeCompare(b));
+        const on = [...new Set([...byStation.values()].filter((f) => f.licence.id === l.id).map((f) => stationName(f.stationId)))];
+        const letter = deskEndingLetter({ licensor: l.licensor, name: l.name, endsOn: l.endsOn, covered, stations: on });
+        await services.notifications.notify(admins, {
+          kind: "licence_ending",
+          title: letter.title,
+          body: letter.body,
+          link: `/desk/licences/${l.id}`,
+          scope: { kind: "station", id: null },
+          dedupeKey: deskKey(l),
+          action: "Open the licence",
+          footer: "You're getting this because you're on Opencast's Network desk."
+        });
+        desk++;
+      }
+      return { stations, desk };
     }
   };
   return service;
+}
+
+/** "Prairie Westerns", "Prairie Westerns and High Noon", "A, B and 2 more". */
+function listWords(names: string[], more = "more"): string {
+  if (names.length <= 1) return names[0] ?? "";
+  if (names.length <= 3) return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} ${more}`;
+}
+
+/** The most entries a station's letter lists; the rest are counted. */
+const LINES_LISTED = 6;
+
+/** P6.8's letter to a station's owners: what the licence covers on their log, and its last day. */
+export function endingLetter(input: { licensor: string; endsOn: string; station: string; names: string[]; lines: Array<{ line: string; after: boolean }> }): { title: string; body: string } {
+  const day = dayWords(input.endsOn);
+  const one = input.names.length === 1;
+  const listed = input.lines.slice(0, LINES_LISTED).map((l) => (l.after ? `${l.line}, after the end` : l.line));
+  const left = input.lines.length - listed.length;
+  const after = input.lines.some((l) => l.after);
+  return {
+    title: one ? `${input.names[0]} comes off the air after ${day}` : `${input.names.length} programs on your log come off the air after ${day}`,
+    body: [
+      `Opencast's licence from ${input.licensor} for ${listWords(input.names)} ends ${day}. ${one ? "It" : "They"} can't air on ${input.station} after that day.`,
+      `On your log:\n${listed.join("\n")}${left ? `\nand ${left} more` : ""}`,
+      after ? `What's on the log after ${day} won't air: station ID and bumpers air in its place. Replace it when you can.` : `Nothing on your log is after ${day}. The log won't take ${one ? "it" : "them"} after that day.`
+    ].join("\n\n")
+  };
+}
+
+/** P6.8's letter to the Network desk: the licence, what it covers, and the stations airing it. */
+export function deskEndingLetter(input: { licensor: string; name: string | null; endsOn: string; covered: string[]; stations: string[] }): { title: string; body: string } {
+  const day = dayWords(input.endsOn);
+  const subject = input.name ? `${input.name}, from ${input.licensor},` : "It";
+  return {
+    title: `The licence from ${input.licensor} ends ${day}`,
+    body: [
+      input.covered.length
+        ? `${subject} covers ${listWords(input.covered)}. Unless another licence covers ${input.covered.length === 1 ? "it, it's" : "them, they're"} off the air after ${day}.`
+        : `${subject} covers nothing now. It ends ${day}.`,
+      input.stations.length ? `Something it covers is on the log at ${listWords(input.stations, "other stations")}. ${input.stations.length === 1 ? "Its" : "Their"} owners have been told.` : "Nothing it covers is on a station's log.",
+      "If the deal goes on, change its last day on the licence's page."
+    ].join("\n\n")
+  };
 }

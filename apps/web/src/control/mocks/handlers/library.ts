@@ -3,7 +3,7 @@
 
 import { http } from "msw";
 import { blockById } from "../blocks";
-import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
+import { IDENT_LEGACY_CODE, isIdentCode, libraryApi, Outlet, outletsWithOpencast, type GeneratedStationId, type LibraryItem, type Program } from "@opencast/contracts";
 import { now } from "../../../lib/clock";
 import { inWindow } from "../../components/live/bumpers";
 import { dbStation, getDb, membership, saveDb, stationLog } from "../db";
@@ -415,7 +415,10 @@ export const libraryHandlers = [
     if (denied) return denied;
     const parsed = libraryApi.confirmRights.body.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return fail(400, "choose", "Choose which of the three is true.");
-    item.rights = { basis: parsed.data.basis, confirmedBy: p.displayName ?? p.email, confirmedAt: now().toISOString(), note: parsed.data.note ?? null };
+    // Programming Phase 6 (P6.13), as the API: made it and public domain go everywhere; the owner's
+    // permission where it allows (opencast always; opencast and relays when not said).
+    const outlets = parsed.data.basis === "owner_permission" ? outletsWithOpencast(parsed.data.outlets) : [...Outlet.options];
+    item.rights = { basis: parsed.data.basis, confirmedBy: p.displayName ?? p.email, confirmedAt: now().toISOString(), note: parsed.data.note ?? null, outlets };
     saveDb();
     return reply(libraryApi.getItem.response, withProbe(item));
   }),

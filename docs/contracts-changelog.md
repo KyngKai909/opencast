@@ -2,6 +2,13 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Where it can air, the emails (programming Phase 6, P6.1 and P6.8)
+
+Additive, no migration.
+
+- `notifications.ts`: `NoticeKind` gains `carriage_outlets` (station owners, once per station: carriers can send its carried programs to their relays unless the maker turns it off; email on, push off) and `licence_ending` (station owners, once per licence and last day: a network licence for something on the log ends within two weeks; the Network desk, once per licence; push and email on).
+- Behaviour: both come from the jobs' hourly pass. `confirmRights`'s `outlets` (2026-10-10) is now sent by master control's Rights dialog for the owner's permission (P6.13).
+
 ## 2026-10-10: Other apps viewers on per-thousand spots (programming Phase 5, P5.1)
 
 Additive, with migration 0066.

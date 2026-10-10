@@ -217,6 +217,8 @@ export interface LogService {
   entrySpan(entryId: string): Promise<{ startsAt: Date; endsAt: Date } | null>;
   /** Every station's items on the log in a window, earliest first (the readiness check reads ahead). */
   upcomingItems(from: Date, to: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
+  /** Programming Phase 6 (P6.8): every station's program entries of these items still to air after `from`, earliest first. */
+  upcomingOfItems(itemIds: string[], from: Date): Promise<Array<{ stationId: string; entryId: string; itemId: string; startsAt: Date }>>;
   /** Takes an item off every log from now on (a rights claim). Returns what was pulled per station. */
   pullItem(itemId: string): Promise<Array<{ stationId: string; entries: number }>>;
   markBreakFilled(breakId: string): Promise<void>;
@@ -2087,6 +2089,16 @@ export function createLogService(ctx: ModuleContext): LogService {
         .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt })
         .from(E)
         .where(and(sql`${E.assetId} is not null`, gt(E.endsAt, from), lt(E.startsAt, to)))
+        .orderBy(asc(E.startsAt));
+      return rows.map((r) => ({ ...r, itemId: r.itemId! }));
+    },
+
+    async upcomingOfItems(itemIds, from) {
+      if (!itemIds.length) return [];
+      const rows = await db
+        .select({ stationId: E.stationId, entryId: E.id, itemId: E.assetId, startsAt: E.startsAt })
+        .from(E)
+        .where(and(eq(E.kind, "program"), inArray(E.assetId, [...new Set(itemIds)]), gt(E.endsAt, from)))
         .orderBy(asc(E.startsAt));
       return rows.map((r) => ({ ...r, itemId: r.itemId! }));
     },

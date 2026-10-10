@@ -45,7 +45,7 @@ export interface Harness {
   db: Deps["db"];
   clock: { set(iso: string): void; now(): Date; advance(ms: number): void };
   /** Pushes and emails sent, in order (an email's link, idempotency key and words too). */
-  sent: Array<{ channel: "push" | "email"; to: string; title: string; link?: string | null; key?: string; body?: string }>;
+  sent: Array<{ channel: "push" | "email"; to: string; title: string; link?: string | null; key?: string; body?: string; action?: string; footer?: string }>;
   /** Linked accounts Privy would report for a did. */
   linked: Map<string, LinkedAccount[]>;
   /** Clear cross-app accounts Privy would report for a did, and the access Clear grants. */
@@ -130,7 +130,7 @@ export async function createHarness(
     payments: options.payments ? options.payments(clock) : fakePayments(clock),
     notifier: {
       push: async (userId, n) => void sent.push({ channel: "push", to: userId, title: n.title }),
-      email: async (to, n) => void sent.push({ channel: "email", to, title: n.title, link: n.link, key: n.key, body: n.body })
+      email: async (to, n) => void sent.push({ channel: "email", to, title: n.title, link: n.link, key: n.key, body: n.body, action: n.action, footer: n.footer })
     },
     bus: new EventBus(),
     clock,
