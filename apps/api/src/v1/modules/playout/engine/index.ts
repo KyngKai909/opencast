@@ -41,7 +41,7 @@ import { createLiveCopier, liveCopyCounter, type LiveCopyStats } from "./livecop
 import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
-import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
+import { baseKey, createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
 import { ffmpegBreakFinder, type BreakFinder } from "./breaks.js";
 import { ELSEWHERE_SECONDS, elsewhereSlateKey, GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
 import { clockTime } from "../../../lib/time.js";
@@ -125,8 +125,15 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     log
   });
   const bands = new Map<string, Band>();
+  /** What the run sheets found not prepared (by key), and the stations planned without it. */
+  const waitingOn = new Map<string, Set<string>>();
   const planner = createPlanner(ctx, {
-    isReady: (ref, stationId) => preparer.isReady(ref, bands.get(stationId) ?? "tv"),
+    isReady: (ref, stationId) => {
+      const ready = preparer.isReady(ref, bands.get(stationId) ?? "tv");
+      const key = ready ? null : refKey(ref);
+      if (key) waitingOn.set(key, (waitingOn.get(key) ?? new Set<string>()).add(stationId));
+      return ready;
+    },
     // A generated station ID that isn't prepared (a new station, or its look changed): queued now.
     wantGenerated: (spec) => preparer.generated(spec)
   });
@@ -165,9 +172,16 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
   let ingestListening: Promise<unknown> | null = null;
   let ingestTriedAt = 0;
 
-  // A program that just became ready airs from its next segment boundary: plan again.
+  // A program that just became ready airs from its next segment boundary: the stations whose run
+  // sheets went without it plan again (a newer copy, `-p2`, for those waiting on the first). Only
+  // those: since 2026-10-10, not every station for anything prepared (another station's
+  // generated ID, a slate).
   preparer.onReady((key) => {
-    if (!key.startsWith("slate-")) for (const a of assemblers.values()) a.replan();
+    for (const k of new Set([key, baseKey(key)])) {
+      const stations = waitingOn.get(k);
+      waitingOn.delete(k);
+      for (const id of stations ?? []) assemblers.get(id)?.replan();
+    }
   });
 
   async function bandOf(stationIds: string[]) {

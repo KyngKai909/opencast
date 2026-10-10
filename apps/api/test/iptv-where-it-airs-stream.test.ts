@@ -94,9 +94,9 @@ beforeAll(async () => {
   engine = createEngine({ deps: h.deps, services: h.services }, { ladderScale: 0.1, preset: "ultrafast", log: () => undefined });
   // The readiness check queues the programs and, for the carried one, the other apps' slates.
   await engine.sweep();
-  // Every station's generated station ID, opener and closer too, so nothing becomes ready (and replans the channel) while it airs.
-  await engine.queueGeneratedIds();
-  await engine.queueGeneratedIdents();
+  // (The other station's generated station ID is queued by the engine's first tick and becomes
+  // ready while the channel airs: this one's run sheet never went without it, so it isn't planned
+  // again.)
   await prepareQueued(h, engine.preparer);
 }, 150_000);
 
