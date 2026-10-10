@@ -583,7 +583,7 @@ For the user's decision. Built as recommended below.
 
 ## The dial in other apps, programming Phase 5 (2026-10-10)
 
-**Decided (the user, 2026-10-10):** every recommendation below as given, except P5.1: Other apps viewers count toward per-thousand spots wherever they can be properly attributed (a run of polls covering the spot; a local business only for sessions placed in its area), as relay viewers already do. Built after Phase 6: P5.12 to P5.14 say how.
+**Decided (the user, 2026-10-10):** every recommendation below as given, except P5.1: Other apps viewers count toward per-thousand spots wherever they can be properly attributed (a run of polls covering the spot; a local business only for sessions placed in its area), as relay viewers already do. Built: P5.12 to P5.14 say how, and the user took their recommendations as given (2026-10-10).
 
 For the user's decision. Built as recommended below. What the files hold is in `docs/iptv.md`.
 
