@@ -690,6 +690,13 @@ export const logEntries = broadcast.table(
      * master control stops here, and a live block ending early doesn't move it up.
      */
     keepTime: boolean("keep_time").notNull().default(false),
+    /**
+     * Programming Phase 3 (migration 0063): the template slot that made it (`day_template_entries.slot_id`),
+     * with `repeat_group_id` the template. No foreign key: a template's entries are written again on
+     * each save, and the slot id is what lasts. A slot's walk counts its entries: aired (as-run, by
+     * `log_entry_id`) or still to come.
+     */
+    templateSlotId: uuid("template_slot_id"),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt()
   },
@@ -698,7 +705,8 @@ export const logEntries = broadcast.table(
     check("program_has_asset", sql`${t.kind} <> 'program' or ${t.assetId} is not null`),
     check("live_has_source", sql`${t.kind} <> 'live' or ${t.liveSourceId} is not null`),
     check("episode_description_length", sql`char_length(${t.episodeDescription}) <= 160`),
-    index("log_entries_station_time").on(t.stationId, t.startsAt)
+    index("log_entries_station_time").on(t.stationId, t.startsAt),
+    index("log_entries_template_slot").on(t.templateSlotId, t.startsAt)
   ]
 );
 
@@ -784,6 +792,22 @@ export const dayTemplateEntries = broadcast.table(
     episodeDescription: text("episode_description"),
     /** G18 (migration 0050): "Keep at this time", copied onto each date the template makes. */
     keepTime: boolean("keep_time").notNull().default(false),
+    /**
+     * Programming Phase 3 (migration 0063): the slot's own id. The entries are deleted and written
+     * again on each save; the editor sends the slot id back, so a slot keeps it (and its walk).
+     */
+    slotId: uuid("slot_id").notNull().defaultRandom(),
+    /**
+     * What airs: `this_episode` (the item, every date, as before), `next_episode` (one step of its
+     * programs' walk each date it airs), `fill` (as many next episodes as fit), `same_as` (what an
+     * earlier slot aired that date). The walk's programs (`program_ids`, one or a mix), its order
+     * (contracts' `PlaybackOrder`) and what happens at the end (`start_over`, `stop`).
+     */
+    whatAirs: text("what_airs", { enum: ["this_episode", "next_episode", "fill", "same_as"] }).notNull().default("this_episode"),
+    programIds: uuid("program_ids").array(),
+    playbackOrder: text("playback_order", { enum: ["in_order", "newest_first", "shuffle", "shuffle_shows", "marathon"] }),
+    atEnd: text("at_end", { enum: ["start_over", "stop"] }),
+    sameAsSlotId: uuid("same_as_slot_id"),
     createdAt: createdAt()
   },
   (t) => [
@@ -818,6 +842,15 @@ export const dayTemplateBlocks = broadcast.table(
   ]
 );
 
+/** Programming Phase 3: a warning from making a template's date (contracts' `TemplateWarning`). */
+export interface TemplateNoteRow {
+  code: "last_episode" | "pushes_kept";
+  slotId: string;
+  message: string;
+  /** The airing it's about. */
+  startsAt: string;
+}
+
 /**
  * Day templates (added 2026-09-29): each date a template generated, one per station and date.
  * Generation is idempotent: a date made from the template since its last change is left alone,
@@ -839,7 +872,16 @@ export const dayTemplateDates = broadcast.table(
     editedAt: at("edited_at"),
     entries: integer("entries").notNull().default(0),
     /** Template entries that overlapped something already there, or can't air (rights, carriage). */
-    skipped: integer("skipped").notNull().default(0)
+    skipped: integer("skipped").notNull().default(0),
+    /**
+     * Programming Phase 3 (migration 0063): what the date's walking slots were made from (what each
+     * had aired or had on the log before it, and their programs' episodes). When that changes (an
+     * earlier date became an exception, an airing didn't happen, an episode was added), the date is
+     * made again.
+     */
+    walk: text("walk"),
+    /** Programming Phase 3: warnings from making it (a program's last new episode, a kept entry pushed). */
+    notes: jsonb("notes").$type<TemplateNoteRow[]>()
   },
   (t) => [primaryKey({ columns: [t.stationId, t.date] }), index("day_template_dates_template").on(t.templateId)]
 );

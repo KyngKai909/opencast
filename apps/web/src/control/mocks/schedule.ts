@@ -4,14 +4,14 @@
 // window covers; the template handlers (handlers/templates.ts) write through it.
 
 import { spansForDate, templateBlocksOf } from "./blocks";
-import type { DayTemplate, DayTemplateEntryInput, LogDay, OffAirHours, OffAirSpan, RepeatPattern, TemplateGeneration } from "@opencast/contracts";
+import { slotPreviewLine, type DayTemplate, type DayTemplateEntryInput, type LogDay, type OffAirHours, type OffAirSpan, type RepeatPattern, type TemplateGeneration, type TemplateSlotPreview } from "@opencast/contracts";
 import { now, STATION_TZ } from "../../lib/clock";
-import { addDays, broadcastDay, isoDate, localTime, weekdayOf } from "../components/onair/time";
+import { addDays, broadcastDay, DAY_WORDS, isoDate, localTime, weekdayOf } from "../components/onair/time";
 import { getDb, stationLog } from "./db";
 import type { DbLogEntry } from "./fixtures/evening";
 import { offAirSpans, ruleLabel } from "./fixtures/offair";
 import { onAirState } from "./fixtures/onair";
-import { entryOn, HORIZON_DAYS, MAX_AHEAD_DAYS, templateLabel, toTemplateEntry, winner, ymd, type DbTemplate, type DbTemplateDate, type DbTemplateEntry } from "./fixtures/templates";
+import { entryOn, HORIZON_DAYS, MAX_AHEAD_DAYS, slotAirings, slotEpisodes, templateLabel, toTemplateEntry, winner, ymd, type DbTemplate, type DbTemplateDate, type DbTemplateEntry } from "./fixtures/templates";
 
 const DAY = 86_400_000;
 const MIN = 60_000;
@@ -90,7 +90,7 @@ export function templateView(t: DbTemplate): DayTemplate {
     onDate: t.pattern === "once" ? t.onDate : null,
     until: t.until,
     timezone: STATION_TZ,
-    entries: t.entries.map(({ carriedFrom: _c, ...e }) => e),
+    entries: t.entries.map(({ carriedFrom: _c, ...e }) => ({ ...e, slotId: e.slotId ?? e.id })),
     dates: t.dates
       .filter((d) => d.date >= tomorrow)
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -122,10 +122,75 @@ function entriesOn(templateId: string, date: string): DbLogEntry[] {
 const keyOf = (e: Pick<DbLogEntry, "startsAt" | "endsAt" | "kind" | "itemId" | "liveSourceId" | "carriageAgreementId">) =>
   [e.startsAt, e.endsAt, e.kind, e.itemId ?? "", e.liveSourceId ?? "", e.carriageAgreementId ?? ""].join("|");
 
-/** What a template puts on a date: its entries still ahead. */
+/** Programming Phase 3: how many times a slot aired (or is on the log) on the dates before `date`. */
+function slotPosition(stationId: string, slotId: string, date: string): number {
+  return stationLog(stationId).filter((e) => e.templateSlot?.slotId === slotId && dayOf(e.startsAt) < date).length;
+}
+
+/**
+ * What a template puts on a date: its entries still ahead. Programming Phase 3: each names its
+ * slot; a Next episode or Fill the slot slot airs its walk's episodes (one after another from its
+ * start), a Same as earlier slot what that slot aired.
+ */
 function desiredFor(t: DbTemplate, date: string): DbLogEntry[] {
   const t0 = now().toISOString();
-  return t.entries.map((te) => entryOn(te, date, t.stationId, t.id, uuid())).filter((e) => e.startsAt > t0);
+  const items = getDb().library.items;
+  const aired = new Map<string, typeof items>();
+  const out: DbLogEntry[] = [];
+  for (const te of t.entries) {
+    const slotId = te.slotId ?? te.id;
+    const templateSlot = { slotId, templateId: t.id, templateName: t.name, label: templateLabel(t), startTime: te.startTime, whatAirs: te.whatAirs ?? "this_episode" };
+    const row = { ...entryOn(te, date, t.stationId, t.id, uuid()), templateSlot };
+    if (te.kind !== "program" || !te.whatAirs || te.whatAirs === "this_episode") {
+      out.push(row);
+      continue;
+    }
+    const episodes = te.whatAirs === "same_as" ? (aired.get(te.sameAsSlotId ?? "") ?? []) : slotAirings(te, slotEpisodes(items, te.programIds ?? []), slotPosition(t.stationId, slotId, date));
+    aired.set(slotId, episodes);
+    let cursor = Date.parse(row.startsAt);
+    for (const ep of episodes) {
+      const len = Math.ceil((ep.durationMs ?? 0) / MIN) * MIN;
+      const end = te.whatAirs === "next_episode" ? Math.max(cursor + len, Date.parse(row.endsAt)) : cursor + len;
+      if (te.whatAirs === "same_as" && end > Date.parse(row.endsAt)) break;
+      out.push({ ...row, id: uuid(), itemId: ep.id, programId: ep.programId, title: titleOfProgram(ep.programId) ?? ep.title, episodeTitle: ep.title, startsAt: iso(cursor), endsAt: iso(end) });
+      cursor = end;
+    }
+  }
+  return out.filter((e) => e.startsAt > t0);
+}
+
+const titleOfProgram = (programId: string | null) => (programId ? getDb().library.programs.find((p) => p.id === programId)?.title : undefined);
+
+/**
+ * Programming Phase 3: `previewTemplateSlot`, the mocks' way: a slot's episodes on the template's
+ * next `count` dates (not edited), from where its walk is, and the editor's line.
+ */
+export function previewSlot(t: DbTemplate, entry: DayTemplateEntryInput, count = 4): TemplateSlotPreview {
+  const dates: string[] = [];
+  const edited = new Set(t.dates.filter((d) => d.edited).map((d) => d.date));
+  for (let d = addDays(today(), 1); dates.length < count && isoDate(d) <= isoDate(addDays(today(), MAX_AHEAD_DAYS)); d = addDays(d, 1)) {
+    if (winner(templatesOf(t.stationId), isoDate(d)) === t && !edited.has(isoDate(d))) dates.push(isoDate(d));
+  }
+  const items = getDb().library.items;
+  const source = entry.whatAirs === "same_as" ? t.entries.find((e) => (e.slotId ?? e.id) === entry.sameAsSlotId) : undefined;
+  const slot = source ? { ...source, slotId: source.slotId ?? source.id } : { ...entry, lengthMs: entry.lengthMs ?? 30 * MIN };
+  const known = !!slot.slotId && t.entries.some((e) => (e.slotId ?? e.id) === slot.slotId);
+  const out: TemplateSlotPreview["dates"] = [];
+  if (slot.whatAirs === "next_episode" || slot.whatAirs === "fill") {
+    const episodes = slotEpisodes(items, slot.programIds ?? (slot.programId ? [slot.programId] : []));
+    let position = known && dates.length ? slotPosition(t.stationId, slot.slotId!, dates[0]) : 0;
+    for (const date of dates) {
+      const eps = slotAirings(slot, episodes, position);
+      position += eps.length;
+      out.push({ date, episodes: eps.map((e) => ({ itemId: e.id, title: e.title, programId: e.programId, seasonNumber: e.seasonNumber ?? null, episodeNumber: e.episodeNumber })) });
+    }
+    const day = t.pattern === "weekly" ? DAY_WORDS[t.weekday ?? 0] : null;
+    const days = day ? { one: day, many: `${day}s` } : t.pattern === "weekdays" ? { one: "weekday", many: "weekdays" } : t.pattern === "once" ? templateLabel(t).replace(/^Once, /, "") : { one: "day", many: "days" };
+    return { dates: out, line: slotPreviewLine(out, days, (id) => titleOfProgram(id) ?? "") };
+  }
+  const it = slot.itemId ? items.find((i) => i.id === slot.itemId) : undefined;
+  for (const date of dates) out.push({ date, episodes: it ? [{ itemId: it.id, title: it.title, programId: it.programId, seasonNumber: it.seasonNumber ?? null, episodeNumber: it.episodeNumber }] : [] });
+  return { dates: out, line: it ? `The same every date: ${it.title}` : "No dates ahead" };
 }
 
 function overlapsLog(stationId: string, startsAt: string, endsAt: string) {
@@ -203,7 +268,7 @@ export function generate(stationId: string, opts: { dates?: string[]; through?: 
       const want = wanted.get(key);
       if (want && !kept.has(key)) {
         kept.add(key);
-        Object.assign(row, { repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime });
+        Object.assign(row, { repeatGroupId: want.repeatGroupId, localNote: want.localNote, episodeTitle: want.episodeTitle, episodeDescription: want.episodeDescription, programId: want.programId, keepTime: want.keepTime, templateSlot: want.templateSlot });
       } else if (row.startsAt > t0) {
         removeWithBreaks(row.id);
         totals.removed++;
@@ -336,9 +401,46 @@ export function entriesFromInput(t: DbTemplate, list: DayTemplateEntryInput[]): 
     const it = x.itemId ? db.library.items.find((i) => i.id === x.itemId) : undefined;
     const carried = x.carriageAgreementId ? stationLog(t.stationId).find((e) => e.carriageAgreementId === x.carriageAgreementId) : undefined;
     const program = x.programId ? db.library.programs.find((p) => p.id === x.programId) : undefined;
+    // Programming Phase 3: a slot keeps its id when it's one of the template's; what airs from it.
+    const walking = x.kind === "program" && (x.whatAirs === "next_episode" || x.whatAirs === "fill");
+    const slotId = x.slotId && t.entries.some((e) => (e.slotId ?? e.id) === x.slotId) ? x.slotId : uuid();
+    if (walking) {
+      const programIds = x.programIds?.length ? x.programIds : x.programId ? [x.programId] : it?.programId ? [it.programId] : [];
+      if (!programIds.length) throw new TemplateInputError("Choose the program it airs the next episode of.", { entries: "Required" });
+      if (x.order === "marathon" && programIds.length < 2) throw new TemplateInputError("Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time.", { entries: "Several programs" });
+      const names = programIds.map((id) => db.library.programs.find((p) => p.id === id)?.title).filter((v): v is string => !!v);
+      return {
+        id: uuid(),
+        startTime: x.startTime,
+        lengthMs: x.lengthMs ?? Math.ceil((it?.durationMs ?? 30 * MIN) / MIN) * MIN,
+        kind: "program",
+        code: "PGM",
+        title: names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : (names[0] ?? it?.title ?? "Program"),
+        itemId: x.itemId ?? null,
+        programId: programIds.length === 1 ? programIds[0] : null,
+        liveSourceId: null,
+        carriageAgreementId: null,
+        episodeTitle: null,
+        episodeDescription: null,
+        localNote: x.localNote ?? null,
+        ...(x.keepTime ? { keepTime: true } : {}),
+        slotId,
+        whatAirs: x.whatAirs!,
+        programIds,
+        order: x.order ?? "in_order",
+        atEnd: x.atEnd ?? "start_over"
+      };
+    }
+    if (x.kind === "program" && x.whatAirs === "same_as") {
+      const source = t.entries.find((e) => (e.slotId ?? e.id) === x.sameAsSlotId);
+      if (!source) throw new TemplateInputError("Choose an earlier program slot on this template.", { entries: "Same as earlier slot" });
+      return { ...source, id: uuid(), startTime: x.startTime, lengthMs: x.lengthMs ?? source.lengthMs, slotId, whatAirs: "same_as", sameAsSlotId: x.sameAsSlotId, programIds: undefined, order: undefined, atEnd: undefined, keepTime: x.keepTime || undefined };
+    }
     if (x.kind === "program" && !was && !it && !carried) throw new TemplateInputError("That item isn't in your library.", { entries: "Not in your library" });
     const title = x.kind === "off_air" ? "Off air" : (was?.title ?? (x.kind === "live" ? (program?.title ?? "Live") : (carried?.title ?? it?.title ?? "Program")));
     return {
+      slotId,
+      whatAirs: "this_episode",
       id: uuid(),
       startTime: x.startTime,
       lengthMs: x.lengthMs ?? Math.ceil((it?.durationMs ?? 30 * MIN) / MIN) * MIN,

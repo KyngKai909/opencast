@@ -824,6 +824,7 @@ function pseudoRow(stationId: string, input: Input, startsAt: Date): Row {
     endedEarlyAt: null,
     templateDate: null,
     keepTime: input.keepTime ?? false,
+    templateSlotId: null,
     createdBy: null,
     createdAt: new Date(0)
   };

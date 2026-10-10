@@ -28,7 +28,8 @@ export function ReminderRows({ reminders, now, form, onRemove }: { reminders: Re
               {clock(r.airing.startsAt, { timeZone: MARKET_TZ })}
             </span>
             <div className="vw-y-rem__w">
-              <b>{r.airing.title}</b>
+              {/* Programming Phase 3: the episode, as the guide lists it. */}
+              <b>{r.airing.episodeTitle ? `${r.airing.title}, ${r.airing.episodeTitle}` : r.airing.title}</b>
               <small>{form === "phone" && r.switchMeOver ? `${station}, switch me over` : station}</small>
               {form === "web" && r.switchMeOver && (
                 <span className="vw-y-rem__flag">

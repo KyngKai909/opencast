@@ -51,6 +51,8 @@ export interface AiringRef {
   title: string;
   startsAt: string;
   endsAt: string;
+  /** Programming Phase 3: the episode, as the guide lists it (null: none). */
+  episodeTitle?: string | null;
 }
 
 export interface BreakSlotView {
@@ -425,7 +427,9 @@ export function createLogService(ctx: ModuleContext): LogService {
     );
     for (const [id, p] of extraPrograms) programs.set(id, p);
     const makers = await services.stations.idents([...agreements.values()].map((a) => a.makerStationId));
-    return { items, programs, agreements, makers };
+    // Programming Phase 3: the template slots that made them.
+    const slots = await templates.slotsOf(rows.map((r) => r.templateSlotId).filter((v): v is string => Boolean(v)));
+    return { items, programs, agreements, makers, slots };
   }
 
   function titleOf(row: Row, ctx: Awaited<ReturnType<typeof context>>): string {
@@ -481,7 +485,9 @@ export function createLogService(ctx: ModuleContext): LogService {
       localNote: row.localNote,
       episodeDescription: airing.episodeDescription ?? null,
       endedEarlyAt: row.endedEarlyAt?.toISOString() ?? null,
-      keepTime: row.keepTime
+      keepTime: row.keepTime,
+      // Programming Phase 3: the template slot that made it (one taken off its template since: null).
+      ...(row.templateSlotId ? { templateSlot: ctx.slots.get(row.templateSlotId) ?? null } : {})
     };
   }
 
@@ -1692,7 +1698,7 @@ export function createLogService(ctx: ModuleContext): LogService {
       const rows = await db.select().from(E).where(inArray(E.id, ids));
       const ctx = await context(rows);
       return new Map(
-        rows.map((r) => [r.id, { id: r.id, stationId: r.stationId, title: titleOf(r, ctx), startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString() }])
+        rows.map((r) => [r.id, { id: r.id, stationId: r.stationId, title: titleOf(r, ctx), startsAt: r.startsAt.toISOString(), endsAt: r.endsAt.toISOString(), episodeTitle: toAiring(r, ctx).episodeTitle }])
       );
     },
 
@@ -2212,12 +2218,13 @@ export function createLogService(ctx: ModuleContext): LogService {
       const [rows, offAir] = await Promise.all([load([stationId], from, to), service.offAirSpans(stationId, from, to)]);
       const ctx = await context(rows);
       const breaks = await service.breaks(stationId, from, to);
-      const [contents, repeats, days, blocks, spans] = await Promise.all([
+      const [contents, repeats, days, blocks, spans, warnings] = await Promise.all([
         service.breakContents(stationId, breaks),
         service.repeats(stationId, from),
         templates.days(stationId, from, to),
         spanViews(stationId, from, to),
-        spansOverlapping(stationId, from, to)
+        spansOverlapping(stationId, from, to),
+        templates.warnings(stationId, from, to)
       ]);
       return {
         from: from.toISOString(),
@@ -2233,7 +2240,9 @@ export function createLogService(ctx: ModuleContext): LogService {
         // Edit mode: what a draft began from (a batch is refused if the window changed since; A244: its blocks too).
         version: logVersion(rows, spans),
         // A244: programming blocks in the window.
-        ...(blocks.length ? { blocks } : {})
+        ...(blocks.length ? { blocks } : {}),
+        // Programming Phase 3: day template warnings (a program's last new episode, a week ahead).
+        ...(warnings.length ? { warnings } : {})
       };
     },
 

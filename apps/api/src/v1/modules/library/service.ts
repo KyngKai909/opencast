@@ -151,6 +151,11 @@ export interface LibraryService {
    * episodes, which of them can be repeated now, and what aired on the station.
    */
   episodeWalks(stationId: string, programIds: string[]): Promise<Map<string, EpisodeWalk>>;
+  /**
+   * Programming Phase 3: a station's programs' episodes (`PGM`, not archived), in episode order, for
+   * template slots (they count their own airings, so no as-run here).
+   */
+  programEpisodes(stationId: string, programIds: string[]): Promise<ItemRef[]>;
   /** A claimable station's import of a covered creator work (the file comes later). */
   addCreatorWork(db: Executor, input: { stationId: string; creatorWorkId: string; title: string; durationMs: number | null; sourceUrl: string; programId?: string }): Promise<string>;
 
@@ -930,15 +935,21 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       return (await toRefs(rows)).filter((r) => r.rightsConfirmed && r.durationMs && !r.contentUnavailable && !offAir.has(r.id)).slice(0, limit);
     },
 
-    async episodeWalks(stationId, programIds) {
+    async programEpisodes(stationId, programIds) {
       const ids = [...new Set(programIds)];
-      if (!ids.length) return new Map();
+      if (!ids.length) return [];
       const rows = await db
         .select()
         .from(A)
         .where(and(eq(A.stationId, stationId), inArray(A.programId, ids), eq(A.code, "PGM"), isNull(A.archivedAt)))
         .orderBy(sql`${A.seasonNumber} nulls last`, sql`${A.episodeNumber} nulls last`, asc(A.createdAt), asc(A.id));
-      const refs = await toRefs(rows);
+      return toRefs(rows);
+    },
+
+    async episodeWalks(stationId, programIds) {
+      const ids = [...new Set(programIds)];
+      if (!ids.length) return new Map();
+      const refs = await service.programEpisodes(stationId, ids);
       const [offAir, aired] = await Promise.all([
         services.trust.offAirItems(refs.map((r) => r.id)),
         refs.length

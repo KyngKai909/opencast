@@ -15,6 +15,7 @@ import { cadenceOf, longWords, sequencesOf, timingWords } from "../station/break
 import { breakKindOf, breakOwner, breakParts, rowLength, spotsPending, spotsPlacedAt, type Glance, type RowBlock } from "./dayRows";
 import { entrySource } from "./rundown";
 import { spanText } from "./time";
+import { slotDetail } from "./whatAirs";
 
 const t = (s: string) => Date.parse(s);
 
@@ -262,6 +263,12 @@ export function EntryPane({ entry, block, onEdit, onClose }: { entry: LogEntry; 
           <div>
             <dt>Keep at this time</dt>
             <dd>On</dd>
+          </div>
+        )}
+        {entry.templateSlot && (
+          <div>
+            <dt>Template</dt>
+            <dd>{slotDetail(entry.templateSlot)}</dd>
           </div>
         )}
       </dl>

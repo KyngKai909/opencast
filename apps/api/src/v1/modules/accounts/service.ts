@@ -193,6 +193,8 @@ export interface ReminderRow {
     listed: boolean;
     logEntryId: string | null;
     listedAiringId: string | null;
+    /** Programming Phase 3: the episode, as the guide lists it. */
+    episodeTitle: string | null;
   };
 }
 
@@ -312,7 +314,8 @@ export function createAccountsService({ deps, services }: ModuleContext): Accoun
             station,
             listed: Boolean(row.listedAiringId),
             logEntryId: row.logEntryId,
-            listedAiringId: row.listedAiringId
+            listedAiringId: row.listedAiringId,
+            episodeTitle: "episodeTitle" in target ? ((target.episodeTitle as string | null | undefined) ?? null) : null
           }
         }
       ];
