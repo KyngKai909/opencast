@@ -134,6 +134,14 @@ export function offAirDesc(start: Date, backAt: Date, tz: string): string {
   return `Back ${day} at ${time}.`;
 }
 
+/** Programming Phase 6: a slot not cleared for other apps, as the guide lists it (what their stream shows then: the slate). */
+export const ELSEWHERE_TITLE = "Airing on Opencast";
+
+/** Its description: "On Opencast only. Watch it on BEAT, channel 12.1, in the Opencast app." */
+export function elsewhereDesc(channel: Pick<IptvChannel, "callSign" | "name" | "number">): string {
+  return `On Opencast only. Watch it on ${channel.callSign ?? channel.name}, channel ${channel.number}, in the Opencast app.`;
+}
+
 /** A gap this short between two programmes is a break between them: the first runs to the second. */
 export const FOLD_GAP_MS = 15 * 60_000;
 

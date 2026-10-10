@@ -182,6 +182,43 @@ export function readLayout(buf: Buffer): Layout | null {
   return null;
 }
 
+/**
+ * Programming Phase 6: a copy of a segment as its `repeat`th showing in a row, played straight on
+ * from the one before: every PTS, DTS and PCR moved `ms` later, and each PID's continuity counters
+ * carried on as if the segment had been sent `repeat` times already. The other-apps playlists put a
+ * prepared slate segment in place of each of a program's (`/hls/elsewhere/…`), so the slate runs
+ * the program's length as one continuous stretch, with no discontinuity inside it.
+ */
+export function shiftSegment(source: Buffer, ms: number, repeat: number): Buffer {
+  const buf = Buffer.from(source);
+  const ticks = Math.round(ms * TS_CLOCK);
+  visit(
+    buf,
+    (at, v) => writeTimestamp(buf, at, v + ticks),
+    (at, base) => {
+      const v = (((base + ticks) % WRAP) + WRAP) % WRAP;
+      buf[at] = Math.floor(v / 2 ** 25) & 0xff;
+      buf[at + 1] = Math.floor(v / 2 ** 17) & 0xff;
+      buf[at + 2] = Math.floor(v / 2 ** 9) & 0xff;
+      buf[at + 3] = Math.floor(v / 2) & 0xff;
+      buf[at + 4] = (buf[at + 4] & 0x7f) | ((v & 1) << 7);
+    }
+  );
+  if (repeat > 0) {
+    // Packets with a payload per PID: each showing moves the counters on by that many.
+    const counts = new Map<number, number>();
+    for (let p = 0; p + PACKET <= buf.length; p += PACKET) {
+      if (buf[p] === 0x47 && (buf[p + 3] >> 4) & 0x1) counts.set(pidOf(buf, p), (counts.get(pidOf(buf, p)) ?? 0) + 1);
+    }
+    for (let p = 0; p + PACKET <= buf.length; p += PACKET) {
+      if (buf[p] !== 0x47) continue;
+      const step = ((counts.get(pidOf(buf, p)) ?? 0) * repeat) & 0x0f;
+      buf[p + 3] = (buf[p + 3] & 0xf0) | (((buf[p + 3] & 0x0f) + step) & 0x0f);
+    }
+  }
+  return buf;
+}
+
 export class TsRetimer {
   private layout: Layout | null = null;
   private cc = new Map<number, number>();

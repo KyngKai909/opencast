@@ -50,6 +50,11 @@ export interface OtherApps {
   typical(stationId: string, at: Date): Promise<number>;
   /** Sessions that count and are still polling, by station. */
   tunedInNow(stationIds: string[]): Promise<Map<string, number>>;
+  /**
+   * Programming Phase 6: the sessions that count on these stations overlapping [from, to), each
+   * clipped to it (from its start to its last poll), for the licensor's minutes.
+   */
+  sessions(stationIds: string[], from: Date, to: Date): Promise<Array<{ stationId: string; startedAt: Date; endedAt: Date }>>;
   /** Clears the hashed keys of sessions over a day old (the daily purge). */
   forget(): Promise<number>;
 }
@@ -219,6 +224,23 @@ export function createOtherApps({ deps, services }: ModuleContext): OtherApps {
         )
         .groupBy(O.stationId);
       return new Map(rows.map((r) => [r.stationId, Number(r.n)]));
+    },
+
+    async sessions(stationIds, from, to) {
+      if (!stationIds.length) return [];
+      const rows = await db
+        .select({ stationId: O.stationId, startedAt: O.startedAt, lastPollAt: O.lastPollAt })
+        .from(O)
+        .where(
+          and(
+            inArray(O.stationId, stationIds),
+            lt(O.startedAt, to),
+            gt(O.lastPollAt, from),
+            sql`${O.lastPollAt} - ${O.startedAt} >= ${`${OTHER_APPS_COUNTS_AFTER_MS / 1000} seconds`}::interval`
+          )
+        )
+        .orderBy(O.startedAt);
+      return rows.map((r) => ({ stationId: r.stationId, startedAt: new Date(Math.max(r.startedAt.getTime(), from.getTime())), endedAt: new Date(Math.min(r.lastPollAt.getTime(), to.getTime())) }));
     },
 
     async forget() {

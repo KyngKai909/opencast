@@ -14,6 +14,13 @@
 // an item's prepared caption segments where it has captions, and an empty WebVTT segment for
 // every segment of anything that hasn't (live blocks carry Livepeer's, if it gives any).
 //
+// Programming Phase 6: other apps (a playlist asked for with `?via=iptv`) get a variant in which a
+// program not cleared for them is the station's "Airing on Opencast" slate, a prepared slate
+// segment in place of each of the program's (the same media sequence numbers and lengths, near
+// enough, so the variant stays one continuous live playlist), without the program's own tags. The
+// slate's segments are played straight on from each other (`/hls/elsewhere/…`, tsretime.ts
+// `shiftSegment`), so only the item boundaries carry a discontinuity, as in the plain playlist.
+//
 // The same function serves the API and the worker, so any replica answers the same playlist.
 
 import { bandwidthOf, BAND_RENDITIONS, FPS, REFERENCE, type Band, type Ladder, type RenditionName } from "./ladder.js";
@@ -100,6 +107,13 @@ export interface MediaInput {
   lengths(key: string): number[] | null;
   /** A prepared segment's URL. */
   uri(key: string, index: number): string;
+  /** Programming Phase 6 (other apps): rows shown as the "Airing on Opencast" slate instead. */
+  swapped?: ReadonlySet<string>;
+  /**
+   * A swapped row's slate segment in place of its own `index`th (from the row's first): its URL and
+   * length. Null when no slate is ready: the playlist stops before it, and carries on once one is.
+   */
+  slate?(row: ChannelRow, index: number): { uri: string; ms: number } | null;
 }
 
 /** The rolling media playlist for one rendition, or null when nothing is published yet. */
@@ -122,10 +136,12 @@ export function renderMedia(input: MediaInput): string | null {
     uri: string;
   }
   const out: Out[] = [];
+  let held = false;
   for (const row of rows) {
-    if (row.kind === "end") break;
+    if (row.kind === "end" || held) break;
     const n = publishedCount(row, edge);
-    const own = row.kind === "prepared" && row.preparedKey ? input.lengths(row.preparedKey) : null;
+    const swapped = input.swapped?.has(row.id) ?? false;
+    const own = row.kind === "prepared" && row.preparedKey && !swapped ? input.lengths(row.preparedKey) : null;
     let at = row.startsAt.getTime();
     for (let i = 0; i < n; i++) {
       const refMs = row.segmentMs[i];
@@ -133,7 +149,15 @@ export function renderMedia(input: MediaInput): string | null {
       if (segEnd > windowStart) {
         let uri: string | undefined;
         let ms = refMs;
-        if (row.kind === "live") uri = row.liveUris?.[input.rendition]?.[i];
+        if (swapped) {
+          // Programming Phase 6: the slate in its place; nothing ready, and the playlist holds here.
+          const slate = input.slate?.(row, i) ?? null;
+          if (!slate) {
+            held = true;
+            break;
+          }
+          ({ uri, ms } = slate);
+        } else if (row.kind === "live") uri = row.liveUris?.[input.rendition]?.[i];
         else if (row.preparedKey) {
           const index = row.firstSegment + i;
           if (own && own[index] === undefined) uri = undefined;
@@ -157,13 +181,14 @@ export function renderMedia(input: MediaInput): string | null {
     if (startsRow) {
       // Between items; never before the window's first segment (the sequence above counts it).
       if (previous && o.row.discontinuity && o.index === 0) lines.push("#EXT-X-DISCONTINUITY");
-      lines.push(...o.row.tags);
+      // A swapped program's tags (its title, bug, lower thirds) aren't what's showing.
+      if (!input.swapped?.has(o.row.id)) lines.push(...o.row.tags);
       lines.push(`#EXT-X-PROGRAM-DATE-TIME:${new Date(o.at).toISOString()}`);
       previous = o.row;
     }
     lines.push(`#EXTINF:${(o.ms / 1000).toFixed(3)},`, o.uri);
   }
-  if (ended) lines.push("#EXT-X-ENDLIST");
+  if (ended && !held) lines.push("#EXT-X-ENDLIST");
   return lines.join("\n") + "\n";
 }
 
@@ -175,6 +200,8 @@ export interface SubtitlesInput {
   uri(row: ChannelRow, index: number): string | null;
   /** The empty WebVTT segment's URL, for everything without captions. */
   empty: string;
+  /** Programming Phase 6 (other apps): rows shown as the "Airing on Opencast" slate, so without their captions. */
+  swapped?: ReadonlySet<string>;
 }
 
 /**
@@ -200,7 +227,7 @@ export function renderSubtitles(input: SubtitlesInput): string | null {
     for (let i = 0; i < n; i++) {
       const ms = row.segmentMs[i];
       if (at + ms > windowStart) {
-        const own = row.kind === "live" ? row.liveUris?.subs?.[i] || null : input.uri(row, row.firstSegment + i);
+        const own = input.swapped?.has(row.id) ? null : row.kind === "live" ? row.liveUris?.subs?.[i] || null : input.uri(row, row.firstSegment + i);
         out.push({ row, index: i, at, ms, uri: own ?? input.empty });
       }
       at += ms;

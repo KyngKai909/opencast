@@ -120,6 +120,23 @@ app.get("/hls/prepared/:key/:rendition/:file", async (req, res, next) => {
   }
 });
 
+// Programming Phase 6: the other apps' "Airing on Opencast" slate, a prepared segment re-timed to
+// its place in the program it stands in for (the `via=iptv` playlists name these).
+app.get("/hls/elsewhere/:key/:rendition/:file", async (req, res, next) => {
+  const match = /^(\d{1,6})-(\d{1,9})\.ts$/.exec(req.params.file);
+  if (!match) return next();
+  try {
+    const segment = await v1.services.playout.elsewhereSegment(req.params.key, req.params.rendition, Number(match[1]), Number(match[2]));
+    if (!segment) return next();
+    res.setHeader("Content-Type", "video/mp2t");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(segment);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use(
   "/hls",
   express.static(HLS_ROOT, {
