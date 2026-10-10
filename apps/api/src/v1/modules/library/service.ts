@@ -941,16 +941,9 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       const refs = await toRefs(rows);
       const [offAir, aired] = await Promise.all([
         services.trust.offAirItems(refs.map((r) => r.id)),
-        refs.length
-          ? db
-              .select({ assetId: schema.asRun.assetId })
-              .from(schema.asRun)
-              .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, refs.map((r) => r.id))))
-              .orderBy(desc(schema.asRun.startedAt), desc(schema.asRun.id))
-              .limit(5000)
-          : Promise.resolve([])
+        services.playout.airedHistory(stationId, refs.map((r) => r.id), 5000)
       ]);
-      const history = aired.map((a) => a.assetId!).reverse();
+      const history = [...aired].reverse();
       const walks = new Map<string, EpisodeWalk>();
       for (const programId of ids) {
         const episodes = refs.filter((r) => r.programId === programId);
@@ -1021,16 +1014,10 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       // program's episodes come in its walk (In order, as dead-air fill and repeats choose).
       const ids = items.map((i) => i.id);
       const [lastAired, walks] = await Promise.all([
-        ids.length
-          ? db
-              .select({ assetId: schema.asRun.assetId, at: max(schema.asRun.startedAt) })
-              .from(schema.asRun)
-              .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, ids)))
-              .groupBy(schema.asRun.assetId)
-          : Promise.resolve([]),
+        services.playout.lastAired(stationId, ids),
         service.episodeWalks(stationId, items.filter((i) => i.code === "PGM" && i.programId).map((i) => i.programId!))
       ]);
-      const last = new Map(lastAired.map((r) => [r.assetId!, r.at]));
+      const last = lastAired;
       const ranks = new Map<string, number>();
       const next = new Set<string>();
       for (const walk of walks.values()) {

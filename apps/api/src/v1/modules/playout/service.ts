@@ -166,6 +166,10 @@ export interface PlayoutService {
   airedItem(itemId: string, limit: number): Promise<Array<{ stationId: string; startedAt: Date; reason: AsRunView["reason"]; carriageAgreementId: string | null }>>;
   /** C5: when each item first aired anywhere, and where. */
   firstAired(itemIds: string[]): Promise<Map<string, { stationId: string; startedAt: Date }>>;
+  /** Programming Phase 2: a station's airings of these items, newest first, as item ids (up to `limit`): where each program's walk is. */
+  airedHistory(stationId: string, itemIds: string[], limit: number): Promise<string[]>;
+  /** Programming Phase 2: when each of these items last aired on a station (left out: never). */
+  lastAired(stationId: string, itemIds: string[]): Promise<Map<string, Date>>;
   /** G3: a live block ended early: playout hands back to the log now. */
   endLive(stationId: string, userId: string): Promise<void>;
   /** G2: when each station last signed on (while on air). */
@@ -1006,6 +1010,27 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
         .where(inArray(schema.asRun.assetId, itemIds))
         .orderBy(schema.asRun.assetId, asc(schema.asRun.startedAt));
       return new Map(rows.map((r) => [r.itemId!, { stationId: r.stationId, startedAt: r.startedAt }]));
+    },
+
+    async airedHistory(stationId, itemIds, limit) {
+      if (!itemIds.length) return [];
+      const rows = await db
+        .select({ assetId: schema.asRun.assetId })
+        .from(schema.asRun)
+        .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, itemIds)))
+        .orderBy(desc(schema.asRun.startedAt), desc(schema.asRun.id))
+        .limit(limit);
+      return rows.map((r) => r.assetId!);
+    },
+
+    async lastAired(stationId, itemIds) {
+      if (!itemIds.length) return new Map();
+      const rows = await db
+        .select({ assetId: schema.asRun.assetId, at: sql<Date>`max(${schema.asRun.startedAt})` })
+        .from(schema.asRun)
+        .where(and(eq(schema.asRun.stationId, stationId), inArray(schema.asRun.assetId, itemIds)))
+        .groupBy(schema.asRun.assetId);
+      return new Map(rows.map((r) => [r.assetId!, new Date(r.at)]));
     },
 
     async endLive(stationId, userId) {
