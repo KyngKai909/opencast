@@ -12,6 +12,7 @@ import { badRequest } from "../../errors.js";
 import { createWatchData, recordSessionMinute, type WatchData } from "./watch.js";
 import { createTotals, type Totals } from "./totals.js";
 import { createAnalytics, type Analytics } from "./analytics.js";
+import { createOtherApps, type OtherApps } from "./otherApps.js";
 
 type Platform = "phone" | "cast" | "web" | "tv_app" | "mirror";
 type TuneVia = import("@opencast/contracts").TuneVia;
@@ -70,6 +71,8 @@ export interface AudienceService {
   totals: Totals;
   /** A251: the desk's Analytics tabs. */
   analytics: Analytics;
+  /** Programming Phase 5: the audience source "Other apps", from runs of `via=iptv` playlist polls, counted apart and never billed. */
+  otherApps: OtherApps;
 }
 
 export function createAudienceService({ deps, services }: ModuleContext): AudienceService {
@@ -86,8 +89,10 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
     () => services.stations.dialPlaces(),
     (from, to) => services.playout.airedBreaks(from, to)
   );
+  const otherApps = createOtherApps({ deps, services });
   const service: AudienceService = {
-    watch: createWatchData({ deps, services }),
+    watch: createWatchData({ deps, services }, otherApps),
+    otherApps,
     totals,
     analytics: createAnalytics({ deps, services }, totals),
 
@@ -378,9 +383,28 @@ export function createAudienceService({ deps, services }: ModuleContext): Audien
         comparison: lastWeek
           .map((r) => ({ minute: new Date(r.minute.getTime() + weekMs).toISOString(), tunedIn: r.tunedIn }))
           .sort((a, b) => a.minute.localeCompare(b.minute)),
-        breaks: breaks.map((b) => ({ startsAt: b.startsAt, endsAt: new Date(Date.parse(b.startsAt) + b.lengthMs).toISOString() }))
+        breaks: breaks.map((b) => ({ startsAt: b.startsAt, endsAt: new Date(Date.parse(b.startsAt) + b.lengthMs).toISOString() })),
+        // Programming Phase 5: other apps, counted apart.
+        otherApps: await otherAppsReport(stationId, from, to)
       };
     }
   };
+
+  async function otherAppsReport(stationId: string, from: Date, to: Date): Promise<NonNullable<AudienceReport["otherApps"]>> {
+    const [counts, now] = await Promise.all([otherApps.counts(from, to, [stationId]), otherApps.tunedInNow([stationId])]);
+    const markets = await services.network.marketsByIds(counts.map((c) => c.marketId).filter((v): v is string => Boolean(v)));
+    const hours = (minutes: number) => Math.round((minutes / 60) * 10) / 10;
+    return {
+      tunedInNow: now.get(stationId) ?? 0,
+      sessions: counts.reduce((n, c) => n + c.sessions, 0),
+      hoursWatched: hours(counts.reduce((n, c) => n + c.minutes, 0)),
+      byMarket: counts
+        .map((c) => {
+          const m = c.marketId ? markets.get(c.marketId) : undefined;
+          return { market: m ? { id: m.id, slug: m.slug, name: m.name } : null, sessions: c.sessions, hoursWatched: hours(c.minutes) };
+        })
+        .sort((a, b) => b.hoursWatched - a.hoursWatched || b.sessions - a.sessions)
+    };
+  }
   return service;
 }

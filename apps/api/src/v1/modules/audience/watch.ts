@@ -20,6 +20,7 @@ import { NOT_ENOUGH_VIEWERS, type AiringWatch, type MakerProgramWatch, type Make
 import type { ModuleContext } from "../../context.js";
 import { badRequest, conflict } from "../../errors.js";
 import type { ProgramRow } from "../playout/service.js";
+import type { OtherApps } from "./otherApps.js";
 
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
@@ -129,7 +130,7 @@ export interface WatchData {
   forMaker(makerStationId: string, from: Date, to: Date): Promise<MakerWatchData>;
 }
 
-export function createWatchData({ deps, services }: ModuleContext): WatchData {
+export function createWatchData({ deps, services }: ModuleContext, otherApps?: Pick<OtherApps, "forget">): WatchData {
   const { db } = deps;
   const S = schema.sessions;
   const SM = schema.sessionMinutes;
@@ -328,6 +329,8 @@ export function createWatchData({ deps, services }: ModuleContext): WatchData {
       const sessions = await db.delete(S).where(lt(S.lastBeatAt, cutoff)).returning({ id: S.id });
       // A251: searches viewers settled on go after 90 days, whatever the retention rule says.
       const searches = await db.delete(schema.searches).where(lt(schema.searches.at, new Date(now.getTime() - SEARCH_DAYS * DAY))).returning({ id: schema.searches.id });
+      // Programming Phase 5: other apps' sessions keep their counts, not the hashed key of where they came from.
+      await otherApps?.forget();
       return { sessions: sessions.length, minutes: minutes.length, votes: votes.length, searches: searches.length };
     },
 

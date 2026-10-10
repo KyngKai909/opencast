@@ -1447,3 +1447,16 @@ For review. No frame draws these; they follow the template editor's and the Add 
 | Log and template warnings (the API's) | "{Late Crate} airs its last new episode {Sat Oct 24}, then starts over." (on the log from a week before); with Stop: "{Late Crate} airs its last new episode {Sat Oct 24}, then stops. Its slot is dead air after that."; "{Late Crate, ep. 14} would push {Night Desk} {10} min past {8:30 pm} on {Sat Oct 24}, where it's kept. What doesn't fit before {8:30 pm} isn't placed that day." |
 | The API's refusals | "Choose the program it airs the next episode of."; "Marathon is for a slot that draws on several programs. For one program, In order already airs a season at a time."; "Say how long the slot runs."; "Choose the earlier slot it repeats."; "Choose an earlier program slot on this template." |
 | Viewer, You, a reminder | "{Late Crate}, {Episode 14}": the episode after the title when the airing has one |
+
+## The dial in other apps (programming Phase 5, 2026-10-10)
+
+For review. No frame draws these; the section follows You's Invite friends (ruled rows, a quiet lede).
+
+| Where | Words |
+|---|---|
+| Viewer, You (web and phone), after Invite friends | the section "Watch in other apps" (web: with "TiviMate, Jellyfin, Channels DVR, Kodi, VLC" beside it); "Opencast's stations in an IPTV app: paste the channel list, then the guide."; rows "Channel list" M3U and "Guide" XMLTV, each with its address and "Copy" (read aloud as "Copy the channel list address", "Copy the guide address"); toasts "Channel list copied." and "Guide copied." |
+| The apps, one line each | "TiviMate: Add playlist, then enter the channel list’s address. It finds the guide on its own; if not, add the guide under EPG."; "Jellyfin: Live TV: add an M3U tuner with the channel list, and an XMLTV guide provider with the guide."; "Channels DVR: Add a source, Custom Channels: the channel list as M3U, the guide as XMLTV."; "Kodi: Install the PVR IPTV Simple Client add-on, then give it the channel list (M3U) and the guide (XMLTV)."; "VLC: Open Network Stream with the channel list. VLC plays the channels; it doesn’t show a guide."; "Plex: Plex has no M3U support of its own, so these addresses don't go into Plex." |
+| Under them | "Other apps show the programs, station IDs and spots, but not the bug, lower thirds, or a spot's code and QR." |
+| The channel list (in the apps) | each channel "{BEAT} · {Inland Beat}", grouped by market ("Inland Empire") |
+| The guide (in the apps) | planned off air: "Off air" / "Back at {6:00 am}." ("Back {Monday} at {6:00 am}." when it's a day or more away); live blocks under the category "Live"; an episode with no season "Episode {14}"; a program with no TV rating, its advisory: "Language", "Mature" |
+| The API's refusals | "The band is tv or radio."; "Choose a market by its slug."; "That market wasn't found." |

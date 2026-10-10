@@ -106,5 +106,7 @@ export const MODULE_TABLES: Record<string, string[]> = {
   ],
   // Added 2026-09-30 (follow-up Phase 4): direct uploads, from their parts to what they made.
   uploads: ["broadcast.uploads"],
+  // Added 2026-10-10 (programming Phase 5): the dial in other apps, the channel list and guide. Reads through the other services only.
+  iptv: [],
   shelf: ["catalog.shelf_series", "catalog.shelf_items", "catalog.shelf_item_checks", "catalog.shelf_item_evidence", "catalog.shelf_episodes", "catalog.shelf_episode_items", "catalog.shelf_rebuilds"]
 };

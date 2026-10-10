@@ -79,6 +79,18 @@ export function renderMaster(band: Band, ladder: Ladder, subtitles?: { language:
   return lines.join("\n") + "\n";
 }
 
+/**
+ * Programming Phase 5: a master playlist whose renditions (and subtitle rendition) carry `query`.
+ * Players resolve a master's relative lines against its URL without its query string, so a master
+ * asked for with `?via=iptv` names its renditions with it too, and their polls count as well.
+ */
+export function masterWithQuery(body: string, query: string): string {
+  return body
+    .split("\n")
+    .map((line) => (/^[a-z0-9]+\.m3u8$/.test(line) ? `${line}?${query}` : line.startsWith("#EXT-X-MEDIA:") ? line.replace(/URI="([a-z0-9]+\.m3u8)"/, `URI="$1?${query}"`) : line))
+    .join("\n");
+}
+
 export interface MediaInput {
   rows: ChannelRow[];
   rendition: RenditionName;

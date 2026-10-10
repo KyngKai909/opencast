@@ -6,6 +6,7 @@ import express from "express";
 import { API_PORT, STORAGE_ROOT, HLS_ROOT, UPLOAD_ROOT, WEB_DIST_DIR, WEB_ORIGIN } from "./config.js";
 import { bootV1 } from "./v1/boot.js";
 import { checkoutWebhookHandler, webhookHandler } from "./v1/webhooks.js";
+import { clientIp } from "./v1/geo.js";
 
 const app = express();
 // The API (mounted at /v1 below).
@@ -84,7 +85,9 @@ app.get("/hls/:stationId/:file", async (req, res, next) => {
   // The subtitle rendition's empty segment (empty.vtt) is served here too (X2).
   if (!/^[0-9a-f-]{36}$/.test(req.params.stationId) || !/^([a-z0-9]+\.m3u8|empty\.vtt)$/.test(req.params.file)) return next();
   try {
-    const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file);
+    // Programming Phase 5: `?via=iptv` (the channel list's) counts the poll as "Other apps".
+    const via = typeof req.query.via === "string" ? req.query.via : null;
+    const playlist = await v1.services.playout.playlist(req.params.stationId, req.params.file, via ? { via, ip: clientIp(req), userAgent: req.get("user-agent") ?? null } : undefined);
     if (playlist === null) return next();
     res.setHeader("Content-Type", playlist.contentType ?? "application/vnd.apple.mpegurl");
     res.setHeader("Access-Control-Allow-Origin", "*");

@@ -1,0 +1,16 @@
+/* You: Watch in other apps (programming Phase 5). */
+.vw-oa__lede { margin-top: 10px; }
+.vw-oa { margin: 8px 0 0; }
+.vw-oa__row { display: grid; grid-template-columns: 9.5em minmax(0, 1fr) auto; align-items: center; gap: 6px 14px; padding: 10px 0; border-bottom: 1px solid var(--hair); }
+.vw-oa__row dt { font: 600 14px var(--font-text); color: var(--ink); }
+.vw-oa__row dt span { font-weight: 500; font-size: 12.5px; color: var(--ink-50); }
+.vw-oa__row dd { margin: 0; }
+.vw-oa__url { font: 500 13.5px var(--font-mono); color: var(--ink-70); min-width: 0; overflow-wrap: anywhere; user-select: all; }
+.vw-oa__apps { list-style: none; margin: 10px 0 0; padding: 0; }
+.vw-oa__apps li { padding: 7px 0; font-size: 14px; color: var(--ink-70); }
+.vw-oa__apps b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+.vw-oa--phone { padding: 0 16px 8px; }
+@media (max-width: 560px) {
+  .vw-oa__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .vw-oa__url { grid-column: 1 / -1; grid-row: 2; }
+}

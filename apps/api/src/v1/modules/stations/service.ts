@@ -303,8 +303,13 @@ export interface StationsService {
    */
   resolveBreakRule(stationId: string, rule: BreakRuleInput): Promise<BreakRuleView>;
   translators(stationId: string): Promise<TranslatorView[]>;
+  /**
+   * Programming Phase 5: each station's mark (its logo, a path or URL), or null without one: the
+   * channel list's `tvg-logo` and the guide's channel icon in other apps.
+   */
+  marks(ids: string[]): Promise<Map<string, string | null>>;
   /** A251: every station on the dial's band and market (its channel not released). */
-  dialPlaces(): Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
+  dialPlaces():Promise<Map<string, { band: "tv" | "radio"; marketId: string }>>;
   /** A251: when a station came on the dial: its first sign-on, else when its channel was given. */
   onDialSince(stationId: string): Promise<Date | null>;
   /** A251 Phase 7: stations started in a span, by kind, and how many signed on for the first time. */
@@ -700,6 +705,12 @@ export function createStationsService({ deps, services }: ModuleContext): Statio
     async kindOf(stationId) {
       const [row] = await db.select({ kind: S.kind }).from(S).where(eq(S.id, stationId));
       return row?.kind ?? null;
+    },
+
+    async marks(ids) {
+      if (!ids.length) return new Map();
+      const found = await db.select({ id: S.id, logoUrl: S.logoUrl }).from(S).where(inArray(S.id, [...new Set(ids)]));
+      return new Map(found.map((r) => [r.id, r.logoUrl]));
     },
 
     async idsOfKinds(kinds) {

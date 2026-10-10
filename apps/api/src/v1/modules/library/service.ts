@@ -76,6 +76,8 @@ export interface ProgramRef {
   description: string | null;
   category: string | null;
   advisory: "none" | "language" | "mature";
+  /** Programming Phase 5: its TV rating (TV-Y to TV-MA), or null: the guide in other apps. */
+  rating: "TV-Y" | "TV-Y7" | "TV-G" | "TV-PG" | "TV-14" | "TV-MA" | null;
   live: boolean;
   attribution: string | null;
   rightsNote: string | null;
@@ -517,6 +519,7 @@ export function createLibraryService(ctx: ModuleContext): LibraryService {
       description: p.description,
       category: p.category,
       advisory: p.advisory,
+      rating: p.rating,
       live: p.isLive,
       attribution: p.attribution,
       rightsNote: p.rightsNote

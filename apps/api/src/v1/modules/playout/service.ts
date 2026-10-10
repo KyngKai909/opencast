@@ -9,7 +9,7 @@ import type { OffAirSpanView } from "../log/service.js";
 import { clockTime } from "../../lib/time.js";
 import { isContentId, objectKey } from "../../storage.js";
 import { BAND_RENDITIONS, LADDER, REFERENCE, scaledLadder, type Band, type RenditionName } from "./engine/ladder.js";
-import { renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
+import { masterWithQuery, renderMaster, renderMedia, renderSubtitles, SUBTITLES, WINDOW_MS, type ChannelRow } from "./engine/playlist.js";
 import { captionSources } from "./engine/captions.js";
 import { liveObjectPrefixes } from "./engine/assemble.js";
 import { EMPTY_VTT, languageName } from "../../lib/captions.js";
@@ -146,7 +146,7 @@ export interface PlayoutService {
    * when there's no such playlist (or nothing published yet). `maxAge` is the cache time. On the
    * TV band, `subs.m3u8` is the subtitle rendition (X2), and `empty.vtt` its empty segment.
    */
-  playlist(stationId: string, file: string): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
+  playlist(stationId: string, file: string, request?: PlaylistRequest): Promise<{ body: string; maxAge: number; contentType?: string } | null>;
   /** Every station on air now, for the dead-air check. */
   onAirStations(): Promise<string[]>;
   /** Stations that aired anything in a window (from the as-run log). */
@@ -287,6 +287,19 @@ export function preparedTail(failed: number, preparing: number): string {
   if (!failed) return `. The rest are being prepared; ${fallback}`;
   const broken = `${failed} couldn't be prepared (${failed === 1 ? "its file needs" : "their files need"} replacing)`;
   return preparing ? `. ${broken} and ${preparing} ${preparing === 1 ? "is" : "are"} being prepared; ${fallback}` : `. ${broken}; ${fallback}`;
+}
+
+/**
+ * Programming Phase 5: who asked for a channel's playlist, from `/hls/:stationId/:file` (the API's
+ * and the worker's). `via` is the request's `?via=` (`iptv` from the channel list); the address
+ * and user agent tell one other app's polls from another's, and are never kept. `counted` hears of
+ * the count's promise (tests wait on it; serving doesn't).
+ */
+export interface PlaylistRequest {
+  via?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  counted?: (done: Promise<void>) => void;
 }
 
 export function createPlayoutService({ deps, services }: ModuleContext): PlayoutService {
@@ -888,14 +901,24 @@ export function createPlayoutService({ deps, services }: ModuleContext): Playout
       return new Map(rows.map((r) => [r.airingId!, r]));
     },
 
-    async playlist(stationId, file) {
+    async playlist(stationId, file, request) {
       const id = `${stationId}/${file}`;
       const hit = rendered.get(id);
       const at = deps.clock.now().getTime();
-      if (hit && Math.abs(at - hit.at) < 1_000) return hit.value;
-      const value = await renderPlaylist(stationId, file);
-      rendered.set(id, { at, value });
-      if (rendered.size > 5_000) rendered.clear();
+      let value: { body: string; maxAge: number; contentType?: string } | null;
+      if (hit && Math.abs(at - hit.at) < 1_000) value = hit.value;
+      else {
+        value = await renderPlaylist(stationId, file);
+        rendered.set(id, { at, value });
+        if (rendered.size > 5_000) rendered.clear();
+      }
+      // Programming Phase 5: other apps tune with `?via=iptv`. Their polls are the audience source
+      // "Other apps" (counted apart, never billed; not waited for), and the master hands the query on.
+      if (value && request?.via === "iptv" && file.endsWith(".m3u8")) {
+        const poll = services.audience.otherApps.poll({ stationId, ip: request.ip ?? null, userAgent: request.userAgent ?? null }).catch(() => undefined);
+        request.counted?.(poll);
+        if (file === "master.m3u8" || file === "index.m3u8") value = { ...value, body: masterWithQuery(value.body, "via=iptv") };
+      }
       return value;
     },
 

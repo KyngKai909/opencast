@@ -2,6 +2,15 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: The dial in other apps (programming Phase 5)
+
+Additive, with migration 0065.
+
+- `audience.ts`: `AudienceReport.otherApps` (optional): the audience source "Other apps", viewers tuned from the channel list in TiviMate, Jellyfin, Channels DVR, Kodi or VLC, `{ tunedInNow, sessions, hoursWatched, byMarket[] }` (`byMarket[].market` null for those Opencast couldn't place). Counted apart from runs of `via=iptv` playlist polls; never in the report's other numbers, never billed.
+- `analytics.ts`: `AnalyticsOverview.otherApps` (optional): the same by station and market, `{ station, market, sessions, hours }`, most hours first. Never in the totals, like `relays`.
+- Not in the contracts (files, not JSON; mounted like previews): `GET /v1/iptv/channels.m3u` and `GET /v1/iptv/xmltv.xml` (and `.xml.gz`), public, with `?market=` (a market's slug) and `?band=tv|radio`, an ETag, a minute's cache and gzip. 404 for a market that doesn't exist, 400 for another band. `docs/iptv.md` says what's in them.
+- Behaviour: a station's playlists (`/hls/:stationId/master.m3u8` and its renditions) asked for with `?via=iptv` count as "Other apps", and that master names its renditions with `?via=iptv` too. Without it, nothing changes.
+
 ## 2026-10-10: Suggested break points (programming Phase 4)
 
 Additive, with migration 0063.
