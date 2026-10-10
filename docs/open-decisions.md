@@ -610,7 +610,9 @@ For the user's decision. Built as recommended below. What the files hold is in `
 |---|---|---|---|
 | P7.1 | **A tuner of our own for Plex, and recording (Kai's call).** Plex doesn't support adding a tuner at a public HTTPS address (`docs/iptv.md`, Plex), so nothing is built; Plex users run Threadfin on their network. Plex records from such a tuner, so viewers can already record our stream that way. If a tuner is built later, it carries only stations whose programs are all cleared for `recording` (programming Phase 6), or swaps the rest to the slate, as relays do | `docs/iptv.md`; the viewer's You, Watch in other apps | **Recommendation:** build nothing for Plex now; decide on recording when Phase 6's clearances are in use |
 
-## Where it can air, programming Phase 6 (2026-10-10)
+## Where it can air, programming Phase 6 (2026-10-10; the user's decision 2026-10-10)
+
+**Decided:** every recommendation below, as given, and the user asked for the emails to be built now: P6.1's one-time email to makers, P6.8's emails to station owners and the desk, and P6.13's dialog.
 
 For the user's decision. Built as recommended below. The "Other apps" enforcement (the `via=iptv` playlists and the XMLTV's "Airing on Opencast") is added with Phase 5; the hook it uses is `playout.notCleared`.
 
