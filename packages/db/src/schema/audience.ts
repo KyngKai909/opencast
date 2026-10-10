@@ -359,3 +359,29 @@ export const breakStats = audience.table(
   },
   (t) => [uniqueIndex("break_stats_aired").on(t.breakId, t.startedAt), index("break_stats_station_time").on(t.stationId, t.startedAt)]
 );
+
+/**
+ * Programming Phase 5 (added 2026-10-10, migration 0065): viewers in other apps (TiviMate,
+ * Jellyfin, Channels DVR, Kodi, VLC), the audience source "Other apps". Those apps send no
+ * heartbeats, so a session is a run of playlist polls carrying `via=iptv` from one connection: a
+ * gap of two minutes ends it, and it counts once its polls span a minute. Placed by market from
+ * the connection, as the viewer's sessions are. The address is never kept: `client_key` is a hash
+ * of it, the app's user agent and the station, salted with the day, and it's cleared once the
+ * session is a day old. Never in `minute_samples` or `minute_markets`, so per-thousand billing and
+ * the pool don't read these (docs/open-decisions.md, programming Phase 5).
+ */
+export const otherAppSessions = audience.table(
+  "other_app_sessions",
+  {
+    id: id(),
+    stationId: uuid("station_id")
+      .notNull()
+      .references(() => stations.id),
+    marketId: uuid("market_id").references(() => markets.id),
+    clientKey: text("client_key"),
+    startedAt: at("started_at").notNull().defaultNow(),
+    lastPollAt: at("last_poll_at").notNull().defaultNow(),
+    polls: integer("polls").notNull().default(1)
+  },
+  (t) => [index("other_app_sessions_client").on(t.clientKey, t.lastPollAt), index("other_app_sessions_station").on(t.stationId, t.lastPollAt)]
+);

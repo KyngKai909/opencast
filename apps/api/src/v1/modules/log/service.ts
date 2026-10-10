@@ -163,6 +163,11 @@ export interface LogService {
   nowNext(stationIds: string[], at: Date): Promise<Map<string, { now: Airing | null; next: Airing | null }>>;
   /** Every airing in a window per station, for the guide and station pages. */
   window(stationIds: string[], from: Date, to: Date): Promise<Map<string, Airing[]>>;
+  /**
+   * Programming Phase 5: `window` for the guide in other apps (XMLTV), each airing with the library
+   * item it airs (its season, episode and first airing are looked up from that), or null.
+   */
+  feed(stationIds: string[], from: Date, to: Date): Promise<Map<string, Array<Airing & { itemId: string | null }>>>;
   upcomingForProgram(programId: string, limit: number): Promise<AiringRef[]>;
   itemUsage(itemId: string): Promise<{ upcoming: number }>;
   gaps(stationId: string, from: Date, to: Date): Promise<Gap[]>;
@@ -1739,6 +1744,14 @@ export function createLogService(ctx: ModuleContext): LogService {
         );
       }
       return result;
+    },
+
+    async feed(stationIds, from, to) {
+      const [rows, airings] = await Promise.all([load(stationIds, from, to), service.window(stationIds, from, to)]);
+      const itemOf = new Map(rows.map((r) => [r.id, r.assetId]));
+      return new Map(
+        [...airings].map(([id, list]) => [id, list.map((a) => ({ ...a, itemId: (a.kind === "off_air" || !a.logEntryId ? null : itemOf.get(a.logEntryId)) ?? null }))])
+      );
     },
 
     async upcomingForProgram(programId, limit) {

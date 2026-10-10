@@ -17,7 +17,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
+import { clientIp, createDeps, createEngine, createJobs, createV1 } from "@opencast/api/runtime";
 import { STORAGE_ROOT } from "./config.js";
 import { closeRedis, refreshLeadershipLease, releaseLeadershipLease } from "./redis.js";
 import { startExternalChecks } from "./externalChecks.js";
@@ -78,7 +78,7 @@ const PLAYLIST = /^\/hls\/([0-9a-f-]{36})\/([a-z0-9]+\.m3u8|empty\.vtt)$/;
 const PREPARED = /^\/hls\/(prepared\/[\w-]+\/[a-z0-9]+\/seg_\d{5}\.(?:ts|vtt))$/;
 const LOCAL_OBJECT = /^\/objects\/((?:prepared|proof)\/[\w/.-]+)$/;
 const health = http.createServer((req, res) => {
-  const url = (req.url ?? "").split("?")[0];
+  const [url, search = ""] = (req.url ?? "").split("?");
   if (url === "/health") {
     engine
       .stats()
@@ -94,8 +94,10 @@ const health = http.createServer((req, res) => {
   // A channel's playlists, from its assembled timeline (any replica can answer), with a short cache.
   const playlist = PLAYLIST.exec(url);
   if (playlist) {
+    // Programming Phase 5: `?via=iptv` (the channel list's) counts the poll as "Other apps".
+    const via = new URLSearchParams(search).get("via");
     services.playout
-      .playlist(playlist[1], playlist[2])
+      .playlist(playlist[1], playlist[2], via ? { via, ip: clientIp(req), userAgent: req.headers["user-agent"] ?? null } : undefined)
       .then((found) => {
         if (!found) return void res.writeHead(404, { ...cors, "cache-control": "no-cache" }).end();
         const headers = { ...cors, "content-type": found.contentType ?? "application/vnd.apple.mpegurl", "cache-control": `public, max-age=${found.maxAge}`, vary: "Accept-Encoding" };

@@ -1,5 +1,6 @@
 // You (you 02.1 web, 06.1 and 06.2 phone): presets, reminders, pledges and TVs, in the order
-// people use them, then a way into running a station. Settings is a link on the web and the name
+// people use them, then invites, watching in other apps (programming Phase 5: the channel list and
+// guide for IPTV apps) and a way into running a station. Settings is a link on the web and the name
 // row on the phone. Signed out, it says what an account adds and names the presets on this device.
 // /you/pledges/:pledgeId opens a pledge over it; ?modal=tv-code adds a TV.
 
@@ -20,6 +21,7 @@ import { PledgeModal } from "../components/you/PledgeModal";
 import { PresetTiles } from "../components/you/PresetTiles";
 import { TvCodeDialog } from "../components/you/TvCodeDialog";
 import { InvitesSection } from "../components/you/InvitesSection";
+import { OtherAppsSection } from "../components/you/OtherAppsSection";
 import { PledgeRows, ReminderRows, RunStation, SignedOutYou, TvRows, comingUp, supportingSub } from "../components/you/YouSections";
 import { useMyStation, useOpenChannels, usePledges, useReminders, useRemoveReminder, useTvs } from "../components/you/useYouData";
 import "../components/you/sections.css";
@@ -175,6 +177,8 @@ function YouWeb({ columns }: { columns?: 2 | 3 }) {
 
       <InvitesSection form="web" />
 
+      <OtherAppsSection form="web" />
+
       <RunStation form="web" marketName={me?.market?.name ?? null} open={y.open} mine={y.mine} />
       <TvCodeDialog open={y.tvCode.open} onClose={y.tvCode.close} />
     </div>
@@ -228,6 +232,8 @@ function YouPhone() {
       </div>
 
       <InvitesSection form="phone" />
+
+      <OtherAppsSection form="phone" />
 
       <h2 className="vw-y-psec">Run a station</h2>
       <div className="vw-you-p__list">
