@@ -88,6 +88,12 @@ export interface CatalogService {
   partiesOf(agreementId: string): Promise<{ makerStationId: string; carrierStationId: string }>;
   endAgreement(agreementId: string, by: "maker" | "carrier"): Promise<Agreement>;
   place(agreementId: string, input: { from: string; weeks: number; replaceExisting: boolean }): Promise<{ placed: number; replaced: number; blockedByLimit: number }>;
+  /**
+   * Programming Phase 6 (P6.1), from the jobs' hourly pass: each maker whose offered or carried
+   * programs can go to carriers' relays hears it once, with a link to its offers. Returns how many
+   * stations were told this time.
+   */
+  tellMakersAboutRelays(): Promise<number>;
 }
 
 const O = schema.offers;
@@ -767,7 +773,75 @@ export function createCatalogService({ deps, services }: ModuleContext): Catalog
         starts,
         replaceExisting: input.replaceExisting
       });
+    },
+
+    async tellMakersAboutRelays() {
+      // Open offers and running agreements whose carriers may send them to relays (what every one
+      // made before 2026-10-10 has, from the column's default), by maker.
+      const now = deps.clock.now();
+      const [offered, carried] = await Promise.all([
+        db.select({ stationId: O.makerStationId, programId: O.programId, outlets: O.outlets }).from(O).where(eq(O.status, "offered")),
+        db
+          .select({ stationId: G.makerStationId, programId: G.programId, outlets: G.outlets })
+          .from(G)
+          .where(or(isNull(G.endsAt), gt(G.endsAt, now)))
+      ]);
+      const programsOf = new Map<string, string[]>();
+      for (const r of [...offered, ...carried]) {
+        if (!r.outlets.includes("relays")) continue;
+        const list = programsOf.get(r.stationId) ?? [];
+        if (!list.includes(r.programId)) list.push(r.programId);
+        programsOf.set(r.stationId, list);
+      }
+      if (!programsOf.size) return 0;
+      // Once per station: the key is the station's, whoever its owners are now.
+      const key = (stationId: string) => `carriage-outlets:${stationId}`;
+      const told = await services.notifications.told([...programsOf.keys()].map(key));
+      const due = [...programsOf].filter(([stationId]) => !told.has(key(stationId)));
+      if (!due.length) return 0;
+      const { programs } = await services.library.titles({ itemIds: [], programIds: due.flatMap(([, ids]) => ids) });
+      let count = 0;
+      for (const [stationId, programIds] of due) {
+        const owners = await services.accounts.stationMemberIds(stationId, ["owner"]);
+        if (!owners.length) continue;
+        const titles = programIds.map((id) => programs.get(id)).filter((t): t is string => Boolean(t)).sort((a, b) => a.localeCompare(b));
+        const letter = relaysLetter(titles);
+        await services.notifications.notify(owners, {
+          kind: "carriage_outlets",
+          title: letter.title,
+          body: letter.body,
+          link: `/stations/${stationId}/offered`,
+          scope: { kind: "station", id: stationId },
+          dedupeKey: key(stationId),
+          action: "See your offers",
+          footer: "Opencast sends this once, to the owners of stations whose programs other stations can carry."
+        });
+        count++;
+      }
+      return count;
     }
   };
   return service;
+}
+
+/** "Night Reel", "Night Reel and Crate Sessions", "Night Reel, Crate Sessions and 2 more". */
+function titleWords(titles: string[]): string {
+  if (titles.length <= 1) return titles[0] ?? "your programs";
+  if (titles.length <= 3) return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
+  return `${titles.slice(0, 2).join(", ")} and ${titles.length - 2} more`;
+}
+
+/**
+ * P6.1's letter: relays were always on for carried programs, and they stay on unless the maker
+ * turns them off (for new carriers; a running agreement keeps its own).
+ */
+export function relaysLetter(titles: string[]): { title: string; body: string } {
+  const one = titles.length === 1;
+  return {
+    title: "Stations carrying your programs can send them to relays",
+    body: [
+      `Stations that carry ${titleWords(titles)} can send ${one ? "it" : "them"} to their relays too: YouTube, Twitch and the other platforms. They always could. Now you choose, and it stays on unless you turn it off.`,
+      `To turn it off, open an offer and untick Relays under "Where carriers can send it". The change is for new carriers. Stations carrying ${one ? "it" : "them"} now keep what they agreed to.`
+    ].join("\n\n")
+  };
 }
