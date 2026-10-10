@@ -521,7 +521,9 @@ New service methods: `ledger.earningRows`, `usageTotals`, `opencastShareBetween`
 
 **Deviations:** relays are stacked, not side by side; "Average tuned in on each platform" is each relay's day of viewers over the day's minutes, added up; the grid's hover is the browser's title. Days already totalled are worked out again (`station_days.version` 2) while their sessions are kept | migration 0056; packages/contracts `analytics.ts`; apps/api audience `totals.ts` (bands, visits, version), `analytics.ts` (`audience`), routes; accounts `presetsAdded`; the desk's `AudienceTab`, the station picker, mocks | as described |
 
-## Cleaner pictures from prepare, programming Phase 1 (2026-10-09)
+## Cleaner pictures from prepare, programming Phase 1 (2026-10-09; the user's decision 2026-10-10)
+
+**Decided:** every recommendation below, as given. P1.1 still needs the check on the worker before this deploys; P1.3's sweep is built with Phase 4; P1.7 waits for the next pipeline version.
 
 | # | Decision | Where it lives | Default |
 |---|---|---|---|
@@ -533,7 +535,9 @@ New service methods: `ledger.earningRows`, `usageTotals`, `opencastShareBetween`
 | P1.6 | **Brightness after tonemapping.** Hable with `desat=0` (as asked) keeps colour, but a bright HLG phone clip comes out a little darker than the scene looked on the phone | `prepare.ts` (`pictureFilters`) | **Recommendation:** keep hable; look at real phone uploads on staging before tuning `npl` |
 | P1.7 | **Standard-definition colour.** Every rendition is now tagged BT.709, but an SD source's BT.601 colour matrix isn't converted, so its colours are as before (players took the HD renditions for BT.709 already) and slightly off, as before | `prepare.ts` (`ffmpegTranscoder`) | **Recommendation:** convert BT.601 sources' matrix in the scaler, with the next pipeline version |
 
-## Seasons and playback orders, programming Phase 2 (2026-10-09)
+## Seasons and playback orders, programming Phase 2 (2026-10-09; the user's decision 2026-10-10)
+
+**Decided:** every recommendation below, as given. Phase 3 offers Marathon only for a slot that draws on several programs; "(1)" stays a part guess for programs, to be looked at again with staging's file names.
 
 | Decision | Where it lives | Default |
 |---|---|---|
