@@ -1419,3 +1419,14 @@ For review. No frame draws these; they follow the item page's and the Add drawer
 | The Add drawer's fit badges | "Never aired", and its line's lead "Never aired. " (as "Next episode. ") |
 | "Repeat from your library" (the Fill pane and the Add drawer) | with a season: "{Late Crate} season {2}, episodes {3} to {6}, in order, with your break rule" (the short line stays "{Late Crate} {3} to {6}, until {2:00 am}") |
 | Playback orders (contracts' `PLAYBACK_ORDER_WORDS`, for Phase 3's select) | "In order": "Season, then episode, then date added"; "Newest first": "The newest episode not yet aired from this slot, then back through the rest"; "Shuffle": "Every episode once, in a random order, before any repeats; then a new random order"; "Shuffle shows, keep each in order": "Which program is random, and each program's episodes stay in order"; "Marathon": "A whole season in a row, then the next season" (the prompt's words) |
+
+## Suggested break points (programming Phase 4, 2026-10-10)
+
+For review. No frame draws these; they follow the item page's voice (the "Episode" section's rows and buttons).
+
+| Where | Words |
+|---|---|
+| A library item's page, a program: the section "Break points" | its own: "{3} break points" ("1 break point") / "At {8:00, 22:10 and 33:40}." Suggested: "Suggested break points: {3}, from chapter marks" (or "from fades to black") / "Found in the file. Nothing changes until you choose: listen to each first.", with "Use these" and "Dismiss"; then a row per point, "{22:10}", with "Preview" ("Stop" while it plays; read aloud as "Preview the break at {22:10}") and, while it plays, "Playing from {22:08}" |
+| Under the points | "The preview is still being made." (not prepared yet); "The preview couldn't be played." |
+| Toasts | "{3} break points set." ("1 break point set."); "Suggestions dismissed." |
+| The API's refusal (and the mock's) | "There are no suggested break points to answer." (409 `no_suggestions`) |

@@ -2,6 +2,13 @@
 
 Changes to `packages/contracts` once the apps prompt has started using it. Add a version or a new field; never change the shape of a published one.
 
+## 2026-10-10: Suggested break points (programming Phase 4)
+
+Additive, with migration 0063.
+
+- `library.ts`: `LibraryItem.suggestedBreakPoints` (optional, nullable): break points suggested for a program in the station's own library, found as its file was prepared, `{ source: "chapter" | "fade", pointsMs, previewUrl }`. Null when there are none to answer (none found, not looked for yet, already used or dismissed for this file, or the item has break points of its own). Never applied on their own.
+- `library.ts`: `answerBreakSuggestions` (`POST /library/:itemId/break-suggestions`, body `{ answer: "use" | "dismiss" }`, returns the `LibraryItem`). `use` makes them `breakPointsMs`; either answer ends them for this file. 409 `no_suggestions` when there are none to answer.
+
 ## 2026-10-09: Cleaner pictures from prepare (programming Phase 1)
 
 Additive, with migration 0061.

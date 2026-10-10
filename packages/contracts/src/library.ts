@@ -141,6 +141,19 @@ export const LibraryItem = z.object({
    */
   upNext: z.number().int().nullable().optional(),
   nextEpisode: z.boolean().optional(),
+  /**
+   * Programming Phase 4 (added 2026-10-10): break points suggested for a program in the station's
+   * own library, found as its file was prepared: its chapter marks (`chapter`), or where it's both
+   * black and silent (`fade`). Never applied on their own: `answerBreakSuggestions` uses them (they
+   * become `breakPointsMs`) or dismisses them. Null (or absent) when there are none to answer: none
+   * found, not looked for yet, already answered for this file, or the item has break points of its
+   * own. `previewUrl` is the item's prepared preview (VOD HLS), for hearing each point from two
+   * seconds before; null until it's prepared.
+   */
+  suggestedBreakPoints: z
+    .object({ source: z.enum(["chapter", "fade"]), pointsMs: z.array(Millis), previewUrl: z.string().nullable() })
+    .nullable()
+    .optional(),
   createdAt: Timestamp
 });
 export type LibraryItem = z.infer<typeof LibraryItem>;
@@ -417,6 +430,20 @@ export const libraryApi = {
       "Change title, type, program, folder, episode details or break points. A242: made an opener, closer or off-air card (`OPN`, `CLS`, `OFF`) while it's on the log, 409 `on_the_log`; an off-air card that's a picture can't become another type, 422 `still_image`. A243: `bumperRole` on anything but a bumper, or `airs` on anything but a bumper, station ID, opener or closer, 400.",
     params: ItemParams,
     body: ItemFields.partial(),
+    response: LibraryItem
+  }),
+  /**
+   * Programming Phase 4 (added 2026-10-10): `use` makes the item's suggested break points its own
+   * (`breakPointsMs`); `dismiss` leaves its break points as they are. Either way they aren't
+   * suggested again for this file. 409 `no_suggestions` when there are none to answer.
+   */
+  answerBreakSuggestions: endpoint({
+    method: "POST",
+    path: "/library/:itemId/break-suggestions",
+    auth: "user",
+    summary: "Use or dismiss the break points suggested for a program (chapter marks, fades to black). Never applied otherwise.",
+    params: ItemParams,
+    body: z.object({ answer: z.enum(["use", "dismiss"]) }),
     response: LibraryItem
   }),
   deleteItem: endpoint({

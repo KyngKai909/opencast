@@ -39,6 +39,7 @@ import { liveSegmentKey, WorkerLiveSource, type LiveCpu } from "./radiolive.js";
 import { RtmpIngest } from "./rtmp.js";
 import { createPlanner } from "./plan.js";
 import { createPreparer, ffmpegTranscoder, refKey, type CaptionGenerator, type PreparationStats, type Transcoder, type WantRef } from "./prepare.js";
+import { ffmpegBreakFinder, type BreakFinder } from "./breaks.js";
 import { GENERATED_IDENT_MS, GENERATED_SID_MS, generatedIdentKey, generatedStationIdKey, type IdentKind } from "./stationId.js";
 import { clockTime } from "../../../lib/time.js";
 
@@ -74,6 +75,11 @@ export interface EngineOptions {
   liveUrl?: (liveSourceId: string) => Promise<string | null>;
   /** Captions from speech (X2): none by default, until a provider is chosen. */
   captionGenerator?: CaptionGenerator;
+  /**
+   * Suggested break points (programming Phase 4): where to look for them. FFmpeg's with FFmpeg's
+   * transcoder; none with another transcoder (a test's fake has no real file to look in), unless given.
+   */
+  breakFinder?: BreakFinder | null;
   /** How far ahead the channel's rows are written. */
   leadMs?: number;
   /**
@@ -110,6 +116,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
     scratchDir,
     concurrency: options.prepareConcurrency ?? Number(process.env.PREPARE_CONCURRENCY ?? 1),
     captionGenerator: options.captionGenerator,
+    breakFinder: options.breakFinder !== undefined ? options.breakFinder : options.transcoder ? null : ffmpegBreakFinder(),
     log
   });
   const bands = new Map<string, Band>();
@@ -543,6 +550,7 @@ export function createEngine(ctx: ModuleContext, options: EngineOptions = {}) {
           .sweep()
           .then((swept) => {
             if (swept.prepared.dropped || swept.oldPreviews) log(`[storage] swept: ${swept.prepared.dropped} prepared items of files that are gone, ${swept.oldPreviews} old previews`);
+            if (swept.firstCopies.dropped) log(`[storage] swept: ${swept.firstCopies.dropped} first copies a week after their newer copy took over`);
           })
           .catch((error) => log(`[storage] the sweep failed: ${(error as Error).message}`));
       }
